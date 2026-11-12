@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"maps"
 	"math"
 	"net/http"
 	"strconv"
@@ -202,9 +203,18 @@ func effectiveAdmin(ctx context.Context, u auth.User) bool {
 	return u.IsAdmin && netguard.AdminAllowed(ctx)
 }
 
+// adminOnly is the operation metadata key adminOp sets, so tests can find
+// every admin operation (TestAdminOperationsRefuseMembers).
+const adminOnly = "wmm.adminOnly"
+
 // adminOp limits an operation to admins with access on this request
 // (requireAdmin), checked before its input is read.
 func adminOp(api huma.API, op huma.Operation) huma.Operation {
+	op.Metadata = maps.Clone(op.Metadata)
+	if op.Metadata == nil {
+		op.Metadata = map[string]any{}
+	}
+	op.Metadata[adminOnly] = true
 	op.Middlewares = append(op.Middlewares, func(ctx huma.Context, next func(huma.Context)) {
 		if _, err := requireAdmin(ctx.Context()); err != nil {
 			status := http.StatusForbidden

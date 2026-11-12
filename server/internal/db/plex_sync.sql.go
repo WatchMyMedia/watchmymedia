@@ -45,6 +45,43 @@ func (q *Queries) AddPlexOutcomeCounts(ctx context.Context, arg AddPlexOutcomeCo
 	return err
 }
 
+const addPlexRunCounts = `-- name: AddPlexRunCounts :execrows
+UPDATE plex_sync_runs SET
+ already_watched=already_watched+?1,
+ local_kept=local_kept+?2,
+ unmatched=unmatched+?3,
+ ambiguous=ambiguous+?4,
+ unavailable=unavailable+?5
+WHERE id=?6 AND fence=?7 AND status='running'
+`
+
+type AddPlexRunCountsParams struct {
+	AlreadyWatched int64 `json:"already_watched"`
+	LocalKept      int64 `json:"local_kept"`
+	Unmatched      int64 `json:"unmatched"`
+	Ambiguous      int64 `json:"ambiguous"`
+	Unavailable    int64 `json:"unavailable"`
+	ID             int64 `json:"id"`
+	Fence          int64 `json:"fence"`
+}
+
+// Counts for the items a scheduled sync found unchanged and did not write.
+func (q *Queries) AddPlexRunCounts(ctx context.Context, arg AddPlexRunCountsParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, addPlexRunCounts,
+		arg.AlreadyWatched,
+		arg.LocalKept,
+		arg.Unmatched,
+		arg.Ambiguous,
+		arg.Unavailable,
+		arg.ID,
+		arg.Fence,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const backoffPlexRun = `-- name: BackoffPlexRun :execrows
 UPDATE plex_sync_runs SET status='queued',phase='waiting',reason=?,retry_at=?,lease_until=''
 WHERE id=? AND fence=? AND status='running'
@@ -1124,6 +1161,52 @@ func (q *Queries) ListPlexScope(ctx context.Context, runID int64) ([]PlexRunScop
 			&i.SourceKnown,
 			&i.Outcome,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPlexSourceFingerprints = `-- name: ListPlexSourceFingerprints :many
+SELECT remote_key,fingerprint FROM plex_source_items
+WHERE machine_identifier=? AND source_epoch=? AND user_id=? AND section_id=?
+`
+
+type ListPlexSourceFingerprintsParams struct {
+	MachineIdentifier string `json:"machine_identifier"`
+	SourceEpoch       string `json:"source_epoch"`
+	UserID            int64  `json:"user_id"`
+	SectionID         int64  `json:"section_id"`
+}
+
+type ListPlexSourceFingerprintsRow struct {
+	RemoteKey   string `json:"remote_key"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+// One person's known source items in one Plex section, by the primary key.
+func (q *Queries) ListPlexSourceFingerprints(ctx context.Context, arg ListPlexSourceFingerprintsParams) ([]ListPlexSourceFingerprintsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPlexSourceFingerprints,
+		arg.MachineIdentifier,
+		arg.SourceEpoch,
+		arg.UserID,
+		arg.SectionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPlexSourceFingerprintsRow{}
+	for rows.Next() {
+		var i ListPlexSourceFingerprintsRow
+		if err := rows.Scan(&i.RemoteKey, &i.Fingerprint); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

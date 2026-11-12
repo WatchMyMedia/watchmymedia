@@ -28,6 +28,8 @@ type listsState struct {
 	previewGroup memo.Group
 	genres       *memo.Map[string, []MediaListGenre]
 	genreGroup   memo.Group
+	// fetches limits what members' lists fetch from MDBList.
+	fetches *listFetchLimits
 }
 
 func newListsState() *listsState {
@@ -37,6 +39,7 @@ func newListsState() *listsState {
 		previewGroup: memo.Group{Timeout: time.Minute},
 		genres:       memo.NewMap[string, []MediaListGenre](24*time.Hour, 4),
 		genreGroup:   memo.Group{Timeout: 30 * time.Second},
+		fetches:      newListFetchLimits(),
 	}
 }
 

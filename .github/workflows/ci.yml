@@ -137,9 +137,14 @@ jobs:
         env:
           FFMPEG_CACHE: ${{ runner.tool_cache }}/watchmymedia-ffmpeg
         run: deploy/macos/fetch-ffmpeg.sh arm64
+      # GitHub's macOS runners have three cores. Under the race detector, with
+      # three packages' tests at once, the api package ran past go test's
+      # 10-minute limit and ffmpeg runs in other packages outlived the
+      # server's own deadlines. One package at a time (-p 1) keeps each
+      # package's ffmpeg runs to themselves.
       - name: Test with the race detector
         working-directory: server
-        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test -race -short ./...
+        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test -race -short -p 1 -timeout 30m ./...
 
   web:
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
@@ -177,14 +182,13 @@ jobs:
       - name: Test the downloads Worker and the release scripts
         working-directory: .
         run: |
-          # The Worker, the site and the release scripts are not in the
-          # public repository (deploy/oss/private-paths.txt).
-          if [ -d deploy/release ]; then
+          # The downloads Worker and the site are not in the public repository.
+          if [ -d deploy/downloads ]; then
             node --test deploy/downloads/worker.test.js
             python3 -I -m unittest discover -s deploy/downloads -p '*_test.py'
             node --test deploy/site/downloads.test.mjs
-            python3 -I -m unittest discover -s deploy/release -p '*_test.py'
           fi
+          python3 -I -m unittest discover -s deploy/release -p '*_test.py'
           python3 -I -m unittest discover -s deploy/ci -p '*_test.py'
           python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'
 

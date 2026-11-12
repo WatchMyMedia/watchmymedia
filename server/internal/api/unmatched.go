@@ -140,14 +140,14 @@ func registerUnmatched(h huma.API, deps Deps) {
 		return &UnmatchedGroupsOutput{Body: UnmatchedGroupList{Groups: groups}}, nil
 	})
 
-	huma.Register(h, huma.Operation{
+	huma.Register(h, adminOp(h, huma.Operation{
 		OperationID: "lineUpFiles",
 		Method:      http.MethodPost,
 		Path:        Prefix + "/libraries/{id}/lineup",
 		Summary:     "Preview how files would line up with a TMDB show or movie",
 		Description: "Saves nothing. For TV, counts per season how many files name an episode the show has on TMDB.",
 		Tags:        []string{"files"},
-	}, func(ctx context.Context, in *LineUpInput) (*LineUpOutput, error) {
+	}), func(ctx context.Context, in *LineUpInput) (*LineUpOutput, error) {
 		lib, files, err := loadGroupFiles(ctx, deps, in.ID, in.Body.FileIDs)
 		if err != nil {
 			return nil, err
@@ -159,14 +159,14 @@ func registerUnmatched(h huma.API, deps Deps) {
 		return &LineUpOutput{Body: lu}, nil
 	})
 
-	huma.Register(h, huma.Operation{
+	huma.Register(h, adminOp(h, huma.Operation{
 		OperationID: "matchFiles",
 		Method:      http.MethodPost,
 		Path:        Prefix + "/libraries/{id}/match-files",
 		Summary:     "Match several files to a TMDB show or movie chosen by the user",
 		Description: "Each episode is linked by the season and episode in its own name, and locked. Files whose episode is not on TMDB stay unmatched under the show. With remember, new files in the files' shared folder use the same show or movie.",
 		Tags:        []string{"files"},
-	}, func(ctx context.Context, in *MatchFilesInput) (*MatchFilesOutput, error) {
+	}), func(ctx context.Context, in *MatchFilesInput) (*MatchFilesOutput, error) {
 		lib, files, err := loadGroupFiles(ctx, deps, in.ID, in.Body.FileIDs)
 		if err != nil {
 			return nil, err
@@ -181,7 +181,7 @@ func registerUnmatched(h huma.API, deps Deps) {
 }
 
 func registerIgnore(h huma.API, deps Deps) {
-	huma.Register(h, huma.Operation{
+	huma.Register(h, adminOp(h, huma.Operation{
 		OperationID:   "ignoreFiles",
 		Method:        http.MethodPost,
 		Path:          Prefix + "/libraries/{id}/ignore-files",
@@ -189,7 +189,7 @@ func registerIgnore(h huma.API, deps Deps) {
 		Description:   "Ignored files are skipped by matching and left out of the unmatched count. Matching one by hand clears the flag.",
 		Tags:          []string{"files"},
 		DefaultStatus: http.StatusNoContent,
-	}, func(ctx context.Context, in *IgnoreFilesInput) (*struct{}, error) {
+	}), func(ctx context.Context, in *IgnoreFilesInput) (*struct{}, error) {
 		lib, err := getLibrary(ctx, deps, in.ID)
 		if err != nil {
 			return nil, err

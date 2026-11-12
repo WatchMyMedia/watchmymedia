@@ -17,7 +17,7 @@ golangci-lint v2.15.0, the versions CI pins.
 | One package or test | `go test ./internal/playback -run TestVOD -count=1` |
 | Vet as CI does | `go vet ./... && GOOS=linux GOARCH=amd64 go vet ./... && GOOS=windows GOARCH=amd64 go vet ./...` |
 | Lint | `golangci-lint run ./...` (or `make lint` from the root, which also lints the web); `.golangci.yml` adds errorlint, nilerr, rowserrcheck, sqlclosecheck, bodyclose, noctx, modernize and gosec to the standard set, and `go fix ./...` applies the modernizers |
-| Race detector, as CI's `server-race` job runs it | `go test -race -short ./...` (`-short` skips the speed budgets) |
+| Race detector, as CI's `server-race` job runs it | `go test -race -short -p 1 -timeout 30m ./...` (`-short` skips the speed budgets; one package at a time and the longer limit are for GitHub's three-core macOS runners) |
 | Regenerate queries | `sqlc generate` (or `make gen-sqlc`) |
 | Regenerate the API documents and web types | `make gen-api` from the root |
 | Speed budgets | `make bench` from the root |
@@ -55,7 +55,7 @@ Under `internal/`:
 | `offline` | Offline downloads outside the database: who may download (`offline.access`) and the transfers running now; the records, routes and sync are in `api` (`offline.go`, `offline_media.go`) ([PLAN-DOWNLOADS.md](../PLAN-DOWNLOADS.md)) |
 | `livetv` | Live TV: HDHomeRun tuners, channels and live HLS sessions; listings in `internal/livetv/guide`: SiliconDust's XMLTV feed (`internal/livetv/guide/xmltv`), its pictures (`internal/livetv/guide/art`), the refresh schedule and TMDB pictures and descriptions matched to listings (`internal/livetv/guide/enrich`), and each person's favourites, reminders and listings search (`internal/livetv/guide/personal.go`), with fakes in `internal/livetv/guide/guidetest` and `internal/livetv/hdhomerun/hdhrtest` ([PLAN-LIVE-TV-GUIDE.md](../PLAN-LIVE-TV-GUIDE.md)). The tuner's `DeviceAuth` is a `hdhomerun.Secret`, which never prints. `internal/livetv/dvr` owns schedules, capture, shared tuners, finalization, deletion and progress handoff ([PLAN-LIVE-TV-DVR.md](../PLAN-LIVE-TV-DVR.md)); `internal/growing` follows owned recording files, and `internal/bgwork` gates optional background analysis |
 | `plex` | The Plex adapter; `cmd/plexprobe` is its read-only probe, `internal/plex/plextest` a fictional plex.tv and server for tests. `cmd/plexsyncfixture` runs a disposable loopback provider/server for browser and client acceptance ([usage](cmd/plexsyncfixture/README.md)) |
-| `plexsync` | Plex sign-in, private grants, mappings, previews, durable opt-in watched imports, guarded undo and separate history ([PLAN-PLEX-SYNC.md](../PLAN-PLEX-SYNC.md), “P3 as built”). Watch mutations and checkpoints commit through `watchstate.ImportChecked`; worker and preview shutdown are awaited. |
+| `plexsync` | Plex sign-in, private grants, mappings, previews, durable opt-in watched imports, guarded undo and separate history ([PLAN-PLEX-SYNC.md](../PLAN-PLEX-SYNC.md), “P3 as built”). Watch mutations and checkpoints commit through `watchstate.ImportChecked`; worker and preview shutdown are awaited. A scheduled sync (`planScheduled`) writes only items an import would mark or whose source identity is not recorded yet, and adds the rest to the run's counts in one fenced update; a manual import writes every item. One item whose identity changed in Plex is skipped as unavailable (`sourceChanges`); only most of them changing stops the run as `source_identity_changed`. `TestScheduledSyncNoChangeCost` measures a 10,000-item no-change run. |
 | `httpx`, `memo`, `internal/integrations/apiclient`, `internal/tmdb/tmdbtest`, `internal/lists/mdblisttest` | What the clients for outside services share: URL redaction, size-limited reads and `Retry-After` (`httpx`); bounded TTL caches and shared calls detached from the first caller (`memo`); the Radarr, Sonarr and Seerr request and error code (`apiclient`); one fake TMDB for tests (`tmdbtest`) and one MDBList (`internal/lists/mdblisttest`) |
 
 ## Rules
@@ -65,6 +65,16 @@ Under `internal/`:
 names, so treat them as public. New reply fields take `required:"false"`. Bump
 `APILevel` in `internal/api/system.go` for changes the apps must know about. Then
 `make gen-api` and the Swift client steps in the root file.
+
+**Admin routes.** Wrap an admin-only operation in `adminOp` (`internal/api/auth.go`)
+rather than checking inside the handler: it refuses members and admins
+without access on this request before the body is read, and it marks the
+operation so `TestAdminOperationsRefuseMembers` checks it. Library
+maintenance (matching, rematching, hiding files, scans, and the TMDB
+searches behind them) is admin work, GETs included. What members' lists
+fetch from MDBList, on the admin's key, is limited in
+`internal/api/media_list_limits.go`. Media tokens (`?access_token=`) open
+GET and HEAD media routes only.
 
 **SQL.** Queries go in `internal/db/queries/*.sql` and run through sqlc;
 `internal/activity` keeps its own SQL. The server never runs `ANALYZE`, so

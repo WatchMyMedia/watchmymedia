@@ -9,7 +9,7 @@ OPENSUBTITLES_API_KEY ?=
 LDFLAGS  = -s -w -X main.version=$(VERSION) -X main.openSubtitlesKey=$(OPENSUBTITLES_API_KEY)
 
 .PHONY: help dev web-dev gen gen-sqlc gen-api web build build-universal release ffmpeg-macos ffmpeg-windows windows-app windows-installer windows-test macos-app macos-dmg test bench lint docker docker-up clean fixture fixture-serve apple-api apple-gen apple-test apple-build apple-test-sim apple-archive apple-upload apple-tv-archive apple-tv-upload apple-e2e apple-tv-build apple-tv-test-sim agents-check server-deps android-verify-metadata
-.PHONY: streaming-check
+.PHONY: streaming-check release-tag
 
 PLATFORMS := darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64
 
@@ -179,6 +179,11 @@ release: web ffmpeg-macos ffmpeg-windows ## Cross-compile binaries for every pla
 	  else tar -C dist -czf $$out.tar.gz $$(basename $$out) && rm $$out; fi; \
 	done
 	@ls -la dist
+
+# VERSION must be given here: its default, git describe, is never a new tag.
+release-tag: ## Tag origin/main as a release and push it, which starts release.yml (VERSION=vX.Y.Z[-rc.N])
+	@$(if $(filter command line,$(origin VERSION)),,echo "usage: make release-tag VERSION=vX.Y.Z" >&2; exit 1)
+	deploy/release/tag.sh $(VERSION)
 
 fixture: ## Render the synthetic test library into data/fixture (needs ffmpeg; see deploy/fixture/fixture.sh)
 	deploy/fixture/fixture.sh media

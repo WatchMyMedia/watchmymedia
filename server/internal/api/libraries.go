@@ -110,7 +110,7 @@ func registerLibraries(h huma.API, deps Deps) {
 		return &GetLibraryOutput{Body: libraryFromDB(deps, row, counts[row.ID])}, nil
 	})
 
-	huma.Register(h, huma.Operation{
+	huma.Register(h, adminOp(h, huma.Operation{
 		OperationID:   "scanLibrary",
 		Method:        http.MethodPost,
 		Path:          Prefix + "/libraries/{id}/scan",
@@ -118,7 +118,7 @@ func registerLibraries(h huma.API, deps Deps) {
 		Description:   "Queues a scan of the library folder. Progress is reported on the events stream.",
 		Tags:          []string{"libraries"},
 		DefaultStatus: http.StatusAccepted,
-	}, func(ctx context.Context, in *LibraryIDInput) (*ScanLibraryOutput, error) {
+	}), func(ctx context.Context, in *LibraryIDInput) (*ScanLibraryOutput, error) {
 		if _, err := getLibrary(ctx, deps, in.ID); err != nil {
 			return nil, err
 		}
@@ -129,7 +129,7 @@ func registerLibraries(h huma.API, deps Deps) {
 		return &ScanLibraryOutput{Status: http.StatusAccepted, Body: ScanRequested{Queued: true}}, nil
 	})
 
-	huma.Register(h, huma.Operation{
+	huma.Register(h, adminOp(h, huma.Operation{
 		OperationID:   "matchLibrary",
 		Method:        http.MethodPost,
 		Path:          Prefix + "/libraries/{id}/match",
@@ -137,7 +137,7 @@ func registerLibraries(h huma.API, deps Deps) {
 		Description:   "Queues metadata matching for pending files; with rematch=true, unmatched and failed files are retried too. Progress is reported on the events stream.",
 		Tags:          []string{"libraries"},
 		DefaultStatus: http.StatusAccepted,
-	}, func(ctx context.Context, in *MatchLibraryInput) (*ScanLibraryOutput, error) {
+	}), func(ctx context.Context, in *MatchLibraryInput) (*ScanLibraryOutput, error) {
 		if _, err := getLibrary(ctx, deps, in.ID); err != nil {
 			return nil, err
 		}

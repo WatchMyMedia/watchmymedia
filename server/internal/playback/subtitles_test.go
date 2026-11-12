@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -170,6 +171,16 @@ done
 			t.Fatal(err)
 		}
 	}
+	// The niceness this test runs at: 0 at a terminal, -10 on GitHub's macOS
+	// runners. Low priority adds 15, up to 19 on Linux and 20 on macOS.
+	own, err := exec.Command("ps", "-o", "nice=", "-p", strconv.Itoa(os.Getpid())).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, err := strconv.Atoi(strings.TrimSpace(string(own)))
+	if err != nil {
+		t.Fatalf("niceness %q: %v", own, err)
+	}
 	subs := NewSubtitles(bin, filepath.Join(dir, "subs"))
 	if _, err := subs.Embedded(context.Background(), 1, video, 2, "webvtt"); err != nil {
 		t.Fatal(err)
@@ -181,8 +192,13 @@ done
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Fields(string(b)); len(got) != 2 || got[0] != "15" || got[1] != "0" {
-		t.Errorf("niceness of the video read, then the file conversion = %q, want [15 0]", got)
+	got := strings.Fields(string(b))
+	if len(got) != 2 {
+		t.Fatalf("niceness of the video read, then the file conversion = %q, want two values", got)
+	}
+	read, _ := strconv.Atoi(got[0])
+	if read < min(base+15, 19) || got[1] != strconv.Itoa(base) {
+		t.Errorf("niceness of the video read, then the file conversion = %q, want [%d %d]", got, min(base+15, 19), base)
 	}
 }
 

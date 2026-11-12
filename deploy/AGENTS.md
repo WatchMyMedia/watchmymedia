@@ -13,6 +13,7 @@ it covers releases, the downloads Worker and the CI runners.
 | `unraid/` | The Unraid Docker template (`watchmymedia.xml`), the templates repository's profile, their test, and `mirror.sh`, which assembles the public `taimoorq/unraid-templates` repository Community Applications reads; [its README](unraid/README.md) has the hand install, the test list for an Unraid server and the submission checklist |
 | `ci/docker-smoke.sh` | Checks a built image without a GPU: ffmpeg's hardware encoders and filters, the entrypoint's device groups, `--group-add` and `UMASK`, and that the server comes up healthy (`make docker-smoke`; CI's `docker` job runs it) |
 | `config.example.yaml` | Every server option, commented; update it with any new option |
+| `release/` | `tag.sh` (`make release-tag`) and `notes.sh` (a version's CHANGELOG section), with `version_test.py` for `apple/scripts/version.sh` |
 | `fixture/fixture.sh` | The synthetic test library and its test accounts |
 | `fixture/golden-replies.sh` | Captures a server's replies on a copy of the fixture for the Android contract tests (`android/core/data/src/test/resources/golden/`) |
 | `fixture/streaming.py`, `fixture/streaming.md` | Owned fictional file/Live TV concurrency and bandwidth-change harness (`make streaming-check`); model timings and decoded sample frames are separate from native-device evidence |
@@ -28,12 +29,46 @@ it covers releases, the downloads Worker and the CI runners.
 ## Checks
 
 ```bash
+python3 -I -m unittest discover -s deploy/release -p '*_test.py'
 python3 -I -m unittest discover -s deploy/ci -p '*_test.py'
 python3 -I -m unittest discover -s deploy/fixture -p '*_test.py'
 python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'   # the Unraid template
 make docker      # when the Dockerfile, entrypoint or .dockerignore change
 make docker-smoke  # then this, against the image make docker built
 ```
+
+## How a release goes
+
+1. A `## X.Y.Z` section in `CHANGELOG.md`, merged to `main` in its own PR,
+   written for the people who run WatchMyMedia. A pre-release (`vX.Y.Z-rc.N`)
+   uses the section of the release it leads to. Use a paragraph and top-level
+   `- ` items only: `release/notes.sh` joins every indented line onto the
+   line before it, because the site, Settings and Sparkle read each `- `
+   line as one item, so a nested list comes out as a single item. Run
+   `deploy/release/notes.sh vX.Y.Z` to see the section as they will.
+2. `make release-tag VERSION=vX.Y.Z` tags `origin/main` (not this checkout)
+   after checking the version shape (`apple/scripts/version.sh`), that it is
+   newer than every tag, and that the notes exist. **Only on the user's
+   explicit go-ahead.**
+3. `release.yml`: `check` creates the GitHub release; `binaries`, `macos`
+   (signed, notarised DMG), `image` (GHCR, two architectures), `ios`
+   (TestFlight), `android` (APK and bundle) and `windows` (the installer,
+   signed with Artifact Signing) add to it. It runs on GitHub's runners with
+   no caches; the jobs that read a secret run in the `release` or
+   `windows-signing` environment, which admit only `v*` tags. Keep it that
+   way: `ci/security_test.py` checks it.
+4. The release is not offered to anyone until the maintainers publish its
+   files to downloads.watchmy.media, which happens outside this repository.
+
+Changes to `release.yml` are only fully exercised by a tag. Say what could
+not be checked, and leave tagging an rc to the user.
+
+Version numbers come from the tag everywhere: `apple/scripts/version.sh` for
+Apple and the Mac app, `versionCodeOf` in `android/app/build.gradle.kts` for
+Android, using the same build number so pre-releases sort before their
+release. The iPhone, iPad and Apple TV apps' version stays on 1.x: `v0.M.P`
+is 1.M.P, `v1.0.0` is 1.6.0, and from `v1.3.0` `v1.M.P` is 1.(M + 4).P.
+`version.sh` refuses a `v2` tag until a line for it is added.
 
 ## Rules
 

@@ -1,0 +1,465 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+# Each job asks for what it writes: the GitHub release, or the image.
+permissions:
+  contents: read
+
+# Every job runs on GitHub's runners, with nothing restored from a cache, so
+# a release is built only from the tagged commit and what it pins. The jobs
+# that hold a signing key or an API key run in the release environment (the
+# Windows job in windows-signing), which admit only v* tags.
+#
+# This workflow builds, signs and puts the files on the GitHub release. It
+# does not publish to https://downloads.watchmy.media, which the website,
+# Check for updates and the Mac and Windows apps' updaters read: the
+# maintainers do that afterwards, from the release's files.
+
+jobs:
+  # Every other job waits for this one, so a bad tag stops before anything is
+  # built or uploaded: the tag must be a version every app can number
+  # (apple/scripts/version.sh) and CHANGELOG.md must have its notes
+  # (deploy/release/notes.sh; `make release-tag` checks both before tagging).
+  # It creates the GitHub release with those notes, followed by GitHub's list
+  # of merged pull requests, as a pre-release when the tag has a suffix
+  # (v1.2.3-rc.1). The other jobs only add their files to it, which keeps
+  # its notes and pre-release flag.
+  check:
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check the tag and read its notes
+        id: tag
+        run: |
+          apple/scripts/version.sh "$GITHUB_REF_NAME"
+          deploy/release/notes.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+          case $GITHUB_REF_NAME in *-*) prerelease=true ;; *) prerelease=false ;; esac
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          name: WatchMyMedia ${{ steps.tag.outputs.version }}
+          body_path: ${{ runner.temp }}/notes.md
+          prerelease: ${{ steps.tag.outputs.prerelease }}
+          generate_release_notes: true
+
+  binaries:
+    needs: check
+    runs-on: macos-26
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 9
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache: false
+      # PATH is passed so make uses the Go and pnpm set up above rather than
+      # the Makefile's Homebrew path.
+      - run: make release VERSION=${GITHUB_REF_NAME} PATH="$PATH"
+        env:
+          OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          files: dist/*
+      # The web app make release embedded, for the windows job's app, so every
+      # platform ships the same build.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-embedded-web
+          path: server/internal/webui/dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  # The menu bar app as a universal DMG. With the signing and notarisation
+  # secrets set (see README, "Releasing the Mac app") it is Developer ID
+  # signed, notarised and stapled; without them it is signed ad hoc and
+  # still uploaded to the GitHub release, with a warning: only a notarised
+  # DMG may go on downloads.watchmy.media.
+  macos:
+    needs: check
+    runs-on: macos-26
+    environment: release
+    permissions:
+      contents: write
+    env:
+      HAS_CERT: ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}
+      HAS_NOTARY: ${{ secrets.NOTARY_KEY_P8 != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 9
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache: false
+      # The keychain lives in RUNNER_TEMP and goes at the end even when the job
+      # fails or is cancelled; the runner account's own login keychain is not
+      # touched.
+      - name: Import the Developer ID certificate into a throwaway keychain
+        if: env.HAS_CERT == 'true'
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain=$RUNNER_TEMP/signing.keychain-db
+          password=$(openssl rand -hex 16)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$MACOS_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          rm "$RUNNER_TEMP/cert.p12"
+          # The certificate chains to Apple's root through the Developer ID G2
+          # intermediate, which the runner's keychains lack (a Mac that signs
+          # with Xcode keeps it in the login keychain). Without it the
+          # identity is not valid and the app would be signed ad hoc.
+          curl -fsSL -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          echo "f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a  $RUNNER_TEMP/DeveloperIDG2CA.cer" | shasum -a 256 -c -
+          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$keychain"
+          rm "$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          # Sign with this identity, by its hash and from this keychain, and
+          # stop here rather than let the build fall back to ad hoc signing.
+          identity=$(security find-identity -v -p codesigning "$keychain" | awk '/"Developer ID Application/ { print $2; exit }')
+          if [ -z "$identity" ]; then
+            security find-identity -p codesigning "$keychain"
+            echo "::error::No valid Developer ID Application identity in the imported certificate (listed above)."
+            exit 1
+          fi
+          echo "CODESIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "CODESIGN_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+      - name: Write the notarisation key
+        if: env.HAS_NOTARY == 'true'
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+        run: |
+          echo "$NOTARY_KEY_P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          echo "NOTARY_KEY_PATH=$RUNNER_TEMP/notary.p8" >> "$GITHUB_ENV"
+      - name: Build, sign and notarise the DMG
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          SPARKLE_FEED_URL: ${{ vars.SPARKLE_FEED_URL }}
+          SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY }}
+          OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
+        run: make macos-dmg VERSION=${GITHUB_REF_NAME} PATH="$PATH"
+      # Only a notarised DMG with its ticket stapled opens without a warning
+      # once downloaded.
+      - name: Check the DMG is notarised
+        run: |
+          if ! xcrun stapler validate dist/*.dmg; then
+            echo "::warning::The DMG is not notarised, so it must not be published to downloads.watchmy.media."
+            echo "**The DMG is not notarised.** It is on the GitHub release only." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Remove the throwaway keychain
+        if: always() && env.HAS_CERT == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+          # Drop it from the search list too, in case deleting it failed.
+          security list-keychains -d user -s $(security list-keychains -d user | tr -d '"' | grep -v signing.keychain-db)
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          files: dist/*.dmg
+
+  image:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The GHCR login is written into a config in this job's temp folder,
+      # gone when the job ends: the runner's own config without its
+      # credential store or saved logins, sharing its contexts (which
+      # daemon) and CLI plugins (buildx).
+      - name: Log in to GHCR
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          config=$RUNNER_TEMP/docker
+          mkdir -p "$config"
+          python3 -I -c '
+          import base64, json, os, sys
+          src, dst = sys.argv[1:]
+          c = json.load(open(src)) if os.path.exists(src) else {}
+          for k in ("auths", "credsStore", "credHelpers"):
+              c.pop(k, None)
+          login = os.environ["REGISTRY_USER"] + ":" + os.environ["REGISTRY_TOKEN"]
+          c["auths"] = {"ghcr.io": {"auth": base64.b64encode(login.encode()).decode()}}
+          with os.fdopen(os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
+              json.dump(c, f)
+          ' "$HOME/.docker/config.json" "$config/config.json"
+          for d in contexts cli-plugins; do
+            if [ -e "$HOME/.docker/$d" ]; then ln -s "$HOME/.docker/$d" "$config/$d"; fi
+          done
+          echo "DOCKER_CONFIG=$config" >> "$GITHUB_ENV"
+      # QEMU builds linux/arm64 on the amd64 runner.
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # latest moves only on releases: v1.2.3-rc.1 gets its own tag alone.
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ github.ref_name }}
+          secrets: |
+            opensubtitles_api_key=${{ secrets.OPENSUBTITLES_API_KEY }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # The Android app: the bundle for Google Play and the APK for sideloading
+  # (TVs without Play, Fire TV), versioned from the tag (see versionCodeOf in
+  # android/app/build.gradle.kts). With the upload key secrets set (see
+  # README, "Android app") both are signed; without them both are unsigned
+  # and the job summary says so. The bundle goes to Play's internal track
+  # when PLAY_SERVICE_ACCOUNT_JSON is set too, and is kept as a workflow
+  # artifact either way (Play's first upload is made by hand).
+  # The iPhone app to TestFlight, with the version from the
+  # tag (apple/scripts/version.sh). Signing is automatic through an App Store
+  # Connect API key (README, "Releasing the iPhone app"); without the
+  # APP_STORE_CONNECT_* secrets the job only builds for the simulator and
+  # says so.
+  ios:
+    needs: check
+    runs-on: macos-26
+    environment: release
+    env:
+      HAS_ASC: ${{ secrets.APP_STORE_CONNECT_KEY_P8 != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install XcodeGen
+        run: apple/scripts/install-xcodegen.sh
+      - name: Write the App Store Connect key
+        if: env.HAS_ASC == 'true'
+        env:
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: |
+          echo "$APP_STORE_CONNECT_KEY_P8" | base64 --decode > "$RUNNER_TEMP/asc.p8"
+          echo "ASC_KEY_PATH=$RUNNER_TEMP/asc.p8" >> "$GITHUB_ENV"
+      - name: Archive and upload to TestFlight
+        if: env.HAS_ASC == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          make apple-upload VERSION=${GITHUB_REF_NAME} PATH="$PATH"
+          echo "### iOS ${GITHUB_REF_NAME#v}: uploaded to TestFlight ($(apple/scripts/version.sh "$GITHUB_REF_NAME"))" >> "$GITHUB_STEP_SUMMARY"
+      - name: Build without uploading
+        if: env.HAS_ASC != 'true'
+        run: |
+          make apple-build PATH="$PATH"
+          echo "::warning::The iPhone app was built but not uploaded: the APP_STORE_CONNECT_* secrets are not set (README, \"Releasing the iPhone app\")."
+      - name: Remove the App Store Connect key
+        if: always() && env.HAS_ASC == 'true'
+        run: rm -f "$RUNNER_TEMP/asc.p8"
+
+  android:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      HAS_PLAY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Use the runner's Android SDK, or put one in its tool cache
+        run: |
+          sdk=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
+          echo "ANDROID_SDK_ROOT=${sdk:-$RUNNER_TOOL_CACHE/android-sdk}" >> "$GITHUB_ENV"
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: platform-tools platforms;android-37.0 build-tools;36.0.0
+          log-accepted-android-sdk-licenses: false
+      # The keystore lives in RUNNER_TEMP and is removed at the end even when
+      # the job fails or is cancelled.
+      - name: Write the upload keystore
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+      # Only this step signs (the Play upload below configures the build
+      # without the key). No Gradle or Kotlin daemon and no configuration
+      # cache, so the passwords are neither left in a process after the job
+      # nor written to disk.
+      - name: Build the bundle and the APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ "$HAS_KEYSTORE" = true ]; then export ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/upload.jks; fi
+          ./gradlew bundleRelease assembleRelease -PappVersion="$GITHUB_REF_NAME" \
+            -Pkotlin.compiler.execution.strategy=in-process \
+            --no-daemon --no-configuration-cache --console=plain
+          version=${GITHUB_REF_NAME#v}
+          suffix=$([ "$HAS_KEYSTORE" = true ] || echo -unsigned)
+          rm -rf build/dist && mkdir -p build/dist
+          cp app/build/outputs/bundle/release/app-release.aab "build/dist/WatchMyMedia-$version$suffix.aab"
+          cp app/build/outputs/apk/release/app-release$suffix.apk "build/dist/WatchMyMedia-$version$suffix.apk"
+      - name: Check the APK and write the summary
+        working-directory: android
+        run: |
+          tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          apk=$(ls build/dist/*.apk)
+          badging=$("$tools/aapt2" dump badging "$apk")
+          { echo "### Android ${GITHUB_REF_NAME#v}"; echo; echo '```'; sed -n 1p <<< "$badging"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$HAS_KEYSTORE" = true ]; then
+            "$tools/apksigner" verify --print-certs "$apk" > "$RUNNER_TEMP/signer.txt"
+            { echo "Signed with the upload key:"; echo; echo '```'; grep -E 'DN|SHA-256' "$RUNNER_TEMP/signer.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::The Android bundle and APK are unsigned: the ANDROID_KEYSTORE_* secrets are not set (README, \"Android app\")."
+            echo "**Unsigned.** The \`ANDROID_KEYSTORE_*\` secrets are not set, so the APK cannot be installed as it is and Play would refuse the bundle. See the README, \"Android app\"." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          files: android/build/dist/*.apk
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-bundle
+          path: android/build/dist/*.aab
+      # --artifact-dir uploads the bundle built above instead of building again.
+      - name: Upload the bundle to Play's internal track
+        if: env.HAS_PLAY == 'true' && env.HAS_KEYSTORE == 'true'
+        working-directory: android
+        env:
+          ANDROID_PUBLISHER_CREDENTIALS: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_RELEASE_STATUS: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+        run: |
+          ./gradlew publishReleaseBundle --artifact-dir "$PWD/build/dist" -PappVersion="$GITHUB_REF_NAME" \
+            -PplayReleaseStatus="$PLAY_RELEASE_STATUS" --no-daemon --no-configuration-cache --console=plain
+          echo "Uploaded to Play's internal track ($PLAY_RELEASE_STATUS)." >> "$GITHUB_STEP_SUMMARY"
+      - name: Note that Play was skipped
+        if: env.HAS_PLAY != 'true' || env.HAS_KEYSTORE != 'true'
+        run: |
+          echo "Not uploaded to Play: that needs PLAY_SERVICE_ACCOUNT_JSON and the upload key secrets." >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove the upload keystore
+        if: always() && env.HAS_KEYSTORE == 'true'
+        run: rm -f "$RUNNER_TEMP/upload.jks"
+
+  # The Windows app and installer, signed with Artifact Signing as Eldwick
+  # Software LLC inside out and checked by verify-installer.ps1, which gives
+  # the installer its public name. The windows-signing environment admits
+  # only v* tags, and its Azure app can only sign with the watchmymedia
+  # profile; seven signatures a release. The app's updater reads
+  # windows/appcast.xml with the Mac feed's public key. The installer goes on
+  # the GitHub release.
+  windows:
+    needs: [check, binaries]
+    runs-on: windows-latest
+    environment: windows-signing
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-embedded-web
+          path: server/internal/webui/dist
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache: false
+      # The Artifact Signing client runs on .NET 10.
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.x
+      # Chocolatey's feed sometimes answers 503; a failed job would leave
+      # Windows out of the release, so try a few times.
+      - name: Install the pinned installer compiler
+        shell: pwsh
+        run: |
+          foreach ($attempt in 1..4) {
+            choco install nsis --version=3.13.0 --yes --no-progress
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($attempt -lt 4) { Start-Sleep -Seconds (30 * $attempt) }
+          }
+          exit 1
+      - name: Build the Windows app
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+          WINDOWS_UPDATE_FEED_URL: https://downloads.watchmy.media/windows/appcast.xml
+          SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY }}
+          OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
+        run: |
+          deploy/macos/fetch-ffmpeg.sh windows-amd64
+          windows/build.sh
+      - name: Fetch the pinned signing tools
+        shell: pwsh
+        env:
+          ARTIFACT_SIGNING_ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          ARTIFACT_SIGNING_ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          ARTIFACT_SIGNING_PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+        run: ./windows/setup-signing.ps1 -Destination "$env:RUNNER_TEMP\artifact-signing"
+      # Sign in through GitHub's OIDC token: no client secret exists. The token
+      # lasts minutes, so signing follows at once; the first step takes the
+      # signing service's access token, which the Azure CLI then reuses.
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_SIGNING_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Sign the app, inside out
+        shell: pwsh
+        run: |
+          az account get-access-token --resource https://codesigning.azure.net --output none
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $app = "$env:GITHUB_WORKSPACE\build\windows-app"
+          ./windows/sign.ps1 -Path (@('WatchMyMedia.exe', 'watchmymedia-server.exe', 'ffmpeg.exe', 'ffprobe.exe', 'WinSparkle.dll') | ForEach-Object { Join-Path $app $_ })
+      - name: Build and sign the uninstaller and installer
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          if ! command -v makensis >/dev/null; then
+            export PATH="/c/Program Files (x86)/NSIS:$PATH"
+          fi
+          windows/installer.sh --sign
+      - name: Verify every signature and promote the installer
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          ./windows/verify-installer.ps1 -AppDir "$env:GITHUB_WORKSPACE\build\windows-app" -Installer "$env:GITHUB_WORKSPACE\build\windows-installer\WatchMyMedia-$version-x64-setup-unsigned.exe" -Uninstaller "$env:GITHUB_WORKSPACE\build\windows-installer\uninstall.exe"
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          files: build/windows-installer/WatchMyMedia-*-x64-setup.exe
+          fail_on_unmatched_files: true

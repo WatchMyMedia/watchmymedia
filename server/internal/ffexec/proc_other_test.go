@@ -5,6 +5,7 @@ package ffexec
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -58,11 +59,28 @@ func TestCancelKillsTheGroup(t *testing.T) {
 	}
 }
 
+// ownNiceness is the niceness these tests run at, which a low-priority
+// process adds 15 to. It is 0 at a terminal and -10 on GitHub's macOS runners.
+func ownNiceness(t *testing.T) int {
+	t.Helper()
+	out, err := exec.Command("ps", "-o", "nice=", "-p", strconv.Itoa(os.Getpid())).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		t.Fatalf("niceness %q: %v", out, err)
+	}
+	return n
+}
+
 func TestLowPriority(t *testing.T) {
 	t.Parallel()
 	if nicePath() == "" {
 		t.Skip("no nice")
 	}
+	// Niceness stops at 19 on Linux and 20 on macOS.
+	want := min(ownNiceness(t)+15, 19)
 	for _, awaited := range []bool{false, true} {
 		cmd := Command(context.Background(), "/bin/sh", "-c", "ps -o nice= -p $$")
 		cmd.LowPriority, cmd.Awaited = true, awaited
@@ -70,8 +88,8 @@ func TestLowPriority(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if n, _ := strconv.Atoi(strings.TrimSpace(string(out))); n < 10 {
-			t.Errorf("awaited %v: niceness %q, want 15", awaited, out)
+		if n, _ := strconv.Atoi(strings.TrimSpace(string(out))); n < want {
+			t.Errorf("awaited %v: niceness %q, want %d", awaited, out, want)
 		}
 	}
 }

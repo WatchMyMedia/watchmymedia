@@ -89,7 +89,10 @@ func (s *Service) notify(source, channel, reason string) {
 }
 
 // OnLineup calls fn after a tuner is added or its lineup refreshed, so
-// listings can be fetched for new channels.
+// listings can be fetched for new channels. fn runs after s.mu is released:
+// the listings hold their own lock while recordings start, and a starting
+// recording takes s.mu (ProtectRecording), so calling out under s.mu would
+// close a tuner -> listings -> recorder -> tuner lock cycle.
 func (s *Service) OnLineup(fn func(context.Context)) { s.lineup = fn }
 
 func (s *Service) lineupChanged(ctx context.Context) {
@@ -209,18 +212,27 @@ func (s *Service) Inspect(ctx context.Context, address string) (Inspection, erro
 }
 func (s *Service) Add(ctx context.Context, address, name string) (Source, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	src, added, err := s.add(ctx, address, name)
+	s.mu.Unlock()
+	if added {
+		s.lineupChanged(ctx)
+	}
+	return src, err
+}
+
+// add runs under s.mu and says whether the tuner and its lineup were stored.
+func (s *Service) add(ctx context.Context, address, name string) (Source, bool, error) {
 	c, device, channels, err := s.inspect(ctx, address)
 	if err != nil {
-		return Source{}, err
+		return Source{}, false, err
 	}
 	rows, err := s.q.ListLiveSources(ctx)
 	if err != nil {
-		return Source{}, err
+		return Source{}, false, err
 	}
 	for _, r := range rows {
 		if r.DeviceID == device.ID {
-			return Source{}, ErrConflict
+			return Source{}, false, ErrConflict
 		}
 	}
 	name = strings.TrimSpace(name)
@@ -228,7 +240,7 @@ func (s *Service) Add(ctx context.Context, address, name string) (Source, error)
 		name = device.Name
 	}
 	if len(name) > 128 {
-		return Source{}, hdhomerun.ErrDevice
+		return Source{}, false, hdhomerun.ErrDevice
 	}
 	var row db.LiveTvSource
 	err = s.q.Transaction(ctx, func(q *db.Queries) error {
@@ -243,18 +255,26 @@ func (s *Service) Add(ctx context.Context, address, name string) (Source, error)
 		return q.SetSetting(ctx, db.SetSettingParams{Key: "livetv.setup_complete", Value: "1"})
 	})
 	if err != nil {
-		return Source{}, err
+		return Source{}, false, err
 	}
 	row, err = s.q.GetLiveSource(ctx, row.ID)
-	s.lineupChanged(ctx)
-	return sourceView(row), err
+	return sourceView(row), true, err
 }
 func (s *Service) Refresh(ctx context.Context, id string) (Source, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	src, refreshed, err := s.refresh(ctx, id)
+	s.mu.Unlock()
+	if refreshed {
+		s.lineupChanged(ctx)
+	}
+	return src, err
+}
+
+// refresh runs under s.mu and says whether the lineup was stored again.
+func (s *Service) refresh(ctx context.Context, id string) (Source, bool, error) {
 	row, err := s.q.GetLiveSource(ctx, id)
 	if err != nil {
-		return Source{}, err
+		return Source{}, false, err
 	}
 	_, device, channels, err := s.inspect(ctx, row.Address)
 	if err == nil && device.ID != row.DeviceID {
@@ -263,14 +283,13 @@ func (s *Service) Refresh(ctx context.Context, id string) (Source, error) {
 	if err != nil {
 		// Only adapter errors enter stored diagnostics, never arbitrary I/O text.
 		_ = s.q.FailedLiveSource(ctx, db.FailedLiveSourceParams{ID: id, LastError: err.Error()})
-		return Source{}, err
+		return Source{}, false, err
 	}
 	if err := s.q.Transaction(ctx, func(q *db.Queries) error { return reconcile(ctx, q, id, device, channels) }); err != nil {
-		return Source{}, err
+		return Source{}, false, err
 	}
 	row, err = s.q.GetLiveSource(ctx, id)
-	s.lineupChanged(ctx)
-	return sourceView(row), err
+	return sourceView(row), true, err
 }
 func reconcile(ctx context.Context, q *db.Queries, id string, device hdhomerun.Device, channels []hdhomerun.Channel) error {
 	if err := q.UnavailableLiveChannels(ctx, id); err != nil {
