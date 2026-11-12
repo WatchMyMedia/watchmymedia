@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/db/dbtest"
 	"watchmymedia/server/internal/integrations/arrtest"
 )
 
@@ -31,14 +32,7 @@ func (f *fakeScanner) RequestPaths(lib int64, paths []string) {
 
 func setup(t *testing.T) (*Service, *db.Queries, *fakeScanner) {
 	t.Helper()
-	conn, err := db.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = conn.Close() })
-	if err := db.Migrate(context.Background(), conn); err != nil {
-		t.Fatal(err)
-	}
+	conn := dbtest.OpenPath(t, filepath.Join(t.TempDir(), "t.db"))
 	q := db.New(conn)
 	sc := &fakeScanner{}
 	return New(q, sc, slog.New(slog.NewTextHandler(io.Discard, nil))), q, sc

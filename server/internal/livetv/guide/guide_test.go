@@ -76,16 +76,9 @@ type env struct {
 // synctest bubble.
 func newEnv(t *testing.T, serve func(http.Handler) *httptest.Server) *env {
 	t.Helper()
-	// Its own file rather than dbtest's, so secretsKept can read it.
+	// At a known path, so secretsKept can read the file.
 	path := filepath.Join(t.TempDir(), "test.db")
-	conn, err := db.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = conn.Close() })
-	if err := db.Migrate(t.Context(), conn); err != nil {
-		t.Fatal(err)
-	}
+	conn := dbtest.OpenPath(t, path)
 	q := db.New(conn)
 	e := &env{t: t, ctx: t.Context(), dbPath: path, q: q, store: settings.New(q), log: &syncBuffer{}, start: time.Now()}
 	e.tuner = hdhrtest.New(nil)
