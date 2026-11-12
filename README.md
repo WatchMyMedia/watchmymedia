@@ -791,10 +791,15 @@ Mac app.
   owner out from another. Unknown names are throttled like real ones, and a wrong name
   and a wrong password get the same answer in the same time. The address is the real
   client's, so set `network.trusted_proxies` when a proxy sits in front. Without it,
-  everyone shares the proxy's address and its limits.
-  At most two password operations run at once, and only one sign-in for a given
-  account/address pair. Excess attempts receive 429 with `Retry-After` rather
-  than accumulating password-hashing work in memory.
+  the limits per address count the client the proxy's headers name, which nobody
+  vouches for: one visitor cannot lock out the others, but one that forges the header
+  escapes the address limits, leaving only the account's own. (A proxy that names no
+  client gets no address limit for sign-ins, and its visitors share one allowance of
+  TV pairings.) Signed-in devices then show no address, as watch history does.
+  At most two password checks run at once, and only one sign-in for a given
+  account/address pair; the bot check runs before a sign-in takes one. Excess attempts
+  receive 429 with `Retry-After` rather than accumulating password-hashing work in
+  memory.
 - **Passwords** are stored with argon2id. New passwords need at least 8 characters;
   older, shorter ones still work.
 - **Cookies** are HttpOnly and SameSite=Lax. They are also Secure with
