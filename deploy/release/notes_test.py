@@ -35,9 +35,14 @@ class NotesTest(unittest.TestCase):
         # pipe's buffer (64 KB) made the writer fail with SIGPIPE.
         big = changelog(1000)
         self.assertGreater(len(big), 256 * 1024)
-        result = subprocess.run(["bash", "-o", "pipefail", "-c", 'printf %s "$BIG" | sh "$NOTES" v1.2.3 -'],
-                                env={"BIG": big, "NOTES": str(NOTES), "PATH": "/usr/bin:/bin"},
-                                capture_output=True, text=True)
+        # Written to a file and piped with cat, as an environment variable
+        # this size is over Linux's 128 KB limit for one.
+        with tempfile.NamedTemporaryFile("w", suffix=".md") as f:
+            f.write(big)
+            f.flush()
+            result = subprocess.run(["bash", "-o", "pipefail", "-c", 'cat "$BIG" | sh "$NOTES" v1.2.3 -'],
+                                    env={"BIG": f.name, "NOTES": str(NOTES), "PATH": "/usr/bin:/bin"},
+                                    capture_output=True, text=True)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(result.stdout.startswith("An intro that wraps"))
 
