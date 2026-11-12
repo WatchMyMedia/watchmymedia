@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -223,8 +224,13 @@ func TestTwoTunersAndExternalConsumer(t *testing.T) {
 func TestLiveTVKeepsItsSelectedAdapter(t *testing.T) {
 	t.Parallel()
 	n := 2
+	// On Linux QSV sits on the render node (playback's pipelineOnOS).
+	qsv := "qsv=qs:hw,child_device=2,child_device_type=d3d11va"
+	if runtime.GOOS == "linux" {
+		qsv = "qsv=qs:hw,child_device=/dev/dri/renderD130"
+	}
 	for _, tc := range []struct{ encoder, want string }{
-		{"h264_nvenc", "-gpu 2"}, {"h264_amf", "d3d11va=dx:2"}, {"h264_qsv", "qsv=qs:hw,child_device=2,child_device_type=d3d11va"},
+		{"h264_nvenc", "-gpu 2"}, {"h264_amf", "d3d11va=dx:2"}, {"h264_qsv", qsv},
 	} {
 		got := strings.Join(HLSArgsOnDevice(t.TempDir(), tc.encoder, 1080, 8000, &n), " ")
 		if !strings.Contains(got, tc.want) {
