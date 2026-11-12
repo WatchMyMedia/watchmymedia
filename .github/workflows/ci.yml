@@ -113,9 +113,15 @@ jobs:
         run: |
           deploy/macos/fetch-ffmpeg.sh arm64
           build/ffmpeg/darwin-arm64/ffmpeg -hide_banner -version | head -1
+      # The speed budgets (Test...Speed) time queries against the wall clock,
+      # so they run in a step of their own, one package at a time, rather
+      # than beside the other packages on the runner's three cores.
       - name: Test
         working-directory: server
-        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test ./...
+        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test -skip 'Speed$' ./...
+      - name: Test the speed budgets alone
+        working-directory: server
+        run: go test -p 1 -run 'Speed$' ./...
       # The server-race job runs on Linux; the macOS-only code (the library
       # watcher's kqueue, the leftover ffmpeg sweep) runs under the race
       # detector here.
@@ -566,7 +572,12 @@ jobs:
         shell: pwsh
         run: |
           $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          go test ./...
+          go test -skip 'Speed$' ./...
+      # As in the server job: the speed budgets alone, one package at a time.
+      - name: Test the speed budgets alone
+        working-directory: server
+        shell: pwsh
+        run: go test -p 1 -run 'Speed$' ./...
       - name: Qualify complete software VOD rendition output
         working-directory: server
         shell: pwsh

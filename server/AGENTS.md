@@ -122,7 +122,12 @@ SQLite plans joins without statistics, and a plan that looks fine after
   with ten 250-entry lists and three library lists on Home, and times each
   page alone and the web Home's requests as one burst, arranged and not;
   `internal/activity`'s speed test seeds plays; `internal/livetv/dvr` measures list and guide-mark bursts over 10,000 recordings without statistics. `make bench` fails over budget;
-  plain `go test` runs smaller versions with looser budgets.
+  plain `go test` runs smaller versions with looser budgets. Name such a
+  test `Test...Speed`: CI's `server` and `windows` jobs skip `Speed$` in the
+  main test step and run those tests in a step of their own, one package at
+  a time. Beside the other packages on a three-core runner,
+  `TestHistorySpeed` went over its budget (PR #16, 2026-11-12) though alone
+  it has six times the room.
 
 **Watch state.** Change `watch_state` only through `internal/watchstate`, never
 with its queries directly: each change must also take a revision and leave a
