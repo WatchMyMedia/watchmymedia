@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+            Debug builds only: the phone player on the fakes, without signing in or browsing.
+            adb shell am start -n <applicationId>/media.watchmy.client.mobile.player.harness.PlayerHarnessActivity -e scenario next
+        -->
+        <activity
+            android:name="media.watchmy.client.mobile.player.harness.PlayerHarnessActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
+            android:exported="true"
+            android:label="Player harness"
+            android:launchMode="singleTask"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true"
+            android:taskAffinity="media.watchmy.client.playerharness" />
+    </application>
+</manifest>

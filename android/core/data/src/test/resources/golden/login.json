@@ -1,0 +1,8 @@
+{
+  "id": 2,
+  "name": "viewer",
+  "isAdmin": false,
+  "sessionId": "0123456789abcdef",
+  "token": "golden-token",
+  "expiresAt": "2027-11-01T19:50:09Z"
+}

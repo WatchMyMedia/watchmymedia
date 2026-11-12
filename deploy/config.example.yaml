@@ -1,0 +1,127 @@
+# Copy to <data_dir>/config.yaml (data/config.yaml when running with `make dev`).
+# Environment variables WATCHMYMEDIA_* override anything set here.
+# host: 127.0.0.1  # listen only on this machine (e.g. behind Tailscale Serve); default is all interfaces
+port: 27587
+log:
+  level: info    # debug | info | warn | error
+  format: text   # text | json
+# Added as libraries on a new server's first start, each only if it holds anything.
+# After that, libraries are changed in setup and Settings › Libraries; these are not read again.
+libraries:
+  movies: /Volumes/Media/Movies
+  tv: /Volumes/Media/TV
+tmdb:
+  api_key: ""
+# opensubtitles:
+#   api_key: ""    # development builds only: release builds carry WatchMyMedia's key.
+#                  # The account downloads count against is set in Settings › Subtitles.
+scan:
+  interval: 15m    # scheduled full scan of every library, for what the watcher misses (Settings › Libraries wins)
+  stable_for: 10s  # leave files alone until size and mtime stop changing
+  workers: 4       # concurrent ffprobe processes
+  detect_segments: true  # find intros and credits by matching audio across a season
+ffmpeg:
+  ffmpeg: ffmpeg    # a bare name is looked for next to the server binary, then on PATH
+  ffprobe: ffprobe
+transcode:
+  # Experimental A2 client adoption. Default off; qualify this host before enabling.
+  # WATCHMYMEDIA_TRANSCODE_ADAPTIVE_HLS (Live TV also needs share_sources).
+  adaptive_hls: false
+  dir: ""              # defaults to <data_dir>/transcode; segments go in its watchmymedia-sessions
+                       # folder, the only part the server clears, so /tmp or /dev/shm is fine
+  hwaccel: auto        # auto | software | videotoolbox | nvenc | qsv | vaapi | amf
+  device: -1           # -1: backend default. NVENC: CUDA index. Linux QSV/VAAPI: render node
+                       # number (0 is /dev/dri/renderD128). Windows QSV/AMF: DirectX index.
+                       # Set hwaccel to that backend explicitly before selecting an index.
+                       # WATCHMYMEDIA_TRANSCODE_DEVICE; saved settings take precedence.
+  idle_timeout: 60s    # stop a session nobody is fetching from
+  max_sessions: 8
+  max_download_sessions: 1  # of those, how many offline downloads may transcode at once (low
+                            # priority; a play that finds every session taken stops one)
+  max_cache_bytes: 4294967296    # 4 GiB across owned file and Live TV playback output; 0 disables
+  max_session_bytes: 536870912  # 512 MiB per playback session; Live TV also has a 160 MiB limit; 0 disables this shared limit
+  min_free_bytes: 1073741824    # 1 GiB free on the temporary volume; 0 disables
+  event_ahead: 32s              # event fallback prepares one window at a time
+  event_keep_behind: 32s        # retain recently served event segments for retries
+auth:
+  session_ttl: 720h      # sign-ins last 30 days, sliding
+  device_session_ttl: 8760h  # TV and phone apps stay signed in a year of disuse, sliding
+  secure_cookies: false  # true when served over HTTPS (cookies are also Secure on requests that arrive over HTTPS)
+  # Cloudflare Turnstile on the sign-in and setup pages: a check that the
+  # person is not a bot, made before the password is tried. Usually turned
+  # on under Settings → Sign-in protection; keys set here (or in
+  # WATCHMYMEDIA_AUTH_TURNSTILE_SITE_KEY and _SECRET_KEY) override those and
+  # cannot be changed there. Off while empty.
+  turnstile:
+    site_key: ""
+    secret_key: ""
+    # true turns Turnstile off whatever Settings says, for when a key problem
+    # stops everyone signing in (WATCHMYMEDIA_AUTH_TURNSTILE_DISABLED=true).
+    disabled: false
+live_tv:
+  # Stage L0 same-channel tuner sharing. Leave off until the fixture and
+  # tuner-capacity checks pass for your server. Env: WATCHMYMEDIA_LIVE_TV_SHARE_SOURCES.
+  share_sources: false
+network:
+  # Optional aggregate remote media upload ceiling in bits per second.
+  # 0 observes delivery without a ceiling. Start with enforcement off until
+  # measured with your own simultaneous streams. Env: WATCHMYMEDIA_REMOTE_UPLOAD_BPS.
+  # remote_upload_bps: 40000000
+  # Enforce the ceiling for remote file, HLS, Live TV and offline media.
+  # Env: WATCHMYMEDIA_ENFORCE_UPLOAD. The default is observation only.
+  # enforce_upload: false
+  # A saved admin upload setting overrides both values on later starts.
+  # Reverse proxies whose X-Forwarded-For header is believed, as addresses or
+  # CIDR ranges. Leave empty unless a proxy (Caddy, Tailscale Serve) sits in
+  # front; otherwise any client could claim any address. A proxy on this
+  # machine connects from [127.0.0.1, "::1"]; until it is listed here, the
+  # clients it forwards count as internet clients (admins among them reach
+  # settings over HTTPS, and are asked for the password as away from home). A listed proxy must name
+  # the client in X-Forwarded-For: a request from its address with no header
+  # counts as that machine's own (the menu bar app's do), and one whose
+  # header doesn't end in an address counts as an internet client.
+  trusted_proxies: []
+  # Trusted networks: first-run setup works only here; admin needs no HTTPS
+  # or second password here. With remote_admin: false, admin works only here.
+  # "local" is loopback, private LAN and Tailscale; also CIDR ranges or "any".
+  # "!" excludes a range, e.g. [local, "!192.168.65.0/24"] behind a proxy
+  # in Docker Desktop, which shows every client as 192.168.65.1.
+  admin_networks: [local]
+  # Allow admins anywhere over HTTPS, with password re-entry for sensitive
+  # actions. Unset uses the Security switch (default on). A configured value
+  # wins over that switch. Env: WATCHMYMEDIA_REMOTE_ADMIN.
+  # remote_admin: true
+  # Announce the server on the local network (mDNS) so TV and phone apps list
+  # it without an address. In Docker this needs network_mode: host. Off by
+  # itself when host is a loopback address.
+  discovery: true
+cast:
+  # Casting to Chromecast and Google TV (README, Casting). A sender gets a
+  # cast token for the TV, which plays as the person who cast.
+  enabled: true
+  # The receiver application the web UI's Cast button launches, from the
+  # Google Cast SDK Developer Console. Empty shows no Cast button in browsers
+  # (WATCHMYMEDIA_CAST_APP_ID).
+  app_id: ""
+  # An address TVs can reach this server at, offered to them first: the
+  # HTTPS domain of a reverse proxy, for example. Without it a TV gets this
+  # machine's LAN addresses (WATCHMYMEDIA_CAST_URL).
+  url: ""
+  # Where receiver pages are served from; they may call the API from the
+  # TV's browser (WATCHMYMEDIA_CAST_RECEIVER_ORIGINS).
+  receiver_origins: [https://cast.watchmy.media]
+updates:
+  # Check for updates in Settings › General: when an admin presses it, the
+  # server reads the list of releases at url, sending only its version, and
+  # links to the new download. Nothing is checked in the background. Off
+  # hides the button (WATCHMYMEDIA_UPDATES_ENABLED, WATCHMYMEDIA_UPDATES_URL).
+  enabled: true
+  url: https://downloads.watchmy.media/releases.json
+lists:
+  # Rows on Home and the library screens can be made from lists: TMDB's
+  # trending titles, charts and discover (with the server's TMDB key) and
+  # MDBList's lists (with an MDBList key an admin enters in Settings ›
+  # Lists). The server fetches them about once a day. Off asks neither
+  # service for lists; lists of the library and imported lists still work
+  # (WATCHMYMEDIA_LISTS).
+  enabled: true

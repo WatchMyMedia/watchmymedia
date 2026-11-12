@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.4.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.4.1)" variant="all" version="9.4.1">
+
+    <issue
+        id="ComposeNonRestartableComposable"
+        message="This composable&apos;s body only delegates to another composable. Consider marking it @NonRestartableComposable when its own restart and skip boundary is unlikely to be useful. The annotation avoids generating that code, but also prevents the wrapper from being restarted or skipped independently.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#avoid-unnecessary-restart-groups for more information."
+        errorLine1="@Composable"
+        errorLine2="~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/components/States.kt"
+            line="90"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="ComposeCompositionLocalUsage"
+        message="`CompositionLocal`s are implicit dependencies and creating new ones should be avoided.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#compositionlocals for more information."
+        errorLine1="private val LocalCardRowFocus = compositionLocalOf&lt;CardRowFocus?> { null }"
+        errorLine2="~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/components/Cards.kt"
+            line="217"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="ComposeCompositionLocalUsage"
+        message="`CompositionLocal`s are implicit dependencies and creating new ones should be avoided.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#compositionlocals for more information."
+        errorLine1="/** Your requests and the admins&apos; Inbox count, provided by the nav host for the rail&apos;s Settings badge. */"
+        errorLine2="^">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/components/Rail.kt"
+            line="52"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun BoxScope.QualityBadges(quality: String?, hdr: Boolean, inset: Dp = 8.dp) {"
+        errorLine2="             ~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/components/Cards.kt"
+            line="227"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun BoxScope.PlayMark() {"
+        errorLine2="             ~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/components/Cards.kt"
+            line="249"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun Breadcrumb(section: String, title: String) {"
+        errorLine2="    ~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/detail/DetailParts.kt"
+            line="53"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun DetailTitle(title: String) {"
+        errorLine2="    ~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/detail/DetailParts.kt"
+            line="58"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun FactsLine(parts: List&lt;String>, extra: @Composable RowScope.() -> Unit = {}) {"
+        errorLine2="    ~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/detail/DetailParts.kt"
+            line="65"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun Overview(text: String) {"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/detail/DetailParts.kt"
+            line="77"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun StatusPill(text: String, gold: Boolean) {"
+        errorLine2="    ~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/detail/DetailParts.kt"
+            line="84"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun CastMember(person: Person, imageUrl: String?) {"
+        errorLine2="    ~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/detail/DetailParts.kt"
+            line="98"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun DetailsSheet(title: String, overview: String, facts: List&lt;Pair&lt;String, String>>, cast: List&lt;Person>, castImage: (Person) -> String?, onDismiss: () -> Unit) {"
+        errorLine2="    ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/detail/DetailParts.kt"
+            line="116"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun &lt;T> OptionsDialog("
+        errorLine2="        ~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/components/Dialogs.kt"
+            line="62"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun KeyboardDialog("
+        errorLine2="    ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/components/Keyboard.kt"
+            line="199"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun LibraryScreen("
+        errorLine2="    ~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/library/LibraryScreen.kt"
+            line="86"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun RequestsScreen(onNavigate: (Any) -> Unit, onOpenShow: (Long) -> Unit, onOpenMovie: (Long) -> Unit, inbox: Boolean = false) {"
+        errorLine2="    ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/requests/RequestsScreen.kt"
+            line="87"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun ScreenStub(name: String, mockup: String) {"
+        errorLine2="    ~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/components/ScreenStub.kt"
+            line="15"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun SearchScreen("
+        errorLine2="    ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/search/SearchScreen.kt"
+            line="91"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null) {"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/servers/ServerPickerScreen.kt"
+            line="69"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun SettingsScreen(onSwitchServer: () -> Unit, onSignedOut: () -> Unit, onNavigate: (Any) -> Unit, onOpenRequests: (inbox: Boolean) -> Unit = {}) {"
+        errorLine2="    ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/settings/SettingsScreen.kt"
+            line="98"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun SignInScreen(onSwitchServer: () -> Unit) {"
+        errorLine2="    ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/signin/SignInScreen.kt"
+            line="64"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun TvApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {"
+        errorLine2="    ~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/TvApp.kt"
+            line="32"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierMissing"
+        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
+        errorLine1="fun TvNavHost("
+        errorLine2="    ~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/navigation/TvNavHost.kt"
+            line="99"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierWithoutDefault"
+        message="This @Composable function has a modifier parameter but it doesn&apos;t have a default value.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#modifiers-should-have-default-parameters for more information."
+        errorLine1="    modifier: Modifier,"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/components/Keyboard.kt"
+            line="136"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierWithoutDefault"
+        message="This @Composable function has a modifier parameter but it doesn&apos;t have a default value.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#modifiers-should-have-default-parameters for more information."
+        errorLine1="private fun ScrubberRow(state: PlayerUiState, positionMs: Long, focus: ChromeFocus, actions: ChromeActions, modifier: Modifier) {"
+        errorLine2="                                                                                                            ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/player/PlayerChrome.kt"
+            line="136"
+            column="109"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierWithoutDefault"
+        message="This @Composable function has a modifier parameter but it doesn&apos;t have a default value.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#modifiers-should-have-default-parameters for more information."
+        errorLine1="private fun TransportRow(state: PlayerUiState, focus: ChromeFocus, actions: ChromeActions, modifier: Modifier) {"
+        errorLine2="                                                                                           ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/player/PlayerChrome.kt"
+            line="171"
+            column="92"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierWithoutDefault"
+        message="This @Composable function has a modifier parameter but it doesn&apos;t have a default value.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#modifiers-should-have-default-parameters for more information."
+        errorLine1="private fun RailItem(label: String, icon: ImageVector, active: Boolean, expanded: Boolean, count: Int, onClick: () -> Unit, modifier: Modifier) {"
+        errorLine2="                                                                                                                            ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/components/Rail.kt"
+            line="155"
+            column="125"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierWithoutDefault"
+        message="This @Composable function has a modifier parameter but it doesn&apos;t have a default value.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#modifiers-should-have-default-parameters for more information."
+        errorLine1="private fun MyRequestRow(r: MediaRequest, busy: Boolean, onCancel: () -> Unit, onOpen: (() -> Unit)?, modifier: Modifier) {"
+        errorLine2="                                                                                                      ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/requests/RequestsScreen.kt"
+            line="220"
+            column="103"/>
+    </issue>
+
+    <issue
+        id="ComposeModifierWithoutDefault"
+        message="This @Composable function has a modifier parameter but it doesn&apos;t have a default value.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#modifiers-should-have-default-parameters for more information."
+        errorLine1="private fun MessageState(title: String, message: String, modifier: Modifier, action: (@Composable () -> Unit)?) {"
+        errorLine2="                                                         ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/components/States.kt"
+            line="96"
+            column="58"/>
+    </issue>
+
+    <issue
+        id="ComposeMultipleContentEmitters"
+        message="Composable functions should only be emitting content into the composition from one source at their top level.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#do-not-emit-multiple-pieces-of-content for more information."
+        errorLine1="@Composable"
+        errorLine2="^">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/signin/SignInScreen.kt"
+            line="110"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="ComposeMultipleContentEmitters"
+        message="Composable functions should only be emitting content into the composition from one source at their top level.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#do-not-emit-multiple-pieces-of-content for more information."
+        errorLine1="@Composable"
+        errorLine2="^">
+        <location
+            file="src/main/kotlin/media/watchmy/client/tv/signin/SignInScreen.kt"
+            line="201"
+            column="1"/>
+    </issue>
+
+</issues>

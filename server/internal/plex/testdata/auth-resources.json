@@ -1,0 +1,5 @@
+[
+  {"clientIdentifier":"synthetic-machine","provides":"server","owned":true,"productVersion":"synthetic-pms-version","accessToken":"synthetic-server-token","connections":[{"uri":"https://plex.example.invalid:32400","local":true,"relay":false}]},
+  {"clientIdentifier":"synthetic-other-machine","provides":"server,player","owned":false,"productVersion":"synthetic-pms-version","connections":[]},
+  {"clientIdentifier":"synthetic-player","provides":"player","owned":true,"accessToken":"synthetic-player-token"}
+]

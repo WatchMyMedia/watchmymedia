@@ -1,0 +1,208 @@
+{
+  "id": 2,
+  "showId": 1,
+  "number": 2,
+  "name": "Season 2",
+  "overview": "",
+  "airDate": "2021-03-29",
+  "episodeCount": 5,
+  "availableCount": 3,
+  "watchedCount": 0,
+  "show": {
+    "id": 1,
+    "libraryId": 2,
+    "tmdbId": 900001,
+    "title": "Night Shift Diner",
+    "year": 2020,
+    "firstAirDate": "2020-03-02",
+    "overview": "A roadside diner that never closes, and the night crew who keep it that way.",
+    "status": "Returning Series",
+    "genres": [
+      "Comedy",
+      "Drama"
+    ],
+    "rating": 7.4,
+    "contentRating": "TV-14",
+    "posterPath": "/nsd-poster.jpg",
+    "backdropPath": "/nsd-backdrop.jpg",
+    "episodeCount": 0,
+    "lastAirDate": "2021-04-12",
+    "nextAirDate": "2031-01-06",
+    "credits": [
+      {
+        "name": "Rosa Vance",
+        "character": "Mae",
+        "profilePath": "/rosa.jpg"
+      },
+      {
+        "name": "Theo Park",
+        "character": "Cook"
+      }
+    ]
+  },
+  "episodes": [
+    {
+      "id": 21,
+      "seasonId": 2,
+      "number": 1,
+      "title": "Open Late",
+      "overview": "",
+      "airDate": "2021-03-29",
+      "runtimeMin": 4,
+      "files": [
+        {
+          "id": 1,
+          "libraryId": 2,
+          "path": "/media/TV/Night Shift Diner (2020)/Season 02/Night Shift Diner (2020) - S02E01 - Open Late.mkv",
+          "relativePath": "Night Shift Diner (2020)/Season 02/Night Shift Diner (2020) - S02E01 - Open Late.mkv",
+          "size": 3573959,
+          "modifiedAt": "2026-10-29T18:37:56.001Z",
+          "status": "present",
+          "parsed": {
+            "kind": "episode",
+            "title": "Night Shift Diner",
+            "year": 2020,
+            "season": 2,
+            "episodes": [
+              1
+            ],
+            "episodeTitle": "Open Late"
+          },
+          "container": "matroska",
+          "videoCodec": "h264",
+          "audioCodec": "aac",
+          "width": 1280,
+          "height": 720,
+          "durationMs": 200021,
+          "firstSeenAt": "2026-10-29T18:38:19.616Z",
+          "addedAt": "2026-10-29T18:37:56.001Z",
+          "lastSeenAt": "2026-10-29T23:07:01.188Z",
+          "matchStatus": "matched",
+          "matchLocked": true,
+          "matchIgnored": false
+        }
+      ],
+      "hasFile": true,
+      "aired": true,
+      "addedAt": "2026-10-29T18:37:56.001Z",
+      "isNew": false
+    },
+    {
+      "id": 22,
+      "seasonId": 2,
+      "number": 2,
+      "title": "Double Shift",
+      "overview": "",
+      "airDate": "2021-04-05",
+      "runtimeMin": 4,
+      "files": [
+        {
+          "id": 9,
+          "libraryId": 2,
+          "path": "/media/TV/Night Shift Diner (2020)/Season 02/Night Shift Diner (2020) - S02E02 - Double Shift.mkv",
+          "relativePath": "Night Shift Diner (2020)/Season 02/Night Shift Diner (2020) - S02E02 - Double Shift.mkv",
+          "size": 3496298,
+          "modifiedAt": "2026-10-29T18:38:01.236Z",
+          "status": "present",
+          "parsed": {
+            "kind": "episode",
+            "title": "Night Shift Diner",
+            "year": 2020,
+            "season": 2,
+            "episodes": [
+              2
+            ],
+            "episodeTitle": "Double Shift"
+          },
+          "container": "matroska",
+          "videoCodec": "h264",
+          "audioCodec": "aac",
+          "width": 1280,
+          "height": 720,
+          "durationMs": 200021,
+          "firstSeenAt": "2026-10-29T18:38:19.642Z",
+          "addedAt": "2026-10-29T18:38:01.236Z",
+          "lastSeenAt": "2026-10-29T23:07:01.188Z",
+          "matchStatus": "matched",
+          "matchLocked": true,
+          "matchIgnored": false
+        }
+      ],
+      "hasFile": true,
+      "aired": true,
+      "addedAt": "2026-10-29T18:38:01.236Z",
+      "isNew": false
+    },
+    {
+      "id": 23,
+      "seasonId": 2,
+      "number": 3,
+      "title": "Closing Time",
+      "overview": "",
+      "airDate": "2021-04-12",
+      "runtimeMin": 4,
+      "files": [
+        {
+          "id": 10,
+          "libraryId": 2,
+          "path": "/media/TV/Night Shift Diner (2020)/Season 02/Night Shift Diner (2020) - S02E03 - Closing Time.mkv",
+          "relativePath": "Night Shift Diner (2020)/Season 02/Night Shift Diner (2020) - S02E03 - Closing Time.mkv",
+          "size": 5762361,
+          "modifiedAt": "2026-10-29T18:38:09.797Z",
+          "status": "present",
+          "parsed": {
+            "kind": "episode",
+            "title": "Night Shift Diner",
+            "year": 2020,
+            "season": 2,
+            "episodes": [
+              3
+            ],
+            "episodeTitle": "Closing Time"
+          },
+          "container": "matroska",
+          "videoCodec": "h264",
+          "audioCodec": "aac",
+          "width": 1280,
+          "height": 720,
+          "durationMs": 200021,
+          "firstSeenAt": "2026-10-29T18:38:29.702Z",
+          "addedAt": "2026-10-29T18:38:09.797Z",
+          "lastSeenAt": "2026-10-29T23:07:01.188Z",
+          "matchStatus": "matched",
+          "matchLocked": true,
+          "matchIgnored": false
+        }
+      ],
+      "hasFile": true,
+      "aired": true,
+      "addedAt": "2026-10-29T18:38:09.797Z",
+      "isNew": false
+    },
+    {
+      "id": 24,
+      "seasonId": 2,
+      "number": 4,
+      "title": "Grease Fire",
+      "overview": "Nobody has this one.",
+      "airDate": "2021-04-19",
+      "runtimeMin": 4,
+      "files": [],
+      "hasFile": false,
+      "aired": true,
+      "isNew": false
+    },
+    {
+      "id": 25,
+      "seasonId": 2,
+      "number": 5,
+      "title": "Sunrise",
+      "overview": "",
+      "airDate": "2031-01-06",
+      "files": [],
+      "hasFile": false,
+      "aired": false,
+      "isNew": false
+    }
+  ]
+}

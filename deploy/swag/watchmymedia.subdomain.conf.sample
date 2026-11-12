@@ -1,0 +1,40 @@
+## WatchMyMedia behind SWAG (linuxserver/swag).
+# Copy to your SWAG config folder as nginx/proxy-confs/watchmymedia.subdomain.conf
+# and restart SWAG. It serves watchmymedia.<your domain>; for another
+# subdomain, change server_name below (e.g. server_name wmm.*;) and leave
+# $upstream_app alone, since that is the container name. Also:
+#   - the name needs a DNS record pointing at your home IP (a CNAME to the
+#     name SWAG already uses is enough) and must be covered by SWAG's
+#     certificate (add it to SUBDOMAINS, or use a wildcard)
+#   - the server must share a Docker network with SWAG; start it with
+#     deploy/docker-compose.swag.yml, which also tells it to trust SWAG's
+#     X-Forwarded-For header
+# Do not put SWAG's basic auth or Authelia in front: TV apps and players
+# cannot get past it. WatchMyMedia has its own sign-in.
+
+server {
+    listen 443 ssl;
+#    listen 443 quic;
+    listen [::]:443 ssl;
+#    listen [::]:443 quic;
+
+    server_name watchmymedia.*;
+
+    include /config/nginx/ssl.conf;
+
+    client_max_body_size 0;
+
+    location / {
+        include /config/nginx/proxy.conf;
+        include /config/nginx/resolver.conf;
+        set $upstream_app watchmymedia;
+        set $upstream_port 27587;
+        set $upstream_proto http;
+        proxy_pass $upstream_proto://$upstream_app:$upstream_port;
+
+        # Pass video and live events through as they arrive. The server also
+        # sends X-Accel-Buffering: no on those routes.
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+}

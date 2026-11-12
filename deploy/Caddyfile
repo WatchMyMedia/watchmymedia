@@ -1,0 +1,17 @@
+# Public HTTPS for WatchMyMedia. Caddy gets and renews a Let's Encrypt
+# certificate for WATCHMYMEDIA_DOMAIN, which must point at your home IP
+# (see the ddns service) with ports 80 and 443 forwarded to this machine.
+#
+# Caddy replaces any X-Forwarded-For header a client sends with the real
+# client address, so the server can tell home and internet clients apart.
+
+{$WATCHMYMEDIA_DOMAIN} {
+	reverse_proxy {$WATCHMYMEDIA_UPSTREAM:watchmymedia:27587} {
+		# Send live events and video to the client as they arrive.
+		flush_interval -1
+	}
+	log {
+		output stdout
+		format console
+	}
+}

@@ -1,0 +1,1 @@
+{"MediaContainer":{"size":2,"Directory":[{"key":"1","uuid":"fictional-movies","title":"Fixture Movies","type":"movie","agent":"tv.plex.agents.movie"},{"key":2,"uuid":"fictional-shows","title":"Fixture Shows","type":"show","agent":"tv.plex.agents.series"}]}}

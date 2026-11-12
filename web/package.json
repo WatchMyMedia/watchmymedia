@@ -1,0 +1,49 @@
+{
+  "name": "watchmymedia-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:receiver": "tsc --noEmit -p receiver && vite build -c vite.receiver.config.ts",
+    "build:tizen-core": "tsc --noEmit -p tizen && vite build -c vite.tizen-core.config.ts",
+    "build:tizen": "tsc --noEmit -p tizen && vite build -c vite.tizen.config.ts",
+    "dev:tizen": "vite -c vite.tizen.config.ts",
+    "dev:receiver": "vite -c vite.receiver.config.ts",
+    "deploy:receiver": "pnpm build:receiver && wrangler deploy -c wrangler.receiver.jsonc",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p receiver && tsc --noEmit -p tizen",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "preview": "vite preview",
+    "gen:api": "openapi-typescript src/api/openapi.json -o src/api/schema.d.ts"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.105.0",
+    "@tanstack/react-router": "^1.170.46",
+    "hls.js": "^1.7.3",
+    "jassub": "^2.5.23",
+    "openapi-fetch": "^0.17.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/chromecast-caf-receiver": "^7.0.1",
+    "@types/chromecast-caf-sender": "^1.0.11",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0",
+    "openapi-typescript": "^7.13.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

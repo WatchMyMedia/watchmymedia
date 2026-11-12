@@ -1,0 +1,34 @@
+# A throwaway Seerr for testing it as the request backend (PLAN-ARR.md §7.3,
+# §15), with the Jellyfin it needs to finish setup: Seerr signs its first
+# admin in through Plex, Jellyfin or Emby and has no other way. Jellyfin has
+# an empty library; Seerr looks titles up on TMDB itself, so it needs the
+# internet.
+#
+#   SEERR_CONFIG=/path/to/scratch \
+#     docker compose -f deploy/arr/seerr.compose.yaml -p wmm-seerr-test up -d
+#
+# Then finish Jellyfin's and Seerr's setup with deploy/arr/seerr-setup.sh,
+# which prints Seerr's API key. Inside the containers Jellyfin is
+# http://jellyfin:8096, and Radarr and Sonarr from compose.yaml are
+# http://host.docker.internal:17878 and :18989. Remove it all with
+# `docker compose -p wmm-seerr-test down` and the folder.
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:10.11.2
+    volumes:
+      - "${SEERR_CONFIG}/jellyfin/config:/config"
+      - "${SEERR_CONFIG}/jellyfin/cache:/cache"
+    ports:
+      - "127.0.0.1:18096:8096"
+  seerr:
+    image: ghcr.io/seerr-team/seerr:v3.5.1
+    init: true
+    environment:
+      TZ: UTC
+      LOG_LEVEL: info
+    volumes:
+      - "${SEERR_CONFIG}/seerr:/app/config"
+    ports:
+      - "127.0.0.1:15055:5055"
+    depends_on:
+      - jellyfin

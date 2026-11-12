@@ -1,0 +1,10 @@
+{
+  "movies": false,
+  "shows": false,
+  "needsApproval": false,
+  "problems": true,
+  "manage": false,
+  "backend": "none",
+  "inbox": 0,
+  "delete": false
+}

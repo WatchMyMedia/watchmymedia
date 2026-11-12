@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+. The DataStore holds this device's random ID and its sign-ins, sealed with
+     a Keystore key that never leaves the device: restoring it elsewhere would give two
+     devices one ID and tokens that can't be opened. Downloads (noBackupFilesDir/offline, never
+     backed up) are listed in Media3's database, which would be wrong without them. Nothing else
+     is worth keeping. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="datastore/" />
+        <exclude domain="database" path="exoplayer_internal.db" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore/" />
+        <exclude domain="database" path="exoplayer_internal.db" />
+    </device-transfer>
+</data-extraction-rules>

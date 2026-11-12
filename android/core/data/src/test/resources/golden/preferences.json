@@ -1,0 +1,10 @@
+{
+  "skip": {
+    "commercial": "none",
+    "credits": "ask",
+    "intro": "ask",
+    "preview": "none",
+    "recap": "ask"
+  },
+  "autoplayNext": true
+}

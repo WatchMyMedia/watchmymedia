@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Downloads run in a data sync foreground service with a progress notification
+         (PLAN-DOWNLOADS.md §10.3). Android 13+ asks for the notification permission when
+         the first download starts; downloads run without it. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application>
+        <!-- Not exported: only the app and Media3's scheduler start it. WorkManager restarts
+             it when Wi-Fi or space comes back, and after a reboot, so there is no boot receiver
+             (dataSync can't start from BOOT_COMPLETED). -->
+        <service
+            android:name="media.watchmy.client.core.downloads.WmmDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync">
+            <intent-filter>
+                <action android:name="androidx.media3.exoplayer.downloadService.action.RESTART" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

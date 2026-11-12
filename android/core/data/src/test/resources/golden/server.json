@@ -1,0 +1,10 @@
+{
+  "id": "golden-fixture-server",
+  "name": "Golden Fixture",
+  "version": "dev",
+  "apiLevel": 7,
+  "setupRequired": false,
+  "turnstile": false,
+  "casting": true,
+  "castAppId": "0A4D0B6A"
+}

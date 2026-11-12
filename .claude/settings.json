@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "permissions": {
+    "deny": [
+      "Read(**/android/secrets/**)",
+      "Read(**/*.jks)",
+      "Read(**/*.keystore)",
+      "Read(**/*.p8)",
+      "Read(**/*.p12)",
+      "Read(**/.env)",
+      "Read(**/deploy/.env)"
+    ],
+    "ask": [
+      "Bash(make release-tag *)",
+      "Bash(deploy/release/tag.sh *)",
+      "Bash(./deploy/release/tag.sh *)",
+      "Bash(deploy/release/publish.sh *)",
+      "Bash(deploy/release/r2.sh *)",
+      "Bash(make release *)",
+      "Bash(make clean *)",
+      "Bash(make apple-archive *)",
+      "Bash(make apple-upload *)",
+      "Bash(pnpm deploy:receiver *)",
+      "Bash(pnpm run deploy:receiver *)",
+      "Bash(pnpm --dir web deploy:receiver *)",
+      "Bash(wrangler deploy *)",
+      "Bash(npx wrangler deploy *)",
+      "Bash(pnpm wrangler deploy *)",
+      "Bash(pnpm exec wrangler deploy *)",
+      "Bash(npx wrangler pages deploy *)",
+      "Bash(./gradlew publishReleaseBundle *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push --tags *)",
+      "Bash(git push origin main *)",
+      "Bash(git push origin HEAD:main *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh release create *)",
+      "Bash(gh release delete *)",
+      "Bash(gh release edit *)",
+      "Bash(gh release upload *)",
+      "Bash(gh secret set *)",
+      "Bash(gh secret delete *)",
+      "Bash(gh variable set *)",
+      "Bash(gh variable delete *)",
+      "Bash(gh workflow run *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-generated.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

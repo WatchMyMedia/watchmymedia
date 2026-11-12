@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The notification channel for downloads, in the system's notification settings. -->
+    <string name="downloads_channel">Downloads</string>
+    <string name="downloads_channel_description">Movies and episodes downloading to watch offline</string>
+</resources>

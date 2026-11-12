@@ -1,0 +1,7 @@
+{
+  "device_id": "5f0c1d2e3a4b49c8a7d6e5f4c3b2a190",
+  "device_name": "Den TV",
+  "current_server": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+  "quality": "1080",
+  "servers": "[{\"id\":\"a1b2c3d4e5f60718293a4b5c6d7e8f90\",\"name\":\"Golden Fixture\",\"baseUrl\":\"http://192.168.1.20:27587\",\"version\":\"0.4.6\",\"apiLevel\":7,\"lastUsedAtMs\":1793404800000,\"lastUserName\":\"viewer\",\"account\":{\"userId\":2,\"userName\":\"viewer\",\"isAdmin\":false,\"sessionId\":\"86e0d90b273fc14a\",\"token\":\"p1:tok-viewer\"},\"showMissing\":[11,42]},{\"id\":\"0f1e2d3c4b5a69788796a5b4c3d2e1f0\",\"name\":\"Cabin\",\"baseUrl\":\"https://cabin.example.net\",\"version\":\"0.4.4\",\"apiLevel\":6,\"turnstile\":true,\"lastUsedAtMs\":1793318400000,\"lastUserName\":\"admin\",\"account\":{\"userId\":1,\"userName\":\"admin\",\"isAdmin\":true,\"sessionId\":\"0c2a9e7f1b3d5a68\",\"token\":\"k1:q83vEjRWeJA0V2j7fPZ3wFJ3dW1hYmxlLXRva2VuLWJ5dGVz\"}},{\"id\":\"9988776655443322110099887766554\",\"name\":\"Old NAS\",\"baseUrl\":\"http://nas.local:27587\",\"version\":\"0.3.4\",\"apiLevel\":4,\"setupRequired\":true,\"lastUsedAtMs\":1790726400000,\"lastUserName\":\"guest\"}]"
+}

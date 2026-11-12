@@ -1,0 +1,9 @@
+{
+  "setupRequired": false,
+  "user": {
+    "id": 2,
+    "name": "viewer",
+    "isAdmin": false
+  },
+  "adminAllowed": true
+}

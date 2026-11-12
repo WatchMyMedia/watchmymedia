@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<!--
+  The Unraid Docker template (PLAN-UNRAID.md). This is the working copy;
+  the copy Community Applications reads lives in the public templates
+  repository, templates/watchmymedia.xml, which deploy/unraid/mirror.sh
+  assembles. Change this file, run the test, then mirror it; bump Date and
+  add to Changes when what the template does changes.
+-->
+<Container version="2">
+  <Name>WatchMyMedia</Name>
+  <Repository>ghcr.io/taimoorq/watchmymedia:latest</Repository>
+  <Registry>https://github.com/taimoorq/watchmymedia/pkgs/container/watchmymedia</Registry>
+  <Network>host</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/taimoorq/unraid-templates/issues</Support>
+  <Project>https://watchmy.media</Project>
+  <ReadMe>https://watchmy.media/guide/unraid</ReadMe>
+  <Overview>Your movies and TV shows, with live TV and recording from an HDHomeRun tuner, on every screen in the house. One container holds the server and the web app; there are apps for Android, Android TV, iPhone, iPad and Apple TV, and you can cast to Chromecast and Google TV. Converts video on your Intel, AMD or NVIDIA GPU.</Overview>
+  <Category>MediaServer:Video</Category>
+  <WebUI>http://[IP]:[PORT:27587]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/taimoorq/unraid-templates/main/templates/watchmymedia.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/taimoorq/unraid-templates/main/images/watchmymedia.png</Icon>
+  <ExtraSearchTerms>media server live tv dvr hdhomerun chromecast</ExtraSearchTerms>
+  <Requires>Intel or AMD GPU: keep the /dev/dri device below (remove it if this server has no /dev/dri). NVIDIA: install the Nvidia Driver plugin, add --runtime=nvidia to Extra Parameters (Advanced View) and put your GPU's UUID in NVIDIA_VISIBLE_DEVICES. Open the WebUI once the container is running to finish setup.</Requires>
+  <MinVer>6.12.0</MinVer>
+  <Date>2026-11-07</Date>
+  <Changes>
+### 2026-11-07
+- First template.
+  </Changes>
+
+  <Config Name="WebUI port" Target="27587" Default="27587" Mode="tcp" Description="The web app and API. With Host networking this is the port the server listens on." Type="Port" Display="always" Required="true" Mask="false"/>
+  <Config Name="Appdata" Target="/config" Default="/mnt/user/appdata/watchmymedia" Mode="rw" Description="Database, settings, artwork, seek thumbnails and backups. Keep it on a cache pool." Type="Path" Display="advanced" Required="true" Mask="false"/>
+  <Config Name="Movies" Target="/movies" Default="/mnt/user/Movies" Mode="ro" Description="Your movies folder, read-only. Becomes a library on first start if it holds anything; more folders are added in Settings." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="TV Shows" Target="/tv" Default="/mnt/user/TV" Mode="ro" Description="Your TV folder, read-only. Point it at an empty folder if you have no TV shows." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Recordings" Target="/recordings" Default="/mnt/user/Recordings" Mode="rw" Description="Where Live TV recordings go, chosen in Settings, Live TV, Recordings. Remove it if you have no tuner." Type="Path" Display="always" Required="false" Mask="false"/>
+  <Config Name="Transcode" Target="/transcode" Default="/mnt/user/appdata/watchmymedia/transcode" Mode="rw" Description="Converted video while it plays. To use RAM instead, remove this and add --mount type=tmpfs,destination=/transcode,tmpfs-size=4g to Extra Parameters." Type="Path" Display="advanced" Required="true" Mask="false"/>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="The user the server runs as (99 is nobody)." Type="Variable" Display="advanced" Required="true" Mask="false"/>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Its group (100 is users)." Type="Variable" Display="advanced" Required="true" Mask="false"/>
+  <Config Name="UMASK" Target="UMASK" Default="022" Mode="" Description="Permissions of files the server writes." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Intel or AMD GPU" Target="" Default="/dev/dri" Mode="" Description="Hardware video conversion with an Intel or AMD GPU. Remove this if the server has no /dev/dri." Type="Device" Display="always" Required="false" Mask="false"/>
+  <Config Name="NVIDIA_VISIBLE_DEVICES" Target="NVIDIA_VISIBLE_DEVICES" Default="" Mode="" Description="NVIDIA only: the GPU's UUID from Plugins, Nvidia Driver, or all. Also add --runtime=nvidia to Extra Parameters." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="NVIDIA_DRIVER_CAPABILITIES" Target="NVIDIA_DRIVER_CAPABILITIES" Default="all" Mode="" Description="NVIDIA only." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+</Container>

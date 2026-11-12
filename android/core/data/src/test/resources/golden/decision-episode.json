@@ -1,0 +1,54 @@
+{
+  "mode": "direct",
+  "reasons": [],
+  "protocol": "file",
+  "url": "/api/files/2/stream?play=fedcba9876543210",
+  "mimeType": "video/x-matroska",
+  "playId": "fedcba9876543210",
+  "durationMs": 200021,
+  "startMs": 0,
+  "resumeMs": 60000,
+  "bitrate": 142007,
+  "auto": {
+    "step": "original",
+    "reason": "on the local network"
+  },
+  "video": {
+    "codec": "h264",
+    "copy": true,
+    "width": 1280,
+    "height": 720,
+    "bitDepth": 8,
+    "toneMap": false
+  },
+  "audio": {
+    "index": 1,
+    "codec": "aac",
+    "copy": true,
+    "channels": 2
+  },
+  "audioTracks": [
+    {
+      "index": 1,
+      "codec": "aac",
+      "channels": 2,
+      "default": false
+    }
+  ],
+  "subtitles": [],
+  "segments": [],
+  "creditsMs": 0,
+  "watchedAtMs": 184019,
+  "upNextMs": 0,
+  "nextEpisode": {
+    "fileId": 3,
+    "episodeId": 13,
+    "showId": 1,
+    "showTitle": "Night Shift Diner",
+    "seasonNumber": 1,
+    "episodeNumber": 3,
+    "title": "Last Call",
+    "runtimeMin": 3,
+    "seasonFinale": true
+  }
+}

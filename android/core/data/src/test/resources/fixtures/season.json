@@ -1,0 +1,66 @@
+{
+  "id": 31,
+  "showId": 11,
+  "number": 1,
+  "name": "Season 1",
+  "overview": "",
+  "airDate": "2019-09-01",
+  "posterPath": "/s1.jpg",
+  "episodeCount": 2,
+  "availableCount": 1,
+  "watchedCount": 1,
+  "show": { "id": 11, "libraryId": 2, "tmdbId": 9001, "title": "Harbor Lights", "overview": "", "genres": [], "credits": [], "episodeCount": 9 },
+  "episodes": [
+    {
+      "id": 401,
+      "seasonId": 31,
+      "number": 1,
+      "title": "Pilot",
+      "overview": "It begins.",
+      "airDate": "2019-09-01",
+      "stillPath": "/e1.jpg",
+      "runtimeMin": 47,
+      "rating": 7.5,
+      "hasFile": true,
+      "aired": true,
+      "isNew": false,
+      "addedAt": "2026-10-28T10:00:00Z",
+      "watch": { "positionMs": 2820000, "durationMs": 2820000, "completed": true, "fileId": 4, "updatedAt": "2026-10-20T21:00:00Z" },
+      "files": [
+        {
+          "id": 4,
+          "libraryId": 2,
+          "path": "/media/TV/Harbor Lights (2019)/Season 01/Harbor Lights - S01E01 - Pilot.mkv",
+          "relativePath": "Harbor Lights (2019)/Season 01/Harbor Lights - S01E01 - Pilot.mkv",
+          "size": 3573959,
+          "modifiedAt": "2026-10-29T17:01:24.534Z",
+          "status": "present",
+          "parsed": { "kind": "episode", "title": "Harbor Lights", "year": 2019, "season": 1, "episodes": [1], "episodeTitle": "Pilot" },
+          "container": "matroska",
+          "videoCodec": "h264",
+          "audioCodec": "truehd",
+          "width": 1920,
+          "height": 1080,
+          "durationMs": 2820000,
+          "firstSeenAt": "2026-10-29T17:07:37.423Z",
+          "addedAt": "2026-10-29T17:01:24.534Z",
+          "lastSeenAt": "2026-10-29T17:07:37.258Z",
+          "matchStatus": "matched",
+          "matchLocked": false,
+          "matchIgnored": false
+        }
+      ]
+    },
+    {
+      "id": 402,
+      "seasonId": 31,
+      "number": 2,
+      "title": "Next Week",
+      "overview": "",
+      "hasFile": false,
+      "aired": false,
+      "isNew": false,
+      "files": []
+    }
+  ]
+}

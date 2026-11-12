@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Debug builds only: the TV player on the fakes, started with adb (see PlayerHarnessActivity). -->
+        <activity
+            android:name="media.watchmy.client.tv.player.PlayerHarnessActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
+            android:exported="true" />
+        <!-- Debug builds only: a channel cast to this TV on the fakes, started with adb (see CastLiveHarnessActivity). -->
+        <activity
+            android:name="media.watchmy.client.tv.live.CastLiveHarnessActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
+            android:exported="true" />
+    </application>
+</manifest>

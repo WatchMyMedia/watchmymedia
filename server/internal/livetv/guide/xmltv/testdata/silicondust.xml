@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tv SYSTEM "xmltv.dtd">
+<!-- The forms SiliconDust's feed carries (PLAN-LIVE-TV-GUIDE.md §7.1), with fictional channels and programmes. -->
+<tv source-info-name="Fictional listings">
+  <channel id="US10001.hdhomerun.com">
+    <display-name>QMDWDT</display-name>
+    <display-name>7.1 QMDWDT</display-name>
+    <display-name>7.1 QMDW-DT</display-name>
+    <display-name>7.1</display-name>
+    <display-name>QMDW-DT</display-name>
+    <display-name>Meadow News</display-name>
+    <icon src="https://img.hdhomerun.com/channels/US10001.png" width="360" height="270"/>
+    <lcn>7.1</lcn>
+  </channel>
+  <channel id="US10002.hdhomerun.com">
+    <display-name>QORCDT2</display-name>
+    <display-name>7.2 QORCDT2</display-name>
+    <display-name>7.2 </display-name>
+    <display-name>7.2</display-name>
+    <display-name></display-name>
+    <display-name>Orchard Arts</display-name>
+    <icon src="https://img.hdhomerun.com/channels/US10002.png" width="360" height="270"/>
+    <lcn>7.2</lcn>
+  </channel>
+  <channel id="US10003.hdhomerun.com">
+    <display-name>QCDRDT</display-name>
+    <display-name>22.1 QCDRDT</display-name>
+    <display-name>Cedar Sports</display-name>
+    <lcn>22.1</lcn>
+  </channel>
+  <programme start="20261102120000 +0000" stop="20261102130000 +0000" channel="US10001.hdhomerun.com">
+    <title>The Sleuth Files</title>
+    <sub-title>The Low Tide</sub-title>
+    <desc lang="en">A body on the mudflats at dawn sends Inspector Marlow chasing the tide tables.</desc>
+    <date>20251005</date>
+    <category>Series</category>
+    <category>Drama</category>
+    <category>Mystery</category>
+    <category>Drama</category>
+    <category>  series </category>
+    <language>en</language>
+    <icon src="https://img.hdhomerun.com/titles/C510005.jpg" width="360" height="270"/>
+    <series-id system="cseries">C510005</series-id>
+    <episode-num system="dd_progid">EP00510005.0204</episode-num>
+    <episode-num system="onscreen">S02E04</episode-num>
+    <episode-num system="xmltv_ns">1.3.</episode-num>
+    <video>
+      <quality>HDTV</quality>
+    </video>
+    <previously-shown/>
+  </programme>
+  <programme start="20261102130000 +0000" stop="20261102133000 +0000" channel="US10001.hdhomerun.com">
+    <title>Garden Rounds</title>
+    <sub-title>Autumn Bulbs</sub-title>
+    <desc lang="en">A walk through community gardens with tips for the season ahead.</desc>
+    <date>20261102</date>
+    <category>Series</category>
+    <category>Home &amp; garden</category>
+    <language>en</language>
+    <icon src="https://img.hdhomerun.com/titles/C520001.jpg" width="360" height="270"/>
+    <series-id system="cseries">C520001</series-id>
+    <episode-num system="dd_progid">EP00520001.2614</episode-num>
+    <episode-num system="onscreen">S2026E14</episode-num>
+    <episode-num system="xmltv_ns">2025.13.</episode-num>
+    <new/>
+  </programme>
+  <programme start="20261102133000 +0000" stop="20261102143000 +0000" channel="US10001.hdhomerun.com">
+    <title>Meadow News Hour</title>
+    <desc lang="en">Local headlines, traffic and community stories.</desc>
+    <date>20261102</date>
+    <category>News</category>
+    <language>en</language>
+    <icon src="https://img.hdhomerun.com/titles/C510001.jpg" width="360" height="270"/>
+    <series-id system="cseries">C510001</series-id>
+    <episode-num system="dd_progid">SH00510001.0000</episode-num>
+    <video>
+      <quality>HDTV</quality>
+    </video>
+    <new/>
+    <live/>
+  </programme>
+  <programme start="20261102143000 +0000" stop="20261102163000 +0000" channel="US10001.hdhomerun.com">
+    <title>Copper Valley Run</title>
+    <desc lang="en">A railway surveyor and a stubborn rancher race a flood across the valley. (3.0/4.0)</desc>
+    <date>1962</date>
+    <category>Movie</category>
+    <category>Western</category>
+    <language>en</language>
+    <icon src="https://img.hdhomerun.com/posters/MV00540002.jpg" width="240" height="360"/>
+    <icon src="https://img.hdhomerun.com/titles/MV00540002.jpg" width="360" height="270"/>
+    <series-id>MV00540002</series-id>
+    <episode-num system="dd_progid">MV00540002.0000</episode-num>
+    <previously-shown/>
+    <star-rating>
+      <value>3/4</value>
+    </star-rating>
+  </programme>
+  <programme start="20261102163000 +0000" stop="20261102170000 +0000" channel="US10001.hdhomerun.com">
+    <title>Recetas del Huerto</title>
+    <sub-title>Pan de maíz</sub-title>
+    <desc lang="es">Recetas sencillas con lo que da el huerto en cada temporada.</desc>
+    <date>20250713</date>
+    <category>Cooking</category>
+    <language>es</language>
+    <icon src="https://img.hdhomerun.com/titles/C520002.jpg" width="360" height="270"/>
+    <series-id system="cseries">C520002</series-id>
+    <episode-num system="dd_progid">EP00520002.0108</episode-num>
+    <episode-num system="xmltv_ns">0.7.</episode-num>
+    <previously-shown/>
+  </programme>
+  <programme start="20261102170000 +0000" stop="20261102180000 +0000" channel="US10001.hdhomerun.com">
+    <title>Orchard Arts Spotlight</title>
+    <category>Art</category>
+    <category>Documentary</category>
+    <language>en</language>
+    <episode-num system="dd_progid">SH00520004.0000</episode-num>
+    <previously-shown/>
+  </programme>
+  <programme start="20261102180000 +0000" stop="20261102183000 +0000" channel="US10001.hdhomerun.com">
+    <title>Dollar Dash</title>
+    <sub-title>Coins in the Fountain</sub-title>
+    <desc lang="en">Shoppers dash through a pretend market.</desc>
+    <date>20260302</date>
+    <category>Game show</category>
+    <language>en</language>
+    <icon src="https://img.hdhomerun.com/titles/C510004.jpg" width="360" height="270"/>
+    <series-id system="cseries">C510004</series-id>
+    <episode-num system="dd_progid">EP00510004.0001</episode-num>
+    <previously-shown/>
+  </programme>
+  <programme start="20261102120000 +0000" stop="20261102123000 +0000" channel="US10002.hdhomerun.com">
+    <title>Cafe&#x301; Stories</title>
+    <sub-title>Part	Two</sub-title>
+    <desc lang="en">From &lt;i&gt;Glass Harbor&lt;/i&gt;, the sequel.&lt;br/&gt;Second
+line&#x9F;, with	a tab.</desc>
+    <date>2026-11-02</date>
+    <category>Series</category>
+    <icon src="https://img.hdhomerun.com/titles/C520005.jpg" width="360" height="270"/>
+    <series-id system="tms">SH520005</series-id>
+    <series-id system="cseries">C520005</series-id>
+    <episode-num system="dd_progid">EP00520005.0002</episode-num>
+    <episode-num system="onscreen">Part 2 of 3</episode-num>
+    <video>
+      <quality>HD 1080i</quality>
+    </video>
+    <rating system="VCHIP">
+      <value>TV-PG</value>
+    </rating>
+  </programme>
+  <programme start="20261102123000 +0000" stop="20261102130000 +0000" channel="US10002.hdhomerun.com">
+    <title>Brushwork Weekly</title>
+    <episode-num system="onscreen">s3e7</episode-num>
+    <episode-num system="xmltv_ns">2.6.</episode-num>
+  </programme>
+  <programme start="20261102130000 +0000" stop="20261102133000 +0000" channel="US10002.hdhomerun.com">
+    <title>Fairway Notebook</title>
+    <episode-num system="onscreen">Part 1</episode-num>
+    <episode-num system="xmltv_ns">0/2 . 4/10 . 0/1</episode-num>
+  </programme>
+</tv>

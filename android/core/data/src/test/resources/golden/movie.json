@@ -1,0 +1,108 @@
+{
+  "id": 1,
+  "libraryId": 1,
+  "tmdbId": 800001,
+  "title": "Harbor Lights",
+  "year": 2019,
+  "releaseDate": "2019-09-13",
+  "overview": "A lighthouse keeper's last season.",
+  "tagline": "Every light goes out.",
+  "runtimeMin": 2,
+  "genres": [
+    "Drama"
+  ],
+  "rating": 6.9,
+  "contentRating": "PG-13",
+  "posterPath": "/hl-poster.jpg",
+  "backdropPath": "/hl-backdrop.jpg",
+  "fileCount": 1,
+  "credits": [
+    {
+      "name": "June Okafor",
+      "character": "Keeper",
+      "profilePath": "/june.jpg"
+    }
+  ],
+  "files": [
+    {
+      "id": 8,
+      "libraryId": 1,
+      "path": "/media/Movies/Harbor Lights (2019)/Harbor Lights (2019).mkv",
+      "relativePath": "Harbor Lights (2019)/Harbor Lights (2019).mkv",
+      "size": 97716429,
+      "modifiedAt": "2026-10-29T18:37:00.443Z",
+      "status": "present",
+      "parsed": {
+        "kind": "movie",
+        "title": "Harbor Lights",
+        "year": 2019
+      },
+      "container": "matroska",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "width": 1920,
+      "height": 1080,
+      "durationMs": 150021,
+      "firstSeenAt": "2026-10-29T18:38:19.621Z",
+      "addedAt": "2026-10-29T18:37:00.443Z",
+      "lastSeenAt": "2026-10-29T23:07:01.186Z",
+      "matchStatus": "matched",
+      "matchLocked": true,
+      "matchIgnored": false,
+      "movieId": 1,
+      "probe": {
+        "container": "matroska",
+        "formatName": "matroska,webm",
+        "durationMs": 150021,
+        "bitRate": 5210813,
+        "size": 97716429,
+        "video": [
+          {
+            "index": 0,
+            "codec": "h264",
+            "profile": "High",
+            "width": 1920,
+            "height": 1080,
+            "frameRate": 23.976,
+            "pixelFormat": "yuv420p",
+            "bitDepth": 8,
+            "default": false
+          }
+        ],
+        "audio": [
+          {
+            "index": 1,
+            "codec": "aac",
+            "profile": "LC",
+            "channels": 2,
+            "channelLayout": "stereo",
+            "sampleRate": 48000,
+            "default": false
+          }
+        ],
+        "subtitles": [
+          {
+            "index": 2,
+            "codec": "subrip",
+            "language": "eng",
+            "default": true,
+            "forced": false,
+            "image": false
+          },
+          {
+            "index": 3,
+            "codec": "subrip",
+            "language": "spa",
+            "default": false,
+            "forced": false,
+            "image": false
+          }
+        ]
+      }
+    }
+  ],
+  "quality": "1080p",
+  "hdr": false,
+  "totalSize": 97716429,
+  "addedAt": "2026-10-29T18:37:00.443Z"
+}

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Servers are whatever address someone types or finds on the network, often
+  http:// to a LAN address or a .local name, so cleartext is allowed. The
+  sign-in screen nudges hostnames towards https (PLAN-CLIENTS.md §5.5).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

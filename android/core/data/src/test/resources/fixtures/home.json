@@ -1,0 +1,147 @@
+{
+  "hero": {
+    "kind": "episode",
+    "kicker": "New episode · Harbor Lights",
+    "title": "Low Tide",
+    "facts": "S02E01 · Aired 2026-10-26",
+    "overview": "The lighthouse goes dark.",
+    "backdropPath": "/hl-backdrop.jpg",
+    "posterPath": "/hl-poster.jpg",
+    "showId": 11,
+    "episodeId": 501,
+    "fileId": 77,
+    "seasonNumber": 2
+  },
+  "continueWatching": [
+    {
+      "kind": "episode",
+      "title": "Harbor Lights",
+      "subtitle": "S01E03 · Undertow",
+      "posterPath": "/hl-poster.jpg",
+      "backdropPath": "/hl-backdrop.jpg",
+      "stillPath": "/hl-s1e3.jpg",
+      "fileId": 70,
+      "showId": 11,
+      "episodeId": 403,
+      "seasonNumber": 1,
+      "episodeNumber": 3,
+      "positionMs": 600000,
+      "durationMs": 2400000,
+      "updatedAt": "2026-10-28T20:15:00Z"
+    },
+    {
+      "kind": "movie",
+      "title": "Paper Moons",
+      "fileId": 5,
+      "movieId": 21,
+      "positionMs": 1000,
+      "durationMs": 4000,
+      "updatedAt": "2026-10-27T20:15:00.123456Z"
+    },
+    {
+      "kind": "trailer",
+      "title": "From a newer server",
+      "fileId": 99,
+      "positionMs": 1,
+      "durationMs": 2,
+      "updatedAt": "2026-10-27T20:15:00Z"
+    }
+  ],
+  "recentlyAddedShows": [
+    {
+      "kind": "show",
+      "id": 11,
+      "libraryId": 2,
+      "title": "Harbor Lights",
+      "year": 2019,
+      "overview": "A lighthouse keeper's family.",
+      "genres": ["Drama", "Mystery"],
+      "rating": 7.9,
+      "posterPath": "/hl-poster.jpg",
+      "backdropPath": "/hl-backdrop.jpg",
+      "quality": "4K",
+      "hdr": true,
+      "addedAt": "2026-10-28T10:00:00Z",
+      "isNew": true,
+      "totalSize": 1000,
+      "subtitle": "2 seasons",
+      "watched": false,
+      "episodeCount": 16,
+      "status": "Returning Series"
+    }
+  ],
+  "recentlyAired": [
+    {
+      "episodeId": 501,
+      "showId": 11,
+      "showTitle": "Harbor Lights",
+      "seasonNumber": 2,
+      "episodeNumber": 1,
+      "title": "Low Tide",
+      "overview": "The lighthouse goes dark.",
+      "airDate": "2026-10-26",
+      "stillPath": "/hl-s2e1.jpg",
+      "showPosterPath": "/hl-poster.jpg",
+      "showBackdropPath": "/hl-backdrop.jpg",
+      "hasFile": true,
+      "fileId": 77,
+      "isNew": true
+    },
+    {
+      "episodeId": 502,
+      "showId": 11,
+      "showTitle": "Harbor Lights",
+      "seasonNumber": 2,
+      "episodeNumber": 2,
+      "title": "Fog",
+      "overview": "",
+      "hasFile": false,
+      "isNew": false
+    }
+  ],
+  "recentlyAddedMovies": [
+    {
+      "kind": "movie",
+      "id": 21,
+      "libraryId": 1,
+      "title": "Paper Moons",
+      "year": 2021,
+      "overview": "Two cartographers.",
+      "genres": ["Romance"],
+      "posterPath": "/pm-poster.jpg",
+      "quality": "1080p",
+      "hdr": false,
+      "addedAt": "2026-10-28T10:00:00Z",
+      "isNew": false,
+      "totalSize": 2000,
+      "watched": false,
+      "progress": 0.25,
+      "runtimeMin": 104,
+      "releaseDate": "2021-03-04"
+    },
+    {
+      "kind": "unmatched",
+      "id": 1,
+      "libraryId": 1,
+      "title": "Glass Tide (2023).mkv",
+      "overview": "",
+      "genres": [],
+      "quality": "",
+      "hdr": false,
+      "addedAt": "2026-10-29T17:01:00.612Z",
+      "isNew": true,
+      "totalSize": 12798425,
+      "subtitle": "Not looked up yet",
+      "watched": false,
+      "fileCount": 1,
+      "fileName": "Glass Tide (2023)/Glass Tide (2023).mkv",
+      "libraryType": "movie"
+    }
+  ],
+  "recentlyReleased": [],
+  "totals": { "movies": 4, "shows": 1, "episodes": 6, "files": 10, "totalSize": 227327054 },
+  "lastScannedAt": "2026-10-29T17:07:37.475Z",
+  "movieLibraryId": 1,
+  "tvLibraryId": 2,
+  "someFieldFromANewerServer": { "ignored": true }
+}

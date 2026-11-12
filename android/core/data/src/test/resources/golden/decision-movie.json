@@ -1,0 +1,66 @@
+{
+  "mode": "direct",
+  "reasons": [],
+  "protocol": "file",
+  "url": "/api/files/8/stream?play=fedcba9876543210",
+  "mimeType": "video/x-matroska",
+  "playId": "fedcba9876543210",
+  "durationMs": 150021,
+  "startMs": 0,
+  "resumeMs": 0,
+  "bitrate": 5210813,
+  "video": {
+    "codec": "h264",
+    "copy": true,
+    "width": 1920,
+    "height": 1080,
+    "bitDepth": 8,
+    "toneMap": false
+  },
+  "audio": {
+    "index": 1,
+    "codec": "aac",
+    "copy": true,
+    "channels": 2
+  },
+  "audioTracks": [
+    {
+      "index": 1,
+      "codec": "aac",
+      "channels": 2,
+      "default": false
+    }
+  ],
+  "subtitles": [
+    {
+      "id": "s2",
+      "language": "eng",
+      "codec": "subrip",
+      "format": "webvtt",
+      "url": "/api/files/8/subtitles/s2.vtt",
+      "forced": false,
+      "default": true,
+      "burnInOnly": false,
+      "external": false,
+      "source": "embedded",
+      "hearingImpaired": false
+    },
+    {
+      "id": "s3",
+      "language": "spa",
+      "codec": "subrip",
+      "format": "webvtt",
+      "url": "/api/files/8/subtitles/s3.vtt",
+      "forced": false,
+      "default": false,
+      "burnInOnly": false,
+      "external": false,
+      "source": "embedded",
+      "hearingImpaired": false
+    }
+  ],
+  "segments": [],
+  "creditsMs": 0,
+  "watchedAtMs": 138019,
+  "upNextMs": 0
+}

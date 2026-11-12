@@ -1,0 +1,60 @@
+{
+  "mode": "audio",
+  "reasons": [
+    "client cannot decode dts audio"
+  ],
+  "protocol": "hls",
+  "playlist": "event",
+  "url": "/api/playback/0123456789abcdef/index.m3u8",
+  "mimeType": "application/vnd.apple.mpegurl",
+  "playId": "fedcba9876543210",
+  "sessionId": "0123456789abcdef",
+  "durationMs": 150000,
+  "startMs": 0,
+  "resumeMs": 0,
+  "bitrate": 1445379,
+  "auto": {
+    "step": "original",
+    "reason": "on the local network"
+  },
+  "video": {
+    "codec": "hevc",
+    "copy": true,
+    "width": 1280,
+    "height": 720,
+    "toneMap": false
+  },
+  "audio": {
+    "index": 1,
+    "codec": "aac",
+    "copy": false,
+    "channels": 6
+  },
+  "audioTracks": [
+    {
+      "index": 1,
+      "codec": "dts",
+      "channels": 6,
+      "default": false
+    }
+  ],
+  "subtitles": [
+    {
+      "id": "s2",
+      "language": "eng",
+      "codec": "subrip",
+      "format": "webvtt",
+      "url": "/api/files/6/subtitles/s2.vtt",
+      "forced": true,
+      "default": false,
+      "burnInOnly": false,
+      "external": false,
+      "source": "embedded",
+      "hearingImpaired": false
+    }
+  ],
+  "segments": [],
+  "creditsMs": 0,
+  "watchedAtMs": 138000,
+  "upNextMs": 0
+}

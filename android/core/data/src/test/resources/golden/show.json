@@ -1,0 +1,70 @@
+{
+  "id": 1,
+  "libraryId": 2,
+  "tmdbId": 900001,
+  "title": "Night Shift Diner",
+  "year": 2020,
+  "firstAirDate": "2020-03-02",
+  "overview": "A roadside diner that never closes, and the night crew who keep it that way.",
+  "status": "Returning Series",
+  "genres": [
+    "Comedy",
+    "Drama"
+  ],
+  "rating": 7.4,
+  "contentRating": "TV-14",
+  "posterPath": "/nsd-poster.jpg",
+  "backdropPath": "/nsd-backdrop.jpg",
+  "episodeCount": 6,
+  "lastAirDate": "2021-04-12",
+  "nextAirDate": "2031-01-06",
+  "credits": [
+    {
+      "name": "Rosa Vance",
+      "character": "Mae",
+      "profilePath": "/rosa.jpg"
+    },
+    {
+      "name": "Theo Park",
+      "character": "Cook"
+    }
+  ],
+  "seasons": [
+    {
+      "id": 1,
+      "showId": 1,
+      "number": 1,
+      "name": "Season 1",
+      "overview": "The first winter on nights.",
+      "airDate": "2020-03-02",
+      "posterPath": "/nsd-s1.jpg",
+      "episodeCount": 3,
+      "availableCount": 3,
+      "watchedCount": 1
+    },
+    {
+      "id": 2,
+      "showId": 1,
+      "number": 2,
+      "name": "Season 2",
+      "overview": "",
+      "airDate": "2021-03-29",
+      "episodeCount": 5,
+      "availableCount": 3,
+      "watchedCount": 0
+    }
+  ],
+  "totalEpisodes": 8,
+  "quality": "720p",
+  "hdr": false,
+  "totalSize": 86942445,
+  "fileCount": 6,
+  "addedAt": "2026-10-29T18:38:09.797Z",
+  "nextEpisode": {
+    "episodeId": 12,
+    "seasonNumber": 1,
+    "episodeNumber": 2,
+    "title": "Graveyard Special",
+    "fileId": 2
+  }
+}

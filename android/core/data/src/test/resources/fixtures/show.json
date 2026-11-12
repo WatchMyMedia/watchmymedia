@@ -1,0 +1,33 @@
+{
+  "id": 11,
+  "libraryId": 2,
+  "tmdbId": 9001,
+  "title": "Harbor Lights",
+  "originalTitle": "Harbor Lights",
+  "year": 2019,
+  "overview": "A lighthouse keeper's family.",
+  "status": "Returning Series",
+  "genres": ["Drama", "Mystery"],
+  "rating": 7.9,
+  "posterPath": "/hl-poster.jpg",
+  "backdropPath": "/hl-backdrop.jpg",
+  "firstAirDate": "2019-09-01",
+  "lastAirDate": "2026-10-26",
+  "nextAirDate": "2026-11-02",
+  "quality": "4K",
+  "hdr": true,
+  "credits": [
+    { "name": "Ada Brook", "character": "Mara", "profilePath": "/ada.jpg" },
+    { "name": "Tom Vale" }
+  ],
+  "seasons": [
+    { "id": 31, "showId": 11, "number": 1, "name": "Season 1", "overview": "", "airDate": "2019-09-01", "posterPath": "/s1.jpg", "episodeCount": 8, "availableCount": 8, "watchedCount": 3 },
+    { "id": 32, "showId": 11, "number": 2, "name": "Season 2", "overview": "Fog rolls in.", "episodeCount": 8, "availableCount": 1, "watchedCount": 0 }
+  ],
+  "episodeCount": 9,
+  "fileCount": 9,
+  "totalEpisodes": 16,
+  "totalSize": 45000000000,
+  "nextEpisode": { "episodeId": 404, "seasonNumber": 1, "episodeNumber": 4, "title": "Breakwater", "fileId": 71 },
+  "addedAt": "2026-10-28T10:00:00Z"
+}

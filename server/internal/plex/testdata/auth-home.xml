@@ -1,0 +1,4 @@
+<MediaContainer size="2">
+  <User id="701" title="Synthetic Owner" admin="1" protected="0" restricted="0"/>
+  <User id="703" title="Synthetic Profile" admin="0" protected="1" restricted="1"/>
+</MediaContainer>

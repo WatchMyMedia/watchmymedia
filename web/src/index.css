@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ground: #0f0f10;
+  --color-surface: #151517;
+  --color-surface-2: #1a1a1d;
+  --color-line: #222225;
+  --color-line-2: #2a2a2e;
+  /* Burgundy is the brand: buttons, avatar, icon tiles. Too dark to read on
+     the ground (1.4:1), so it is always a fill, never text or a thin line. */
+  --color-brand: #5a1414;
+  --color-brand-hover: #6e1a1a;
+  --color-brand-line: #b04545; /* button rim, 3.4:1 on the ground */
+  /* Gold is the accent on dark: progress, selection, focus, badges (black text on it). */
+  --color-accent: #ffb612;
+  /* Orange, so warnings do not read as the gold accent. */
+  --color-warn: #fb923c;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-ground text-neutral-100 antialiased font-sans;
+}
+
+.scrollbar-hide {
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+@layer components {
+  /* Primary action: burgundy with white text (13.6:1). */
+  .btn-primary {
+    @apply border border-brand-line bg-brand text-white transition-colors;
+  }
+  .btn-primary:hover:not(:disabled) {
+    @apply bg-brand-hover;
+  }
+}
+
+:focus-visible {
+  outline-color: var(--color-accent);
+}
+
+/* Cards lift and show the accent ring on hover/focus. */
+.card {
+  @apply transition duration-150 ease-out rounded-md outline-none;
+}
+.card:hover,
+.card:focus-visible {
+  @apply -translate-y-0.5 ring-2 ring-accent;
+}
+
+/* The Skip button's fill in "skip after 3 s" mode; duration comes from the element. */
+.skip-fill {
+  width: 0;
+  animation: skip-fill linear forwards;
+}
+@keyframes skip-fill {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}

@@ -1,0 +1,39 @@
+# Public access on macOS. Docker Desktop shows every connection to a
+# published port as coming from its own gateway, which hides real client
+# addresses from a proxy inside Docker. So Caddy runs natively (Homebrew)
+# and sets X-Forwarded-For, the server listens only on 127.0.0.1, and it
+# trusts the header only from this network's gateway, which is where
+# connections from the Mac itself appear.
+#
+# Never forward a router port straight to 27587 on macOS: internet clients
+# would look like local ones.
+#
+# Set up Caddy and data/ddns/config.json as the README describes, then run
+# from the repository root:
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy-macos.yml up -d
+services:
+  watchmymedia:
+    ports: !override
+      - "127.0.0.1:${WATCHMYMEDIA_HOST_PORT:-27587}:27587"
+    environment:
+      WATCHMYMEDIA_TRUSTED_PROXIES: "${WATCHMYMEDIA_PROXY_GATEWAY:-10.87.250.1}"
+      WATCHMYMEDIA_AUTH_SECURE_COOKIES: "true"
+
+  ddns:
+    image: qmcgaw/ddns-updater:v2.10
+    container_name: watchmymedia-ddns
+    restart: unless-stopped
+    environment:
+      PERIOD: "5m"
+    volumes:
+      - ../data/ddns:/updater/data
+
+networks:
+  default:
+    # A fixed subnet outside Docker's own pools (172.17-31.x and 192.168.x),
+    # so it cannot clash with networks Docker hands out. Override it with
+    # WATCHMYMEDIA_PROXY_SUBNET if your LAN or a VPN uses 10.87.250.x.
+    ipam:
+      config:
+        - subnet: "${WATCHMYMEDIA_PROXY_SUBNET:-10.87.250.0/24}"
+          gateway: "${WATCHMYMEDIA_PROXY_GATEWAY:-10.87.250.1}"

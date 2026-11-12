@@ -1,0 +1,7 @@
+{
+  "code": "KX7P4M",
+  "secret": "golden-secret",
+  "expiresAt": "2026-11-01T20:00:09Z",
+  "intervalMs": 2000,
+  "linkPath": "/link?code=KX7P4M"
+}

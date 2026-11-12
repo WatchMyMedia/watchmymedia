@@ -1,0 +1,57 @@
+{
+  "id": 21,
+  "libraryId": 1,
+  "tmdbId": 7001,
+  "title": "Paper Moons",
+  "year": 2021,
+  "tagline": "Every map lies a little.",
+  "overview": "Two cartographers.",
+  "releaseDate": "2021-03-04",
+  "runtimeMin": 104,
+  "genres": ["Romance"],
+  "rating": 6.8,
+  "posterPath": "/pm-poster.jpg",
+  "backdropPath": "/pm-backdrop.jpg",
+  "quality": "1080p",
+  "hdr": false,
+  "credits": [{ "name": "Ada Brook", "character": "June" }],
+  "fileCount": 1,
+  "totalSize": 97716429,
+  "watch": { "positionMs": 1000, "durationMs": 4000, "completed": false, "updatedAt": "2026-10-27T20:15:00Z" },
+  "files": [
+    {
+      "id": 8,
+      "libraryId": 1,
+      "path": "/media/Movies/Paper Moons (2021)/Paper Moons (2021).mkv",
+      "relativePath": "Paper Moons (2021)/Paper Moons (2021).mkv",
+      "size": 97716429,
+      "modifiedAt": "2026-10-29T17:01:24.534Z",
+      "status": "present",
+      "parsed": { "kind": "movie", "title": "Paper Moons", "year": 2021 },
+      "container": "matroska",
+      "videoCodec": "hevc",
+      "audioCodec": "truehd",
+      "durationMs": 150021,
+      "firstSeenAt": "2026-10-29T17:07:37.423Z",
+      "addedAt": "2026-10-29T17:01:24.534Z",
+      "lastSeenAt": "2026-10-29T17:07:37.258Z",
+      "matchStatus": "matched",
+      "matchLocked": false,
+      "matchIgnored": false,
+      "probe": {
+        "container": "matroska",
+        "formatName": "matroska,webm",
+        "durationMs": 150021,
+        "video": [{ "index": 0, "codec": "hevc", "width": 3840, "height": 2160, "hdr": "hdr10", "bitDepth": 10, "default": true }],
+        "audio": [
+          { "index": 1, "codec": "aac", "channels": 2, "language": "spa", "default": false },
+          { "index": 2, "codec": "truehd", "channels": 8, "channelLayout": "7.1", "language": "eng", "default": true }
+        ],
+        "subtitles": [
+          {"index": 3, "codec": "subrip", "language": "eng", "title": "SDH", "default": false, "forced": false, "image": false},
+          {"index": 4, "codec": "hdmv_pgs_subtitle", "language": "eng", "default": false, "forced": false, "image": true}
+        ]
+      }
+    }
+  ]
+}

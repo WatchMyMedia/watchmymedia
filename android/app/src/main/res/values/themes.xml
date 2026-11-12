@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose draws everything; the window only needs the dark ground. -->
+    <style name="Theme.WatchMyMedia" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ground</item>
+        <item name="android:colorBackground">@color/ground</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+    <!-- The launch screen on every Android version (core-splashscreen): the icon on the
+         ground, held until the first frame, which is the page or its loading skeleton. -->
+    <style name="Theme.WatchMyMedia.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ground</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.WatchMyMedia</item>
+    </style>
+    <color name="ground">#0F0F10</color>
+</resources>

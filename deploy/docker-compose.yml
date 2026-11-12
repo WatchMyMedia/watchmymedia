@@ -1,0 +1,49 @@
+# Run from the repository root:  docker compose -f deploy/docker-compose.yml up -d
+services:
+  watchmymedia:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: watchmymedia:dev
+    container_name: watchmymedia
+    restart: unless-stopped
+    # Per-machine settings go in deploy/.env (copy .env.example), which git
+    # ignores, so pulls never conflict with your local values.
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      # host:container. WATCHMYMEDIA_BIND=127.0.0.1 accepts connections only
+      # from this machine, e.g. through Tailscale Serve. Change the left port
+      # if 27587 is taken.
+      - "${WATCHMYMEDIA_BIND:-0.0.0.0}:${WATCHMYMEDIA_HOST_PORT:-27587}:27587"
+    environment:
+      # Match your host user so the container can read the libraries:  id -u ; id -g
+      PUID: "${PUID:-1000}"
+      PGID: "${PGID:-1000}"
+      TZ: "${TZ:-UTC}"
+      # Permissions of files the server writes (recordings, backups).
+      UMASK: "${UMASK:-022}"
+    volumes:
+      - ../data/config:/config
+      - ../data/transcode:/transcode
+      # Set MOVIES_DIR and TV_DIR in deploy/.env. On macOS, /Volumes/... must
+      # be listed under Docker Desktop > Settings > Resources > File sharing.
+      - ${MOVIES_DIR:?Set MOVIES_DIR in deploy/.env}:/movies:ro
+      - ${TV_DIR:?Set TV_DIR in deploy/.env}:/tv:ro
+    # TV and phone apps find the server on the local network over mDNS, which
+    # cannot leave Docker's bridge network. On a Linux host, uncomment this
+    # (and drop "ports:" above, which host networking ignores) so the apps
+    # list it by name; otherwise people type its address once. Docker Desktop
+    # on macOS and Windows cannot do this.
+    # network_mode: host
+    # Linux hosts with an Intel or AMD GPU: uncomment for QSV/VAAPI
+    # transcoding. The image carries the drivers; the entrypoint gives the
+    # server the group that owns the device.
+    # devices:
+    #   - /dev/dri:/dev/dri
+    # Linux hosts with an NVIDIA GPU and the NVIDIA Container Toolkit:
+    # uncomment for NVENC. The runtime mounts the host's driver.
+    # runtime: nvidia
+    # environment:
+    #   NVIDIA_VISIBLE_DEVICES: all

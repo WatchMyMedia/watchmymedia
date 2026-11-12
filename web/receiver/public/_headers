@@ -1,0 +1,9 @@
+# Headers for the Cast receiver (cast.watchmy.media), which Cloudflare serves
+# as a Worker's static assets (wrangler.receiver.jsonc).
+# The receiver talks to whichever WatchMyMedia server the sender names, so
+# connections, media and images may come from any address; scripts only from
+# here and Google's Cast SDK (gstatic, and Shaka Player from ajax.googleapis.com).
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://www.gstatic.com https://ajax.googleapis.com; style-src 'self' 'unsafe-inline' https://www.gstatic.com; connect-src 'self' https: http: https://www.gstatic.com; media-src 'self' https: http: blob: data:; img-src 'self' https: http: data: blob:; font-src 'self' data: https://www.gstatic.com https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'none'; form-action 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer

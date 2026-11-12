@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "type": "movie",
+      "name": "Movies",
+      "path": "/media/Movies",
+      "fileCount": 4,
+      "missingCount": 0,
+      "pendingCount": 0,
+      "unmatchedCount": 0,
+      "lastScannedAt": "2026-11-01T19:50:07.729Z",
+      "watch": {
+        "state": "watching",
+        "folders": 5,
+        "unwatched": 0
+      },
+      "createdAt": "2026-10-29T18:38:18.549Z",
+      "updatedAt": "2026-11-01T19:50:07.729Z"
+    },
+    {
+      "id": 2,
+      "type": "tv",
+      "name": "TV Shows",
+      "path": "/media/TV",
+      "fileCount": 6,
+      "missingCount": 0,
+      "pendingCount": 0,
+      "unmatchedCount": 0,
+      "lastScannedAt": "2026-11-01T19:50:07.729Z",
+      "watch": {
+        "state": "watching",
+        "folders": 4,
+        "unwatched": 0
+      },
+      "createdAt": "2026-10-29T18:38:18.549Z",
+      "updatedAt": "2026-11-01T19:50:07.73Z"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+<MediaContainer size="2">
+  <SharedServer userID="702" accessToken="synthetic-shared-token"/>
+  <SharedServer userID="704" accessToken="synthetic-other-shared-token"/>
+</MediaContainer>

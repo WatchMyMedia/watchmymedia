@@ -1,0 +1,62 @@
+:root {
+  --ground: #0f0f10;
+  --gold: #ffb612;
+  --burgundy: #5a1414;
+  --text: #f5f5f5;
+  --muted: #a3a3a3;
+}
+html, body { margin: 0; height: 100%; background: var(--ground); color: var(--text); font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
+cast-media-player {
+  position: absolute; inset: 0;
+  --theme-hue: 40;
+  --progress-color: var(--gold);
+  --background-color: var(--ground);
+  --splash-image: none;
+}
+#overlay { position: absolute; inset: 0; pointer-events: none; }
+section.idle, section.loading, section.message { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; text-align: center; background: var(--ground); }
+section.message { background: rgba(15, 15, 16, 0.86); }
+.logo { width: 28vw; max-width: 520px; }
+.mark { width: 7vw; max-width: 120px; margin-bottom: 2vh; }
+h1 { font-size: 3.2vw; margin: 0 0 1vh; font-weight: 700; }
+h2 { font-size: 2vw; margin: 0.4vh 0; font-weight: 700; }
+p { font-size: 1.7vw; margin: 0.6vh 0; color: var(--muted); }
+.small { font-size: 1.2vw; color: var(--muted); }
+section.idle p { margin-top: 3vh; }
+.spinner { width: 3.2vw; height: 3.2vw; margin-top: 3vh; border: 0.35vw solid rgba(255, 255, 255, 0.15); border-top-color: var(--gold); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.toast { position: absolute; right: 4vw; bottom: 9vh; padding: 1.4vh 1.6vw; background: rgba(15, 15, 16, 0.9); border: 0.15vw solid var(--gold); border-radius: 0.6vw; font-size: 1.6vw; font-weight: 600; }
+.toast span { font-weight: 400; color: var(--muted); margin-left: 0.6vw; }
+.note { position: absolute; left: 50%; top: 7vh; transform: translateX(-50%); max-width: 80vw; padding: 1.2vh 1.8vw; background: rgba(15, 15, 16, 0.9); border: 0.1vw solid rgba(255, 255, 255, 0.2); border-radius: 999px; font-size: 1.5vw; white-space: nowrap; }
+aside.next { position: absolute; right: 4vw; bottom: 9vh; display: flex; gap: 1.4vw; align-items: center; max-width: 42vw; padding: 1.4vw; background: rgba(15, 15, 16, 0.92); border: 0.15vw solid var(--gold); border-radius: 0.8vw; }
+aside.next img { width: 14vw; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 0.4vw; }
+
+/* Live TV (PLAN-LIVE-TV.md §4.1): the web canvas's LiveReceiver board, its sizes at 1920 × 1080. */
+:root { --live: #b42318; --soft: #e5e5e5; --dim: #bdbdbd; --panel: #1c1c1f; }
+.tvb { position: absolute; left: 4vw; right: 4vw; bottom: 9vh; display: flex; align-items: stretch; border-radius: 0.8vw; border: 0.1vw solid rgba(255, 255, 255, 0.14); background: rgba(15, 15, 16, 0.92); box-shadow: 0 1.25vw 3.1vw rgba(0, 0, 0, 0.55); overflow: hidden; }
+.tvnum { display: flex; flex-direction: column; justify-content: center; gap: 0.2vw; min-width: 10.4vw; padding: 1.25vw 1.7vw; box-sizing: border-box; background: rgba(255, 255, 255, 0.06); border-right: 0.1vw solid rgba(255, 255, 255, 0.1); }
+.tvnum img { height: 2.8vw; max-width: 8vw; object-fit: contain; object-position: left center; }
+.tvnum .num { font-size: 3.75vw; line-height: 1; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tvnum .name { font-size: 1.3vw; color: var(--dim); }
+.tvpic { display: flex; align-items: center; padding: 1.25vw 0 1.25vw 1.45vw; }
+.tvpic img { width: 14vw; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 0.4vw; background: var(--panel); }
+.tvnow { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 0.4vw; padding: 1.25vw 1.7vw; }
+.tvnow .line { display: flex; align-items: center; gap: 0.73vw; min-width: 0; }
+.tvnow .title { font-size: 2.1vw; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tvnow .ep { font-size: 1.5vw; color: var(--soft); }
+.tvnow .times { font-size: 1.3vw; color: var(--dim); font-variant-numeric: tabular-nums; }
+.tvnext { flex: 0 0 22.9vw; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 0.3vw; padding: 1.25vw 1.7vw; border-left: 0.1vw solid rgba(255, 255, 255, 0.1); }
+.tvnext .when { font-size: 1.05vw; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tvnext .title { font-size: 1.6vw; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tvnext .ep { font-size: 1.2vw; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live { display: inline-flex; flex: none; align-items: center; gap: 0.5vw; padding: 0.2vw 0.73vw; border-radius: 0.3vw; background: var(--live); color: #fff; font-size: 1.05vw; font-weight: 700; letter-spacing: 0.06em; }
+.live::before { content: ''; width: 0.5vw; height: 0.5vw; border-radius: 50%; background: currentColor; }
+.tag { display: inline-flex; flex: none; align-items: center; padding: 0.1vw 0.63vw; border-radius: 999px; border: 0.1vw solid rgba(255, 255, 255, 0.25); font-size: 1vw; font-weight: 600; color: var(--soft); white-space: nowrap; }
+.tag.new { border-color: rgba(255, 182, 18, 0.6); color: var(--gold); }
+.thin { position: relative; height: 0.3vw; max-width: 33vw; margin-top: 0.3vw; border-radius: 0.15vw; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
+.thin span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); }
+section.paused { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; text-align: center; background: rgba(15, 15, 16, 0.62); }
+.pz { display: grid; place-items: center; width: 6.25vw; height: 6.25vw; margin-bottom: 1.35vw; border-radius: 50%; background: rgba(15, 15, 16, 0.9); border: 0.16vw solid var(--gold); color: var(--text); }
+.pz svg { width: 2.5vw; height: 2.5vw; }
+section.message.failure { background: var(--ground); }
+section.message .small, section.paused .small { margin-top: 2vh; }

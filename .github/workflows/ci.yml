@@ -1,0 +1,650 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      sign_windows:
+        description: Also sign and verify a Windows installer (seven Artifact Signing signatures)
+        type: boolean
+        default: false
+
+# A newer push to the same branch or pull request cancels the older run, so
+# the runners do not spend time on commits nobody will look at.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Trusted CI in this private repository uses the four Mac Studio runners.
+# Fork PRs (and all CI if the repository becomes public) stay on disposable
+# hosted machines. Keep the event/repository guard on every compatible job;
+# Windows stays hosted. See deploy/ci/mac-studio.md for the access boundary.
+permissions:
+  contents: read
+
+jobs:
+  # Which parts changed, so that the app jobs run only when their own folder
+  # or the API documents their clients come from changed (or this file). A
+  # manual run builds everything.
+  changes:
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      android: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.android == 'true' }}
+      windows: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.windows == 'true' }}
+      apple: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apple == 'true' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          filters: |
+            android:
+              - 'android/**'
+              - 'api/**'
+              - '.github/workflows/ci.yml'
+              - 'deploy/ci/**'
+            apple:
+              - 'apple/**'
+              - 'api/**'
+              - '.github/workflows/ci.yml'
+              - 'deploy/ci/**'
+            windows:
+              - 'windows/**'
+              - 'deploy/windows/**'
+              - 'brand/src/tray-*.svg'
+              - 'brand/export/windows/**'
+              - 'Makefile'
+              - 'server/**'
+              - 'deploy/macos/fetch-ffmpeg.sh'
+              - '.github/workflows/ci.yml'
+              - 'deploy/ci/**'
+
+  # Vet, lint and the generated-code check, then the Go tests with the ffmpeg
+  # build the releases ship, so the VideoToolbox paths run on real hardware.
+  # Linux is covered by building and vetting for it, Windows by vetting
+  # here and by the windows job's tests.
+  server:
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Keep Go caches in this runner's tool cache
+        run: |
+          echo "GOCACHE=$RUNNER_TOOL_CACHE/go-build" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$RUNNER_TOOL_CACHE/go-mod" >> "$GITHUB_ENV"
+          echo "GOLANGCI_LINT_CACHE=$RUNNER_TOOL_CACHE/golangci-lint" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+          cache: ${{ runner.environment == 'github-hosted' }}
+      - name: Vet, and build for Linux and Windows
+        working-directory: server
+        run: |
+          go vet ./...
+          GOOS=linux GOARCH=amd64 go vet ./...
+          GOOS=linux GOARCH=arm64 go build ./...
+          GOOS=windows GOARCH=amd64 go vet ./...
+      - name: Test the isolated streaming runner
+        run: python3 -I -m unittest discover -s deploy/fixture -p '*_test.py'
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          working-directory: server
+          skip-cache: ${{ runner.environment == 'self-hosted' }}
+      - name: Check generated code is current
+        working-directory: server
+        run: |
+          go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
+          git diff --exit-code -- internal/db
+      # Known vulnerabilities in code the server calls, at the version
+      # server/scripts/update-deps.sh pins (make server-deps reports newer).
+      - name: govulncheck
+        working-directory: server
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: Fetch the ffmpeg build the releases ship
+        env:
+          FFMPEG_CACHE: ${{ runner.tool_cache }}/watchmymedia-ffmpeg
+        run: |
+          deploy/macos/fetch-ffmpeg.sh arm64
+          build/ffmpeg/darwin-arm64/ffmpeg -hide_banner -version | head -1
+      - name: Test
+        working-directory: server
+        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test ./...
+
+  # The Go tests again under the race detector, on another runner so the
+  # server job does not wait for it. -short skips the speed budgets, which
+  # mean nothing at the race detector's speed.
+  server-race:
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Keep Go caches in this runner's tool cache
+        run: |
+          echo "GOCACHE=$RUNNER_TOOL_CACHE/go-build" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$RUNNER_TOOL_CACHE/go-mod" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+          cache: ${{ runner.environment == 'github-hosted' }}
+      - name: Fetch the ffmpeg build the releases ship
+        env:
+          FFMPEG_CACHE: ${{ runner.tool_cache }}/watchmymedia-ffmpeg
+        run: deploy/macos/fetch-ffmpeg.sh arm64
+      - name: Test with the race detector
+        working-directory: server
+        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test -race -short ./...
+
+  web:
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Each runner owns its installation; ~/setup-pnpm is shared on the Mac.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 9
+          dest: ${{ runner.temp }}/setup-pnpm
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-embedded-web
+          path: web/dist/
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+      # The Cast receiver, deployed separately to cast.watchmy.media.
+      - run: pnpm build:receiver
+      # The downloads Worker and the release scripts (deploy/, PLAN-RELEASES.md
+      # §3), tested in this job because it has Node.
+      - name: Test the downloads Worker and the release scripts
+        working-directory: .
+        run: |
+          # The Worker, the site and the release scripts are not in the
+          # public repository (deploy/oss/private-paths.txt).
+          if [ -d deploy/release ]; then
+            node --test deploy/downloads/worker.test.js
+            python3 -I -m unittest discover -s deploy/downloads -p '*_test.py'
+            node --test deploy/site/downloads.test.mjs
+            python3 -I -m unittest discover -s deploy/release -p '*_test.py'
+          fi
+          python3 -I -m unittest discover -s deploy/ci -p '*_test.py'
+          python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'
+
+  # The API documents in api/ (which the native apps generate their clients
+  # from) and the web's copy and types must match the server's code.
+  contract:
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Keep Go caches in this runner's tool cache
+        run: |
+          echo "GOCACHE=$RUNNER_TOOL_CACHE/go-build" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$RUNNER_TOOL_CACHE/go-mod" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+          cache: ${{ runner.environment == 'github-hosted' }}
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 9
+          dest: ${{ runner.temp }}/setup-pnpm
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: cd web && pnpm install --frozen-lockfile
+      # PATH is passed so make uses the Go and pnpm set up above, not
+      # whatever the Makefile's Homebrew path holds on the machine.
+      - name: Check the API documents and web types are current
+        run: |
+          make gen-api PATH="$PATH"
+          git diff --exit-code -- api web/src/api
+
+  docker:
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    needs: [server, web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check Docker is running
+        run: |
+          docker info --format 'Docker {{.ServerVersion}} on {{.OperatingSystem}}' || {
+            echo "::error::Docker is not running for the runner's user. Start OrbStack or Docker Desktop on the Mac Studio, or check the hosted Linux daemon (deploy/ci/mac-studio.md)."
+            exit 1
+          }
+      # Keep registry credentials and keychain helpers out of CI, while
+      # retaining the Mac's Docker context and installed CLI plugins.
+      - name: Prepare a private Docker config
+        run: |
+          python3 -I deploy/ci/prepare-docker.py "${DOCKER_CONFIG:-$HOME/.docker}" "$RUNNER_TEMP/docker-ci"
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/docker-ci" >> "$GITHUB_ENV"
+      # Native Linux image: arm64 on the Mac Studio, amd64 on hosted Linux.
+      # The release image job builds both architectures with QEMU.
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: false
+          load: true
+          tags: watchmymedia:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # The image's ffmpeg, entrypoint and server, without a GPU.
+      - name: Smoke test the image
+        run: deploy/ci/docker-smoke.sh watchmymedia:ci
+
+  # The Android app (one APK for phones, tablets and TVs): unit tests with
+  # their coverage report (no threshold), lint, a debug build and an unsigned
+  # release build, so R8's shrinking and keep rules are checked before a tag,
+  # when android/ or api/ changed. --continue runs them all even when one
+  # fails, so a run reports every problem at once.
+  android:
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # gradle-wrapper.jar runs before anything else in the build: check it is
+      # one Gradle published.
+      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Keep Android tools in this runner's tool cache
+        run: |
+          echo "ANDROID_HOME=$RUNNER_TOOL_CACHE/android-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$RUNNER_TOOL_CACHE/android-sdk" >> "$GITHUB_ENV"
+          echo "GRADLE_USER_HOME=$RUNNER_TOOL_CACHE/gradle" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: ${{ runner.environment == 'github-hosted' && 'gradle' || '' }}
+          cache-dependency-path: |
+            android/**/*.gradle.kts
+            android/gradle/libs.versions.toml
+            android/gradle/wrapper/gradle-wrapper.properties
+      # Both SDK variables and Gradle's home are set above: an inherited
+      # machine-wide SDK must never make two runners install into one folder.
+      # The licences are accepted, so the Android Gradle plugin can add
+      # anything else it needs; these are what the build uses today.
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: platform-tools platforms;android-37.0 build-tools;36.0.0
+          log-accepted-android-sdk-licenses: false
+      - name: Test, lint and build
+        run: ./gradlew testDebugUnitTest coverageReport lintDebug assembleDebug :app:assembleRelease --continue --console=plain
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: android-reports
+          path: |
+            android/**/build/reports/lint-results-debug.html
+            android/**/build/reports/tests/testDebugUnitTest/
+            android/**/build/test-results/testDebugUnitTest/*.xml
+            android/build/reports/jacoco/coverageReport/
+
+  # The iPhone app (apple/, PLAN-IOS.md), when apple/ or api/ changed: the
+  # Swift API client against api/openapi.json, the Kit's unit tests on the
+  # Mac, then the app built and every test run on an iOS simulator. Xcode is
+  # already on the Mac Studio and hosted Macs; XcodeGen comes from Homebrew, at least
+  # the version project.yml asks for (apple/scripts/install-xcodegen.sh).
+  apple:
+    needs: changes
+    if: needs.changes.outputs.apple == 'true'
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install XcodeGen
+        run: apple/scripts/install-xcodegen.sh
+      - name: Check the Swift API client is current
+        run: |
+          make apple-api PATH="$PATH"
+          git diff --exit-code -- apple/Kit/Sources/WMMAPI
+      - name: Kit unit tests
+        env:
+          SWIFT_BACKTRACE: enable=yes,interactive=no
+          NSUnbufferedIO: "YES"
+        run: |
+          xcodebuild -version
+          swift --version
+          mkdir -p apple/build
+          set -o pipefail
+          make apple-test PATH="$PATH" 2>&1 | tee apple/build/kit-tests.log
+      - name: Preserve failed Kit test diagnostics
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ failure() && !cancelled() }}
+        with:
+          name: apple-kit-diagnostics
+          path: |
+            apple/build/kit-tests.log
+            ~/Library/Logs/DiagnosticReports/swiftpm*.ips
+            ~/Library/Logs/DiagnosticReports/WatchMyMedia*.ips
+      - name: Build and test on a simulator
+        run: make apple-test-sim PATH="$PATH"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: apple-test-results
+          path: apple/build/Tests.xcresult
+
+  # The Apple TV app (apple/TV, PLAN-IOS.md §11.2), gated like the apple job:
+  # built, and the Kit's tests and the remote UI tests (apple/TVUITests) run,
+  # on an Apple TV simulator. The tvOS simulator runtime is downloaded the
+  # first time a runner needs it.
+  apple-tv:
+    needs: changes
+    if: needs.changes.outputs.apple == 'true'
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install XcodeGen
+        run: apple/scripts/install-xcodegen.sh
+      - name: Install the tvOS simulator runtime
+        run: xcrun simctl list runtimes | grep -q tvOS || xcodebuild -downloadPlatform tvOS
+      - name: Build and test on an Apple TV simulator
+        # Two Studio runners stalled after all tests passed. Avoid verbose
+        # sysdiagnose collection, a possible cause; keep results and failures.
+        timeout-minutes: 20
+        run: make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never PATH="$PATH"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: apple-tv-test-results
+          path: apple/build/TVTests.xcresult
+
+  # The Go tests on Windows, with the ffmpeg build the Windows app will ship
+  # (PLAN.md §7c). The Mac Studio cannot run Windows, so this is GitHub's
+  # Windows runner, billed by the minute; it runs only when the server, the
+  # ffmpeg pin or this file changed. It has no GPU: it covers the software
+  # path, Windows file handling and the GPU pipelines' arguments, not the
+  # GPUs themselves.
+  windows:
+    needs: [changes, web]
+    if: needs.changes.outputs.windows == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test Windows hardware collector helpers
+        shell: pwsh
+        run: ./windows/hardware-check-test.ps1
+      - name: Test the signer identity checks
+        shell: pwsh
+        run: ./windows/signing-test.ps1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-embedded-web
+          path: server/internal/webui/dist
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: Fetch the ffmpeg build the Windows app will ship
+        shell: bash
+        run: |
+          deploy/macos/fetch-ffmpeg.sh windows-amd64
+          build/ffmpeg/windows-amd64/ffmpeg.exe -hide_banner -version | head -1
+      - name: Check Windows playlists and recording publication
+        working-directory: server
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          go test ./internal/playback -run '^Test(PlaylistSnapshotDoesNotBlockReplacement|EventPlaylistCachesTheLastSnapshot|FinishedPlaylist.*|VODPlaylistReadsOnlyNewPieces|SharedSegmentCanBeRenamedAwayWhileReading|SharedReaderSupportsLongPaths|SharedPathPreservesWindowsNamespaces)$' -count=1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Exercise the final playlist publication against its startup reader.
+          go test ./internal/playback -run '^TestRemuxSession$' -count=50
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Exercise recording ownership, no-replace publication and an
+          # open growing reader across the final rename on Windows itself.
+          go test -short ./internal/growing ./internal/livetv/dvr -count=1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test ./internal/playback -run '^TestGrowingTransportProducesEventThenEndList$' -count=1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Qualify shared Live TV output, recovery and held readers
+        working-directory: server
+        shell: pwsh
+        env:
+          # Five simultaneous software claims were not stable on this runner.
+          # Keep HD, separate outputs, recording and the six-second failure guard.
+          WMM_LIVE_QUALIFICATION_CLAIMS: '3'
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          go test -tags streamingacceptance ./internal/livetv/dvr -run '^TestLiveLadder.*Qualification$' -count=2 -v
+      - name: Report Windows transcoder diagnostics
+        working-directory: server
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          New-Item -ItemType Directory -Force ../build/hardware-report | Out-Null
+          $env:WATCHMYMEDIA_DATA_DIR = "$env:GITHUB_WORKSPACE\build\hardware-report\must-not-create-data"
+          go run ./cmd/server gpu-adapters | Out-File -Encoding utf8 ../build/hardware-report/adapters.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $inventory = Get-Content -Raw ../build/hardware-report/adapters.json | ConvertFrom-Json
+          if (!$inventory.supported -or $null -eq $inventory.adapters -or @($inventory.diagnostics).Count -ne 2) { throw 'Missing native Windows inventory' }
+          $directx = @($inventory.diagnostics | Where-Object namespace -eq 'directx')
+          if ($directx.Count -ne 1 -or !$directx[0].ok) { throw ('DXGI enumeration failed: ' + ($directx | ConvertTo-Json -Compress)) }
+          if (Test-Path $env:WATCHMYMEDIA_DATA_DIR) { throw 'Adapter discovery opened a data directory' }
+          # Missing CUDA is expected on hosted software runners. Names are not
+          # codec admission: the standalone pipeline probe below remains separate.
+          go run ./cmd/server probe-transcoder -hwaccel software | Out-File -Encoding utf8 ../build/hardware-report/windows.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Test-Path $env:WATCHMYMEDIA_DATA_DIR) { throw 'Standalone probes opened a data directory' }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: windows-transcoder-report
+          path: build/hardware-report/*.json
+          retention-days: 7
+
+      - name: Test and vet the tray app
+        working-directory: windows
+        run: |
+          go vet ./...
+          go test ./...
+      - name: Build the Windows app
+        shell: bash
+        run: windows/build.sh
+      - name: Check the pinned updater DLL
+        working-directory: windows
+        shell: pwsh
+        run: |
+          $env:WMM_WINSPARKLE_TEST_DLL = "$env:GITHUB_WORKSPACE\build\windows-app\WinSparkle.dll"
+          go test ./internal/winui -run TestPinnedUpdaterDLL -v
+      - name: Test and collect Windows hardware evidence
+        shell: pwsh
+        run: |
+          $env:WATCHMYMEDIA_DATA_DIR = "$env:GITHUB_WORKSPACE\build\hardware-acceptance-must-not-create-data"
+          ./windows/hardware-check.ps1 -AppDir build/windows-app -ReportDir build/windows-hardware-check -Backend software -MaxMinutes 3
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $report = Get-Content -Raw build/windows-hardware-check/report.json | ConvertFrom-Json
+          if (!$report.collectionComplete -or $report.acceptanceComplete -or $report.desktopPlatform.desktopSupported -or $report.desktopPlatform.ciOnly) { throw 'Hosted software evidence was mistaken for desktop/release acceptance' }
+          if (@($report.probes).Count -ne 1 -or $report.probes[0].outcome -ne 'software' -or @($report.source.files).Count -ne 5) { throw 'Missing software probe or binary provenance' }
+          if (Test-Path $env:WATCHMYMEDIA_DATA_DIR) { throw 'Hardware collector opened a server data directory' }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: windows-hardware-check
+          path: build/windows-hardware-check/**
+          retention-days: 7
+      - name: Install the pinned installer compiler
+        shell: pwsh
+        run: choco install nsis --version=3.13.0 --yes --no-progress
+      - name: Build the development installer
+        shell: bash
+        run: |
+          if ! command -v makensis >/dev/null; then
+            export PATH="/c/Program Files (x86)/NSIS:$PATH"
+          fi
+          VERSION=development windows/installer.sh
+      - name: Reject publication of the unsigned installer
+        shell: pwsh
+        run: |
+          $installer = "$env:GITHUB_WORKSPACE\build\windows-installer\WatchMyMedia-development-x64-setup-unsigned.exe"
+          $rejected = $false
+          try {
+            ./windows/verify-installer.ps1 -AppDir "$env:GITHUB_WORKSPACE\build\windows-app" -Installer $installer -Uninstaller "$env:GITHUB_WORKSPACE\build\windows-installer\uninstall.exe"
+          } catch {
+            if ($_.Exception.Message -notlike 'Signature verification failed for *') { throw }
+            $rejected = $true
+          }
+          if (!$rejected -or !(Test-Path $installer) -or (Test-Path ($installer -replace '-unsigned\.exe$','.exe'))) {
+            throw 'Unsigned installer was not held in staging'
+          }
+      - name: Verify normal desktop app and installer reject Windows Server
+        shell: pwsh
+        run: windows/platform-smoke.ps1
+      - name: Build separate CI-only app and installer for hosted Server tests
+        shell: bash
+        run: |
+          windows/build.sh --ci-server-host
+          if ! command -v makensis >/dev/null; then
+            export PATH="/c/Program Files (x86)/NSIS:$PATH"
+          fi
+          windows/installer.sh --ci-server-host
+      - name: Reject promotion and off-CI use of the CI-only build
+        shell: pwsh
+        run: windows/platform-smoke.ps1 -CIHost
+      - name: Exercise the tray and real server on the hosted Server
+        shell: pwsh
+        run: windows/smoke.ps1 -CIHost
+      - name: Exercise installation, upgrade and uninstall
+        shell: pwsh
+        run: windows/installer-smoke.ps1 -CIHost
+      - name: Test
+        working-directory: server
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          go test ./...
+      - name: Qualify complete software VOD rendition output
+        working-directory: server
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          go test -tags streamingacceptance ./internal/playback -run '^TestVODLadder(FullFileQualification|RejectsUnboundedCopiedAudio)$' -count=1 -v
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-development-installer
+          path: build/windows-installer/*-unsigned.exe
+          retention-days: 7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: windows-tray-logs
+          path: build/windows-smoke/**/Logs/*.log*
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: windows-desktop-platform-report
+          path: build/windows-platform-smoke/*.json
+          retention-days: 7
+
+  # A Windows app and installer signed with Artifact Signing and verified, on
+  # a manual run that asks for it ("Also sign and verify a Windows
+  # installer"); never on pull requests or pushes. A run uses seven of the
+  # Basic plan's 5,000 signatures a month. The windows-signing environment
+  # admits only v* tags, so start the run from a tag, and the Azure app it signs in
+  # as can only sign with the watchmymedia profile (windows/SIGNING.md).
+  # GitHub-hosted, like the windows job.
+  windows-signing:
+    needs: [web]
+    if: github.event_name == 'workflow_dispatch' && inputs.sign_windows
+    runs-on: windows-latest
+    environment: windows-signing
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-embedded-web
+          path: server/internal/webui/dist
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      # The Artifact Signing client runs on .NET 10.
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.x
+      - name: Install the pinned installer compiler
+        shell: pwsh
+        run: choco install nsis --version=3.13.0 --yes --no-progress
+      - name: Build the Windows app
+        shell: bash
+        run: |
+          deploy/macos/fetch-ffmpeg.sh windows-amd64
+          windows/build.sh
+      - name: Fetch the pinned signing tools
+        shell: pwsh
+        env:
+          ARTIFACT_SIGNING_ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          ARTIFACT_SIGNING_ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          ARTIFACT_SIGNING_PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+        run: ./windows/setup-signing.ps1 -Destination "$env:RUNNER_TEMP\artifact-signing"
+      # Sign in through GitHub's OIDC token: no client secret exists. The token
+      # lasts minutes, so everything that needs Azure follows at once; the
+      # first step takes the signing service's access token, which the Azure
+      # CLI then reuses for every signature.
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_SIGNING_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Sign the app, inside out
+        shell: pwsh
+        run: |
+          az account get-access-token --resource https://codesigning.azure.net --output none
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $app = "$env:GITHUB_WORKSPACE\build\windows-app"
+          ./windows/sign.ps1 -Path (@('WatchMyMedia.exe', 'watchmymedia-server.exe', 'ffmpeg.exe', 'ffprobe.exe', 'WinSparkle.dll') | ForEach-Object { Join-Path $app $_ })
+      - name: Build and sign the uninstaller and installer
+        shell: bash
+        run: |
+          if ! command -v makensis >/dev/null; then
+            export PATH="/c/Program Files (x86)/NSIS:$PATH"
+          fi
+          VERSION=development windows/installer.sh --sign
+      - name: Check the signed app and installer still refuse Windows Server
+        shell: pwsh
+        run: windows/platform-smoke.ps1
+      - name: Verify every signature and promote the installer
+        shell: pwsh
+        run: ./windows/verify-installer.ps1 -AppDir "$env:GITHUB_WORKSPACE\build\windows-app" -Installer "$env:GITHUB_WORKSPACE\build\windows-installer\WatchMyMedia-development-x64-setup-unsigned.exe" -Uninstaller "$env:GITHUB_WORKSPACE\build\windows-installer\uninstall.exe"
+      - name: Refuse a changed installer and a look-alike signature
+        shell: pwsh
+        run: ./windows/signing-smoke.ps1
+      # For installing on a real Windows 11 PC. Private to this run's
+      # artifacts for seven days; never a release or a download.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-signed-installer
+          path: build/windows-installer/WatchMyMedia-development-x64-setup.exe
+          if-no-files-found: error
+          retention-days: 7

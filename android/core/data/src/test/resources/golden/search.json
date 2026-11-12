@@ -1,0 +1,159 @@
+{
+  "movies": [
+    {
+      "id": 4,
+      "libraryId": 1,
+      "tmdbId": 800004,
+      "title": "Glass Tide",
+      "year": 2023,
+      "releaseDate": "2023-08-25",
+      "overview": "Rising water, falling glass.",
+      "runtimeMin": 2,
+      "genres": [
+        "Science Fiction"
+      ],
+      "rating": 8.1,
+      "contentRating": "PG",
+      "posterPath": "/gt-poster.jpg",
+      "backdropPath": "/gt-backdrop.jpg",
+      "fileCount": 0,
+      "credits": []
+    },
+    {
+      "id": 1,
+      "libraryId": 1,
+      "tmdbId": 800001,
+      "title": "Harbor Lights",
+      "year": 2019,
+      "releaseDate": "2019-09-13",
+      "overview": "A lighthouse keeper's last season.",
+      "tagline": "Every light goes out.",
+      "runtimeMin": 2,
+      "genres": [
+        "Drama"
+      ],
+      "rating": 6.9,
+      "contentRating": "PG-13",
+      "posterPath": "/hl-poster.jpg",
+      "backdropPath": "/hl-backdrop.jpg",
+      "fileCount": 0,
+      "credits": [
+        {
+          "name": "June Okafor",
+          "character": "Keeper",
+          "profilePath": "/june.jpg"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "libraryId": 1,
+      "tmdbId": 800003,
+      "title": "Static Bloom",
+      "year": 2016,
+      "releaseDate": "2016-02-19",
+      "overview": "",
+      "runtimeMin": 2,
+      "genres": [],
+      "fileCount": 0,
+      "credits": []
+    }
+  ],
+  "shows": [
+    {
+      "id": 1,
+      "libraryId": 2,
+      "tmdbId": 900001,
+      "title": "Night Shift Diner",
+      "year": 2020,
+      "firstAirDate": "2020-03-02",
+      "overview": "A roadside diner that never closes, and the night crew who keep it that way.",
+      "status": "Returning Series",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ],
+      "rating": 7.4,
+      "contentRating": "TV-14",
+      "posterPath": "/nsd-poster.jpg",
+      "backdropPath": "/nsd-backdrop.jpg",
+      "episodeCount": 0,
+      "lastAirDate": "2021-04-12",
+      "nextAirDate": "2031-01-06",
+      "credits": [
+        {
+          "name": "Rosa Vance",
+          "character": "Mae",
+          "profilePath": "/rosa.jpg"
+        },
+        {
+          "name": "Theo Park",
+          "character": "Cook"
+        }
+      ]
+    }
+  ],
+  "episodes": [
+    {
+      "id": 11,
+      "showId": 1,
+      "showTitle": "Night Shift Diner",
+      "showPosterPath": "/nsd-poster.jpg",
+      "seasonNumber": 1,
+      "number": 1,
+      "title": "Pilot",
+      "stillPath": "/nsd-101.jpg",
+      "airDate": "2020-03-02",
+      "fileId": 4,
+      "watched": true
+    },
+    {
+      "id": 13,
+      "showId": 1,
+      "showTitle": "Night Shift Diner",
+      "showPosterPath": "/nsd-poster.jpg",
+      "seasonNumber": 1,
+      "number": 3,
+      "title": "Last Call",
+      "airDate": "2020-03-16",
+      "fileId": 3,
+      "watched": false
+    },
+    {
+      "id": 21,
+      "showId": 1,
+      "showTitle": "Night Shift Diner",
+      "showPosterPath": "/nsd-poster.jpg",
+      "seasonNumber": 2,
+      "number": 1,
+      "title": "Open Late",
+      "airDate": "2021-03-29",
+      "fileId": 1,
+      "watched": false
+    },
+    {
+      "id": 22,
+      "showId": 1,
+      "showTitle": "Night Shift Diner",
+      "showPosterPath": "/nsd-poster.jpg",
+      "seasonNumber": 2,
+      "number": 2,
+      "title": "Double Shift",
+      "airDate": "2021-04-05",
+      "fileId": 9,
+      "watched": false
+    },
+    {
+      "id": 23,
+      "showId": 1,
+      "showTitle": "Night Shift Diner",
+      "showPosterPath": "/nsd-poster.jpg",
+      "seasonNumber": 2,
+      "number": 3,
+      "title": "Closing Time",
+      "airDate": "2021-04-12",
+      "fileId": 10,
+      "watched": false
+    }
+  ]
+}

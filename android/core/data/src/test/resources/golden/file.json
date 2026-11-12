@@ -1,0 +1,67 @@
+{
+  "id": 2,
+  "libraryId": 2,
+  "path": "/media/TV/Night Shift Diner (2020)/Season 01/Night Shift Diner (2020) - S01E02 - Graveyard Special.mkv",
+  "relativePath": "Night Shift Diner (2020)/Season 01/Night Shift Diner (2020) - S01E02 - Graveyard Special.mkv",
+  "size": 3550555,
+  "modifiedAt": "2026-10-29T18:37:43.795Z",
+  "status": "present",
+  "parsed": {
+    "kind": "episode",
+    "title": "Night Shift Diner",
+    "year": 2020,
+    "season": 1,
+    "episodes": [
+      2
+    ],
+    "episodeTitle": "Graveyard Special"
+  },
+  "container": "matroska",
+  "videoCodec": "h264",
+  "audioCodec": "aac",
+  "width": 1280,
+  "height": 720,
+  "durationMs": 200021,
+  "firstSeenAt": "2026-10-29T18:38:19.617Z",
+  "addedAt": "2026-10-29T18:37:43.795Z",
+  "lastSeenAt": "2026-10-29T23:07:01.186Z",
+  "matchStatus": "matched",
+  "matchLocked": true,
+  "matchIgnored": false,
+  "probe": {
+    "container": "matroska",
+    "formatName": "matroska,webm",
+    "durationMs": 200021,
+    "bitRate": 142007,
+    "size": 3550555,
+    "video": [
+      {
+        "index": 0,
+        "codec": "h264",
+        "profile": "High",
+        "width": 1280,
+        "height": 720,
+        "frameRate": 24,
+        "pixelFormat": "yuv420p",
+        "bitDepth": 8,
+        "default": false
+      }
+    ],
+    "audio": [
+      {
+        "index": 1,
+        "codec": "aac",
+        "profile": "LC",
+        "channels": 2,
+        "channelLayout": "stereo",
+        "sampleRate": 48000,
+        "default": false
+      }
+    ],
+    "subtitles": []
+  },
+  "episodeId": 12,
+  "showId": 1,
+  "seasonNumber": 1,
+  "episodeNumber": 2
+}

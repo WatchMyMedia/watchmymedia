@@ -1,0 +1,42 @@
+# The image builds the web app and the server from source (deploy/Dockerfile),
+# so it needs only the sources. Keep out runtime data (deploy/docker-compose.yml
+# mounts ../data), per-machine settings, and host build outputs, which are
+# large and, for node_modules, built for the wrong platform.
+.git
+.github
+.claude
+data
+deploy/.env
+**/node_modules
+web/dist
+server/internal/webui/dist
+server/tmp
+bin
+dist
+build
+macos
+brand/export
+*.log
+
+# Only server/web/deploy sources are needed; never send client signing files.
+android
+apple
+**/.git
+**/.env
+**/.env.*
+**/secrets
+**/*.p8
+**/*.p12
+**/*.pfx
+**/*.pem
+**/*.key
+**/*.cer
+**/*.keystore
+**/*.jks
+**/*.db
+**/*.db-*
+**/*.sqlite
+**/*.sqlite3
+**/*.log
+**/local.properties
+**/.DS_Store

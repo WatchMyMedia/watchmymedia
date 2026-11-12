@@ -1,0 +1,202 @@
+{
+  "id": 1,
+  "showId": 1,
+  "number": 1,
+  "name": "Season 1",
+  "overview": "The first winter on nights.",
+  "airDate": "2020-03-02",
+  "posterPath": "/nsd-s1.jpg",
+  "episodeCount": 3,
+  "availableCount": 3,
+  "watchedCount": 0,
+  "show": {
+    "id": 1,
+    "libraryId": 2,
+    "tmdbId": 900001,
+    "title": "Night Shift Diner",
+    "year": 2020,
+    "firstAirDate": "2020-03-02",
+    "overview": "A roadside diner that never closes, and the night crew who keep it that way.",
+    "status": "Returning Series",
+    "genres": [
+      "Comedy",
+      "Drama"
+    ],
+    "rating": 7.4,
+    "contentRating": "TV-14",
+    "posterPath": "/nsd-poster.jpg",
+    "backdropPath": "/nsd-backdrop.jpg",
+    "episodeCount": 0,
+    "lastAirDate": "2021-04-12",
+    "nextAirDate": "2031-01-06",
+    "credits": [
+      {
+        "name": "Rosa Vance",
+        "character": "Mae",
+        "profilePath": "/rosa.jpg"
+      },
+      {
+        "name": "Theo Park",
+        "character": "Cook"
+      }
+    ]
+  },
+  "episodes": [
+    {
+      "id": 11,
+      "seasonId": 1,
+      "number": 1,
+      "title": "Pilot",
+      "overview": "Mae takes the night shift.",
+      "airDate": "2020-03-02",
+      "stillPath": "/nsd-101.jpg",
+      "runtimeMin": 4,
+      "rating": 7.1,
+      "files": [
+        {
+          "id": 4,
+          "libraryId": 2,
+          "path": "/media/TV/Night Shift Diner (2020)/Season 01/Night Shift Diner (2020) - S01E01 - Pilot.mkv",
+          "relativePath": "Night Shift Diner (2020)/Season 01/Night Shift Diner (2020) - S01E01 - Pilot.mkv",
+          "size": 66933489,
+          "modifiedAt": "2026-10-29T18:37:38.369Z",
+          "status": "present",
+          "parsed": {
+            "kind": "episode",
+            "title": "Night Shift Diner",
+            "year": 2020,
+            "season": 1,
+            "episodes": [
+              1
+            ],
+            "episodeTitle": "Pilot"
+          },
+          "container": "matroska",
+          "videoCodec": "h264",
+          "audioCodec": "aac",
+          "width": 1280,
+          "height": 720,
+          "durationMs": 200021,
+          "firstSeenAt": "2026-10-29T18:38:19.618Z",
+          "addedAt": "2026-10-29T18:37:38.369Z",
+          "lastSeenAt": "2026-10-29T23:07:01.183Z",
+          "matchStatus": "matched",
+          "matchLocked": true,
+          "matchIgnored": false
+        }
+      ],
+      "hasFile": true,
+      "aired": true,
+      "addedAt": "2026-10-29T18:37:38.369Z",
+      "isNew": false,
+      "watch": {
+        "positionMs": 200000,
+        "durationMs": 200000,
+        "completed": true,
+        "fileId": 4,
+        "updatedAt": "2026-11-01T19:50:06.71Z"
+      }
+    },
+    {
+      "id": 12,
+      "seasonId": 1,
+      "number": 2,
+      "title": "Graveyard Special",
+      "overview": "A trucker orders off the menu.",
+      "airDate": "2020-03-09",
+      "stillPath": "/nsd-102.jpg",
+      "runtimeMin": 4,
+      "rating": 7.3,
+      "files": [
+        {
+          "id": 2,
+          "libraryId": 2,
+          "path": "/media/TV/Night Shift Diner (2020)/Season 01/Night Shift Diner (2020) - S01E02 - Graveyard Special.mkv",
+          "relativePath": "Night Shift Diner (2020)/Season 01/Night Shift Diner (2020) - S01E02 - Graveyard Special.mkv",
+          "size": 3550555,
+          "modifiedAt": "2026-10-29T18:37:43.795Z",
+          "status": "present",
+          "parsed": {
+            "kind": "episode",
+            "title": "Night Shift Diner",
+            "year": 2020,
+            "season": 1,
+            "episodes": [
+              2
+            ],
+            "episodeTitle": "Graveyard Special"
+          },
+          "container": "matroska",
+          "videoCodec": "h264",
+          "audioCodec": "aac",
+          "width": 1280,
+          "height": 720,
+          "durationMs": 200021,
+          "firstSeenAt": "2026-10-29T18:38:19.617Z",
+          "addedAt": "2026-10-29T18:37:43.795Z",
+          "lastSeenAt": "2026-10-29T23:07:01.186Z",
+          "matchStatus": "matched",
+          "matchLocked": true,
+          "matchIgnored": false
+        }
+      ],
+      "hasFile": true,
+      "aired": true,
+      "addedAt": "2026-10-29T18:37:43.795Z",
+      "isNew": false,
+      "watch": {
+        "positionMs": 60000,
+        "durationMs": 200000,
+        "completed": false,
+        "fileId": 2,
+        "updatedAt": "2026-11-01T19:50:06.71Z"
+      }
+    },
+    {
+      "id": 13,
+      "seasonId": 1,
+      "number": 3,
+      "title": "Last Call",
+      "overview": "",
+      "airDate": "2020-03-16",
+      "runtimeMin": 4,
+      "files": [
+        {
+          "id": 3,
+          "libraryId": 2,
+          "path": "/media/TV/Night Shift Diner (2020)/Season 01/Night Shift Diner (2020) - S01E03 - Last Call.mkv",
+          "relativePath": "Night Shift Diner (2020)/Season 01/Night Shift Diner (2020) - S01E03 - Last Call.mkv",
+          "size": 3625783,
+          "modifiedAt": "2026-10-29T18:37:50.338Z",
+          "status": "present",
+          "parsed": {
+            "kind": "episode",
+            "title": "Night Shift Diner",
+            "year": 2020,
+            "season": 1,
+            "episodes": [
+              3
+            ],
+            "episodeTitle": "Last Call"
+          },
+          "container": "matroska",
+          "videoCodec": "h264",
+          "audioCodec": "aac",
+          "width": 1280,
+          "height": 720,
+          "durationMs": 200021,
+          "firstSeenAt": "2026-10-29T18:38:19.618Z",
+          "addedAt": "2026-10-29T18:37:50.338Z",
+          "lastSeenAt": "2026-10-29T23:07:01.187Z",
+          "matchStatus": "matched",
+          "matchLocked": true,
+          "matchIgnored": false
+        }
+      ],
+      "hasFile": true,
+      "aired": true,
+      "addedAt": "2026-10-29T18:37:50.338Z",
+      "isNew": false
+    }
+  ]
+}

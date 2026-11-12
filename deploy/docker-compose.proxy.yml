@@ -1,0 +1,54 @@
+# Public access: Caddy (HTTPS) in front of WatchMyMedia plus a dynamic DNS
+# updater that keeps your domain pointed at your home IP. For Linux hosts.
+# On macOS use docker-compose.proxy-macos.yml with Caddy from Homebrew:
+# Docker Desktop hides client addresses, so a Caddy container would make
+# every internet client look local.
+#
+# Set WATCHMYMEDIA_DOMAIN in deploy/.env, create data/ddns/config.json, then
+# run from the repository root:
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml up -d
+services:
+  watchmymedia:
+    environment:
+      # Believe X-Forwarded-For only from the Caddy container's fixed address.
+      WATCHMYMEDIA_TRUSTED_PROXIES: "${WATCHMYMEDIA_PROXY_IP:-10.87.250.10}"
+      WATCHMYMEDIA_AUTH_SECURE_COOKIES: "true"
+
+  caddy:
+    image: caddy:2.11-alpine
+    container_name: watchmymedia-caddy
+    restart: unless-stopped
+    depends_on:
+      - watchmymedia
+    networks:
+      default:
+        ipv4_address: "${WATCHMYMEDIA_PROXY_IP:-10.87.250.10}"
+    ports:
+      - "80:80"   # certificate challenges and the redirect to HTTPS
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      WATCHMYMEDIA_DOMAIN: "${WATCHMYMEDIA_DOMAIN:?Set WATCHMYMEDIA_DOMAIN in deploy/.env}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../data/caddy/data:/data
+      - ../data/caddy/config:/config
+
+  ddns:
+    image: qmcgaw/ddns-updater:v2.10
+    container_name: watchmymedia-ddns
+    restart: unless-stopped
+    environment:
+      PERIOD: "5m"
+      # Its status page stays inside the compose network; nothing is published.
+    volumes:
+      - ../data/ddns:/updater/data
+
+networks:
+  default:
+    # A fixed subnet outside Docker's own pools (172.17-31.x and 192.168.x),
+    # so it cannot clash with networks Docker hands out. Override it with
+    # WATCHMYMEDIA_PROXY_SUBNET if your LAN or a VPN uses 10.87.250.x.
+    ipam:
+      config:
+        - subnet: "${WATCHMYMEDIA_PROXY_SUBNET:-10.87.250.0/24}"

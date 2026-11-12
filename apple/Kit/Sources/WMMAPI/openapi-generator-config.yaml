@@ -1,0 +1,102 @@
+# swift-openapi-generator settings for the client in Generated/. Regenerate
+# with `make apple-api` after `make gen-api`; CI fails when it is stale.
+# Only the operations an app makes are generated: admin, setup, activity and
+# statistics stay in the web UI (PLAN-CLIENTS.md §6).
+generate:
+  - types
+  - client
+accessModifier: public
+namingStrategy: idiomatic
+filter:
+  operations:
+    - getServer
+    - getAuthStatus
+    - login
+    - logout
+    - getMe
+    - createMediaToken
+    - startPairing
+    - claimPairing
+    - getPairing
+    - approvePairing
+    - listSessions
+    - revokeSession
+    - events
+    - getHome
+    - getLibraryRows
+    - getRowLayout
+    - updateRowLayout
+    - resetRowLayout
+    - listMediaLists
+    - getMediaList
+    - listMediaListEntries
+    - refreshMediaList
+    - deleteMediaList
+    - listLibraries
+    - listLibraryItems
+    - getShow
+    - getSeason
+    - getMovie
+    - search
+    - listContinueWatching
+    - markWatched
+    - markUnwatched
+    - markSeasonWatched
+    - markSeasonUnwatched
+    - markShowWatched
+    - markShowUnwatched
+    - getPreferences
+    - updatePreferences
+    - getFile
+    - startPlayback
+    - reportProgress
+    - stopPlayback
+    - planPlayback
+    - searchSubtitles
+    - downloadSubtitle
+    - automaticSubtitle
+    - createCastToken
+    - getRequestOptions
+    - searchRequestable
+    - getRequestable
+    - createRequest
+    - listMyRequests
+    - cancelRequest
+    - listInbox
+    - decideRequest
+    - reportProblem
+    - resolveProblem
+    - searchMissingEpisodes
+    - monitorEpisodes
+    - previewDelete
+    - deleteEpisode
+    - deleteMovie
+    - replaceFile
+    - getLiveTVCapabilities
+    - listLiveTVChannels
+    - startLiveTV
+    - getLiveTVSession
+    - heartbeatLiveTV
+    - stopLiveTV
+    - getLiveTVGuide
+    - searchLiveTVGuide
+    - addLiveTVFavourite
+    - removeLiveTVFavourite
+    - listLiveTVReminders
+    - listLiveTVRecordings
+    - createLiveTVRecording
+    - createManualLiveTVRecording
+    - updateLiveTVRecording
+    - cancelLiveTVRecording
+    - deleteLiveTVRecordingFile
+    - getLiveTVRecordingRule
+    - updateLiveTVRecordingRule
+    - deleteLiveTVRecordingRule
+    - startLiveTVRecordingPlayback
+    - reportLiveTVRecordingProgress
+    - setLiveTVReminder
+    - deleteLiveTVReminder
+    - planOfflineDownload
+    - createOfflineDownload
+    - createOfflineToken
+    - syncOffline

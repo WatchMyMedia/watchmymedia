@@ -1,0 +1,20 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/watchmymedia ./cmd/server"
+  bin = "./tmp/watchmymedia"
+  # Data lives at the repo root so the web dev server and Docker share it.
+  full_bin = "WATCHMYMEDIA_DATA_DIR=../data ./tmp/watchmymedia"
+  include_ext = ["go", "sql"]
+  exclude_dir = ["tmp", "internal/webui/dist"]
+  exclude_regex = ["_test\\.go"]
+  delay = 500
+  send_interrupt = true
+  kill_delay = "2s"
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = true

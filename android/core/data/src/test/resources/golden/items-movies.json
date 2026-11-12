@@ -1,0 +1,140 @@
+{
+  "items": [
+    {
+      "kind": "movie",
+      "id": 4,
+      "libraryId": 1,
+      "title": "Glass Tide",
+      "year": 2023,
+      "overview": "Rising water, falling glass.",
+      "genres": [
+        "Science Fiction"
+      ],
+      "rating": 8.1,
+      "contentRating": "PG",
+      "posterPath": "/gt-poster.jpg",
+      "backdropPath": "/gt-backdrop.jpg",
+      "quality": "720p",
+      "hdr": true,
+      "addedAt": "2026-10-29T18:37:28.912Z",
+      "isNew": false,
+      "totalSize": 12798425,
+      "watched": false,
+      "fileCount": 1,
+      "runtimeMin": 2,
+      "releaseDate": "2023-08-25"
+    },
+    {
+      "kind": "movie",
+      "id": 1,
+      "libraryId": 1,
+      "title": "Harbor Lights",
+      "year": 2019,
+      "overview": "A lighthouse keeper's last season.",
+      "genres": [
+        "Drama"
+      ],
+      "rating": 6.9,
+      "contentRating": "PG-13",
+      "posterPath": "/hl-poster.jpg",
+      "backdropPath": "/hl-backdrop.jpg",
+      "quality": "1080p",
+      "hdr": false,
+      "addedAt": "2026-10-29T18:37:00.443Z",
+      "isNew": false,
+      "totalSize": 97716429,
+      "watched": false,
+      "fileCount": 1,
+      "runtimeMin": 2,
+      "releaseDate": "2019-09-13"
+    },
+    {
+      "kind": "movie",
+      "id": 2,
+      "libraryId": 1,
+      "title": "Paper Moons",
+      "year": 2021,
+      "overview": "Two letters cross in the mail.",
+      "genres": [
+        "Romance",
+        "Comedy"
+      ],
+      "rating": 7.2,
+      "posterPath": "/pm-poster.jpg",
+      "quality": "720p",
+      "hdr": false,
+      "addedAt": "2026-10-29T18:37:04.102Z",
+      "isNew": false,
+      "totalSize": 2768892,
+      "watched": false,
+      "progress": 0.25,
+      "fileCount": 1,
+      "runtimeMin": 2,
+      "releaseDate": "2021-05-07"
+    },
+    {
+      "kind": "movie",
+      "id": 3,
+      "libraryId": 1,
+      "title": "Static Bloom",
+      "year": 2016,
+      "overview": "",
+      "genres": [],
+      "quality": "720p",
+      "hdr": false,
+      "addedAt": "2026-10-29T18:37:21.45Z",
+      "isNew": false,
+      "totalSize": 27100863,
+      "watched": false,
+      "fileCount": 1,
+      "runtimeMin": 2,
+      "releaseDate": "2016-02-19"
+    }
+  ],
+  "total": 4,
+  "limit": 50,
+  "offset": 0,
+  "facets": {
+    "genres": [
+      "Comedy",
+      "Drama",
+      "Romance",
+      "Science Fiction"
+    ],
+    "decades": [
+      2020,
+      2010
+    ]
+  },
+  "totals": {
+    "items": 4,
+    "episodes": 0,
+    "continuing": 0,
+    "unmatched": 0,
+    "totalSize": 140384609
+  },
+  "letters": [
+    {
+      "letter": "G",
+      "offset": 0
+    },
+    {
+      "letter": "H",
+      "offset": 1
+    },
+    {
+      "letter": "P",
+      "offset": 2
+    },
+    {
+      "letter": "S",
+      "offset": 3
+    }
+  ],
+  "genreCounts": {
+    "Comedy": 1,
+    "Drama": 1,
+    "Romance": 1,
+    "Science Fiction": 1
+  }
+}

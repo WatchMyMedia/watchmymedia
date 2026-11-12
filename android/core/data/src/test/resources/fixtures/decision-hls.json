@@ -1,0 +1,61 @@
+{
+  "mode": "remux",
+  "reasons": [
+    "client cannot play the mkv container"
+  ],
+  "protocol": "hls",
+  "playlist": "vod",
+  "url": "/api/playback/a75ff047261dcc3e/master.m3u8",
+  "mimeType": "application/vnd.apple.mpegurl",
+  "playId": "d2081dfed30c2b6c",
+  "sessionId": "a75ff047261dcc3e",
+  "durationMs": 200021,
+  "startMs": 0,
+  "resumeMs": 0,
+  "video": {
+    "codec": "h264",
+    "copy": true,
+    "width": 1280,
+    "height": 720,
+    "bitDepth": 8,
+    "toneMap": false
+  },
+  "audio": {
+    "index": 1,
+    "codec": "aac",
+    "copy": true,
+    "channels": 2
+  },
+  "audioTracks": [
+    {
+      "index": 1,
+      "codec": "aac",
+      "channels": 2,
+      "default": false
+    }
+  ],
+  "subtitles": [],
+  "segments": [
+    {
+      "id": 1,
+      "kind": "intro",
+      "startMs": 30000,
+      "endMs": 55000,
+      "final": false,
+      "source": "chapter",
+      "confidence": 1
+    },
+    {
+      "id": 2,
+      "kind": "credits",
+      "startMs": 170000,
+      "endMs": 200000,
+      "final": true,
+      "source": "chapter",
+      "confidence": 1
+    }
+  ],
+  "creditsMs": 170000,
+  "watchedAtMs": 170000,
+  "upNextMs": 0
+}

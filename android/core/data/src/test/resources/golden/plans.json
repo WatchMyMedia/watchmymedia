@@ -1,0 +1,45 @@
+{
+  "items": [
+    {
+      "fileId": 8,
+      "mode": "direct",
+      "protocol": "file",
+      "reasons": [],
+      "video": {
+        "codec": "h264",
+        "copy": true,
+        "width": 1920,
+        "height": 1080,
+        "bitDepth": 8,
+        "toneMap": false
+      },
+      "audio": {
+        "index": 1,
+        "codec": "aac",
+        "copy": true,
+        "channels": 2
+      }
+    },
+    {
+      "fileId": 6,
+      "mode": "audio",
+      "protocol": "hls",
+      "reasons": [
+        "client cannot decode dts audio"
+      ],
+      "video": {
+        "codec": "hevc",
+        "copy": true,
+        "width": 1280,
+        "height": 720,
+        "toneMap": false
+      },
+      "audio": {
+        "index": 1,
+        "codec": "aac",
+        "copy": false,
+        "channels": 6
+      }
+    }
+  ]
+}

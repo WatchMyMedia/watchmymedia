@@ -1,0 +1,30 @@
+# Public access through an existing SWAG (linuxserver/swag) container, in
+# place of docker-compose.proxy.yml. Copy swag/watchmymedia.subdomain.conf.sample
+# into SWAG, set the two WATCHMYMEDIA_SWAG_* values in deploy/.env, then run
+# from the repository root:
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.swag.yml up -d
+services:
+  watchmymedia:
+    # Only SWAG (and Tailscale Serve, from this machine) reach the server.
+    ports: !override
+      - "127.0.0.1:${WATCHMYMEDIA_HOST_PORT:-27587}:27587"
+    networks:
+      - default
+      - swag
+    environment:
+      # Trust only SWAG's stable address, not sibling containers on its network.
+      # See README for finding it. This replaces WATCHMYMEDIA_SWAG_SUBNET.
+      WATCHMYMEDIA_TRUSTED_PROXIES: "${WATCHMYMEDIA_SWAG_PROXY_IP:?Set WATCHMYMEDIA_SWAG_PROXY_IP to SWAG's exact address in deploy/.env}"
+      WATCHMYMEDIA_AUTH_SECURE_COOKIES: "true"
+      # Docker Desktop (macOS, Windows) shows every client of a published
+      # port, SWAG's included, as 192.168.65.1, so SWAG cannot tell the
+      # internet from your LAN. Excluding that range keeps first-run setup
+      # and password-free admin off SWAG; remote admin works over HTTPS and
+      # sensitive actions ask for the password again. Harmless on Linux
+      # unless your LAN is 192.168.65.x.
+      WATCHMYMEDIA_ADMIN_NETWORKS: "${WATCHMYMEDIA_ADMIN_NETWORKS:-local,!192.168.65.0/24}"
+
+networks:
+  swag:
+    external: true
+    name: "${WATCHMYMEDIA_SWAG_NETWORK:?Set WATCHMYMEDIA_SWAG_NETWORK in deploy/.env to the Docker network SWAG is on}"
