@@ -185,13 +185,13 @@ func registerFiles(h huma.API, deps Deps) {
 		return out, nil
 	})
 
-	huma.Register(h, huma.Operation{
+	huma.Register(h, adminOp(h, huma.Operation{
 		OperationID: "searchFileCandidates",
 		Method:      http.MethodGet,
 		Path:        Prefix + "/files/{id}/candidates",
 		Summary:     "Search TMDB for possible matches for a file",
 		Tags:        []string{"files"},
-	}, func(ctx context.Context, in *SearchCandidatesInput) (*SearchCandidatesOutput, error) {
+	}), func(ctx context.Context, in *SearchCandidatesInput) (*SearchCandidatesOutput, error) {
 		row, lib, err := fileAndLibrary(ctx, deps, in.ID)
 		if err != nil {
 			return nil, err
@@ -214,14 +214,14 @@ func registerFiles(h huma.API, deps Deps) {
 		return searchCandidates(ctx, deps, lib.Type, query, year)
 	})
 
-	huma.Register(h, huma.Operation{
+	huma.Register(h, adminOp(h, huma.Operation{
 		OperationID: "applyFileMatch",
 		Method:      http.MethodPost,
 		Path:        Prefix + "/files/{id}/match",
 		Summary:     "Match a file to a TMDB item chosen by the user",
 		Description: "Links the file to the given movie or show and locks the match so automatic matching leaves it alone.",
 		Tags:        []string{"files"},
-	}, func(ctx context.Context, in *ApplyMatchInput) (*GetFileOutput, error) {
+	}), func(ctx context.Context, in *ApplyMatchInput) (*GetFileOutput, error) {
 		row, lib, err := fileAndLibrary(ctx, deps, in.ID)
 		if err != nil {
 			return nil, err
