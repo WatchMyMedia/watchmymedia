@@ -48,8 +48,8 @@ class WorkflowIsolationTest(unittest.TestCase):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
-        hosted = dict.fromkeys(('changes', 'web', 'contract', 'docker', 'android'), 'ubuntu-latest')
-        hosted.update(dict.fromkeys(('server', 'server-race', 'apple', 'apple-tv'), 'macos-26'))
+        hosted = dict.fromkeys(('changes', 'web', 'contract', 'docker', 'android', 'server-race'), 'ubuntu-latest')
+        hosted.update(dict.fromkeys(('server', 'apple', 'apple-tv'), 'macos-26'))
         hosted['windows'] = hosted['windows-signing'] = 'windows-latest'
         self.assertEqual(set(hosted), set(jobs))
         studio = ['self-hosted', 'macOS', 'ARM64', 'mac-studio']

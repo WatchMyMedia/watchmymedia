@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/db/dbtest"
 	"watchmymedia/server/internal/events"
 	"watchmymedia/server/internal/probe"
 )
@@ -51,14 +52,7 @@ func TestDetectorFindsIntrosAndCredits(t *testing.T) {
 		t.Skip("ffmpeg not installed")
 	}
 	ctx := context.Background()
-	conn, err := db.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = conn.Close() })
-	if err := db.Migrate(ctx, conn); err != nil {
-		t.Fatal(err)
-	}
+	conn := dbtest.OpenPath(t, filepath.Join(t.TempDir(), "t.db"))
 	q := db.New(conn)
 	lib, _ := q.UpsertLibrary(ctx, db.UpsertLibraryParams{Type: "tv", Name: "TV", Path: "/tv"})
 	show, _ := q.UpsertShow(ctx, db.UpsertShowParams{LibraryID: lib.ID, TmdbID: 1, Title: "Show", Genres: "[]", Credits: "[]"})
@@ -146,14 +140,7 @@ func TestDetectorFindsIntrosAndCredits(t *testing.T) {
 func TestDetectorRecordsNothingWithoutFFmpeg(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	conn, err := db.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = conn.Close() })
-	if err := db.Migrate(ctx, conn); err != nil {
-		t.Fatal(err)
-	}
+	conn := dbtest.OpenPath(t, filepath.Join(t.TempDir(), "t.db"))
 	q := db.New(conn)
 	lib, _ := q.UpsertLibrary(ctx, db.UpsertLibraryParams{Type: "tv", Name: "TV", Path: "/tv"})
 	show, _ := q.UpsertShow(ctx, db.UpsertShowParams{LibraryID: lib.ID, TmdbID: 1, Title: "Show", Genres: "[]", Credits: "[]"})

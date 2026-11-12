@@ -113,15 +113,34 @@ jobs:
         run: |
           deploy/macos/fetch-ffmpeg.sh arm64
           build/ffmpeg/darwin-arm64/ffmpeg -hide_banner -version | head -1
+      # The speed budgets (Test...Speed) time queries against the wall clock,
+      # so they run in a step of their own, one package at a time, rather
+      # than beside the other packages on the runner's three cores.
       - name: Test
         working-directory: server
-        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test ./...
+        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test -skip 'Speed$' ./...
+      - name: Test the speed budgets alone
+        working-directory: server
+        run: go test -p 1 -run 'Speed$' ./...
+      # The server-race job runs on Linux; the macOS-only code (the library
+      # watcher's kqueue, the leftover ffmpeg sweep) runs under the race
+      # detector here.
+      - name: Test the macOS-only code with the race detector
+        working-directory: server
+        run: |
+          export PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH"
+          go test -race -short ./internal/ffexec
+          go test -race -short -run 'Watch' ./internal/scanner
 
   # The Go tests again under the race detector, on another runner so the
   # server job does not wait for it. -short skips the speed budgets, which
-  # mean nothing at the race detector's speed.
+  # mean nothing at the race detector's speed. On Linux: GitHub's Linux
+  # runners have four cores to the macOS runners' three, are far easier to
+  # get, and run the Linux code (Pdeathsig, renameat2) that no other job
+  # tests. The macOS-only code runs under the race detector in the server
+  # job.
   server-race:
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Keep Go caches in this runner's tool cache
@@ -136,15 +155,24 @@ jobs:
       - name: Fetch the ffmpeg build the releases ship
         env:
           FFMPEG_CACHE: ${{ runner.tool_cache }}/watchmymedia-ffmpeg
-        run: deploy/macos/fetch-ffmpeg.sh arm64
-      # GitHub's macOS runners have three cores. Under the race detector, with
-      # three packages' tests at once, the api package ran past go test's
-      # 10-minute limit and ffmpeg runs in other packages outlived the
-      # server's own deadlines. One package at a time (-p 1) keeps each
-      # package's ffmpeg runs to themselves.
+        run: |
+          case "$RUNNER_OS-$RUNNER_ARCH" in
+            macOS-ARM64) target=arm64 dir=darwin-arm64 ;;
+            Linux-X64) target=linux-amd64 dir=linux-amd64 ;;
+            Linux-ARM64) target=linux-arm64 dir=linux-arm64 ;;
+            *) echo "no ffmpeg build for $RUNNER_OS-$RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          deploy/macos/fetch-ffmpeg.sh "$target"
+          echo "$GITHUB_WORKSPACE/build/ffmpeg/$dir" >> "$GITHUB_PATH"
+          "build/ffmpeg/$dir/ffmpeg" -hide_banner -version | head -1
+      # Packages build and test in parallel again (one per core). On the
+      # three-core macOS runners, before test databases were copied rather
+      # than migrated, that ran the api package past go test's 10-minute
+      # limit and ffmpeg past the server's deadlines, and the job ran with
+      # -p 1, which also built one package at a time.
       - name: Test with the race detector
         working-directory: server
-        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test -race -short -p 1 -timeout 30m ./...
+        run: go test -race -short -timeout 20m ./...
 
   web:
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
@@ -544,7 +572,12 @@ jobs:
         shell: pwsh
         run: |
           $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          go test ./...
+          go test -skip 'Speed$' ./...
+      # As in the server job: the speed budgets alone, one package at a time.
+      - name: Test the speed budgets alone
+        working-directory: server
+        shell: pwsh
+        run: go test -p 1 -run 'Speed$' ./...
       - name: Qualify complete software VOD rendition output
         working-directory: server
         shell: pwsh

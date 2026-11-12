@@ -26,6 +26,7 @@ import (
 	"watchmymedia/server/internal/auth"
 	"watchmymedia/server/internal/backup"
 	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/db/dbtest"
 	"watchmymedia/server/internal/events"
 	"watchmymedia/server/internal/livetv/guide"
 	"watchmymedia/server/internal/metadata"
@@ -79,14 +80,7 @@ var adminHash = sync.OnceValue(func() string {
 func startTestEnv(t *testing.T, adjust func(*Deps), start func(http.Handler) *httptest.Server) *testEnv {
 	t.Helper()
 	ctx := t.Context()
-	conn, err := db.Open(filepath.Join(t.TempDir(), "test.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = conn.Close() })
-	if err := db.Migrate(ctx, conn); err != nil {
-		t.Fatal(err)
-	}
+	conn := dbtest.OpenPath(t, filepath.Join(t.TempDir(), "test.db"))
 	q := db.New(conn)
 	lib, err := q.UpsertLibrary(ctx, db.UpsertLibraryParams{Type: "movie", Name: "Movies", Path: "/m"})
 	if err != nil {

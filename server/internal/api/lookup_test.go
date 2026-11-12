@@ -13,6 +13,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/db/dbtest"
 )
 
 func TestNotFound(t *testing.T) {
@@ -33,13 +34,7 @@ func TestNotFound(t *testing.T) {
 // A database failure looking up a library is not a missing library.
 func TestLookupsPassDatabaseErrorsThrough(t *testing.T) {
 	t.Parallel()
-	conn, err := db.Open(filepath.Join(t.TempDir(), "test.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Migrate(t.Context(), conn); err != nil {
-		t.Fatal(err)
-	}
+	conn := dbtest.OpenPath(t, filepath.Join(t.TempDir(), "test.db"))
 	deps := Deps{Queries: db.New(conn)}
 	var se huma.StatusError
 	if _, err := getLibrary(t.Context(), deps, 7); !errors.As(err, &se) || se.GetStatus() != http.StatusNotFound {
