@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"watchmymedia/server/internal/netguard"
 )
 
 // Pairing signs a TV in without typing a password with a remote. The TV
@@ -124,7 +126,13 @@ func newPairCode() (string, error) {
 func (s *Service) StartPairing(ctx context.Context, c Client) (code, secret string, exp time.Time, err error) {
 	c.Kind = KindDevice
 	ip := clientIP(ctx)
-	key := addrKey(clientAddr(ctx))
+	key, ok := limitAddr(ctx)
+	if !ok {
+		// An untrusted proxy named no client: its visitors share one
+		// allowance, as they did before, since nothing else bounds starts.
+		info, _ := netguard.From(ctx)
+		key = "via " + info.IP.String()
+	}
 	now := time.Now()
 	p := s.pair
 	p.mu.Lock()

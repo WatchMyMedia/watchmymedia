@@ -65,3 +65,54 @@ func TestUntrustedProxyOnTrustedNetworkOpensRemoteAdmin(t *testing.T) {
 		})
 	}
 }
+
+// Behind an untrusted proxy, Forwarded is the client the proxy's headers
+// name: the entry the proxy added, not ones its client sent.
+func TestUntrustedProxyForwardedClient(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		remote  string
+		headers map[string]string
+		want    string
+	}{
+		{"x-forwarded-for", "127.0.0.1:40000", map[string]string{"X-Forwarded-For": "203.0.113.9"}, "203.0.113.9"},
+		{"appended to a client's own", "127.0.0.1:40000", map[string]string{"X-Forwarded-For": "198.51.100.7, 203.0.113.9"}, "203.0.113.9"},
+		{"with a port", "127.0.0.1:40000", map[string]string{"X-Forwarded-For": "[2001:db8::9]:5000"}, "2001:db8::9"},
+		{"x-real-ip", "[::1]:40000", map[string]string{"X-Real-Ip": "203.0.113.9"}, "203.0.113.9"},
+		{"forwarded", "127.0.0.1:40000", map[string]string{"Forwarded": `for=198.51.100.7, for="[2001:db8::9]:5000";proto=https`}, "2001:db8::9"},
+		{"ends in garbage", "127.0.0.1:40000", map[string]string{"X-Forwarded-For": "203.0.113.9, unknown"}, ""},
+		{"forwarded without for", "127.0.0.1:40000", map[string]string{"Forwarded": "proto=https"}, ""},
+		{"no headers", "127.0.0.1:40000", nil, ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/auth/login", nil)
+			req.RemoteAddr = c.remote
+			for k, v := range c.headers {
+				req.Header.Set(k, v)
+			}
+			var got Info
+			Default().Middleware(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				got, _ = From(r.Context())
+			})).ServeHTTP(httptest.NewRecorder(), req)
+			if c.want == "" {
+				if got.Forwarded.IsValid() {
+					t.Errorf("Forwarded = %s, want none", got.Forwarded)
+				}
+				return
+			}
+			if got.Forwarded.String() != c.want || !got.Proxied {
+				t.Errorf("got %+v, want Forwarded %s", got, c.want)
+			}
+		})
+	}
+	// A trusted proxy's client is known, so there is nothing unverified.
+	trusted, _ := Parse([]string{"127.0.0.1"})
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/auth/login", nil)
+	req.RemoteAddr = "127.0.0.1:40000"
+	req.Header.Set("X-Forwarded-For", "203.0.113.9")
+	New(trusted, nil).Middleware(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		if got, _ := From(r.Context()); got.Forwarded.IsValid() || got.Proxied || got.IP.String() != "203.0.113.9" {
+			t.Errorf("trusted proxy: %+v", got)
+		}
+	})).ServeHTTP(httptest.NewRecorder(), req)
+}

@@ -24,9 +24,13 @@ import (
 //
 // The address is the real client's, which netguard resolves through trusted
 // proxies; IPv6 addresses count by /64, which one client usually holds whole.
-// Behind a proxy missing from network.trusted_proxies, or Docker Desktop's
-// port forwarding, every client shares one address and the per-address
-// limits apply to everyone together.
+// Behind a forwarding proxy missing from network.trusted_proxies, every
+// client arrives from the proxy's address, so the per-address limits count
+// the client the proxy's headers name instead, kept apart per proxy, or do
+// not apply when no header names one (limitAddr); the per-name limit always
+// does. Docker Desktop's port forwarding, which sends no headers, still
+// gives every client one address, and the per-address limits apply to them
+// together.
 type policy struct {
 	free int           // failures allowed before any wait
 	base time.Duration // first wait, doubled for each further failure

@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -261,14 +260,18 @@ func (s *Service) checkPassword(ctx context.Context, name, password string) (db.
 	pair, addr, nm := throttleKeys(ctx, name)
 	row, err := s.q.GetUserByName(ctx, strings.TrimSpace(name))
 	if err == nil && VerifyPassword(row.PasswordHash, password) {
-		s.limit.succeed(pair)
+		if pair != "" {
+			s.limit.succeed(pair)
+		}
 		return row, nil
 	}
 	if err != nil {
 		// Burn the same time as a real check so names cannot be enumerated.
 		VerifyPassword(dummyHash(), password)
 	}
-	s.limit.fail(pair)
+	if pair != "" {
+		s.limit.fail(pair)
+	}
 	if addr != "" {
 		s.addrLimit.fail(addr)
 	}
@@ -277,18 +280,51 @@ func (s *Service) checkPassword(ctx context.Context, name, password string) (db.
 }
 
 // throttleKeys are the keys a sign-in counts under: the name with the
-// client's address, the address, and the name.
+// client's address, the address, and the name. pair and addr are "" when
+// the client is unknown (see limitAddr); then only the name's limit counts.
 func throttleKeys(ctx context.Context, name string) (pair, addr, nm string) {
 	nm = limitKey(name)
-	addr = addrKey(clientAddr(ctx))
-	return nm + "|" + addr, addr, nm
+	addr, ok := limitAddr(ctx)
+	if ok {
+		pair = nm + "|" + addr
+	}
+	return pair, addr, nm
+}
+
+// limitAddr is the key the client counts under in limits per address, and
+// whether there is one.
+//
+// Behind a proxy missing from trusted proxies, netguard's IP is the proxy's
+// own address, the same for everyone the proxy serves, so failures counted
+// there would let one visitor lock every other one out. The client the
+// proxy's headers name (netguard's Forwarded) counts instead, scoped to
+// that proxy: "203.0.113.9 via 127.0.0.1". The headers are not verified,
+// so a visitor can put a new address in each request and spread its
+// failures over many keys; the name's own limit, which no address escapes,
+// still bounds guessing at each account. What a forged header cannot do is
+// count against someone else: the scope keeps it apart from that address
+// coming directly, and through a proxy that appends its client, as proxies
+// do, the last entry is the visitor's own, whatever it sent. When no header
+// names an address, ok is false and no per-address limit applies.
+func limitAddr(ctx context.Context) (key string, ok bool) {
+	info, _ := netguard.From(ctx)
+	if !info.Proxied {
+		return addrKey(info.IP), true
+	}
+	if f := addrKey(info.Forwarded); f != "" {
+		return f + " via " + info.IP.String(), true
+	}
+	return "", false
 }
 
 // throttled returns a *ThrottledError while any limit on this name or
 // client is in force.
 func (s *Service) throttled(ctx context.Context, name string) error {
 	pair, addr, nm := throttleKeys(ctx, name)
-	d := max(s.limit.wait(pair), s.nameLimit.wait(nm))
+	d := s.nameLimit.wait(nm)
+	if pair != "" {
+		d = max(d, s.limit.wait(pair))
+	}
 	if addr != "" {
 		d = max(d, s.addrLimit.wait(addr))
 	}
@@ -305,9 +341,11 @@ func (s *Service) passChallenge(ctx context.Context, token string) error {
 	if s.challenge == nil || !s.challenge.Required() {
 		return nil
 	}
+	// Behind an untrusted proxy clientIP is "", so Cloudflare is not told
+	// the proxy's address as the visitor's.
 	err := s.challenge.Verify(ctx, token, clientIP(ctx))
 	if errors.Is(err, turnstile.ErrRejected) {
-		if addr := addrKey(clientAddr(ctx)); addr != "" {
+		if addr, _ := limitAddr(ctx); addr != "" {
 			s.addrLimit.fail(addr)
 		}
 	}
@@ -317,18 +355,21 @@ func (s *Service) passChallenge(ctx context.Context, token string) error {
 // Login checks the credentials and creates a session for the client. The
 // throttle is checked first, then the bot check, then the password.
 func (s *Service) Login(ctx context.Context, cr Credentials, c Client) (User, Grant, error) {
+	if err := s.throttled(ctx, cr.Name); err != nil {
+		return User{}, Grant{}, err
+	}
+	// The bot check runs before a password slot is taken: it waits on
+	// Cloudflare (up to 8 s), and sign-ins holding both slots through it
+	// with junk tokens would turn away every password check on the server.
+	if err := s.passChallenge(ctx, cr.Challenge); err != nil {
+		return User{}, Grant{}, err
+	}
 	key, _, _ := throttleKeys(ctx, cr.Name)
 	release, err := s.admitPassword(ctx, key)
 	if err != nil {
 		return User{}, Grant{}, err
 	}
 	defer release()
-	if err := s.throttled(ctx, cr.Name); err != nil {
-		return User{}, Grant{}, err
-	}
-	if err := s.passChallenge(ctx, cr.Challenge); err != nil {
-		return User{}, Grant{}, err
-	}
 	if err := s.throttled(ctx, cr.Name); err != nil {
 		return User{}, Grant{}, err
 	}
@@ -612,17 +653,17 @@ func newID() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// clientIP is the request's client address, from the netguard middleware.
+// clientIP is the request's client address, from the netguard middleware,
+// as sessions (lastIp), pairings and the bot check record it. It is ""
+// when the client is unknown: behind a proxy missing from trusted proxies,
+// the address netguard has is the proxy's, and like history, sessions show
+// no address rather than the proxy's.
 func clientIP(ctx context.Context) string {
-	if a := clientAddr(ctx); a.IsValid() {
-		return a.String()
-	}
-	return ""
-}
-
-func clientAddr(ctx context.Context) netip.Addr {
 	info, _ := netguard.From(ctx)
-	return info.IP
+	if info.Proxied || !info.IP.IsValid() {
+		return ""
+	}
+	return info.IP.String()
 }
 
 // clip trims s and cuts it to at most n bytes without splitting a
