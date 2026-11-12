@@ -1,5 +1,5 @@
 #!/bin/sh
-# Assembles the public templates repository (taimoorq/unraid-templates),
+# Assembles the public templates repository (WatchMyMedia/unraid-templates),
 # which Community Applications reads, from the working copies here:
 #
 #   deploy/unraid/mirror.sh <checkout of the templates repository>
@@ -7,7 +7,7 @@
 # It writes templates/watchmymedia.xml, ca_profile.xml, the icon, LICENSE
 # and README.md into that folder and prints what changed. Committing and
 # pushing is left to you, and so is creating the repository the first time
-# (gh repo create taimoorq/unraid-templates --public): both publish.
+# (gh repo create WatchMyMedia/unraid-templates --public): both publish.
 set -eu
 
 dest="${1:?usage: mirror.sh <templates repository checkout>}"
@@ -60,7 +60,7 @@ keeping it updated is at <https://watchmy.media/guide/unraid>. Until the app
 is in Community Applications, install it by hand: in the Unraid terminal,
 
     wget -O /boot/config/plugins/dockerMan/templates-user/my-WatchMyMedia.xml \
-      https://raw.githubusercontent.com/taimoorq/unraid-templates/main/templates/watchmymedia.xml
+      https://raw.githubusercontent.com/WatchMyMedia/unraid-templates/main/templates/watchmymedia.xml
 
 then open Docker › Add Container and pick WatchMyMedia from the template
 list.

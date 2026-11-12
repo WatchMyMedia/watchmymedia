@@ -13,14 +13,14 @@
   <Network>host</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/taimoorq/unraid-templates/issues</Support>
+  <Support>https://github.com/WatchMyMedia/unraid-templates/issues</Support>
   <Project>https://watchmy.media</Project>
   <ReadMe>https://watchmy.media/guide/unraid</ReadMe>
   <Overview>Your movies and TV shows, with live TV and recording from an HDHomeRun tuner, on every screen in the house. One container holds the server and the web app; there are apps for Android, Android TV, iPhone, iPad and Apple TV, and you can cast to Chromecast and Google TV. Converts video on your Intel, AMD or NVIDIA GPU.</Overview>
   <Category>MediaServer:Video</Category>
   <WebUI>http://[IP]:[PORT:27587]</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/taimoorq/unraid-templates/main/templates/watchmymedia.xml</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/taimoorq/unraid-templates/main/images/watchmymedia.png</Icon>
+  <TemplateURL>https://raw.githubusercontent.com/WatchMyMedia/unraid-templates/main/templates/watchmymedia.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/WatchMyMedia/unraid-templates/main/images/watchmymedia.png</Icon>
   <ExtraSearchTerms>media server live tv dvr hdhomerun chromecast</ExtraSearchTerms>
   <Requires>Intel or AMD GPU: keep the /dev/dri device below (remove it if this server has no /dev/dri). NVIDIA: install the Nvidia Driver plugin, add --runtime=nvidia to Extra Parameters (Advanced View) and put your GPU's UUID in NVIDIA_VISIBLE_DEVICES. Open the WebUI once the container is running to finish setup.</Requires>
   <MinVer>6.12.0</MinVer>
