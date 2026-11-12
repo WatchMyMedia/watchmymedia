@@ -9,15 +9,42 @@ workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-re
 
 WatchMyMedia's source code is now public, at https://github.com/WatchMyMedia/watchmymedia,
 under the GNU Affero General Public License, version 3. This is the first release built there,
-from the same code as 1.4.0: nothing in the server or the apps changes.
+and it fixes what a review of the server found: high bit rate films stopping a few minutes in,
+a rare Live TV hang, and settings any member could change.
 
 - The server's database is the same as 1.4.0's, so updating needs no backup to go back.
+- Films and episodes above about 18 Mbps, such as 4K remuxes, no longer stop a few minutes in
+  when they are transcoded or copied: since 1.3.0 the server's storage check stopped them as
+  their session's files passed 512 MB. A session now keeps within its share of the playback
+  storage, so at very high bit rates it buffers less far ahead and seeking back can take a
+  moment longer. When the storage as a whole runs short, only as many plays stop as are needed.
+- Adding or refreshing a tuner while listings were saving and a recording was starting could
+  hang Live TV, the guide and recordings until the server restarted. It no longer can.
+- Matching is for admins: Fix match, rematching a movie or show, lining up and hiding unmatched
+  files, Scan and Match, and changing posters. Members could use all of these before; they no
+  longer see them in the web app.
+- A member's lists from MDBList can no longer use up the server's daily MDBList allowance. A
+  member gets 20 fetches, then one every 5 minutes, and a list refreshes at most every 10
+  minutes; past that the web app says to try again later. Admins are not limited.
+- Behind a reverse proxy that isn't in `trusted_proxies`, one person's wrong passwords, failed
+  bot checks or pairing attempts no longer lock everyone else out: each person behind the proxy
+  counts on their own. Sign-ins no longer record the proxy's address as theirs.
+- A backup no longer keeps anyone signed in, so whoever holds one cannot use it to play from
+  your server. After restoring a backup, everyone signs in again on each browser, app and TV.
+- A scheduled Plex sync now writes only what changed, so it no longer slows the server every
+  15 minutes. One Plex item that changes its identity is skipped and counted as unavailable
+  instead of pausing the sync; a sync still pauses when many items change at once, as after
+  rebuilding the Plex server.
+- Links that play media can only play it: they can no longer stop or change someone's play.
+- Home rows from lists are quicker to load on servers with many lists.
 - The Docker image moves to `ghcr.io/watchmymedia/watchmymedia`. The old address,
   `ghcr.io/taimoorq/watchmymedia`, keeps 1.4.0 and gets no newer versions, so change the image
   in your compose file or container settings to the new one. The Unraid template follows.
 - The server, the Docker image, the Mac app, the Windows app and the Android app are 1.4.1. The
   Mac app and the Windows app of 1.4.0 offer the update under Check for updates. The iPhone,
   iPad and Apple TV apps have no changes and stay at 1.8.0 in the App Store.
+- The fixes have been tried in tests, not yet with a real 4K file in a real player, a real
+  tuner, a real Plex server or a real reverse proxy.
 
 ## 1.4.0
 
