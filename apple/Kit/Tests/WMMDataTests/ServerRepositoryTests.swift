@@ -7,7 +7,11 @@ import WMMModel
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct ServerRepositoryTests {
-    let h = Harness(probeTimeout: .milliseconds(400))
+    /// How long one address may take. Long enough for a stubbed answer on a
+    /// busy machine: at 400 ms, GitHub's three-core runners timed out answers
+    /// that were on their way, with the rest of the tests running beside them.
+    static let probeTimeout = Duration.seconds(3)
+    let h = Harness(probeTimeout: probeTimeout)
     var servers: any ServerRepository { h.services.servers }
     var host: String { h.server.host }
 
@@ -77,7 +81,7 @@ struct ServerRepositoryTests {
         let start = ContinuousClock.now
         let found = try await servers.probe("http://\(host)")
         #expect(found.baseURL.absoluteString == "http://\(host)")
-        #expect(ContinuousClock.now - start >= .milliseconds(400))
+        #expect(ContinuousClock.now - start >= Self.probeTimeout)
     }
 
     @Test func probeTimesOutWhenNothingAnswersInTime() async throws {
