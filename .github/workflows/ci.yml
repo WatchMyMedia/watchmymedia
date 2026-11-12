@@ -159,14 +159,14 @@ jobs:
           deploy/macos/fetch-ffmpeg.sh "$target"
           echo "$GITHUB_WORKSPACE/build/ffmpeg/$dir" >> "$GITHUB_PATH"
           "build/ffmpeg/$dir/ffmpeg" -hide_banner -version | head -1
-      # On GitHub's three-core macOS runners, three packages' tests at once
-      # under the race detector ran the api package past go test's 10-minute
-      # limit and ffmpeg runs in other packages past the server's own
-      # deadlines. One package at a time (-p 1) keeps each package's ffmpeg
-      # runs to themselves.
+      # Packages build and test in parallel again (one per core). On the
+      # three-core macOS runners, before test databases were copied rather
+      # than migrated, that ran the api package past go test's 10-minute
+      # limit and ffmpeg past the server's deadlines, and the job ran with
+      # -p 1, which also built one package at a time.
       - name: Test with the race detector
         working-directory: server
-        run: go test -race -short -p 1 -timeout 30m ./...
+        run: go test -race -short -timeout 20m ./...
 
   web:
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
