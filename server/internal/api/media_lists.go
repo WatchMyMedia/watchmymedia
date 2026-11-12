@@ -257,6 +257,9 @@ func registerMediaLists(h huma.API, deps Deps) {
 			return nil, err
 		}
 		kind := b.Source.Kind
+		if err := deps.listsState.fetches.fetch(ctx, u, kind); err != nil {
+			return nil, err
+		}
 		p := sourceParams(b.Source)
 		limit := listLimit(b.Limit)
 		res, err := collectList(ctx, deps, kind, lists.Request{Params: p, MediaType: mediaType, Limit: limit})
@@ -292,7 +295,8 @@ func registerMediaLists(h huma.API, deps Deps) {
 		Summary:     "What a list would hold, and how much of it the library has, without saving it",
 		Tags:        []string{"lists"},
 	}, func(ctx context.Context, in *PreviewMediaListInput) (*struct{ Body MediaListPreview }, error) {
-		if _, err := currentUser(ctx); err != nil {
+		u, err := currentUser(ctx)
+		if err != nil {
 			return nil, err
 		}
 		b := in.Body
@@ -323,6 +327,11 @@ func registerMediaLists(h huma.API, deps Deps) {
 			return &struct{ Body MediaListPreview }{Body: out}, nil
 		}
 		key := previewKey(kind, mediaType, limit, p)
+		if _, ok := deps.listsState.preview.Get(key); !ok {
+			if err := deps.listsState.fetches.fetch(ctx, u, kind); err != nil {
+				return nil, err
+			}
+		}
 		res, err := memo.Load(ctx, deps.listsState.preview, &deps.listsState.previewGroup, key, func(ctx context.Context) (lists.Result, error) {
 			return collectList(ctx, deps, kind, lists.Request{Params: p, MediaType: mediaType, Limit: limit})
 		})
@@ -480,6 +489,9 @@ func registerMediaLists(h huma.API, deps Deps) {
 				}
 				up.SourceUrl, up.NextFetchAt = "", nil
 			default:
+				if err := deps.listsState.fetches.fetch(ctx, u, up.SourceKind); err != nil {
+					return nil, err
+				}
 				res, err := collectList(ctx, deps, up.SourceKind, lists.Request{Params: p, MediaType: l.MediaType, Limit: int(up.EntryLimit)})
 				if err != nil {
 					return nil, err
@@ -542,8 +554,19 @@ func registerMediaLists(h huma.API, deps Deps) {
 		if !lists.Outside(l.SourceKind) {
 			return nil, huma.Error422UnprocessableEntity("imports and library lists are not fetched")
 		}
+		limits := deps.listsState.fetches
+		if err := limits.refresh(ctx, u, l.ID); err != nil {
+			return nil, err
+		}
+		if err := limits.fetch(ctx, u, l.SourceKind); err != nil {
+			limits.forget(l.ID)
+			return nil, err
+		}
 		deps.Lists.Want(ctx, l)
 		got, err := deps.Lists.Fetch(ctx, l.ID)
+		if errors.Is(err, lists.ErrFetching) || errors.Is(err, lists.ErrDisabled) {
+			limits.forget(l.ID)
+		}
 		switch {
 		case errors.Is(err, lists.ErrFetching):
 			return nil, huma.Error409Conflict("this list is being fetched")
