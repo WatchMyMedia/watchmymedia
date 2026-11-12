@@ -45,6 +45,9 @@ jobs:
       android: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.android == 'true' }}
       windows: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.windows == 'true' }}
       apple: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apple == 'true' }}
+      apple-tv: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apple-tv == 'true' }}
+      # Not a job: whether the apple job checks the generated Swift API client.
+      apple-api: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apple-api == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -93,9 +96,32 @@ jobs:
               - 'android/**'
               - 'api/**'
               - '.github/workflows/ci.yml'
+            # The iPhone app's job runs for its own folders, the TV app's for
+            # its own, and both for what they share. Docs in apple/ run neither.
             apple:
-              - 'apple/**'
+              - 'apple/App/**'
+              - 'apple/UITests/**'
+              - 'apple/Kit/**'
+              - 'apple/project.yml'
+              - 'apple/Tools/**'
+              - 'apple/scripts/**'
               - 'api/**'
+              - '.github/workflows/ci.yml'
+            apple-tv:
+              - 'apple/TV/**'
+              - 'apple/TVUITests/**'
+              - 'apple/Kit/**'
+              - 'apple/project.yml'
+              - 'apple/Tools/**'
+              - 'apple/scripts/**'
+              - 'api/**'
+              - '.github/workflows/ci.yml'
+            apple-api:
+              - 'api/**'
+              - 'apple/Tools/**'
+              - 'apple/Kit/Sources/WMMAPI/**'
+              - 'apple/scripts/openapi-for-swift.py'
+              - 'apple/scripts/open-response-enums.py'
               - '.github/workflows/ci.yml'
             windows:
               - 'windows/**'
@@ -536,11 +562,13 @@ jobs:
             android/**/build/test-results/testDebugUnitTest/*.xml
             android/build/reports/jacoco/coverageReport/
 
-  # The iPhone app (apple/, PLAN-IOS.md), when apple/ or api/ changed: the
-  # Swift API client against api/openapi.json, the Kit's unit tests on the
-  # Mac, then the app built and every test run on an iOS simulator. Xcode is
-  # already on the Mac Studio and hosted Macs; XcodeGen comes from Homebrew, at least
-  # the version project.yml asks for (apple/scripts/install-xcodegen.sh).
+  # The iPhone app (apple/, PLAN-IOS.md), when the iPhone app, what it shares
+  # with the TV app, or api/ changed: the Swift API client against
+  # api/openapi.json, then the app built and every test run on an iOS
+  # simulator, the Kit's included (they run on tvOS in the apple-tv job; on
+  # the Mac, make apple-test runs them locally). Xcode is already on the Mac
+  # Studio and hosted Macs; XcodeGen comes from Homebrew, at least the
+  # version project.yml asks for (apple/scripts/install-xcodegen.sh).
   apple:
     needs: changes
     if: needs.changes.outputs.apple == 'true'
@@ -549,44 +577,67 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install XcodeGen
         run: apple/scripts/install-xcodegen.sh
+      # The OpenAPI generator is built from source in release mode (two
+      # minutes cold), so its build folder is kept between runs. The check
+      # runs when the API, the generator or the generated client changed,
+      # and on every main and manual run, which also keeps the cache fresh.
+      - name: Name the generator cache
+        id: generator
+        if: needs.changes.outputs.apple-api == 'true' || github.event_name != 'pull_request'
+        run: echo "key=openapi-generator-$RUNNER_OS-$RUNNER_ARCH-$(xcodebuild -version | tail -n 1 | sed 's/^Build version //')-${{ hashFiles('apple/Tools/Package.swift', 'apple/Tools/Package.resolved') }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: generator-cache
+        if: steps.generator.outputs.key && runner.environment == 'github-hosted'
+        with:
+          path: apple/Tools/.build
+          key: ${{ steps.generator.outputs.key }}
       - name: Check the Swift API client is current
+        if: steps.generator.outputs.key
         run: |
           make apple-api PATH="$PATH"
           git diff --exit-code -- apple/Kit/Sources/WMMAPI
-      - name: Kit unit tests
-        env:
-          SWIFT_BACKTRACE: enable=yes,interactive=no
-          NSUnbufferedIO: "YES"
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && steps.generator.outputs.key && steps.generator-cache.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: apple/Tools/.build
+          key: ${{ steps.generator.outputs.key }}
+      # Xcode's Swift package checkouts (the Kit's and the app's), keyed on
+      # what pins them; only pushes to main save, as with the Go caches.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: packages
+        if: runner.environment == 'github-hosted'
+        with:
+          path: apple/build/DerivedData/SourcePackages
+          key: swift-packages-${{ runner.os }}-${{ hashFiles('apple/project.yml', 'apple/Kit/Package.swift', 'apple/Kit/Package.resolved') }}-${{ github.job }}
+          restore-keys: |
+            swift-packages-${{ runner.os }}-${{ hashFiles('apple/project.yml', 'apple/Kit/Package.swift', 'apple/Kit/Package.resolved') }}-
+            swift-packages-${{ runner.os }}-
+      # No code coverage in CI: nobody reads it, and it slows the build.
+      - name: Build and test on a simulator
         run: |
           xcodebuild -version
-          swift --version
-          mkdir -p apple/build
-          set -o pipefail
-          make apple-test PATH="$PATH" 2>&1 | tee apple/build/kit-tests.log
-      - name: Preserve failed Kit test diagnostics
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ failure() && !cancelled() }}
+          make apple-test-sim APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && steps.packages.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
         with:
-          name: apple-kit-diagnostics
-          path: |
-            apple/build/kit-tests.log
-            ~/Library/Logs/DiagnosticReports/swiftpm*.ips
-            ~/Library/Logs/DiagnosticReports/WatchMyMedia*.ips
-      - name: Build and test on a simulator
-        run: make apple-test-sim PATH="$PATH"
+          path: apple/build/DerivedData/SourcePackages
+          # The restore's key: the build adds the app's pins to the Kit's
+          # Package.resolved, so hashing it again here would differ.
+          key: ${{ steps.packages.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
           name: apple-test-results
           path: apple/build/Tests.xcresult
 
-  # The Apple TV app (apple/TV, PLAN-IOS.md §11.2), gated like the apple job:
+  # The Apple TV app (apple/TV, PLAN-IOS.md §11.2), when the TV app, what it
+  # shares with the iPhone app, or api/ changed:
   # built, and the Kit's tests and the remote UI tests (apple/TVUITests) run,
   # on an Apple TV simulator. The tvOS simulator runtime is downloaded the
   # first time a runner needs it.
   apple-tv:
     needs: changes
-    if: needs.changes.outputs.apple == 'true'
+    if: needs.changes.outputs.apple-tv == 'true'
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -594,11 +645,28 @@ jobs:
         run: apple/scripts/install-xcodegen.sh
       - name: Install the tvOS simulator runtime
         run: xcrun simctl list runtimes | grep -q tvOS || xcodebuild -downloadPlatform tvOS
+      # Swift package checkouts, as in the apple job.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: packages
+        if: runner.environment == 'github-hosted'
+        with:
+          path: apple/build/DerivedData/SourcePackages
+          key: swift-packages-${{ runner.os }}-${{ hashFiles('apple/project.yml', 'apple/Kit/Package.swift', 'apple/Kit/Package.resolved') }}-${{ github.job }}
+          restore-keys: |
+            swift-packages-${{ runner.os }}-${{ hashFiles('apple/project.yml', 'apple/Kit/Package.swift', 'apple/Kit/Package.resolved') }}-
+            swift-packages-${{ runner.os }}-
       - name: Build and test on an Apple TV simulator
         # Two Studio runners stalled after all tests passed. Avoid verbose
         # sysdiagnose collection, a possible cause; keep results and failures.
         timeout-minutes: 20
-        run: make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never PATH="$PATH"
+        run: make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && steps.packages.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: apple/build/DerivedData/SourcePackages
+          # The restore's key: the build adds the app's pins to the Kit's
+          # Package.resolved, so hashing it again here would differ.
+          key: ${{ steps.packages.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:

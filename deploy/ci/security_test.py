@@ -84,14 +84,16 @@ class WorkflowIsolationTest(unittest.TestCase):
                                workflow.split('jobs:\n', 1)[1]))
         gated = {'server': 'server', 'server-race': 'race', 'contract': 'contract', 'web': 'web',
                  'docker': 'docker', 'scripts': 'scripts', 'android': 'android', 'apple': 'apple',
-                 'apple-tv': 'apple', 'windows': 'windows'}
+                 'apple-tv': 'apple-tv', 'windows': 'windows'}
         self.assertEqual(set(gated) | {'changes', 'windows-signing'}, set(jobs))
         for job, output in gated.items():
             with self.subTest(job=job):
                 self.assertRegex(jobs[job], r'(?m)^    needs: (changes|\[changes[^\]]*\])$')
                 self.assertIn(f"needs.changes.outputs.{output} == 'true'", jobs[job])
         outputs = dict(re.findall(r"(?m)^      ([\w-]+): (\$\{\{ github\.event_name == 'workflow_dispatch' \|\|.*)$", jobs['changes']))
-        self.assertEqual(set(gated.values()), set(outputs))
+        # apple-api gates a step, not a job: the apple job's API client check.
+        self.assertEqual(set(gated.values()) | {'apple-api'}, set(outputs))
+        self.assertIn("needs.changes.outputs.apple-api == 'true'", jobs['apple'])
         filters = jobs['changes'].split('filters: |', 1)[1]
         for output in outputs:
             with self.subTest(output=output):
@@ -229,7 +231,7 @@ class WorkflowIsolationTest(unittest.TestCase):
         for name, job in jobs.items():
             with self.subTest(job=name):
                 if name not in cached:
-                    self.assertNotIn('actions/cache/', job)
+                    self.assertNotIn('go-cache', job)
                     continue
                 self.assertEqual(1, job.count('uses: actions/cache/restore@'))
                 self.assertEqual(1, job.count('uses: actions/cache/save@'))
@@ -355,8 +357,9 @@ case "$*" in
 esac
 ''')
             stub.chmod(0o755)
+            # The Mac Studio's runners, whatever machine runs this test.
             env = dict(os.environ, PATH=str(path) + os.pathsep + os.environ['PATH'],
-                       STUB_DIR=tmp, CREATED_ID=created)
+                       STUB_DIR=tmp, CREATED_ID=created, RUNNER_ENVIRONMENT='self-hosted')
             script = str(ROOT / 'apple/scripts/simulator.sh')
             existing = subprocess.check_output(['sh', script, 'iPhone 17 Pro'],
                                                env=dict(env, RUNNER_NAME='mac-studio-1'), text=True)
@@ -387,6 +390,28 @@ esac
                              'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro '
                              'com.apple.CoreSimulator.SimRuntime.iOS-26-0\n', (path / 'created').read_text())
 
+            # A GitHub-hosted runner is a new machine each job: it uses
+            # Xcode's own device rather than making a copy that never booted.
+            (path / 'created').unlink()
+            hosted = subprocess.check_output(['sh', script, 'iPhone 17 Pro'],
+                                             env=dict(env, RUNNER_NAME='GitHub Actions 1000001',
+                                                      RUNNER_ENVIRONMENT='github-hosted'), text=True)
+            self.assertEqual(base, hosted.strip())
+            self.assertFalse((path / 'created').exists())
+
+    def test_every_cache_is_saved_only_by_main_pushes_on_hosted_runners(self):
+        # Whatever the cache, a pull request (a fork's included) only reads
+        # what main saved, and the Mac Studio keeps its own disk instead.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        steps = re.findall(r'(?m)^      - uses: actions/cache/(restore|save)@[^\n]*\n((?:        .*\n)+)', workflow)
+        self.assertEqual({'restore', 'save'}, {kind for kind, _ in steps})
+        for kind, body in steps:
+            with self.subTest(kind=kind, step=body.splitlines()[0]):
+                guard = re.search(r'(?m)^        if: (.+)$', body).group(1)
+                self.assertIn("runner.environment == 'github-hosted'", guard)
+                if kind == 'save':
+                    self.assertIn("github.event_name == 'push' && github.ref == 'refs/heads/main'", guard)
+
     def test_git_ignores_private_files_at_nested_paths(self):
         for path in ('nested/.env', 'nested/.env.production', 'nested/signing.p8',
                      'nested/signing.p12', 'nested/private.key', 'nested/private.pem',
@@ -399,7 +424,7 @@ esac
         tv = re.search(r'(?ms)^  apple-tv:\n(.*?)(?=^  windows:)', workflow).group(1)
         step = re.search(r'(?ms)- name: Build and test on an Apple TV simulator\n(.*?)(?=      -)', tv).group(1)
         self.assertIn('timeout-minutes: 20', step)
-        self.assertIn('make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never PATH="$PATH"', step)
+        self.assertIn("make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH=\"$PATH\"", step)
         self.assertNotIn('continue-on-error', tv)
         self.assertIn('path: apple/build/TVTests.xcresult', tv)
 
@@ -411,6 +436,8 @@ esac
             commands = {
                 'apple/scripts/simulator.sh': 'echo 00000000-0000-0000-0000-000000000001',
                 'xcodegen': 'exit 0',
+                # The early boot: a failure there must not stop the tests.
+                'xcrun': 'exit 1',
                 'xcodebuild': 'printf "%s\\n" "$@" > "$CAPTURE_PATH"\nexit "$STUB_EXIT"',
             }
             for name, script in commands.items():
@@ -434,6 +461,11 @@ esac
                         self.assertEqual(policy, args[args.index('-collect-test-diagnostics') + 1])
                     else:
                         self.assertNotIn('-collect-test-diagnostics', args)
+            subprocess.run(command + ['APPLE_TEST_FLAGS=-enableCodeCoverage NO'], cwd=tmp, env=env,
+                           check=True, capture_output=True)
+            args = capture.read_text().splitlines()
+            self.assertEqual('NO', args[args.index('-enableCodeCoverage') + 1])
+            self.assertEqual('test', args[-1])
             failed = subprocess.run(command + ['APPLE_TV_TEST_DIAGNOSTICS=never'], cwd=tmp,
                                     env=dict(env, STUB_EXIT='65'), capture_output=True)
             self.assertNotEqual(0, failed.returncode)

@@ -40,9 +40,11 @@ fi
 udid=$(printf '%s\n' "$line" | grep -oE "$uuid" | head -n 1)
 # CI runners on one Mac share its simulators, and two jobs on one device kill
 # each other's tests when one launches or tears down while the other runs. So
-# each runner (RUNNER_NAME, set by GitHub Actions) gets its own device of the
-# same type and runtime, made the first time and reused after.
-if [ -n "${RUNNER_NAME:-}" ]; then
+# each self-hosted runner (RUNNER_NAME, set by GitHub Actions) gets its own
+# device of the same type and runtime, made the first time and reused after.
+# A GitHub-hosted runner is a fresh machine running one job, with a new name
+# each time, so a copy there would only be a device that never booted before.
+if [ -n "${RUNNER_NAME:-}" ] && [ "${RUNNER_ENVIRONMENT:-}" != github-hosted ]; then
 	own="$(printf '%s' "$line" | sed -E 's/^ +//; s/ \('"$uuid"'\).*$//') ($RUNNER_NAME)"
 	mine=$(printf '%s\n' "$list" | grep -F "    $own (" | grep -E "^    .{${#own}} \($uuid\)" | grep -oE "$uuid" | head -n 1 || true)
 	if [ -z "$mine" ]; then
