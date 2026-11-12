@@ -66,6 +66,16 @@ names, so treat them as public. New reply fields take `required:"false"`. Bump
 `APILevel` in `internal/api/system.go` for changes the apps must know about. Then
 `make gen-api` and the Swift client steps in the root file.
 
+**Admin routes.** Wrap an admin-only operation in `adminOp` (`internal/api/auth.go`)
+rather than checking inside the handler: it refuses members and admins
+without access on this request before the body is read, and it marks the
+operation so `TestAdminOperationsRefuseMembers` checks it. Library
+maintenance (matching, rematching, hiding files, scans, and the TMDB
+searches behind them) is admin work, GETs included. What members' lists
+fetch from MDBList, on the admin's key, is limited in
+`internal/api/media_list_limits.go`. Media tokens (`?access_token=`) open
+GET and HEAD media routes only.
+
 **SQL.** Queries go in `internal/db/queries/*.sql` and run through sqlc;
 `internal/activity` keeps its own SQL. The server never runs `ANALYZE`, so
 SQLite plans joins without statistics, and a plan that looks fine after
