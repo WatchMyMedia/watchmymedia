@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/db/dbtest"
 	"watchmymedia/server/internal/opensubtitles"
 	"watchmymedia/server/internal/settings"
 )
@@ -58,14 +59,7 @@ func newFakeProvider(t *testing.T) *fakeProvider {
 func newTestService(t *testing.T, p *fakeProvider, n int) ([]*Service, int64) {
 	t.Helper()
 	ctx := context.Background()
-	conn, err := db.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = conn.Close() })
-	if err := db.Migrate(ctx, conn); err != nil {
-		t.Fatal(err)
-	}
+	conn := dbtest.OpenPath(t, filepath.Join(t.TempDir(), "t.db"))
 	q := db.New(conn)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "Clip (2020).mp4")

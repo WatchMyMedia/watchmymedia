@@ -17,7 +17,7 @@ golangci-lint v2.15.0, the versions CI pins.
 | One package or test | `go test ./internal/playback -run TestVOD -count=1` |
 | Vet as CI does | `go vet ./... && GOOS=linux GOARCH=amd64 go vet ./... && GOOS=windows GOARCH=amd64 go vet ./...` |
 | Lint | `golangci-lint run ./...` (or `make lint` from the root, which also lints the web); `.golangci.yml` adds errorlint, nilerr, rowserrcheck, sqlclosecheck, bodyclose, noctx, modernize and gosec to the standard set, and `go fix ./...` applies the modernizers |
-| Race detector, as CI's `server-race` job runs it | `go test -race -short -p 1 -timeout 30m ./...` (`-short` skips the speed budgets; one package at a time and the longer limit are for GitHub's three-core macOS runners) |
+| Race detector, as CI's `server-race` job runs it | `go test -race -short -p 1 -timeout 30m ./...` (`-short` skips the speed budgets; CI runs it on Linux, and the macOS-only code under the race detector in the `server` job) |
 | Regenerate queries | `sqlc generate` (or `make gen-sqlc`) |
 | Regenerate the API documents and web types | `make gen-api` from the root |
 | Speed budgets | `make bench` from the root |
@@ -25,7 +25,8 @@ golangci-lint v2.15.0, the versions CI pins.
 
 The tests use ffmpeg and ffprobe from `PATH`. CI runs them with the build the
 releases ship: `deploy/macos/fetch-ffmpeg.sh arm64` from the root puts it in
-`build/ffmpeg/darwin-arm64`; put that first on `PATH` to match. Tests skip
+`build/ffmpeg/darwin-arm64` (`linux-amd64` for the race job's Linux runner);
+put that first on `PATH` to match. Tests skip
 what the local ffmpeg can't do (libx265, the overlay filter) rather than fail.
 
 ## Layout
@@ -253,9 +254,12 @@ requests with `doJSON`, and keep package globals out of tests. A test that
 waits on timers runs in a synctest bubble on an in-memory server
 (`startTestEnv` with `httptest.NewTestServer`).
 
-- Open a test database with `dbtest.Open(t)` (`internal/db/dbtest`), which
-  migrates it as the server does; `internal/db`'s own tests, which cannot
-  import it, use `openTest` and `migrateTo`.
+- Open a test database with `dbtest.Open(t)` (`internal/db/dbtest`), or
+  `dbtest.OpenPath` where the test needs the file's path. Each is a copy of
+  one database the test binary migrated as the server does: migrating takes
+  about 0.9 s under the race detector against 30 ms without, and calling
+  `db.Migrate` per test made `internal/api` three times slower there. `internal/db`'s own tests, which cannot import it,
+  use `openTest` and `migrateTo`.
 - Don't sleep to wait for goroutines or timers. Use the standard library's
   synctest package for code driven by timers (the watcher's debouncer,
   coalesced scans), or wait on an event or channel; give code that compares
