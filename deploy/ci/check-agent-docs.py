@@ -18,7 +18,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 # Things in backticks that look like paths but are not files here: branch
 # names, URLs and URL paths, other machines' folders, and ./commands.
-NOT_PATHS = ("taimoorq/", "origin/", "refs/", "http://", "https://", "~/", "/", "./")
+NOT_PATHS = ("taimoorq/", "WatchMyMedia/", "origin/", "refs/", "http://", "https://", "~/", "/", "./")
 PATHLIKE = re.compile(r"^[\w.\-/*{},]+$")
 
 # The public repository is a copy without the plans, the mockups, the site,

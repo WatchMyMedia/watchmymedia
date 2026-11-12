@@ -10,7 +10,7 @@ it covers releases, the downloads Worker and the CI runners.
 | Path | What |
 |---|---|
 | `Dockerfile`, `entrypoint.sh`, `docker-compose*.yml`, `Caddyfile`, `swag/` | The image (built from source; see `../.dockerignore`) and example setups behind proxies. The image's ffmpeg is jellyfin-ffmpeg from Jellyfin's apt repository, which carries the Intel, AMD and Vulkan user-mode drivers; the entrypoint runs the server as `PUID`/`PGID` in the groups that own `/dev/dri` |
-| `unraid/` | The Unraid Docker template (`watchmymedia.xml`), the templates repository's profile, their test, and `mirror.sh`, which assembles the public `taimoorq/unraid-templates` repository Community Applications reads; [its README](unraid/README.md) has the hand install, the test list for an Unraid server and the submission checklist |
+| `unraid/` | The Unraid Docker template (`watchmymedia.xml`), the templates repository's profile, their test, and `mirror.sh`, which assembles the public `WatchMyMedia/unraid-templates` repository Community Applications reads; [its README](unraid/README.md) has the hand install, the test list for an Unraid server and the submission checklist |
 | `ci/docker-smoke.sh` | Checks a built image without a GPU: ffmpeg's hardware encoders and filters, the entrypoint's device groups, `--group-add` and `UMASK`, and that the server comes up healthy (`make docker-smoke`; CI's `docker` job runs it) |
 | `config.example.yaml` | Every server option, commented; update it with any new option |
 | `release/` | `tag.sh` (`make release-tag`) and `notes.sh` (a version's CHANGELOG section), with `version_test.py` for `apple/scripts/version.sh` |

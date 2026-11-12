@@ -64,7 +64,7 @@ class TemplateTest(unittest.TestCase):
         self.assertIsNone(self.root.find("ExtraParams"), "--runtime=nvidia in ExtraParams fails on hosts without the plugin")
 
     def test_image_and_links(self):
-        self.assertEqual(self.text("Repository"), "ghcr.io/taimoorq/watchmymedia:latest")
+        self.assertEqual(self.text("Repository"), "ghcr.io/watchmymedia/watchmymedia:latest")
         self.assertTrue(self.text("TemplateURL").endswith("/templates/watchmymedia.xml"))
         self.assertTrue(self.text("Icon").endswith("/images/watchmymedia.png"))
         for name in ("Support", "Project", "ReadMe", "Registry", "TemplateURL", "Icon"):
