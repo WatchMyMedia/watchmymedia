@@ -688,7 +688,7 @@ func currentSettings(ctx context.Context, deps Deps) Settings {
 	s.Cast = CastSettings{Enabled: deps.Cast.Enabled, AppID: deps.Cast.AppID, URL: deps.Cast.URL,
 		ReceiverOrigins: append([]string{}, deps.Cast.ReceiverOrigins...), URLs: castURLs(requestFrom(ctx), deps)}
 	if deps.Playback != nil {
-		resources, scanErr := deps.Playback.Resources()
+		resources, scanErr := deps.Playback.LastResources()
 		s.Storage = &PlaybackCacheLoad{TemporaryBytes: resources.TemporaryBytes, TemporaryFiles: resources.TemporaryFiles,
 			FreeBytes: resources.FreeBytes, MaxCacheBytes: resources.MaxCacheBytes, MaxSessionBytes: resources.MaxSessionBytes,
 			MinFreeBytes: resources.MinFreeBytes, EventAheadMs: resources.EventAheadMs,
