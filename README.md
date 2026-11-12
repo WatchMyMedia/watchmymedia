@@ -163,6 +163,52 @@ and Quit. The development NSIS installer builds with `make windows-installer`. R
 sign the installer, but Windows downloads and automatic updates are not published yet;
 [windows/README.md](windows/README.md) covers building and testing it.
 
+### Cutting a release
+
+The server and every app take their version from one git tag, `vMAJOR.MINOR.PATCH`, with
+`-alpha.N`, `-beta.N` or `-rc.N` for a pre-release.
+Add the release's section to [CHANGELOG.md](CHANGELOG.md) on `main`, then run
+`make release-tag VERSION=v1.2.3`. It tags `origin/main`, not this checkout, once it has
+checked that the version is valid and newer than every tag so far and that the changelog
+has its notes, and it asks before pushing. Only repository admins can push a `v*` tag.
+The tag starts `.github/workflows/release.yml`, which creates the
+GitHub release with those notes (as a pre-release for a suffixed tag); each job then adds
+its files: the server archives, the DMG, the APK and the Windows installer. It also pushes
+the Docker image and uploads the iPhone app to TestFlight. The Mac app's build number,
+which Sparkle compares, is the number the iPhone and
+Android builds use (`apple/scripts/version.sh`: 1.2.3 is 10200399).
+
+The workflow runs on GitHub's runners and restores nothing from a cache. Its signing keys
+and API keys are secrets of the `release` environment (`windows-signing` for the Windows
+job), which admit only `v*` tags; a build without them still runs, unsigned, and says so.
+
+A GitHub release is not yet what people are offered. The website, the servers' Check for
+updates and the Mac and Windows apps' updaters read <https://downloads.watchmy.media>,
+which the maintainers publish to from the release's files once it is built.
+
+### Releasing the Mac app
+
+The `macos` job in `.github/workflows/release.yml` builds a universal DMG on every `v*`
+tag. It signs, notarises and staples the app and the DMG when these `release` environment
+secrets exist, and otherwise uploads an ad-hoc-signed DMG:
+
+- `MACOS_CERTIFICATE_P12` and `MACOS_CERTIFICATE_PASSWORD`: a **Developer ID Application**
+  certificate (developer.apple.com → Certificates; not Apple Distribution, which is for
+  the App Store) exported from Keychain Access as a `.p12`, then `base64 -i cert.p12`.
+- `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY_P8`: an App Store Connect API key
+  (Users and Access → Integrations → Team Keys, Developer role); the `.p8` file as
+  base64. `xcrun notarytool` uses it; no Apple ID password is involved.
+- The repository variables `SPARKLE_PUBLIC_KEY` and `SPARKLE_FEED_URL`
+  (`https://downloads.watchmy.media/mac/appcast.xml`): the public half of the key from
+  Sparkle's `generate_keys`, and where the app looks for updates. With them the app checks
+  for updates itself; without them it has no update item. The private half signs the feed
+  and is not kept in this repository.
+
+Locally, `make macos-dmg` does the same: it signs with the first Developer ID in your
+keychain (or `CODESIGN_IDENTITY`), and notarises when `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`
+and `NOTARY_KEY_PATH` are set, or `NOTARY_KEYCHAIN_PROFILE` names a profile saved with
+`xcrun notarytool store-credentials`.
+
 ## TV and phone apps
 
 The native apps (Android below; the iPhone app below that) use the same server:
@@ -219,6 +265,55 @@ debugging, then `adb connect <tv-ip>:5555`). The GitHub APK is signed with the u
 and Play's copy with Google's app signing key, so Android will not update one with the
 other: uninstall first when switching.
 
+### Releasing the Android app
+
+The `android` job in `.github/workflows/release.yml` builds the bundle and the APK on every
+`v*` tag, attaches the APK to the GitHub release and keeps the bundle as the run's
+`android-bundle` artifact. Without the signing secrets both are unsigned (the job summary
+says so); with them they are signed, and with `PLAY_SERVICE_ACCOUNT_JSON` as well the bundle
+goes to Play's internal testing track. Secrets of the `release` environment:
+
+- `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+  `ANDROID_KEY_PASSWORD`: the upload key. Play App Signing keeps the key that signs what
+  Play delivers, so this one only proves uploads are yours, and Play Console can reset it if
+  it is lost. Make it once, keep the file and password in a password manager, never commit
+  it:
+
+  ```bash
+  keytool -genkeypair -keystore watchmymedia-upload.jks -storetype PKCS12 \
+    -alias upload -keyalg RSA -keysize 4096 -validity 10000
+  base64 -i watchmymedia-upload.jks | gh secret set --env release ANDROID_KEYSTORE_BASE64
+  gh secret set --env release ANDROID_KEYSTORE_PASSWORD   # prompts
+  gh secret set --env release ANDROID_KEY_ALIAS --body upload
+  ```
+
+  `ANDROID_KEY_PASSWORD` can stay unset: a PKCS12 keystore uses the store password for the
+  key. Locally, the same variables with `ANDROID_KEYSTORE_FILE` (the `.jks` path) sign
+  `./gradlew bundleRelease`. The upload key made for 0.1.0 lives in `android/secrets/`
+  (gitignored): `watchmymedia-upload.jks` and `upload.env`, which holds its password and
+  alias. A signed build from it:
+
+  ```bash
+  cd android
+  set -a; . secrets/upload.env; set +a
+  ANDROID_KEYSTORE_FILE="$PWD/secrets/watchmymedia-upload.jks" ./gradlew bundleRelease assembleRelease -PappVersion=v0.1.0
+  ```
+
+  Release builds are minified by R8 (shrunk, optimized and obfuscated), with the app's keep
+  rules in `android/app/proguard-rules.pro`. The bundle carries the R8 mapping file, and Play
+  uses it to deobfuscate crash reports, so nothing else needs uploading.
+- `PLAY_SERVICE_ACCOUNT_JSON`: in Google Cloud, enable the Google Play Android Developer
+  API in a project, create a service account there and download a JSON key for it
+  (`gh secret set --env release PLAY_SERVICE_ACCOUNT_JSON < key.json`). In Play Console → Users and
+  permissions, invite the service account's email and give it "Release to testing tracks"
+  for WatchMyMedia.
+
+Play's API cannot create an app or make its first upload: create the app in Play Console
+(Play App Signing is on by default) and upload the first bundle by hand from the
+`android-bundle` artifact. Until Play has published the app, it only accepts draft
+releases from the API; set the repository variable `PLAY_RELEASE_STATUS` to `draft` until
+then and roll each release out in Play Console.
+
 ## iPhone app
 
 The app is on the [App Store](https://apps.apple.com/app/watchmymedia/id6828975407)
@@ -240,6 +335,43 @@ against a real one, `make fixture-serve` and type `localhost:27588` in the
 simulator's server picker. On a phone, the server must be reachable at an IP
 address or `.local` name over http, or at an https address: iOS refuses plain
 http to other host names.
+
+### Releasing the iPhone app
+
+The `ios` job in `.github/workflows/release.yml` archives the app on every `v*`
+tag and uploads it to TestFlight. `apple/scripts/version.sh` turns the tag into
+the version, and the build number follows the Android version code, so
+pre-releases sort before their release (`v1.2.3-rc.1` is build 10200361, `v1.2.3`
+is build 10200399). The App Store's first release was 1.0, and App Store Connect
+takes only a higher version than the last approved one, so
+`CFBundleShortVersionString` stays on 1.x: `v0.5.2` was 1.5.2, `v1.0.0` was
+1.6.0, and since 1.1 and 1.2 shipped no App Store build, from `v1.3.0` the minor
+version is four ahead of the tag's (`v1.3.0` is 1.7.0, `v1.4.0` is 1.8.0) on
+iPhone, iPad and Apple TV, while the server, the Mac app and Android say
+the tag's own version.
+
+Once, by hand, in the Eldwick Software account (team `6R8GZD78G3`):
+
+1. Register the bundle ID `media.watchmy.client` (Certificates, Identifiers &
+   Profiles), with no extra capabilities, and create the app in App Store
+   Connect with it. The Apple TV app will join the same record (universal
+   purchase).
+2. Make an App Store Connect API key (Users and Access → Integrations → Team
+   Keys) whose role may manage certificates and profiles (Admin, or App Manager
+   with access to Certificates, Identifiers & Profiles), so `xcodebuild
+   -allowProvisioningUpdates` can sign in the cloud. Set the `release` environment's secrets
+   `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID` and
+   `APP_STORE_CONNECT_KEY_P8` (the `.p8` file as base64). The notarisation key
+   from the Mac release works if its role allows this.
+
+Without the secrets the job builds the app for the simulator and warns. Locally,
+`make apple-upload VERSION=v1.2.3` does the same with the Xcode accounts signed in
+on this Mac, or with `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_PATH` set. To archive
+in Xcode instead, run `make apple-gen VERSION=v1.2.3` first: otherwise the archive is
+the project's placeholder version, 1.0 (1). The Apple TV app uploads with
+`make apple-tv-upload VERSION=v1.2.3`: it is archived unsigned and signed for the
+App Store at export, since Xcode's own Archive needs an Apple TV registered to the
+team.
 
 ## Remote access with Tailscale
 

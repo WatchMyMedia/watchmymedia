@@ -125,9 +125,7 @@ class WorkflowIsolationTest(unittest.TestCase):
         positions = [signing.index(marker) for marker in order]
         self.assertEqual(sorted(positions), positions)
 
-    # release.yml is not in the public repository (deploy/oss/private-paths.txt).
-    @unittest.skipUnless((ROOT / '.github/workflows/release.yml').exists(), 'release.yml is kept outside this repository')
-    def test_release_signs_windows_only_in_its_job_and_publishes_only_when_turned_on(self):
+    def test_release_signs_windows_only_in_its_job(self):
         workflow = (ROOT / '.github/workflows/release.yml').read_text()
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
@@ -148,17 +146,35 @@ class WorkflowIsolationTest(unittest.TestCase):
                          dict(re.findall(r'(?m)^          ([\w-]+): (.+)$', login)))
         self.assertNotIn('--ci-server-host', windows)
         order = ['windows/build.sh', 'setup-signing.ps1', 'azure/login@', 'sign.ps1 -Path',
-                 'installer.sh --sign', 'verify-installer.ps1', 'action-gh-release@', 'actions/upload-artifact@']
+                 'installer.sh --sign', 'verify-installer.ps1', 'action-gh-release@']
         positions = [windows.index(marker) for marker in order]
         self.assertEqual(sorted(positions), positions)
         # Only the name verify-installer.ps1 gives a checked installer leaves the job.
         outputs = re.findall(r'(?ms)- uses: (?:softprops/action-gh-release|actions/upload-artifact)@[^\n]+\n'
                              r'        with:\n(?:          (?!files|path)[^\n]*\n)*          (?:files|path): ([^\n]+)', windows)
-        self.assertEqual(['build/windows-installer/WatchMyMedia-*-x64-setup.exe'] * 2, outputs)
-        publish = jobs['publish']
-        self.assertRegex(publish, r'(?m)^    needs: \[[^\]]*\bwindows\b[^\]]*\]$')
-        self.assertIn("PUBLISH_WINDOWS_APP: ${{ vars.PUBLISH_WINDOWS_APP == 'true' && needs.windows.result == 'success' }}", publish)
-        self.assertIn('SIGN_UPDATE=$RUNNER_TEMP/sparkle/bin/sign_update', publish)
+        self.assertEqual(['build/windows-installer/WatchMyMedia-*-x64-setup.exe'], outputs)
+
+    def test_release_runs_on_hosted_runners_without_caches_and_with_least_permissions(self):
+        # A release is built from the tagged commit alone, on a machine nobody
+        # else has used, and a job can write only what it publishes.
+        workflow = (ROOT / '.github/workflows/release.yml').read_text()
+        self.assertIn('\non:\n  push:\n    tags: ["v*"]\n\n', workflow)
+        self.assertIn('\npermissions:\n  contents: read\n', workflow)
+        self.assertNotIn('self-hosted', workflow)
+        self.assertNotIn('actions/cache@', workflow)
+        self.assertNotIn('type=gha', workflow)
+        self.assertEqual(set(), set(re.findall(r'(?m)^          cache: (.+)$', workflow)) - {'false'})
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        self.assertEqual({'check', 'binaries', 'macos', 'image', 'ios', 'android', 'windows'}, set(jobs))
+        for name, job in jobs.items():
+            with self.subTest(job=name):
+                self.assertRegex(job, r'(?m)^    runs-on: (macos-26|ubuntu-latest|windows-latest)$')
+                # Every job that reads a secret runs in an environment that admits only v* tags.
+                if 'secrets.' in job.replace('secrets.GITHUB_TOKEN', ''):
+                    self.assertRegex(job, r'(?m)^    environment: (release|windows-signing)$')
+                if 'packages: write' in job:
+                    self.assertEqual('image', name)
 
     def test_actions_are_pinned_to_commits(self):
         # A tag can be moved to other code and a commit cannot. Release jobs

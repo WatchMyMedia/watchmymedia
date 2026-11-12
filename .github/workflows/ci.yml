@@ -177,14 +177,13 @@ jobs:
       - name: Test the downloads Worker and the release scripts
         working-directory: .
         run: |
-          # The Worker, the site and the release scripts are not in the
-          # public repository (deploy/oss/private-paths.txt).
-          if [ -d deploy/release ]; then
+          # The downloads Worker and the site are not in the public repository.
+          if [ -d deploy/downloads ]; then
             node --test deploy/downloads/worker.test.js
             python3 -I -m unittest discover -s deploy/downloads -p '*_test.py'
             node --test deploy/site/downloads.test.mjs
-            python3 -I -m unittest discover -s deploy/release -p '*_test.py'
           fi
+          python3 -I -m unittest discover -s deploy/release -p '*_test.py'
           python3 -I -m unittest discover -s deploy/ci -p '*_test.py'
           python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'
 
