@@ -137,9 +137,11 @@ jobs:
         env:
           FFMPEG_CACHE: ${{ runner.tool_cache }}/watchmymedia-ffmpeg
         run: deploy/macos/fetch-ffmpeg.sh arm64
+      # GitHub's macOS runners have three cores: under the race detector the
+      # api package alone ran past go test's 10-minute limit there.
       - name: Test with the race detector
         working-directory: server
-        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test -race -short ./...
+        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test -race -short -timeout 30m ./...
 
   web:
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
