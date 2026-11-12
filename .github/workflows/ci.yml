@@ -674,12 +674,138 @@ jobs:
           path: apple/build/TVTests.xcresult
 
   # The Go tests on Windows, with the ffmpeg build the Windows app will ship
-  # (PLAN.md §7c). The Mac Studio cannot run Windows, so this is GitHub's
-  # Windows runner, billed by the minute; it runs only when the server, the
-  # ffmpeg pin or this file changed. It has no GPU: it covers the software
-  # path, Windows file handling and the GPU pipelines' arguments, not the
-  # GPUs themselves.
-  windows:
+  # (PLAN.md §7c). The Mac Studio cannot run Windows, so this and
+  # windows-app are GitHub's Windows runners; they run only when the server,
+  # the Windows app, the ffmpeg pin or this file changed. No GPU: they cover
+  # the software path, Windows file handling and the GPU pipelines'
+  # arguments, not the GPUs themselves.
+  windows-server:
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache: false
+      # Go's caches, saved by main and restored everywhere, as in the server job.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum', 'windows/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
+      - name: Fetch the ffmpeg build the Windows app will ship
+        shell: bash
+        run: |
+          deploy/macos/fetch-ffmpeg.sh windows-amd64
+          build/ffmpeg/windows-amd64/ffmpeg.exe -hide_banner -version | head -1
+      # Pull requests keep main's passing results for packages they don't
+      # change; main and manual runs run every test again, and main saves
+      # those results for the pull requests after it.
+      - name: Run every test again outside pull requests
+        if: github.event_name != 'pull_request'
+        working-directory: server
+        run: go clean -testcache
+      # The final playlist publication against its startup reader, fifty
+      # times. Windows' playlist, shared-reader and recording-publication
+      # tests (internal/playback, internal/growing, internal/livetv/dvr) run
+      # in the Test step below, with the rest.
+      - name: Stress the final playlist publication
+        working-directory: server
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          go test ./internal/playback -run '^TestRemuxSession$' -count=50
+      # Twice on main and manual runs, once on pull requests: a pass takes
+      # about 3.7 minutes, and the second catches an unsteady one.
+      - name: Qualify shared Live TV output, recovery and held readers
+        working-directory: server
+        shell: pwsh
+        env:
+          # Five simultaneous software claims were not stable on this runner.
+          # Keep HD, separate outputs, recording and the six-second failure guard.
+          WMM_LIVE_QUALIFICATION_CLAIMS: '3'
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          go test -tags streamingacceptance ./internal/livetv/dvr -run '^TestLiveLadder.*Qualification$' -count=${{ github.event_name == 'pull_request' && 1 || 2 }} -v
+      - name: Report Windows transcoder diagnostics
+        working-directory: server
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          New-Item -ItemType Directory -Force ../build/hardware-report | Out-Null
+          $env:WATCHMYMEDIA_DATA_DIR = "$env:GITHUB_WORKSPACE\build\hardware-report\must-not-create-data"
+          go run ./cmd/server gpu-adapters | Out-File -Encoding utf8 ../build/hardware-report/adapters.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $inventory = Get-Content -Raw ../build/hardware-report/adapters.json | ConvertFrom-Json
+          if (!$inventory.supported -or $null -eq $inventory.adapters -or @($inventory.diagnostics).Count -ne 2) { throw 'Missing native Windows inventory' }
+          $directx = @($inventory.diagnostics | Where-Object namespace -eq 'directx')
+          if ($directx.Count -ne 1 -or !$directx[0].ok) { throw ('DXGI enumeration failed: ' + ($directx | ConvertTo-Json -Compress)) }
+          if (Test-Path $env:WATCHMYMEDIA_DATA_DIR) { throw 'Adapter discovery opened a data directory' }
+          # Missing CUDA is expected on hosted software runners. Names are not
+          # codec admission: the standalone pipeline probe below remains separate.
+          go run ./cmd/server probe-transcoder -hwaccel software | Out-File -Encoding utf8 ../build/hardware-report/windows.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Test-Path $env:WATCHMYMEDIA_DATA_DIR) { throw 'Standalone probes opened a data directory' }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: windows-transcoder-report
+          path: build/hardware-report/*.json
+          retention-days: 7
+      - name: Test
+        working-directory: server
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          go test -skip 'Speed$' ./...
+      # As in the server job: the speed budgets alone, one package at a time.
+      - name: Test the speed budgets alone
+        working-directory: server
+        shell: pwsh
+        run: go test -p 1 -run 'Speed$' ./...
+      - name: Qualify complete software VOD rendition output
+        working-directory: server
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          go test -tags streamingacceptance ./internal/playback -run '^TestVODLadder(FullFileQualification|RejectsUnboundedCopiedAudio)$' -count=1 -v
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+
+  # The Windows app beside windows-server, at the same time: the tray app's
+  # tests, the app and its installers built with this run's web build, and
+  # the tray, installer and platform smoke tests on the hosted Windows Server.
+  windows-app:
     needs: [changes, web]
     if: needs.changes.outputs.windows == 'true'
     runs-on: windows-latest
@@ -739,59 +865,6 @@ jobs:
         if: github.event_name != 'pull_request'
         working-directory: server
         run: go clean -testcache
-      - name: Check Windows playlists and recording publication
-        working-directory: server
-        shell: pwsh
-        run: |
-          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          go test ./internal/playback -run '^Test(PlaylistSnapshotDoesNotBlockReplacement|EventPlaylistCachesTheLastSnapshot|FinishedPlaylist.*|VODPlaylistReadsOnlyNewPieces|SharedSegmentCanBeRenamedAwayWhileReading|SharedReaderSupportsLongPaths|SharedPathPreservesWindowsNamespaces)$' -count=1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # Exercise the final playlist publication against its startup reader.
-          go test ./internal/playback -run '^TestRemuxSession$' -count=50
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # Exercise recording ownership, no-replace publication and an
-          # open growing reader across the final rename on Windows itself.
-          go test -short ./internal/growing ./internal/livetv/dvr -count=1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          go test ./internal/playback -run '^TestGrowingTransportProducesEventThenEndList$' -count=1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Qualify shared Live TV output, recovery and held readers
-        working-directory: server
-        shell: pwsh
-        env:
-          # Five simultaneous software claims were not stable on this runner.
-          # Keep HD, separate outputs, recording and the six-second failure guard.
-          WMM_LIVE_QUALIFICATION_CLAIMS: '3'
-        run: |
-          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          go test -tags streamingacceptance ./internal/livetv/dvr -run '^TestLiveLadder.*Qualification$' -count=2 -v
-      - name: Report Windows transcoder diagnostics
-        working-directory: server
-        shell: pwsh
-        run: |
-          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          New-Item -ItemType Directory -Force ../build/hardware-report | Out-Null
-          $env:WATCHMYMEDIA_DATA_DIR = "$env:GITHUB_WORKSPACE\build\hardware-report\must-not-create-data"
-          go run ./cmd/server gpu-adapters | Out-File -Encoding utf8 ../build/hardware-report/adapters.json
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $inventory = Get-Content -Raw ../build/hardware-report/adapters.json | ConvertFrom-Json
-          if (!$inventory.supported -or $null -eq $inventory.adapters -or @($inventory.diagnostics).Count -ne 2) { throw 'Missing native Windows inventory' }
-          $directx = @($inventory.diagnostics | Where-Object namespace -eq 'directx')
-          if ($directx.Count -ne 1 -or !$directx[0].ok) { throw ('DXGI enumeration failed: ' + ($directx | ConvertTo-Json -Compress)) }
-          if (Test-Path $env:WATCHMYMEDIA_DATA_DIR) { throw 'Adapter discovery opened a data directory' }
-          # Missing CUDA is expected on hosted software runners. Names are not
-          # codec admission: the standalone pipeline probe below remains separate.
-          go run ./cmd/server probe-transcoder -hwaccel software | Out-File -Encoding utf8 ../build/hardware-report/windows.json
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (Test-Path $env:WATCHMYMEDIA_DATA_DIR) { throw 'Standalone probes opened a data directory' }
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: windows-transcoder-report
-          path: build/hardware-report/*.json
-          retention-days: 7
-
       - name: Test and vet the tray app
         working-directory: windows
         run: |
@@ -866,23 +939,6 @@ jobs:
       - name: Exercise installation, upgrade and uninstall
         shell: pwsh
         run: windows/installer-smoke.ps1 -CIHost
-      - name: Test
-        working-directory: server
-        shell: pwsh
-        run: |
-          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          go test -skip 'Speed$' ./...
-      # As in the server job: the speed budgets alone, one package at a time.
-      - name: Test the speed budgets alone
-        working-directory: server
-        shell: pwsh
-        run: go test -p 1 -run 'Speed$' ./...
-      - name: Qualify complete software VOD rendition output
-        working-directory: server
-        shell: pwsh
-        run: |
-          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          go test -tags streamingacceptance ./internal/playback -run '^TestVODLadder(FullFileQualification|RejectsUnboundedCopiedAudio)$' -count=1 -v
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-development-installer
