@@ -36,7 +36,7 @@ export function FilesTable({ files, type, tmdbConfigured }: { files: MediaFile[]
           </thead>
           <tbody className="divide-y divide-neutral-800">
             {files.map((f) => (
-              <FileRow key={f.id} file={f} type={type} onFix={tmdbConfigured ? () => setFixing(f) : undefined} onSegments={admin ? () => setEditing(f) : undefined} />
+              <FileRow key={f.id} file={f} type={type} onFix={admin && tmdbConfigured ? () => setFixing(f) : undefined} onSegments={admin ? () => setEditing(f) : undefined} />
             ))}
           </tbody>
         </table>

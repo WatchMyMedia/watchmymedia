@@ -107,9 +107,13 @@ to keep both working.
 
 1. **Read first**: this file and the folder's `AGENTS.md` and README.
 2. **One PR per change and platform**, on a branch named `taimoorq/<kebab-name>`.
-   Small direct commits to `main` have also been normal; ask when unsure
-   whether the user wants a PR. Bring a branch up to date by merging
-   `origin/main` into it.
+   A batch of fixes, such as a review's findings, is one change: put it in
+   one PR with a commit per fix, not one PR each, since every PR runs the
+   full CI (`server-race` alone takes about half an hour). Split only when a
+   fix needs a different reviewer, could hold the rest back, or is on
+   another platform. Small direct commits to `main` have also been normal;
+   ask when unsure whether the user wants a PR. Bring a branch up to date by
+   merging `origin/main` into it.
 3. **Validate by what changed** (next section), and say plainly what was not
    checked, such as real devices or a Chromecast.
 4. **Update the docs in the same change**: the README or folder README when a

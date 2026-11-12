@@ -160,11 +160,15 @@ func TestRunParentRematchOrOrderChangeCannotMarkApprovedOldEpisode(t *testing.T)
 			r := e.previewRun(c, false)
 			e.f.Set(func(f *plextest.Fake) { f.Shows["301"] = replacement })
 			r = e.tickRun(c, r)
-			if r.Status != "failed" || r.Reason != "source_identity_changed" {
+			// One changed item is skipped, not a reason to pause the connection.
+			if r.Status != "complete" || r.Counts.Unavailable != 1 || r.Counts.Marked != 0 {
 				t.Fatalf("changed parent %+v", r)
 			}
-			if e.count("watch_state") != 0 {
+			if e.count("watch_state") != 0 || e.count("plex_source_items") != 0 {
 				t.Fatal("changed source marked old episode")
+			}
+			if saved, err := e.q.GetPlexConnection(t.Context(), c.ID); err != nil || saved.Problem != "" {
+				t.Fatalf("connection paused for one item: %+v %v", saved, err)
 			}
 		})
 	}

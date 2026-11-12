@@ -21,6 +21,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
+
 	"watchmymedia/server/internal/auth"
 	"watchmymedia/server/internal/backup"
 	"watchmymedia/server/internal/db"
@@ -46,6 +48,9 @@ type testEnv struct {
 	client  *http.Client
 	bus     *events.Bus
 	dataDir string
+	// api is the server's huma API, whose OpenAPI document lists every
+	// operation with its metadata.
+	api huma.API
 }
 
 func newTestServer(t *testing.T) *testEnv {
@@ -106,7 +111,8 @@ func startTestEnv(t *testing.T, adjust func(*Deps), start func(http.Handler) *ht
 	if adjust != nil {
 		adjust(&deps)
 	}
-	r, _ := New(deps)
+	r, h := New(deps)
+	env.api = h
 	env.Server = start(r)
 	t.Cleanup(env.Close)
 	// Signed in without checking the password, which only the sign-in

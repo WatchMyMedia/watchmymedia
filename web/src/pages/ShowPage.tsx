@@ -602,7 +602,8 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
   const markShow = useMarkShowWatched()
   const manage = useCanManage()
   const auth = useAuth()
-  const posterAdmin = (auth.user?.isAdmin ?? false) && auth.adminAllowed
+  // Fixing the match and changing the poster are for admins (the server refuses members).
+  const admin = (auth.user?.isAdmin ?? false) && auth.adminAllowed
   const navigate = useNavigate()
   const { pick } = usePickSeason(s)
   const [acting, setActing] = useState<'fix' | 'poster' | 'request' | 'deleteSeason' | 'deleteShow' | null>(null)
@@ -622,7 +623,7 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
           : undefined
 
   const items: MoreItem[] = []
-  if (posterAdmin) items.push({ label: 'Change poster…', icon: 'poster', onSelect: () => setActing('poster') })
+  if (admin) items.push({ label: 'Change poster…', icon: 'poster', onSelect: () => setActing('poster') })
   if (manage) {
     if (open) items.push({ label: `Delete ${seasonName(open.number)}…`, icon: 'delete', danger: true, divider: true, onSelect: () => setActing('deleteSeason') })
     items.push({ label: 'Delete show…', icon: 'delete', danger: true, divider: !open, onSelect: () => setActing('deleteShow') })
@@ -662,9 +663,11 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
               ＋ Request missing seasons
             </button>
           )}
-          <button type="button" onClick={() => setActing('fix')} className={secondaryBtn}>
-            Fix match
-          </button>
+          {admin && (
+            <button type="button" onClick={() => setActing('fix')} className={secondaryBtn}>
+              Fix match
+            </button>
+          )}
           <MoreMenu tall label={`More for ${s.title}`} items={items} />
           {markShow.error && <span className="text-sm text-warn">{markShow.error.message}</span>}
         </div>

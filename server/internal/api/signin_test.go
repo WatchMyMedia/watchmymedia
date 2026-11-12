@@ -342,6 +342,43 @@ func TestInternalErrorsHidden(t *testing.T) {
 	}
 }
 
+// Behind a reverse proxy on this machine that is not in trusted proxies,
+// every visitor arrives from 127.0.0.1. One visitor's failures must not
+// lock out the others: the limits count the client the proxy names.
+func TestSignInThrottledBehindUntrustedProxy(t *testing.T) {
+	t.Parallel()
+	srv := newTestServerWith(t, func(d *Deps) {
+		admin, _ := netguard.Parse([]string{"local"})
+		d.Net = netguard.New(nil, admin)
+	})
+	anon := &http.Client{}
+	stranger := map[string]string{"X-Forwarded-For": "203.0.113.9", "X-Forwarded-Proto": "https"}
+	owner := map[string]string{"X-Forwarded-For": "198.51.100.7", "X-Forwarded-Proto": "https"}
+	for range 6 {
+		post(t, anon, srv.URL+"/api/auth/login", `{"name":"admin","password":"guess123"}`, stranger)
+	}
+	if res, _ := post(t, anon, srv.URL+"/api/auth/login", `{"name":"admin","password":"password1"}`, stranger); res.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("stranger after 6 guesses -> %d", res.StatusCode)
+	}
+	if res, body := post(t, anon, srv.URL+"/api/auth/login", `{"name":"admin","password":"password1"}`, owner); res.StatusCode != http.StatusOK {
+		t.Errorf("owner behind the same proxy -> %d %s", res.StatusCode, body)
+	}
+	// TV pairing likewise: the stranger's starts use up only its own.
+	for i := range 11 {
+		res, _ := post(t, anon, srv.URL+"/api/auth/pair", `{"client":{"deviceId":"tv-1","name":"Test TV"}}`, stranger)
+		if want := http.StatusOK; i == 10 {
+			if res.StatusCode != http.StatusTooManyRequests {
+				t.Errorf("stranger's 11th pairing -> %d", res.StatusCode)
+			}
+		} else if res.StatusCode != want {
+			t.Fatalf("stranger's pairing %d -> %d", i+1, res.StatusCode)
+		}
+	}
+	if res, body := post(t, anon, srv.URL+"/api/auth/pair", `{"client":{"deviceId":"tv-2","name":"Test TV"}}`, owner); res.StatusCode != http.StatusOK {
+		t.Errorf("owner's pairing behind the same proxy -> %d %s", res.StatusCode, body)
+	}
+}
+
 func TestSignInThrottledPerAddress(t *testing.T) {
 	t.Parallel()
 	srv := newTestServerWith(t, func(d *Deps) {

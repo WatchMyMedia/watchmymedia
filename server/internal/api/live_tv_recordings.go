@@ -7,6 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"watchmymedia/server/internal/auth"
+	"watchmymedia/server/internal/integrations"
 	"watchmymedia/server/internal/livetv"
 	"watchmymedia/server/internal/livetv/dvr"
 	"watchmymedia/server/internal/netguard"
@@ -148,15 +149,14 @@ func registerLiveTVRecordings(h huma.API, deps Deps) {
 		return nil, recordingError(deps.Recordings.Cancel(ctx, in.ID, a))
 	})
 	huma.Register(h, op("deleteLiveTVRecordingFile", "DELETE", "/live-tv/recordings/{id}/file", "Delete only the file owned by a finished recording", false), func(ctx context.Context, in *LiveTVRecordingDeleteFileInput) (*struct{}, error) {
-		if _, err := currentUser(ctx); err != nil {
-			return nil, err
-		}
-		if err := available(); err != nil {
+		// Only people who may see recordings may delete their files, even
+		// when Who can delete is everyone.
+		if _, _, err := people(ctx); err != nil {
 			return nil, err
 		}
 		access := "admins"
 		if deps.Settings != nil {
-			access, _ = deps.Settings.Get(ctx, "delete.access", "admins")
+			access, _ = deps.Settings.Get(ctx, integrations.KeyDeleteAccess, "admins")
 		}
 		if access != "everyone" {
 			if _, err := requireAdmin(ctx); err != nil {
@@ -274,7 +274,7 @@ func markRecordingDeletion(ctx context.Context, deps Deps, rows []*dvr.Recording
 	}
 	allowed := u.IsAdmin && netguard.AdminAllowed(ctx)
 	if !allowed && deps.Settings != nil {
-		access, _ := deps.Settings.Get(ctx, "delete.access", "admins")
+		access, _ := deps.Settings.Get(ctx, integrations.KeyDeleteAccess, "admins")
 		allowed = access == "everyone"
 	}
 	for _, r := range rows {

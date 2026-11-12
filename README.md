@@ -84,6 +84,10 @@ unsupported profiles can be left out while the others continue. Choose **Check
 what will change**, then **Import once** or **Import and keep up to date** (every
 15 minutes). Connecting alone imports nothing. Current WatchMyMedia progress,
 rewatches and explicit unwatched choices always stay; nothing is written to Plex.
+Each scheduled update writes only the items that changed; imports you start check
+every item. An item Plex re-identifies (a refreshed match, a new ID) is skipped and
+counted as unavailable while the rest keeps updating; when most items change at
+once, as after rebuilding the Plex server, updates pause until an admin checks it.
 
 Saved import results explain what was applied, kept or skipped. Pause, cancellation
 and retry keep completed changes; **Undo imported watch marks** removes only marks
@@ -659,7 +663,7 @@ for it if sign-ins start failing for all users. If you changed Docker Desktop's 
 
 ## Backups
 
-A backup is a `.tar.gz` of the database (libraries, matches, users, watch history) and
+A backup is a `.tar.gz` of the database (libraries, matches, accounts, watch history) and
 `config.yaml`; artwork and subtitle caches are rebuilt on demand, and seek thumbnails are
 made again. Backups run nightly
 into `<data_dir>/backups` (keep count in Settings), can be made on demand from Settings
@@ -672,6 +676,11 @@ watchmymedia backup /path/to/file.tar.gz
 
 To restore: stop the server, unpack the archive into the data directory (replacing
 `watchmymedia.db`), and start it again.
+
+A backup keeps no one signed in: it leaves out every browser and device sign-in and the
+key that signs media and cast links, so whoever holds an archive cannot use them. After a
+restore the server makes a new key, and everyone signs in again with their password on
+each browser, app and TV; casts and downloads in progress stop until they do.
 
 A connected Plex server's sign-in (`<data_dir>/plex-credentials`) is never in a
 backup, so a restored server has to connect to Plex again.
@@ -791,10 +800,15 @@ Mac app.
   owner out from another. Unknown names are throttled like real ones, and a wrong name
   and a wrong password get the same answer in the same time. The address is the real
   client's, so set `network.trusted_proxies` when a proxy sits in front. Without it,
-  everyone shares the proxy's address and its limits.
-  At most two password operations run at once, and only one sign-in for a given
-  account/address pair. Excess attempts receive 429 with `Retry-After` rather
-  than accumulating password-hashing work in memory.
+  the limits per address count the client the proxy's headers name, which nobody
+  vouches for: one visitor cannot lock out the others, but one that forges the header
+  escapes the address limits, leaving only the account's own. (A proxy that names no
+  client gets no address limit for sign-ins, and its visitors share one allowance of
+  TV pairings.) Signed-in devices then show no address, as watch history does.
+  At most two password checks run at once, and only one sign-in for a given
+  account/address pair; the bot check runs before a sign-in takes one. Excess attempts
+  receive 429 with `Retry-After` rather than accumulating password-hashing work in
+  memory.
 - **Passwords** are stored with argon2id. New passwords need at least 8 characters;
   older, shorter ones still work.
 - **Cookies** are HttpOnly and SameSite=Lax. They are also Secure with

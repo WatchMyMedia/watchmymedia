@@ -88,7 +88,7 @@ export function Movie({ movieId }: { movieId: number }) {
             <SecondaryButton disabled={mark.isPending} onClick={() => mark.mutate({ type: 'movie', id: m.id, watched: !m.watch?.completed })}>
               {m.watch?.completed ? '✓ Watched' : 'Mark watched'}
             </SecondaryButton>
-            <SecondaryButton onClick={() => setFixing(true)}>Fix match</SecondaryButton>
+            {admin && <SecondaryButton onClick={() => setFixing(true)}>Fix match</SecondaryButton>}
             {admin && <SecondaryButton onClick={() => setPoster(true)}>Change poster</SecondaryButton>}
             {selected && <SecondaryButton onClick={() => setReporting(true)}>Report a problem</SecondaryButton>}
             {/* Members delete a movie with a file when admins allow it; admins can also remove one without (PLAN-EPISODE-PAGE.md §4). */}

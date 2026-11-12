@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"time"
 
@@ -57,10 +58,37 @@ type ResourceSnapshot struct {
 	Sessions          []SessionResources `json:"sessions"`
 }
 
+// Resources measures the owned temporary output now. It walks every
+// session's folder under resourceMu, which every playback start takes too,
+// so readers that only show the figures use LastResources.
 func (m *Manager) Resources() (ResourceSnapshot, error) {
 	m.resourceMu.Lock()
-	defer m.resourceMu.Unlock()
-	return m.resourcesLocked()
+	r, err := m.resourcesLocked()
+	m.resourceMu.Unlock()
+	m.lastResources.Store(&resourceReading{r: r, err: err})
+	return r, err
+}
+
+type resourceReading struct {
+	r   ResourceSnapshot
+	err error
+}
+
+// resourcesFresh is how old a measurement LastResources serves may be. The
+// watchdog measures every resourceEvery while Run runs; past this, Run is
+// not running and LastResources measures itself.
+const resourcesFresh = 5 * time.Second
+
+// LastResources is the latest measurement of the owned temporary output,
+// taken by the storage watchdog at most resourcesFresh ago, for the pages
+// that show it. It neither walks the disk nor takes resourceMu then.
+func (m *Manager) LastResources() (ResourceSnapshot, error) {
+	if last := m.lastResources.Load(); last != nil && time.Since(last.r.At) < resourcesFresh {
+		r := last.r
+		r.Sessions = slices.Clone(r.Sessions)
+		return r, last.err
+	}
+	return m.Resources()
 }
 
 // RemoveOutputDir deletes an owned file or Live TV session's output while
@@ -218,7 +246,17 @@ func (s *Session) ResourceError() error {
 	return nil
 }
 
+// checkResources is the storage watchdog. It stops every session past the
+// per-session limit and, while the cache is past its limit or the volume
+// below its free-space reserve, the largest sessions, only as many as
+// bring the figures back within bounds. Folders already on their way out
+// (sessions stopped, by the watchdog or otherwise, whose ffmpeg has not
+// exited or whose files are not yet deleted) count as freed: stopping more
+// sessions for bytes about to go stopped one more every tick until none
+// were left.
 func (m *Manager) checkResources() {
+	m.watchMu.Lock()
+	defer m.watchMu.Unlock()
 	r, err := m.Resources()
 	if err != nil {
 		m.log.Warn("cannot measure playback temporary storage", "err", err)
@@ -227,56 +265,95 @@ func (m *Manager) checkResources() {
 	m.resourceMu.Lock()
 	stopLive := m.stopLive
 	m.resourceMu.Unlock()
-	var victim *Session
-	var liveID string
-	var largest int64
-	var reason string
+	owned := map[string]*Session{}
+	removing := map[string]bool{}
 	m.mu.Lock()
-	owned := make([]*Session, 0, len(m.sessions)+len(m.retiring))
 	for s := range m.ownedSessionsLocked() {
-		owned = append(owned, s)
+		owned[filepath.Base(s.Dir)] = s
+	}
+	for name := range m.removing {
+		removing[name] = true
 	}
 	m.mu.Unlock()
+
+	type candidate struct {
+		item SessionResources
+		s    *Session // nil for a Live TV output
+	}
+	var candidates []candidate
+	var leaving int64
+	live := map[string]bool{}
 	for _, item := range r.Sessions {
-		if r.MaxSessionBytes <= 0 || item.Bytes <= r.MaxSessionBytes {
+		switch item.Kind {
+		case "live":
+			live[item.ID] = true
+			if _, stopped := m.stoppedLive[item.ID]; stopped {
+				leaving += item.Bytes
+			} else if stopLive != nil {
+				candidates = append(candidates, candidate{item: item})
+			}
+		case "file":
+			// A folder of no session that is not being deleted either (one
+			// whose deletion failed) still counts against the limits.
+			s := owned[item.ID]
+			switch {
+			case s != nil && s.resourceFailure.Load() == nil:
+				candidates = append(candidates, candidate{item: item, s: s})
+			case s != nil || removing[item.ID]:
+				leaving += item.Bytes
+			}
+		}
+	}
+	for id := range m.stoppedLive {
+		if !live[id] {
+			delete(m.stoppedLive, id)
+		}
+	}
+	// Largest first, as the sessions whose stop frees the most.
+	sort.SliceStable(candidates, func(i, j int) bool { return candidates[i].item.Bytes > candidates[j].item.Bytes })
+
+	stop := func(c candidate, reason string) {
+		if c.s == nil {
+			m.log.Warn("live TV session stopped for temporary storage", "session", c.item.ID, "bytes", c.item.Bytes, "reason", reason)
+			if m.stoppedLive == nil {
+				m.stoppedLive = map[string]struct{}{}
+			}
+			m.stoppedLive[c.item.ID] = struct{}{}
+			stopLive(c.item.ID)
+			return
+		}
+		m.stopForStorage(c.s, reason)
+	}
+	var kept []candidate
+	freed := leaving
+	for _, c := range candidates {
+		if r.MaxSessionBytes > 0 && c.item.Bytes > r.MaxSessionBytes {
+			stop(c, "session byte limit")
+			freed += c.item.Bytes
 			continue
 		}
-		if item.Kind == "live" && stopLive != nil && item.Bytes > largest {
-			victim, liveID, largest, reason = nil, item.ID, item.Bytes, "session byte limit"
+		kept = append(kept, c)
+	}
+	over := func() bool {
+		if r.MaxCacheBytes > 0 && r.TemporaryBytes-freed > r.MaxCacheBytes {
+			return true
 		}
-		if item.Kind == "file" {
-			for _, s := range owned {
-				if filepath.Base(s.Dir) == item.ID && item.Bytes > largest {
-					victim, liveID, largest, reason = s, "", item.Bytes, "session byte limit"
-				}
-			}
+		// Deleted files give their room back to the volume.
+		return r.FreeBytes != nil && r.MinFreeBytes > 0 && int64(*r.FreeBytes)+freed < r.MinFreeBytes //nolint:gosec // G115: free bytes fit an int64
+	}
+	for _, c := range kept {
+		if !over() {
+			break
 		}
+		stop(c, "cache byte limit or free-space reserve")
+		freed += c.item.Bytes
 	}
-	if victim == nil && liveID == "" && ((r.MaxCacheBytes > 0 && r.TemporaryBytes > r.MaxCacheBytes) ||
-		(r.FreeBytes != nil && r.MinFreeBytes > 0 && *r.FreeBytes < uint64(r.MinFreeBytes))) {
-		for _, item := range r.Sessions {
-			if item.Kind == "live" && stopLive != nil && item.Bytes > largest {
-				victim, liveID, largest = nil, item.ID, item.Bytes
-			}
-			if item.Kind == "file" {
-				for _, s := range owned {
-					if filepath.Base(s.Dir) == item.ID && item.Bytes > largest {
-						victim, liveID, largest = s, "", item.Bytes
-					}
-				}
-			}
-		}
-		reason = "cache byte limit or free-space reserve"
-	}
-	if liveID != "" {
-		m.log.Warn("live TV session stopped for temporary storage", "session", liveID, "reason", reason)
-		stopLive(liveID)
-		return
-	}
-	if victim == nil {
-		return
-	}
-	err = fmt.Errorf("%w: %s", ErrStorageBudget, reason)
+}
+
+// stopForStorage stops a session the watchdog chose, failing its requests
+// with ErrStorageBudget.
+func (m *Manager) stopForStorage(victim *Session, reason string) {
+	err := fmt.Errorf("%w: %s", ErrStorageBudget, reason)
 	if victim.resourceFailure.CompareAndSwap(nil, &resourceFailure{err: err}) {
 		m.log.Warn("playback session stopped for temporary storage", "session", victim.ID, "reason", reason)
 		m.mu.Lock()

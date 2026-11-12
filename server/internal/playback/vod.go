@@ -39,7 +39,12 @@ import (
 // stops but its pieces stay usable. A run pauses once it is vodAhead past
 // the latest segment asked for, and goes on from where it paused when
 // requests come within vodResume of it, so ffmpeg works no more than a few
-// minutes ahead of the player. After the idle timeout ffmpeg stops and the
+// minutes ahead of the player. The pieces also stay within a byte budget,
+// three quarters of the per-session storage limit (vodBudget): a few
+// minutes of a high bit rate file is more than that limit, and the storage
+// watchdog stops a session past it. At the budget, pieces behind the player
+// go first, then those furthest ahead, and the run pauses until the player
+// has used up half the budget. After the idle timeout ffmpeg stops and the
 // pieces go, but the playlist stays valid for hours and the next request
 // starts ffmpeg again where it is needed.
 const (
@@ -59,6 +64,14 @@ const (
 	vodAhead  = 4 * time.Minute
 	vodResume = time.Minute
 	vodWait   = 30 * time.Second
+	// vodBudgetShare is the share of the per-session storage limit a VOD
+	// session's pieces may fill. The rest is room for the piece ffmpeg is
+	// writing, the init segments and the playlists, which the storage
+	// watchdog counts too.
+	vodBudgetShare = 0.75
+	// vodBudgetRefill is how close to the end of a run paused at the byte
+	// budget the player comes before it goes on, however full the budget.
+	vodBudgetRefill = 3 * vodSegmentSeconds * time.Second
 	// VODKeep is how long a VOD session stays usable without requests.
 	VODKeep = 6 * time.Hour
 )
@@ -192,6 +205,9 @@ type vodState struct {
 	head int64
 	// ahead and resume are vodAhead and vodResume (shorter in tests).
 	ahead, resume time.Duration
+	// bytes is the size of the indexed pieces' files, and budget how much
+	// of that the session keeps (vodBudget); zero is no byte budget.
+	bytes, budget int64
 }
 
 type vodRun struct {
@@ -218,8 +234,8 @@ type vodRun struct {
 	trimmed bool
 	// paused is set when the server stopped the run for being too far
 	// ahead of the player: its pieces are good up to reached, and nothing
-	// past it was made.
-	paused bool
+	// past it was made. full is set as well when that was the byte budget.
+	paused, full bool
 	// plOffset is how much of the run's playlist has been read, up to the
 	// end of plLast, the last piece's line.
 	plOffset int64
@@ -258,6 +274,7 @@ type vodPiece struct {
 	// dropped, and the last of them deletes the file.
 	pins    int
 	dropped bool
+	size    int64
 }
 
 // joinedSegment is a segment as served, kept for the next request for it.
@@ -280,7 +297,7 @@ func newVOD(m *Manager, s *Session, ctx context.Context, spec Spec) (*vodState, 
 		return nil, errors.New("vod: unknown duration")
 	}
 	v := &vodState{m: m, s: s, ctx: ctx, spec: spec, opts: o, cues: map[string][]vttCue{}, changed: make(chan struct{}),
-		ahead: cmp.Or(m.vodAhead, vodAhead), resume: cmp.Or(m.vodResume, vodResume)}
+		ahead: cmp.Or(m.vodAhead, vodAhead), resume: cmp.Or(m.vodResume, vodResume), budget: vodBudget(m.resources.MaxSessionBytes)}
 	if spec.SharedOutput && spec.ReserveSlot {
 		v.segmentWork = make(chan struct{}, 1)
 	}
@@ -299,6 +316,15 @@ func newVOD(m *Manager, s *Session, ctx context.Context, spec Spec) (*vodState, 
 
 // Segments is how many segments the playlist lists.
 func (v *vodState) Segments() int { return len(v.bounds) - 1 }
+
+// vodBudget is how many bytes of pieces a VOD session keeps under the
+// per-session storage limit (zero for none).
+func vodBudget(limit int64) int64 {
+	if limit <= 0 {
+		return 0
+	}
+	return int64(float64(limit) * vodBudgetShare)
+}
 
 func (v *vodState) segmentAt(us int64) int {
 	k := sort.Search(len(v.bounds), func(i int) bool { return v.bounds[i] > us }) - 1
@@ -380,6 +406,14 @@ func (v *vodState) startRunLocked(k int) error {
 			r.exitErr = err
 			v.m.log.Error("playback run failed", "session", v.s.ID, "run", r.n, "err", err)
 		}
+		if ctx.Err() != nil {
+			// A run stopped part way leaves the piece it was writing as a
+			// .tmp file, which no playlist lists: it would only take room.
+			tmps, _ := filepath.Glob(filepath.Join(v.s.Dir, fmt.Sprintf("r%d-*.m4s.tmp", r.n)))
+			for _, f := range tmps {
+				_ = os.Remove(f)
+			}
+		}
 		v.live.Add(-1)
 		close(r.done)
 	}()
@@ -423,6 +457,11 @@ func (v *vodState) refreshRun(r *vodRun, finished bool) bool {
 	if finished || r.listed != listed || r.init != init || (r.err != nil) != failed {
 		v.notifyLocked()
 	}
+	if v.budget > 0 && v.bytes > v.budget {
+		// Also once the run has ended: a run that copies the video can make
+		// many pieces between two looks at its playlist.
+		v.fitBudgetLocked(r)
+	}
 	if !finished && !r.paused && v.head > 0 && r.reached-v.head > v.ahead.Microseconds() {
 		// Far enough ahead of the player: stop, keeping the pieces, until
 		// requests come close (requested).
@@ -431,6 +470,64 @@ func (v *vodState) refreshRun(r *vodRun, finished bool) bool {
 		v.m.log.Info("playback run paused ahead of the player", "session", v.s.ID, "run", r.n, "reached_ms", r.reached/1000, "requested_ms", v.head/1000)
 	}
 	return true
+}
+
+// fitBudgetLocked brings the session's pieces back within its byte budget
+// and pauses run r, the session's run, when it cannot go on. Pieces behind
+// the player go first, down to half the budget so that the run has room to
+// go on; then, if that is not enough, pieces furthest ahead of the player,
+// which a run makes again when the player gets there.
+func (v *vodState) fitBudgetLocked(r *vodRun) {
+	v.shedBehindLocked(v.budget / 2)
+	trimmed := false
+	if v.bytes > v.budget {
+		kept := len(v.pieces)
+		for kept > 0 && v.bytes > v.budget && v.pieces[kept-1].start >= v.head {
+			kept--
+			v.dropLocked(v.pieces[kept])
+			trimmed = true
+		}
+		clear(v.pieces[kept:])
+		v.pieces = v.pieces[:kept]
+		// The run goes on, when it does, from the end of what is left of it.
+		reached := r.startUs
+		for _, p := range v.pieces {
+			if p.run == r {
+				reached = max(reached, p.end)
+			}
+		}
+		r.reached = min(r.reached, reached)
+	}
+	// Shedding behind may have made room enough for the run to go on; if
+	// not, it pauses, as it does when its own end was cut.
+	if !r.paused && (trimmed || v.bytes > v.budget) {
+		r.paused, r.full = true, true
+		r.cancel()
+		v.m.log.Info("playback run paused at the session's byte budget", "session", v.s.ID, "run", r.n, "reached_ms", r.reached/1000,
+			"requested_ms", v.head/1000, "bytes", v.bytes, "byte_budget", v.budget)
+	}
+}
+
+// shedBehindLocked deletes pieces behind the player, oldest first, until
+// the session's pieces fit in target bytes or none behind are left. It
+// keeps the segment before the latest asked for, whose pieces a request
+// may be about to read.
+func (v *vodState) shedBehindLocked(target int64) {
+	if v.head <= 0 {
+		return
+	}
+	k := v.segmentAt(v.head - 1)
+	cutoff := v.bounds[max(k-1, 0)]
+	kept := v.pieces[:0]
+	for _, p := range v.pieces {
+		if v.bytes > target && p.end <= cutoff {
+			v.dropLocked(p)
+			continue
+		}
+		kept = append(kept, p)
+	}
+	clear(v.pieces[len(kept):])
+	v.pieces = kept
 }
 
 // requested notes that segment k was asked for, and starts a paused run
@@ -447,6 +544,16 @@ func (v *vodState) requested(k int) {
 	at := v.bounds[k]
 	if at < r.reached-v.resume.Microseconds() || at > r.reached+vodLookahead.Microseconds() {
 		return
+	}
+	if low := v.budget / 2; r.full && v.bytes > low {
+		// Paused at the byte budget: go on once there is room for the run
+		// to make a fair stretch before it pauses again, rather than
+		// restarting ffmpeg for every segment, or once the player is
+		// about to run out of pieces.
+		v.shedBehindLocked(low)
+		if v.bytes > low && at < r.reached-vodBudgetRefill.Microseconds() {
+			return
+		}
 	}
 	next := v.segmentAt(r.reached)
 	if err := v.startRunLocked(next); err != nil {
@@ -610,6 +717,9 @@ func (v *vodState) refreshLocked() {
 	for _, e := range v.newEntriesLocked(r) {
 		path := filepath.Join(v.s.Dir, e.name)
 		p := &vodPiece{start: r.next, file: path, run: r}
+		if st, err := os.Stat(path); err == nil {
+			p.size = st.Size()
+		}
 		p.end = p.start + int64(math.Round(e.dur*1e6))
 		r.next = p.end
 		r.listed++
@@ -620,6 +730,7 @@ func (v *vodState) refreshLocked() {
 			continue
 		}
 		v.pieces = slices.Insert(v.pieces, i, p)
+		v.bytes += p.size
 	}
 }
 
@@ -714,8 +825,7 @@ func (v *vodState) dropAheadLocked(k int) {
 	kept := v.pieces[:0]
 	for _, p := range v.pieces {
 		if p.start > cutoff {
-			dropLocked(p)
-			p.run.trimmed = true
+			v.dropLocked(p)
 			continue
 		}
 		kept = append(kept, p)
@@ -959,8 +1069,10 @@ func (v *vodState) unpin(chain []*vodPiece) {
 }
 
 // dropLocked deletes a piece's file, or leaves that to the last request
-// reading it.
-func dropLocked(p *vodPiece) {
+// reading it, and marks its run as no longer holding all it made.
+func (v *vodState) dropLocked(p *vodPiece) {
+	v.bytes -= p.size
+	p.run.trimmed = true
 	if p.pins > 0 {
 		p.dropped = true
 		return
@@ -1062,8 +1174,7 @@ func (v *vodState) trimLocked(k int) {
 	kept := v.pieces[:0]
 	for _, p := range v.pieces {
 		if p.end < cutoff {
-			dropLocked(p)
-			p.run.trimmed = true
+			v.dropLocked(p)
 			continue
 		}
 		kept = append(kept, p)
@@ -1294,6 +1405,7 @@ func (v *vodState) suspendLocked() {
 		}
 	}
 	v.pieces = nil
+	v.bytes = 0
 	v.notifyLocked()
 	go func() {
 		if done != nil {

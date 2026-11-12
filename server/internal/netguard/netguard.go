@@ -199,7 +199,16 @@ type Info struct {
 	// client in X-Forwarded-For. IP is then the proxy's address and the
 	// real client could be anywhere, so it counts as remote: use Loopback
 	// rather than IP.IsLoopback, and do not classify IP.
-	Proxied     bool
+	Proxied bool
+	// Forwarded is, behind an untrusted proxy, the client address the
+	// proxy's headers name: the last X-Forwarded-For entry, else
+	// X-Real-Ip, else the last Forwarded for=. It is not verified (anyone
+	// who reaches the server can send the headers), so it only tells
+	// clients of one proxy apart, for limits keyed on the client: it never
+	// grants anything, and it is not shown or recorded as the client's
+	// address. It is invalid when the client is not proxied or no header
+	// names an address.
+	Forwarded   netip.Addr
 	unnamed     bool // a trusted proxy named no client: no admin, even over HTTPS
 	RemoteAdmin bool // snapshot of the switch for refusal wording
 	Trusted     bool // setup and password-free admin work here
@@ -334,6 +343,40 @@ func (g *Guard) untrustedProxy(r *http.Request) bool {
 	return false
 }
 
+// forwardedClient is the client an untrusted proxy's headers name, as the
+// proxy itself would have written it: a proxy appends its client to
+// X-Forwarded-For, so the last entry is the one it added, and earlier ones
+// came from the client. It is invalid when the header that names the
+// client does not end in an address.
+func forwardedClient(r *http.Request) netip.Addr {
+	if xff := r.Header.Values("X-Forwarded-For"); len(xff) > 0 {
+		var last string
+		for _, h := range xff {
+			for hop := range strings.SplitSeq(h, ",") {
+				if strings.TrimSpace(hop) != "" {
+					last = hop
+				}
+			}
+		}
+		return parseHop(last)
+	}
+	if xri := r.Header.Values("X-Real-Ip"); len(xri) > 0 {
+		return parseHop(xri[len(xri)-1])
+	}
+	fwd := r.Header.Values("Forwarded")
+	if len(fwd) == 0 {
+		return netip.Addr{}
+	}
+	elems := strings.Split(fwd[len(fwd)-1], ",")
+	for pair := range strings.SplitSeq(elems[len(elems)-1], ";") {
+		k, v, _ := strings.Cut(strings.TrimSpace(pair), "=")
+		if strings.EqualFold(k, "for") {
+			return parseHop(strings.Trim(v, `"`))
+		}
+	}
+	return netip.Addr{}
+}
+
 // maxWarned bounds the untrusted proxies warned about, one line each.
 const maxWarned = 8
 
@@ -375,6 +418,7 @@ func (g *Guard) Middleware(next http.Handler) http.Handler {
 			// The client is unknown: only admin networks that take
 			// every address admit it.
 			info.Proxied, info.Trusted = true, g.adminAll
+			info.Forwarded = forwardedClient(r)
 			g.warnProxy(ip, untrustedWarning)
 		case !named:
 			info.Proxied, info.unnamed, info.Trusted = true, true, g.adminAll
