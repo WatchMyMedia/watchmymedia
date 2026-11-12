@@ -462,8 +462,9 @@ panel and the TV hero) or `-fakesLiveGuideNoPictures` for the boards' Tweaks.
 The fakes' server is at level 15 there, with the extras boards' five
 favourites and reminders; `-fakesLiveReminder set|moved|gone` and
 `-fakesLiveNoFavourites` are those boards' Tweaks, `-fakesLiveGuideNoExtras`
-keeps the server at level 13, and `-fakesLiveReminderSoon` replaces the canned
-reminders with one whose notification or banner comes 20 s after launch.
+keeps the server at level 13, and `-fakesLiveReminderSoon` (optionally
+followed by a number of seconds, 20 by default) replaces the canned
+reminders with one whose notification or banner comes that long after launch.
 Debug fake states add `-liveStillWatching`, `-livePauseExpired`, `-liveBusy`,
 `-liveTakeover` (a recording needs the tuner in 2 minutes) or `-liveTakenOver`
 (stopped for a recording).

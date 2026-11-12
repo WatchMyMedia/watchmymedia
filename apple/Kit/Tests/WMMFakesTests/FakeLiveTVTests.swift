@@ -95,4 +95,20 @@ import WMMModel
         #expect(due.channelID == "ch-9.1")
         #expect(due.title == "Pro Hockey")
     }
+
+    /// `-fakesLiveReminderSoon` alone keeps 20 s; a number after it sets the
+    /// wait, which the TV UI tests shorten; anything else after it is ignored.
+    @Test func theSoonReminderWaitsAsLongAsAsked() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let lead = Double(LiveReminderLead.standard) * 60
+        func wait(_ arguments: [String]) throws -> TimeInterval {
+            let guide = try #require(FakeLiveGuide.from(["-fakes", "-fakesLiveGuide"] + arguments, now: now))
+            return try #require(guide.soon).timeIntervalSince(now) - lead
+        }
+        #expect(try wait(["-fakesLiveReminderSoon"]) == 20)
+        #expect(try wait(["-fakesLiveReminderSoon", "8"]) == 8)
+        #expect(try wait(["-fakesLiveReminderSoon", "-open", "watchmymedia://live-tv/ch-7.1"]) == 20)
+        #expect(try wait(["-fakesLiveReminderSoon", "-3"]) == 20)
+        #expect(FakeLiveGuide.from(["-fakes", "-fakesLiveGuide"], now: now)?.soon == nil)
+    }
 }
