@@ -193,6 +193,9 @@ class WorkflowIsolationTest(unittest.TestCase):
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
         self.assertEqual({'check', 'binaries', 'macos', 'image', 'ios', 'android', 'windows'}, set(jobs))
+        # check only reads the tag and the changelog: it must not wait on the
+        # scarce macOS runners, since every other job waits on it.
+        self.assertRegex(jobs['check'], r'(?m)^    runs-on: ubuntu-latest$')
         for name, job in jobs.items():
             with self.subTest(job=name):
                 self.assertRegex(job, r'(?m)^    runs-on: (macos-26|ubuntu-latest|windows-latest)$')
