@@ -84,6 +84,10 @@ unsupported profiles can be left out while the others continue. Choose **Check
 what will change**, then **Import once** or **Import and keep up to date** (every
 15 minutes). Connecting alone imports nothing. Current WatchMyMedia progress,
 rewatches and explicit unwatched choices always stay; nothing is written to Plex.
+Each scheduled update writes only the items that changed; imports you start check
+every item. An item Plex re-identifies (a refreshed match, a new ID) is skipped and
+counted as unavailable while the rest keeps updating; when most items change at
+once, as after rebuilding the Plex server, updates pause until an admin checks it.
 
 Saved import results explain what was applied, kept or skipped. Pause, cancellation
 and retry keep completed changes; **Undo imported watch marks** removes only marks

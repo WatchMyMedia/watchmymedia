@@ -227,3 +227,18 @@ UPDATE plex_sync_runs SET watch_complete=1 WHERE id=? AND fence=? AND status='ru
 -- Commit the next run's rotation with the page effects and checkpoint.
 UPDATE plex_connections SET history_cursor_user=sqlc.arg(plex_user_id),history_cursor_section=sqlc.arg(section_id)
 WHERE id=sqlc.arg(id) AND generation=sqlc.arg(generation);
+
+-- name: ListPlexSourceFingerprints :many
+-- One person's known source items in one Plex section, by the primary key.
+SELECT remote_key,fingerprint FROM plex_source_items
+WHERE machine_identifier=? AND source_epoch=? AND user_id=? AND section_id=?;
+
+-- name: AddPlexRunCounts :execrows
+-- Counts for the items a scheduled sync found unchanged and did not write.
+UPDATE plex_sync_runs SET
+ already_watched=already_watched+sqlc.arg(already_watched),
+ local_kept=local_kept+sqlc.arg(local_kept),
+ unmatched=unmatched+sqlc.arg(unmatched),
+ ambiguous=ambiguous+sqlc.arg(ambiguous),
+ unavailable=unavailable+sqlc.arg(unavailable)
+WHERE id=sqlc.arg(id) AND fence=sqlc.arg(fence) AND status='running';
