@@ -15,10 +15,15 @@ version=${tag#v}
 version=${version%%-*}
 
 # Collects the lines under the heading, joining an indented line onto the
-# line before it, then drops blank lines at both ends.
+# line before it, then drops blank lines at both ends. It reads to the end
+# of the input even after the section: stopping early would close the pipe
+# under a writer such as `git show … | notes.sh v1.2.3 -`, which then fails
+# with SIGPIPE (exit 141) once the changelog outgrows the pipe's buffer, as
+# it did at 88 KB for 1.4.1.
 awk -v v="$version" '
+  done { next }
   /^## / {
-    if (found) exit
+    if (found) { done = 1; next }
     if ($2 == v) { found = 1; next }
   }
   found && /^[ \t]+[^ \t]/ && n > 0 && lines[n] !~ /^[ \t]*$/ {
