@@ -55,8 +55,8 @@ created, so a later install from Community Applications finds their values.
 - the Unraid terminal runs `docker login ghcr.io` with a fine-grained GitHub
   token the owner creates with read access to this one package (Unraid's
   Docker page then pulls with that login, and Check for Updates works), or
-- the owner ships a tarball: `docker pull --platform linux/amd64 ghcr.io/taimoorq/watchmymedia:X.Y.Z`
-  then `docker save ghcr.io/taimoorq/watchmymedia:X.Y.Z | gzip > watchmymedia-X.Y.Z.tar.gz`;
+- the owner ships a tarball: `docker pull --platform linux/amd64 ghcr.io/watchmymedia/watchmymedia:X.Y.Z`
+  then `docker save ghcr.io/watchmymedia/watchmymedia:X.Y.Z | gzip > watchmymedia-X.Y.Z.tar.gz`;
   on the box, `docker load < watchmymedia-X.Y.Z.tar.gz` and the template's
   Repository changed to that tag. Check for Updates cannot work this way.
 
@@ -95,7 +95,7 @@ Blocked until the repository is open-sourced and the GHCR package is public
 (PLAN-UNRAID.md Decision 1); the portal's scan refuses an image it cannot
 pull, and the policy wants a maintainer's own app to be open source. Then:
 
-1. The owner makes `ghcr.io/taimoorq/watchmymedia` public in the package's
+1. The owner makes `ghcr.io/watchmymedia/watchmymedia` public in the package's
    settings and checks that `docker pull` works signed out.
 2. Two-factor authentication is on for the GitHub account that owns the
    templates repository (a policy requirement).

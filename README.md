@@ -100,7 +100,7 @@ checks. Backups exclude Plex grants, so a restored server must reconnect.
 
 **Docker (recommended on Linux/NAS).** Copy `deploy/.env.example` to `deploy/.env` and
 set your library folders and `PUID`/`PGID` there, then `make docker-up` (or use the
-published `ghcr.io/taimoorq/watchmymedia` image). Git ignores `deploy/.env`, so pulling
+published `ghcr.io/watchmymedia/watchmymedia` image). Git ignores `deploy/.env`, so pulling
 updates never conflicts with your settings. The container reads `/movies` and `/tv`
 (on its first start each becomes a library if it holds anything; after that, libraries are
 added and removed in setup and Settings › Libraries, and the folders aren't added again),

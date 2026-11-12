@@ -34,7 +34,7 @@ RUN --mount=type=secret,id=opensubtitles_api_key,required=false \
 FROM debian:trixie-slim
 LABEL org.opencontainers.image.title="WatchMyMedia" \
       org.opencontainers.image.description="Self-hosted media server" \
-      org.opencontainers.image.source="https://github.com/taimoorq/watchmymedia"
+      org.opencontainers.image.source="https://github.com/WatchMyMedia/watchmymedia"
 
 # ffmpeg is jellyfin-ffmpeg, the build the Mac and Windows releases ship
 # (deploy/macos/fetch-ffmpeg.sh pins the same version; bump both together),

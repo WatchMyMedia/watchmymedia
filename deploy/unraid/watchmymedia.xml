@@ -8,8 +8,8 @@
 -->
 <Container version="2">
   <Name>WatchMyMedia</Name>
-  <Repository>ghcr.io/taimoorq/watchmymedia:latest</Repository>
-  <Registry>https://github.com/taimoorq/watchmymedia/pkgs/container/watchmymedia</Registry>
+  <Repository>ghcr.io/watchmymedia/watchmymedia:latest</Repository>
+  <Registry>https://github.com/WatchMyMedia/watchmymedia/pkgs/container/watchmymedia</Registry>
   <Network>host</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
