@@ -184,7 +184,9 @@ depend on them. Only `main` saves those caches, and `main` and manual runs run
 every test again (`go clean -testcache`). A change to the pinned ffmpeg starts
 from an empty cache, since Go can't see the ffmpeg its tests run. The
 `android` job's Gradle caches, kept by Gradle's setup-gradle action, work the
-same way: restored everywhere, saved only by `main`.
+same way: restored everywhere, saved only by `main`. Its configuration cache
+is encrypted with `GRADLE_ENCRYPTION_KEY`, the only secret `ci.yml` may read
+(`security_test.py` checks); without it, as on fork PRs, that cache is skipped.
 
 | Changed | Run |
 |---|---|

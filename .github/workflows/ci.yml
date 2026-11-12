@@ -495,18 +495,21 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      # Gradle's home (the wrapper, dependencies and the build cache) on
-      # GitHub's machines. setup-java's Gradle cache saved ~/.gradle, which
-      # the step above moves, so it never saved anything. As with the Go
-      # caches, only pushes to main save; every run restores. The
-      # configuration cache isn't kept: saving it needs an encryption key
-      # from a secret, and this workflow reads none. The default provider is
-      # Gradle's own caching library, free for public repositories; 'basic'
-      # is the open-source one, without clean-up of stale entries.
+      # Gradle's home (the wrapper, dependencies and the build cache) and the
+      # configuration cache, on GitHub's machines. setup-java's Gradle cache
+      # saved ~/.gradle, which the step above moves, so it never saved
+      # anything. As with the Go caches, only pushes to main save; every run
+      # restores. GRADLE_ENCRYPTION_KEY is the one secret this workflow
+      # reads: it only encrypts the configuration cache, and without it (fork
+      # pull requests) that cache is skipped and the rest still works. The
+      # default provider is Gradle's own caching library, free for public
+      # repositories; 'basic' is the open-source one, without the
+      # configuration cache or clean-up of stale entries.
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         if: runner.environment == 'github-hosted'
         with:
           cache-read-only: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
       # Both SDK variables and Gradle's home are set above: an inherited
       # machine-wide SDK must never make two runners install into one folder.
       # The licences are accepted, so the Android Gradle plugin can add
