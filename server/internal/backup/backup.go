@@ -3,7 +3,9 @@
 // downloaded from online providers (each cost a download from the day's
 // quota). Artwork and converted subtitles are left out since they can be
 // made again, and so are the Plex connection's grants
-// (plexsync.CredentialsDir): a restored server connects Plex again.
+// (plexsync.CredentialsDir): a restored server connects Plex again. Nor do
+// archives keep signed-in sessions or the media token key: after a restore
+// everyone signs in again.
 package backup
 
 import (
@@ -19,6 +21,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"watchmymedia/server/internal/settings"
 
 	_ "modernc.org/sqlite" // the "sqlite" driver, for scrubbing the copy
 )
@@ -81,13 +85,25 @@ func Write(ctx context.Context, conn *sql.DB, dataDir string, w io.Writer) error
 	return gz.Close()
 }
 
-// scrubbed is what the archive's copy of the database must not keep. The
-// Plex grants stay out of the archive, so the copy must not refer to them
-// or have sync on: restoring it leaves the connection waiting for a new
-// sign-in (PLAN-PLEX-SYNC.md, "Security, credentials and recovery
-// controls"). Only the copy changes, never the live database.
+// scrubbed is what the archive's copy of the database must not keep. Only
+// the copy changes, never the live database.
+//
+//   - The Plex grants stay out of the archive, so the copy must not refer to
+//     them or have sync on: restoring it leaves the connection waiting for a
+//     new sign-in (PLAN-PLEX-SYNC.md, "Security, credentials and recovery
+//     controls").
+//   - Signed-in sessions and the media token key. Media, cast and offline
+//     tokens are signed with the key over the SHA-256 of a session's token,
+//     which is exactly what sessions.token_hash holds, so an archive with
+//     both would let its holder make tokens for every live session (device
+//     sessions last a year, and a cast token renews itself while its
+//     session lives). Without them a restored server makes a new key when it
+//     starts, and everyone signs in again with their password; the password
+//     hashes stay so they can.
 var scrubbed = []string{
 	`UPDATE plex_connections SET credential_ref = NULL, sync_enabled = 0, problem = 'restored_from_backup'`,
+	`DELETE FROM sessions`,
+	`DELETE FROM settings WHERE key = '` + settings.KeyMediaTokenKey + `'`,
 }
 
 func scrub(ctx context.Context, snapshot string) error {
@@ -97,6 +113,10 @@ func scrub(ctx context.Context, snapshot string) error {
 	}
 	defer func() { _ = conn.Close() }()
 	conn.SetMaxOpenConns(1)
+	// Deleted rows otherwise stay readable in the file's free pages.
+	if _, err := conn.ExecContext(ctx, "PRAGMA secure_delete = ON"); err != nil {
+		return err
+	}
 	for _, stmt := range scrubbed {
 		if _, err := conn.ExecContext(ctx, stmt); err != nil {
 			return err
@@ -109,10 +129,11 @@ func scrub(ctx context.Context, snapshot string) error {
 // Save writes an archive into <dataDir>/backups and prunes older ones
 // beyond keep. It returns the archive path.
 //
-// An archive holds password and session hashes, the media token key, the
-// *arr API keys and the OpenSubtitles password, so the folder is the
-// server's alone (0700, tightened if it was made wider) and so is each
-// archive (0600).
+// An archive holds password hashes, the *arr API keys and webhook tokens,
+// the OpenSubtitles password and the other keys saved in Settings (though
+// not sessions or the media token key, which scrub removes), so the folder
+// is the server's alone (0700, tightened if it was made wider) and so is
+// each archive (0600).
 func Save(ctx context.Context, conn *sql.DB, dataDir string, keep int) (string, error) {
 	dir := filepath.Join(dataDir, "backups")
 	if err := os.MkdirAll(dir, 0o700); err != nil {

@@ -7,7 +7,7 @@ export function BackupsSettings() {
   return (
     <>
       <PageHeader title="Backups">
-        A backup holds the database (libraries, matches, users, watch history) and <code className="text-neutral-200">config.yaml</code>; artwork is fetched again.
+        A backup holds the database (libraries, matches, accounts, watch history) and <code className="text-neutral-200">config.yaml</code>; artwork is fetched again. It keeps no one signed in: after a restore, everyone signs in again.
       </PageHeader>
       <ServerOnly>
         <BackupSection />
