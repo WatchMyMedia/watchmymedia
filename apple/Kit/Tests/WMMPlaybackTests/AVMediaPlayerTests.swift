@@ -5,7 +5,8 @@ import Foundation
 import Testing
 @testable import WMMPlayback
 
-/// The real AVPlayer path on this Mac, with a 3 second movie made for the test.
+/// The real AVPlayer path, on the Mac and on the iPhone simulator (where CI
+/// runs the Kit's tests), with a 3 second movie made for the test.
 @MainActor
 @Suite(.serialized) struct AVMediaPlayerTests {
     @Test func theItemsMetadataNamesWhatPlaysForTheTransportBar() {
