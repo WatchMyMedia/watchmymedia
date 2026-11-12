@@ -31,7 +31,7 @@ UNPUBLISHED = re.compile(
     r"(^|/)(PLAN(-[A-Z0-9-]+)?\.md|(AGENTS|README)\.private\.md|SIGNING\.md|Makefile\.private)$"
     r"|(^|/)(design/mockups|site|deploy/(release|downloads|site|oss)|release|downloads|brand/(src|tools))(/|$)"
     r"|(^|/)ci/(mac-studio\.md|site_test\.py)$"
-    r"|(^|/)\.github/workflows/(release|downloads)\.yml$"
+    r"|(^|/)\.github/workflows/downloads\.yml$"
 )
 UNPUBLISHED_TARGETS = {"release-tag", "download-stats", "site-dev", "site-check", "brand", "brand-sources"}
 

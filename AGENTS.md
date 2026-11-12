@@ -182,6 +182,7 @@ Android and Apple jobs run when their code, `api/`, or CI support changes.
 | Apple Kit | `make apple-test` |
 | iPhone or iPad app, or UIKit | `make apple-test-sim` |
 | Apple TV app | `make apple-tv-test-sim` |
+| Release scripts or `release.yml` | `python3 -I -m unittest discover -s deploy/release -p '*_test.py'` and `python3 -I -m unittest discover -s deploy/ci -p '*_test.py'` |
 | `AGENTS.md`, `CLAUDE.md`, or paths and targets they name | `make agents-check` |
 | Dockerfile | `make docker` |
 | A screen or flow | run it: the web app in a browser, the apps on an emulator or simulator, on the fakes and against a fixture server |
@@ -221,8 +222,9 @@ Gaps the usual checks miss:
 Being able to run something is not permission to. These need the user's
 explicit go-ahead in the current conversation, every time:
 
-- **Releases**: pushing any `v*` tag, creating or editing a GitHub release,
-  `make apple-upload`.
+- **Releases**: `make release-tag`, `deploy/release/tag.sh`, pushing any `v*`
+  tag (it starts `release.yml`, which builds, signs and uploads every app),
+  creating or editing a GitHub release, `make apple-upload`.
 - **Signing as the company**: running CI with "Also sign and verify a Windows
   installer" (it signs as Eldwick Software LLC), and changing the Azure
   Artifact Signing account, profile, its Entra app or the `windows-signing`

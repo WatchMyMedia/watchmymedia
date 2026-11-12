@@ -206,21 +206,15 @@ or a download.
 ## Releasing
 
 Each `v*` tag's `windows` job in `release.yml` builds the app with the release
-version, the feed URL and the update key, signs and verifies it as above, attaches
-`WatchMyMedia-X.Y.Z-x64-setup.exe` to the GitHub release (private while the
-repository is), and hands it to the publish job. The publish job adds it to
-downloads.watchmy.media (`windows/`, `releases.json`'s `windows-app-amd64` asset, the
-feed and `/windows/latest`) only when the repository variable `PUBLISH_WINDOWS_APP` is
-`true` and the job succeeded. It was set for the Windows launch on 2026-11-06
-(PLAN-WINDOWS.md W6); unsetting it stops publishing Windows from the next tag on.
-Changing it is a production change that needs the owner's go-ahead. The downloads
-Worker serves `/windows/latest` and `windows/appcast.xml` (deployed 2026-11-06).
+version, the feed URL and the update key, signs and verifies it as above, and attaches
+`WatchMyMedia-X.Y.Z-x64-setup.exe` to the GitHub release. The maintainers then publish
+the release to downloads.watchmy.media, outside this repository: the installer goes
+under `windows/`, into `releases.json`'s `windows-app-amd64` asset, the update feed and
+`/windows/latest`, as it has for every release since the Windows launch on 2026-11-06.
 Before a release has a Windows installer, `/windows/latest` redirects to the download
-page and the feed is 404. Re-running a tag's publish job publishes it again, replacing
-its files and its entry; that is how 1.0.0's installer went out after the variable was
-set. The website's Windows download went live on 2026-11-06 (#164).
+page and the feed is 404. Publishing a version again replaces its files and its entry.
 
-Successful Windows CI keeps the unsigned installer as the private
+Successful Windows CI keeps the unsigned installer as the
 `windows-development-installer` artifact for seven days, for manual Windows testing.
 It includes the embedded web app from the same CI run. The installer smoke checks
 its actual `/setup` page, not just the local status endpoint. It is not a GitHub
