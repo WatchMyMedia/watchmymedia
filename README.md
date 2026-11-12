@@ -659,7 +659,7 @@ for it if sign-ins start failing for all users. If you changed Docker Desktop's 
 
 ## Backups
 
-A backup is a `.tar.gz` of the database (libraries, matches, users, watch history) and
+A backup is a `.tar.gz` of the database (libraries, matches, accounts, watch history) and
 `config.yaml`; artwork and subtitle caches are rebuilt on demand, and seek thumbnails are
 made again. Backups run nightly
 into `<data_dir>/backups` (keep count in Settings), can be made on demand from Settings
@@ -672,6 +672,11 @@ watchmymedia backup /path/to/file.tar.gz
 
 To restore: stop the server, unpack the archive into the data directory (replacing
 `watchmymedia.db`), and start it again.
+
+A backup keeps no one signed in: it leaves out every browser and device sign-in and the
+key that signs media and cast links, so whoever holds an archive cannot use them. After a
+restore the server makes a new key, and everyone signs in again with their password on
+each browser, app and TV; casts and downloads in progress stop until they do.
 
 A connected Plex server's sign-in (`<data_dir>/plex-credentials`) is never in a
 backup, so a restored server has to connect to Plex again.
