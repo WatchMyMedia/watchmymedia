@@ -48,7 +48,7 @@ class WorkflowIsolationTest(unittest.TestCase):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
-        hosted = dict.fromkeys(('changes', 'web', 'contract', 'docker', 'android', 'server-race'), 'ubuntu-latest')
+        hosted = dict.fromkeys(('changes', 'web', 'contract', 'docker', 'scripts', 'android', 'server-race'), 'ubuntu-latest')
         hosted.update(dict.fromkeys(('server', 'apple', 'apple-tv'), 'macos-26'))
         hosted['windows'] = hosted['windows-signing'] = 'windows-latest'
         self.assertEqual(set(hosted), set(jobs))
@@ -74,6 +74,32 @@ class WorkflowIsolationTest(unittest.TestCase):
                     expected = studio if trusted and visibility and not job.startswith('windows') else hosted[job]
                     with self.subTest(job=job, event=event, private=visibility, head=head, ref=ref):
                         self.assertEqual(expected, evaluate_runner(runner, context))
+
+    def test_every_job_runs_only_for_what_it_checks(self):
+        # Each job waits on the changes job and runs when its own paths, this
+        # workflow or a manual run say so, so a docs or template change does
+        # not run the server's race tests or build the apps.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        gated = {'server': 'server', 'server-race': 'race', 'contract': 'contract', 'web': 'web',
+                 'docker': 'docker', 'scripts': 'scripts', 'android': 'android', 'apple': 'apple',
+                 'apple-tv': 'apple', 'windows': 'windows'}
+        self.assertEqual(set(gated) | {'changes', 'windows-signing'}, set(jobs))
+        for job, output in gated.items():
+            with self.subTest(job=job):
+                self.assertRegex(jobs[job], r'(?m)^    needs: (changes|\[changes[^\]]*\])$')
+                self.assertIn(f"needs.changes.outputs.{output} == 'true'", jobs[job])
+        outputs = dict(re.findall(r"(?m)^      ([\w-]+): (\$\{\{ github\.event_name == 'workflow_dispatch' \|\|.*)$", jobs['changes']))
+        self.assertEqual(set(gated.values()), set(outputs))
+        filters = jobs['changes'].split('filters: |', 1)[1]
+        for output in outputs:
+            with self.subTest(output=output):
+                block = re.search(rf'(?ms)^            {output}:\n((?:              - .*\n)+)', filters).group(1)
+                if output != 'scripts':
+                    self.assertIn("'.github/workflows/ci.yml'", block)
+        # The windows job installs the web job's build, so web runs with it.
+        self.assertIn("steps.filter.outputs.windows == 'true'", outputs['web'])
 
     def test_windows_installer_embeds_the_web_build_from_the_same_run(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()

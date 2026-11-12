@@ -172,7 +172,12 @@ Several agent sessions use this repository at once.
 
 Run the checks for the surfaces you touched before handing work back. CI
 (`.github/workflows/ci.yml`) runs the same ones on GitHub-hosted runners.
-Android and Apple jobs run when their code, `api/`, or CI support changes.
+Each job runs only when what it builds or tests changed: the `changes` job's
+path filters in `ci.yml` decide (the server jobs for `server/`, the apps for
+their folder and `api/`, `scripts` for `deploy/`, the workflows and the docs),
+and a change to `ci.yml` or a manual run runs everything. When a new job or
+input is added, give it a filter; `deploy/ci/security_test.py` checks every
+job has one.
 
 | Changed | Run |
 |---|---|
