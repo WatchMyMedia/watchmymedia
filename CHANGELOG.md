@@ -5,6 +5,20 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 1.4.1
+
+WatchMyMedia's source code is now public, at https://github.com/WatchMyMedia/watchmymedia,
+under the GNU Affero General Public License, version 3. This is the first release built there,
+from the same code as 1.4.0: nothing in the server or the apps changes.
+
+- The server's database is the same as 1.4.0's, so updating needs no backup to go back.
+- The Docker image moves to `ghcr.io/watchmymedia/watchmymedia`. The old address,
+  `ghcr.io/taimoorq/watchmymedia`, keeps 1.4.0 and gets no newer versions, so change the image
+  in your compose file or container settings to the new one. The Unraid template follows.
+- The server, the Docker image, the Mac app, the Windows app and the Android app are 1.4.1. The
+  Mac app and the Windows app of 1.4.0 offer the update under Check for updates. The iPhone,
+  iPad and Apple TV apps have no changes and stay at 1.8.0 in the App Store.
+
 ## 1.4.0
 
 A show, its seasons and its episodes are now one page in every app: the episode on top, the
