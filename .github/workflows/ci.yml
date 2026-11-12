@@ -25,15 +25,23 @@ permissions:
   contents: read
 
 jobs:
-  # Which parts changed, so that the app jobs run only when their own folder
-  # or the API documents their clients come from changed (or this file). A
-  # manual run builds everything.
+  # Which parts changed, so that each job runs only when what it builds or
+  # tests changed (or this file): a README or template change does not run
+  # the server's race tests or build the apps. A manual run runs everything,
+  # and so does a change to this file.
   changes:
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
     permissions:
       contents: read
       pull-requests: read
     outputs:
+      server: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.server == 'true' }}
+      race: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.race == 'true' }}
+      contract: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.contract == 'true' }}
+      # The windows job installs the web build this job makes.
+      web: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.web == 'true' || steps.filter.outputs.windows == 'true' }}
+      docker: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.docker == 'true' }}
+      scripts: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.scripts == 'true' }}
       android: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.android == 'true' }}
       windows: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.windows == 'true' }}
       apple: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apple == 'true' }}
@@ -44,16 +52,52 @@ jobs:
         if: github.event_name != 'workflow_dispatch'
         with:
           filters: |
+            server:
+              - 'server/**'
+              - 'deploy/fixture/**'
+              - 'deploy/macos/fetch-ffmpeg.sh'
+              - 'Makefile'
+              - '.github/workflows/ci.yml'
+            race:
+              - 'server/**'
+              - 'deploy/macos/fetch-ffmpeg.sh'
+              - '.github/workflows/ci.yml'
+            contract:
+              - 'server/**'
+              - 'api/**'
+              - 'web/src/api/**'
+              - 'web/package.json'
+              - 'web/pnpm-lock.yaml'
+              - 'Makefile'
+              - '.github/workflows/ci.yml'
+            web:
+              - 'web/**'
+              - 'brand/export/web/**'
+              - '.github/workflows/ci.yml'
+            docker:
+              - 'deploy/Dockerfile'
+              - 'deploy/entrypoint.sh'
+              - '.dockerignore'
+              - 'deploy/ci/docker-smoke.sh'
+              - 'deploy/ci/prepare-docker.py'
+              - 'server/**'
+              - 'web/**'
+              - '.github/workflows/ci.yml'
+            scripts:
+              - 'deploy/**'
+              - '.github/**'
+              - 'Makefile'
+              - '**/*.md'
+              - '.gitignore'
+              - '.dockerignore'
             android:
               - 'android/**'
               - 'api/**'
               - '.github/workflows/ci.yml'
-              - 'deploy/ci/**'
             apple:
               - 'apple/**'
               - 'api/**'
               - '.github/workflows/ci.yml'
-              - 'deploy/ci/**'
             windows:
               - 'windows/**'
               - 'deploy/windows/**'
@@ -63,13 +107,14 @@ jobs:
               - 'server/**'
               - 'deploy/macos/fetch-ffmpeg.sh'
               - '.github/workflows/ci.yml'
-              - 'deploy/ci/**'
 
   # Vet, lint and the generated-code check, then the Go tests with the ffmpeg
   # build the releases ship, so the VideoToolbox paths run on real hardware.
   # Linux is covered by building and vetting for it, Windows by vetting
   # here and by the windows job's tests.
   server:
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -140,6 +185,8 @@ jobs:
   # tests. The macOS-only code runs under the race detector in the server
   # job.
   server-race:
+    needs: changes
+    if: needs.changes.outputs.race == 'true'
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -175,6 +222,8 @@ jobs:
         run: go test -race -short -timeout 20m ./...
 
   web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
     defaults:
       run:
@@ -205,24 +254,29 @@ jobs:
           overwrite: true
       # The Cast receiver, deployed separately to cast.watchmy.media.
       - run: pnpm build:receiver
-      # The downloads Worker and the release scripts (deploy/, PLAN-RELEASES.md
-      # §3), tested in this job because it has Node.
-      - name: Test the downloads Worker and the release scripts
-        working-directory: .
+
+  # The scripts under deploy/ (releases, the Unraid template, these
+  # workflows' own checks) and the guidance's paths and make targets: no
+  # build, so a change to them or to the docs costs seconds.
+  scripts:
+    needs: changes
+    if: needs.changes.outputs.scripts == 'true'
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test the release, Unraid and CI scripts
         run: |
-          # The downloads Worker and the site are not in the public repository.
-          if [ -d deploy/downloads ]; then
-            node --test deploy/downloads/worker.test.js
-            python3 -I -m unittest discover -s deploy/downloads -p '*_test.py'
-            node --test deploy/site/downloads.test.mjs
-          fi
           python3 -I -m unittest discover -s deploy/release -p '*_test.py'
           python3 -I -m unittest discover -s deploy/ci -p '*_test.py'
           python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'
+      - name: Check the guidance's paths and make targets
+        run: python3 -I deploy/ci/check-agent-docs.py
 
   # The API documents in api/ (which the native apps generate their clients
   # from) and the web's copy and types must match the server's code.
   contract:
+    needs: changes
+    if: needs.changes.outputs.contract == 'true'
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -254,7 +308,10 @@ jobs:
 
   docker:
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
-    needs: [server, web]
+    needs: [changes, server, web]
+    # After the server and web jobs, when they ran and passed or had nothing
+    # to check.
+    if: ${{ !cancelled() && needs.changes.outputs.docker == 'true' && needs.server.result != 'failure' && needs.web.result != 'failure' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check Docker is running
