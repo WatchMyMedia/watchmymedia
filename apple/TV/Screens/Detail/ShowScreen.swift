@@ -140,9 +140,16 @@ private struct ShowPageView: View {
                     .padding(.horizontal, TVLayout.gutter)
                     .padding(.top, 10)
                     .accessibilityHidden(true)
-                about(show)
-                    .padding(.horizontal, TVLayout.gutter)
-                    .padding(.top, 70)
+                AboutShow(
+                    show: show, posterURL: url(show.posterPath, .w500),
+                    canMarkShow: model.canMarkShow, showToggleLabel: model.showToggleLabel,
+                    canRequestMissingSeasons: model.canRequestMissingSeasons,
+                    canShowMissing: model.canShowMissing, showMissing: model.showMissing,
+                    busy: model.busy, model: model, focus: $focus
+                )
+                .equatable()
+                .padding(.horizontal, TVLayout.gutter)
+                .padding(.top, 70)
             }
             .padding(.bottom, 60)
             .background(alignment: .top) {
@@ -349,7 +356,14 @@ private struct ShowPageView: View {
 
     private var seasons: some View {
         VStack(alignment: .leading, spacing: 22) {
-            tabRow.padding(.horizontal, TVLayout.gutter)
+            SeasonTabs(
+                singleSeason: model.singleSeason, tabs: model.tabs, selectedSeason: model.selectedSeason,
+                missingShown: model.missingShown, seasonLine: model.seasonLine,
+                markSeasonLabel: model.canMarkSeason ? model.seasonToggleLabel : nil,
+                busy: model.busy, model: model, focus: $focus
+            )
+            .equatable()
+            .padding(.horizontal, TVLayout.gutter)
             if let note = model.note {
                 Text(note)
                     .font(.system(size: 19, weight: .medium))
@@ -361,45 +375,6 @@ private struct ShowPageView: View {
             }
             row
         }
-    }
-
-    /// The tabs (or one season's heading), the season's line, and Mark season watched at the end.
-    private var tabRow: some View {
-        HStack(spacing: 10) {
-            if model.singleSeason {
-                Text(seasonName(model.selectedSeason ?? 1))
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(Palette.text)
-                    .padding(.trailing, 8)
-                    .accessibilityAddTraits(.isHeader)
-            } else {
-                ForEach(model.tabs) { season in
-                    let selected = season.number == model.selectedSeason
-                    Button { Task { await model.selectSeason(season.number) } } label: {
-                        HStack(spacing: 10) {
-                            Text(season.chipName)
-                            Text(season.tabCount(missingShown: model.missingShown)).fontWeight(.medium).opacity(0.7)
-                        }
-                    }
-                    .buttonStyle(TVChipStyle(selected: selected, height: 52, fontSize: 21))
-                    .focused($focus, equals: .tab(season.number))
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-                }
-            }
-            if let line = model.seasonLine {
-                Text(line).font(.system(size: 19)).foregroundStyle(Palette.muted).lineLimit(1).padding(.leading, 8)
-            }
-            Spacer(minLength: 18)
-            if model.canMarkSeason {
-                Button(model.seasonToggleLabel) { Task { await model.toggleSeasonWatched() } }
-                    .buttonStyle(TVChipStyle(selected: false, height: 52, fontSize: 21))
-                    .disabled(model.busy)
-                    .focused($focus, equals: .markSeason)
-            }
-        }
-        // Across the page, so Up from the row and Down from the top both reach it.
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .focusSection()
     }
 
     @ViewBuilder private var row: some View {
@@ -462,11 +437,93 @@ private struct ShowPageView: View {
         .accessibilityIdentifier("episode-card-\(episode.id)")
     }
 
-    // MARK: About the show
+}
 
-    private func about(_ show: ShowDetail) -> some View {
+/// The tabs (or one season's heading), the season's line, and Mark season
+/// watched at the end. A view of its own that compares what it shows and
+/// reads neither the model nor the focus, so moving along the episode row
+/// (which changes the episode on top and the focus) doesn't redraw it.
+private struct SeasonTabs: View, Equatable {
+    /// One season: a plain heading instead of a lone tab.
+    let singleSeason: Bool
+    let tabs: [SeasonSummary]
+    let selectedSeason: Int?
+    let missingShown: Bool
+    let seasonLine: String?
+    /// "Mark season watched" or "Mark season unwatched"; nil when there is nothing to mark.
+    let markSeasonLabel: String?
+    let busy: Bool
+    let model: ShowPageModel
+    var focus: FocusState<PageFocus?>.Binding
+
+    nonisolated static func == (a: Self, b: Self) -> Bool {
+        a.singleSeason == b.singleSeason && a.tabs == b.tabs && a.selectedSeason == b.selectedSeason && a.missingShown == b.missingShown
+            && a.seasonLine == b.seasonLine && a.markSeasonLabel == b.markSeasonLabel && a.busy == b.busy && a.model === b.model
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if singleSeason {
+                Text(seasonName(selectedSeason ?? 1))
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(Palette.text)
+                    .padding(.trailing, 8)
+                    .accessibilityAddTraits(.isHeader)
+            } else {
+                ForEach(tabs) { season in
+                    let selected = season.number == selectedSeason
+                    Button { Task { await model.selectSeason(season.number) } } label: {
+                        HStack(spacing: 10) {
+                            Text(season.chipName)
+                            Text(season.tabCount(missingShown: missingShown)).fontWeight(.medium).opacity(0.7)
+                        }
+                    }
+                    .buttonStyle(TVChipStyle(selected: selected, height: 52, fontSize: 21))
+                    .focused(focus, equals: .tab(season.number))
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                }
+            }
+            if let seasonLine {
+                Text(seasonLine).font(.system(size: 19)).foregroundStyle(Palette.muted).lineLimit(1).padding(.leading, 8)
+            }
+            Spacer(minLength: 18)
+            if let markSeasonLabel {
+                Button(markSeasonLabel) { Task { await model.toggleSeasonWatched() } }
+                    .buttonStyle(TVChipStyle(selected: false, height: 52, fontSize: 21))
+                    .disabled(busy)
+                    .focused(focus, equals: .markSeason)
+            }
+        }
+        // Across the page, so Up from the row and Down from the top both reach it.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .focusSection()
+    }
+}
+
+/// About the show: the poster, title, facts, overview, Mark show watched,
+/// Request missing seasons, Show missing and the cast. Like ``SeasonTabs`` it
+/// compares what it shows, so moving along the episode row leaves it be.
+private struct AboutShow: View, Equatable {
+    let show: ShowDetail
+    let posterURL: URL?
+    let canMarkShow: Bool
+    let showToggleLabel: String
+    let canRequestMissingSeasons: Bool
+    let canShowMissing: Bool
+    let showMissing: Bool
+    let busy: Bool
+    let model: ShowPageModel
+    var focus: FocusState<PageFocus?>.Binding
+
+    nonisolated static func == (a: Self, b: Self) -> Bool {
+        a.show == b.show && a.posterURL == b.posterURL && a.canMarkShow == b.canMarkShow && a.showToggleLabel == b.showToggleLabel
+            && a.canRequestMissingSeasons == b.canRequestMissingSeasons && a.canShowMissing == b.canShowMissing
+            && a.showMissing == b.showMissing && a.busy == b.busy && a.model === b.model
+    }
+
+    var body: some View {
         HStack(alignment: .top, spacing: 48) {
-            DetailPoster(url: url(show.posterPath, .w500), seed: show.title, width: 280)
+            DetailPoster(url: posterURL, seed: show.title, width: 280)
             VStack(alignment: .leading, spacing: 18) {
                 Text(show.title)
                     .font(.system(size: 52, weight: .heavy))
@@ -488,27 +545,27 @@ private struct ShowPageView: View {
                         .frame(maxWidth: 1100, alignment: .leading)
                 }
                 HStack(spacing: 18) {
-                    if model.canMarkShow {
-                        Button(model.showToggleLabel) { Task { await model.toggleShowWatched() } }
+                    if canMarkShow {
+                        Button(showToggleLabel) { Task { await model.toggleShowWatched() } }
                             .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
-                            .disabled(model.busy)
-                            .focused($focus, equals: .about(0))
+                            .disabled(busy)
+                            .focused(focus, equals: .about(0))
                     }
-                    if model.canRequestMissingSeasons {
+                    if canRequestMissingSeasons {
                         Button("Request missing seasons") { model.requestMissingSeasons() }
                             .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
-                            .focused($focus, equals: .about(1))
+                            .focused(focus, equals: .about(1))
                     }
-                    if model.canShowMissing {
-                        Button { Task { await model.setShowMissing(!model.showMissing) } } label: {
+                    if canShowMissing {
+                        Button { Task { await model.setShowMissing(!showMissing) } } label: {
                             HStack(spacing: 14) {
                                 Text("Show missing")
-                                SwitchKnob(on: model.showMissing)
+                                SwitchKnob(on: showMissing)
                             }
                         }
                         .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
-                        .accessibilityValue(model.showMissing ? "On" : "Off")
-                        .focused($focus, equals: .about(2))
+                        .accessibilityValue(showMissing ? "On" : "Off")
+                        .focused(focus, equals: .about(2))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
