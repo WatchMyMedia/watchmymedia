@@ -87,12 +87,23 @@ data class PlayerSource(
     val embeddedSubtitles: List<EmbeddedSubtitle> = emptyList(),
 )
 
+/** The video a decoder failed on: its format ("video/hevc") and picture size, as the player read them. */
+data class FailedVideo(val mimeType: String, val width: Int, val height: Int)
+
 /**
  * Why the player stopped. [detail] is for logs and the fallback message.
  * [audioMimeType] is the format the audio renderer was playing when it was
- * the one that failed ("audio/eac3"), and null for any other failure.
+ * the one that failed ("audio/eac3"), and null for any other failure;
+ * [video] likewise for the video renderer.
  */
-data class PlayerFailure(val kind: Kind, val detail: String, val httpStatus: Int? = null, val audioMimeType: String? = null, val subtitleId: String? = null) {
+data class PlayerFailure(
+    val kind: Kind,
+    val detail: String,
+    val httpStatus: Int? = null,
+    val audioMimeType: String? = null,
+    val subtitleId: String? = null,
+    val video: FailedVideo? = null,
+) {
     enum class Kind { Network, Http, Decoder, Audio, Source, Subtitle, BehindLiveWindow, Other }
 }
 

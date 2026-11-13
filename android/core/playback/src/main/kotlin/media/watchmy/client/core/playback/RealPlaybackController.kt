@@ -44,6 +44,7 @@ import media.watchmy.client.model.PlayState
 import media.watchmy.client.model.PlaybackController
 import media.watchmy.client.model.PlaybackDecision
 import media.watchmy.client.model.PlaybackGateway
+import media.watchmy.client.model.PlaybackMode
 import media.watchmy.client.model.PlaybackProfile
 import media.watchmy.client.model.PlaybackProgress
 import media.watchmy.client.model.PlayerEvent
@@ -179,6 +180,13 @@ class RealPlaybackController(
          * remuxes a track other than the file's default (PLAN-LANGUAGES.md §5.2).
          */
         var playerSelectsAudio = true
+
+        /**
+         * A video decoder failed on this viewing's stream: its decisions
+         * leave that codec out, or ask for a picture the decoder takes.
+         * Once a viewing, as [playerSelectsAudio] is.
+         */
+        var videoNarrowing: VideoNarrowing? = null
 
         /** The profile the last decision was asked with, which an offline play's audio choice reads. */
         var profile: PlaybackProfile? = null
@@ -585,7 +593,7 @@ class RealPlaybackController(
         // Onto mobile data or off it since the last decision: this one takes that network's default.
         quality = choice.current()
         // Automatic has no caps: the device's own profile, and the server picks the step.
-        val device = withContext(io) { profileProvider.current() }.capped(quality)
+        val device = withContext(io) { profileProvider.current() }.capped(quality).narrowed(v.videoNarrowing)
         val profile = if (v.playerSelectsAudio) device else device.copy(selectsAudioTrack = null)
         v.profile = profile
         val request = DecisionRequest(
@@ -890,6 +898,19 @@ class RealPlaybackController(
         if (v.switch.awaitingFrame) {
             v.switch.reject()
             v.stepMessage = null
+        }
+        // A video decoder that can't take this stream (a picture larger than it decodes, a profile it
+        // lists but fails on): ask once more, for this viewing, at a size it decodes or without the codec.
+        val video = failure.video?.takeIf { failure.kind == PlayerFailure.Kind.Decoder && v.videoNarrowing == null }
+        val d = v.decision
+        val narrowing = if (video != null && d != null && !d.isOffline) {
+            videoNarrowing(video, profileProvider.videoLimit(video.mimeType), copied = d.mode != PlaybackMode.Transcode)
+        } else null
+        if (narrowing != null) {
+            Log.w(TAG, "The video decoder failed on ${video?.mimeType} ${video?.width}x${video?.height}; asking again with $narrowing")
+            v.videoNarrowing = narrowing
+            reload(v)
+            return
         }
         // A decoder the device lists but that fails (a Pixel's Dolby E-AC-3): ask again
         // without it, so the server converts the audio. Once per codec, then as any error.

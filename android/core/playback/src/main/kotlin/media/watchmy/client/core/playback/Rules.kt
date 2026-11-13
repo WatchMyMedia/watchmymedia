@@ -1,6 +1,10 @@
 package media.watchmy.client.core.playback
 
 import media.watchmy.client.core.playback.player.EmbeddedSubtitle
+import media.watchmy.client.core.playback.player.FailedVideo
+import media.watchmy.client.core.playback.profile.VideoSize
+import media.watchmy.client.core.playback.profile.videoCodecKeys
+import media.watchmy.client.model.PlaybackProfile
 import media.watchmy.client.core.playback.player.PlayerFailure
 import media.watchmy.client.core.playback.player.TextSelection
 import media.watchmy.client.model.PlaybackDecision
@@ -159,6 +163,38 @@ internal fun errorMessage(failure: PlayerFailure): String = when (failure.kind) 
     PlayerFailure.Kind.Source -> "The stream could not be read."
     PlayerFailure.Kind.BehindLiveWindow -> "The stream fell behind."
     PlayerFailure.Kind.Other -> "Playback failed (${failure.detail})."
+}
+
+/** What a viewing's decisions leave out after a video decoder failed on its stream (PLAN-ANDROID-REVIEW.md §3.1.3). */
+internal sealed interface VideoNarrowing {
+    /** The codec's keys: the server sends the video another way, or transcodes it. */
+    data class LeaveOut(val keys: Set<String>) : VideoNarrowing
+
+    /** A picture the decoder takes: the server transcodes to it. */
+    data class Within(val size: VideoSize) : VideoNarrowing
+}
+
+/**
+ * What to ask for after a video decoder failed on [video]: a picture within
+ * the decoder's [limit] when the video was larger; else, when the server
+ * sent the file's own video ([copied]: direct play, remux, audio
+ * transcode), the decision without that codec; else nothing (a transcode
+ * the decoder should take failed: an error as before).
+ */
+internal fun videoNarrowing(video: FailedVideo, limit: VideoSize?, copied: Boolean): VideoNarrowing? = when {
+    limit != null && video.width > 0 && video.height > 0 && !limit.fits(video.width, video.height) -> VideoNarrowing.Within(limit)
+    copied -> videoCodecKeys(video.mimeType).takeIf { it.isNotEmpty() }?.let(VideoNarrowing::LeaveOut)
+    else -> null
+}
+
+/** The profile with [narrowing] applied. */
+internal fun PlaybackProfile.narrowed(narrowing: VideoNarrowing?): PlaybackProfile = when (narrowing) {
+    null -> this
+    is VideoNarrowing.LeaveOut -> copy(videoCodecs = videoCodecs - narrowing.keys)
+    is VideoNarrowing.Within -> copy(
+        maxWidth = minOf(maxWidth ?: narrowing.size.width, narrowing.size.width),
+        maxHeight = minOf(maxHeight ?: narrowing.size.height, narrowing.size.height),
+    )
 }
 
 /** Failures worth one more try at the current position: an expired token, a session the server dropped, a network hiccup. */

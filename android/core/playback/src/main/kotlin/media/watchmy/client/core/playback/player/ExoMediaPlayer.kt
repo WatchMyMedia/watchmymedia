@@ -372,7 +372,7 @@ internal fun frameRateOf(tracks: Tracks): Float? {
     return null
 }
 
-/** What went wrong, for the controller: HTTP statuses, and the audio format a renderer couldn't take. */
+/** What went wrong, for the controller: HTTP statuses, and the audio or video format a renderer couldn't take. */
 @OptIn(UnstableApi::class)
 internal fun failureOf(error: PlaybackException): PlayerFailure {
     val detail = "${error.errorCodeName}: ${error.message}"
@@ -389,10 +389,10 @@ internal fun failureOf(error: PlaybackException): PlayerFailure {
         in 5000..5999 -> PlayerFailure.Kind.Audio
         else -> PlayerFailure.Kind.Other
     }
-    val audio = (error as? ExoPlaybackException)
-        ?.takeIf { it.type == ExoPlaybackException.TYPE_RENDERER }
-        ?.rendererFormat?.sampleMimeType?.takeIf(MimeTypes::isAudio)
-    return PlayerFailure(kind, detail, audioMimeType = audio)
+    val format = (error as? ExoPlaybackException)?.takeIf { it.type == ExoPlaybackException.TYPE_RENDERER }?.rendererFormat
+    val audio = format?.sampleMimeType?.takeIf(MimeTypes::isAudio)
+    val video = format?.sampleMimeType?.takeIf(MimeTypes::isVideo)?.let { FailedVideo(it, format.width, format.height) }
+    return PlayerFailure(kind, detail, audioMimeType = audio, video = video)
 }
 
 /** A load's subtitle tracks: the side-loaded files' IDs, and the file's own tracks in its order. */
