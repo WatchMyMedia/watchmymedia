@@ -130,6 +130,11 @@ server, and on iPad in both a regular and a compact width.
     (`TabPage`) then rebuilds its content, and an `.equatable()` view's `==`
     isn't asked for its first several updates; so what changes with each
     move (the episode on top) is read only in views of its own (`Separately`).
+    Building `TabPage`'s content once, in its `init`, saves nothing: the
+    owner's body runs on each move and would build it there instead
+    (measured 2026-11-13: one `TabPage` content build per owner redraw, none
+    besides), and the model reads in the content would then redraw the owner
+    rather than `TabPage` alone.
   - On Apple TV a focused button that becomes disabled keeps focus, dimmed,
     until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
     up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable
