@@ -18,6 +18,7 @@ import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.model.LiveCapabilities
 import media.watchmy.client.model.LiveMeasurement
 import media.watchmy.client.model.LiveOutputDirective
+import media.watchmy.client.model.LivePlaybackState
 import media.watchmy.client.model.LivePlaybackGateway
 import media.watchmy.client.model.PlaybackProfile
 import media.watchmy.client.model.LiveSession
@@ -439,6 +440,30 @@ class LivePlaybackTest {
         h.close()
     }
 
+    @Test fun `Automatic's heartbeat measures the player on its own thread and keeps the channel`() = runTest {
+        val h = harness()
+        h.gateway.automatic = true
+        h.preferences.quality.value = StreamQuality.Auto
+        h.controller.start(ONE)
+        runCurrent()
+        assertTrue(h.controller.state.value.session!!.automatic)
+        val before = h.gateway.measurements.size
+        h.media.transfer = media.watchmy.client.core.playback.player.TransferSample(6_000_000, 400)
+        h.media.bufferAheadMs = 12_000
+        advanceTimeBy(10_500)
+        runCurrent()
+        assertTrue("The measured heartbeat went out", h.gateway.measurements.size > before)
+        runCurrent()
+        val m = h.gateway.measurements.last()
+        assertEquals(6_000_000L, m.throughputBps)
+        assertEquals(12_000L, m.bufferedMs)
+        assertEquals(LivePlaybackState.Playing, m.state)
+        assertEquals("The channel plays on", PlayerStatus.Playing, h.controller.state.value.status)
+        assertNull(h.controller.state.value.error)
+        assertEquals(1, h.gateway.allocated.size)
+        h.close()
+    }
+
     @Test fun `failed output load reports failure and restores the old stream on the same tuner`() = runTest {
         val h = harness()
         h.gateway.automatic = true
@@ -501,7 +526,7 @@ class LivePlaybackTest {
         var ids = 0
         return Harness(
             RealLivePlaybackController(gateway, prefs, CLIENT, { media }, visibility = visibility,
-                network = MeteredNetwork { metered }, clock = clock, dispatcher = dispatcher, io = dispatcher,
+                network = MeteredNetwork { metered }, clock = clock, dispatcher = dispatcher, io = OffMainDispatcher(StandardTestDispatcher(testScheduler)),
                 requestId = { "request-${++ids}" }), gateway, media, prefs, visibility,
         )
     }

@@ -477,18 +477,14 @@ class RealLivePlaybackController(
                     val reportedPause = paused
                     val accepted = acceptedOutputGeneration
                     val failed = failedOutputGeneration
+                    // Measured here, on the player's thread: ExoPlayer throws when read from IO.
+                    val measurement = if (beat && session.automatic) measure(reportedPause, accepted, failed) else null
                     val updated = withContext(io) {
-                        if (!beat) gateway.status(session.id)
-                        else if (session.automatic) {
-                            val p = media
-                            val transfer = p?.transfer
-                            gateway.heartbeatMeasured(session.id, reportedPause, reportedInput != sentInteraction, LiveMeasurement(
-                                state = if (reportedPause) LivePlaybackState.Paused else if (p?.phase == PlayerPhase.Ready) LivePlaybackState.Playing else LivePlaybackState.Buffering,
-                                bufferedMs = p?.let { (it.bufferedPositionMs - it.positionMs).coerceAtLeast(0) },
-                                throughputBps = transfer?.bps, throughputAgeMs = transfer?.ageMs,
-                                stalls = p?.stalls?.count?.toLong(), switchGeneration = accepted, switchFailedGeneration = failed,
-                            ))
-                        } else gateway.heartbeat(session.id, reportedPause, reportedInput != sentInteraction)
+                        when {
+                            !beat -> gateway.status(session.id)
+                            measurement != null -> gateway.heartbeatMeasured(session.id, reportedPause, reportedInput != sentInteraction, measurement)
+                            else -> gateway.heartbeat(session.id, reportedPause, reportedInput != sentInteraction)
+                        }
                     }
                     lastPollAt = clock.elapsedMs()
                     if (beat) {
@@ -514,6 +510,18 @@ class RealLivePlaybackController(
                 }
             }
         }
+    }
+
+    /** Automatic's measurement for a heartbeat. Main thread only, as the player is. */
+    private fun measure(paused: Boolean, accepted: Long?, failed: Long?): LiveMeasurement {
+        val p = media
+        val transfer = p?.transfer
+        return LiveMeasurement(
+            state = if (paused) LivePlaybackState.Paused else if (p?.phase == PlayerPhase.Ready) LivePlaybackState.Playing else LivePlaybackState.Buffering,
+            bufferedMs = p?.let { (it.bufferedPositionMs - it.positionMs).coerceAtLeast(0) },
+            throughputBps = transfer?.bps, throughputAgeMs = transfer?.ageMs,
+            stalls = p?.stalls?.count?.toLong(), switchGeneration = accepted, switchFailedGeneration = failed,
+        )
     }
 
     private fun refresh() {
