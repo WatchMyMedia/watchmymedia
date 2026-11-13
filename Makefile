@@ -8,7 +8,7 @@ VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev
 OPENSUBTITLES_API_KEY ?=
 LDFLAGS  = -s -w -X main.version=$(VERSION) -X main.openSubtitlesKey=$(OPENSUBTITLES_API_KEY)
 
-.PHONY: help dev web-dev gen gen-sqlc gen-api web build build-universal release ffmpeg-macos ffmpeg-windows windows-app windows-installer windows-test macos-app macos-dmg test bench lint docker docker-up clean fixture fixture-serve apple-api apple-gen apple-test apple-build apple-test-sim apple-archive apple-upload apple-tv-archive apple-tv-upload apple-e2e apple-tv-build apple-tv-test-sim agents-check server-deps android-verify-metadata
+.PHONY: help dev web-dev gen gen-sqlc gen-api web build build-universal release ffmpeg-macos ffmpeg-windows windows-app windows-installer windows-test macos-app macos-dmg test bench lint docker docker-up clean fixture fixture-serve apple-api apple-gen apple-test apple-build apple-test-sim apple-archive apple-upload apple-tv-archive apple-tv-upload apple-e2e apple-tv-build apple-tv-test-sim apple-build-release apple-tv-build-release agents-check server-deps android-verify-metadata
 .PHONY: streaming-check release-tag
 
 PLATFORMS := darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64
@@ -87,6 +87,21 @@ apple-tv-test-sim: apple-gen ## Build the Apple TV app and run every test on the
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
 	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVTests.xcresult $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) \
 	  $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) test
+
+# The Release configuration for devices, unsigned: what an archive compiles
+# (optimised, no DEBUG, so no fakes), without signing. CI runs both, so a
+# release-only break shows before a tag. No coverage, as in an archive (the
+# scheme's test coverage otherwise instruments the build). The check then
+# fails without the privacy manifest or with the fakes' code in the binary.
+apple-build-release: apple-gen ## Build the iPhone app in Release for devices, unsigned (as CI does)
+	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMedia -configuration Release -destination 'generic/platform=iOS' \
+	  -derivedDataPath $(APPLE_DERIVED) CLANG_COVERAGE_MAPPING=NO CODE_SIGNING_ALLOWED=NO build
+	apple/scripts/check-release-binary.sh $(APPLE_DERIVED)/Build/Products/Release-iphoneos/WatchMyMedia.app
+
+apple-tv-build-release: apple-gen ## Build the Apple TV app in Release for devices, unsigned (as CI does)
+	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -configuration Release -destination 'generic/platform=tvOS' \
+	  -derivedDataPath $(APPLE_DERIVED) CLANG_COVERAGE_MAPPING=NO CODE_SIGNING_ALLOWED=NO build
+	apple/scripts/check-release-binary.sh $(APPLE_DERIVED)/Build/Products/Release-appletvos/WatchMyMediaTV.app
 
 # apple-e2e runs the app on $(SIM) against a server: E2E_SERVER as typed in
 # the server picker (from the simulator, localhost is this Mac), and an account

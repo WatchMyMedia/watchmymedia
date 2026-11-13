@@ -524,6 +524,21 @@ esac
             self.assertNotEqual(0, failed.returncode)
             self.assertIn(b'Error 65', failed.stderr)
 
+    def test_apple_jobs_build_release_unsigned_after_their_tests(self):
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        makefile = (ROOT / 'Makefile').read_text()
+        for job, target, platform in (('apple', 'apple-build-release', 'iOS'), ('apple-tv', 'apple-tv-build-release', 'tvOS')):
+            with self.subTest(job=job):
+                body = re.search(r'(?ms)^  ' + re.escape(job) + r':\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
+                step = re.search(r'(?ms)- name: Build for release\n(.*?)(?=      -)', body).group(1)
+                self.assertIn(f'run: make {target} PATH="$PATH"', step)
+                self.assertLess(body.index('-test-sim '), body.index('- name: Build for release'))
+                recipe = re.search(r'(?ms)^' + re.escape(target) + r':.*?\n((?:\t.*\n)+)', makefile).group(1)
+                self.assertIn('-configuration Release', recipe)
+                self.assertIn(f"-destination 'generic/platform={platform}'", recipe)
+                self.assertIn('CODE_SIGNING_ALLOWED=NO', recipe)
+                self.assertIn('apple/scripts/check-release-binary.sh', recipe)
+
     def test_build_context_excludes_nested_credentials_and_client_outputs(self):
         rules = set((ROOT / '.dockerignore').read_text().splitlines())
         for rule in ('android', 'apple', '**/.env', '**/.env.*', '**/secrets',

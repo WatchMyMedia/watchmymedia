@@ -19,6 +19,8 @@ make apple-api        # after `make gen-api`: regenerate Kit/Sources/WMMAPI/Gene
 make apple-e2e        # the app end to end against a server (default: the fixture server at localhost:27588)
 make apple-tv-build   # build the Apple TV app for the simulator
 make apple-tv-test-sim # build it and run every test on the Apple TV 4K simulator (TV_SIM=… for another)
+make apple-build-release    # the iPhone app in Release for devices, unsigned, then check-release-binary.sh (CI runs it)
+make apple-tv-build-release # the same for the Apple TV app
 ```
 
 The Apple TV app needs the tvOS simulator runtime too
@@ -594,6 +596,14 @@ and fictional broadcasts do not certify a physical tuner, remote, AirPlay,
 Picture in Picture or real-broadcast ad detection.
 
 ## Release builds, privacy and measuring
+
+**Release builds.** `make apple-build-release` and `make apple-tv-build-release`
+build the Release configuration for devices without signing (what an archive
+compiles), and CI's `apple` and `apple-tv` jobs run them after their tests, so a
+break that only shows in Release (an `#if DEBUG`, optimisation, a missing
+import) shows before a tag. `scripts/check-release-binary.sh` then fails if the
+app has no privacy manifest, holds any `WMMFakes` symbol or still reads
+`-fakesSignedOut`.
 
 **The fakes are debug-only** (PLAN-APPLE-REVIEW.md §2.9): every
 `import WMMFakes` in `App/` and `TV/`, the fakes' branch of each

@@ -707,6 +707,11 @@ jobs:
         run: |
           xcodebuild -version
           make apple-test-sim APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
+      # The Release configuration for devices, unsigned: what an archive
+      # compiles, so a release-only break shows before a tag. The target also
+      # checks the privacy manifest is in the app and the fakes aren't.
+      - name: Build for release
+        run: make apple-build-release PATH="$PATH"
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: "!cancelled() && steps.packages.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
         with:
@@ -753,6 +758,9 @@ jobs:
         # and a timing-sensitive Kit test failed (run of 2026-11-12).
         timeout-minutes: 20
         run: make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
+      # Release for devices, unsigned, as in the apple job.
+      - name: Build for release
+        run: make apple-tv-build-release PATH="$PATH"
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: "!cancelled() && steps.packages.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
         with:
