@@ -723,6 +723,14 @@ app's files are written, phone rules first, once both are there;
 `generate.sh` alone runs both on one device. A half installs the release
 build with the debug key and takes about a quarter of an hour on a busy Mac.
 
+The profiles go stale quietly: a renamed screen's rules match nothing, and
+its replacement runs interpreted. CI's android job runs
+`deploy/ci/baseline_profile.py`, which fails when more than 5% of the
+profiles' rules for the app's own code (and at least 50) name classes no
+longer in the sources; it lists them, most rules first. Run it from the
+repository root before a pull request that renames screens:
+`python3 -I deploy/ci/baseline_profile.py android`.
+
 `StartupBenchmark` measures a cold start to the first frame, as installed
 without a profile and with this one, on whatever build you choose (without
 `-Pfakes`, the real app's start into the server picker):
