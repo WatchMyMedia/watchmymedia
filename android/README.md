@@ -289,10 +289,24 @@ How it works (`core:downloads`):
 - **Media3** `DownloadManager` and `WmmDownloadService` (a `dataSync`
   foreground service with the progress notification) fetch one download at a
   time, segments in order, into a `SimpleCache` in `noBackupFilesDir/offline/`
-  that never evicts. Wi-Fi only and enough storage are requirements;
-  `WorkManagerScheduler` starts the service again when they are met. A
+  that never evicts. Wi-Fi only and enough storage are requirements. A
   download that would leave under 1 GB free is refused. The resulting
   prepared copy's size is checked again before queuing its media bytes.
+- **After the app's process ends** (`DownloadRestarts`): the manager starts
+  paused, so the app resumes it as soon as it is made, and starts the service
+  on its first time in the foreground when a download is unfinished. Below
+  Android 12 `WorkManagerScheduler` starts the service again when Wi-Fi or
+  space comes back and after a reboot. Android 12 and later refuse a
+  foreground service started from the background and Media3 drops that
+  scheduler there, so while the app is away with a download unfinished a
+  WorkManager job with the same requirements (`DownloadJobWorker`) runs the
+  downloads in the app's process, without the notification: when the network
+  or space returns, after a reboot, and again each time Android stops the job
+  (about ten minutes a run). Coming back to the foreground cancels it and the
+  service takes over. A user-initiated data transfer job (Android 14) is not
+  used: Media3 1.11 has no downloader on one, it can be scheduled only while
+  the app is in front, and it needs the service replaced by a job service of
+  the app's own.
 - **Tokens**: each fetch carries the download's own `o1.` token, renewed with
   the device's session on 401 (`OfflineDataSource`); 503 with Retry-After
   shows Preparing and is waited out; 409 starts the download over; 403 and

@@ -29,6 +29,7 @@ import androidx.media3.exoplayer.offline.DefaultDownloaderFactory
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadManager
 import androidx.media3.exoplayer.offline.DownloadNotificationHelper
+import androidx.media3.exoplayer.scheduler.Requirements
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -119,13 +120,18 @@ class OfflineDownloads(
 
     private val notifications = DownloadNotificationHelper(app, CHANNEL)
 
+    private val engine = Media3Engine(app, manager, cache)
+
+    /** Unfinished downloads go on after the process starts again: the manager resumes now. */
+    private val restarts = DownloadRestarts(manager, engine::startService, WorkManagerJobs(app))
+
     val repository: DownloadRepository
 
     init {
         ready = RealDownloadRepository(
             store = store,
             gateway = gateway,
-            engine = Media3Engine(app, manager, cache),
+            engine = engine,
             client = client,
             profile = profile,
             space = {
@@ -138,11 +144,13 @@ class OfflineDownloads(
         )
         repository = repo
         // At start and on coming to the foreground (PLAN-DOWNLOADS.md §6).
-        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+        val process = ProcessLifecycleOwner.get().lifecycle
+        process.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 scope.launch { repo.sync() }
             }
         })
+        process.addObserver(restarts)
     }
 
     /** The player's calls, with downloaded items played from the device. */
@@ -167,6 +175,19 @@ class OfflineDownloads(
         val running = downloads.firstOrNull { it.state == Download.STATE_DOWNLOADING }
         val title = running?.let { repo.downloads.value.firstOrNull { d -> d.id == it.request.id } }?.item?.let { downloadTitle(it) }
         return notifications.buildProgressNotification(app, R.drawable.ic_stat_download, launchIntent(app), title, downloads.filterNot { isPart(it.request.id) }, notMetRequirements)
+    }
+
+    /**
+     * The job that runs unfinished downloads while the app is away, on
+     * Android 12 and later ([DownloadRestarts]): it returns once the manager
+     * can do no more, and asks to run again while any is left.
+     */
+    class DownloadJobWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+        override suspend fun doWork(): Result {
+            val downloads = (applicationContext as? Host)?.offlineDownloads ?: return Result.success()
+            val done = kotlinx.coroutines.withContext(Dispatchers.Main.immediate) { downloads.restarts.runUntilIdle() }
+            return if (done) Result.success() else Result.retry()
+        }
     }
 
     /** A job that syncs once a network is back. */
@@ -212,10 +233,50 @@ class OfflineDownloads(
             .followSslRedirects(false)
             .build()
 
+        /** WorkManager's constraints for Media3's [requirements]: the network (unmetered for Wi-Fi only) and storage that isn't low. */
+        internal fun constraintsFor(requirements: Requirements): Constraints = Constraints.Builder()
+            .setRequiredNetworkType(
+                when {
+                    requirements.isUnmeteredNetworkRequired -> NetworkType.UNMETERED
+                    requirements.isNetworkRequired -> NetworkType.CONNECTED
+                    else -> NetworkType.NOT_REQUIRED
+                },
+            )
+            .setRequiresStorageNotLow(requirements.isStorageNotLowRequired)
+            .build()
+
         internal fun launchIntent(context: Context): PendingIntent? {
             val intent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return null
             return PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         }
+    }
+}
+
+/** [DownloadJobs] on WorkManager: one unique job, kept while one is waiting, with the downloads' requirements. */
+@OptIn(UnstableApi::class)
+private class WorkManagerJobs(private val context: Context) : DownloadJobs {
+    override fun schedule(requirements: Requirements) {
+        try {
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                DOWNLOAD_WORK,
+                ExistingWorkPolicy.KEEP,
+                OneTimeWorkRequestBuilder<OfflineDownloads.DownloadJobWorker>().setConstraints(OfflineDownloads.constraintsFor(requirements)).build(),
+            )
+        } catch (e: IllegalStateException) {
+            Log.w("WmmDownloads", "could not schedule the downloads' job", e)
+        }
+    }
+
+    override fun cancel() {
+        try {
+            WorkManager.getInstance(context).cancelUniqueWork(DOWNLOAD_WORK)
+        } catch (e: IllegalStateException) {
+            Log.w("WmmDownloads", "could not cancel the downloads' job", e)
+        }
+    }
+
+    private companion object {
+        const val DOWNLOAD_WORK = "offline-downloads-run"
     }
 }
 
