@@ -265,6 +265,8 @@ struct LiveRecordingsScreen: View {
         .task(id: services.liveTV.contextID) {
             for section in LiveRecordingSection.allCases { await recordings.load(section) }
         }
+        // On screen until this list goes: events then stop asking for its sections (PLAN-APPLE-REVIEW.md §4.1.8).
+        .task { await recordings.show(LiveRecordingSection.allCases) }
         .sheet(isPresented: $manual) { LiveManualRecordingSheet() }
         .sheet(item: $deleting) { item in LiveRecordingDeleteSheet(recording: item) }
         .sheet(item: $clash) { LiveRecordingClashSheet(clash: $0) }

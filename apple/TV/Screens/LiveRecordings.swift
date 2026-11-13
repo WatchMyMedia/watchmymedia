@@ -145,6 +145,8 @@ struct TVLiveRecordingsScreen: View {
             .padding(.horizontal, TVLayout.gutter).padding(.vertical, 40)
         }
         .task(id: services.liveTV.contextID) { for section in LiveRecordingSection.allCases { await recordings.load(section) } }
+        // On screen until this list goes: events then stop asking for its sections (PLAN-APPLE-REVIEW.md §4.1.8).
+        .task { await recordings.show(LiveRecordingSection.allCases) }
         .messagePill(Binding(get: { recordings.message }, set: { recordings.message = $0 }))
         .fullScreenCover(item: $deleting) { item in TVLiveRecordingDelete(recording: item) }
         .fullScreenCover(item: $clash) { found in TVLiveRecordingClashView(clash: found) { _ in clash = nil } }
