@@ -35,7 +35,10 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   ones (as `PlaybackProfile.forApiLevel` does) and it is not sent at all.
 - **Server levels.** A feature that needs a newer server is gated on the
   server's `apiLevel` and hidden below it; the app's minimum level does not
-  move for it. The app refreshes the level at each sign-in and at start.
+  move for it. Gate with `ServerFeatures` in `core:model` (named booleans:
+  `http.features().rows`), and give a new level its boolean there. The app
+  refreshes the level at each sign-in, at start and when the event stream
+  reconnects.
 - **Mirrors.** `core/cast`'s `CastProtocol` mirrors `web/src/cast/protocol.ts`;
   the wording in `core:model` and `core:ui` matches the Apple apps'. Change
   both sides together.
@@ -52,7 +55,15 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   storage with `Harness.editStorage`, not `dataStore.edit`, and reopen with
   `Harness.reopen`. Both wait for the writes still running, which would
   otherwise land over the test's: `StoredSettingsFormatTest` failed on CI
-  that way.
+  that way. `Harness.reopen` also waits for the old instance's sign-in
+  checks, which wrote the old sign-in back once when they finished late.
+  Request options, Live TV capabilities and the library list are kept per
+  sign-in (`SessionMemo`): a test that asks twice in one sign-in moves
+  `h.now` past `SessionMemo.TTL_MS` first.
+- **Crypto under Robolectric.** Robolectric installs Conscrypt, beside
+  which the JDK's AES-GCM fails to load ("Framework jar verification can
+  not be initialized"). A test that seals with a JVM key runs with
+  `@ConscryptMode(ConscryptMode.Mode.OFF)`, as `TokenSealerTest` does.
 - **Build conventions.** The settings modules share (SDK levels, Java and
   Kotlin targets, test options, Compose) are set by the plugins in
   `build-logic/` (README, "Build conventions"); a module's build file holds

@@ -751,6 +751,20 @@ devices, and a busy Mac makes them noisy, so compare medians of several runs.
   ViewModel start over when what it shows changes (the phone's sign-in).
 - **Repositories throw** `ApiException` (status and the server's message);
   `SignedOutException` means show sign-in. Screens show the message.
+- **The data layer** (`core:data`) builds its OkHttp clients off the main
+  thread, on one connection pool shared by the API, images, the event stream
+  and media (`DataServices.mediaHttpClient`, for the player and downloads).
+  A request carries who it is sent as (a `Credential` tag), and one
+  interceptor adds that token, only to its server, and handles 401. API
+  replies with an ETag stay in a 20 MB HTTP cache and are asked again each
+  time, so a quiet reload gets a 304. The event stream connects only while
+  the app is in front (`DataServices.setInFront`, from the process
+  lifecycle) and on a network, and again at once on the return to either;
+  `LibraryRepository.libraryChanges` says which movies, episodes and
+  libraries a burst of events touched. Request options, Live TV
+  capabilities and the library list are asked once a sign-in, for five
+  minutes, and again on their events. What a newer server brings is gated
+  with `ServerFeatures(apiLevel)`.
 - **Images**: `services.library.imageUrl(path, ImageSize.W342)` into
   `Artwork(url, seed = title, …)`, which draws the mockups' gradient when the
   URL is null or loading. The app's image loader adds the sign-in.
