@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"watchmymedia/server/internal/ffexec"
+	"watchmymedia/server/internal/ffexec/ffexectest"
 	"watchmymedia/server/internal/probe/probetest"
 )
 
@@ -236,7 +237,7 @@ func fakeProbe(t *testing.T, script string) string {
 		t.Skip("needs a shell")
 	}
 	bin := filepath.Join(t.TempDir(), "ffprobe")
-	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"+script+"\n"), 0o700); err != nil { //nolint:gosec // G306: a script, which must be executable
+	if err := ffexectest.WriteScript(bin, "#!/bin/sh\n"+script+"\n"); err != nil {
 		t.Fatal(err)
 	}
 	return bin

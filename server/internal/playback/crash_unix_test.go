@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"watchmymedia/server/internal/ffexec"
+	"watchmymedia/server/internal/ffexec/ffexectest"
 )
 
 // Exercise the production startup primitives across a real parent SIGKILL,
@@ -31,7 +32,7 @@ func TestPlaybackAfterKilledParent(t *testing.T) {
 	}
 	// Force real-time input so the encoder is still alive at the crash.
 	bin := filepath.Join(dir, "slow-ffmpeg")
-	if err := os.WriteFile(bin, []byte("#!/bin/sh\nexec '"+strings.ReplaceAll(ffmpeg, "'", "'\\''")+"' -re \"$@\"\n"), 0o700); err != nil { //nolint:gosec // executable test wrapper
+	if err := ffexectest.WriteScript(bin, "#!/bin/sh\nexec '"+strings.ReplaceAll(ffmpeg, "'", "'\\''")+"' -re \"$@\"\n"); err != nil {
 		t.Fatal(err)
 	}
 	keep := filepath.Join(dir, "other-app.bin")
