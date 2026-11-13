@@ -34,9 +34,10 @@ struct ScreenEventsTests {
 
         await model.setWatched(.movie(id: 21), true)
         #expect(await eventually { count("GET /api/home") == 2 }, "the mark's own notice")
-        // The server's echo of it: nothing more.
+        // The server's echo of it: read and dropped, so nothing more.
+        let read = h.services.events.received[.library] ?? 0
         events.send(event: "watch.changed", data: #"{"itemType":"movie","itemIds":[21]}"#)
-        try await Task.sleep(for: .milliseconds(100))
+        #expect(await eventually { h.services.events.received[.library] == read + 1 })
         #expect(count("GET /api/home") == 2)
         // Another device's change is news.
         events.send(event: "watch.changed", data: #"{"itemType":"episode","itemIds":[401]}"#)

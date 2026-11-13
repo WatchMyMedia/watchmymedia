@@ -330,7 +330,7 @@ struct LibraryRepositoryTests {
         let changes = Counter()
         let listening = Task { for await _ in library.changes() { changes.count += 1 } }
         defer { listening.cancel() }
-        try await Task.sleep(for: .milliseconds(20))
+        #expect(await eventually { h.services.events.listenerCount == 1 })
 
         try await library.setWatched(.movie, id: 21, watched: true)
         try await library.setWatched(.episode, id: 401, watched: false)
