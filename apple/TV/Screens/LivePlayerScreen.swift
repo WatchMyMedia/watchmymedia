@@ -90,8 +90,13 @@ private struct TVLivePlayerContent: View {
     private var content: some View {
         ZStack {
             if model.showsVideo {
-                LiveSystemPlayer(model: model, extras: extras, recordings: recordings, player: model.controller.player ?? standIn,
-                                 contextualActions: model.contextualActions, transportBarActions: model.transportBarActions)
+                SystemPlayer(
+                    player: model.controller.player ?? standIn,
+                    contextualActions: model.contextualActions,
+                    transportBarActions: model.transportBarActions,
+                    behavior: .live(model, extras: extras, recordings: recordings),
+                    overlay: LiveVideoOverlay(model: model, standIn: model.controller.player == nil)
+                )
                     .disabled(!model.videoTakesInput || previewPanel != nil)
             }
             if let previewPanel, model.overlay == nil {
@@ -248,87 +253,33 @@ private struct LiveVideoOverlay: View {
     }
 }
 
-/// AVKit retains its familiar transport, but seeking and file skips are disabled.
-private struct LiveSystemPlayer: UIViewControllerRepresentable {
-    let model: TVLivePlayerModel
-    let extras: LiveExtrasStore
-    let recordings: LiveRecordingsStore
-    let player: AVPlayer
-    let contextualActions: [TVLivePlayerAction]
-    let transportBarActions: [TVLivePlayerAction]
-    func makeCoordinator() -> Coordinator { Coordinator(model: model) }
-
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let controller = AVPlayerViewController()
-        controller.player = player
-        controller.delegate = context.coordinator
-        controller.requiresLinearPlayback = true
-        controller.allowedSubtitleOptionLanguages = []
-        controller.customInfoViewControllers = LivePanel.allCases.map { LiveOptionsController(model: model, panel: $0, extras: extras, recordings: recordings) }
-        context.coordinator.installOverlay(in: controller, standIn: model.controller.player == nil)
-        context.coordinator.updateActions(in: controller, contextual: contextualActions, transport: transportBarActions)
-        model.pictureInPicturePossibleChanged(controller.allowsPictureInPicturePlayback && AVPictureInPictureController.isPictureInPictureSupported())
-        return controller
-    }
-    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
-        if controller.player !== player { controller.player = player }
-        context.coordinator.updateActions(in: controller, contextual: contextualActions, transport: transportBarActions)
-    }
-    static func dismantleUIViewController(_ controller: AVPlayerViewController, coordinator: Coordinator) {
-        controller.player = nil
-    }
-
-    @MainActor final class Coordinator: NSObject, @MainActor AVPlayerViewControllerDelegate {
-        let model: TVLivePlayerModel
-        private var overlayHost: UIViewController?
-        private var contextual: [TVLivePlayerAction] = []
-        private var transport: [TVLivePlayerAction] = []
-        init(model: TVLivePlayerModel) { self.model = model }
-        func installOverlay(in controller: AVPlayerViewController, standIn: Bool) {
-            guard let container = controller.contentOverlayView else { return }
-            let host = UIHostingController(rootView: LiveVideoOverlay(model: model, standIn: standIn))
-            host.view.backgroundColor = .clear
-            host.view.isUserInteractionEnabled = false
-            host.view.frame = container.bounds
-            host.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            container.addSubview(host.view)
-            overlayHost = host
-        }
-        func updateActions(in controller: AVPlayerViewController, contextual newContextual: [TVLivePlayerAction], transport newTransport: [TVLivePlayerAction]) {
-            if contextual != newContextual {
-                contextual = newContextual
-                controller.contextualActions = contextual.map(action)
+/// Live TV on the shared ``SystemPlayer``: AVKit keeps its familiar
+/// transport, but seeking and file skips are off; Ch−, Ch+, Go live and Stop
+/// are its buttons, Channels and Quality its tabs, and picture in picture stays on.
+private extension SystemPlayerBehavior where Action == TVLivePlayerAction {
+    @MainActor static func live(_ model: TVLivePlayerModel, extras: LiveExtrasStore, recordings: LiveRecordingsStore) -> Self {
+        Self(
+            linear: true,
+            pictureInPicture: PictureInPicture(
+                possible: { model.pictureInPicturePossibleChanged($0) },
+                changed: { model.pictureInPictureChanged(active: $0, appActive: $1) },
+                canRestore: { model.controller.player?.currentItem != nil }
+            ),
+            infoTabs: { LivePanel.allCases.map { LiveOptionsController(model: model, panel: $0, extras: extras, recordings: recordings) } },
+            uiAction: { item in
+                let result = UIAction(title: item.title, image: UIImage(systemName: item.systemImage), identifier: .init("media.watchmy.live.\(item.kind.rawValue)")) { [weak model] _ in
+                    model?.perform(item.kind)
+                }
+                result.accessibilityLabel = item.accessibilityLabel
+                return result
+            },
+            transportBarChanged: { model.transportBarChanged(visible: $0) },
+            // Nothing moves: a press on the bar counts as input.
+            seek: { old, _ in
+                model.controller.noteUserInput()
+                return old
             }
-            if transport != newTransport {
-                transport = newTransport
-                controller.transportBarCustomMenuItems = transport.map(action)
-            }
-        }
-        private func action(_ item: TVLivePlayerAction) -> UIAction {
-            let result = UIAction(title: item.title, image: UIImage(systemName: item.systemImage), identifier: .init("media.watchmy.live.\(item.kind.rawValue)")) { [weak model] _ in model?.perform(item.kind) }
-            result.accessibilityLabel = item.accessibilityLabel
-            return result
-        }
-        func playerViewController(_ playerViewController: AVPlayerViewController, willTransitionToVisibilityOfTransportBar visible: Bool, with coordinator: any AVPlayerViewControllerAnimationCoordinator) {
-            model.transportBarChanged(visible: visible)
-        }
-        func playerViewController(_ playerViewController: AVPlayerViewController, timeToSeekAfterUserNavigatedFrom oldTime: CMTime, to targetTime: CMTime) -> CMTime {
-            model.controller.noteUserInput()
-            return oldTime
-        }
-        func playerViewControllerShouldAutomaticallyDismissAtPictureInPictureStart(_ playerViewController: AVPlayerViewController) -> Bool { false }
-        func playerViewControllerWillStartPictureInPicture(_ playerViewController: AVPlayerViewController) {
-            model.pictureInPictureChanged(active: true, appActive: UIApplication.shared.applicationState == .active)
-        }
-        func playerViewControllerDidStopPictureInPicture(_ playerViewController: AVPlayerViewController) {
-            model.pictureInPictureChanged(active: false, appActive: UIApplication.shared.applicationState == .active)
-        }
-        func playerViewController(_ playerViewController: AVPlayerViewController, failedToStartPictureInPictureWithError error: any Error) {
-            model.pictureInPictureChanged(active: false, appActive: UIApplication.shared.applicationState == .active)
-        }
-        func playerViewController(_ playerViewController: AVPlayerViewController, restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
-            completionHandler(model.controller.player?.currentItem != nil)
-        }
+        )
     }
 }
 

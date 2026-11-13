@@ -63,10 +63,10 @@ private struct PlayerContent: View {
         ZStack {
             if model.showsVideo {
                 SystemPlayer(
-                    model: model,
                     player: model.controller.player ?? standIn,
                     contextualActions: model.contextualActions,
                     transportBarActions: model.transportBarActions,
+                    behavior: .film(model),
                     overlay: VideoOverlay(
                         model: model,
                         standIn: model.controller.player == nil,
