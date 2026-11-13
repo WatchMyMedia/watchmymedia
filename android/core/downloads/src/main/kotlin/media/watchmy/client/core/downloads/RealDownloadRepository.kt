@@ -107,6 +107,7 @@ internal class RealDownloadRepository(
     init {
         engine.setWifiOnly(store.value.wifiOnly)
         engine.listen(::onEngineChange)
+        settleCompleted()
         gateway.onSessionChange { scope.launch { onSessionChange() } }
         gateway.beforeSignOut { reportAllRemoved() }
         scope.launch { onSessionChange() }
@@ -229,6 +230,8 @@ internal class RealDownloadRepository(
 
     private fun onEngineChange(changed: EngineDownload?, failure: Exception?) {
         engineChanges.value = engineChanges.value + 1
+        // Several at once, as when the engine has read its index at start.
+        if (changed == null) settleCompleted()
         if (changed != null && !isPart(changed.id)) {
             val rec = store.record(changed.id)
             when {
@@ -251,6 +254,18 @@ internal class RealDownloadRepository(
                 }
             }
         }
+    }
+
+    /**
+     * Downloads the engine finished with no one to hear it: the process
+     * ended between the last bytes and the record. They are done now, with
+     * the notice and the replaced copy removed, as at the moment they finished.
+     */
+    private fun settleCompleted() {
+        val engineDownloads = engine.downloads()
+        store.value.records
+            .filter { it.completedAtMs == null && engineDownloads[it.id]?.state == EngineDownload.State.Completed }
+            .forEach(::completed)
     }
 
     private fun completed(rec: StoredRecord) {
