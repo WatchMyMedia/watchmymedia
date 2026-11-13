@@ -621,6 +621,22 @@ installed SDK. Keep the server computer awake for future recordings. Simulator
 and fictional broadcasts do not certify a physical tuner, remote, AirPlay,
 Picture in Picture or real-broadcast ad detection.
 
+## Keyboard, pointer, quick actions and coming back
+
+What the iPhone and iPad apps take from the platform without a screen of
+their own (PLAN-APPLE-REVIEW.md §6.3):
+
+- **A pointer on iPad.** Cards (`CardButtonStyle`) lift and Search's and
+  Settings' rows highlight under the pointer, as the system draws it.
+- **Coming back to where you were** (`App/Shell/PlaceKeeping.swift`,
+  `SavedPlace` in the Kit): the tab and each tab's pages are saved per
+  account and server as the app goes to the background and restored once a
+  launch; never the player or Settings, and a page a later version added
+  ends its tab's pages there. A launch with `-open` or `-tab` goes where it
+  says; on the fakes nothing is kept unless `-fakesRestorePlace` is given.
+- **Recent searches** are kept between launches per account and server
+  (`RecentSearches`); they show on iPad, as before.
+
 ## Release builds, privacy and measuring
 
 **Release builds.** `make apple-build-release` and `make apple-tv-build-release`

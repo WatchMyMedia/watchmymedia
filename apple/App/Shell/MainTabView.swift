@@ -73,6 +73,7 @@ struct MainTabView: View {
             .presentationBackground(Palette.ground)
             .interactiveDismissDisabled(flow.serverSwitch != nil)
         }
+        .modifier(TabShellKeys())
         // A note left by a page that has gone ("Deleted").
         .messageToast(Binding(get: { navigator.toast }, set: { navigator.toast = $0 }))
         .fullScreenCover(isPresented: Binding(get: { cast.remotePresented }, set: { cast.remotePresented = $0 }), onDismiss: continueOnDevice) { CastRemoteScreen() }
@@ -118,6 +119,23 @@ struct MainTabView: View {
         case .liveSearch: LiveListingsSearchScreen()
         case .mediaList(let id): MediaListScreen(id: id)
         }
+    }
+}
+
+/// What the tabs do besides showing: keeping where the person was for when
+/// the system evicts the app (PLAN-APPLE-REVIEW.md §6.3).
+private struct TabShellKeys: ViewModifier {
+    @Environment(Navigator.self) private var navigator
+    @Environment(AppFlow.self) private var flow
+    @Environment(AppServices.self) private var services
+    @Environment(\.scenePhase) private var scenePhase
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { PlaceKeeping.restoreOnce(navigator, services: services) }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background, flow.serverSwitch == nil { PlaceKeeping.save(navigator, services: services) }
+            }
     }
 }
 

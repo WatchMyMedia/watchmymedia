@@ -37,7 +37,7 @@ public enum AppTab: String, CaseIterable, Hashable, Sendable {
 }
 
 /// A screen pushed onto a tab's stack.
-public enum Route: Hashable, Sendable {
+public enum Route: Hashable, Sendable, Codable {
     /// A show's page (PLAN-SHOW-PAGE.md) with its up-next episode on top, or
     /// on `season` with that season's first unfinished one. With `episode`
     /// it is pushed as ``episode(showID:season:id:)``.
