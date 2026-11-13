@@ -66,6 +66,38 @@ struct PreferencesRepositoryTests {
         #expect(prefs.playback.skipMode(.intro) == .auto)
     }
 
+    /// A load asked for while a change is on its way leaves the preferences
+    /// to the change's reply, also when it waits its turn behind another load
+    /// and is sent only after the change was answered.
+    @Test func aLoadAskedForDuringAChangeLeavesItToTheChangeEvenAfterWaitingItsTurn() async throws {
+        try await signIn()
+        let loads = Mutex(0)
+        let firstLoad = ReplyGate()
+        let saved = ReplyGate()
+        h.server.respondAsync { request in
+            if request.httpMethod == "PUT" {
+                await saved.wait()
+                return (200, Data(#"{"skip":{"intro":"auto"},"autoplayNext":true}"#.utf8))
+            }
+            guard request.url?.path == "/api/me/preferences" else { return (200, Data(Fixtures.preferences.utf8)) }
+            // Every load reads the preferences from before the change.
+            if loads.withLock({ $0 += 1; return $0 }) == 1 { await firstLoad.wait() }
+            return (200, Data(Fixtures.preferences.utf8))
+        }
+        let loading = Task { try await prefs.refresh() }
+        #expect(await eventually { loads.withLock { $0 } == 1 })
+        let saving = Task { try await prefs.setSkip(.intro, mode: .auto) }
+        #expect(await eventually { prefs.playback.skipMode(.intro) == .auto })
+        let other = Task { try await prefs.refresh() }
+        for _ in 0..<3 { await Task.yield() }
+        await saved.release()
+        try await saving.value
+        await firstLoad.release()
+        try await loading.value
+        try await other.value
+        #expect(prefs.playback.skipMode(.intro) == .auto)
+    }
+
     @Test func signingInLoadsThePreferences() async throws {
         h.router.always("GET /api/me/preferences", .json(#"{"skip":{"intro":"auto"},"autoplayNext":false}"#))
         try await h.signIn()

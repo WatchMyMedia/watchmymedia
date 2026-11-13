@@ -38,20 +38,24 @@ final class RealPreferencesRepository: PreferencesRepository {
     }
 
     func refresh() async throws {
+        // A change on its way when the load is asked for keeps the last word,
+        // as it does for one still on its way when the load is sent: waiting
+        // its turn below must not turn this into a load that undoes it.
+        let changing = !unanswered.isEmpty
         let prior = loadTail
         let loading = Task { @MainActor in
             await prior?.value
             try Task.checkCancellation()
-            try await self.load()
+            try await self.load(changing: changing)
         }
         loadTail = Task { _ = await loading.result }
         // The caller giving up ends its own load, as it did when the request was the caller's.
         try await withTaskCancellationHandler { try await loading.value } onCancel: { loading.cancel() }
     }
 
-    private func load() async throws {
+    private func load(changing: Bool) async throws {
         let mine: Int?
-        if unanswered.isEmpty {
+        if !changing, unanswered.isEmpty {
             generation += 1
             mine = generation
         } else {
