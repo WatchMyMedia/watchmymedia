@@ -14,13 +14,30 @@ import WMMModel
 /// and one from before the link named its server opens the guide
 /// (``DeepLink/opening(_:signedInServer:)``). Permission is asked at the
 /// first Remind me, after the app's own explainer; Not now keeps the
-/// reminder on the server.
+/// reminder on the server. The notification offers Watch (as a tap) and
+/// Remind again, which notifies once more five minutes later
+/// (PLAN-APPLE-REVIEW.md §6.3).
 @MainActor @Observable
 final class LiveReminderNotifier: NSObject, UNUserNotificationCenterDelegate {
     static let shared = LiveReminderNotifier()
 
     /// Every request this app schedules starts so; others are left alone.
     nonisolated static let prefix = "live-reminder-"
+    /// A Remind again: kept through rescheduling while its server is the one signed in.
+    nonisolated static let againPrefix = "live-reminder-again-"
+    nonisolated static let category = "live-reminder"
+    nonisolated static let watchAction = "watch"
+    nonisolated static let remindAgainAction = "remind-again"
+    nonisolated static let remindAgainSeconds: TimeInterval = 5 * 60
+
+    override init() {
+        super.init()
+        let watch = UNNotificationAction(identifier: Self.watchAction, title: "Watch", options: [.foreground])
+        let again = UNNotificationAction(identifier: Self.remindAgainAction, title: "Remind again", options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([
+            UNNotificationCategory(identifier: Self.category, actions: [watch, again], intentIdentifiers: [])
+        ])
+    }
 
     /// What iOS last said; nil until asked.
     private(set) var status: UNAuthorizationStatus?
@@ -60,6 +77,11 @@ final class LiveReminderNotifier: NSObject, UNUserNotificationCenterDelegate {
         var keep: Set<String> = []
         var stale: [String] = []
         for request in pendingRequests where request.identifier.hasPrefix(Self.prefix) {
+            if request.identifier.hasPrefix(Self.againPrefix) {
+                // Asked for on this sign-in: it stays; another server's or a signed-out one goes.
+                if serverID == nil || request.content.userInfo["serverID"] as? String != serverID { stale.append(request.identifier) }
+                continue
+            }
             if let alert = wanted[request.identifier], Self.matches(request, alert),
                request.content.userInfo["serverID"] as? String == serverID { keep.insert(request.identifier) }
             else { stale.append(request.identifier) }
@@ -71,6 +93,7 @@ final class LiveReminderNotifier: NSObject, UNUserNotificationCenterDelegate {
             content.body = alert.body
             content.sound = .default
             content.threadIdentifier = "live-tv-reminders"
+            content.categoryIdentifier = Self.category
             var info: [String: String] = [:]
             if let channelID = alert.reminder.channelID { info["channelID"] = channelID }
             if let serverID { info["serverID"] = serverID }
@@ -84,7 +107,9 @@ final class LiveReminderNotifier: NSObject, UNUserNotificationCenterDelegate {
 
     private static func matches(_ request: UNNotificationRequest, _ alert: LiveReminderAlert) -> Bool {
         guard let trigger = request.trigger as? UNCalendarNotificationTrigger, let date = trigger.nextTriggerDate() else { return false }
+        // One scheduled before the notification had its actions is scheduled again with them.
         return abs(date.timeIntervalSince(alert.date)) < 1 && request.content.title == alert.title && request.content.body == alert.body
+            && request.content.categoryIdentifier == category
     }
 
     // MARK: UNUserNotificationCenterDelegate
@@ -94,11 +119,20 @@ final class LiveReminderNotifier: NSObject, UNUserNotificationCenterDelegate {
         notification.request.identifier.hasPrefix(Self.prefix) ? [.banner, .list, .sound] : []
     }
 
-    /// A tap opens the channel in the player.
+    /// A tap or Watch opens the channel in the player; Remind again notifies once more in five minutes.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        guard response.notification.request.identifier.hasPrefix(Self.prefix),
-              response.actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
-        let info = response.notification.request.content.userInfo
+        let request = response.notification.request
+        guard request.identifier.hasPrefix(Self.prefix) else { return }
+        if response.actionIdentifier == Self.remindAgainAction {
+            let again = UNNotificationRequest(
+                identifier: Self.againPrefix + UUID().uuidString, content: request.content,
+                trigger: UNTimeIntervalNotificationTrigger(timeInterval: Self.remindAgainSeconds, repeats: false)
+            )
+            try? await center.add(again)
+            return
+        }
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier || response.actionIdentifier == Self.watchAction else { return }
+        let info = request.content.userInfo
         let channelID = info["channelID"] as? String
         let serverID = info["serverID"] as? String
         await MainActor.run {

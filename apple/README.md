@@ -652,6 +652,8 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
   says; on the fakes nothing is kept unless `-fakesRestorePlace` is given.
 - **Recent searches** are kept between launches per account and server
   (`RecentSearches`); they show on iPad, as before.
+- **A Live TV reminder's notification** offers Watch and Remind again,
+  which notifies once more five minutes later.
 - **Text size.** `PrimaryButtonStyle`, `GhostButtonStyle` and `Chip` scale
   their text and height with Dynamic Type and look as before at the default
   size (§2.8); `UITests/TextSizeTests.swift` runs a movie's page and the
