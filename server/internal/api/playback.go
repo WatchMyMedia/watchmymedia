@@ -95,7 +95,7 @@ func registerPlayback(h huma.API, r *chi.Mux, deps Deps) {
 		Description: "Given the client's capability profile, returns the cheapest playback mode that works: direct play of the original file, an HLS remux, an audio-only transcode, or a full transcode. HLS modes start an ffmpeg session; a new request that sends back the returned playId replaces that play's session (used for seeking), while other people watching the same file keep theirs.",
 		Tags:        []string{"playback"},
 	}, func(ctx context.Context, in *PlaybackInput) (*PlaybackOutput, error) {
-		return startFilePlayback(ctx, deps, in)
+		return withMediaToken(ctx, deps)(startFilePlayback(ctx, deps, in))
 	})
 
 	huma.Register(h, huma.Operation{
@@ -182,6 +182,30 @@ func registerPlayback(h huma.API, r *chi.Mux, deps Deps) {
 	r.Head(Prefix+"/files/{id}/stream", streamFile(deps))
 	r.Get(Prefix+"/files/{id}/subtitles/{track}", serveSubtitle(deps))
 	r.Get(Prefix+"/playback/{session}/{name}", serveSegment(deps))
+}
+
+// withMediaToken puts on a decision the media token createMediaToken would
+// give the same request (API level 28), so a player that sends
+// ?access_token= can start without asking for one. Only a request signed in
+// with a session gets one, as from createMediaToken: a cast token's
+// receiver uses its cast token. When no token can be made the decision goes
+// without, and the client asks createMediaToken as before.
+func withMediaToken(ctx context.Context, deps Deps) func(*PlaybackOutput, error) (*PlaybackOutput, error) {
+	return func(out *PlaybackOutput, err error) (*PlaybackOutput, error) {
+		if err != nil || out == nil || deps.Auth == nil {
+			return out, err
+		}
+		session, ok := auth.SessionTokenFrom(ctx)
+		if !ok {
+			return out, nil
+		}
+		if mt, err := deps.Auth.MediaTokenFor(ctx, session); err == nil {
+			out.Body.MediaToken = &mt
+		} else {
+			deps.Log.Debug("no media token for the decision", "err", err)
+		}
+		return out, nil
+	}
 }
 
 // addMarkers puts the file's skippable segments on a decision, with where

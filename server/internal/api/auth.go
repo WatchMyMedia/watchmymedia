@@ -153,11 +153,8 @@ type CreateUserOutput struct {
 	Body   auth.User
 }
 
-type MediaToken struct {
-	Token     string    `json:"token" doc:"Append as ?access_token= to media URLs (streams, HLS playlists, subtitles, images)."`
-	ExpiresAt time.Time `json:"expiresAt" doc:"Request a new token (and new playback URLs) after this."`
-	Param     string    `json:"param" doc:"The query parameter name, access_token."`
-}
+// MediaToken is defined in auth, so a playback decision can carry one too.
+type MediaToken = auth.MediaToken
 
 type MediaTokenOutput struct{ Body MediaToken }
 
@@ -508,11 +505,11 @@ func registerAuth(h huma.API, deps Deps) {
 		if !ok {
 			return nil, huma.Error401Unauthorized("sign in with a session to get a media token")
 		}
-		tok, exp, err := deps.Auth.IssueMediaToken(ctx, session)
+		mt, err := deps.Auth.MediaTokenFor(ctx, session)
 		if err != nil {
 			return nil, huma.Error401Unauthorized("sign in required")
 		}
-		return &MediaTokenOutput{Body: MediaToken{Token: tok, ExpiresAt: exp.UTC(), Param: auth.QueryParam}}, nil
+		return &MediaTokenOutput{Body: mt}, nil
 	})
 
 	huma.Register(h, huma.Operation{

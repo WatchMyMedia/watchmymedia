@@ -48,7 +48,7 @@ func registerRecordingPlayback(h huma.API, deps Deps) {
 	op := func(id, method, path, summary string) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: Prefix + path, Summary: summary, Tags: []string{"live-tv"}}
 	}
-	huma.Register(h, op("startLiveTVRecordingPlayback", "POST", "/live-tv/recordings/{id}/playback", "Watch a recording from the start, including while it grows"), func(ctx context.Context, in *LiveTVRecordingPlaybackInput) (*PlaybackOutput, error) {
+	start := func(ctx context.Context, in *LiveTVRecordingPlaybackInput) (*PlaybackOutput, error) {
 		if err := viewer(ctx); err != nil {
 			return nil, err
 		}
@@ -166,6 +166,9 @@ func registerRecordingPlayback(h huma.API, deps Deps) {
 		// supported; never advertise unserved track URLs.
 		d.Subtitles = []playback.SubtitleTrack{}
 		return &PlaybackOutput{Body: d}, nil
+	}
+	huma.Register(h, op("startLiveTVRecordingPlayback", "POST", "/live-tv/recordings/{id}/playback", "Watch a recording from the start, including while it grows"), func(ctx context.Context, in *LiveTVRecordingPlaybackInput) (*PlaybackOutput, error) {
+		return withMediaToken(ctx, deps)(start(ctx, in))
 	})
 	huma.Register(h, op("reportLiveTVRecordingProgress", "PUT", "/live-tv/recordings/{id}/progress", "Keep a viewer’s recording position as it grows and joins the library"), func(ctx context.Context, in *LiveTVRecordingProgressInput) (*ProgressOutput, error) {
 		if err := viewer(ctx); err != nil {
