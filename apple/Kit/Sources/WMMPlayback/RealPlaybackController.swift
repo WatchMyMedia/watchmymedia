@@ -849,20 +849,6 @@ public final class RealPlaybackController: PlaybackController {
         return codec
     }
 
-    func restorePrevious(_ v: Viewing, _ pending: Viewing.PendingSwitch, showFailureNote: Bool = true) {
-        v.pendingSwitch = nil
-        v.awaitingFrameGeneration = nil
-        v.acceptedGeneration = nil
-        v.failedGeneration = pending.generation
-        v.pendingPositionMs = pending.atMs
-        v.stepMessage = nil
-        apply(v, pending.previous, requestedStartMs: pending.atMs)
-        if showFailureNote {
-            showNote(v, "Still playing at \(pending.previous.autoStep?.shortLabel ?? "Original"). Quality will retry later.")
-        }
-        refresh(0)
-    }
-
     // MARK: - The tick
 
     func startTicker() {
@@ -1053,7 +1039,7 @@ public final class RealPlaybackController: PlaybackController {
         }
     }
 
-    // MARK: - Heartbeats
+    // MARK: - Automatic's step changes
 
     /// Automatic's negotiated step change: the same play again here, still
     /// at Automatic. The saved default quality stays as it is.
@@ -1073,12 +1059,6 @@ public final class RealPlaybackController: PlaybackController {
             showNote(v, reply.lowerMessage ?? "Lowered to \(step.shortLabel) for your connection.")
             reload(v, at: position(v))
         }
-    }
-
-    /// Shows `text` over the video for a few seconds; the next refresh publishes it.
-    func showNote(_ v: Viewing, _ text: String) {
-        v.qualityNote = text
-        v.qualityNoteUntil = clock.elapsedMs + qualityNoteMs
     }
 
     // MARK: - Helpers
