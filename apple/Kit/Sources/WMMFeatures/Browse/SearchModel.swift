@@ -216,15 +216,11 @@ public final class SearchModel {
     }
 
     private func mark(_ target: WatchTarget, _ watched: Bool, update: (inout SearchResults) -> Void) async {
-        do {
-            try await library.mark(target, watched: watched)
+        message = await markWatched(target, watched, in: library, drawn: {
             if var r = results {
                 update(&r)
                 results = r
             }
-            message = markedMessage(watched: watched)
-        } catch {
-            message = error.displayMessage
-        }
+        })
     }
 }

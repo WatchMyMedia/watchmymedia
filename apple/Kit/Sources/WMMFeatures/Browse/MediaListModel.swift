@@ -187,12 +187,7 @@ public final class MediaListModel {
     }
 
     public func setWatched(_ target: WatchTarget, _ watched: Bool) async {
-        do {
-            try await library.mark(target, watched: watched)
-            message = markedMessage(watched: watched)
-        } catch {
-            message = error.displayMessage
-        }
+        message = await markWatched(target, watched, in: library)
     }
 
     /// Asks the server to fetch the list again; the page follows when it has.

@@ -157,21 +157,16 @@ public final class MovieModel {
     public func setWatched(_ watched: Bool) async {
         guard !busy else { return }
         busy = true
-        do {
-            // The mark's own notice reloads the page (``run()``).
-            try await library.mark(.movie(id: movieID), watched: watched)
-            busy = false
-            message = markedMessage(watched: watched)
-        } catch let error as APIError where error.status == nil && held != nil {
+        // The mark's own notice reloads the page (``run()``).
+        let note = await markWatched(.movie(id: movieID), watched, in: library, offline: {
             // No server: the mark waits with the download, by when it was made.
-            busy = false
-            if let held { downloads?.mark(fileID: held.fileID, watched: watched) }
-            message = markedMessage(watched: watched)
+            guard let held else { return false }
+            downloads?.mark(fileID: held.fileID, watched: watched)
             if offline, let detail = self.held?.movieDetail() { state = .loaded(detail) }
-        } catch {
-            busy = false
-            message = error.displayMessage
-        }
+            return true
+        })
+        busy = false
+        message = note
     }
 
     /// The page from the download again, after a play or a mark made here with no server.

@@ -142,12 +142,7 @@ public final class HomeModel {
 
     /// The mark's own notice reloads Home, as it does every screen showing it.
     public func setWatched(_ target: WatchTarget, _ watched: Bool) async {
-        do {
-            try await library.mark(target, watched: watched)
-            message = markedMessage(watched: watched)
-        } catch {
-            message = error.displayMessage
-        }
+        message = await markWatched(target, watched, in: library)
     }
 
     /// `quiet` keeps what is on screen: a failure then is a message, not an

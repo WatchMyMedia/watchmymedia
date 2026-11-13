@@ -448,24 +448,16 @@ public final class ShowPageModel {
     private func mark(_ target: WatchTarget, _ watched: Bool) async {
         guard !busy else { return }
         busy = true
-        do {
-            // The mark's own notice reloads the page (``run()``).
-            try await library.mark(target, watched: watched)
-            busy = false
-            message = markedMessage(watched: watched)
-        } catch let error as APIError where error.status == nil && held != nil {
-            if case .episode = target, let held {
-                downloads?.mark(fileID: held.fileID, watched: watched)
-                message = markedMessage(watched: watched)
-                loadOffline()
-            } else {
-                message = error.displayMessage
-            }
-            busy = false
-        } catch {
-            busy = false
-            message = error.displayMessage
-        }
+        // The mark's own notice reloads the page (``run()``).
+        let note = await markWatched(target, watched, in: library, offline: {
+            // No server: an episode's mark waits with its download.
+            guard case .episode = target, let held else { return false }
+            downloads?.mark(fileID: held.fileID, watched: watched)
+            loadOffline()
+            return true
+        })
+        busy = false
+        message = note
     }
 
     // MARK: The episode's ⋯

@@ -748,8 +748,12 @@ brand views and the QR code in `WMMUI`. The two targets share no files.
   screen model follows them through `ScreenChanges`, which keeps listening
   while the screen is away, so coming back loads nothing unless something
   changed meanwhile or the screen is five minutes old. A mark made here
-  reloads every screen through its own notice: don't reload again after
-  `library.mark`. The server's echo of it is dropped.
+  reloads every screen through its own notice: mark through `markWatched`
+  (`WMMFeatures/Browse/MarkWatched.swift`), which may draw the mark at once
+  or keep it with a download, and never reloads after it. The server's echo
+  of it is dropped. A screen's own loads go through `LoadController`: the
+  first shows a spinner, a later quiet one keeps the screen and says why it
+  failed as a message, and the newest wins.
 - **Concurrency**: Swift 6 language mode. Repositories, models and the
   controller are `@MainActor`; network work suspends off it.
 - **Apple TV**: every page is a `TabPage` (a scroll view from the screen's

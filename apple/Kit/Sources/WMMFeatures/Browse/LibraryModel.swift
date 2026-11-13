@@ -438,24 +438,13 @@ public final class LibraryModel {
     /// A mark from a row's card; the rows and grid follow from the mark's
     /// own notice (``apply(_:)``), as every screen showing it does.
     public func setWatched(_ target: WatchTarget, _ watched: Bool) async {
-        do {
-            try await library.mark(target, watched: watched)
-            message = markedMessage(watched: watched)
-        } catch {
-            message = error.displayMessage
-        }
+        message = await markWatched(target, watched, in: library)
     }
 
     /// A mark from a poster: drawn at once; its notice brings the rows.
     public func setWatched(_ item: BrowseItem, _ watched: Bool) async {
         guard let target = item.watchTarget else { return }
-        do {
-            try await library.mark(target, watched: watched)
-            patch([item.id: watched])
-            message = markedMessage(watched: watched)
-        } catch {
-            message = error.displayMessage
-        }
+        message = await markWatched(target, watched, in: library, drawn: { patch([item.id: watched]) })
     }
 
     // MARK: Internals
