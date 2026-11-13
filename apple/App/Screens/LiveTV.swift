@@ -220,10 +220,11 @@ struct LiveOnNowCard: View {
     var width: CGFloat = 220
     /// The gold ring of the iPad's leading card (PLAN-HOME.md §7.2).
     var leading = false
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            LivePictureView(programme: programme, channel: channel)
+            LivePictureView(programme: programme, channel: channel, maxPixel: width * displayScale)
                 .frame(width: width, height: (width * 9 / 16).rounded())
                 .overlay(alignment: .topLeading) { LiveChannelChip(channel: channel).padding(8) }
                 .overlay(alignment: .topTrailing) { LiveBadge().padding(8) }

@@ -71,12 +71,14 @@ struct WideCard<Overlay: View>: View {
     /// The gold ring of the iPad's leading card (PLAN-HOME.md §7.2).
     var leading = false
     @ViewBuilder var overlay: () -> Overlay
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Color.clear
                 .frame(width: width, height: (width * 9 / 16).rounded())
-                .overlay { Artwork(url: imageURL, seed: seed) }
+                // As wide as it is drawn: 220 points is 660 pixels on a 3× iPhone.
+                .overlay { Artwork(url: imageURL, seed: seed, maxPixel: width * displayScale) }
                 .overlay { ZStack { overlay() } }
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .leadingRing(leading, cornerRadius: 10)

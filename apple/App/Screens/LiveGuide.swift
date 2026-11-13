@@ -737,7 +737,7 @@ struct LiveProgrammeDetails: View {
                         }
                     }
                     .frame(minHeight: 44)
-                    LivePictureView(programme: programme, channel: channel, wide: wide, maxPixel: 900)
+                    LivePictureView(programme: programme, channel: channel, wide: wide, maxPixel: 1200)
                         .aspectRatio(16 / 9, contentMode: .fit)
                         .frame(maxWidth: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 12))

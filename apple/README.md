@@ -641,6 +641,10 @@ brand views and the QR code in `WMMUI`. The two targets share no files.
 - **Images**: `Artwork(url: services.library.imageURL(path, size: .w342), seed: title)`;
   the loader in the environment adds the sign-in, and the gradient shows
   until the image arrives. Posters `w342`, backdrops `w1280`, stills `w300`.
+  `maxPixel` is the longer side in pixels as drawn (points times the screen's
+  scale); `ImagePipeline` fetches and decodes off the main actor, shares a
+  load under way, and keeps decodes by address and size step in a byte budget
+  (128 MB, 192 MB on Apple TV), so a small decode never stands in for a large one.
 - **Look**: dark only. `Palette` for colours (gold for progress, selection
   and badges; burgundy for primary fills; orange for warnings), the system
   font with Dynamic Type, 44 pt touch targets, real `Button`s with
