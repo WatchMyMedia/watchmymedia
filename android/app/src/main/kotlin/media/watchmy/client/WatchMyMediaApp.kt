@@ -10,17 +10,13 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.launch
-import media.watchmy.client.model.LivePersonalChange
 import media.watchmy.client.reminders.LiveReminderAlarms
+import media.watchmy.client.reminders.ReminderFollower
 import media.watchmy.client.core.cast.CastConnectLive
 import media.watchmy.client.core.cast.CastConnectPlay
 import media.watchmy.client.core.cast.CastConnectReceiver
@@ -74,8 +70,8 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
     var castConnect: CastConnectReceiver? = null
         private set
 
-    /** Live TV reminders' alarms, on phones and tablets with the real data layer; null on TVs (a banner) and the fakes. */
-    private var reminderAlarms: LiveReminderAlarms? = null
+    /** Live TV reminders, on phones and tablets with the real data layer; null on TVs (a banner) and the fakes. */
+    private var reminders: ReminderFollower? = null
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -129,59 +125,19 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
         return RealAppServices(data, playback, cast, receiver, library = playback.screensLibrary(library), downloads = downloads?.repository ?: DownloadRepository.Unavailable, seekThumbnails = CoilSeekThumbnails(this), livePlayback = playback.live(data.livePlaybackGateway))
     }
 
-    /**
-     * Live TV reminders on a phone or tablet (PLAN-LIVE-TV-GUIDE.md §6.5):
-     * every read or change of the list sets the alarms again, and a sign-out
-     * or another account cancels them. The list is read at start and on each
-     * return to the foreground, and again on the server's
-     * live.reminders.changed while the app is in the foreground; after a
-     * reboot, LiveReminderBoot. Servers below API level 15 have no list.
-     */
+    /** Live TV reminders' alarms on a phone or tablet ([ReminderFollower]). */
     private fun followReminders(data: DataServices, account: () -> String?) {
         val alarms = LiveReminderAlarms(this).also {
             it.createChannel()
             // The boot receiver follows the alarms; a version before it was always on.
             it.matchBootReceiver()
-            reminderAlarms = it
         }
-        var logos: Pair<Long, Map<String, String>>? = null
-        var scheduledFor: String? = null
-        appScope.launch {
-            combine(data.auth.user, data.servers.current, data.live.reminders) { _, _, reminders -> reminders }.collect { reminders ->
-                val who = account()
-                if (who == null || who != scheduledFor && reminders == null) {
-                    if (scheduledFor != null || who == null) alarms.cancelAll()
-                    scheduledFor = null
-                }
-                if (who == null || reminders == null) return@collect
-                val now = System.currentTimeMillis()
-                val known = logos?.takeIf { it.first > now - LOGOS_FOR_MS }?.second ?: LiveReminderAlarms.logos(data.live).also { logos = now to it }
-                alarms.schedule(reminders, who, known)
-                scheduledFor = who
-            }
-        }
-        val process = ProcessLifecycleOwner.get()
-        appScope.launch {
-            process.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch { syncReminders() }
-                data.live.personalChanges.collect { if (it == LivePersonalChange.Reminders) syncReminders() }
-            }
-        }
+        val session = combine(data.auth.user, data.servers.current) { user, server -> user to server }
+        reminders = ReminderFollower(alarms, data.live, session, account, appScope).also { it.start(ProcessLifecycleOwner.get().lifecycle) }
     }
 
-    /** Reads the reminders again, which sets the alarms; false when the server couldn't be asked. */
-    suspend fun syncReminders(): Boolean {
-        val live = data?.live ?: return true
-        if (reminderAlarms == null) return true
-        return try {
-            live.refreshReminders()
-            true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            false
-        }
-    }
+    /** Reads the reminders again, which sets the alarms; false when the server couldn't be asked (LiveReminderSync). */
+    suspend fun syncReminders(): Boolean = reminders?.sync() ?: true
 
     /** Plays cast to this TV: from the caster's server, as the caster, through this TV's own players. */
     private fun castConnect(data: DataServices, playback: PlaybackEngine): CastConnectReceiver {
@@ -224,9 +180,6 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
             .crossfade(CROSSFADE_MS)
             .build()
 }
-
-/** The channels' logos for reminders are asked for again after this. */
-private const val LOGOS_FOR_MS = 10 * 60_000L
 
 /** How long artwork takes to fade in. */
 private const val CROSSFADE_MS = 150
