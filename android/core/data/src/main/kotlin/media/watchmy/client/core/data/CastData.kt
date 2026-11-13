@@ -103,10 +103,13 @@ internal fun castImageUrl(baseUrl: String, token: String, path: String?, size: I
 }
 
 /** A sender's server calls: whether the server in use can cast, and a token for the TV. */
-internal class RealCastGateway(private val store: LocalStore, private val http: Http) : CastGateway {
-    override suspend fun liveAutomaticAvailable(): Boolean =
-        http.features().liveAutomatic &&
-            http.signedIn { base, client -> LiveTvApi(base, client).getLiveTVCapabilities() }.automatic == true
+internal class RealCastGateway(
+    private val store: LocalStore,
+    private val http: Http,
+    /** Live TV's capabilities as the screens have them ([RealLiveRepository.capabilities]). */
+    private val liveCapabilities: suspend () -> media.watchmy.client.model.LiveCapabilities,
+) : CastGateway {
+    override suspend fun liveAutomaticAvailable(): Boolean = http.features().liveAutomatic && liveCapabilities().automatic
 
     override suspend fun castServer(): CastServer? {
         val base = store.session()?.server?.baseUrl ?: return null

@@ -20,6 +20,11 @@ class HttpCacheTest {
     @After
     fun tearDown() = h.close()
 
+    /** Past the library list's memo ([SessionMemo]), so the next call asks the server. */
+    private fun later() {
+        h.now += SessionMemo.TTL_MS
+    }
+
     private fun tagged(body: String, tag: String, cacheControl: String = "private, no-cache") =
         json(body).setHeader("ETag", tag).setHeader("Cache-Control", cacheControl)
 
@@ -36,6 +41,7 @@ class HttpCacheTest {
         h.server.on("GET /api/libraries", tagged(libraries, "W/\"a\""), notModified("W/\"a\""))
         assertEquals("Movies", h.services.library.libraries().first().name)
         assertNull(h.server.last("GET /api/libraries").getHeader("If-None-Match"))
+        later()
         assertEquals("Movies", h.services.library.libraries().first().name)
         val again = h.server.last("GET /api/libraries")
         assertEquals("W/\"a\"", again.getHeader("If-None-Match"))
@@ -58,6 +64,7 @@ class HttpCacheTest {
         assertEquals("W/\"viewer\"", asked.getHeader("If-None-Match"))
 
         // A reply that calls itself fresh for an hour is still asked again for the next account.
+        later()
         h.server.on("GET /api/libraries", tagged(libraries.replace("\"Movies\"", "\"Fresh\""), "W/\"fresh\"", "private, max-age=3600"))
         assertEquals("Fresh", h.services.library.libraries().first().name)
         signInAs("viewer", 2, "tok-viewer")
@@ -72,6 +79,7 @@ class HttpCacheTest {
         h.signIn()
         h.server.on("GET /api/libraries", json(libraries).setHeader("Cache-Control", "private, max-age=3600"), json(libraries.replace("\"Movies\"", "\"Later\"")))
         h.services.library.libraries()
+        later()
         assertEquals("Later", h.services.library.libraries().first().name)
         assertNull(h.server.last("GET /api/libraries").getHeader("If-None-Match"))
     }

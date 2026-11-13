@@ -135,17 +135,18 @@ class DataServices internal constructor(
 
     val servers: ServerRepository = serverRepository
     val auth: AuthRepository = authRepository
-    val library: LibraryRepository = RealLibraryRepository(store, http, events)
-    val live: LiveRepository = RealLiveRepository(http, store, scope, clock, events)
-    val livePlaybackGateway: LivePlaybackGateway = RealLivePlaybackGateway(store, http)
-    val requests: RequestRepository = RealRequestRepository(store, http, events)
+    val library: LibraryRepository = RealLibraryRepository(store, http, events, scope, clock)
+    private val liveRepository = RealLiveRepository(http, store, scope, clock, events)
+    val live: LiveRepository = liveRepository
+    val livePlaybackGateway: LivePlaybackGateway = RealLivePlaybackGateway(store, http, capabilities = liveRepository::capabilities)
+    val requests: RequestRepository = RealRequestRepository(store, http, events, scope, clock)
     val rows: RowsRepository = RealRowsRepository(http, events)
     val preferences: PreferencesRepository = preferencesRepository
     val playbackGateway: PlaybackGateway =
         RealPlaybackGateway(SignedInAccess(http), { store.deviceName.value }, { deviceId }, { RealPlaybackGateway.signedInMediaToken(http) })
 
     /** A sender's calls for casting to a TV. */
-    val castGateway: CastGateway = RealCastGateway(store, http)
+    val castGateway: CastGateway = RealCastGateway(store, http, liveRepository::capabilities)
 
     /** The offline routes, for downloads on phones and tablets (PLAN-DOWNLOADS.md). */
     val offlineGateway: OfflineGateway = RealOfflineGateway(store, http, authRepository)

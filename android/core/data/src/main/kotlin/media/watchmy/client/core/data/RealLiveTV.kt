@@ -87,10 +87,16 @@ internal class RealLiveRepository(
     private val windows = mutableMapOf<Long, Window>()
     private val lock = Any()
     private val recordingChanges = MutableSharedFlow<LivePersonalChange>(extraBufferCapacity = 1)
+
+    /** Live TV's capabilities, which change only with the admin's settings: asked again after a reconnect or a while ([SessionMemo]). */
+    private val capabilitiesMemo = SessionMemo(store, scope, clock) {
+        http.signedIn { base, client -> LiveTvApi(base, client).getLiveTVCapabilities() }.toModel(http.features())
+    }
     private val _reminders = MutableStateFlow<LiveReminders?>(null)
     override val reminders: StateFlow<LiveReminders?> = _reminders.asStateFlow()
 
     init {
+        events?.onEvent { if (it == ServerEvents.RECONNECTED) capabilitiesMemo.clear() }
         // Another server or account: its reminders and listings aren't this one's.
         scope.launch {
             store.sessionChanges.drop(1).collect {
@@ -243,7 +249,7 @@ internal class RealLiveRepository(
 
     override suspend fun capabilities(): LiveCapabilities {
         if (!http.features().liveTv) return LiveCapabilities()
-        return http.signedIn { base, client -> LiveTvApi(base, client).getLiveTVCapabilities() }.toModel(http.features())
+        return capabilitiesMemo.get()
     }
 
     override suspend fun channels(): List<LiveChannel> {
@@ -354,12 +360,14 @@ internal class RealLivePlaybackGateway(
     private val revision: Long? = null,
     /** Where media tokens come from instead of createMediaToken: a cast token's renewal (Cast Connect), which a cast token may call. */
     private val mediaTokens: (suspend () -> MediaToken)? = null,
+    /** The signed-in account's capabilities as Live TV's screens have them ([RealLiveRepository.capabilities]), so a channel change doesn't ask again. */
+    private val capabilities: (suspend () -> LiveCapabilities)? = null,
 ) : LivePlaybackGateway {
     private var automaticEnabled = false
     override fun bind(): LivePlaybackGateway {
         if (access != null) return this
         val (session, capturedRevision) = store.requestSnapshot()
-        return RealLivePlaybackGateway(store, http, http.bind(session), capturedRevision)
+        return RealLivePlaybackGateway(store, http, http.bind(session), capturedRevision, capabilities = capabilities)
     }
 
     override val isCurrent: Boolean get() = revision == null || store.revision == revision
@@ -370,7 +378,8 @@ internal class RealLivePlaybackGateway(
         if (access == null) return bind().liveCapabilities()
         requireCurrent()
         if (!access.features().liveTv) return LiveCapabilities()
-        val result = access.call { base, client -> LiveTvApi(base, client).getLiveTVCapabilities() }.toModel(access.features())
+        val result = capabilities?.invoke()?.also { requireCurrent() }
+            ?: access.call { base, client -> LiveTvApi(base, client).getLiveTVCapabilities() }.toModel(access.features())
         automaticEnabled = result.automatic
         return result
     }

@@ -212,6 +212,17 @@ internal class ServerEvents(
      */
     @Volatile private var connected: Long? = null
 
+    private val listeners = java.util.concurrent.CopyOnWriteArrayList<(event: String) -> Unit>()
+
+    /**
+     * Calls [listener] with each event's name as it arrives while the stream
+     * is connected, and with [RECONNECTED] after a gap: for what the data
+     * layer keeps ([SessionMemo]), without keeping the stream open itself.
+     */
+    fun onEvent(listener: (event: String) -> Unit) {
+        listeners += listener
+    }
+
     /** The events screens refetch for, and [RECONNECTED]. */
     @OptIn(ExperimentalCoroutinesApi::class)
     private val events: Flow<ServerEvent> = combine(store.sessionChanges, front, network.network) { revision, inFront, net ->
@@ -237,12 +248,16 @@ internal class ServerEvents(
                                     pinged = true
                                     if (connected == gate.revision) {
                                         onReconnect()
+                                        listeners.forEach { it(RECONNECTED) }
                                         emit(ServerEvent(RECONNECTED, ""))
                                     }
                                     connected = gate.revision
                                 }
                             }
-                            WATCH_CHANGED, in LIBRARY_EVENTS, in REQUEST_EVENTS, in LIVE_EVENTS, in ROW_EVENTS -> emit(e)
+                            WATCH_CHANGED, in LIBRARY_EVENTS, in REQUEST_EVENTS, in LIVE_EVENTS, in ROW_EVENTS -> {
+                                listeners.forEach { it(e.event) }
+                                emit(e)
+                            }
                         }
                     }
                 } catch (e: EventStreamException) {
@@ -326,7 +341,7 @@ internal class ServerEvents(
 
         /** How long a burst of library events gathers before pages hear of it. */
         const val COALESCE_MS = 250L
-        private val REQUEST_EVENTS = setOf("requests.changed", "problems.changed")
+        val REQUEST_EVENTS = setOf("requests.changed", "problems.changed")
         const val LIVE_FAVOURITES = "live.favourites.changed"
         const val LIVE_REMINDERS = "live.reminders.changed"
         const val LIVE_RECORDINGS = "live.recordings.changed"

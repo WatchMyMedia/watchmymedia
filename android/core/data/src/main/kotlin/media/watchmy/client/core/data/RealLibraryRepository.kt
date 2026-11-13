@@ -34,7 +34,24 @@ internal class RealLibraryRepository(
     private val store: LocalStore,
     private val http: Http,
     events: ServerEvents,
+    scope: kotlinx.coroutines.CoroutineScope,
+    clock: () -> Long,
 ) : LibraryRepository {
+    /** The library list, asked again after a scan or a change to a library, or after a while ([SessionMemo]). */
+    private val libraryList = SessionMemo(store, scope, clock) {
+        http.signedIn { base, client -> LibrariesApi(base, client).listLibraries() }.items.mapNotNull { lib ->
+            when (lib.type) {
+                ApiLibrary.Type.movie -> Library(lib.id, lib.name, LibraryType.Movie, lib.scan != null, lib.lastScannedAt, lib.lastScanError, lib.lastScanErrorAt)
+                ApiLibrary.Type.tv -> Library(lib.id, lib.name, LibraryType.Tv, lib.scan != null, lib.lastScannedAt, lib.lastScanError, lib.lastScanErrorAt)
+                ApiLibrary.Type.unknown_default_open_api -> null
+            }
+        }
+    }
+
+    init {
+        events.onEvent { if (it == ServerEvents.RECONNECTED || it in ServerEvents.LIBRARY_EVENTS) libraryList.clear() }
+    }
+
     private fun browse(base: String, client: okhttp3.Call.Factory) = BrowseApi(base, client)
 
     override suspend fun home(): HomeData = http.signedIn { base, client -> browse(base, client).getHome() }.toModel()
@@ -53,13 +70,7 @@ internal class RealLibraryRepository(
     override suspend fun continueWatching(): List<ContinueItem> =
         http.signedIn { base, client -> WatchApi(base, client).listContinueWatching() }.items.mapNotNull { it.toModel() }
 
-    override suspend fun libraries(): List<Library> = http.signedIn { base, client -> LibrariesApi(base, client).listLibraries() }.items.mapNotNull { lib ->
-        when (lib.type) {
-            ApiLibrary.Type.movie -> Library(lib.id, lib.name, LibraryType.Movie, lib.scan != null, lib.lastScannedAt, lib.lastScanError, lib.lastScanErrorAt)
-            ApiLibrary.Type.tv -> Library(lib.id, lib.name, LibraryType.Tv, lib.scan != null, lib.lastScannedAt, lib.lastScanError, lib.lastScanErrorAt)
-            ApiLibrary.Type.unknown_default_open_api -> null
-        }
-    }
+    override suspend fun libraries(): List<Library> = libraryList.get()
 
     override suspend fun items(query: ItemQuery): ItemPage {
         val list = http.signedIn { base, client ->

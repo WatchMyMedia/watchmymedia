@@ -57,7 +57,23 @@ internal class RealRequestRepository(
     private val store: LocalStore,
     private val http: Http,
     events: ServerEvents,
+    scope: kotlinx.coroutines.CoroutineScope,
+    clock: () -> Long,
 ) : RequestRepository {
+    /** What the person may do, asked again on requests.changed and problems.changed (its inbox count), after a change made here, or after a while. */
+    private val optionsMemo = SessionMemo(store, scope, clock) { loadOptions() }
+
+    init {
+        events.onEvent { if (it == ServerEvents.RECONNECTED || it in ServerEvents.REQUEST_EVENTS) optionsMemo.clear() }
+    }
+
+    /** [block], then [options] asked again: a request, decision or report changes the inbox it counts. */
+    private suspend fun <T> changing(block: suspend () -> T): T = try {
+        block()
+    } finally {
+        optionsMemo.clear()
+    }
+
     private fun features() = ServerFeatures(store.current.value?.server?.apiLevel ?: 0)
 
     private fun supported() = features().requests
@@ -66,6 +82,10 @@ internal class RealRequestRepository(
 
     override suspend fun options(): RequestOptions {
         if (!supported()) return RequestOptions.None
+        return optionsMemo.get()
+    }
+
+    private suspend fun loadOptions(): RequestOptions {
         val admin = store.user.value?.isAdmin == true
         val (reply, status) = try {
             http.signedIn { base, client ->
@@ -109,13 +129,13 @@ internal class RealRequestRepository(
             tmdbId = tmdbId,
             seasons = seasons.takeIf { type == MediaType.Tv }?.map { it.toLong() },
         )
-        val created = api { it.createRequest(body) }
+        val created = changing { api { it.createRequest(body) } }
         return CreatedRequest(created.request.toModel(), created.created)
     }
 
     override suspend fun mine(): List<MediaRequest> = if (!supported()) emptyList() else api { it.listMyRequests() }.items.map { it.toModel() }
 
-    override suspend fun cancel(requestId: Long) = api { it.cancelRequest(requestId) }
+    override suspend fun cancel(requestId: Long) = changing { api { it.cancelRequest(requestId) } }
 
     override suspend fun inbox(): Inbox {
         if (!supported()) return Inbox(emptyList(), emptyList())
@@ -124,7 +144,7 @@ internal class RealRequestRepository(
     }
 
     override suspend fun decide(requestId: Long, approve: Boolean, note: String?): MediaRequest =
-        api { it.decideRequest(requestId, DecideRequestInputBody(approve, note?.trim()?.takeIf { n -> n.isNotEmpty() && !approve }?.take(MAX_NOTE))) }.toModel()
+        changing { api { it.decideRequest(requestId, DecideRequestInputBody(approve, note?.trim()?.takeIf { n -> n.isNotEmpty() && !approve }?.take(MAX_NOTE))) } }.toModel()
 
     override suspend fun report(episode: Boolean, itemId: Long, fileId: Long?, kind: ProblemKind, note: String): Problem {
         val body = ReportProblemInputBody(
@@ -139,10 +159,10 @@ internal class RealRequestRepository(
             fileId = fileId,
             note = note.trim().take(MAX_REPORT).ifEmpty { null },
         )
-        return api { it.reportProblem(body) }.toModel() ?: throw media.watchmy.client.model.ApiException(null, "The server sent a reply this app doesn't understand.")
+        return changing { api { it.reportProblem(body) } }.toModel() ?: throw media.watchmy.client.model.ApiException(null, "The server sent a reply this app doesn't understand.")
     }
 
-    override suspend fun resolve(problemId: Long) = api { it.resolveProblem(problemId) }
+    override suspend fun resolve(problemId: Long) = changing { api { it.resolveProblem(problemId) } }
 
     override suspend fun searchMissing(showId: Long, season: Int, episodes: List<Int>) =
         api { it.searchMissingEpisodes(showId, ShowEpisodesInputBody(season.toLong(), episodes.map { e -> e.toLong() }.ifEmpty { null })) }
