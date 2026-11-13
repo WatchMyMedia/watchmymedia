@@ -37,6 +37,8 @@ public enum PlaybackAudioSession {
 @MainActor
 final class PlayerCore {
     let player: AVPlayer
+    /// Sent as `User-Agent` on the item's requests; nil leaves AVFoundation's own.
+    let userAgent: String?
     private(set) var item: AVPlayerItem?
     /// Watches for the item's first decoded frame; off the item once seen.
     private var videoOutput: AVPlayerItemVideoOutput?
@@ -44,16 +46,19 @@ final class PlayerCore {
     private(set) var frameShown = false
     private var meter = AccessLogMeter()
 
-    init(player: AVPlayer = AVPlayer()) {
+    init(player: AVPlayer = AVPlayer(), userAgent: String? = nil) {
         self.player = player
+        self.userAgent = userAgent
     }
 
-    /// A new item for `url`, to put on the player: with the MIME type, a
-    /// video output to see its first frame by, and `metadata` for the
-    /// system's player (tvOS).
+    /// A new item for `url`, to put on the player: with the MIME type and the
+    /// app's user agent on its requests, a video output to see its first
+    /// frame by, and `metadata` for the system's player (tvOS).
+    /// `AVURLAssetHTTPUserAgentKey` is public from iOS and tvOS 16.
     func makeItem(url: URL, mimeType: String? = nil, metadata: [AVMetadataItem]) -> AVPlayerItem {
         var options: [String: Any] = [:]
         if let mimeType { options[AVURLAssetOverrideMIMETypeKey] = mimeType }
+        if let userAgent { options[AVURLAssetHTTPUserAgentKey] = userAgent }
         let item = AVPlayerItem(asset: AVURLAsset(url: url, options: options))
         let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [
             kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)

@@ -75,8 +75,9 @@ public final class AVLiveMediaPlayer: LiveMediaPlayer {
     private var statusObservation: NSKeyValueObservation?
     private var stallNotice: NSObjectProtocol?
     private var externalProgressStart: Double?
-    public init() {
-        core = PlayerCore()
+    /// - Parameter userAgent: the app's, for the media requests; nil leaves AVFoundation's.
+    public init(userAgent: String? = nil) {
+        core = PlayerCore(userAgent: userAgent)
         let player = core.player
         self.player = player
         statusObservation = player.observe(\.timeControlStatus) { [weak self] _, _ in

@@ -18,6 +18,9 @@ public final class OfflinePlaybackGateway: PlaybackGateway, @unchecked Sendable 
     /// What this player plays now, when from the device.
     private let playing = Locked<OfflinePlay?>(nil)
 
+    /// The online gateway's: a download plays from the device and asks for nothing.
+    public var userAgent: String? { online.userAgent }
+
     init(online: any PlaybackGateway, downloads: RealDownloadRepository?) {
         self.online = online
         self.downloads = downloads

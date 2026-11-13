@@ -395,10 +395,15 @@ public protocol PlaybackGateway: Sendable {
 
     /// The text of a subtitle track (WebVTT), fetched with the media token already on `url`.
     func subtitleText(_ url: URL) async throws -> String
+
+    /// The app's `User-Agent`, for the player's own requests for the media,
+    /// as the API's requests carry it; nil leaves AVFoundation's.
+    var userAgent: String? { get }
 }
 
 extension PlaybackGateway {
     @MainActor public func bound() -> any PlaybackGateway { self }
+    public var userAgent: String? { nil }
     @MainActor public func needsTokenBeside(_ request: DecisionRequest) -> Bool { true }
     public func automaticSubtitle(fileID: Int, playID: String) async throws -> DecisionSubtitle? { nil }
     public func cancelAutomaticSubtitle(fileID: Int, playID: String) async throws {}

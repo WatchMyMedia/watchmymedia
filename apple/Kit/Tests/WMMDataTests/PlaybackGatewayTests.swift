@@ -42,6 +42,14 @@ import WMMAPI
         return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 
+    @Test func theMediaRequestsCarryTheAppsUserAgent() async {
+        // PLAN-APPLE-REVIEW.md §6.4: the one the API's requests carry, from ClientIdentity.
+        #expect(gateway.userAgent == ClientIdentity.userAgent())
+        let bound = await gateway.bound()
+        #expect(bound.userAgent == ClientIdentity.userAgent())
+        #expect(APIPlaybackGateway.userAgent.hasPrefix("WatchMyMedia/"))
+    }
+
     @Test func aVODDecisionRequestSendsThePlaylistKindQualityCapsClientAndPlay() async throws {
         serve(["POST /api/files/4/playback": (200, decisionHLS)])
         _ = try await gateway.decide(DecisionRequest(fileID: 4, profile: profile, client: client, startMs: 30_000, audioIndex: 1, subtitleID: "s2", quality: .fullHD, playID: "d2081dfed30c2b6c"))

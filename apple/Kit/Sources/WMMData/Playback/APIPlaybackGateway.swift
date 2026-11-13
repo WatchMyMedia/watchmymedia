@@ -20,6 +20,12 @@ public struct APIPlaybackGateway: PlaybackGateway {
         self.apiLevel = apiLevel
     }
 
+    /// "WatchMyMedia/1.0 (ios; iOS 27.1)": the API's own (``ClientIdentity``),
+    /// for the media requests AVFoundation makes, the Live TV player's included.
+    public static var userAgent: String { ClientIdentity.userAgent() }
+
+    public var userAgent: String? { Self.userAgent }
+
     @MainActor public func bound() -> any PlaybackGateway {
         let captured = Result { try api() }
         let level = apiLevel()

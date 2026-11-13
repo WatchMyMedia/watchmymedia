@@ -12,12 +12,16 @@ public final class LivePlaybackEngine: LivePlaybackControllerFactory {
     private let profile: any ProfileProvider
     private let network = LiveNetworkPath()
     private let system: (any PlaybackSystem)?
+    private let userAgent: String?
     private var current: RealLivePlaybackController?
     /// - Parameter system: Now Playing, the remote commands and the audio
     ///   session's interruptions. By default the system's on iPhone and iPad;
     ///   none on Apple TV, where AVKit's player shows Now Playing itself.
-    public init(repository: any LiveTVRepository, profile: any ProfileProvider = DeviceProfileProvider(), system: (any PlaybackSystem)? = LivePlaybackEngine.defaultSystem()) {
-        self.repository = repository; self.profile = profile; self.system = system
+    /// - Parameter userAgent: the app's, for the media requests
+    ///   (`APIPlaybackGateway.userAgent`); nil leaves AVFoundation's.
+    public init(repository: any LiveTVRepository, profile: any ProfileProvider = DeviceProfileProvider(), system: (any PlaybackSystem)? = LivePlaybackEngine.defaultSystem(),
+                userAgent: String? = nil) {
+        self.repository = repository; self.profile = profile; self.system = system; self.userAgent = userAgent
     }
 
     public static func defaultSystem() -> (any PlaybackSystem)? {
@@ -30,7 +34,7 @@ public final class LivePlaybackEngine: LivePlaybackControllerFactory {
     public func make() -> any LivePlaybackController {
         let previous = current
         previous?.release()
-        let next = RealLivePlaybackController(repository: repository, media: AVLiveMediaPlayer(), clock: SystemPlaybackClock(),
+        let next = RealLivePlaybackController(repository: repository, media: AVLiveMediaPlayer(userAgent: userAgent), clock: SystemPlaybackClock(),
                                               cellular: { [network] in network.cellular }, profile: { [profile] in profile.current() },
                                               beforeStart: { try await previous?.ensureStopped() }, system: system)
         current = next

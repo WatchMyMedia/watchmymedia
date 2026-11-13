@@ -44,8 +44,9 @@ public final class AVMediaPlayer: MediaPlayer {
     /// What the system shows about the item, kept so a new name or picture replaces only its part.
     private var named: (title: String, subtitle: String?, details: ItemDetails) = ("", nil, ItemDetails())
 
-    public init() {
-        core = PlayerCore()
+    /// - Parameter userAgent: the app's, for the media requests; nil leaves AVFoundation's.
+    public init(userAgent: String? = nil) {
+        core = PlayerCore(userAgent: userAgent)
         player = core.player
         player.allowsExternalPlayback = true
         #if os(iOS)
