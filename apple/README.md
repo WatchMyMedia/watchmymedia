@@ -455,6 +455,11 @@ rolling buffer. Go live advances to the live edge. An expired position resumes
 at live with a notice. After five minutes
 paused, the tuner is released and Watch live starts a new session. Four hours
 without input asks whether you are still watching and gives one minute to answer.
+On iPhone and iPad the channel shows on the lock screen and in Control Center
+as a live stream, with Play and Pause (no skipping); a call pauses it and,
+when the call ends, it carries on (at live once the pause passed the buffer),
+and unplugged headphones pause it. A stream that refuses the media token gets
+a new one on the same tuner, as films do, before it reports a lost signal.
 
 Quality is fixed at 1080p, 720p, 480p or 360p. Mobile data caps Live TV at 720p,
 including when the connection changes during playback. AirPlay and Picture in

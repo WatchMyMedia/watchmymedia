@@ -11,16 +11,28 @@ public final class LivePlaybackEngine: LivePlaybackControllerFactory {
     private let repository: any LiveTVRepository
     private let profile: any ProfileProvider
     private let network = LiveNetworkPath()
+    private let system: (any PlaybackSystem)?
     private var current: RealLivePlaybackController?
-    public init(repository: any LiveTVRepository, profile: any ProfileProvider = DeviceProfileProvider()) {
-        self.repository = repository; self.profile = profile
+    /// - Parameter system: Now Playing, the remote commands and the audio
+    ///   session's interruptions. By default the system's on iPhone and iPad;
+    ///   none on Apple TV, where AVKit's player shows Now Playing itself.
+    public init(repository: any LiveTVRepository, profile: any ProfileProvider = DeviceProfileProvider(), system: (any PlaybackSystem)? = LivePlaybackEngine.defaultSystem()) {
+        self.repository = repository; self.profile = profile; self.system = system
+    }
+
+    public static func defaultSystem() -> (any PlaybackSystem)? {
+        #if os(iOS)
+        AppleSystem()
+        #else
+        nil
+        #endif
     }
     public func make() -> any LivePlaybackController {
         let previous = current
         previous?.release()
         let next = RealLivePlaybackController(repository: repository, media: AVLiveMediaPlayer(), clock: SystemPlaybackClock(),
                                               cellular: { [network] in network.cellular }, profile: { [profile] in profile.current() },
-                                              beforeStart: { try await previous?.ensureStopped() })
+                                              beforeStart: { try await previous?.ensureStopped() }, system: system)
         current = next
         return next
     }
@@ -93,11 +105,16 @@ public final class RealLivePlaybackController: LivePlaybackController {
     /// as the file player's recoveries, counted afresh after a minute of playing.
     @ObservationIgnored private var tokenRenewals = 0
     @ObservationIgnored private var renewedAt = 0
+    /// Now Playing and the remote commands (iPhone and iPad), from the first start until release.
+    @ObservationIgnored private let system: (any PlaybackSystem)?
+    @ObservationIgnored private var systemSession: (any SystemSession)?
+    /// A call paused the channel, which it may resume when it ends.
+    @ObservationIgnored private var pausedByInterruption = false
 
     public init(repository: any LiveTVRepository, media: any LiveMediaPlayer, clock: any PlaybackClock, cellular: @escaping @MainActor () -> Bool = { false },
                 profile: @escaping @MainActor () -> PlaybackProfile = { PlaybackProfile(name: "Apple Live TV", containers: ["mpegts"], videoCodecs: ["h264"], audioCodecs: ["aac"], maxHeight: 1080) },
-                beforeStart: @escaping @MainActor () async throws -> Void = {}) {
-        self.repository = repository; self.contextID = repository.contextID
+                beforeStart: @escaping @MainActor () async throws -> Void = {}, system: (any PlaybackSystem)? = nil) {
+        self.repository = repository; self.contextID = repository.contextID; self.system = system
         self.gateway = Result { try repository.makeSessionGateway() }
         self.media = media; self.clock = clock; self.cellular = cellular; self.profile = profile; self.beforeStart = beforeStart
         tokens = TokenKeeper(clock: clock)
@@ -120,6 +137,8 @@ public final class RealLivePlaybackController: LivePlaybackController {
         state = LivePlayerState(); state.channel = request.channel; state.quality = request.quality
         state.status = .tuning
         updateNetworkState()
+        openSystemSession()
+        updateNowPlaying()
         scheduleTick()
         runSwitches()
     }
@@ -135,6 +154,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
         }
         pausedAt = nil; wantsPlay = true; media.play(); lastNativePlaying = true
         state.status = loaded ? .playing : .tuning
+        updateNowPlaying()
         sendHeartbeat(force: true)
     }
     public func pause() {
@@ -144,6 +164,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
         media.pause(); lastNativePlaying = false
         if pausedAt == nil { pausedAt = clock.elapsedMs; pauseBudget = 300_000 }
         state.status = .paused
+        updateNowPlaying()
         sendHeartbeat(force: true)
     }
     public func togglePlayPause() { wantsPlay ? pause() : play() }
@@ -174,11 +195,13 @@ public final class RealLivePlaybackController: LivePlaybackController {
         loadedURL = nil; pendingOutput = nil; switches = SwitchGenerations(handled: switches.handled)
         ticker.stop(); media.stop()
         state.status = .stopped; state.askStillWatching = false
+        updateNowPlaying()
         runSwitches()
     }
     public func release() {
         guard !released else { return }
         stop(); released = true
+        systemSession?.close(); systemSession = nil
     }
     public func waitUntilStopped() async { await worker?.value }
     func ensureStopped() async throws {
@@ -391,6 +414,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
             if state.pauseRemainingSeconds == 0 { finish(reason: "pause_expired"); return }
         }
         if tokenRenewals > 0, media.playing, !media.buffering, clock.elapsedMs - renewedAt >= recoveryResetMs { tokenRenewals = 0 }
+        updateNowPlaying()
         if media.failed && !renewingToken {
             if media.failure?.refusedToken == true, tokenRenewals < maxRecoveries { renewToken() }
             else { finish(reason: "signal_lost", failure: true); return }
@@ -420,6 +444,45 @@ public final class RealLivePlaybackController: LivePlaybackController {
                 finish(reason: "signal_lost", failure: true)
             }
         }
+    }
+
+    /// Now Playing, the lock screen's and Control Center's controls, and the
+    /// audio session's interruptions, as the file player has them
+    /// (PLAN-APPLE-REVIEW.md §6.3). Play and pause are the screen's own: a
+    /// pause keeps the tuner within its allowance and Play goes back to live
+    /// once it passed the buffer. There is nothing to skip or scrub.
+    private func openSystemSession() {
+        guard systemSession == nil, let system else { return }
+        systemSession = system.open(SystemCommands(
+            play: { [weak self] in self?.play() },
+            pause: { [weak self] in self?.pause() },
+            togglePlayPause: { [weak self] in self?.togglePlayPause() },
+            seekBy: { _ in },
+            seekTo: { _ in },
+            interruption: { [weak self] began, resume in self?.interrupted(began: began, shouldResume: resume) },
+            // Headphones unplugged: pause rather than play out loud.
+            routeLost: { [weak self] in self?.pause() },
+            foreground: {},
+            seeks: false
+        ))
+    }
+
+    /// A call pauses the channel, within the pause's allowance; when it ends
+    /// the system says whether to carry on, at live if the pause passed the buffer.
+    private func interrupted(began: Bool, shouldResume: Bool) {
+        if began {
+            pausedByInterruption = wantsPlay && activeSession != nil && state.status != .stopped && state.status != .error
+            if pausedByInterruption { pause() }
+        } else {
+            if shouldResume && pausedByInterruption && activeSession != nil && !wantsPlay { play() }
+            pausedByInterruption = false
+        }
+    }
+
+    private func updateNowPlaying() {
+        guard let systemSession, let channel = state.channel else { return }
+        systemSession.update(NowPlayingInfo(title: channel.title, subtitle: nil, durationMs: 0, positionMs: 0,
+                                            playing: state.status == .playing || state.status == .buffering, live: true))
     }
 
     private func updateNetworkState() {

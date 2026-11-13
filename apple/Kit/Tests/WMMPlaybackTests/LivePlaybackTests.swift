@@ -143,9 +143,10 @@ private final class LiveRig {
     let clock = LiveClock()
     let repository: LiveRepositorySpy
     let controller: RealLivePlaybackController
-    init(cellular: @escaping @MainActor () -> Bool = { false }, profile: @escaping @MainActor () -> PlaybackProfile = { PlaybackProfile(name: "Apple Live TV", containers: ["mpegts"], videoCodecs: ["h264"], audioCodecs: ["aac"], maxHeight: 1080) }) {
+    init(cellular: @escaping @MainActor () -> Bool = { false }, profile: @escaping @MainActor () -> PlaybackProfile = { PlaybackProfile(name: "Apple Live TV", containers: ["mpegts"], videoCodecs: ["h264"], audioCodecs: ["aac"], maxHeight: 1080) },
+         system: (any PlaybackSystem)? = nil) {
         repository = LiveRepositorySpy(gateway: gateway)
-        controller = RealLivePlaybackController(repository: repository, media: media, clock: clock, cellular: cellular, profile: profile)
+        controller = RealLivePlaybackController(repository: repository, media: media, clock: clock, cellular: cellular, profile: profile, system: system)
     }
     func start(_ index: Int = 0) async { controller.start(.init(channel: repository.channels[index])); await settle() }
     func settle() async { for _ in 0..<25 { await Task.yield() } }
@@ -615,6 +616,44 @@ struct LivePlaybackTests {
         #expect(rig.controller.state.status == .error)
         #expect(rig.controller.state.stopReason == "signal_lost")
         await rig.finish()
+    }
+
+    @Test func nowPlayingAndTheLockScreenFollowTheChannel() async throws {
+        // PLAN-APPLE-REVIEW.md §6.3: Live TV on the lock screen and in Control Center, as films are.
+        let system = FakeSystem()
+        let rig = LiveRig(system: system)
+        await rig.start()
+        rig.media.playing = true
+        await rig.advance(500)
+        #expect(system.opened == 1)
+        let commands = try #require(system.commands)
+        #expect(!commands.seeks, "nothing to skip or scrub on a live channel")
+        let title = rig.repository.channels[0].title
+        #expect(system.nowPlaying.last == NowPlayingInfo(title: title, subtitle: nil, durationMs: 0, positionMs: 0, playing: true, live: true))
+
+        commands.pause()
+        #expect(rig.controller.state.status == .paused)
+        #expect(system.nowPlaying.last?.playing == false)
+        commands.play()
+        #expect(rig.controller.state.status == .playing)
+
+        // A call pauses the channel; when it ends, the system says whether to carry on.
+        commands.interruption(true, false)
+        #expect(rig.controller.state.status == .paused)
+        commands.interruption(false, true)
+        #expect(rig.controller.state.status == .playing)
+        // Headphones unplugged: paused, and a call ending doesn't start it.
+        commands.routeLost()
+        commands.interruption(false, true)
+        #expect(rig.controller.state.status == .paused)
+        #expect(rig.gateway.starts.count == 1, "the tuner is the same throughout")
+
+        // Another channel keeps the one session; leaving the player closes it.
+        rig.controller.start(.init(channel: rig.repository.channels[1])); await rig.settle()
+        #expect(system.opened == 1)
+        await rig.finish()
+        #expect(system.closed == 1)
+        #expect(system.nowPlaying.last?.playing == false)
     }
 
     @Test func aFailureThatIsntTheTokensStillLosesTheSignal() async {
