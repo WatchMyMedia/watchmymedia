@@ -642,9 +642,11 @@ it runs is taken on trust. The repositories are filtered too, in
 `settings.gradle.kts` and `build-logic/settings.gradle.kts`: AndroidX,
 `com.android.*` and Google's Play services groups come only from Google's
 Maven repository, two plugins and kotlin-dsl only from the Gradle Plugin
-Portal, and everything else only from Maven Central. A library from
-Google's repository in a group the filter doesn't name needs its group
-added there.
+Portal, and everything else only from Maven Central. Google's groups are
+listed once, in `gradle/google-groups.txt`, which both settings scripts
+read; a library from Google's repository in a group not listed there needs
+its group added. Each script still names `google()` in its own
+`dependencyResolutionManagement`, which is where Dependabot looks for it.
 
 After changing a version in `libs.versions.toml`, adding a library or
 plugin, or updating the Gradle wrapper, rewrite the file and commit it with

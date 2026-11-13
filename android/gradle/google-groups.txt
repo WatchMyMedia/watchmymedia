@@ -1,0 +1,10 @@
+# The groups fetched from Google's Maven repository, and only from it
+# (README, "Dependency verification"): AndroidX, the Android tools and Play
+# services. One regular expression a line. settings.gradle.kts (plugins and
+# libraries) and build-logic/settings.gradle.kts read this file; a library
+# from Google in another group needs its group added here.
+androidx\..*
+com\.android(\..*)?
+com\.google\.android\..*
+com\.google\.firebase
+com\.google\.testing\.platform

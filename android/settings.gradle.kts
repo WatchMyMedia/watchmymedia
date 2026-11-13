@@ -3,18 +3,13 @@ pluginManagement {
     includeBuild("build-logic")
     // Each group is fetched from one repository only (README, "Dependency
     // verification"). Google's Maven repository serves AndroidX, the Android
-    // tools and Play services; a library from it in another group needs its
-    // group added to both lists in this file and in build-logic's settings.
+    // tools and Play services: the groups in gradle/google-groups.txt, which
+    // build-logic's settings read too.
     repositories {
         exclusiveContent {
             forRepository { google() }
-            filter {
-                includeGroupByRegex("androidx\\..*")
-                includeGroupByRegex("com\\.android(\\..*)?")
-                includeGroupByRegex("com\\.google\\.android\\..*")
-                includeGroup("com.google.firebase")
-                includeGroup("com.google.testing.platform")
-            }
+            // Google's groups (gradle/google-groups.txt), and nothing else from Google.
+            filter { file("gradle/google-groups.txt").readLines().filter { it.isNotBlank() && !it.startsWith("#") }.forEach(::includeGroupByRegex) }
         }
         // Plugins published only there; their own libraries come from Maven Central.
         exclusiveContent {
@@ -35,13 +30,8 @@ dependencyResolutionManagement {
     repositories {
         exclusiveContent {
             forRepository { google() }
-            filter {
-                includeGroupByRegex("androidx\\..*")
-                includeGroupByRegex("com\\.android(\\..*)?")
-                includeGroupByRegex("com\\.google\\.android\\..*")
-                includeGroup("com.google.firebase")
-                includeGroup("com.google.testing.platform")
-            }
+            // Google's groups (gradle/google-groups.txt), and nothing else from Google.
+            filter { file("gradle/google-groups.txt").readLines().filter { it.isNotBlank() && !it.startsWith("#") }.forEach(::includeGroupByRegex) }
         }
         mavenCentral()
     }
