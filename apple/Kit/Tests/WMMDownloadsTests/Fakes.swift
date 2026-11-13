@@ -124,6 +124,8 @@ final class FakeEngine: DownloadEngine {
     var wifiOnly = true
     var reason: DownloadStatus.Reason?
     var freeBytes: Int64 = 50_000_000_000
+    /// How often the repository asked for the downloads' states.
+    private(set) var reads = 0
 
     func add(_ request: EngineRequest) {
         added.append(request)
@@ -140,7 +142,7 @@ final class FakeEngine: DownloadEngine {
         delegate?.engineChanged(id, failure: nil)
     }
 
-    func downloads() -> [String: EngineDownload] { states }
+    func downloads() -> [String: EngineDownload] { reads += 1; return states }
     func setWifiOnly(_ wifiOnly: Bool) { self.wifiOnly = wifiOnly }
     func usedBytes() -> Int64 { states.values.reduce(0) { $0 + $1.bytes } }
     func space() -> (free: Int64, total: Int64) { (freeBytes, 256_000_000_000) }

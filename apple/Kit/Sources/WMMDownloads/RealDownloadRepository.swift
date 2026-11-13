@@ -30,7 +30,10 @@ protocol DownloadNotices: AnyObject {
 @Observable
 public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
     private(set) var stored: StoredDownloads {
-        didSet { if stored != oldValue { store.save(stored) } }
+        didSet {
+            storedVersion += 1
+            if stored != oldValue { store.save(stored) }
+        }
     }
     private(set) var owner: OfflineOwner?
     /// Bumped whenever the engine changes, so what reads `downloads` looks again.
@@ -52,6 +55,13 @@ public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
     @ObservationIgnored private var ticker: Task<Void, Never>?
     @ObservationIgnored private var syncing: Task<Void, Never>?
     @ObservationIgnored private var tokens: [String: MediaToken] = [:]
+    /// Bumped at every write to ``stored``, so ``downloads`` knows its list is still current.
+    @ObservationIgnored private var storedVersion = 0
+    /// Bumped when this repository changes the engine itself (adds, removes,
+    /// pauses), which the engine needn't report as a change.
+    @ObservationIgnored private var engineEdits = 0
+    /// ``downloads`` as last built, and for which engine tick, write and account.
+    @ObservationIgnored private var built: (tick: Int, version: Int, edits: Int, owner: OfflineOwner?, list: [OfflineDownload])?
     /// The device's name for the menu's Wi-Fi line ("iPhone", "iPad").
     @ObservationIgnored let deviceKind: String
 
@@ -106,8 +116,19 @@ public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
 
     public var settings: DownloadSettings { DownloadSettings(quality: DownloadQuality(id: stored.quality), wifiOnly: stored.wifiOnly) }
 
+    /// Built once per engine tick, write to the records or change of account,
+    /// not at every read: the screens read it many times a tick.
     public var downloads: [OfflineDownload] {
-        _ = engineTick
+        // Read for observation whether or not the list is rebuilt.
+        let tick = engineTick, owner = owner
+        _ = stored
+        if let built, built.tick == tick, built.version == storedVersion, built.edits == engineEdits, built.owner == owner { return built.list }
+        let list = buildDownloads(owner)
+        built = (tick, storedVersion, engineEdits, owner, list)
+        return list
+    }
+
+    private func buildDownloads(_ owner: OfflineOwner?) -> [OfflineDownload] {
         guard let owner else { return [] }
         let held = engine.downloads()
         let notMet = engine.notMet()
@@ -276,6 +297,7 @@ public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
         guard let rec = stored.record(id), let record = parse(rec) else { return }
         downloadsLog.info("download \(id, privacy: .public) starts over: the server's session changed")
         engine.remove(id)
+        engineEdits += 1
         stored.updateRecord(id) { $0.completedAt = nil }
         enqueue(record)
     }
@@ -288,6 +310,7 @@ public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
         }
         let ext = hls ? nil : Self.fileExtension(record.decision?.mimeType)
         engine.add(EngineRequest(id: record.id, url: record.url, hls: hls, title: downloadTitle(record.item), parts: parts, fileExtension: ext))
+        engineEdits += 1
     }
 
     /// "mp4", "mov", "m4v" from the decision's MIME type.
@@ -301,6 +324,7 @@ public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
 
     private func removeBytes(_ rec: StoredRecord) {
         engine.remove(rec.id)
+        engineEdits += 1
         parsed[rec.id] = nil
         tokens[rec.id] = nil
     }
@@ -410,9 +434,9 @@ public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
         if first { notices.firstDownload() }
     }
 
-    public func pause(_ id: String) { engine.setPaused(id, true) }
+    public func pause(_ id: String) { engine.setPaused(id, true); engineEdits += 1 }
 
-    public func resume(_ id: String) { engine.setPaused(id, false) }
+    public func resume(_ id: String) { engine.setPaused(id, false); engineEdits += 1 }
 
     public func retry(_ id: String) {
         guard let record = record(id) else { return }
