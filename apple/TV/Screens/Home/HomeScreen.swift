@@ -236,53 +236,16 @@ private struct HomeView: View {
         }
     }
 
-    /// Today's rows, from servers below API level 22.
+    /// Today's rows, from servers below API level 22, drawn as arranged rows
+    /// are: the Live TV row after Continue watching, and what to do first
+    /// under it on an empty Home.
     @ViewBuilder private func fixedRows(_ home: HomeData) -> some View {
-                if !home.continueWatching.isEmpty {
-                    ShelfRow(title: "Continue watching", items: home.continueWatching) { item in
-                        Button { model.resume(item) } label: {
-                            WideCard(title: item.title, line: item.remainingLine, imageURL: url(item.stillPath ?? item.backdropPath, .w780), seed: item.title) {
-                                ProgressStrip(progress: item.progress, height: 6).pinned(.bottom, padding: 0)
-                            }
-                        }
-                        .buttonStyle(.borderless)
-                        .accessibilityHint("Resumes playing")
-                        .contextMenu {
-                            Button { model.resume(item) } label: { Label("Resume", systemImage: "play.fill") }
-                            if let target = item.watchTarget {
-                                WatchToggleButton(watched: false) { await model.setWatched(target, $0) }
-                            }
-                            if item.pageRoute != nil {
-                                Button { model.openPage(of: item) } label: { Label(item.pageLabel, systemImage: "info.circle") }
-                            }
-                        }
-                    }
-                }
-                TVLiveHomeRow()
-                if home.isEmpty {
-                    firstRun
-                }
-                if !home.recentlyAddedShows.isEmpty {
-                    posterRow("Recently added", detail: "TV Shows", items: home.recentlyAddedShows)
-                }
-                if !home.recentlyAired.isEmpty {
-                    ShelfRow(title: "Recently aired", detail: "Episodes", items: home.recentlyAired) { episode in airedCard(episode) }
-                }
-                if !home.recentlyAddedMovies.isEmpty {
-                    posterRow("Recently added", detail: "Movies", items: home.recentlyAddedMovies)
-                }
-                if !home.recentlyReleased.isEmpty {
-                    ShelfRow(title: "Recently released", detail: "Movies", items: home.recentlyReleased) { item in
-                        Button { model.open(item) } label: {
-                            WideCard(title: item.title, imageURL: url(item.backdropPath, .w780), seed: item.title) {
-                                if let date = formatDate(item.releaseDate) { TVBadge(date).pinned(.bottomLeading, padding: 10) }
-                                if item.watched { WatchedCheck(size: 28).pinned(.bottomTrailing, padding: 10) }
-                            }
-                        }
-                        .buttonStyle(.borderless)
-                        .contextMenu { watchMenu(item) }
-                    }
-                }
+        ForEach(home.fixedRows) { row in
+            TVArrangedRow(row: row, actions: TVRowActions(model))
+            if row.style == .live && home.isEmpty {
+                firstRun
+            }
+        }
     }
 
     private var firstRun: some View {
@@ -317,43 +280,22 @@ private struct HomeView: View {
             .padding(.top, -200)
             .accessibilityHidden(true)
     }
+}
 
-    private func posterRow(_ title: String, detail: String, items: [BrowseItem]) -> some View {
-        ShelfRow(title: title, detail: detail, items: items) { item in
-            Button { model.open(item) } label: {
-                PosterCard(item: item, imageURL: url(item.posterPath, .w500), width: 160)
-            }
-            .buttonStyle(.borderless)
-            .contextMenu { watchMenu(item) }
-        }
-    }
-
-    private func airedCard(_ episode: EpisodeCard) -> some View {
-        Button { model.open(episode) } label: {
-            WideCard(title: episode.showTitle, line: episode.airedLine(), imageURL: url(episode.stillPath ?? episode.showBackdropPath, .w780), seed: episode.showTitle) {
-                if episode.isNew { TVBadge("New", style: .gold).pinned(.topLeading, padding: 10) }
-                if !episode.hasFile {
-                    TVBadge("Not in library", style: .warning).pinned(.topTrailing, padding: 10)
-                } else if episode.watched {
-                    WatchedCheck(size: 28).pinned(.topTrailing, padding: 10)
-                }
-                TVBadge(episode.codeBadge).pinned(.bottomLeading, padding: 10)
-            }
-        }
-        .buttonStyle(.borderless)
-        .accessibilityHint("Opens the episode on its show")
-        .contextMenu {
-            if episode.playRequest != nil {
-                Button { model.play(episode) } label: { Label("Play", systemImage: "play.fill") }
-            }
-            WatchToggleButton(watched: episode.watched) { await model.setWatched(.episode(id: episode.episodeID), $0) }
-        }
-    }
-
-    @ViewBuilder private func watchMenu(_ item: BrowseItem) -> some View {
-        if let target = item.watchTarget {
-            WatchToggleButton(watched: item.watched) { await model.setWatched(target, $0) }
-        }
+private extension HomeData {
+    /// The fixed rows of a server below API level 22, as arranged rows: their
+    /// titles split at " · " into the heading and its detail, as an arranged
+    /// Home's built-in rows are. The Live TV row draws nothing without Live TV.
+    var fixedRows: [ScreenRow] {
+        [
+            ScreenRow(id: "continue", style: .continue, title: "Continue watching", continueItems: continueWatching),
+            ScreenRow(id: "live", style: .live, title: "Live TV"),
+            ScreenRow(id: "recentlyAddedShows", style: .poster, title: "Recently added · TV Shows", items: recentlyAddedShows),
+            ScreenRow(id: "recentlyAired", style: .episode, title: "Recently aired · Episodes", episodes: recentlyAired),
+            ScreenRow(id: "recentlyAddedMovies", style: .poster, title: "Recently added · Movies", items: recentlyAddedMovies),
+            ScreenRow(id: "recentlyReleased", style: .wide, title: "Recently released · Movies", items: recentlyReleased),
+        ]
+        .filter { !$0.isEmpty }
     }
 }
 
