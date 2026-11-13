@@ -280,13 +280,19 @@ fun MacrobenchmarkScope.phonePlay() {
     // journey looks: let them hide, then bring them back unless they are up.
     device.wait(Until.hasObject(By.desc("Back")), LOAD_MS)
     device.wait(Until.gone(By.desc("Back")), WAIT_MS)
-    if (!device.hasObject(By.text("Subtitles"))) device.click(device.displayWidth / 2, device.displayHeight / 3)
-    device.waitForText("Subtitles").click()
-    device.waitForIdle()
-    // Back closes the picker, then leaves the player for the page.
+    // An emulator's decoder can fail now and then ("Can't play this"): the player has run all the same.
+    if (!device.hasObject(PLAYER_ERROR)) {
+        if (!device.hasObject(By.text("Subtitles"))) device.click(device.displayWidth / 2, device.displayHeight / 3)
+        device.waitForText("Subtitles").click()
+        device.waitForIdle()
+    }
+    // Back closes the picker (or the error), then leaves the player for the page.
     backTo(tag(Tags.PLAY))
     device.pressBack()
 }
+
+/** The player's error, which ends a play the device can't decode. */
+private val PLAYER_ERROR = By.text("Can't play this")
 
 /** Presses Back until [selector] shows, a few times at most. */
 private fun MacrobenchmarkScope.backTo(selector: BySelector) {
