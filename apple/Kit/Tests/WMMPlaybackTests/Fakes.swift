@@ -60,6 +60,9 @@ final class FakeGateway: PlaybackGateway {
     var subtitleFiles: [String: String] = [:]
     var subtitleFetches: [URL] = []
     var planRequests: [(PlaybackProfile, StreamQuality, [Int])] = []
+    /// While true, reports wait in ``reportProgress(_:)`` (a server that can't be reached) until ``releaseReports()``.
+    var holdReports = false
+    private var heldReports: [CheckedContinuation<Void, Never>] = []
 
     init(clock: TestClock) {
         self.clock = clock
@@ -72,7 +75,15 @@ final class FakeGateway: PlaybackGateway {
 
     func reportProgress(_ report: ProgressReport) async throws -> ProgressReply {
         reports.append(report)
+        if holdReports { await withCheckedContinuation { heldReports.append($0) } }
         return reply(report)
+    }
+
+    func releaseReports() {
+        holdReports = false
+        let held = heldReports
+        heldReports = []
+        for c in held { c.resume() }
     }
 
     func mediaToken() async throws -> MediaToken {

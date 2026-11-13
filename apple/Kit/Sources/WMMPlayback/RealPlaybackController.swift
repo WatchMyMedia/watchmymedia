@@ -62,6 +62,8 @@ public final class RealPlaybackController: PlaybackController {
 
     @ObservationIgnored private var outbox: [Outgoing] = []
     @ObservationIgnored private var delivering = false
+    /// A message is out, waiting for the server.
+    @ObservationIgnored private var sending = false
     @ObservationIgnored private var endHold: (@MainActor () -> Void)?
     @ObservationIgnored private var inFlight: [Int: Task<Void, Never>] = [:]
     @ObservationIgnored private var taskCount = 0
@@ -81,7 +83,7 @@ public final class RealPlaybackController: PlaybackController {
     @ObservationIgnored private var localRoute: LocalRoute?
     @ObservationIgnored private var playingLocally = false
 
-    private enum Outgoing {
+    enum Outgoing {
         case report(ProgressReport, generation: Int)
         case endSession(String)
     }
@@ -1224,18 +1226,44 @@ public final class RealPlaybackController: PlaybackController {
     }
 
     private func send(_ message: Outgoing) {
-        outbox.append(message)
+        Self.enqueue(message, into: &outbox, behindDelivery: sending)
         guard !delivering else { return }
         delivering = true
         // Holds the controller until the queue is empty, so the last reports go out after release.
         launch { [self] in
             while !outbox.isEmpty {
-                await deliver(outbox.removeFirst())
+                let next = outbox.removeFirst()
+                sending = true
+                await deliver(next)
+                sending = false
             }
             delivering = false
             endHold?()
             endHold = nil
         }
+    }
+
+    /// Adds `message` to the queue. While the server can't be reached each
+    /// report waits for its time-out (`behindDelivery`: one is out), so a
+    /// progress report replaces the one of the same viewing still waiting:
+    /// only the newest position is worth sending (PLAN-APPLE-REVIEW.md
+    /// §3.1.4). Stops, "closed", session ends and reports that acknowledge or
+    /// refuse a quality switch are never dropped, and the rest keep their
+    /// order. A dropped report's startup time goes with its replacement.
+    static func enqueue(_ message: Outgoing, into outbox: inout [Outgoing], behindDelivery: Bool = true) {
+        guard behindDelivery, case .report(var new, let generation) = message, new.isProgress else {
+            outbox.append(message)
+            return
+        }
+        outbox.removeAll { queued in
+            guard case let .report(old, g) = queued, g == generation, old.isProgress,
+                  old.switchGeneration == nil || old.switchGeneration == new.switchGeneration,
+                  old.switchFailedGeneration == nil || old.switchFailedGeneration == new.switchFailedGeneration
+            else { return false }
+            if new.startupMs == nil { new.startupMs = old.startupMs }
+            return true
+        }
+        outbox.append(.report(new, generation: generation))
     }
 
     private func deliver(_ message: Outgoing) async {
@@ -1426,4 +1454,9 @@ public final class RealPlaybackController: PlaybackController {
             await task.value
         }
     }
+}
+
+private extension ProgressReport {
+    /// Where the play is, which a newer report of the same viewing says better.
+    var isProgress: Bool { state == .playing || state == .paused || state == .buffering }
 }
