@@ -9,34 +9,42 @@ import WMMModel
 /// request, and every failure turned into ``APIError`` or ``SignedOutError``
 /// (android/core/data/.../Http.kt). Repositories call it as
 /// `try await api.call { try await $0.getHome().ok.body.json }`.
+///
+/// It is the one way a sign-in goes on a request (``RequestSigner``) and the
+/// one place a 401 is read (``revokes(status:signed:operationID:)``): a
+/// refused token calls `onSignedOut` before ``SignedOutError`` reaches the
+/// caller, whether the request was the generated client's, a plain fetch
+/// (``data(_:session:)``) or the event stream's (``tokenRefused()``).
 public struct ServerAPI: Sendable {
     public let baseURL: URL
     public let client: Client
     private let session: URLSession
-    private let token: @Sendable () -> String?
-    private let onSignedOut: @Sendable () -> Void
+    let signer: RequestSigner
+    private let onSignedOut: @Sendable () async -> Void
 
     /// - Parameters:
     ///   - token: the bearer token to send, read on every request; nil sends none.
-    ///   - onSignedOut: called when the server refuses the token (401 on a signed-in call).
+    ///   - onSignedOut: called when the server refuses the token (401 on a
+    ///     signed-in call), and awaited before the call throws ``SignedOutError``.
     public init(
         baseURL: URL,
         session: URLSession = .shared,
         userAgent: String? = nil,
         token: @escaping @Sendable () -> String? = { nil },
-        onSignedOut: @escaping @Sendable () -> Void = {}
+        onSignedOut: @escaping @Sendable () async -> Void = {}
     ) {
         self.baseURL = baseURL
         self.session = session
-        self.token = token
+        let signer = RequestSigner(baseURL: baseURL, token: token, userAgent: userAgent)
+        self.signer = signer
         self.onSignedOut = onSignedOut
         client = Client(
             serverURL: baseURL,
             configuration: Configuration(dateTranscoder: LenientISO8601()),
             transport: URLSessionTransport(configuration: .init(session: session)),
             middlewares: [
-                HeadersMiddleware(token: token, userAgent: userAgent),
-                ErrorMiddleware(onSignedOut: onSignedOut),
+                HeadersMiddleware(signer: signer),
+                ErrorMiddleware(),
                 AlreadyCreatedMiddleware(),
             ]
         )
@@ -44,12 +52,15 @@ public struct ServerAPI: Sendable {
 
     /// Runs an API call, turning what can go wrong into ``APIError``: the
     /// server's message for a refused request, ``SignedOutError`` for a 401 on
-    /// a signed-in call, and a plain sentence for network trouble.
+    /// a signed-in call (once `onSignedOut` has run), and a plain sentence for
+    /// network trouble.
     public func call<T: Sendable>(_ operation: @Sendable (Client) async throws -> T) async throws -> T {
         do {
             return try await operation(client)
         } catch {
-            throw Self.translate(error)
+            let translated = Self.translate(error)
+            if translated is SignedOutError { await onSignedOut() }
+            throw translated
         }
     }
 
@@ -58,31 +69,47 @@ public struct ServerAPI: Sendable {
         URL(string: baseURL.absoluteString + (path.hasPrefix("/") ? path : "/" + path)) ?? baseURL
     }
 
-    /// A request for `url` with the bearer token, for what the generated client
-    /// does not cover (images, the event stream, subtitle text).
+    /// A request for `url` with the user agent, and the bearer token only when
+    /// `url` is on this server, for what the generated client does not cover
+    /// (images, the event stream, subtitle text).
     public func authorizedRequest(_ url: URL) -> URLRequest {
-        var request = URLRequest(url: url)
-        if let t = token(), Self.owns(baseURL, url) { request.setValue("Bearer \(t)", forHTTPHeaderField: "Authorization") }
-        return request
+        signer.request(url)
     }
 
-    /// Fetches `url` with the bearer token, failing as ``call`` does: a 401
-    /// with the token signs out.
-    public func data(_ url: URL) async throws -> Data {
+    /// Fetches `url` (on `session`, else this API's) with the bearer token,
+    /// failing as ``call`` does: a 401 with the token signs out.
+    public func data(_ url: URL, session: URLSession? = nil) async throws -> Data {
+        let request = authorizedRequest(url)
+        let data: Data, response: URLResponse
         do {
-            let request = authorizedRequest(url)
-            let (data, response) = try await session.data(for: request)
-            if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
-                if http.statusCode == 401, request.value(forHTTPHeaderField: "Authorization") != nil {
-                    onSignedOut()
-                    throw SignedOutError()
-                }
-                throw Self.error(status: http.statusCode, body: data)
-            }
-            return data
+            (data, response) = try await (session ?? self.session).data(for: request)
         } catch {
             throw Self.translate(error)
         }
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            if Self.revokes(status: http.statusCode, signed: RequestSigner.signed(request)) {
+                await onSignedOut()
+                throw SignedOutError()
+            }
+            throw Self.error(status: http.statusCode, body: data)
+        }
+        return data
+    }
+
+    /// The server refused this API's token on a request of the caller's own
+    /// (the event stream's): signs out as ``call`` would.
+    func tokenRefused() async {
+        await onSignedOut()
+    }
+
+    /// Where 401 means wrong credentials or a code not yet approved, not a lost sign-in.
+    static let credentialOperations: Set<String> = ["login", "claimPairing", "getServer", "getAuthStatus", "startPairing"]
+
+    /// Whether a refusal means the sign-in is gone (revoked or run out): a 401
+    /// to a request that carried the token, other than one of the
+    /// ``credentialOperations``. Every path that reads a 401 asks this.
+    static func revokes(status: Int, signed: Bool, operationID: String? = nil) -> Bool {
+        status == 401 && signed && !(operationID.map(credentialOperations.contains) ?? false)
     }
 
     /// True when `url` is on the server at `base` (same origin, under its path).
@@ -159,30 +186,81 @@ public struct ServerAPI: Sendable {
     }
 }
 
-/// Adds the bearer token and the user agent.
-struct HeadersMiddleware: ClientMiddleware {
+/// How a sign-in goes on a request, in one place (PLAN-APPLE-REVIEW.md
+/// §5.6): the user agent on every request, and the bearer token only on one
+/// to the server at ``baseURL`` (``ServerAPI/owns(_:_:)``: the same scheme,
+/// host and port, under its path), so a token never reaches another host.
+/// The generated client's requests, plain fetches, the event stream, images
+/// and the offline routes all go through it.
+struct RequestSigner: Sendable {
+    let baseURL: URL
+    /// Read on every request; nil sends none.
     let token: @Sendable () -> String?
     let userAgent: String?
+
+    init(baseURL: URL, token: @escaping @Sendable () -> String?, userAgent: String?) {
+        self.baseURL = baseURL
+        self.token = token
+        self.userAgent = userAgent
+    }
+
+    init(baseURL: URL, token: String, userAgent: String?) {
+        self.init(baseURL: baseURL, token: { token }, userAgent: userAgent)
+    }
+
+    /// A request for `url` with the user agent, and the token when `url` is on this server.
+    func request(_ url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        if let userAgent { request.setValue(userAgent, forHTTPHeaderField: "User-Agent") }
+        if let t = token(), ServerAPI.owns(baseURL, url) { request.setValue("Bearer \(t)", forHTTPHeaderField: "Authorization") }
+        return request
+    }
+
+    /// ``request(_:)`` when it carries the token; nil for an address that isn't
+    /// on this server, or with no token, for a caller that needs the sign-in.
+    func signedRequest(_ url: URL) -> URLRequest? {
+        let request = request(url)
+        return Self.signed(request) ? request : nil
+    }
+
+    /// A generated call to `path` on `server` (the client's own server URL):
+    /// the user agent, and the token unless it is the password sign-in or the
+    /// address isn't on this server.
+    func sign(_ fields: inout HTTPFields, path: String?, server: URL, operationID: String) {
+        if let userAgent { fields[.userAgent] = userAgent }
+        if let authorization = authorization(path: path, server: server, operationID: operationID) { fields[.authorization] = authorization }
+    }
+
+    /// The Authorization header for a generated call to `path` on `server`, or nil.
+    func authorization(path: String?, server: URL, operationID: String) -> String? {
+        guard operationID != "login", let t = token(), let path,
+              let url = URL(string: server.absoluteString + path), ServerAPI.owns(baseURL, url) else { return nil }
+        return "Bearer \(t)"
+    }
+
+    static func signed(_ request: URLRequest) -> Bool {
+        request.value(forHTTPHeaderField: "Authorization") != nil
+    }
+}
+
+/// Signs the generated client's requests (``RequestSigner``).
+struct HeadersMiddleware: ClientMiddleware {
+    let signer: RequestSigner
 
     func intercept(
         _ request: HTTPRequest, body: HTTPBody?, baseURL: URL, operationID: String,
         next: @Sendable (HTTPRequest, HTTPBody?, URL) async throws -> (HTTPResponse, HTTPBody?)
     ) async throws -> (HTTPResponse, HTTPBody?) {
         var request = request
-        if let t = token(), operationID != "login" { request.headerFields[.authorization] = "Bearer \(t)" }
-        if let userAgent { request.headerFields[.userAgent] = userAgent }
+        signer.sign(&request.headerFields, path: request.path, server: baseURL, operationID: operationID)
         return try await next(request, body, baseURL)
     }
 }
 
 /// Turns a refused request into ``APIError`` before the generated code sees it,
-/// so the server's message survives; a 401 on a signed-in call is ``SignedOutError``.
+/// so the server's message survives; a 401 that ``ServerAPI/revokes(status:signed:operationID:)``
+/// is ``SignedOutError``, which ``ServerAPI/call(_:)`` signs out on.
 struct ErrorMiddleware: ClientMiddleware {
-    /// Where 401 means wrong credentials or a code not yet approved, not a lost sign-in.
-    static let credentialOperations: Set<String> = ["login", "claimPairing", "getServer", "getAuthStatus", "startPairing"]
-
-    let onSignedOut: @Sendable () -> Void
-
     func intercept(
         _ request: HTTPRequest, body: HTTPBody?, baseURL: URL, operationID: String,
         next: @Sendable (HTTPRequest, HTTPBody?, URL) async throws -> (HTTPResponse, HTTPBody?)
@@ -190,8 +268,7 @@ struct ErrorMiddleware: ClientMiddleware {
         let (response, responseBody) = try await next(request, body, baseURL)
         let status = response.status.code
         guard status >= 400 else { return (response, responseBody) }
-        if status == 401, !Self.credentialOperations.contains(operationID) {
-            onSignedOut()
+        if ServerAPI.revokes(status: status, signed: request.headerFields[.authorization] != nil, operationID: operationID) {
             throw SignedOutError()
         }
         let data: Data? = if let responseBody { try? await Data(collecting: responseBody, upTo: 64 * 1024) } else { nil }

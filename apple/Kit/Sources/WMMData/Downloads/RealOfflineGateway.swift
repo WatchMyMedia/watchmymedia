@@ -51,13 +51,7 @@ final class RealOfflineGateway: OfflineGateway {
     /// Runs a call as `owner`; a refused token signs that account out.
     private func call<T: Sendable>(_ owner: OfflineOwner, _ operation: @Sendable (Client) async throws -> T) async throws -> T {
         let (server, credential) = try access(owner)
-        let api = store.api(baseURL: server?.baseURL ?? owner.baseURL, token: credential.token)
-        do {
-            return try await api.call(operation)
-        } catch let error as APIError where error.status == 401 {
-            store.tokenRejected(serverID: owner.serverID, token: credential.token)
-            throw SignedOutError()
-        }
+        return try await store.api(serverID: owner.serverID, baseURL: server?.baseURL ?? owner.baseURL, token: credential.token).call(operation)
     }
 
     /// Older servers, and servers that turned requests off, offer no downloads.
@@ -118,11 +112,8 @@ final class RealOfflineGateway: OfflineGateway {
     /// Nil for an address that isn't on the owner's server as it is kept now:
     /// the sign-in goes only to the server that issued it (PLAN-APPLE-REVIEW.md §3.4.8).
     func authorizedRequest(_ owner: OfflineOwner, url: URL) -> URLRequest? {
-        guard let (_, credential) = try? access(owner), ServerAPI.owns(baseURL(owner), url) else { return nil }
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(credential.token)", forHTTPHeaderField: "Authorization")
-        request.setValue(store.userAgent, forHTTPHeaderField: "User-Agent")
-        return request
+        guard let (_, credential) = try? access(owner) else { return nil }
+        return store.signer(baseURL: baseURL(owner), token: credential.token).signedRequest(url)
     }
 
     func sync(_ owner: OfflineOwner, client: ClientInfo, sentAt: Date, downloads: [SyncedDownload], progress: [OfflineProgress]) async throws -> SyncReply {

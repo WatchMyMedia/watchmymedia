@@ -210,33 +210,40 @@ final class LocalStore {
         if let cached = cachedAPI, cached.key == key {
             return SignedInSession(serverID: server.id, token: credential.token, api: cached.api)
         }
-        let serverID = server.id, token = credential.token
-        let api = ServerAPI(
-            baseURL: server.baseURL, session: session, userAgent: userAgent, token: { token },
-            onSignedOut: { [weak self] in Task { @MainActor in self?.tokenRejected(serverID: serverID, token: token) } }
-        )
+        let api = api(serverID: server.id, baseURL: server.baseURL, token: credential.token)
         cachedAPI = (key, api)
-        return SignedInSession(serverID: serverID, token: token, api: api)
+        return SignedInSession(serverID: server.id, token: credential.token, api: api)
     }
 
-    /// Runs a call as the signed-in user; a refused token signs out before the
-    /// ``SignedOutError`` reaches the caller.
+    /// Runs a call as the signed-in user; a refused token signs out (in
+    /// ``ServerAPI``) before the ``SignedOutError`` reaches the caller.
     func call<T: Sendable>(_ operation: @Sendable (Client) async throws -> T) async throws -> T {
         let signedIn = try signedIn()
         let started = revision
-        do {
-            let result = try await signedIn.api.call(operation)
-            guard revision == started else { throw CancellationError() }
-            return result
-        } catch is SignedOutError {
-            tokenRejected(serverID: signedIn.serverID, token: signedIn.token)
-            throw SignedOutError()
-        }
+        let result = try await signedIn.api.call(operation)
+        guard revision == started else { throw CancellationError() }
+        return result
     }
 
-    /// An API at `baseURL` that sends `token` (or none), for sign-in and for a server no longer in use.
+    /// The API of a kept sign-in: `token` on `baseURL`'s addresses only, and a
+    /// 401 that revokes it forgets that sign-in (unless it was replaced
+    /// since), wherever the request came from (PLAN-APPLE-REVIEW.md §5.6).
+    func api(serverID: String, baseURL: URL, token: String, session: URLSession? = nil) -> ServerAPI {
+        ServerAPI(
+            baseURL: baseURL, session: session ?? self.session, userAgent: userAgent, token: { token },
+            onSignedOut: { [weak self] in await self?.tokenRejected(serverID: serverID, token: token) }
+        )
+    }
+
+    /// An API at `baseURL` that sends `token` (or none) and keeps no sign-in:
+    /// for signing in, probing, and signing out of a server being forgotten.
     func api(baseURL: URL, token: String? = nil, session: URLSession? = nil) -> ServerAPI {
         ServerAPI(baseURL: baseURL, session: session ?? self.session, userAgent: userAgent, token: { token })
+    }
+
+    /// How a request to `baseURL` carries `token`, for what isn't an API call (the offline routes' fetches).
+    func signer(baseURL: URL, token: String) -> RequestSigner {
+        RequestSigner(baseURL: baseURL, token: token, userAgent: userAgent)
     }
 
     /// POST /api/auth/logout with `token`, ignoring every failure, for at most 5 s.

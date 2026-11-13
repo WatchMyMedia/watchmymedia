@@ -353,9 +353,9 @@ final class ServerEvents {
                 }
                 guard !Task.isCancelled, let self else { return }
                 switch status {
-                case 401:
+                case 401 where ServerAPI.revokes(status: 401, signed: RequestSigner.signed(request)):
                     // Signed out; a new sign-in reconnects.
-                    store.tokenRejected(serverID: signedIn.serverID, token: signedIn.token)
+                    await signedIn.api.tokenRefused()
                     return
                 case 404:
                     // A server without events (or a proxy in front of a restarting

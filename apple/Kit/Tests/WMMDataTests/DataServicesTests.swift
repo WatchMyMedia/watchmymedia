@@ -96,5 +96,17 @@ private final class NoPlayback: PlaybackControllerFactory {
         #expect(h.services.offline.authorizedRequest(owner, url: URL(string: "https://elsewhere.example.net/api/offline/d1/playlist.m3u8")!) == nil)
         let otherPort = URL(string: "http://\(h.server.host):9999/api/offline/d1/playlist.m3u8")!
         #expect(h.services.offline.authorizedRequest(owner, url: otherPort) == nil)
+        #expect(own.value(forHTTPHeaderField: "User-Agent") == "WatchMyMedia/1.0 (ios; iOS 18.0)")
+    }
+
+    /// A 401 on the offline routes went unread (it arrived as SignedOutError,
+    /// not the APIError the gateway caught), so the sign-in stayed.
+    @Test func aRefusedTokenSignsTheOwnerOut() async throws {
+        try await h.signIn()
+        let owner = try #require(h.services.offline.owner())
+        h.router.always("POST /api/offline/downloads/d1/token", .problem(401, "sign in required"))
+        await #expect(throws: SignedOutError()) { try await h.services.offline.token(owner, downloadID: "d1") }
+        #expect(h.services.auth.user == nil)
+        #expect(!h.services.offline.signedIn(owner))
     }
 }

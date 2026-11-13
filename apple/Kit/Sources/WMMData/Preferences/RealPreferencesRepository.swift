@@ -151,7 +151,6 @@ final class RealPreferencesRepository: PreferencesRepository {
             guard store.revision == accountRevision else { throw CancellationError() }
             setIfLatest(mine, saved)
         } catch {
-            if error is SignedOutError { store.tokenRejected(serverID: signedIn.serverID, token: signedIn.token) }
             setIfLatest(mine, before)
             throw error
         }

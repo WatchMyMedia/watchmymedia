@@ -101,8 +101,7 @@ public final class DataServices {
         rows = RealRowsRepository(store: store, events: events)
         images = CachedImageLoader(
             session: imageSession ?? session,
-            current: { [weak store] in try? store?.signedIn() },
-            rejected: { [weak store] in store?.tokenRejected(serverID: $0.serverID, token: $0.token) }
+            current: { [weak store] in try? store?.signedIn() }
         )
 
         // On each sign-in (and at launch, when signed in): check the session is still good and load the
