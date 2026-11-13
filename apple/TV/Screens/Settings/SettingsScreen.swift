@@ -211,7 +211,10 @@ private struct SettingsView: View {
                 }
                 .padding(4)
                 .background(.white.opacity(0.08), in: Capsule())
+                // A container first, so each chip keeps its own label and the group is named once.
+                .accessibilityElement(children: .contain)
                 .accessibilityLabel(liveRemindMe)
+                .accessibilityIdentifier("live-lead-choices")
             }
             .padding(.horizontal, 18)
             .frame(minHeight: 62)
@@ -244,7 +247,10 @@ private struct SettingsView: View {
                     Text(kind.settingsLabel).font(.system(size: 20, weight: .semibold)).foregroundStyle(Palette.text)
                     Spacer(minLength: 12)
                     SkipControl(mode: model.skipMode(kind)) { mode in Task { await model.setSkip(kind, mode: mode) } }
+                        // A container first, so each option keeps its own label and the group is named once.
+                        .accessibilityElement(children: .contain)
                         .accessibilityLabel("Skip \(kind.settingsLabel)")
+                        .accessibilityIdentifier("skip-\(kind.rawValue)")
                 }
                 .padding(.horizontal, 18)
                 .frame(minHeight: 62)
