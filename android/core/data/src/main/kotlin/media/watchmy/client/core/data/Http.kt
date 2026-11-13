@@ -109,7 +109,8 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
         return object : ServerAccess {
             override suspend fun <T> call(block: suspend (baseUrl: String, client: OkHttpClient) -> T): T {
                 val account = session?.account ?: throw SignedOutException()
-                val token = withContext(Dispatchers.IO) { store.tokenForRequest(session.server.id, account) } ?: throw SignedOutException()
+                val token = Http.call(signedIn = true) { withContext(Dispatchers.IO) { store.tokenForRequest(session.server.id, account) } }
+                    ?: throw SignedOutException()
                 val baseUrl = session.server.baseUrl
                 val fixed = publicClient.newBuilder().addInterceptor { chain ->
                     val request = chain.request()
@@ -182,6 +183,8 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
             throw ApiException(e.statusCode, detail((e.response as? ClientError<*>)?.body) ?: clientMessage(e.statusCode), e)
         } catch (e: ServerException) {
             throw ApiException(e.statusCode, detail((e.response as? ServerError<*>)?.body) ?: "The server had a problem (${e.statusCode}). Try again.", e)
+        } catch (e: TokenUnavailableException) {
+            throw ApiException(null, "Couldn't read this device's saved sign-in. Try again.", e)
         } catch (e: ReplyTooLargeException) {
             throw ApiException(null, "The server sent a reply this app doesn't understand.", e)
         } catch (e: IOException) {

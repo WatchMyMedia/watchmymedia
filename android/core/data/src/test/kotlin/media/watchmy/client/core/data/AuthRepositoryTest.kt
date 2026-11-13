@@ -148,6 +148,38 @@ class AuthRepositoryTest {
     }
 
     @Test
+    fun `a Keystore error that may pass fails the request and keeps the sign-in`() = runBlocking<Unit> {
+        val sealer = FlakySealer()
+        val h = Harness(sealer)
+        try {
+            h.signIn()
+            withTimeout(5_000) { h.dataStore.data.first { LocalStore.decode(it).current?.account != null } }
+            // After a restart the Keystore is busy: nothing is opened yet, and nothing is asked without a token.
+            sealer.failing = true
+            val restarted = h.reopen()
+            h.server.always("GET /api/home", json(TestServer.fixture("home.json")))
+            try {
+                restarted.library.home()
+                fail("expected ApiException")
+            } catch (e: SignedOutException) {
+                fail("a Keystore that may recover signed the account out")
+            } catch (e: ApiException) {
+                assertTrue(e.cause is TokenUnavailableException)
+            }
+            assertTrue(h.server.requests("GET /api/home").isEmpty())
+            assertEquals("viewer", restarted.auth.user.value?.name)
+            assertEquals("p1:tok-viewer", restarted.storedToken())
+            // It works again: the same sign-in goes on.
+            sealer.failing = false
+            restarted.library.home()
+            assertEquals("Bearer tok-viewer", h.server.last("GET /api/home").getHeader("Authorization"))
+            assertEquals("viewer", restarted.auth.user.value?.name)
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
     fun `pairing shows the code, polls until approved and signs in`() = runBlocking {
         h.select()
         server.on("POST /api/auth/pair", json(PAIR_START))
@@ -352,4 +384,16 @@ private class LosableSealer : TokenSealer {
     override fun seal(token: String) = PlainSealer.seal(token)
 
     override fun open(sealed: String) = if (lost) null else PlainSealer.open(sealed)
+}
+
+/** Opens tokens as [PlainSealer] does, except that it throws while [failing], as a busy Keystore does. */
+private class FlakySealer : TokenSealer {
+    @Volatile var failing = false
+
+    override fun seal(token: String) = PlainSealer.seal(token)
+
+    override fun open(sealed: String): String? {
+        if (failing) throw TokenUnavailableException(java.security.KeyStoreException("busy"))
+        return PlainSealer.open(sealed)
+    }
 }

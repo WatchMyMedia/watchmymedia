@@ -187,16 +187,28 @@ internal class LocalStore(
     /** Identity and generation captured under the same lock as an account switch. */
     fun requestSnapshot(): Pair<Session?, Long> = synchronized(lock) { session() to revision }
 
-    /** The bearer token of [account], or null when it cannot be opened (signed out). */
+    /**
+     * The bearer token of [account], or null when it can never be opened
+     * (signed out). Throws [TokenUnavailableException] when the Keystore
+     * failed this time; that answer isn't kept, so the next call asks again.
+     */
     fun token(account: StoredAccount): String? = synchronized(opened) {
         opened.getOrPut(account.token) { sealer.open(account.token) }
     }
 
+    /** [token], or null while the Keystore fails too: for ending a session or comparing tokens, where a request isn't waiting. */
+    fun tokenOrNull(account: StoredAccount): String? = try {
+        token(account)
+    } catch (_: TokenUnavailableException) {
+        null
+    }
+
     /**
      * The bearer token of [account] on [serverId], for a request. One that
-     * can't be opened (the Keystore lost its key) clears that sign-in, as a
-     * rejected token does, so the app shows sign-in rather than failing
-     * every call.
+     * can never be opened (the Keystore lost or invalidated its key) clears
+     * that sign-in, as a rejected token does, so the app shows sign-in rather
+     * than failing every call. A Keystore failure that may pass throws
+     * [TokenUnavailableException] and keeps the sign-in.
      */
     fun tokenForRequest(serverId: String, account: StoredAccount): String? {
         val token = token(account)
@@ -254,7 +266,7 @@ internal class LocalStore(
         update { s ->
             s.withServer(serverId) { server ->
                 val account = server.account
-                if (account != null && token(account) == token) server.copy(account = null, lastUserName = account.userName) else server
+                if (account != null && tokenOrNull(account) == token) server.copy(account = null, lastUserName = account.userName) else server
             }
         }
     }

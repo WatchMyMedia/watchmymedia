@@ -113,7 +113,7 @@ internal class RealServerRepository(
             s.copy(servers = s.servers.filter { it.id != serverId }, currentId = s.currentId.takeIf { it != serverId })
         }
         // Ends the session on the server too, when it can be reached; forgetting works offline either way.
-        val token = gone.account?.let(store::token) ?: return
+        val token = gone.account?.let(store::tokenOrNull) ?: return
         signOutLater(gone.baseUrl, token)
     }
 

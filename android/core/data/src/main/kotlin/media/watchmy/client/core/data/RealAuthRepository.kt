@@ -138,7 +138,7 @@ internal class RealAuthRepository(
                 // Signing out goes on whatever the hook met.
             }
         }
-        val token = store.token(account)
+        val token = store.tokenOrNull(account)
         store.updateAndSave { s -> s.withServer(session.server.id) { it.copy(account = null, lastUserName = account.userName) } }
         if (token != null) servers.signOutQuietly(session.server.baseUrl, token)
     }
@@ -198,7 +198,7 @@ internal class RealAuthRepository(
             }
         }
         // Signing in again (another account, or the same one) ends the session it replaces.
-        replaced?.let { (baseUrl, old) -> store.token(old)?.let { servers.signOutLater(baseUrl, it) } }
+        replaced?.let { (baseUrl, old) -> store.tokenOrNull(old)?.let { servers.signOutLater(baseUrl, it) } }
     }
 
     private fun ClientInfo.toApi() = Client(
