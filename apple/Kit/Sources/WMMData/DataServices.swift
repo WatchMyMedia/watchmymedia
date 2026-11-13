@@ -18,6 +18,8 @@ struct DataTuning: Sendable {
     var eventBackoff: @Sendable (Int) -> Duration = ServerEvents.defaultBackoff
     /// How long the event stream stays open after its last listener leaves.
     var eventLinger: Duration = .seconds(5)
+    /// How the event stream waits out its backoff and linger.
+    var eventSleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     var now: @Sendable () -> Date = { .now }
 }
 
@@ -79,7 +81,7 @@ public final class DataServices {
         let store = LocalStore(storage: storage, session: session, userAgent: userAgent, client: client)
         self.store = store
         events = ServerEvents(store: store, session: eventSession ?? session, backoff: tuning.eventBackoff, linger: tuning.eventLinger,
-                              now: tuning.now, network: network)
+                              now: tuning.now, network: network, sleep: tuning.eventSleep)
         let probeSession = probeSession ?? Self.probeSession(connectTimeout: tuning.probeConnectTimeout, total: tuning.probeTimeout)
         serverInfo = ServerInfoReader(store: store, session: probeSession, timeout: tuning.probeTimeout, now: tuning.now)
         serverRepository = RealServerRepository(

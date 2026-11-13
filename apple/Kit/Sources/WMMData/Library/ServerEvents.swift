@@ -158,6 +158,8 @@ final class ServerEvents {
     private let backoff: @Sendable (_ attempt: Int) -> Duration
     private let linger: Duration
     private let now: @Sendable () -> Date
+    /// Waits out a backoff or the linger; tests wait on a clock of their own.
+    private let sleep: @Sendable (Duration) async throws -> Void
     private var listeners: [UUID: (topic: EventTopic, delivery: Delivery)] = [:]
     private var connection: Task<Void, Never>?
     private var stopping: Task<Void, Never>?
@@ -166,7 +168,7 @@ final class ServerEvents {
     private var attempt = 0
     private var connectedBefore = false
     /// Whether the current connection has sent its first ping.
-    private var pinged = false
+    private(set) var pinged = false
     /// Changes made here whose echo is still to come, with when they were made.
     private var echoes: [(id: UUID, echo: ExpectedEcho, at: Date)] = []
     /// Events of each topic received from the server (and reconnects), so a
@@ -181,12 +183,14 @@ final class ServerEvents {
     nonisolated static let defaultBackoff: @Sendable (Int) -> Duration = { attempt in .seconds(min(1 << min(attempt, 6), 60)) }
 
     init(store: LocalStore, session: URLSession, backoff: @escaping @Sendable (Int) -> Duration = ServerEvents.defaultBackoff,
-         linger: Duration = .seconds(5), now: @escaping @Sendable () -> Date = { .now }, network: (any NetworkPath)? = nil) {
+         linger: Duration = .seconds(5), now: @escaping @Sendable () -> Date = { .now }, network: (any NetworkPath)? = nil,
+         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
         self.store = store
         self.session = session
         self.backoff = backoff
         self.linger = linger
         self.now = now
+        self.sleep = sleep
         store.onSessionChange { [weak self] _ in self?.reconnect() }
         if let network {
             let updates = network.updates()
@@ -228,6 +232,9 @@ final class ServerEvents {
             continuation.onTermination = { [weak self] _ in Task { @MainActor in self?.remove(id) } }
         }
     }
+
+    /// How many listen now.
+    var listenerCount: Int { listeners.count }
 
     private func add(_ topic: EventTopic, _ delivery: Delivery) -> UUID {
         let id = UUID()
@@ -305,9 +312,9 @@ final class ServerEvents {
     private func remove(_ id: UUID) {
         listeners[id] = nil
         guard listeners.isEmpty, stopping == nil else { return }
-        let linger = linger
+        let linger = linger, sleep = sleep
         stopping = Task { [weak self] in
-            try? await Task.sleep(for: linger)
+            try? await sleep(linger)
             guard !Task.isCancelled, let self, self.listeners.isEmpty else { return }
             self.connection?.cancel()
             self.connection = nil
@@ -345,7 +352,7 @@ final class ServerEvents {
         var request = signedIn.api.authorizedRequest(signedIn.api.url("/api/events"))
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        connection = Task { [weak self, session, backoff, request] in
+        connection = Task { [weak self, session, backoff, sleep, request] in
             while !Task.isCancelled {
                 self?.pinged = false
                 let status = await Self.read(request, session: session) { event in
@@ -363,11 +370,11 @@ final class ServerEvents {
                     // or the app comes back.
                     attempt = max(attempt, 6)
                     let delay = backoff(attempt)
-                    try? await Task.sleep(for: delay)
+                    try? await sleep(delay)
                 default:
                     let delay = backoff(attempt)
                     attempt += 1
-                    try? await Task.sleep(for: delay)
+                    try? await sleep(delay)
                 }
             }
         }

@@ -58,16 +58,25 @@ import WMMModel
 @Suite(.timeLimit(.minutes(1)))
 struct ServerEventsTests {
     let h = Harness()
+    /// The event stream's backoff and linger, ended by the test (never the real clock).
+    let time = ManualSleeps()
+
+    init() {
+        let time = time
+        h.tuning.eventSleep = { try await time.sleep($0) }
+        h.reopen()
+    }
 
     private func stream(_ body: String) -> Reply { Reply(status: 200, body: Data(body.utf8)) }
 
     private static let ping = "event: ping\ndata: {\"time\":\"t\"}\n\n"
 
+    /// The connection ended and the stream is waiting `delay` before the next.
+    private func waiting(_ delay: Duration) async -> Bool {
+        await eventually { time.waiting == [delay] }
+    }
+
     @Test func changesComeFromWatchAndLibraryEventsAndAgainAfterAReconnect() async throws {
-        // Long enough between connections for each one's news to arrive on its
-        // own; after a 404, longer than the test.
-        h.tuning.eventBackoff = { $0 >= 6 ? .seconds(60) : .milliseconds(300) }
-        h.reopen()
         try await h.signIn()
         h.router.on(
             "GET /api/events",
@@ -79,12 +88,18 @@ struct ServerEventsTests {
         let listening = Task { for await _ in h.services.library.changes() { changes.count += 1 } }
         defer { listening.cancel() }
 
+        // Each connection's news arrives on its own: the next waits for the test.
         #expect(await eventually { changes.count == 1 }, "watch.changed")
+        #expect(await waiting(.milliseconds(20)))
+        time.advance()
         #expect(await eventually { changes.count == 2 }, "the second connection's ping: events may have been missed")
+        #expect(await waiting(.milliseconds(20)))
+        time.advance()
         #expect(await eventually { changes.count >= 3 }, "the third connection")
+        #expect(await waiting(.milliseconds(20)))
+        time.advance()
         // The fourth answers 404 (no events on this server): asked again only at the longest wait.
-        #expect(await eventually { h.router.requests("GET /api/events").count == 4 })
-        try await Task.sleep(for: .milliseconds(400))
+        #expect(await waiting(.seconds(60)))
         #expect(h.router.requests("GET /api/events").count == 4)
 
         let first = try #require(h.router.requests("GET /api/events").first)
@@ -99,9 +114,11 @@ struct ServerEventsTests {
         let listening = Task { for await _ in h.services.library.changes() { changes.count += 1 } }
         defer { listening.cancel() }
         #expect(await eventually { changes.count == 1 }, "watch.changed")
+        #expect(await waiting(.milliseconds(20)))
+        time.advance()
         // The reconnect is answered 404, so the stream is over: the pings sent nothing.
-        #expect(await eventually { h.router.requests("GET /api/events").count == 2 })
-        try await Task.sleep(for: .milliseconds(100))
+        #expect(await waiting(.seconds(60)))
+        #expect(h.router.requests("GET /api/events").count == 2)
         #expect(changes.count == 1)
     }
 
@@ -115,8 +132,8 @@ struct ServerEventsTests {
         let changes = Counter()
         let listening = Task { for await _ in h.services.library.changes() { changes.count += 1 } }
         defer { listening.cancel() }
-        #expect(await eventually { h.router.requests("GET /api/events").count == 2 })
-        #expect(changes.count == 3)
+        #expect(await waiting(.milliseconds(20)), "the connection has ended")
+        #expect(await eventually { changes.count == 3 })
     }
 
     @Test func oneConnectionIsSharedByEveryListener() async throws {
@@ -130,8 +147,9 @@ struct ServerEventsTests {
             second.cancel()
         }
         #expect(await eventually { a.count == 1 && b.count == 1 })
-        #expect(await eventually { h.router.requests("GET /api/events").count == 2 }, "the reconnect, answered 404")
-        try await Task.sleep(for: .milliseconds(100))
+        #expect(await waiting(.milliseconds(20)))
+        time.advance()
+        #expect(await waiting(.seconds(60)), "the reconnect, answered 404")
         #expect(h.router.requests("GET /api/events").count == 2)
     }
 
@@ -141,15 +159,15 @@ struct ServerEventsTests {
         let listening = Task { for await _ in h.services.library.changes() {} }
         defer { listening.cancel() }
         #expect(await eventually { h.services.auth.user == nil })
-        try await Task.sleep(for: .milliseconds(150))
         #expect(h.router.requests("GET /api/events").count == 1)
+        #expect(time.asked.isEmpty, "no backoff: nothing is asked again")
     }
 
     @Test func signedOutNothingConnects() async throws {
         try await h.select()
         let listening = Task { for await _ in h.services.library.changes() {} }
         defer { listening.cancel() }
-        try await Task.sleep(for: .milliseconds(100))
+        #expect(await eventually { h.services.events.listenerCount == 1 })
         #expect(h.router.requests("GET /api/events").isEmpty)
     }
 
@@ -159,22 +177,26 @@ struct ServerEventsTests {
         let changes = Counter()
         let listening = Task { for await _ in h.services.library.changes() { changes.count += 1 } }
         defer { listening.cancel() }
-        try await Task.sleep(for: .milliseconds(50))
+        #expect(await eventually { h.services.events.listenerCount == 1 })
         #expect(h.router.requests("GET /api/events").isEmpty)
         try await h.signIn()
         #expect(await eventually { changes.count == 1 })
     }
 
     @Test func theStreamClosesWhenTheLastListenerLeaves() async throws {
+        h.tuning.eventLinger = .seconds(5)
+        h.reopen()
         try await h.signIn()
         h.router.always("GET /api/events", stream(Self.ping))
         let listening = Task { for await _ in h.services.library.changes() {} }
-        #expect(await eventually { h.router.requests("GET /api/events").count >= 2 })
+        #expect(await waiting(.milliseconds(20)))
         listening.cancel()
-        try await Task.sleep(for: .milliseconds(100))
-        let after = h.router.requests("GET /api/events").count
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(h.router.requests("GET /api/events").count == after)
+        // The stream lingers; once that ends, the waiting reconnect is cancelled.
+        #expect(await eventually { time.waiting.contains(.seconds(5)) })
+        time.advance(.seconds(5))
+        #expect(await eventually { time.waiting.isEmpty })
+        #expect(h.router.requests("GET /api/events").count == 1)
+        #expect(h.services.events.listenerCount == 0)
     }
 
     @Test func aServerWithoutEventsIsAskedAgainAndFollowedOnceItHasThem() async throws {
@@ -185,7 +207,9 @@ struct ServerEventsTests {
         let changes = Counter()
         let listening = Task { for await _ in h.services.library.changes() { changes.count += 1 } }
         defer { listening.cancel() }
-        #expect(await eventually { changes.count >= 1 }, "after the 404, the next connection's event")
+        #expect(await waiting(.milliseconds(20)), "after the 404")
+        time.advance()
+        #expect(await eventually { changes.count >= 1 }, "the next connection's event")
     }
 
     @Test func theNetworkComingBackReconnectsAtOnce() async throws {
@@ -200,8 +224,8 @@ struct ServerEventsTests {
         let listening = Task { for await _ in h.services.library.changes() { changes.count += 1 } }
         defer { listening.cancel() }
         #expect(await eventually { events.requests.count == 1 })
+        #expect(await waiting(.seconds(60)))
         network.set(false)
-        try await Task.sleep(for: .milliseconds(20))
         #expect(events.requests.count == 1, "nothing while the network is gone")
         network.set(true)
         #expect(await eventually { events.requests.count == 2 && events.openCount == 1 }, "at once, not after the backoff")
@@ -215,7 +239,7 @@ struct ServerEventsTests {
         defer { listening.cancel() }
         #expect(await eventually { events.openCount == 1 })
         events.send(event: "ping", data: #"{"time":"t"}"#)
-        try await Task.sleep(for: .milliseconds(20))
+        #expect(await eventually { h.services.events.pinged })
         #expect(changes.count == 0, "a first connection misses nothing")
         // An upgrade while the app was away.
         h.router.always("GET /api/server", .json(Fixtures.serverInfo(apiLevel: 9).replacingOccurrences(of: "2321341d1a4a571c275b88b68f88d3c5", with: h.testServer.id)))

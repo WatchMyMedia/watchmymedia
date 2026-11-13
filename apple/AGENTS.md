@@ -62,9 +62,11 @@ server, and on iPad in both a regular and a compact width.
   actor hundreds of milliseconds behind, so a fixed `Task.sleep` before an
   assertion fails now and then. Give the model or fake a `sleep` (and `now`)
   and move a `ManualTime` (`PlayerTestSupport.swift`), as `PlayerHarness` and
-  `FakePlaybackController(sleep:)` do, or wait for the state with
-  `eventually { … }`. `FakeLatency` covers the fake repositories, not the fake
-  player's own timing. `swift test --maximum-repetitions` repeats one test at a
+  `FakePlaybackController(sleep:)` do (in `WMMDataTests`, the event
+  stream's backoff and linger take `DataTuning.eventSleep`, which
+  `ManualSleeps` ends), or wait for the state with `eventually { … }`.
+  `FakeLatency` covers the fake repositories, not the fake player's own
+  timing. `swift test --maximum-repetitions` repeats one test at a
   time, which doesn't load the main actor; to check a fix, run several copies
   of the whole test bundle at once.
 - **iPhone and Apple TV share no files.** What both need goes in the Kit

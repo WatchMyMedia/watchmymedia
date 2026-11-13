@@ -230,8 +230,10 @@ func eventually(_ timeout: Duration = .seconds(5), _ condition: () -> Bool) asyn
 final class FakeNetworkPath: NetworkPath, @unchecked Sendable {
     private var continuation: AsyncStream<Bool>.Continuation?
 
+    /// Every change in order, so a test that turns the network off and on
+    /// again needn't wait between them for the first to be read.
     func updates() -> AsyncStream<Bool> {
-        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+        AsyncStream { continuation in
             self.continuation = continuation
             continuation.yield(true)
         }
