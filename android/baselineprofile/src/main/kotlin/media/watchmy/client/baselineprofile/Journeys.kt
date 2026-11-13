@@ -91,8 +91,6 @@ internal fun UiDevice.fail(message: String): Nothing {
 internal fun UiDevice.waitFor(selector: BySelector, timeoutMs: Long = WAIT_MS): UiObject2 =
     wait(Until.findObject(selector), timeoutMs) ?: fail("Nothing on screen matches $selector")
 
-private fun UiDevice.waitForText(text: String, timeoutMs: Long = WAIT_MS) = waitFor(By.text(text), timeoutMs)
-
 /** Of the elements matching [selector], the lowest on screen: the bottom bar's "TV Shows". */
 private fun UiDevice.lowest(selector: BySelector): UiObject2 =
     findObjects(selector).maxByOrNull { it.visibleBounds.top } ?: fail("Nothing on screen matches $selector")
@@ -281,14 +279,31 @@ fun MacrobenchmarkScope.phonePlay() {
     device.wait(Until.hasObject(By.desc("Back")), LOAD_MS)
     device.wait(Until.gone(By.desc("Back")), WAIT_MS)
     // An emulator's decoder can fail now and then ("Can't play this"): the player has run all the same.
-    if (!device.hasObject(PLAYER_ERROR)) {
-        if (!device.hasObject(By.text("Subtitles"))) device.click(device.displayWidth / 2, device.displayHeight / 3)
-        device.waitForText("Subtitles").click()
-        device.waitForIdle()
-    }
+    if (!device.hasObject(PLAYER_ERROR)) openSubtitles()
     // Back closes the picker (or the error), then leaves the player for the page.
     backTo(tag(Tags.PLAY))
     device.pressBack()
+}
+
+/**
+ * Brings the phone player's controls back with a tap and opens the Subtitles
+ * picker, trying again when a tap lands as the controls hide (or is taken
+ * for half of a double tap). The picker is the journey's last stop in the
+ * player, so missing it leaves the rest of the profile as it is.
+ */
+private fun MacrobenchmarkScope.openSubtitles() {
+    val subtitles = By.text("Subtitles")
+    repeat(3) {
+        if (!device.hasObject(subtitles)) device.click(device.displayWidth / 2, device.displayHeight / 3)
+        val button = device.wait(Until.findObject(subtitles), 3_000) ?: return@repeat
+        try {
+            button.click()
+            device.waitForIdle()
+            return
+        } catch (_: StaleObjectException) {
+            // The controls hid between finding the button and the tap: again.
+        }
+    }
 }
 
 /** The player's error, which ends a play the device can't decode. */
