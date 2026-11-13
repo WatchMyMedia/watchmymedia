@@ -106,7 +106,15 @@ type HealthOutput struct {
 // generations. Fixed-quality clients keep the same session and heartbeat.
 // 27: opt-in adaptive HLS families and observed rendition measurements.
 // Servers keep experimental family creation disabled unless configured.
-const APILevel = 27
+// 28: playback starts sooner (PLAN-ANDROID-REVIEW.md §4.2): the decision
+// from startPlayback and startLiveTVRecordingPlayback carries mediaToken,
+// what createMediaToken would give the same request, when it signed in
+// with a session; getLiveTVSession takes waitMs (at most 10000) and
+// replies once a starting session plays, fails or stops; and Live TV's
+// capabilities and channel list carry an ETag and answer 304. Clients read
+// mediaToken when present and else ask createMediaToken; they send waitMs
+// only from this level, as older servers reply at once.
+const APILevel = 28
 
 // ServerInfo identifies the server to apps before anyone signs in.
 type ServerInfo struct {

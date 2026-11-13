@@ -1274,10 +1274,12 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//api/live-tv/sessions/{id}/get(getLiveTVSession)`.
     public func getLiveTVSession(
         path: Operations.GetLiveTVSession.Input.Path,
+        query: Operations.GetLiveTVSession.Input.Query = .init(),
         headers: Operations.GetLiveTVSession.Input.Headers = .init()
     ) async throws -> Operations.GetLiveTVSession.Output {
         try await getLiveTVSession(Operations.GetLiveTVSession.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }

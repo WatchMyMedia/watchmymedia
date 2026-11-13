@@ -1929,6 +1929,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Decision/growing`.
             public var growing: Components.Schemas.Growing?
+            /// API level 28: the media token createMediaToken would give this request, for players that send ?access_token= on this decision's URLs. Present when the request signed in with a session; absent for cast tokens, on offline downloads' decisions and from older servers, where clients call createMediaToken as before.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Decision/mediaToken`.
+            public var mediaToken: Components.Schemas.MediaToken?
             /// - Remark: Generated from `#/components/schemas/Decision/mimeType`.
             public var mimeType: Swift.String?
             /// - Remark: Generated from `#/components/schemas/Decision/mode`.
@@ -2120,6 +2124,7 @@ extension Components {
             ///   - creditsMs: Where the final end credits start; 0 when unknown.
             ///   - durationMs:
             ///   - growing: A recording still being written. Use event playback and extend the recorded duration from the clock, up to endsAt (API level 19).
+            ///   - mediaToken: API level 28: the media token createMediaToken would give this request, for players that send ?access_token= on this decision's URLs. Present when the request signed in with a session; absent for cast tokens, on offline downloads' decisions and from older servers, where clients call createMediaToken as before.
             ///   - mimeType:
             ///   - mode:
             ///   - nextEpisode:
@@ -2148,6 +2153,7 @@ extension Components {
                 creditsMs: Swift.Int64,
                 durationMs: Swift.Int64,
                 growing: Components.Schemas.Growing? = nil,
+                mediaToken: Components.Schemas.MediaToken? = nil,
                 mimeType: Swift.String? = nil,
                 mode: Components.Schemas.Decision.ModePayload,
                 nextEpisode: Components.Schemas.UpNext? = nil,
@@ -2176,6 +2182,7 @@ extension Components {
                 self.creditsMs = creditsMs
                 self.durationMs = durationMs
                 self.growing = growing
+                self.mediaToken = mediaToken
                 self.mimeType = mimeType
                 self.mode = mode
                 self.nextEpisode = nextEpisode
@@ -2205,6 +2212,7 @@ extension Components {
                 case creditsMs
                 case durationMs
                 case growing
+                case mediaToken
                 case mimeType
                 case mode
                 case nextEpisode
