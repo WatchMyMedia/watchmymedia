@@ -201,7 +201,15 @@ Off leaves the bitstream formats out of the profile (logged under
 `adb shell settings put global use_external_surround_sound_flag 1` and
 `external_surround_sound_enabled 1` (then restart the app) make Media3
 report AC-3 and E-AC-3 passthrough, so the two settings send different
-profiles. Subtitle size scales the TV's subtitles; phones follow the
+profiles. The profile's size limit is the largest picture the offered
+codecs' decoders take at 24 fps, whatever the screen, so a phone whose
+hardware decodes 4K direct-plays a 4K file: read from
+`MediaCodecInfo.VideoCapabilities` (the decoders' performance points from
+Android 10), hardware decoders first, a software-only codec counting for
+1080p at most, and the display's size only when no decoder says. A video
+decoder that fails on a stream gets one more decision for that viewing, at
+a size it takes or without its codec (logged under `WmmPlayback`).
+Subtitle size scales the TV's subtitles; phones follow the
 system's caption settings while captions are on there. Phones and tablets
 keep 15 s of played video so a jump back plays at once (`PlayerOptions`);
 TVs keep none, as it would come out of the buffer ahead of a 4K remux, and
