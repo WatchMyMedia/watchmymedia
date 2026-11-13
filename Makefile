@@ -8,7 +8,7 @@ VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev
 OPENSUBTITLES_API_KEY ?=
 LDFLAGS  = -s -w -X main.version=$(VERSION) -X main.openSubtitlesKey=$(OPENSUBTITLES_API_KEY)
 
-.PHONY: help dev web-dev gen gen-sqlc gen-api web build build-universal release ffmpeg-macos ffmpeg-windows windows-app windows-installer windows-test macos-app macos-dmg test bench lint docker docker-up clean fixture fixture-serve apple-api apple-gen apple-test apple-build apple-test-sim apple-archive apple-upload apple-tv-archive apple-tv-upload apple-e2e apple-tv-build apple-tv-test-sim apple-build-release apple-tv-build-release agents-check server-deps android-verify-metadata
+.PHONY: help dev web-dev gen gen-sqlc gen-api web build build-universal release ffmpeg-macos ffmpeg-windows windows-app windows-installer windows-test macos-app macos-dmg test bench lint docker docker-up clean fixture fixture-serve apple-api apple-gen apple-test apple-build apple-test-sim apple-archive apple-upload apple-tv-archive apple-tv-upload apple-e2e apple-tv-build apple-tv-test-sim apple-build-release apple-tv-build-release apple-perf agents-check server-deps android-verify-metadata
 .PHONY: streaming-check release-tag
 
 PLATFORMS := darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64
@@ -102,6 +102,23 @@ apple-tv-build-release: apple-gen ## Build the Apple TV app in Release for devic
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -configuration Release -destination 'generic/platform=tvOS' \
 	  -derivedDataPath $(APPLE_DERIVED) CLANG_COVERAGE_MAPPING=NO CODE_SIGNING_ALLOWED=NO build
 	apple/scripts/check-release-binary.sh $(APPLE_DERIVED)/Build/Products/Release-appletvos/WatchMyMediaTV.app
+
+# apple-perf measures a signed-in launch and scrolling Home and Movies on
+# $(SIM), and a launch on $(TV_SIM), five runs each, on the fakes (so Debug
+# builds; PLAN-APPLE-REVIEW.md §4.3.1). Not in CI: the numbers need a quiet Mac.
+apple-perf: apple-gen ## Measure launch and scrolling on $(SIM) and $(TV_SIM) (Debug, fakes) -> apple/build/Perf.xcresult, TVPerf.xcresult
+	id=$$(apple/scripts/simulator.sh "$(SIM)") && \
+	{ xcrun simctl boot "$$id" 2>/dev/null || true; } && \
+	rm -rf apple/build/Perf.xcresult && \
+	TEST_RUNNER_WMM_PERF=1 xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMediaE2E -destination "platform=iOS Simulator,id=$$id" \
+	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/Perf.xcresult $(APPLE_SIM_SIGNING) \
+	  -only-testing:WatchMyMediaUITests/PerformanceTests test
+	id=$$(apple/scripts/simulator.sh "$(TV_SIM)" appletv) && \
+	{ xcrun simctl boot "$$id" 2>/dev/null || true; } && \
+	rm -rf apple/build/TVPerf.xcresult && \
+	TEST_RUNNER_WMM_PERF=1 xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
+	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVPerf.xcresult $(APPLE_SIM_SIGNING) \
+	  -only-testing:WatchMyMediaTVUITests/PerformanceTests test
 
 # apple-e2e runs the app on $(SIM) against a server: E2E_SERVER as typed in
 # the server picker (from the simulator, localhost is this Mac), and an account

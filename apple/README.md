@@ -21,6 +21,7 @@ make apple-tv-build   # build the Apple TV app for the simulator
 make apple-tv-test-sim # build it and run every test on the Apple TV 4K simulator (TV_SIM=… for another)
 make apple-build-release    # the iPhone app in Release for devices, unsigned, then check-release-binary.sh (CI runs it)
 make apple-tv-build-release # the same for the Apple TV app
+make apple-perf       # launch and scrolling measures on SIM and TV_SIM, five runs each (not in CI)
 ```
 
 The Apple TV app needs the tvOS simulator runtime too
@@ -631,6 +632,17 @@ Home, Play to first frame, and its two halves Play to decision and Decision to
 first frame. Its calls are safe in any order: an end without its begin does
 nothing, and a new Play ends an open one as cancelled.
 
+**Measuring**. `make apple-perf` runs
+`UITests/PerformanceTests.swift` (a signed-in launch, flinging Home and the
+Movies grid) on `SIM` and `TVUITests/PerformanceTests.swift` (a launch) on
+`TV_SIM`, five runs each, into `build/Perf.xcresult` and `build/TVPerf.xcresult`.
+They skip unless `WMM_PERF=1`, which the target sets, so the normal test runs
+and CI leave them out. They run on the fakes, so in Debug builds: compare runs
+with each other on one quiet Mac, not with a release on a device. On a
+simulator the scrolling measure reports only the fling's duration (hitches
+need a device), and on the tvOS simulator the launch metric reports nothing,
+so the Apple TV test also times `launch()` with a clock.
+
 **Diagnostics** (PLAN-APPLE-REVIEW.md §6.4; the Settings row is still to be
 designed). `Diagnostics.start()` (WMMData) subscribes to MetricKit on iPhone
 and iPad and keeps the last launch, hang and crash summaries in
@@ -671,8 +683,8 @@ be in it:
 | `Kit/Sources/WMMFeatures` | Screen models and navigation, shared with the Apple TV app: `Navigation/` (`Navigator`, `Route`, `AppTab`, `DeepLink`), `Browse/` (Home, Library, Show, Movie, Search), `Account/` (server picker, sign-in and pairing, Settings, Link a TV), `Player/` (the controls' timing, double-tap seek, the scrubber, the picker's wording, and `TVPlayerModel` for the Apple TV's system player) |
 | `App/` | The iPhone and iPad app: `Shell/` (app, root flow, tabs, `ServicesFactory`), `Screens/<feature>/` (SwiftUI views; a screen lays itself out for a regular width with `PadLayout` from `Components/Layout.swift`), `Components/Browse` and `Components/Account` (views those screens share) |
 | `TV/` | The Apple TV app, target "WatchMyMedia TV" (tvOS 18+, the same bundle ID for the universal purchase): `Shell/` (app, root flow, the tab bar, `TabPage`, its own `ServicesFactory` with the TV profile), `Screens/<feature>/`, `Components/` (focus, buttons, chips, cards, rows), `Resources/` (the layered icon and Top Shelf images from `brand/`) |
-| `UITests/` | The end-to-end test against a real server (`make apple-e2e`) |
-| `TVUITests/` | The Apple TV app on the fakes, driven with the Siri Remote |
+| `UITests/` | The end-to-end test against a real server (`make apple-e2e`), the iPhone and iPad UI tests on the fakes, and the performance tests (`make apple-perf`) |
+| `TVUITests/` | The Apple TV app on the fakes, driven with the Siri Remote, and its launch measure (`make apple-perf`) |
 | `Tools/` | The OpenAPI generator, kept out of the app's dependencies |
 
 Why `TV/` is a folder of its own beside `App/` rather than one `App/` with
