@@ -1,6 +1,7 @@
 package media.watchmy.client.baselineprofile
 
 import android.graphics.Rect
+import android.os.SystemClock
 import android.view.KeyEvent
 import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.test.platform.app.InstrumentationRegistry
@@ -288,10 +289,20 @@ fun MacrobenchmarkScope.tvPairedHome() {
     device.waitForIdle()
 }
 
+/**
+ * Presses [key] [times], letting the screen settle after each. Accessibility
+ * goes idle while a row, the rail or a pager still slides, and a key pressed
+ * then can land elsewhere: the TV journey reached Settings instead of TV Shows
+ * on a busy emulator, where the same keys a second apart did not.
+ */
 private fun MacrobenchmarkScope.press(times: Int, key: () -> Unit) = repeat(times) {
     key()
     device.waitForIdle()
+    SystemClock.sleep(SETTLE_MS)
 }
+
+/** How long each key's slide is given to finish, with room for a busy emulator. */
+private const val SETTLE_MS = 500L
 
 /** Home with the remote: from the hero down to Continue watching, along it, down the rows and back up. */
 fun MacrobenchmarkScope.tvHome() {
