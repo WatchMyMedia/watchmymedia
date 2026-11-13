@@ -101,6 +101,24 @@ struct TVLivePlayerModelTests {
         #expect(controller.calls.filter { $0 == "release" }.count == 1)
         #expect(model.state.status == .stopped)
     }
+    @Test func backWithAReminderBannerClosesItBeforeLeaving() async throws {
+        var exits = 0
+        let (model, controller, _) = try await fixture(onExit: { exits += 1 })
+        #expect(model.back(bannerShowing: true) == .closeBanner)
+        #expect(exits == 0)
+        #expect(model.state.status == .playing, "the channel plays on under the banner")
+        #expect(!controller.calls.contains("release"))
+        // Still watching comes first: its prompt hides the banner.
+        controller.state.askStillWatching = true
+        #expect(model.back(bannerShowing: true) == .handled)
+        #expect(controller.calls.last == "keep")
+        #expect(exits == 0)
+        // With the banner gone, Menu leaves.
+        #expect(model.back() == .handled)
+        #expect(exits == 1)
+        #expect(model.back(bannerShowing: true) == .handled, "a closed player has nothing to hide")
+    }
+
     @Test func playPauseAnswersPromptWithoutTogglingPlayback() async throws {
         let (model, controller, _) = try await fixture()
         controller.state.askStillWatching = true

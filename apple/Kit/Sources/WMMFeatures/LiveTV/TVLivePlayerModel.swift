@@ -138,9 +138,24 @@ public final class TVLivePlayerModel {
         if overlay == .stillWatching { answerStillWatching(keepWatching: true) }
         else if videoTakesInput { controller.noteUserInput(); controller.togglePlayPause() }
     }
-    public func back() {
-        guard !disposed else { return }
-        if overlay == .stillWatching { answerStillWatching(keepWatching: true) }
-        else { close() }
+    /// Menu that reached the app (AVKit closes its own panel first): it
+    /// answers Still watching, then puts away a reminder banner, which never
+    /// takes focus so Menu is the remote's way to it, then leaves. Returns
+    /// ``TVLiveBack/closeBanner`` when the view should hide `bannerShowing`'s banner.
+    @discardableResult
+    public func back(bannerShowing: Bool = false) -> TVLiveBack {
+        guard !disposed else { return .handled }
+        if overlay == .stillWatching { answerStillWatching(keepWatching: true); return .handled }
+        if bannerShowing && overlay == nil { return .closeBanner }
+        close()
+        return .handled
     }
+}
+
+/// What Menu in the Live TV player leaves to the view.
+public enum TVLiveBack: Hashable, Sendable {
+    /// Hide the reminder banner; the channel keeps playing.
+    case closeBanner
+    /// The model answered the prompt or closed the player.
+    case handled
 }

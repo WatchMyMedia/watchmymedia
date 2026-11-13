@@ -153,6 +153,21 @@ final class LiveExtrasTests: XCTestCase {
     }
 
     @MainActor
+    func testMenuPutsThePlayersBannerAwayBeforeLeaving() {
+        // 10 s: the channel is playing before the reminder comes.
+        let app = launch(["-fakesLiveReminderSoon", "10", "-open", "watchmymedia://live-tv/ch-7.1"])
+        let player = app.descendants(matching: .any)["live-player-screen"]
+        let banner = app.descendants(matching: .any)["live-reminder-banner"]
+        XCTAssertTrue(banner.waitForExistence(timeout: 45), "the reminder's banner comes over the channel")
+        remote.press(.menu)
+        XCTAssertTrue(banner.waitForNonExistence(timeout: 5), "Menu puts the banner away")
+        XCTAssertTrue(player.exists, "and stays on the channel")
+        remote.press(.menu)
+        XCTAssertTrue(player.waitForNonExistence(timeout: 10), "the next Menu leaves Live TV")
+        app.terminate()
+    }
+
+    @MainActor
     func testThePlayersChannelsPutTheDueReminderFirst() {
         // 12 s: the channel plays and its Channels panel is open before the
         // reminder comes, so the banner is the player's.

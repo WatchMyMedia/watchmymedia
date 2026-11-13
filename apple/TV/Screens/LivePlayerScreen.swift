@@ -55,6 +55,8 @@ private struct TVLivePlayerContent: View {
     let model: TVLivePlayerModel
     @State private var standIn = AVPlayer()
     @State private var previewPanel: LivePanel?
+    /// The reminder banner Menu put away; the store keeps it up for its ten seconds elsewhere.
+    @State private var closedBanner: String?
     @FocusState private var focused: String?
     @Environment(LiveExtrasStore.self) private var extras
     @Environment(LiveRecordingsStore.self) private var recordings
@@ -77,8 +79,8 @@ private struct TVLivePlayerContent: View {
         content
             // AVKit closes its own info panel first; only bubbled commands reach the app.
             .onExitCommand {
-                if previewPanel != nil { previewPanel = nil }
-                else { model.back() }
+                if previewPanel != nil { previewPanel = nil; return }
+                if model.back(bannerShowing: banner != nil) == .closeBanner { closedBanner = banner?.id }
             }
             .onPlayPauseCommand { model.playPause() }
     }
@@ -149,13 +151,19 @@ private struct TVLivePlayerContent: View {
                 .accessibilityIdentifier("live-recording-takeover")
             }
             // A Live TV reminder: Swipe down opens Channels with it first (TvLiveReminder's `bannerPlayer`).
-            if let reminder = extras.banner, model.overlay == nil {
+            if let reminder = banner, model.overlay == nil {
                 TVLiveReminderBanner(reminder: reminder, inPlayer: true)
                     .padding(.top, 60)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
         }
-        .animation(.easeOut(duration: 0.3), value: extras.banner)
+        .animation(.easeOut(duration: 0.3), value: banner)
+    }
+
+    /// The reminder banner, unless Menu put it away (TvLiveReminder's `bannerPlayer`).
+    private var banner: LiveReminder? {
+        guard let banner = extras.banner, banner.id != closedBanner else { return nil }
+        return banner
     }
 
     private func prompt<Actions: View>(title: String, message: String, @ViewBuilder actions: () -> Actions) -> some View {
