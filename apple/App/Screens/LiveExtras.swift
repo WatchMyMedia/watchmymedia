@@ -264,7 +264,7 @@ struct LiveRemindersList: View {
                     } else if let error = extras.error, !extras.loaded {
                         ErrorState(title: "Couldn't load reminders", message: error, retry: { await extras.refresh() })
                     } else {
-                        EmptyState(systemImage: "bell", title: "No reminders",
+                        EmptyState(systemImage: "bell", title: liveNoReminders,
                                    message: "Choose Remind me on a programme in the guide to have one here.")
                             .padding(.vertical, 24)
                     }
@@ -319,7 +319,7 @@ struct LiveRemindersList: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(liveReminderAccessibilityLabel(reminder, previousStart: previous, now: now))
-            .accessibilityHint(reminder.state == .gone ? "Shows the reminder as it was kept" : "Opens the guide at it")
+            .accessibilityHint(reminder.state == .gone ? liveShowsKeptReminderHint : "Opens the guide at it")
             .accessibilityIdentifier("live-reminder-\(reminder.title)")
             Button("Remove") { Task { await extras.remove(reminder) } }
                 .buttonStyle(GoldTextButtonStyle(font: .system(size: 15, weight: .semibold)))
@@ -433,7 +433,7 @@ struct LiveSearchRow: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(liveSearchAccessibilityLabel(hit, reminded: reminded, now: now))
-            .accessibilityHint(compact ? "Shows it in the guide" : "Opens the guide at it")
+            .accessibilityHint(compact ? liveShowsInGuideHint : "Opens the guide at it")
             .accessibilityIdentifier("live-search-\(hit.channel.number)-\(p.title)")
             action(onNow: onNow, reminded: reminded)
         }

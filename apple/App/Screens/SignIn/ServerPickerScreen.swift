@@ -56,7 +56,7 @@ private struct ServerPickerContent: View {
             }
             .accountList()
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle("Choose a server")
+            .navigationTitle(chooseServerTitle)
             .toolbar {
                 if model.canGoBack {
                     ToolbarItem(placement: .topBarLeading) {
@@ -88,7 +88,7 @@ private struct ServerPickerContent: View {
             } else if model.found.isEmpty {
                 HStack(spacing: 12) {
                     ProgressView().tint(Palette.muted)
-                    Text("Looking for servers…").font(.subheadline).foregroundStyle(Palette.muted)
+                    Text(lookingForServers).font(.subheadline).foregroundStyle(Palette.muted)
                 }
                 .frame(minHeight: 44)
                 .accountRow()
@@ -99,7 +99,7 @@ private struct ServerPickerContent: View {
                 ErrorLine(message: error) { model.dismissError() }.accountRow()
             }
         } header: {
-            GroupHeading("On this network")
+            GroupHeading(onThisNetwork)
         } footer: {
             if !model.localNetworkDenied {
                 GroupFootnote("Found with Bonjour. Servers appear as they come online.")
@@ -141,10 +141,10 @@ private struct ServerPickerContent: View {
     private var addressSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Server address")
+                Text(serverAddressLabel)
                     .font(.footnote)
                     .foregroundStyle(Palette.muted)
-                TextField("Server address", text: $model.address, prompt: Text(verbatim: "192.168.1.20 or https://home.example.net").foregroundStyle(Palette.faint))
+                TextField(serverAddressLabel, text: $model.address, prompt: Text(serverAddressExample).foregroundStyle(Palette.faint))
                     .font(.body)
                     .foregroundStyle(Palette.text)
                     .textContentType(.URL)
@@ -168,7 +168,7 @@ private struct ServerPickerContent: View {
                 } else if model.showsHTTPSNudge {
                     Text(httpsNudge).font(.footnote).foregroundStyle(Palette.warning)
                 }
-                GroupFootnote("An IP address or a .local name works over http on your own network. A hostname needs https; Tailscale Serve or a reverse proxy gives it one.")
+                GroupFootnote(serverAddressNote)
             }
         }
     }
@@ -194,7 +194,7 @@ private struct ServerPickerContent: View {
                     Image(systemName: "checkmark")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(Palette.gold)
-                        .accessibilityLabel("In use")
+                        .accessibilityLabel(serverInUse)
                 } else {
                     RowChevron()
                 }

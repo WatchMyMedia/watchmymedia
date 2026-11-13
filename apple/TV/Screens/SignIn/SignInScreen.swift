@@ -52,7 +52,7 @@ private struct SignInContent: View {
                         Button("Sign in with a password instead") { model.usePassword() }
                             .buttonStyle(TVButtonStyle())
                     }
-                    Button("Switch server") { flow.choosingServer = true }
+                    Button(switchServerTitle) { flow.choosingServer = true }
                         .buttonStyle(TVButtonStyle())
                 }
                 .padding(.top, 26)
@@ -96,19 +96,19 @@ private struct SignInContent: View {
             }
         case .approved:
             CodeTiles(code: "", dim: true)
-            Label("Code accepted. Signing in…", systemImage: "checkmark.circle.fill")
+            Label(pairingCodeAccepted, systemImage: "checkmark.circle.fill")
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Palette.gold)
         case .expired, .failed:
             CodeTiles(code: "", dim: true)
             if let problem = model.pairingProblem { WarningLine(text: problem) }
-            Button("Get a new code") { model.newCode() }
+            Button(pairingNewCode) { model.newCode() }
                 .buttonStyle(TVButtonStyle(kind: .primary))
         case .starting, nil:
             CodeTiles(code: "", dim: true)
             HStack(spacing: 12) {
                 ProgressView()
-                Text("Getting a code…")
+                Text(pairingGettingCode)
             }
             .font(.system(size: 20))
             .foregroundStyle(Palette.muted)
@@ -181,7 +181,7 @@ private struct SignInContent: View {
                     .accessibilityIdentifier("signInButton")
                     Button("Use a pairing code instead") { model.usePairingCode() }
                         .buttonStyle(TVButtonStyle())
-                    Button("Switch server") { flow.choosingServer = true }
+                    Button(switchServerTitle) { flow.choosingServer = true }
                         .buttonStyle(TVButtonStyle())
                 }
                 .padding(.top, 14)
@@ -240,7 +240,7 @@ private struct CodeTiles: View {
         }
         .padding(.top, 6)
         .accessibilityElement()
-        .accessibilityLabel(code.isEmpty ? "No code yet" : "Code \(spokenCode(code))")
+        .accessibilityLabel(pairingCodeAccessibilityLabel(code))
     }
 
     private func tiles(_ characters: [Character], _ range: Range<Int>) -> some View {

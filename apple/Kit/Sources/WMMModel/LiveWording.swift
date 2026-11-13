@@ -492,3 +492,44 @@ public func liveKeepChoice(_ count: Int) -> String { count <= 0 ? "All recording
 
 /// Start early's and End late's choices: "5 min".
 public func livePaddingChoice(_ minutes: Int) -> String { "\(minutes) min" }
+
+// MARK: The guide and the channel list, as both apps word them (PLAN-APPLE-REVIEW.md §5.8)
+
+public let liveAllChannels = "All channels"
+public let liveGoToChannel = "Go to channel"
+public let liveLoadingListings = "Loading listings"
+public let liveListingsFailedTitle = "Couldn't load listings"
+public let liveNoChannelMatches = "Try another channel, or All channels."
+public let liveNoListings = "No listings"
+public let liveNoListingsStillPlays = "No listings for this channel. It still plays."
+public let livePictureFromTMDB = "Picture: TMDB"
+public let liveDescriptionFromTMDB = "Description from TMDB"
+public let liveNoReminders = "No reminders"
+public let liveShowsInGuideHint = "Shows it in the guide"
+public let liveShowsKeptReminderHint = "Shows the reminder as it was kept"
+public let liveChannelNumberOrName = "Channel number or name"
+public let liveNoChannelNumberMatches = "Try another channel number or name."
+public let liveLoadingChannels = "Loading channels"
+public let liveChannelsFailedTitle = "Couldn't load channels"
+public let liveUnavailableTitle = "Live TV isn't available"
+public let liveOnNowTitle = "On now"
+public let liveWatchesLiveHint = "Watches live"
+
+/// Why the listings failed, under the error: "The server is busy. Channels still play."
+public func liveListingsFailed(_ error: String) -> String { "\(error) Channels still play." }
+
+/// A guide cell's spoken name: the programme's (with its recording state),
+/// ", reminder set" when reminded, then the channel: "…, reminder set, 4.1 NFLD-HD".
+public func liveCellAccessibilityLabel(_ programme: LiveProgramme, reminded: Bool, channel: LiveChannel, clock: LiveClock = .device) -> String {
+    liveAccessibilityLabel(programme, clock: clock) + (reminded ? ", reminder set" : "") + ", \(channel.number) \(channel.name)"
+}
+
+/// A guide row without listings, spoken: "4.3 Coast Shop, No listings. It still plays."
+public func liveNoListingsAccessibilityLabel(_ channel: LiveChannel) -> String {
+    "\(channel.number) \(channel.name), No listings. It still plays."
+}
+
+/// The paused Live TV player's countdown to giving the tuner back: "Tuner releases in 4:05".
+public func liveTunerReleasesIn(seconds: Int) -> String {
+    "Tuner releases in \(seconds / 60):\(String(format: "%02d", seconds % 60))"
+}

@@ -212,7 +212,7 @@ struct LiveGuideScreen: View {
     private var search: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(Palette.muted)
-            TextField("Go to channel", text: $model.query, prompt: Text("Go to channel: 7.1 or a name").foregroundStyle(Palette.muted))
+            TextField(liveGoToChannel, text: $model.query, prompt: Text("Go to channel: 7.1 or a name").foregroundStyle(Palette.muted))
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                 .accessibilityIdentifier("live-channel-search")
         }
@@ -264,7 +264,7 @@ struct LiveGuideScreen: View {
                     }
                     .accessibilityIdentifier("live-filter-favourites")
                 }
-                Chip("All channels", selected: model.showingAll) { model.showAll() }
+                Chip(liveAllChannels, selected: model.showingAll) { model.showAll() }
                 ForEach(model.filters, id: \.self) { filter in
                     Chip(filter.title, selected: model.filter == filter) { model.filter = model.filter == filter ? nil : filter }
                 }
@@ -275,14 +275,14 @@ struct LiveGuideScreen: View {
 
     @ViewBuilder private func content(now: Date) -> some View {
         if model.loading {
-            ProgressView("Loading listings").frame(maxWidth: .infinity).padding(40)
+            ProgressView(liveLoadingListings).frame(maxWidth: .infinity).padding(40)
         } else if let error = model.error {
             ContentUnavailableView {
-                Label("Couldn't load listings", systemImage: "list.bullet.rectangle")
-            } description: { Text("\(error) Channels still play.") } actions: { Button("Try again") { Task { await model.load() } } }
+                Label(liveListingsFailedTitle, systemImage: "list.bullet.rectangle")
+            } description: { Text(liveListingsFailed(error)) } actions: { Button("Try again") { Task { await model.load() } } }
         } else if model.rows.isEmpty {
             ContentUnavailableView("No channels", systemImage: "tv",
-                                   description: Text(model.query.isEmpty && model.filter == nil ? "Your server's administrator can add channels in the web app." : "Try another channel, or All channels."))
+                                   description: Text(model.query.isEmpty && model.filter == nil ? "Your server's administrator can add channels in the web app." : liveNoChannelMatches))
         } else {
             LiveGuideGrid(model: model, now: now, wide: wide, stars: extras.available) { row, cell in
                 model.select(row, cell)
@@ -519,7 +519,7 @@ private struct LiveGuideCell: View, Equatable {
             let title = (cell.startsBefore ? "‹ " : "") + p.title
             var spokenProgramme = p
             let _ = { spokenProgramme.recording = mark }()
-            let spoken = liveAccessibilityLabel(spokenProgramme, clock: clock) + (reminded ? ", reminder set" : "") + ", \(row.channel.number) \(row.channel.name)"
+            let spoken = liveCellAccessibilityLabel(spokenProgramme, reminded: reminded, channel: row.channel, clock: clock)
             Button { choose(row, cell) } label: {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 4) {
@@ -559,7 +559,7 @@ private struct LiveGuideCell: View, Equatable {
         case .noListings:
             Button { choose(row, cell) } label: {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("No listings").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.textSecondary)
+                    Text(liveNoListings).font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.textSecondary)
                     Text("It still plays").font(.system(size: 12)).foregroundStyle(Palette.muted)
                 }
                 .padding(.horizontal, 10)
@@ -568,7 +568,7 @@ private struct LiveGuideCell: View, Equatable {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(row.channel.number) \(row.channel.name), No listings. It still plays.")
+            .accessibilityLabel(liveNoListingsAccessibilityLabel(row.channel))
         case .listingsEnd(let date):
             Text(liveNoListingsAfter(date, clock: clock))
                 .font(.system(size: 12)).foregroundStyle(Palette.muted).lineLimit(2)
@@ -660,7 +660,7 @@ struct LiveSelectedCard: View {
                             }
                             Text(liveTimeLine(programme, now: now)).font(.footnote).foregroundStyle(Palette.muted).lineLimit(1)
                         } else {
-                            Text("No listings for this channel. It still plays.").font(.footnote).foregroundStyle(Palette.muted)
+                            Text(liveNoListingsStillPlays).font(.footnote).foregroundStyle(Palette.muted)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -766,7 +766,7 @@ struct LiveProgrammeDetails: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .padding(.top, 8)
                     if let programme, programme.picture(wide: wide)?.fromTMDB == true {
-                        Text("Picture: TMDB").font(.caption2).foregroundStyle(Palette.faint).padding(.top, 6)
+                        Text(livePictureFromTMDB).font(.caption2).foregroundStyle(Palette.faint).padding(.top, 6)
                     }
                     if let programme {
                         Text(programme.title).font(.title2.weight(.bold)).padding(.top, 12)
@@ -790,12 +790,12 @@ struct LiveProgrammeDetails: View {
                             Text(description).font(.body).foregroundStyle(Palette.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true).padding(.top, 12)
                             if programme.descriptionFromTMDB {
-                                Text("Description from TMDB").font(.caption2).foregroundStyle(Palette.faint).padding(.top, 6)
+                                Text(liveDescriptionFromTMDB).font(.caption2).foregroundStyle(Palette.faint).padding(.top, 6)
                             }
                         }
                     } else {
                         Text(channel.name).font(.title2.weight(.bold)).padding(.top, 12)
-                        Text("No listings for this channel. It still plays.").font(.body).foregroundStyle(Palette.muted).padding(.top, 6)
+                        Text(liveNoListingsStillPlays).font(.body).foregroundStyle(Palette.muted).padding(.top, 6)
                     }
                 }
                 .padding(16)

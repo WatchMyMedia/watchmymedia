@@ -103,7 +103,7 @@ struct TVLiveGuideScreen: View {
                 .buttonStyle(TVChipStyle(selected: model.showingFavourites)).fixedSize()
                 .accessibilityIdentifier("live-filter-favourites")
             }
-            Button("All channels") { model.showAll() }.buttonStyle(TVChipStyle(selected: model.showingAll)).fixedSize()
+            Button(liveAllChannels) { model.showAll() }.buttonStyle(TVChipStyle(selected: model.showingAll)).fixedSize()
             ForEach(model.filters, id: \.self) { filter in
                 Button(filter.title) { model.filter = model.filter == filter ? nil : filter }
                     .buttonStyle(TVChipStyle(selected: model.filter == filter)).fixedSize()
@@ -127,7 +127,7 @@ struct TVLiveGuideScreen: View {
                     .buttonStyle(TVChipStyle(selected: false)).fixedSize()
                     .accessibilityIdentifier("live-guide-reminders")
             }
-            TextField("Go to channel", text: $model.query)
+            TextField(liveGoToChannel, text: $model.query)
                 .autocorrectionDisabled()
                 .frame(width: extras.available ? 240 : 300)
                 .accessibilityIdentifier("live-channel-search")
@@ -141,12 +141,12 @@ struct TVLiveGuideScreen: View {
     @ViewBuilder private func grid(now: Date) -> some View {
         let rows = model.rows
         if model.loading {
-            ProgressView("Loading listings").frame(maxWidth: .infinity, minHeight: 300)
+            ProgressView(liveLoadingListings).frame(maxWidth: .infinity, minHeight: 300)
         } else if let error = model.error {
-            TVErrorState(title: "Couldn't load listings", message: "\(error) Channels still play.", retry: model.load)
+            TVErrorState(title: liveListingsFailedTitle, message: liveListingsFailed(error), retry: model.load)
                 .frame(minHeight: 300)
         } else if rows.isEmpty {
-            TVEmptyState(systemImage: "magnifyingglass", title: "No channels match", message: "Try another channel, or All channels.")
+            TVEmptyState(systemImage: "magnifyingglass", title: "No channels match", message: liveNoChannelMatches)
                 .frame(minHeight: 300)
         } else {
             GeometryReader { geo in
@@ -342,16 +342,16 @@ private struct TVGuideCell: View, Equatable {
                 }
             }
             // The recording state is said once, by liveAccessibilityLabel.
-            .accessibilityLabel(liveAccessibilityLabel(spoken, clock: clock) + (reminded ? ", reminder set" : "") + ", \(row.channel.number) \(row.channel.name)")
+            .accessibilityLabel(liveCellAccessibilityLabel(spoken, reminded: reminded, channel: row.channel, clock: clock))
             .accessibilityIdentifier("live-cell-\(row.channel.number)-\(p.title)")
         case .noListings:
             Button { navigator.playLive(.init(channel: row.channel)) } label: {
-                Text("No listings").font(.system(size: 23, weight: .semibold))
+                Text(liveNoListings).font(.system(size: 23, weight: .semibold))
             }
             .buttonStyle(TVGuideCellStyle(progress: nil, muted: true))
             .disabled(!row.channel.available)
             .focused(focus, equals: id)
-            .accessibilityLabel("\(row.channel.number) \(row.channel.name), No listings. It still plays.")
+            .accessibilityLabel(liveNoListingsAccessibilityLabel(row.channel))
             .accessibilityIdentifier("live-cell-\(row.channel.number)-none")
         case .listingsEnd(let date):
             Text(liveNoListingsAfter(date, clock: clock)).font(.system(size: 19)).foregroundStyle(Palette.muted)
@@ -470,7 +470,7 @@ struct TVLiveHero: View {
                         .overlay(LinearGradient(stops: [.init(color: Palette.ground.opacity(0), location: 0.45), .init(color: Palette.ground, location: 0.92)], startPoint: .top, endPoint: .bottom))
                         .overlay(alignment: .bottomTrailing) {
                             if picture?.fromTMDB == true {
-                                Text("Picture: TMDB").font(.system(size: 15)).foregroundStyle(Palette.faint).padding(.trailing, TVLayout.gutter).padding(.bottom, 200)
+                                Text(livePictureFromTMDB).font(.system(size: 15)).foregroundStyle(Palette.faint).padding(.trailing, TVLayout.gutter).padding(.bottom, 200)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -516,10 +516,10 @@ struct TVLiveHero: View {
                     Text(description).font(.system(size: 21)).foregroundStyle(Palette.muted).lineLimit(2)
                 }
                 if programme.descriptionFromTMDB {
-                    Text("Description from TMDB").font(.system(size: 15)).foregroundStyle(Palette.faint)
+                    Text(liveDescriptionFromTMDB).font(.system(size: 15)).foregroundStyle(Palette.faint)
                 }
             } else {
-                Text("No listings for this channel. It still plays.").font(.system(size: 22)).foregroundStyle(Palette.muted)
+                Text(liveNoListingsStillPlays).font(.system(size: 22)).foregroundStyle(Palette.muted)
             }
             HStack(spacing: 16) {
                 let reminder = programme.flatMap { p in p.start > now ? extras.reminder(for: p).flatMap { $0.state == .gone ? nil : $0 } : nil }

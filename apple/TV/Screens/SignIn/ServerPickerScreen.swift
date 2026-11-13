@@ -44,14 +44,14 @@ private struct ServerPickerContent: View {
     private var servers: some View {
         VStack(alignment: .leading, spacing: 28) {
             Kicker(text: "Servers")
-            Text("Choose a server")
+            Text(chooseServerTitle)
                 .font(.system(size: 60, weight: .bold))
                 .tracking(-1.2)
                 .foregroundStyle(Palette.text)
                 .accessibilityAddTraits(.isHeader)
             Text(model.localNetworkDenied
                  ? "Local network is off for WatchMyMedia, so it can't look for servers. Allow it in Settings › Privacy & Security › Local Network, or enter an address."
-                 : "Servers on this network appear by themselves.")
+                 : serversAppearByThemselves)
                 .font(.system(size: 24))
                 .foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -60,7 +60,7 @@ private struct ServerPickerContent: View {
                     if model.found.isEmpty && !model.localNetworkDenied {
                         HStack(spacing: 16) {
                             ProgressView()
-                            Text("Looking for servers…").font(.system(size: 22)).foregroundStyle(Palette.muted)
+                            Text(lookingForServers).font(.system(size: 22)).foregroundStyle(Palette.muted)
                         }
                         .frame(height: 124)
                     }
@@ -94,22 +94,22 @@ private struct ServerPickerContent: View {
 
     private var address: some View {
         VStack(alignment: .leading, spacing: 22) {
-            Text("Or enter an address").font(.system(size: 30, weight: .semibold)).foregroundStyle(Palette.text)
-            Text("Server address").font(.system(size: 20)).foregroundStyle(Palette.muted)
-            TextField("192.168.1.20 or https://home.example.net", text: $model.address)
+            Text(enterAnAddressHeading).font(.system(size: 30, weight: .semibold)).foregroundStyle(Palette.text)
+            Text(serverAddressLabel).font(.system(size: 20)).foregroundStyle(Palette.muted)
+            TextField(serverAddressExample, text: $model.address)
                 .font(.system(size: 24))
                 .keyboardType(.URL)
                 .textContentType(.URL)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .onSubmit(connect)
-                .accessibilityLabel("Server address")
+                .accessibilityLabel(serverAddressLabel)
             if let error = model.addressError {
                 WarningLine(text: error)
             } else if model.showsHTTPSNudge {
                 Text(httpsNudge).font(.system(size: 18)).foregroundStyle(Palette.warning)
             }
-            Text("An IP address or a .local name works over http on your own network. A hostname needs https; Tailscale Serve or a reverse proxy gives it one.")
+            Text(serverAddressNote)
                 .font(.system(size: 18))
                 .lineSpacing(5)
                 .foregroundStyle(Palette.faint)
@@ -154,9 +154,9 @@ private struct ServerRow: View {
                 ProgressView()
             } else if row.current {
                 Image(systemName: "checkmark").font(.system(size: 24, weight: .bold)).foregroundStyle(focused ? Palette.ground : Palette.gold)
-                    .accessibilityLabel("In use")
+                    .accessibilityLabel(serverInUse)
             } else if row.kind == .found {
-                TVBadge("On this network", style: .gold, size: 15)
+                TVBadge(onThisNetwork, style: .gold, size: 15)
             }
         }
         .padding(.horizontal, 28)

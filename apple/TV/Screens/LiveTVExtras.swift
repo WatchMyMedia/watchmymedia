@@ -126,7 +126,7 @@ struct TVLiveRemindersScreen: View {
                         if extras.loading && !extras.loaded {
                             ProgressView().frame(maxWidth: .infinity, minHeight: 300)
                         } else {
-                            TVEmptyState(systemImage: "bell", title: "No reminders", message: "Hold Select on a programme in the guide and choose Remind me.")
+                            TVEmptyState(systemImage: "bell", title: liveNoReminders, message: "Hold Select on a programme in the guide and choose Remind me.")
                                 .frame(minHeight: 300)
                         }
                     } else {
@@ -163,7 +163,7 @@ struct TVLiveRemindersScreen: View {
             }
             .buttonStyle(TVLiveCardButtonStyle())
             .accessibilityLabel(liveReminderAccessibilityLabel(reminder, previousStart: extras.previousStart(of: reminder), now: now))
-            .accessibilityHint(reminder.state == .gone ? "Shows the reminder as it was kept" : "Shows it in the guide")
+            .accessibilityHint(reminder.state == .gone ? liveShowsKeptReminderHint : liveShowsInGuideHint)
             .accessibilityIdentifier("live-reminder-\(reminder.title)")
             Button("Remove") { Task { await extras.remove(reminder) } }
                 .buttonStyle(TVButtonStyle())
@@ -373,7 +373,7 @@ struct TVLiveSearchSection: View {
             .disabled(!actions.watch)
         }
         .accessibilityLabel(liveSearchAccessibilityLabel(hit, reminded: reminded, now: now))
-        .accessibilityHint("Shows it in the guide")
+        .accessibilityHint(liveShowsInGuideHint)
         .accessibilityIdentifier("live-search-\(hit.channel.number)-\(hit.programme.title)")
     }
 
