@@ -53,7 +53,10 @@ final class RealServerRepository: ServerRepository {
         discovered = []
         discovery.start(
             found: { [weak self] in self?.discovered = $0 },
-            denied: { [weak self] in self?.localNetworkDenied = $0 }
+            denied: { [weak self] in
+                self?.localNetworkDenied = $0
+                self?.store.localNetwork.denied = $0
+            }
         )
     }
 
@@ -97,6 +100,9 @@ final class RealServerRepository: ServerRepository {
         if let serverError { throw APIError(status: serverError, message: Self.serverErrorMessage(shown, status: serverError)) }
         if reached { throw APIError(status: nil, message: "\(shown) doesn't look like a WatchMyMedia server.") }
         if let explained { throw explained }
+        if localNetworkDenied, let host = try? ServerAddress.candidates(address).first?.host(), isLANHost(host) {
+            throw APIError(status: nil, message: localNetworkOffMessage)
+        }
         throw APIError(status: nil, message: "Couldn't reach \(shown). Check the address and that the server is running.")
     }
 

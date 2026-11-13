@@ -61,6 +61,11 @@ public func isLANHost(_ host: String) -> Bool {
     return octets[0] == 10 || (octets[0] == 172 && (16...31).contains(octets[1])) || (octets[0] == 192 && octets[1] == 168)
 }
 
+/// Why a server on this network can't be reached when the person said no to
+/// Local Network for this app, worded as the Android app words its
+/// equivalent (LocalNetworkGate.kt).
+public let localNetworkOffMessage = "Local network access is turned off for WatchMyMedia. To use a server on this network, allow Local Network in Settings."
+
 /// A server found on the local network over Bonjour (`_watchmymedia._tcp`).
 public struct DiscoveredServer: Hashable, Sendable, Identifiable {
     public var id: String

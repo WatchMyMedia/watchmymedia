@@ -97,6 +97,32 @@ struct ServerRepositoryTests {
         #expect(ContinuousClock.now - start >= Self.probeTimeout)
     }
 
+    /// PLAN-APPLE-REVIEW.md §3.4.3: once discovery has heard that Local
+    /// Network access is off, a server on this network that can't be reached
+    /// says why; one elsewhere, or with access allowed again, doesn't.
+    @Test func aServerOnThisNetworkSaysWhenLocalNetworkIsOff() async throws {
+        servers.startDiscovery()
+        h.discovery.deny()
+        servers.stopDiscovery()
+        let nowhere = "nowhere-\(UUID().uuidString.lowercased()).local"
+        let probed = await #expect(throws: APIError.self) { try await servers.probe(nowhere) }
+        #expect(probed?.message == localNetworkOffMessage)
+        let lan = h.services.store.api(baseURL: URL(string: "http://\(nowhere):27587")!, token: "tok")
+        await #expect(throws: APIError(status: nil, message: localNetworkOffMessage)) { try await lan.call { try await $0.getHome().ok.body.json } }
+
+        let elsewhere = h.services.store.api(baseURL: URL(string: "https://nowhere-\(UUID().uuidString.lowercased()).example.net")!, token: "tok")
+        await #expect(throws: APIError(status: nil, message: "Couldn't reach the server. Check the connection and try again.")) {
+            try await elsewhere.call { try await $0.getHome().ok.body.json }
+        }
+
+        servers.startDiscovery()
+        h.discovery.allow()
+        servers.stopDiscovery()
+        let allowed = await #expect(throws: APIError.self) { try await servers.probe(nowhere) }
+        #expect(allowed?.message == "Couldn't reach \(nowhere). Check the address and that the server is running.")
+        await #expect(throws: APIError(status: nil, message: "Couldn't reach the server. Check the connection and try again.")) { try await lan.call { try await $0.getHome().ok.body.json } }
+    }
+
     @Test func probeTimesOutWhenNothingAnswersInTime() async throws {
         let hanging = "http://\(host):27587"
         HangingURLProtocol.hang(hanging)

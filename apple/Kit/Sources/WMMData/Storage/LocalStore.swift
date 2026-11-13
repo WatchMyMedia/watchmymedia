@@ -26,6 +26,8 @@ final class LocalStore {
     @ObservationIgnored let session: URLSession
     @ObservationIgnored let userAgent: String
     @ObservationIgnored let deviceID: String
+    /// Local Network access as discovery last heard it, for the APIs made here.
+    @ObservationIgnored let localNetwork = LocalNetworkAccess()
     @ObservationIgnored private let baseClient: ClientInfo
     @ObservationIgnored private var sessionKey: String?
     @ObservationIgnored private var sessionListeners: [(_ signedIn: Bool) -> Void] = []
@@ -231,14 +233,14 @@ final class LocalStore {
     func api(serverID: String, baseURL: URL, token: String, session: URLSession? = nil) -> ServerAPI {
         ServerAPI(
             baseURL: baseURL, session: session ?? self.session, userAgent: userAgent, token: { token },
-            onSignedOut: { [weak self] in await self?.tokenRejected(serverID: serverID, token: token) }
+            onSignedOut: { [weak self] in await self?.tokenRejected(serverID: serverID, token: token) }, localNetwork: localNetwork
         )
     }
 
     /// An API at `baseURL` that sends `token` (or none) and keeps no sign-in:
     /// for signing in, probing, and signing out of a server being forgotten.
     func api(baseURL: URL, token: String? = nil, session: URLSession? = nil) -> ServerAPI {
-        ServerAPI(baseURL: baseURL, session: session ?? self.session, userAgent: userAgent, token: { token })
+        ServerAPI(baseURL: baseURL, session: session ?? self.session, userAgent: userAgent, token: { token }, localNetwork: localNetwork)
     }
 
     /// How a request to `baseURL` carries `token`, for what isn't an API call (the offline routes' fetches).

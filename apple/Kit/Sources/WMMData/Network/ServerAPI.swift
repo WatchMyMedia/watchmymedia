@@ -21,6 +21,8 @@ public struct ServerAPI: Sendable {
     private let session: URLSession
     let signer: RequestSigner
     private let onSignedOut: @Sendable () async -> Void
+    /// What discovery last heard of Local Network access, for why a server on this network can't be reached.
+    private let localNetwork: LocalNetworkAccess?
 
     /// - Parameters:
     ///   - token: the bearer token to send, read on every request; nil sends none.
@@ -33,6 +35,18 @@ public struct ServerAPI: Sendable {
         token: @escaping @Sendable () -> String? = { nil },
         onSignedOut: @escaping @Sendable () async -> Void = {}
     ) {
+        self.init(baseURL: baseURL, session: session, userAgent: userAgent, token: token, onSignedOut: onSignedOut, localNetwork: nil)
+    }
+
+    init(
+        baseURL: URL,
+        session: URLSession,
+        userAgent: String?,
+        token: @escaping @Sendable () -> String?,
+        onSignedOut: @escaping @Sendable () async -> Void = {},
+        localNetwork: LocalNetworkAccess?
+    ) {
+        self.localNetwork = localNetwork
         self.baseURL = baseURL
         self.session = session
         let signer = RequestSigner(baseURL: baseURL, token: token, userAgent: userAgent)
@@ -58,10 +72,16 @@ public struct ServerAPI: Sendable {
         do {
             return try await operation(client)
         } catch {
-            let translated = Self.translate(error)
+            let translated = translate(error)
             if translated is SignedOutError { await onSignedOut() }
             throw translated
         }
+    }
+
+    /// ``translate(_:localNetworkOff:)`` for this server: a network failure
+    /// on this network says so when Local Network access is off.
+    func translate(_ error: Error) -> Error {
+        Self.translate(error, localNetworkOff: localNetwork?.denied == true && isLANHost(baseURL.host() ?? ""))
     }
 
     /// A URL on this server with the path appended (images, subtitles, event stream).
@@ -84,7 +104,7 @@ public struct ServerAPI: Sendable {
         do {
             (data, response) = try await (session ?? self.session).data(for: request)
         } catch {
-            throw Self.translate(error)
+            throw translate(error)
         }
         if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
             if Self.revokes(status: http.statusCode, signed: RequestSigner.signed(request)) {
@@ -135,16 +155,18 @@ public struct ServerAPI: Sendable {
             && port(a) == port(b) && path(a) == path(b)
     }
 
-    static func translate(_ error: Error) -> Error {
+    /// - Parameter localNetworkOff: the server is on this network and the
+    ///   person said no to Local Network, so a failure to connect says so.
+    static func translate(_ error: Error, localNetworkOff: Bool = false) -> Error {
         switch error {
         case is CancellationError, is APIError, is SignedOutError, is ServerTooOldError:
             return error
         case let client as ClientError:
-            return translate(client.underlyingError)
+            return translate(client.underlyingError, localNetworkOff: localNetworkOff)
         case let url as URLError:
-            return url.code == .cancelled ? CancellationError() : network(url)
+            return url.code == .cancelled ? CancellationError() : network(url, localNetworkOff: localNetworkOff)
         case is TimedOut:
-            return network(URLError(.timedOut))
+            return network(URLError(.timedOut), localNetworkOff: localNetworkOff)
         case is DecodingError:
             return APIError(status: nil, message: "The server sent a reply this app doesn't understand. Update the app or the server.")
         default:
@@ -152,14 +174,14 @@ public struct ServerAPI: Sendable {
         }
     }
 
-    private static func network(_ error: URLError) -> APIError {
+    private static func network(_ error: URLError, localNetworkOff: Bool = false) -> APIError {
         switch error.code {
         case .appTransportSecurityRequiresSecureConnection:
             APIError(status: nil, message: "This address needs https. Use the server's IP address or .local name on your network, or an https address such as Tailscale Serve gives.")
         case .serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateNotYetValid, .serverCertificateHasUnknownRoot:
             APIError(status: nil, message: "The server's certificate isn't trusted.")
         default:
-            APIError(status: nil, message: "Couldn't reach the server. Check the connection and try again.")
+            APIError(status: nil, message: localNetworkOff ? localNetworkOffMessage : "Couldn't reach the server. Check the connection and try again.")
         }
     }
 

@@ -131,6 +131,8 @@ final class FakeDiscovery: ServerDiscovery {
 
     func announce(_ servers: [DiscoveredServer]) { found?(servers) }
     func deny() { denied?(true) }
+    /// Browsing started: access was allowed (again).
+    func allow() { denied?(false) }
 }
 
 /// A DataServices on in-memory storage and a stub server, with short timings,
