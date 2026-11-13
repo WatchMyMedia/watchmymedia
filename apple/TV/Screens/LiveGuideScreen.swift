@@ -139,12 +139,13 @@ struct TVLiveGuideScreen: View {
     // MARK: Grid
 
     @ViewBuilder private func grid(now: Date) -> some View {
+        let rows = model.rows
         if model.loading {
             ProgressView("Loading listings").frame(maxWidth: .infinity, minHeight: 300)
         } else if let error = model.error {
             TVErrorState(title: "Couldn't load listings", message: "\(error) Channels still play.", retry: model.load)
                 .frame(minHeight: 300)
-        } else if model.rows.isEmpty {
+        } else if rows.isEmpty {
             TVEmptyState(systemImage: "magnifyingglass", title: "No channels match", message: "Try another channel, or All channels.")
                 .frame(minHeight: 300)
         } else {
@@ -154,13 +155,19 @@ struct TVLiveGuideScreen: View {
                     header(track: track)
                     ScrollView(.vertical) {
                         LazyVStack(spacing: 2) {
-                            ForEach(model.rows) { row in
+                            ForEach(rows) { row in
                                 HStack(spacing: 0) {
                                     channelLabel(row).frame(width: Self.column, height: Self.rowHeight, alignment: .leading)
                                     HStack(spacing: 2) {
                                         ForEach(row.cells) { cell in
-                                            cellView(row, cell, now: now)
-                                                .frame(width: max(track * cell.end.timeIntervalSince(cell.start) / model.span - 2, 0), height: Self.rowHeight)
+                                            let id = "\(row.id)|\(cell.id)"
+                                            TVGuideCell(
+                                                clock: model.clock, row: row, cell: cell, now: now, id: id, focused: focus == id,
+                                                focus: $focus, recordChoice: $recordChoice, clash: $clash,
+                                                move: { page($0, row: row, cell: cell) }
+                                            )
+                                            .equatable()
+                                            .frame(width: max(track * cell.end.timeIntervalSince(cell.start) / model.span - 2, 0), height: Self.rowHeight)
                                         }
                                     }
                                     .frame(width: track, alignment: .leading)
@@ -228,8 +235,60 @@ struct TVLiveGuideScreen: View {
         }
     }
 
-    @ViewBuilder private func cellView(_ row: LiveGuideModel.Row, _ cell: LiveGuideModel.Cell, now: Date) -> some View {
-        let id = "\(row.id)|\(cell.id)"
+    /// Right from a row's last cell shows later, left from its first shows earlier, and focus stays on that channel.
+    private func page(_ direction: MoveCommandDirection, row: LiveGuideModel.Row, cell: LiveGuideModel.Cell) {
+        let last = row.cells.last { $0.programme != nil || $0.kind == .noListings }?.id == cell.id
+        let first = row.cells.first { $0.programme != nil || $0.kind == .noListings }?.id == cell.id
+        if direction == .right, last, cell.end >= model.end, model.canGoLater { model.later() }
+        else if direction == .left, first, model.canGoEarlier { model.earlier() }
+        else { return }
+        let target = direction == .right ? model.start.addingTimeInterval(model.span / 2) : model.start
+        if let next = model.rows.first(where: { $0.id == row.id })?.cells.first(where: { $0.start <= target && target < $0.end && $0.kind != .gap }) {
+            focus = "\(row.id)|\(next.id)"
+        }
+    }
+
+    private var initialFocus: String? {
+        if let selection = model.selection, let row = model.rows.first(where: { $0.channel.id == selection.channelID }),
+           let cell = row.cells.first(where: { $0.programme?.id == selection.programmeID }) {
+            return "\(row.id)|\(cell.id)"
+        }
+        guard let row = model.rows.first(where: { $0.listings }) ?? model.rows.first, let cell = row.cells.first(where: { $0.kind != .gap }) else { return nil }
+        return "\(row.id)|\(cell.id)"
+    }
+
+    private func find(_ id: String) -> (LiveGuideModel.Row, LiveGuideModel.Cell)? {
+        let parts = id.split(separator: "|", maxSplits: 1).map(String.init)
+        guard parts.count == 2, let row = model.rows.first(where: { $0.id == parts[0] }),
+              let cell = row.cells.first(where: { $0.id == parts[1] }) else { return nil }
+        return (row, cell)
+    }
+}
+
+/// One cell of the guide: a view of its own, compared by what it shows, so a
+/// move of focus redraws the cells it moves between and not every cell
+/// (PLAN-APPLE-REVIEW.md §4.3.4). Each cell's look when focused comes from
+/// its button style; `focused` is only for the recording mark's colours.
+private struct TVGuideCell: View, Equatable {
+    let clock: LiveClock
+    let row: LiveGuideModel.Row
+    let cell: LiveGuideModel.Cell
+    let now: Date
+    let id: String
+    let focused: Bool
+    let focus: FocusState<String?>.Binding
+    @Binding var recordChoice: LiveProgramme?
+    @Binding var clash: LiveRecordingClash?
+    let move: (MoveCommandDirection) -> Void
+    @Environment(Navigator.self) private var navigator
+    @Environment(LiveExtrasStore.self) private var extras
+    @Environment(LiveRecordingsStore.self) private var recordings
+
+    nonisolated static func == (a: Self, b: Self) -> Bool {
+        a.id == b.id && a.row == b.row && a.cell == b.cell && a.now == b.now && a.focused == b.focused
+    }
+
+    var body: some View {
         switch cell.kind {
         case .programme(let p):
             let reminded = extras.isReminded(p)
@@ -241,16 +300,16 @@ struct TVLiveGuideScreen: View {
                     Text("\(reminded ? Text("\(Image(systemName: "bell.fill")) ").foregroundStyle(Palette.gold) : Text(""))\((cell.startsBefore ? "‹ " : "") + p.title)")
                         .font(.system(size: 23, weight: .semibold)).lineLimit(1)
                     HStack(spacing: 8) {
-                        if let mark { RecordingMark(mark, onLight: focus == id).accessibilityHidden(true) }
+                        if let mark { RecordingMark(mark, onLight: focused).accessibilityHidden(true) }
                         if !p.tags.isEmpty { LiveTags(p.tags, size: 14) }
-                        Text(p.episodeLine ?? model.clock.shortRange(p.start, p.end)).font(.system(size: 17)).lineLimit(1).opacity(0.7)
+                        Text(p.episodeLine ?? clock.shortRange(p.start, p.end)).font(.system(size: 17)).lineLimit(1).opacity(0.7)
                     }
                 }
             }
             .buttonStyle(TVGuideCellStyle(progress: p.isOn(at: now) ? p.progress(at: now) : nil))
             .disabled(!row.channel.available)
-            .focused($focus, equals: id)
-            .onMoveCommand { page($0, row: row, cell: cell) }
+            .focused(focus, equals: id)
+            .onMoveCommand(perform: move)
             .contextMenu {
                 if recordings.available, p.end > now {
                     if let mark, mark.state.marked {
@@ -279,7 +338,7 @@ struct TVLiveGuideScreen: View {
                 }
             }
             // The recording state is said once, by liveAccessibilityLabel.
-            .accessibilityLabel(liveAccessibilityLabel(spoken, clock: model.clock) + (reminded ? ", reminder set" : "") + ", \(row.channel.number) \(row.channel.name)")
+            .accessibilityLabel(liveAccessibilityLabel(spoken, clock: clock) + (reminded ? ", reminder set" : "") + ", \(row.channel.number) \(row.channel.name)")
             .accessibilityIdentifier("live-cell-\(row.channel.number)-\(p.title)")
         case .noListings:
             Button { navigator.playLive(.init(channel: row.channel)) } label: {
@@ -287,44 +346,15 @@ struct TVLiveGuideScreen: View {
             }
             .buttonStyle(TVGuideCellStyle(progress: nil, muted: true))
             .disabled(!row.channel.available)
-            .focused($focus, equals: id)
+            .focused(focus, equals: id)
             .accessibilityLabel("\(row.channel.number) \(row.channel.name), No listings. It still plays.")
             .accessibilityIdentifier("live-cell-\(row.channel.number)-none")
         case .listingsEnd(let date):
-            Text(liveNoListingsAfter(date, clock: model.clock)).font(.system(size: 19)).foregroundStyle(Palette.muted)
+            Text(liveNoListingsAfter(date, clock: clock)).font(.system(size: 19)).foregroundStyle(Palette.muted)
                 .padding(.horizontal, 18).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         case .gap:
             Color.clear
         }
-    }
-
-    /// Right from a row's last cell shows later, left from its first shows earlier, and focus stays on that channel.
-    private func page(_ direction: MoveCommandDirection, row: LiveGuideModel.Row, cell: LiveGuideModel.Cell) {
-        let last = row.cells.last { $0.programme != nil || $0.kind == .noListings }?.id == cell.id
-        let first = row.cells.first { $0.programme != nil || $0.kind == .noListings }?.id == cell.id
-        if direction == .right, last, cell.end >= model.end, model.canGoLater { model.later() }
-        else if direction == .left, first, model.canGoEarlier { model.earlier() }
-        else { return }
-        let target = direction == .right ? model.start.addingTimeInterval(model.span / 2) : model.start
-        if let next = model.rows.first(where: { $0.id == row.id })?.cells.first(where: { $0.start <= target && target < $0.end && $0.kind != .gap }) {
-            focus = "\(row.id)|\(next.id)"
-        }
-    }
-
-    private var initialFocus: String? {
-        if let selection = model.selection, let row = model.rows.first(where: { $0.channel.id == selection.channelID }),
-           let cell = row.cells.first(where: { $0.programme?.id == selection.programmeID }) {
-            return "\(row.id)|\(cell.id)"
-        }
-        guard let row = model.rows.first(where: { $0.listings }) ?? model.rows.first, let cell = row.cells.first(where: { $0.kind != .gap }) else { return nil }
-        return "\(row.id)|\(cell.id)"
-    }
-
-    private func find(_ id: String) -> (LiveGuideModel.Row, LiveGuideModel.Cell)? {
-        let parts = id.split(separator: "|", maxSplits: 1).map(String.init)
-        guard parts.count == 2, let row = model.rows.first(where: { $0.id == parts[0] }),
-              let cell = row.cells.first(where: { $0.id == parts[1] }) else { return nil }
-        return (row, cell)
     }
 }
 

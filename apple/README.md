@@ -405,8 +405,12 @@ panels show what is on with pictures. Pictures load through the server's
 a programme without one shows the channel's logo. `LiveGuideStore` fetches
 6-hour windows, prefetches the next and forgets them when the server or
 sign-in changes; now and next move on at a programme's end, and the channel
-list is asked again only then. Without listings every screen stays as L8 and
-L9 built it.
+list is asked again only then. `LiveGuideModel` keeps its rows, chips and
+selection until something they read changes (observation says when), and each
+guide cell is a view of its own compared by what it shows, so a focus move on
+Apple TV redraws the cells it moves between; on iPad the Live TV tab holds the
+guide's model, so Guide → Channels → Guide keeps the time, the selection and
+the listings. Without listings every screen stays as L8 and L9 built it.
 
 On servers at API level 15 with listings (§6.5, G9), each channel in the guide
 has a star (its own 44 pt button on iPhone and iPad; on Apple TV the channel

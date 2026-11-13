@@ -31,9 +31,11 @@ struct LiveGuideScreen: View {
     @Environment(LiveRecordingsStore.self) private var recordings
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    init(repository: any LiveTVRepository, extras: LiveExtrasStore, mode: Binding<LiveTVMode>) {
+    /// `model` belongs to the Live TV tab, so the guide keeps its time,
+    /// selection and listings when an iPad goes to Channels and back.
+    init(model: LiveGuideModel, repository: any LiveTVRepository, extras: LiveExtrasStore, mode: Binding<LiveTVMode>) {
         _mode = mode
-        _model = State(initialValue: LiveGuideModel(repository: repository, extras: extras))
+        _model = State(initialValue: model)
         _live = State(initialValue: LiveTVModel(repository: repository))
         _listingsSearch = State(initialValue: LiveSearchModel(repository: repository, extras: extras))
     }
@@ -438,6 +440,7 @@ struct LiveGuideGrid: View {
     private var rowHeight: CGFloat { wide ? 54 : 56 }
 
     var body: some View {
+        let rows = model.rows
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 Text(model.dayLabel).font(.subheadline.weight(.semibold))
@@ -456,7 +459,7 @@ struct LiveGuideGrid: View {
             .background(Palette.surfaceRaised)
             .accessibilityHidden(true)
             LazyVStack(spacing: 0) {
-                ForEach(model.rows) { row in
+                ForEach(rows) { row in
                     Divider().overlay(Palette.separator)
                     HStack(spacing: 0) {
                         HStack(spacing: 0) {
@@ -467,7 +470,8 @@ struct LiveGuideGrid: View {
                         .frame(width: column, height: rowHeight)
                         HStack(spacing: 0) {
                             ForEach(row.cells) { cell in
-                                cellView(row, cell)
+                                LiveGuideCell(clock: model.clock, row: row, cell: cell, selected: model.isSelected(row, cell), now: now, choose: choose)
+                                    .equatable()
                                     .frame(width: max(track * cell.end.timeIntervalSince(cell.start) / model.span, 0), height: rowHeight)
                             }
                         }
@@ -487,18 +491,35 @@ struct LiveGuideGrid: View {
             }
         }
     }
+}
 
-    @ViewBuilder private func cellView(_ row: LiveGuideModel.Row, _ cell: LiveGuideModel.Cell) -> some View {
+/// One cell of the guide: a view of its own, compared by what it shows, so
+/// a change of selection or a pass of the grid redraws only the cells it
+/// changes (PLAN-APPLE-REVIEW.md §4.3.4).
+private struct LiveGuideCell: View, Equatable {
+    let clock: LiveClock
+    let row: LiveGuideModel.Row
+    let cell: LiveGuideModel.Cell
+    let selected: Bool
+    let now: Date
+    let choose: (LiveGuideModel.Row, LiveGuideModel.Cell) -> Void
+    @Environment(LiveExtrasStore.self) private var extras
+    @Environment(LiveRecordingsStore.self) private var recordings
+
+    nonisolated static func == (a: Self, b: Self) -> Bool {
+        a.row.channel == b.row.channel && a.cell == b.cell && a.selected == b.selected && a.now == b.now
+    }
+
+    var body: some View {
         switch cell.kind {
         case .programme(let p):
-            let selected = model.isSelected(row, cell)
             let reminded = extras.isReminded(p)
             let mark = recordings.mark(for: p)
-            let detail = p.episodeLine ?? model.clock.shortRange(p.start, p.end)
+            let detail = p.episodeLine ?? clock.shortRange(p.start, p.end)
             let title = (cell.startsBefore ? "‹ " : "") + p.title
             var spokenProgramme = p
             let _ = { spokenProgramme.recording = mark }()
-            let spoken = liveAccessibilityLabel(spokenProgramme, clock: model.clock) + (reminded ? ", reminder set" : "") + ", \(row.channel.number) \(row.channel.name)"
+            let spoken = liveAccessibilityLabel(spokenProgramme, clock: clock) + (reminded ? ", reminder set" : "") + ", \(row.channel.number) \(row.channel.name)"
             Button { choose(row, cell) } label: {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 4) {
@@ -543,13 +564,13 @@ struct LiveGuideGrid: View {
                 }
                 .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .overlay { if model.isSelected(row, cell) { Rectangle().strokeBorder(Palette.gold, lineWidth: 2) } }
+                .overlay { if selected { Rectangle().strokeBorder(Palette.gold, lineWidth: 2) } }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("\(row.channel.number) \(row.channel.name), No listings. It still plays.")
         case .listingsEnd(let date):
-            Text(liveNoListingsAfter(date, clock: model.clock))
+            Text(liveNoListingsAfter(date, clock: clock))
                 .font(.system(size: 12)).foregroundStyle(Palette.muted).lineLimit(2)
                 .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)

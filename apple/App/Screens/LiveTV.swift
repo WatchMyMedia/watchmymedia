@@ -11,12 +11,33 @@ struct LiveTVScreen: View {
     @Environment(LiveExtrasStore.self) private var extras
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var mode = LiveTVMode.guide
+    /// The guide's model lives as long as the tab, not the guide's view, so
+    /// Guide → Channels → Guide on iPad keeps the time shown, the selection
+    /// and the listings loaded (PLAN-APPLE-REVIEW.md §3.3.5).
+    @State private var guide = GuideModelHolder()
+
     var body: some View {
         if services.liveTV.capabilities?.listings == true && (mode == .guide || !sizeClass.isWide) {
-            LiveGuideScreen(repository: services.liveTV, extras: extras, mode: $mode)
+            LiveGuideScreen(model: guide.model(repository: services.liveTV, extras: extras), repository: services.liveTV, extras: extras, mode: $mode)
         } else {
             LiveTVContent(model: LiveTVModel(repository: services.liveTV), mode: $mode)
         }
+    }
+}
+
+/// Makes the guide's model once for the Live TV tab, and again only for
+/// another repository or favourites store. Not observed: handing it out
+/// changes nothing a view shows.
+@MainActor
+private final class GuideModelHolder {
+    private var made: (model: LiveGuideModel, repository: ObjectIdentifier, extras: ObjectIdentifier)?
+
+    func model(repository: any LiveTVRepository, extras: LiveExtrasStore) -> LiveGuideModel {
+        let ids = (ObjectIdentifier(repository as AnyObject), ObjectIdentifier(extras))
+        if let made, made.repository == ids.0, made.extras == ids.1 { return made.model }
+        let model = LiveGuideModel(repository: repository, extras: extras)
+        made = (model, ids.0, ids.1)
+        return model
     }
 }
 
