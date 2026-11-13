@@ -2,8 +2,10 @@ package media.watchmy.client.core.data
 
 import media.watchmy.client.model.ServerFeatures
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -182,11 +184,20 @@ internal class CastPreferences(
 /** A caster's server as this TV reached it (Cast Connect): the address that answered, and its API level. */
 data class ReachedServer(val baseUrl: String, val apiLevel: Int)
 
-/** Which of [urls] answers GET /api/server as the server [serverId], best first; null when none does. */
-internal suspend fun reachServer(http: Http, serverId: String, urls: List<String>): ReachedServer? = coroutineScope {
-    val probes = castServerUrls(urls).map { base ->
-        async {
-            try {
+/**
+ * Which of [urls] answers GET /api/server as the server [serverId], best
+ * first; null when none does. They are all asked at once. The best address
+ * that has answered wins, but once any has, earlier ones that haven't get
+ * only [graceMs] more: an unreachable first address (the home network's,
+ * away from home) no longer holds the cast for the probe's whole timeout
+ * while a later one has already answered (PLAN-ANDROID-REVIEW.md §4.2.6).
+ */
+internal suspend fun reachServer(http: Http, serverId: String, urls: List<String>, graceMs: Long = CAST_PROBE_GRACE_MS): ReachedServer? = coroutineScope {
+    val candidates = castServerUrls(urls)
+    val answers = Channel<Pair<Int, ReachedServer?>>(Channel.UNLIMITED)
+    val probes = candidates.mapIndexed { index, base ->
+        launch {
+            val reached = try {
                 Http.call(signedIn = false) { SystemApi(base, http.probeClient).getServer() }
                     .takeIf { it.id == serverId }
                     ?.let { ReachedServer(base, it.apiLevel.toInt()) }
@@ -195,12 +206,33 @@ internal suspend fun reachServer(http: Http, serverId: String, urls: List<String
             } catch (e: Exception) {
                 null
             }
+            answers.send(index to reached)
         }
     }
-    val found = probes.firstNotNullOfOrNull { it.await() }
+    val reached = arrayOfNulls<ReachedServer>(candidates.size)
+    val done = BooleanArray(candidates.size)
+    var deadline: Long? = null
+    fun best() = reached.indexOfFirst { it != null }.takeIf { it >= 0 }
+    while (true) {
+        val best = best()
+        // Nothing better can come: every address before the best has said no.
+        if (best != null && (0 until best).all { done[it] }) break
+        if (done.all { it }) break
+        val answer = if (deadline == null) {
+            answers.receive()
+        } else {
+            withTimeoutOrNull((deadline - System.nanoTime() / 1_000_000).coerceAtLeast(0)) { answers.receive() } ?: break
+        }
+        done[answer.first] = true
+        reached[answer.first] = answer.second
+        if (answer.second != null && deadline == null) deadline = System.nanoTime() / 1_000_000 + graceMs
+    }
     probes.forEach { it.cancel() }
-    found
+    best()?.let { reached[it] }
 }
+
+/** How long an earlier, better address gets once a later one has answered ([reachServer]). */
+internal const val CAST_PROBE_GRACE_MS = 300L
 
 /** How many of a sender's addresses this TV tries; it tries them all at once. */
 internal const val MAX_CAST_URLS = 8
