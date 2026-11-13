@@ -64,6 +64,31 @@ class PreferencesRepositoryTest {
         assertFalse(p.autoplayNext)
     }
 
+    /**
+     * A load that returns has loaded, even with another on its way. Each
+     * used to send its own request, and the one answered first left its
+     * reply unused because the other had started after it: its caller (the
+     * player, before its first play) then read the defaults.
+     */
+    @Test
+    fun `a load that returns has loaded, even with another on its way`() = runBlocking {
+        signIn()
+        server.always("GET /api/me/preferences", json("""{"skip":{"intro":"auto"},"autoplayNext":false}"""))
+        val first = server.hold("GET /api/me/preferences")
+        val loading = launch(start = CoroutineStart.UNDISPATCHED) { prefs.refresh() }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { first.awaitArrival() }
+        // Another load starts while the first waits for its answer, and its own answer is slower still.
+        val second = server.hold("GET /api/me/preferences")
+        val other = launch(start = CoroutineStart.UNDISPATCHED) { prefs.refresh() }
+        first.release()
+        loading.join()
+        assertEquals(SkipMode.Auto, prefs.playback.value.skipMode(SegmentKind.Intro))
+        assertFalse(prefs.playback.value.autoplayNext)
+        second.release()
+        other.join()
+        assertEquals(SkipMode.Auto, prefs.playback.value.skipMode(SegmentKind.Intro))
+    }
+
     @Test
     fun `changes are sent as partial updates`() = runBlocking {
         signIn()

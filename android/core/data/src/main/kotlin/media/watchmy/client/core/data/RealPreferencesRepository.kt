@@ -59,7 +59,17 @@ internal class RealPreferencesRepository(private val store: LocalStore, private 
     private val unanswered = mutableSetOf<Int>()
     private val writes = Mutex()
 
-    override suspend fun refresh() {
+    /**
+     * One load at a time. Two at once each sent a request, and the one
+     * answered first left its reply unused because the other had started
+     * after it: it returned with nothing loaded, to a caller (the player,
+     * before its first play, beside the load each sign-in starts) that then
+     * read the defaults. A load waiting here starts after the one before it
+     * has applied its reply, so each returns with what it loaded in place.
+     */
+    private val loads = Mutex()
+
+    override suspend fun refresh() = loads.withLock {
         val revision = store.revision
         val mine = synchronized(generation) { if (unanswered.isEmpty()) generation.incrementAndGet() else null }
         val loaded = http.signedIn { base, client -> UsersApi(base, client).getPreferences() }.toModel()
