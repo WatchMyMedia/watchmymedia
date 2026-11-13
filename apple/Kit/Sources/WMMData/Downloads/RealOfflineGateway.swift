@@ -115,8 +115,10 @@ final class RealOfflineGateway: OfflineGateway {
         return MediaToken(token: t.token, expiresAt: t.expiresAt, param: PlaybackMapping.nonBlank(t.param) ?? "access_token")
     }
 
+    /// Nil for an address that isn't on the owner's server as it is kept now:
+    /// the sign-in goes only to the server that issued it (PLAN-APPLE-REVIEW.md §3.4.8).
     func authorizedRequest(_ owner: OfflineOwner, url: URL) -> URLRequest? {
-        guard let (_, credential) = try? access(owner) else { return nil }
+        guard let (_, credential) = try? access(owner), ServerAPI.owns(baseURL(owner), url) else { return nil }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(credential.token)", forHTTPHeaderField: "Authorization")
         request.setValue(store.userAgent, forHTTPHeaderField: "User-Agent")

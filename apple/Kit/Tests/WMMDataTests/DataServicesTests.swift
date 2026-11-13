@@ -82,3 +82,19 @@ private final class NoPlayback: PlaybackControllerFactory {
         #expect(cache.diskCapacity > 0)
     }
 }
+
+/// The offline routes' sign-in goes only to its own server (PLAN-APPLE-REVIEW.md §3.4.8).
+@MainActor
+@Suite struct OfflineGatewayOriginTests {
+    let h = Harness()
+
+    @Test func aRequestForAnotherAddressIsRefused() async throws {
+        try await h.signIn()
+        let owner = try #require(h.services.offline.owner())
+        let own = try #require(h.services.offline.authorizedRequest(owner, url: URL(string: h.router.baseURL.absoluteString + "/api/offline/d1/playlist.m3u8")!))
+        #expect(own.value(forHTTPHeaderField: "Authorization") == "Bearer tok-viewer")
+        #expect(h.services.offline.authorizedRequest(owner, url: URL(string: "https://elsewhere.example.net/api/offline/d1/playlist.m3u8")!) == nil)
+        let otherPort = URL(string: "http://\(h.server.host):9999/api/offline/d1/playlist.m3u8")!
+        #expect(h.services.offline.authorizedRequest(owner, url: otherPort) == nil)
+    }
+}
