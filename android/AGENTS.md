@@ -88,6 +88,17 @@ Lint warnings that were already on `main` are not yours to fix in passing.
 - **The fakes' artwork** is fictional and lives in `core/fake/src/fakes/assets`,
   a source set only `-Pfakes=true` builds include, so a release APK carries
   no sample art. `FakeData.backdrop` names a file there; posters stay null.
+- **The player's thread in tests.** ExoPlayer throws when read off its own
+  thread. Controller tests give the controller a separate IO dispatcher
+  (`OffMainDispatcher` in `core/playback`'s `Fakes.kt`), on whose tasks
+  `FakeMediaPlayer` throws the same way; with one dispatcher for both, Live
+  TV's Automatic heartbeat read the player inside `withContext(io)` unseen.
+  Read the player on the main thread, then call the server.
+- **Media3's download service from the background.** On Android 12 and
+  later, never start `WmmDownloadService` from a job or receiver: Media3's
+  `DownloadService` calls `startForeground` unguarded once a download runs,
+  which Android refuses from the background. `DownloadRestarts` runs the
+  `DownloadManager` itself from its WorkManager job instead.
 - **Focus tests and cleared semantics.** `HomeFocusTest` finds the focused
   element by its `Focused` semantics. A card that `clearAndSetSemantics` to
   read as one thing must set `focused` itself (as `TvOnNowCard` does), or the
