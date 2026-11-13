@@ -7,7 +7,6 @@ import media.watchmy.client.core.api.apis.AuthApi
 import media.watchmy.client.core.api.apis.PlaybackApi
 import media.watchmy.client.core.api.apis.WatchApi
 import media.watchmy.client.core.api.models.ActivityDirective
-import media.watchmy.client.core.api.models.Client
 import media.watchmy.client.core.api.models.Decision
 import media.watchmy.client.core.api.models.DownloadSubtitleInputBody
 import media.watchmy.client.core.api.models.PlanInputBody
@@ -109,12 +108,8 @@ internal class RealPlaybackGateway(
     override suspend fun mediaToken(): MediaToken = newMediaToken()
 
     override suspend fun stopSession(sessionId: String) {
-        try {
-            server.call { base, client -> PlaybackApi(base, client).stopPlayback(sessionId) }
-        } catch (e: ApiException) {
-            // Already gone (it timed out, or another stop got there first).
-            if (e.status != 404) throw e
-        }
+        // Already gone (it timed out, or another stop got there first): stopped either way.
+        ignoring404 { server.call { base, client -> PlaybackApi(base, client).stopPlayback(sessionId) } }
     }
 
     /** Servers older than the plans call answer with no plans. */
@@ -122,23 +117,13 @@ internal class RealPlaybackGateway(
         val ids = fileIds.distinct().take(MAX_PLANS)
         if (ids.isEmpty()) return emptyList()
         val body = PlanInputBody(fileIds = ids, profile = profile.forApiLevel(server.apiLevel()).narrowedTo(quality).toApi())
-        return try {
-            server.call { base, client -> PlaybackApi(base, client).planPlayback(body) }.items.map { it.toModel() }
-        } catch (e: ApiException) {
-            if (!e.unknownRoute()) throw e
-            emptyList()
-        }
+        return orIfUnknownRoute({ emptyList() }) { server.call { base, client -> PlaybackApi(base, client).planPlayback(body) }.items.map { it.toModel() } }
     }
 
     /** Servers without the search answer as if they had no provider. */
     override suspend fun searchSubtitles(fileId: Long): OnlineSubtitles? {
         if (!onlineSubtitles) return null
-        return try {
-            server.call { base, client -> PlaybackApi(base, client).searchSubtitles(fileId) }.toModel()
-        } catch (e: ApiException) {
-            if (!e.unknownRoute()) throw e
-            null
-        }
+        return orIfUnknownRoute({ null }) { server.call { base, client -> PlaybackApi(base, client).searchSubtitles(fileId) }.toModel() }
     }
 
     override suspend fun downloadSubtitle(fileId: Long, resultId: String): String =
@@ -157,12 +142,6 @@ internal class RealPlaybackGateway(
 
     /** This device's name as it is now, when the request is from this device (the name is editable). */
     private fun ClientInfo.current() = if (deviceId == deviceId()) copy(name = deviceName().ifBlank { name }) else this
-
-    private fun ClientInfo.toApi() =
-        Client(
-            deviceId = deviceId.take(64), name = name.take(64), product = product.take(64), platform = platform.take(32), version = version.take(32),
-            model = model.take(64).ifBlank { null },
-        )
 
     private fun PlayState.toApi() = when (this) {
         PlayState.Playing -> ProgressInputBody.State.playing
@@ -185,7 +164,7 @@ internal class RealPlaybackGateway(
 
         private suspend fun signedInMediaToken(access: ServerAccess): MediaToken {
             val (base, t) = access.call { base, client -> base to AuthApi(base, client).createMediaToken() }
-            return MediaToken(t.token, epochMs(t.expiresAt) ?: (System.currentTimeMillis() + 60 * 60_000L), t.param.ifBlank { "access_token" }, serverUrl = base)
+            return t.toModel(base)
         }
 
         /** The profile with the quality's caps applied, the way the web player does it. */

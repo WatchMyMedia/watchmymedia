@@ -10,7 +10,6 @@ import kotlinx.coroutines.withContext
 import media.watchmy.client.core.api.apis.OfflineApi
 import media.watchmy.client.core.api.apis.RequestsApi
 import media.watchmy.client.core.api.infrastructure.Serializer
-import media.watchmy.client.core.api.models.Client
 import media.watchmy.client.core.api.models.CreateOfflineInputBody
 import media.watchmy.client.core.api.models.OfflinePlanInputBody
 import media.watchmy.client.core.api.models.OfflineSyncDownload
@@ -156,8 +155,7 @@ internal class RealOfflineGateway(
         Serializer.kotlinxSerializationJson.decodeFromString(ApiOfflineDownload.serializer(), json).toModel(owner.baseUrl)
 
     override suspend fun token(owner: OfflineOwner, downloadId: String): MediaToken {
-        val t = call(owner) { it.createOfflineToken(downloadId) }
-        return MediaToken(t.token, epochMs(t.expiresAt) ?: (System.currentTimeMillis() + 60 * 60_000L), t.`param`.ifBlank { "access_token" }, serverUrl = owner.baseUrl)
+        return call(owner) { it.createOfflineToken(downloadId) }.toModel(owner.baseUrl)
     }
 
     override suspend fun sync(owner: OfflineOwner, client: ClientInfo, sentAtMs: Long, downloads: List<SyncedDownload>, progress: List<OfflineProgress>): SyncReply {
@@ -201,11 +199,6 @@ internal class RealOfflineGateway(
             },
         )
     }
-
-    private fun ClientInfo.toApi() = Client(
-        deviceId = deviceId.take(64), name = name.take(64), product = product.take(64), platform = platform.take(32), version = version.take(32),
-        model = model.take(64).ifBlank { null },
-    )
 
     companion object {
         fun mode(value: String) = when (value) {

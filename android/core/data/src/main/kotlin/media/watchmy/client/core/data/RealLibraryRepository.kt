@@ -119,14 +119,11 @@ internal class RealLibraryRepository(
 
     /** One call for the whole show; servers without it get one per season. */
     override suspend fun setShowWatched(showId: Long, watched: Boolean) {
-        try {
+        orIfUnknownRoute({ super.setShowWatched(showId, watched) }) {
             http.signedIn { base, client ->
                 val api = WatchApi(base, client)
                 if (watched) api.markShowWatched(showId) else api.markShowUnwatched(showId)
             }
-        } catch (e: ApiException) {
-            if (!e.unknownRoute()) throw e
-            super.setShowWatched(showId, watched)
         }
     }
 

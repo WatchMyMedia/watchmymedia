@@ -82,13 +82,13 @@ internal class CastTokenAccess(
     /** A fresh cast token, which also opens media URLs. */
     suspend fun renew(): MediaToken {
         val t = call { base, client -> AuthApi(base, client).createCastToken() }
-        val exp = epochMs(t.expiresAt) ?: (System.currentTimeMillis() + 60 * 60_000L)
+        val renewed = t.toMediaToken(baseUrl)
         lock.withLock {
             current = http.calls(Credential(baseUrl, t.token))
-            expiresAt = exp
+            expiresAt = renewed.expiresAtMs
             token = t.token
         }
-        return MediaToken(t.token, exp, t.param.ifBlank { "access_token" }, serverUrl = baseUrl)
+        return renewed
     }
 }
 
@@ -116,7 +116,7 @@ internal class RealCastGateway(private val store: LocalStore, private val http: 
 
     override suspend fun castToken(): CastToken {
         val t = http.signedIn { base, client -> AuthApi(base, client).createCastToken() }
-        return CastToken(t.token, epochMs(t.expiresAt) ?: (System.currentTimeMillis() + 60 * 60_000L), t.urls)
+        return CastToken(t.token, tokenExpiry(t.expiresAt), t.urls)
     }
 
     companion object {

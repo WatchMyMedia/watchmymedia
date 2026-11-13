@@ -10,7 +10,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import media.watchmy.client.core.api.apis.AuthApi
 import media.watchmy.client.core.api.models.ClaimPairingInputBody
-import media.watchmy.client.core.api.models.Client
 import media.watchmy.client.core.api.models.CredentialsInputBody
 import media.watchmy.client.core.api.models.PairingClaim
 import media.watchmy.client.core.api.models.StartPairingInputBody
@@ -200,15 +199,6 @@ internal class RealAuthRepository(
         // Signing in again (another account, or the same one) ends the session it replaces.
         replaced?.let { (baseUrl, old) -> store.tokenOrNull(old)?.let { servers.signOutLater(baseUrl, it) } }
     }
-
-    private fun ClientInfo.toApi() = Client(
-        deviceId = deviceId.take(64),
-        name = name.take(MAX_NAME),
-        product = product.take(64),
-        platform = platform.take(32),
-        version = version.take(32),
-        model = model.take(64).ifBlank { null },
-    )
 
     companion object {
         const val MAX_NAME = 64

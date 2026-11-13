@@ -143,12 +143,8 @@ internal class RealLiveRepository(
     override suspend fun forget(reminderId: String) {
         if (!personal()) return
         val revision = store.revision
-        try {
-            http.signedIn { base, client -> LiveTvApi(base, client).deleteLiveTVReminder(reminderId) }
-        } catch (e: ApiException) {
-            // Already gone (another device, or it ended): the list no longer has it either way.
-            if (e.status != 404) throw e
-        }
+        // Already gone (another device, or it ended): the list no longer has it either way.
+        ignoring404 { http.signedIn { base, client -> LiveTvApi(base, client).deleteLiveTVReminder(reminderId) } }
         if (store.revision == revision) _reminders.value = _reminders.value?.let { it.copy(items = it.items.filter { r -> r.id != reminderId }) }
     }
 
@@ -219,8 +215,7 @@ internal class RealLiveRepository(
 
     override suspend fun cancelRecording(id: String) {
         if (!recordingLevel()) return
-        try { http.signedIn { base, client -> LiveTvApi(base, client).cancelLiveTVRecording(id) } }
-        catch (e: ApiException) { if (e.status != 404) throw e }
+        ignoring404 { http.signedIn { base, client -> LiveTvApi(base, client).cancelLiveTVRecording(id) } }
         recordingsChanged()
     }
 
@@ -242,8 +237,7 @@ internal class RealLiveRepository(
 
     override suspend fun deleteRecordingRule(id: String) {
         if (!recordingLevel()) return
-        try { http.signedIn { base, client -> LiveTvApi(base, client).deleteLiveTVRecordingRule(id) } }
-        catch (e: ApiException) { if (e.status != 404) throw e }
+        ignoring404 { http.signedIn { base, client -> LiveTvApi(base, client).deleteLiveTVRecordingRule(id) } }
         recordingsChanged()
     }
 
@@ -448,11 +442,7 @@ internal class RealLivePlaybackGateway(
 
     override suspend fun stop(sessionId: String) {
         if (access == null) return bind().stop(sessionId)
-        try {
-            access.call { base, client -> LiveTvApi(base, client).stopLiveTV(sessionId) }
-        } catch (e: ApiException) {
-            if (e.status != 404) throw e
-        }
+        ignoring404 { access.call { base, client -> LiveTvApi(base, client).stopLiveTV(sessionId) } }
     }
 
     override suspend fun mediaToken(): MediaToken {
@@ -460,7 +450,7 @@ internal class RealLivePlaybackGateway(
         if (access == null) return bind().mediaToken()
         requireCurrent()
         val (base, token) = access.call { base, client -> base to AuthApi(base, client).createMediaToken() }
-        return MediaToken(token.token, epochMs(token.expiresAt) ?: 0L, token.param.ifBlank { "access_token" }, base)
+        return token.toModel(base)
     }
 
     private fun requireCurrent() {
