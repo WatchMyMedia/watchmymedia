@@ -162,7 +162,7 @@ fun HomeScreen(
     // (the startup benchmarks, :baselineprofile).
     ReportDrawnWhen { state.home != null || state.error != null }
 
-    TvScaffold(RailSection.Home, onNavigate, modifier = if (state.home != null) Modifier.testTag(TestTags.HOME) else Modifier) {
+    TvScaffold(RailSection.Home, onNavigate) {
         when {
             state.loading && state.home == null -> HomeSkeleton()
             state.home == null && state.error != null -> ErrorState(state.error.orEmpty(), vm::retry, title = "Couldn't load Home")
@@ -257,7 +257,7 @@ private fun HomeContent(
     val spec = remember(density) { PivotSpec(with(density) { 124.dp.toPx() }) }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
         LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxSize().testTag(TestTags.HOME),
             state = rememberLazyListState(),
             contentPadding = PaddingValues(bottom = 0.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -571,7 +571,7 @@ private fun ArrangedHomeContent(
 
     VerticalPager(
         state = pager,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().testTag(TestTags.HOME),
         beyondViewportPageCount = 1,
         userScrollEnabled = false,
         key = { pages[it].key },

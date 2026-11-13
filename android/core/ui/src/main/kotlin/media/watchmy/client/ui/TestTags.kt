@@ -8,7 +8,7 @@ package media.watchmy.client.ui
  * strings: rename one in both places, or the journeys stop finding it.
  */
 object TestTags {
-    /** Home once it has loaded from the server: its rows, or an empty library's message. */
+    /** Home once it has loaded from the server: its rows (and on a phone, an empty library's message). */
     const val HOME = "home"
 
     /** The main Play (or Resume) button of a show's or a movie's page. */
