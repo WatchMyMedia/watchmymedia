@@ -657,6 +657,8 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
   size (§2.8); `UITests/TextSizeTests.swift` runs a movie's page and the
   Movies filters at the largest accessibility size. The guide and the
   player keep fixed sizes (Later).
+- **Tapping the selected tab** goes back to its first page
+  (`UITests/TabReselectTests.swift`).
 
 ## Release builds, privacy and measuring
 
