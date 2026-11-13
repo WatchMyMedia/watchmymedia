@@ -178,43 +178,47 @@ private fun UiDevice.scan(forward: Direction, back: Direction, find: UiDevice.()
 }
 
 /** What the app opens on. */
-enum class FirstScreen { TvPairing, ServerPicker, SignIn, Home }
-
-/** The screen the app shows after a start, waiting for one to settle. */
-fun UiDevice.firstScreen(): FirstScreen {
-    val screens = listOf(
-        FirstScreen.TvPairing to By.textStartsWith("Link this TV"),
-        FirstScreen.ServerPicker to tag(Tags.SERVER_ADDRESS),
-        FirstScreen.SignIn to tag(Tags.SIGN_IN_NAME),
-        FirstScreen.Home to tag(Tags.HOME),
-    )
-    repeat((LOAD_MS / 500).toInt()) {
-        screens.firstOrNull { (_, selector) -> hasObject(selector) }?.let { return it.first }
-        waitForIdle(500)
-    }
-    fail("None of the TV's pairing, the server picker, sign-in or Home showed")
-}
+enum class FirstScreen { Tv, ServerPicker, SignIn, Home }
 
 /**
- * True when the app shows the TV UI, false for the phone's, once a first
- * screen has come: the TV's root carries the tv tag. (The fake pairing can
- * sign the TV in before the journey sees the pairing screen.)
+ * The screen the app shows after a start, waiting for one to settle: any
+ * TV screen (the TV's root carries the tv tag), else the phone's server
+ * picker, sign-in or Home. One search a second, for all four at once: each
+ * search walks the window's accessibility tree, which the app builds on its
+ * main thread while it starts.
  */
-fun UiDevice.showsTv(): Boolean {
-    firstScreen()
-    return hasObject(tag(Tags.TV))
+fun UiDevice.firstScreen(): FirstScreen {
+    val tags = mapOf(
+        Tags.TV to FirstScreen.Tv,
+        Tags.SERVER_ADDRESS to FirstScreen.ServerPicker,
+        Tags.SIGN_IN_NAME to FirstScreen.SignIn,
+        Tags.HOME to FirstScreen.Home,
+    )
+    val any = By.res(Pattern.compile(tags.keys.joinToString("|") { Pattern.quote(it) }))
+    repeat((LOAD_MS / 1_000).toInt()) {
+        val found = findObjects(any).mapNotNull { tags[it.resourceName] }
+        // The TV's root holds every TV screen; on a phone, sign-in and Home go before the picker beneath them.
+        listOf(FirstScreen.Tv, FirstScreen.Home, FirstScreen.SignIn, FirstScreen.ServerPicker).firstOrNull { it in found }?.let { return it }
+        SystemClock.sleep(1_000)
+    }
+    fail("None of the TV's screens, the server picker, sign-in or Home showed")
 }
+
+/** True when the app shows the TV UI, false for the phone's, once a first screen has come. */
+fun UiDevice.showsTv(): Boolean = firstScreen() == FirstScreen.Tv
 
 /** [UiDevice.showsTv] for the journeys. */
 fun MacrobenchmarkScope.showsTv(): Boolean = device.showsTv()
 
 /**
  * Signs in and ends on Home: on the fakes the TV pairs by itself and the
- * phone takes any name; a real build signs in to [fixtureServer].
+ * phone takes any name; a real build signs in to [fixtureServer]. A phone
+ * still signed in from the run before (its process kept) is on Home already.
  */
 fun MacrobenchmarkScope.signIn(tv: Boolean) = when {
     tv -> tvPairedHome()
     fixtureServer != null -> fixtureSignIn()
+    device.firstScreen() == FirstScreen.Home -> Unit
     else -> phoneSignIn("Sam", "password")
 }
 
@@ -242,7 +246,7 @@ fun MacrobenchmarkScope.fixtureSignIn() {
         }
         FirstScreen.SignIn -> phoneSignIn(fixtureUser, fixturePassword)
         FirstScreen.Home -> Unit
-        FirstScreen.TvPairing -> error("The real-build journeys run on a phone build")
+        FirstScreen.Tv -> error("The real-build journeys run on a phone build")
     }
 }
 
