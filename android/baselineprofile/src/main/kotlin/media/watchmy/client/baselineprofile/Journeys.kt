@@ -13,6 +13,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import java.io.File
+import java.util.regex.Pattern
 
 /*
  * What people do first in the app (README, "Baseline profile"). On the fakes
@@ -128,6 +129,21 @@ private fun UiDevice.reveal(selector: BySelector, direction: Direction = Directi
     return waitFor(selector)
 }
 
+/** A card's long-press menu ("Mark as watched", "Go to movie"). */
+private val CARD_MENU = By.text(Pattern.compile("Mark as (un)?watched"))
+
+/**
+ * Closes a card's menu that a fling opened: on a busy emulator a fling's
+ * touches can arrive slowly enough to count as a long press on the card
+ * under them.
+ */
+private fun UiDevice.closeCardMenu() {
+    if (hasObject(CARD_MENU)) {
+        pressBack()
+        wait(Until.gone(CARD_MENU), WAIT_MS)
+    }
+}
+
 /**
  * Flings the list [find] finds along and back to its start, as a person
  * scanning it would. The list is found again for each fling: a fling back
@@ -144,6 +160,7 @@ private fun UiDevice.scan(forward: Direction, back: Direction, find: UiDevice.()
                 val across = if (direction == Direction.LEFT || direction == Direction.RIGHT) height / 4 else height / 5
                 list.setGestureMargins(displayWidth / 5, across, displayWidth / 5, across)
                 list.fling(direction)
+                closeCardMenu()
                 return
             } catch (_: StaleObjectException) {
                 waitForIdle()
