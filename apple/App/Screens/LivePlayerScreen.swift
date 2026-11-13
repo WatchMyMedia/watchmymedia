@@ -192,7 +192,7 @@ private struct LivePlayerContent: View {
                             Button("Go live") { model.goLive() }.font(.subheadline.bold()).foregroundStyle(Palette.gold)
                         }
                         if state.status == .paused {
-                            Text("Tuner releases in \(state.pauseRemainingSeconds / 60):\(String(format: "%02d", state.pauseRemainingSeconds % 60))")
+                            Text(liveTunerReleasesIn(seconds: state.pauseRemainingSeconds))
                                 .font(.caption).foregroundStyle(Palette.textSecondary)
                         }
                         Spacer(minLength: 0)

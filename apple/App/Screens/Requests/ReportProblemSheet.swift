@@ -62,7 +62,7 @@ struct ReportProblemSheet: View {
                     .tracking(1)
                     .foregroundStyle(Palette.gold)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Report a problem")
+                Text(reportProblemTitle)
                     .scaledFont(24, weight: .heavy)
                     .foregroundStyle(Palette.text)
                     .accessibilityAddTraits(.isHeader)

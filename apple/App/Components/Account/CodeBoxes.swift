@@ -32,7 +32,7 @@ struct CodeBoxes: View {
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement()
-        .accessibilityLabel(code.isEmpty ? "No code yet" : "Code \(spokenCode(code))")
+        .accessibilityLabel(pairingCodeAccessibilityLabel(code))
     }
 }
 

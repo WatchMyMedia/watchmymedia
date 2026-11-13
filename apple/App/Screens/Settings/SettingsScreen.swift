@@ -289,7 +289,7 @@ private struct SettingsRoot: View {
     }
 
     private var signOutTitle: String {
-        model.server.map { "Sign out of \($0.name)?" } ?? "Sign out?"
+        signOutQuestion(serverName: model.server?.name)
     }
 
     private var accountCard: some View {

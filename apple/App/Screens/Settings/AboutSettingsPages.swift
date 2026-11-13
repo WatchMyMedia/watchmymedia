@@ -41,7 +41,7 @@ struct ServerSettingsPage: View {
             Section {
                 Button { switchServer() } label: {
                     HStack {
-                        Text("Switch server")
+                        Text(switchServerTitle)
                             .font(.body.weight(.medium))
                             .foregroundStyle(Palette.gold)
                         Spacer()

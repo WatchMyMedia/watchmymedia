@@ -663,7 +663,7 @@ private struct ShowPageView: View {
     private var moreMenu: some View {
         Menu {
             if model.canReport {
-                Button { model.reportProblem() } label: { Label("Report a problem", systemImage: "exclamationmark.bubble") }
+                Button { model.reportProblem() } label: { Label(reportProblemTitle, systemImage: "exclamationmark.bubble") }
             }
             if model.canReplace {
                 Button { model.askReplace() } label: { Label("Replace file", systemImage: "arrow.triangle.2.circlepath") }

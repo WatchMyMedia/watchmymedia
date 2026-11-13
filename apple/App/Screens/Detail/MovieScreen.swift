@@ -54,7 +54,7 @@ private struct MovieView: View {
                         Button {
                             report = ReportProblemModel(requests: services.requests, target: .movie(movie))
                         } label: {
-                            Label("Report a problem", systemImage: "exclamationmark.bubble")
+                            Label(reportProblemTitle, systemImage: "exclamationmark.bubble")
                         }
                     } label: {
                         Image(systemName: "ellipsis")
