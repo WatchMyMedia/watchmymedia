@@ -597,6 +597,12 @@ stubs return 0, false or null in unit tests instead of throwing, so a test
 that reaches Android by mistake passes quietly; use Robolectric where a test
 needs Android.
 
+`build-logic` also holds `versionCodeOf` (`VersionCode.kt`), which turns a
+release tag into the app's version code, and its tests (`VersionCodeTest`):
+the order across alpha, beta, rc and the release, and the bounds Play sets.
+The root project's `testDebugUnitTest` runs them, so `./gradlew
+testDebugUnitTest` covers build-logic as well as the modules.
+
 `coverageReport` runs the debug unit tests and reports line and branch
 coverage across the modules, leaving out generated code: `R` and
 `BuildConfig`, Compose's `ComposableSingletons`, serializers and `core:api`'s

@@ -243,7 +243,7 @@ jobs:
 
   # The Android app: the bundle for Google Play and the APK for sideloading
   # (TVs without Play, Fire TV), versioned from the tag (see versionCodeOf in
-  # android/app/build.gradle.kts). With the upload key secrets set (see
+  # android/build-logic, VersionCode.kt). With the upload key secrets set (see
   # README, "Android app") both are signed; without them both are unsigned
   # and the job summary says so. The bundle goes to Play's internal track
   # when PLAY_SERVICE_ACCOUNT_JSON is set too, and is kept as a workflow

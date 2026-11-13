@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prints the Xcode version settings for a release tag, as the Android build
-# derives its versions (android/app/build.gradle.kts, versionCodeOf):
+# derives its versions (versionCodeOf in android/build-logic):
 #
 #   scripts/version.sh v1.4.3-rc.1
 #   MARKETING_VERSION=1.8.3 CURRENT_PROJECT_VERSION=10400361

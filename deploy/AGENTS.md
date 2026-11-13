@@ -64,7 +64,7 @@ Changes to `release.yml` are only fully exercised by a tag. Say what could
 not be checked, and leave tagging an rc to the user.
 
 Version numbers come from the tag everywhere: `apple/scripts/version.sh` for
-Apple and the Mac app, `versionCodeOf` in `android/app/build.gradle.kts` for
+Apple and the Mac app, `versionCodeOf` in `android/build-logic` (`VersionCode.kt`) for
 Android, using the same build number so pre-releases sort before their
 release. The iPhone, iPad and Apple TV apps' version stays on 1.x: `v0.M.P`
 is 1.M.P, `v1.0.0` is 1.6.0, and from `v1.3.0` `v1.M.P` is 1.(M + 4).P.
