@@ -118,7 +118,12 @@ server, and on iPad in both a regular and a compact width.
     chooses its season. Focus coming into the row or the tabs from above or
     below lands on whatever is nearest, so the page moves it to the card on
     top (or the chosen tab) before following it; otherwise coming up from the
-    row would choose the season over the card.
+    row would choose the season over the card. Measured with `_printChanges`
+    on tvOS 27: the view that owns a `@FocusState` is redrawn on every focus
+    move whatever its body reads, a container that takes a closure under it
+    (`TabPage`) then rebuilds its content, and an `.equatable()` view's `==`
+    isn't asked for its first several updates; so what changes with each
+    move (the episode on top) is read only in views of its own (`Separately`).
   - On Apple TV a focused button that becomes disabled keeps focus, dimmed,
     until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
     up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable

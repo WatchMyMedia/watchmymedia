@@ -65,21 +65,27 @@ private struct ShowPageView: View {
             .fullScreenCover(item: $model.requestSheet) { sheet in
                 RequestDialog(model: sheet) { model.requestSheet = nil }
             }
-            .task(id: model.episode != nil) {
-                // The top's first button takes focus once the page is on
-                // screen (it may take a few layouts to get there); an episode
-                // with none (yet to air) gives it to its card.
-                guard let episode = model.episode, !focusedTop else { return }
-                let target: PageFocus = hasTopButton(episode) ? .play : .card(episode.id)
-                for _ in 0..<10 {
-                    try? await Task.sleep(for: .milliseconds(150))
-                    if Task.isCancelled { return }
-                    if focus == target { break }
-                    focus = target
-                }
-                focusedTop = true
+            // The episode on top is read only in what shows it (``Separately``),
+            // so a move along the row doesn't rebuild the page around it.
+            .background {
+                Separately { Color.clear.task(id: model.episode != nil) { await focusTop() } }
             }
             .onChange(of: focus) { old, new in follow(from: old, to: new) }
+    }
+
+    /// The top's first button takes focus once the page is on screen (it may
+    /// take a few layouts to get there); an episode with none (yet to air)
+    /// gives it to its card.
+    private func focusTop() async {
+        guard let episode = model.episode, !focusedTop else { return }
+        let target: PageFocus = hasTopButton(episode) ? .play : .card(episode.id)
+        for _ in 0..<10 {
+            try? await Task.sleep(for: .milliseconds(150))
+            if Task.isCancelled { return }
+            if focus == target { break }
+            focus = target
+        }
+        focusedTop = true
     }
 
     /// Focus moving along the row puts each card's episode on top; focus
@@ -127,11 +133,13 @@ private struct ShowPageView: View {
     private func page(_ show: ShowDetail) -> some View {
         TabPage {
             VStack(alignment: .leading, spacing: 0) {
-                if let episode = model.episode {
-                    onTop(episode)
-                        .padding(.horizontal, TVLayout.gutter)
-                        .padding(.top, 60)
-                        .frame(minHeight: 470, alignment: .top)
+                Separately {
+                    if let episode = model.episode {
+                        onTop(episode)
+                            .padding(.horizontal, TVLayout.gutter)
+                            .padding(.top, 60)
+                            .frame(minHeight: 470, alignment: .top)
+                    }
                 }
                 seasons.padding(.top, 40)
                 Label("About \(show.title)", systemImage: "chevron.down")
@@ -153,8 +161,10 @@ private struct ShowPageView: View {
             }
             .padding(.bottom, 60)
             .background(alignment: .top) {
-                if let episode = model.episode {
-                    backdrop(episode).padding(.top, -150)
+                Separately {
+                    if let episode = model.episode {
+                        backdrop(episode).padding(.top, -150)
+                    }
                 }
             }
         }
@@ -373,7 +383,7 @@ private struct ShowPageView: View {
                     .background(Color(hex: 0x052E16).opacity(0.7), in: Capsule())
                     .padding(.horizontal, TVLayout.gutter)
             }
-            row
+            Separately { row }
         }
     }
 
@@ -437,6 +447,14 @@ private struct ShowPageView: View {
         .accessibilityIdentifier("episode-card-\(episode.id)")
     }
 
+}
+
+/// Draws `content` in a body of its own, so what it reads (the episode on
+/// top, the row's highlight) redraws it alone and not the page around it.
+private struct Separately<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View { content() }
 }
 
 /// The tabs (or one season's heading), the season's line, and Mark season
