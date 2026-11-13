@@ -129,7 +129,6 @@ private struct TabShellKeys: ViewModifier {
     @Environment(Navigator.self) private var navigator
     @Environment(AppFlow.self) private var flow
     @Environment(AppServices.self) private var services
-    @Environment(\.scenePhase) private var scenePhase
 
     func body(content: Content) -> some View {
         content
@@ -142,8 +141,8 @@ private struct TabShellKeys: ViewModifier {
                     .accessibilityHidden(true)
             }
             .onAppear { PlaceKeeping.restoreOnce(navigator, services: services) }
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .background, flow.serverSwitch == nil { PlaceKeeping.save(navigator, services: services) }
+            .onChange(of: navigator.place) { _, _ in
+                if flow.serverSwitch == nil { PlaceKeeping.save(navigator, services: services) }
             }
     }
 }

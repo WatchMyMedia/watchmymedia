@@ -646,8 +646,7 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
   out there are none and a shortcut opens the app as it is.
 - **Coming back to where you were** (`App/Shell/PlaceKeeping.swift`,
   `SavedPlace` in the Kit): the tab and each tab's pages are saved per
-  account and server as the app goes to the background and restored once a
-  launch; never the player or Settings, and a page a later version added
+  account and server whenever they change and restored once a launch; never the player or Settings, and a page a later version added
   ends its tab's pages there. A launch with `-open` or `-tab` goes where it
   says; on the fakes nothing is kept unless `-fakesRestorePlace` is given.
 - **Recent searches** are kept between launches per account and server

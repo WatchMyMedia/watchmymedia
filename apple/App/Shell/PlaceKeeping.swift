@@ -4,8 +4,9 @@ import WMMModel
 
 /// Keeps where the person was (the tab and each tab's pages, ``SavedPlace``)
 /// for the account and server signed in, so the app reopens there after the
-/// system evicts it (PLAN-APPLE-REVIEW.md §6.3): saved as the app goes to
-/// the background, restored once a launch when the tabs first show. Never
+/// system evicts it (PLAN-APPLE-REVIEW.md §6.3): saved whenever it changes
+/// (a view's scene phase didn't report the background on the iOS 27.2
+/// simulator), restored once a launch when the tabs first show. Never
 /// the player or Settings (a sheet on a Live TV server), and never another
 /// account's place. A launch with `-open` or `-tab` goes where it says
 /// instead, and on the fakes nothing is kept unless `-fakesRestorePlace`
