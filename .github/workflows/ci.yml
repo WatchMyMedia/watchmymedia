@@ -133,14 +133,15 @@ jobs:
               - 'deploy/macos/fetch-ffmpeg.sh'
               - '.github/workflows/ci.yml'
 
-  # Vet, lint and the generated-code check, then the Go tests with the ffmpeg
-  # build the releases ship, so the VideoToolbox paths run on real hardware.
-  # Linux is covered by building and vetting for it, Windows by vetting
-  # here and by the windows job's tests.
+  # Vet, lint and the generated-code check, then every Go test with the
+  # ffmpeg build the releases ship, on Linux: GitHub's Linux runners are the
+  # easiest to get, and its macOS ones the scarcest (five at once for every
+  # pull request and release). Windows is covered by vetting here and by the
+  # windows-server job's tests, macOS by the server-macos job.
   server:
     needs: changes
     if: needs.changes.outputs.server == 'true'
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Keep Go caches in this runner's tool cache
@@ -214,8 +215,15 @@ jobs:
         env:
           FFMPEG_CACHE: ${{ runner.tool_cache }}/watchmymedia-ffmpeg
         run: |
-          deploy/macos/fetch-ffmpeg.sh arm64
-          build/ffmpeg/darwin-arm64/ffmpeg -hide_banner -version | head -1
+          case "$RUNNER_OS-$RUNNER_ARCH" in
+            macOS-ARM64) target=arm64 dir=darwin-arm64 ;;
+            Linux-X64) target=linux-amd64 dir=linux-amd64 ;;
+            Linux-ARM64) target=linux-arm64 dir=linux-arm64 ;;
+            *) echo "no ffmpeg build for $RUNNER_OS-$RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          deploy/macos/fetch-ffmpeg.sh "$target"
+          echo "$GITHUB_WORKSPACE/build/ffmpeg/$dir" >> "$GITHUB_PATH"
+          "build/ffmpeg/$dir/ffmpeg" -hide_banner -version | head -1
       # Pull requests keep main's passing results for packages they don't
       # change; main and manual runs run every test again, and main saves
       # those results for the pull requests after it.
@@ -225,20 +233,102 @@ jobs:
         run: go clean -testcache
       # The speed budgets (Test...Speed) time queries against the wall clock,
       # so they run in a step of their own, one package at a time, rather
-      # than beside the other packages on the runner's three cores.
+      # than beside the other packages on the runner's cores.
       - name: Test
         working-directory: server
-        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test -skip 'Speed$' ./...
+        run: go test -skip 'Speed$' ./...
       - name: Test the speed budgets alone
         working-directory: server
         run: go test -p 1 -run 'Speed$' ./...
-      # The server-race job runs on Linux; the macOS-only code (the library
-      # watcher's kqueue, the leftover ffmpeg sweep) runs under the race
-      # detector here.
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+
+  # The server on macOS, where the Mac app runs it: vetted for macOS, and the
+  # tests of the packages with code of their own for it (the library
+  # watcher's kqueue, the leftover ffmpeg sweep, publishing a recording,
+  # VideoToolbox), with the Mac ffmpeg the releases ship. The other packages
+  # run the same code on every system and are tested in the server job. The
+  # server-race job runs on Linux, so the macOS-only code runs under the race
+  # detector here.
+  server-macos:
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Keep Go caches in this runner's tool cache
+        run: |
+          echo "GOCACHE=$RUNNER_TOOL_CACHE/go-build" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$RUNNER_TOOL_CACHE/go-mod" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+          cache: false
+      # Go's caches, saved by main and restored everywhere, as in the server job.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
+      - name: Vet for macOS
+        working-directory: server
+        run: go vet ./...
+      - name: Fetch the ffmpeg build the releases ship
+        env:
+          FFMPEG_CACHE: ${{ runner.tool_cache }}/watchmymedia-ffmpeg
+        run: |
+          deploy/macos/fetch-ffmpeg.sh arm64
+          echo "$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64" >> "$GITHUB_PATH"
+          build/ffmpeg/darwin-arm64/ffmpeg -hide_banner -version | head -1
+      # Pull requests keep main's passing results for packages they don't
+      # change; main and manual runs run every test again, and main saves
+      # those results for the pull requests after it.
+      - name: Run every test again outside pull requests
+        if: github.event_name != 'pull_request'
+        working-directory: server
+        run: go clean -testcache
+      - name: Test the packages with macOS code
+        working-directory: server
+        run: go test -skip 'Speed$' ./internal/ffexec ./internal/scanner ./internal/playback ./internal/livetv ./internal/livetv/dvr
+      # GitHub's Macs are virtual machines, so say in the log whether the
+      # VideoToolbox tests ran here or skipped for want of the hardware.
+      - name: Report which VideoToolbox tests ran
+        working-directory: server
+        run: |
+          set -o pipefail
+          go test -v -run 'VideoToolbox|^TestLiveBroadcastCaptions$' ./internal/playback ./internal/livetv | grep -E -- '--- (PASS|SKIP|FAIL)|^(ok|FAIL|PASS)'
       - name: Test the macOS-only code with the race detector
         working-directory: server
         run: |
-          export PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH"
           go test -race -short ./internal/ffexec
           go test -race -short -run 'Watch' ./internal/scanner
       # Saved even when a test failed: Go keeps only passing results.
@@ -255,8 +345,8 @@ jobs:
   # mean nothing at the race detector's speed. On Linux: GitHub's Linux
   # runners have four cores to the macOS runners' three, are far easier to
   # get, and run the Linux code (Pdeathsig, renameat2) that no other job
-  # tests. The macOS-only code runs under the race detector in the server
-  # job.
+  # tests. The macOS-only code runs under the race detector in the
+  # server-macos job.
   server-race:
     needs: changes
     if: needs.changes.outputs.race == 'true'

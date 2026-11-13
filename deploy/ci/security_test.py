@@ -48,8 +48,9 @@ class WorkflowIsolationTest(unittest.TestCase):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
-        hosted = dict.fromkeys(('changes', 'web', 'contract', 'docker', 'scripts', 'android', 'server-race'), 'ubuntu-latest')
-        hosted.update(dict.fromkeys(('server', 'apple', 'apple-tv'), 'macos-26'))
+        hosted = dict.fromkeys(('changes', 'web', 'contract', 'docker', 'scripts', 'android', 'server', 'server-race'), 'ubuntu-latest')
+        # macOS runners are the scarce ones: only what needs a Mac runs there.
+        hosted.update(dict.fromkeys(('server-macos', 'apple', 'apple-tv'), 'macos-26'))
         hosted['windows-server'] = hosted['windows-app'] = hosted['windows-signing'] = 'windows-latest'
         self.assertEqual(set(hosted), set(jobs))
         studio = ['self-hosted', 'macOS', 'ARM64', 'mac-studio']
@@ -82,7 +83,7 @@ class WorkflowIsolationTest(unittest.TestCase):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
-        gated = {'server': 'server', 'server-race': 'race', 'contract': 'contract', 'web': 'web',
+        gated = {'server': 'server', 'server-macos': 'server', 'server-race': 'race', 'contract': 'contract', 'web': 'web',
                  'docker': 'docker', 'scripts': 'scripts', 'android': 'android', 'apple': 'apple',
                  'apple-tv': 'apple-tv', 'windows-server': 'windows', 'windows-app': 'windows'}
         self.assertEqual(set(gated) | {'changes', 'windows-signing'}, set(jobs))
@@ -118,6 +119,32 @@ class WorkflowIsolationTest(unittest.TestCase):
         for name in ('server', 'windows-server'):
             self.assertNotIn('actions/download-artifact@', jobs[name])
         self.assertRegex(jobs['windows-server'], r'(?m)^    needs: changes$')
+
+    def test_server_tests_run_on_linux_and_macos_keeps_its_own_code(self):
+        # Every Go test, the lint and the generated-code check run on Linux;
+        # the scarce macOS runner tests only the packages with macOS code,
+        # and that code under the race detector.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        server, mac = jobs['server'], jobs['server-macos']
+        for marker in ("go test -skip 'Speed$' ./...\n", "go test -p 1 -run 'Speed$' ./...", 'golangci/golangci-lint-action@',
+                       'cmd/sqlc@v1.31.1 generate', 'govulncheck@', 'GOOS=windows GOARCH=amd64 go vet ./...'):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, server)
+                self.assertNotIn(marker, mac)
+        self.assertIn("go test -skip 'Speed$' ./internal/ffexec ./internal/scanner ./internal/playback "
+                      "./internal/livetv ./internal/livetv/dvr\n", mac)
+        self.assertIn('go test -race -short ./internal/ffexec', mac)
+        self.assertIn("go test -race -short -run 'Watch' ./internal/scanner", mac)
+        self.assertIn('deploy/macos/fetch-ffmpeg.sh arm64', mac)
+        # Every package with a file built only for macOS is one the macOS job tests.
+        tested = set(re.search(r"go test -skip 'Speed\$' ((?:\./internal/\S+ ?)+)", mac).group(1).split())
+        for path in sorted((ROOT / 'server').rglob('*_darwin.go')):
+            with self.subTest(file=path.name):
+                self.assertIn('./' + path.parent.relative_to(ROOT / 'server').as_posix(), tested)
+        # The image is built from what the Linux job tested.
+        self.assertIn('needs: [changes, server, web]', jobs['docker'])
 
     def test_windows_server_and_app_split_the_work_once(self):
         # Two jobs at once instead of one after the other: the Go tests and
@@ -248,12 +275,12 @@ class WorkflowIsolationTest(unittest.TestCase):
                                workflow.split('jobs:\n', 1)[1]))
         self.assertNotIn('actions/cache@', workflow)
         setups = re.findall(r'(?m)uses: actions/setup-go@[^\n]*\n        with:\n((?:          .*\n)+)', workflow)
-        self.assertEqual(6, len(setups))
+        self.assertEqual(7, len(setups))
         for setup in setups:
             self.assertIn('          cache: false\n', setup)
         save_if = ("if: \"!cancelled() && runner.environment == 'github-hosted' && "
                    "github.event_name == 'push' && github.ref == 'refs/heads/main'\"")
-        cached = {'server', 'server-race', 'contract', 'windows-server', 'windows-app'}
+        cached = {'server', 'server-macos', 'server-race', 'contract', 'windows-server', 'windows-app'}
         for name, job in jobs.items():
             with self.subTest(job=name):
                 if name not in cached:
@@ -313,8 +340,8 @@ class WorkflowIsolationTest(unittest.TestCase):
                                     ('ANDROID_SDK_ROOT', 'android-sdk'),
                                     ('GRADLE_USER_HOME', 'gradle')):
             self.assertIn(variable + '=$RUNNER_TOOL_CACHE/' + directory, android)
-        for variable, directory, count in (('GOCACHE', 'go-build', 3),
-                                           ('GOMODCACHE', 'go-mod', 3),
+        for variable, directory, count in (('GOCACHE', 'go-build', 4),
+                                           ('GOMODCACHE', 'go-mod', 4),
                                            ('GOLANGCI_LINT_CACHE', 'golangci-lint', 1)):
             self.assertEqual(count, workflow.count(variable + '=$RUNNER_TOOL_CACHE/' + directory))
         setup = re.search(r"(?ms)- name: Keep Android tools[^\n]*\n        run: \|\n(.*?)(?=      -)", android).group(1)
