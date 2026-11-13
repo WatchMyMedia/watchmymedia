@@ -81,10 +81,9 @@ public final class RealLivePlaybackController: LivePlaybackController {
     @ObservationIgnored private var lastNativePlaying = false
     @ObservationIgnored private var loadedURL: URL?
     @ObservationIgnored private var startedProfile: PlaybackProfile?
-    @ObservationIgnored private var handledOutputGeneration = 0
     @ObservationIgnored private var pendingOutput: (generation: Int, previousURL: URL)?
-    @ObservationIgnored private var acceptedOutputGeneration: Int?
-    @ObservationIgnored private var failedOutputGeneration: Int?
+    /// Automatic's output switches: those handled, and those to report.
+    @ObservationIgnored private var switches = SwitchGenerations<Int>()
     /// A new token is being fetched after the stream refused the last one.
     @ObservationIgnored private var renewingToken = false
     /// Tokens renewed for a refused stream, and when the last was: as many
@@ -109,7 +108,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
         request.quality = request.quality.cappedForCellular(cellular())
         generation += 1; desired = request; lastRequest = request
         loaded = false; wantsPlay = true; pausedAt = nil; pauseBudget = 300_000
-        loadedURL = nil; handledOutputGeneration = 0; pendingOutput = nil; acceptedOutputGeneration = nil; failedOutputGeneration = nil
+        loadedURL = nil; switches = SwitchGenerations(); pendingOutput = nil
         renewingToken = false; tokenRenewals = 0
         noteUserInput()
         media.stop()
@@ -167,7 +166,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
     }
     public func stop() {
         generation += 1; desired = nil; loaded = false
-        loadedURL = nil; pendingOutput = nil; acceptedOutputGeneration = nil; failedOutputGeneration = nil
+        loadedURL = nil; pendingOutput = nil; switches = SwitchGenerations(handled: switches.handled)
         ticker.stop(); media.stop()
         state.status = .stopped; state.askStillWatching = false
         runSwitches()
@@ -325,10 +324,9 @@ public final class RealLivePlaybackController: LivePlaybackController {
 
     private func prepareOutput(_ session: LiveSession) {
         guard let directive = session.directive, pendingOutput == nil,
-              directive.generation > max(handledOutputGeneration, session.outputGeneration) else { return }
-        handledOutputGeneration = directive.generation
+              switches.take(directive.generation, playing: session.outputGeneration) else { return }
         guard let next = directive.url, let previous = loadedURL ?? session.streamURL, let token = tokens.token else {
-            failedOutputGeneration = directive.generation
+            switches.fail(directive.generation)
             sendHeartbeat(force: true)
             return
         }
@@ -340,7 +338,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
     private func rejectOutput() {
         guard let pending = pendingOutput else { return }
         pendingOutput = nil
-        failedOutputGeneration = pending.generation
+        switches.fail(pending.generation)
         loadedURL = pending.previousURL
         state.message = "Keeping the current Live TV quality after a switch failed."
         guard let session = activeSession, let token = tokens.token else { finish(reason: "signal_lost", failure: true); return }
@@ -366,7 +364,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
             if media.failed { rejectOutput() }
             else if media.firstFrameRendered, let pending = pendingOutput {
                 pendingOutput = nil
-                acceptedOutputGeneration = pending.generation
+                switches.accept(pending.generation)
                 state.message = nil
                 sendHeartbeat(force: true)
             }
@@ -434,7 +432,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
         guard force || clock.elapsedMs - lastBeat >= interval else { return }
         lastBeat = clock.elapsedMs
         let version = generation, input = inputVersion, paused = !wantsPlay
-        let accepted = acceptedOutputGeneration, failed = failedOutputGeneration
+        let accepted = switches.accepted, failed = switches.failed
         let transfer = session.automatic ? media.transfer : nil
         let measurement: LiveMeasurement? = session.automatic ? .init(
             state: paused ? .paused : media.ready && media.playing && !media.buffering ? .playing : .buffering,
@@ -450,8 +448,8 @@ public final class RealLivePlaybackController: LivePlaybackController {
                 let updated = try await bound.heartbeat(sessionID: session.id, paused: paused, interacted: input != acknowledgedInput, measurement: measurement)
                 guard version == generation, activeSession?.id == session.id, !released else { return }
                 lastSuccessfulBeat = clock.elapsedMs; acknowledgedInput = input
-                if acceptedOutputGeneration == accepted { acceptedOutputGeneration = nil }
-                if failedOutputGeneration == failed { failedOutputGeneration = nil }
+                switches.acknowledge(accepted: accepted)
+                switches.acknowledge(failed: failed)
                 apply(updated)
                 guard desired != nil else { return }
                 if !tokens.valid {

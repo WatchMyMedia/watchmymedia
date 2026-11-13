@@ -35,8 +35,8 @@ extension RealPlaybackController {
             fileID: v.request.fileID, positionMs: position, durationMs: duration(v, d), playID: playID, state: playState, bufferedMs: buffered,
             throughputBps: transfer?.bps ?? media?.throughputBps,
             throughputAgeMs: transfer?.ageMs,
-            switchGeneration: playState == .playing ? v.acceptedGeneration : nil,
-            switchFailedGeneration: v.failedGeneration,
+            switchGeneration: playState == .playing ? v.switches.accepted : nil,
+            switchFailedGeneration: v.switches.failed,
             stalls: v.measure.stalls, stallMs: v.measure.stallMs(at: now), startupMs: v.measure.takeStartup(), recordingID: v.request.recordingID
         ), generation: v.generation))
         return true
@@ -95,15 +95,14 @@ extension RealPlaybackController {
 
     func onReply(_ generation: Int, _ report: ProgressReport, _ reply: ProgressReply) {
         guard let v = viewing, v.generation == generation else { return }
-        if let acknowledged = report.switchGeneration, acknowledged == v.acceptedGeneration {
+        if v.switches.acknowledge(accepted: report.switchGeneration) {
             if let pending = v.pendingSwitch, let current = v.decision { endReplacedSession(pending.previous, current) }
-            v.acceptedGeneration = nil
             v.pendingSwitch = nil
             if let message = v.stepMessage { showNote(v, message) }
             v.stepMessage = nil
             refresh(0)
         }
-        if let failed = report.switchFailedGeneration, failed == v.failedGeneration { v.failedGeneration = nil }
+        v.switches.acknowledge(failed: report.switchFailedGeneration)
         if reply.completed { v.watched = true }
         guard !v.stopped else { return }
         // The play had ended (timed out, server restarted): the server carries on with a new one.

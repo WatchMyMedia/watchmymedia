@@ -347,11 +347,16 @@ public final class RealPlaybackController: PlaybackController {
         var qualityNoteUntil = 0
         /// Said once that the lowest step stalls too.
         var floorNoted = false
-        var handledGeneration: Int64 = 0
+        /// Automatic's switches: those handled, and those to report.
+        var switches = SwitchGenerations<Int64>()
+        /// The newest switch acted on (``switches``' own).
+        var handledGeneration: Int64 {
+            get { switches.handled }
+            set { switches.handled = newValue }
+        }
         var pendingSwitch: PendingSwitch?
+        /// A switch whose new stream hasn't shown a frame yet.
         var awaitingFrameGeneration: Int64?
-        var acceptedGeneration: Int64?
-        var failedGeneration: Int64?
         var stepMessage: String?
 
         init(request: PlayRequest, generation: Int, at now: Int) {
@@ -481,7 +486,7 @@ public final class RealPlaybackController: PlaybackController {
             }
             v.pendingSwitch = nil
             v.awaitingFrameGeneration = nil
-            v.acceptedGeneration = nil
+            v.switches.forgetAccepted()
         }
         v.loading = true
         v.pendingPositionMs = here ? nil : atMs
@@ -498,7 +503,7 @@ public final class RealPlaybackController: PlaybackController {
                 apply(v, d, requestedStartMs: atMs, playWhenReady: media?.playWhenReady ?? true, qualitySwitch: qualitySwitch)
             } catch is CancellationError {
                 // Overtaken before the server answered: the switch it was for didn't happen.
-                if let generation = qualitySwitch?.switchGeneration, viewing === v, !v.stopped { v.failedGeneration = generation }
+                if let generation = qualitySwitch?.switchGeneration, viewing === v, !v.stopped { v.switches.fail(generation) }
             } catch {
                 if let generation = qualitySwitch?.switchGeneration, viewing === v, v.decision != nil {
                     if let pending = v.pendingSwitch, pending.generation == generation {
@@ -506,7 +511,7 @@ public final class RealPlaybackController: PlaybackController {
                     } else {
                         v.loading = false
                         v.pendingPositionMs = nil
-                        v.failedGeneration = generation
+                        v.switches.fail(generation)
                         v.stepMessage = nil
                         showNote(v, "Still playing at \(v.decision?.autoStep?.shortLabel ?? "Original"). Quality will retry later.")
                         refresh(0)
@@ -576,7 +581,7 @@ public final class RealPlaybackController: PlaybackController {
     func overtaken(_ v: Viewing, _ d: PlaybackDecision, switchGeneration: Int64? = nil) -> Bool {
         guard Task.isCancelled else { return false }
         endUnused(d, of: v)
-        if let switchGeneration, viewing === v, !v.stopped { v.failedGeneration = switchGeneration }
+        if let switchGeneration, viewing === v, !v.stopped { v.switches.fail(switchGeneration) }
         return true
     }
 
@@ -769,7 +774,7 @@ public final class RealPlaybackController: PlaybackController {
             return
         }
         if let generation = v.awaitingFrameGeneration {
-            v.failedGeneration = generation
+            v.switches.fail(generation)
             v.awaitingFrameGeneration = nil
             v.stepMessage = nil
         }
@@ -997,7 +1002,7 @@ public final class RealPlaybackController: PlaybackController {
                 self?.launch {
                     guard let v = self?.active(), let generation = v.awaitingFrameGeneration else { return }
                     v.awaitingFrameGeneration = nil
-                    v.acceptedGeneration = generation
+                    v.switches.accept(generation)
                     self?.refresh(0)
                 }
             },

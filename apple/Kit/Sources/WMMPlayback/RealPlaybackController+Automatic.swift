@@ -10,8 +10,8 @@ extension RealPlaybackController {
     func restorePrevious(_ v: Viewing, _ pending: Viewing.PendingSwitch, showFailureNote: Bool = true) {
         v.pendingSwitch = nil
         v.awaitingFrameGeneration = nil
-        v.acceptedGeneration = nil
-        v.failedGeneration = pending.generation
+        v.switches.forgetAccepted()
+        v.switches.fail(pending.generation)
         v.pendingPositionMs = pending.atMs
         v.stepMessage = nil
         apply(v, pending.previous, requestedStartMs: pending.atMs)
