@@ -48,7 +48,7 @@ enum ServicesFactory {
             servers: data.servers
         )
         return data.makeAppServices(
-            playback: playback, livePlayback: LivePlaybackEngine(repository: data.liveTV, profile: profile), downloads: downloads.repository
+            playback: playback, livePlayback: LivePlaybackEngine(repository: data.liveTV, profile: profile, userAgent: APIPlaybackGateway.userAgent), downloads: downloads.repository
         )
     }
 

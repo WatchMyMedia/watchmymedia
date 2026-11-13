@@ -35,7 +35,7 @@ enum ServicesFactory {
             // Now Playing's picture. No `servers`: the AirPlay restart is the sender's, never the TV's.
             images: data.images
         )
-        return data.makeAppServices(playback: playback, livePlayback: LivePlaybackEngine(repository: data.liveTV, profile: profile))
+        return data.makeAppServices(playback: playback, livePlayback: LivePlaybackEngine(repository: data.liveTV, profile: profile, userAgent: APIPlaybackGateway.userAgent))
     }
 
     #if DEBUG
