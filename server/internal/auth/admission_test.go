@@ -126,3 +126,48 @@ func TestPairingIPv6PrefixAdmission(t *testing.T) {
 		}
 	}
 }
+
+// Sign-ins waiting on the bot check are bounded: past maxChallengeWork the
+// next is turned away at once, without calling Cloudflare, and a slot frees
+// as soon as a check returns.
+func TestBotChecksAreBounded(t *testing.T) {
+	s, _ := setup(t)
+	gate := &admissionGate{make(chan struct{}, maxChallengeWork+1), make(chan struct{})}
+	s.SetChallenge(gate)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	done := make(chan error, maxChallengeWork+1)
+	for i := range maxChallengeWork {
+		go func() {
+			c := netguard.NewContext(ctx, netguard.Info{IP: netip.MustParseAddr(fmt.Sprintf("203.0.113.%d", i+1))})
+			_, _, err := s.Login(c, Credentials{Name: fmt.Sprintf("missing-%d", i), Password: "wrong-password"}, Client{})
+			done <- err
+		}()
+		select {
+		case <-gate.entered:
+		case <-ctx.Done():
+			t.Fatal("login never reached the bot check")
+		}
+	}
+	over := netguard.NewContext(ctx, netguard.Info{IP: netip.MustParseAddr("198.51.100.9")})
+	_, _, err := s.Login(over, Credentials{Name: "one-more", Password: "wrong-password"}, Client{})
+	var te *ThrottledError
+	if !errors.As(err, &te) || te.What != "concurrent bot checks" {
+		t.Fatalf("sign-in past the bound: %v, want a throttle for concurrent bot checks", err)
+	}
+	select {
+	case <-gate.entered:
+		t.Fatal("the turned-away sign-in still called the bot check")
+	default:
+	}
+	close(gate.release)
+	for range maxChallengeWork {
+		<-done
+	}
+	// Every slot is free again.
+	if release, err := s.admitChallenge(); err != nil {
+		t.Fatalf("after the checks returned: %v", err)
+	} else {
+		release()
+	}
+}

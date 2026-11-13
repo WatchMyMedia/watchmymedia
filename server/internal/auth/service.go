@@ -136,9 +136,10 @@ type Service struct {
 	// setupMu makes checking for and creating the first account one step.
 	setupMu sync.Mutex
 	// grantMu orders session/grant issuance against revocation and deletion.
-	grantMu   sync.Mutex
-	confirmed map[string]confirmation
-	passwords passwordAdmission
+	grantMu    sync.Mutex
+	confirmed  map[string]confirmation
+	passwords  passwordAdmission
+	challenges challengeAdmission
 	// mediaKey signs media tokens (see mediatoken.go).
 	mediaKey []byte
 }
@@ -341,9 +342,14 @@ func (s *Service) passChallenge(ctx context.Context, token string) error {
 	if s.challenge == nil || !s.challenge.Required() {
 		return nil
 	}
+	release, err := s.admitChallenge()
+	if err != nil {
+		return err
+	}
+	defer release()
 	// Behind an untrusted proxy clientIP is "", so Cloudflare is not told
 	// the proxy's address as the visitor's.
-	err := s.challenge.Verify(ctx, token, clientIP(ctx))
+	err = s.challenge.Verify(ctx, token, clientIP(ctx))
 	if errors.Is(err, turnstile.ErrRejected) {
 		if addr, _ := limitAddr(ctx); addr != "" {
 			s.addrLimit.fail(addr)

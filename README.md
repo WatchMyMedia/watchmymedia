@@ -1,13 +1,27 @@
 # WatchMyMedia
 
-Self-hosted media server: point it at a Movies folder and a TV folder, it builds
-libraries with metadata and streams to a web client and to the TV and phone apps.
+A self-hosted media server for movies, TV shows and live antenna TV. Point it at
+a Movies folder and a TV folder and it builds a library with posters and details,
+then streams it to any web browser and to the apps for phones, tablets and TVs.
+It is open source under the [GNU AGPL-3.0](LICENSE).
+
+**To use it**, download the Mac or Windows app from
+[watchmy.media/download](https://watchmy.media/download) and follow
+[the guide](https://watchmy.media/guide/). The phone and TV apps are on the
+[App Store](https://apps.apple.com/app/watchmymedia/id6828975407) and
+[Google Play](https://play.google.com/store/apps/details?id=media.watchmy.client).
+This README is for building and running it from source.
 
 ## Layout
 
 - `server/` — Go server (chi + huma API, SQLite via sqlc/goose, ffmpeg orchestration, embedded web UI)
-- `web/` — React + Vite web client, API types generated from the server's OpenAPI
-- `deploy/` — Dockerfile, compose example, config example
+- `web/` — React + Vite web client, API types generated from the server's OpenAPI; the Cast receiver in `web/receiver`
+- `android/` — Android app for phones, tablets, Google TV and Android TV ([android/README.md](android/README.md))
+- `apple/` — iPhone, iPad and Apple TV apps ([apple/README.md](apple/README.md))
+- `macos/` — the Mac menu bar app that runs the server
+- `windows/` — the Windows app and installer that run the server ([windows/README.md](windows/README.md))
+- `api/` — the OpenAPI spec the apps generate their clients from
+- `deploy/` — Dockerfile, compose examples, config example, release and fixture scripts
 - `Makefile` — `make help` lists every target
 
 ## Prerequisites

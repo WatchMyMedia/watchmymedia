@@ -38,6 +38,10 @@ func TestMatroskaKeyframes(t *testing.T) {
 	dir := t.TempDir()
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	k := NewKeyframes(ffprobe, dir, log)
+	// A scan answers from memory before it writes its result into dir, so
+	// wait for it before the folder goes: on Windows the write landed during
+	// cleanup ("TempDir RemoveAll cleanup: ... The directory is not empty").
+	t.Cleanup(k.Close)
 	st, _ := os.Stat(src)
 	got, err := k.Get(context.Background(), src, st.Size(), st.ModTime().String())
 	if err != nil || len(got) != len(want) || got[3] != 6917000 {

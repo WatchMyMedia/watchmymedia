@@ -5,6 +5,22 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 1.4.2
+
+A small release that hardens sign-in on servers using Cloudflare Turnstile, and moves the Unraid
+template to its new home.
+
+- The server's database is the same as 1.4.1's, so updating needs no backup to go back.
+- With Turnstile on, at most 16 sign-ins at a time now wait on Cloudflare's check. One more is
+  told to try again in a second instead of waiting, so a flood of sign-in attempts cannot tie up
+  the server. Servers without Turnstile are unaffected.
+- The Unraid template now lives at https://github.com/WatchMyMedia/unraid-templates and uses the
+  image at `ghcr.io/watchmymedia/watchmymedia`. If you added it by hand, the guide at
+  https://watchmy.media/guide/unraid has the new address.
+- The server, the Docker image, the Mac app, the Windows app and the Android app are 1.4.2. The
+  Mac app and the Windows app of 1.4.1 offer the update under Check for updates. The iPhone,
+  iPad and Apple TV apps have no changes and stay at 1.8.0 in the App Store.
+
 ## 1.4.1
 
 WatchMyMedia's source code is now public, at https://github.com/WatchMyMedia/watchmymedia,

@@ -333,7 +333,13 @@ func TestAdaptiveVODConcurrentColdSeekAndIndependentStop(t *testing.T) {
 		}
 	}
 	doJSON(t, srv.client, "DELETE", srv.URL+"/api/playback/"+peer.SessionID, "", nil)
-	if pm.Claimed() != 0 {
-		t.Fatalf("leaked claims: %d", pm.Claimed())
+	// A stopped session whose producer the other family shared keeps its
+	// claim until that ffmpeg has exited, which the stop does not wait for
+	// (it took longer than the DELETE on a Windows runner). A leak is a
+	// claim that never goes.
+	for deadline := time.Now().Add(10 * time.Second); pm.Claimed() != 0; time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("leaked claims: %d", pm.Claimed())
+		}
 	}
 }
