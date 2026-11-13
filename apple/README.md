@@ -681,7 +681,7 @@ be in it:
 | Path | What |
 |---|---|
 | `Kit/` | Swift package `WatchMyMediaKit`; builds for iOS, tvOS and macOS, so `swift test` runs on the Mac |
-| `Kit/Sources/WMMModel` | Domain types and the protocols every screen builds against (`ServerRepository`, `AuthRepository`, `LibraryRepository`, `RowsRepository`, `PreferencesRepository`, `PlaybackController`, `PlaybackGateway`, `AppServices`), errors, and the shared wording (`Formats.swift`, `TrackLabels.swift`, `Watching.swift`). Mirrors `android/core/model` |
+| `Kit/Sources/WMMModel` | Domain types and the protocols every screen builds against (`ServerRepository`, `AuthRepository`, `LibraryRepository`, `RowsRepository`, `PreferencesRepository`, `PlaybackController`, `PlaybackGateway`, `AppServices`), errors, what a server offers at its API level (`ServerFeatures.swift`, the one table of levels), and the shared wording (`Formats.swift`, `TrackLabels.swift`, `Watching.swift`). Mirrors `android/core/model` |
 | `Kit/Sources/WMMAPI` | The client generated from `../api/openapi.json` (only the operations an app makes, see the config); committed. Generation opens response enums while keeping request-only enums strict |
 | `Kit/Sources/WMMData` | The real repositories. `Network/ServerAPI.swift` wraps the generated client: bearer token, user agent, and every failure as `APIError` or `SignedOutError` |
 | `Kit/Sources/WMMPlayback` | The `PlaybackController` on `AVPlayer` (PLAN-CLIENTS.md §2.3), the device profile, WebVTT cues, Now Playing |

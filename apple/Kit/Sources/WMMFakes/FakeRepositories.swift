@@ -41,9 +41,9 @@ public final class FakeServerRepository: ServerRepository {
     public init(signedIn: Bool = true, chosen: Bool = true, admin: Bool = true, liveTV: Bool = false, liveGuide: Bool = false, liveExtras: Bool = false, apiLevel: Int? = nil) {
         let account = admin ? User(id: 1, name: "Sam", isAdmin: true) : User(id: 2, name: "Alex", isAdmin: false)
         var livingRoom = FakeServers.livingRoom
-        if liveTV { livingRoom.apiLevel = liveTVAPILevel }
-        if liveGuide { livingRoom.apiLevel = liveGuideAPILevel }
-        if liveGuide && liveExtras { livingRoom.apiLevel = liveExtrasAPILevel }
+        if liveTV { livingRoom.apiLevel = ServerFeatures.Level.liveTV }
+        if liveGuide { livingRoom.apiLevel = ServerFeatures.Level.liveGuide }
+        if liveGuide && liveExtras { livingRoom.apiLevel = ServerFeatures.Level.livePersonal }
         if let apiLevel { livingRoom.apiLevel = apiLevel }
         saved = [
             SavedServer(server: livingRoom, userName: account.name, signedIn: signedIn, lastUsedAt: .now),

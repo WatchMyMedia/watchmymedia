@@ -29,10 +29,10 @@ public struct APIPlaybackGateway: PlaybackGateway {
     public func decide(_ request: DecisionRequest) async throws -> PlaybackDecision {
         let api = try await api()
         let level = await apiLevel()
-        if request.recordingID != nil && (level ?? 0) < liveRecordingAPILevel { throw LiveTVError(reason: "unavailable") }
+        if request.recordingID != nil && !ServerFeatures(apiLevel: level).liveRecordings { throw LiveTVError(reason: "unavailable") }
         let body = Components.Schemas.Request(
             audioIndex: request.audioIndex.map(Int64.init),
-            autoRecovery: (level ?? 0) >= 24 && request.quality == .auto && request.autoRecovery ? true : nil,
+            autoRecovery: ServerFeatures(apiLevel: level).autoRecovery && request.quality == .auto && request.autoRecovery ? true : nil,
             burnIn: request.burnIn ? true : nil,
             client: PlaybackMapping.client(request.client),
             playId: request.playID,
@@ -41,8 +41,8 @@ public struct APIPlaybackGateway: PlaybackGateway {
             quality: request.quality.rawValue,
             startMs: request.startMs.map { Int64(max($0, 0)) },
             subtitleId: request.subtitleID,
-            subtitleMode: (level ?? 0) >= subtitlePreferencesAPILevel ? .init(rawValue: request.subtitleMode.rawValue) : nil,
-            switchGeneration: (level ?? 0) >= 24 ? request.switchGeneration : nil
+            subtitleMode: ServerFeatures(apiLevel: level).subtitlePreferences ? .init(rawValue: request.subtitleMode.rawValue) : nil,
+            switchGeneration: ServerFeatures(apiLevel: level).autoRecovery ? request.switchGeneration : nil
         )
         let decision = try await api.call { client in
             if let recordingID = request.recordingID {
@@ -55,12 +55,12 @@ public struct APIPlaybackGateway: PlaybackGateway {
 
     /// Every decision needs its token fetched beside it until the generated
     /// client has `Decision.mediaToken` (API level 28). Then this answers
-    /// `(apiLevel() ?? 0) < decisionTokenAPILevel`, and
+    /// `!ServerFeatures(apiLevel: apiLevel()).tokenWithDecision`, and
     /// ``PlaybackMapping/decision(_:base:apiLevel:)`` maps the field.
     @MainActor public func needsTokenBeside(_ request: DecisionRequest) -> Bool { true }
 
     public func reportProgress(_ report: ProgressReport) async throws -> ProgressReply {
-        let recovery = (await apiLevel() ?? 0) >= 24
+        let recovery = ServerFeatures(apiLevel: await apiLevel()).autoRecovery
         let body = Components.Schemas.ProgressInputBody(
             bufferedMs: Int64(max(report.bufferedMs, 0)),
             durationMs: Int64(max(report.durationMs, 0)),
@@ -140,7 +140,7 @@ public struct APIPlaybackGateway: PlaybackGateway {
     }
 
     public func automaticSubtitle(fileID: Int, playID: String) async throws -> DecisionSubtitle? {
-        guard await (apiLevel() ?? 0) >= subtitlePreferencesAPILevel else { return nil }
+        guard ServerFeatures(apiLevel: await apiLevel()).subtitlePreferences else { return nil }
         let api = try await api()
         let result = try await api.call {
             try await $0.automaticSubtitle(path: .init(id: Int64(fileID)), body: .json(.init(playId: playID))).ok.body.json
@@ -152,7 +152,7 @@ public struct APIPlaybackGateway: PlaybackGateway {
     }
 
     public func cancelAutomaticSubtitle(fileID: Int, playID: String) async throws {
-        guard await (apiLevel() ?? 0) >= subtitlePreferencesAPILevel else { return }
+        guard ServerFeatures(apiLevel: await apiLevel()).subtitlePreferences else { return }
         _ = try await api().call {
             try await $0.automaticSubtitle(path: .init(id: Int64(fileID)), body: .json(.init(cancel: true, playId: playID))).ok.body.json
         }
@@ -277,10 +277,10 @@ enum PlaybackMapping {
             next: d.nextEpisode.map(upNext),
             video: video(d.video),
             autoStep: d.auto.flatMap { StreamQuality(rawValue: $0.step.rawValue) },
-            trickplay: (apiLevel ?? 0) >= trickplayAPILevel ? d.trickplay.flatMap { trickplay($0, base: base) }.flatMap { t in
+            trickplay: ServerFeatures(apiLevel: apiLevel).trickplay ? d.trickplay.flatMap { trickplay($0, base: base) }.flatMap { t in
                 URL(string: t.urlTemplate.replacingOccurrences(of: "{sheet}", with: "0")).map { ServerAPI.owns(base, $0) } == true ? t : nil
             } : nil,
-            growing: (apiLevel ?? 0) >= liveRecordingAPILevel ? d.growing.flatMap { value in
+            growing: ServerFeatures(apiLevel: apiLevel).liveRecordings ? d.growing.flatMap { value in
                 guard let start = value.startedAt, let end = value.endsAt, end > start else { return nil }
                 return .init(startedAt: start, endsAt: end)
             } : nil,

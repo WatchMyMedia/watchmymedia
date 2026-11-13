@@ -41,14 +41,14 @@ final class RealRequestsRepository: RequestsRepository {
     private func loadOptions() async {
         generation += 1
         let mine = generation
-        guard let server = store.current?.server, server.apiLevel >= requestsAPILevel, store.currentCredential != nil else {
+        guard let server = store.current?.server, server.features.requests, store.currentCredential != nil else {
             options = .none
             return
         }
         do {
             var loaded = try await store.call { try await $0.getRequestOptions().ok.body.json }.model
             // Deleting from the apps came with API level 6.
-            if server.apiLevel < deleteAPILevel { loaded.delete = false }
+            if !server.features.delete { loaded.delete = false }
             // The Inbox also holds local reports when Seerr handles requests.
             // Auth status supplies both the current identity and network policy.
             if store.user?.isAdmin == true {
@@ -153,7 +153,7 @@ final class RealRequestsRepository: RequestsRepository {
 
     func deleteEpisode(id: Int, recordAgain: Bool?) async throws -> DeleteOutcome {
         // Only a server that records knows the choice; older ones never get it.
-        let recordAgain = (store.current?.server.apiLevel ?? 0) >= liveRecordingAPILevel ? recordAgain : nil
+        let recordAgain = store.features.liveRecordings ? recordAgain : nil
         let done = try await store.call {
             try await $0.deleteEpisode(path: .init(id: Int64(id)), body: .json(.init(recordAgain: recordAgain))).ok.body.json
         }.model

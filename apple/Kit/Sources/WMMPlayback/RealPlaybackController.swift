@@ -613,7 +613,7 @@ public final class RealPlaybackController: PlaybackController {
             playID: playID,
             vod: v.request.recordingID == nil,
             recordingID: v.request.recordingID,
-            autoRecovery: asked == .auto && (apiLevel ?? 0) >= 24 && v.request.recordingID == nil,
+            autoRecovery: asked == .auto && ServerFeatures(apiLevel: apiLevel).autoRecovery && v.request.recordingID == nil,
             switchGeneration: switchGeneration
         )
         // The token is asked for at the same time as the decision, not after
@@ -1383,7 +1383,7 @@ public final class RealPlaybackController: PlaybackController {
               v.pendingSwitch == nil, v.awaitingFrameGeneration == nil,
               d.autoStep != step else { return }
         if let generation = reply.switchGeneration {
-            guard generation > v.handledGeneration, (apiLevel ?? 0) >= 24 else { return }
+            guard generation > v.handledGeneration, ServerFeatures(apiLevel: apiLevel).autoRecovery else { return }
             v.handledGeneration = generation
             if let message = reply.lowerMessage { v.stepMessage = message }
             else if step == .original { v.stepMessage = "Connection recovered; playing the original file." }

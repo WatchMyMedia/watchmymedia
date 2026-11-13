@@ -289,7 +289,7 @@ extension AppServices {
     public static func fake(signedIn: Bool = true, chosen: Bool = true, client: ClientInfo = .fakePhone, admin: Bool = true, seerr: Bool = false, seerrLinked: Bool = true, liveTV: Bool = false, liveGuide: FakeLiveGuide? = nil, downloads: Bool = false, apiLevel: Int? = nil, recordings: Bool = false, liveAutomatic: Bool = false, rows: Bool = false) -> AppServices {
         let liveTV = liveTV || liveGuide != nil || liveAutomatic
         let servers = FakeServerRepository(signedIn: signedIn, chosen: chosen, admin: admin, liveTV: liveTV, liveGuide: liveGuide != nil,
-                                           liveExtras: liveGuide?.extras ?? false, apiLevel: apiLevel ?? (rows ? rowsAPILevel : nil))
+                                           liveExtras: liveGuide?.extras ?? false, apiLevel: apiLevel ?? (rows ? ServerFeatures.Level.rows : nil))
         let library = FakeLibraryRepository()
         let rowsRepository = FakeRowsRepository(servers: servers, admin: admin)
         library.rows = rowsRepository
@@ -307,7 +307,7 @@ extension AppServices {
             images: FakeImageLoader(),
             client: client,
             liveTV: liveRepository,
-            livePlayback: liveTV ? FakeLivePlaybackFactory(automatic: liveAutomatic && (servers.current?.server.apiLevel ?? 0) >= liveAutomaticAPILevel) : nil,
+            livePlayback: liveTV ? FakeLivePlaybackFactory(automatic: liveAutomatic && ServerFeatures(apiLevel: servers.current?.server.apiLevel).liveAutomatic) : nil,
             downloads: downloadRepository,
             rows: rowsRepository
         )

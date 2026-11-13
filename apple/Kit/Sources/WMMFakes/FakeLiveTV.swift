@@ -50,12 +50,12 @@ public final class FakeLiveTVRepository: LiveTVRepository {
     public var capabilities: LiveTVCapabilities? { loaded && loadedContext == contextID ? offeredForServer : nil }
     public var channels: [LiveChannel] { capabilities?.available == true ? availableChannels.map(decorated) : [] }
     private var offeredForServer: LiveTVCapabilities {
-        if let servers, (servers.current?.server.apiLevel ?? 0) < liveTVAPILevel || servers.currentUser == nil { return .init() }
+        if let servers, !ServerFeatures(apiLevel: servers.current?.server.apiLevel).liveTV || servers.currentUser == nil { return .init() }
         var offered = offered
-        if let servers, (servers.current?.server.apiLevel ?? 0) < liveGuideAPILevel { offered.guide = false }
-        if let servers, (servers.current?.server.apiLevel ?? 0) < liveExtrasAPILevel { offered.extras = false }
-        if let servers, (servers.current?.server.apiLevel ?? 0) < liveRecordingAPILevel { offered.recording = false; offered.canRecord = false }
-        if let servers, (servers.current?.server.apiLevel ?? 0) < liveAutomaticAPILevel { offered.automatic = false }
+        if let servers, !ServerFeatures(apiLevel: servers.current?.server.apiLevel).liveGuide { offered.guide = false }
+        if let servers, !ServerFeatures(apiLevel: servers.current?.server.apiLevel).livePersonal { offered.extras = false }
+        if let servers, !ServerFeatures(apiLevel: servers.current?.server.apiLevel).liveRecordings { offered.recording = false; offered.canRecord = false }
+        if let servers, !ServerFeatures(apiLevel: servers.current?.server.apiLevel).liveAutomatic { offered.automatic = false }
         return offered
     }
     public init(servers: FakeServerRepository? = nil, guide: FakeLiveGuide? = nil) {

@@ -1,11 +1,6 @@
 import Foundation
 import Observation
 
-/// Live TV is additive: older servers keep the established library navigation.
-public let liveTVAPILevel = 11
-public let liveProfileAPILevel = 25
-public let liveAutomaticAPILevel = 26
-
 public struct LiveTVCapabilities: Hashable, Sendable {
     public var enabled: Bool
     public var allowed: Bool

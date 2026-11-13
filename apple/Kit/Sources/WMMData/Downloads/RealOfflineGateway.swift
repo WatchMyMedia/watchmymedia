@@ -62,7 +62,7 @@ final class RealOfflineGateway: OfflineGateway {
 
     /// Older servers, and servers that turned requests off, offer no downloads.
     func allowed(_ owner: OfflineOwner) async throws -> Bool {
-        guard level(owner) >= offlineAPILevel else { return false }
+        guard ServerFeatures(apiLevel: level(owner)).offline else { return false }
         do {
             return try await call(owner) { try await $0.getRequestOptions().ok.body.json }.offline == true
         } catch let error as APIError where PlaybackMapping.unknownRoute(error) || error.status == 503 {

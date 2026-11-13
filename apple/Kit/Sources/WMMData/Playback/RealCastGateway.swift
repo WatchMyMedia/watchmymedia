@@ -18,11 +18,11 @@ final class RealCastGateway: CastGateway {
     }
 
     func capability() async throws -> CastCapability? {
-        guard let identity, let server = store.current?.server, server.apiLevel >= castAPILevel else { return nil }
+        guard let identity, let server = store.current?.server, server.features.castTokens else { return nil }
         let api = try store.signedIn().api
         let info = try await api.call { try await $0.getServer().ok.body.json }
         guard self.identity == identity else { throw SignedOutError() }
-        guard info.id == identity.serverID, info.apiLevel >= castAPILevel, info.casting == true,
+        guard info.id == identity.serverID, ServerFeatures(apiLevel: Int(info.apiLevel)).castTokens, info.casting == true,
               let appID = info.castAppId, appID == watchMyMediaCastAppID else { return nil }
         return CastCapability(identity: identity, apiLevel: Int(info.apiLevel), appID: appID)
     }

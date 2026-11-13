@@ -4,11 +4,6 @@ import Observation
 // Offline downloads on iPhone and iPad (PLAN-DOWNLOADS.md, phase D3), worded
 // and shaped as the Android app's (android/core/model/.../Downloads.kt).
 
-/// The server API level that brought offline downloads: /api/offline,
-/// RequestOptions.offline and /api/settings/offline. The apps offer Download
-/// only from it.
-public let offlineAPILevel = 10
-
 /// The qualities a download is made at (Settings › Downloads › Quality, and the download sheet), best first.
 public enum DownloadQuality: String, CaseIterable, Hashable, Sendable, Codable {
     case original, p1080 = "1080", p720 = "720", p480 = "480"

@@ -1,9 +1,6 @@
 import Foundation
 import Observation
 
-/// The API level this app needs; servers below it are refused (GET /api/server).
-public let requiredAPILevel = 1
-
 /// A WatchMyMedia server as GET /api/server describes it.
 public struct Server: Hashable, Sendable, Codable, Identifiable {
     /// Stable random ID; servers are remembered by it, not by address.
@@ -28,7 +25,7 @@ public struct Server: Hashable, Sendable, Codable, Identifiable {
         self.turnstile = turnstile
     }
 
-    public var tooOld: Bool { apiLevel < requiredAPILevel }
+    public var tooOld: Bool { !features.supported }
 
     /// "192.168.1.20:27587" or "home.example.net": the address without the scheme.
     public var displayAddress: String {

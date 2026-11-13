@@ -30,7 +30,7 @@ final class RealLiveTVRepository: LiveTVRepository {
 
     private func load() async throws {
         let revision = store.revision
-        guard let server = store.current?.server, server.apiLevel >= liveTVAPILevel, store.user != nil else {
+        guard let server = store.current?.server, server.features.liveTV, store.user != nil else {
             loadedRevision = revision; loadedCapabilities = .init(); loadedChannels = []
             return
         }
@@ -38,11 +38,11 @@ final class RealLiveTVRepository: LiveTVRepository {
         let capabilities = LiveTVCapabilities(enabled: c.enabled, allowed: c.allowed, playback: c.playback,
                                                bufferSeconds: c.bufferSeconds.map(Int.init) ?? 60,
                                                pauseSeconds: c.pauseSeconds.map(Int.init) ?? 300,
-                                               guide: c.guide && server.apiLevel >= liveGuideAPILevel,
-                                               extras: server.apiLevel >= liveExtrasAPILevel,
-                                               recording: server.apiLevel >= liveRecordingAPILevel && c.recording == true,
-                                               canRecord: server.apiLevel >= liveRecordingAPILevel && c.canRecord == true,
-                                               automatic: server.apiLevel >= liveAutomaticAPILevel && c.automatic == true)
+                                               guide: c.guide && server.features.liveGuide,
+                                               extras: server.features.livePersonal,
+                                               recording: server.features.liveRecordings && c.recording == true,
+                                               canRecord: server.features.liveRecordings && c.canRecord == true,
+                                               automatic: server.features.liveAutomatic && c.automatic == true)
         // Commit access revocation immediately; a failing channel refresh must not preserve an allowed tab.
         guard revision == store.revision else { throw CancellationError() }
         loadedRevision = revision; loadedCapabilities = capabilities
@@ -60,7 +60,7 @@ final class RealLiveTVRepository: LiveTVRepository {
 
     func guide(start: Date, hours: Int) async throws -> LiveGuide {
         let revision = store.revision
-        guard let server = store.current?.server, server.apiLevel >= liveGuideAPILevel, capabilities?.listings == true else {
+        guard let server = store.current?.server, server.features.liveGuide, capabilities?.listings == true else {
             throw LiveTVError(reason: "unavailable")
         }
         let reply = try await store.call {
@@ -75,7 +75,7 @@ final class RealLiveTVRepository: LiveTVRepository {
 
     /// The server in use when it keeps favourites and reminders, with the revision a reply must still match.
     private func extrasServer() throws -> (server: Server, revision: Int) {
-        guard let server = store.current?.server, server.apiLevel >= liveExtrasAPILevel, capabilities?.extrasAvailable == true else {
+        guard let server = store.current?.server, server.features.livePersonal, capabilities?.extrasAvailable == true else {
             throw LiveTVError(reason: "unavailable")
         }
         return (server, store.revision)
@@ -141,10 +141,10 @@ final class RealLiveTVRepository: LiveTVRepository {
     }
 
     func makeSessionGateway() throws -> any LiveSessionGateway {
-        guard (store.current?.server.apiLevel ?? 0) >= liveTVAPILevel else { throw LiveTVError(reason: "unavailable") }
+        guard store.features.liveTV else { throw LiveTVError(reason: "unavailable") }
         let session = try store.signedIn()
         return APILiveSessionGateway(api: session.api, clientName: store.client.name,
-                                     apiLevel: store.current?.server.apiLevel ?? 0, automaticAvailable: capabilities?.automatic == true)
+                                     apiLevel: store.features.apiLevel, automaticAvailable: capabilities?.automatic == true)
     }
 }
 
@@ -152,23 +152,23 @@ final class RealLiveTVRepository: LiveTVRepository {
 public struct APILiveSessionGateway: LiveSessionGateway {
     private let api: ServerAPI
     private let clientName: String
-    private let apiLevel: Int
+    private let features: ServerFeatures
     private let automaticAvailable: Bool
-    public init(api: ServerAPI, clientName: String, apiLevel: Int = liveTVAPILevel, automaticAvailable: Bool = false) {
-        self.api = api; self.clientName = clientName; self.apiLevel = apiLevel; self.automaticAvailable = automaticAvailable
+    public init(api: ServerAPI, clientName: String, apiLevel: Int = ServerFeatures.Level.liveTV, automaticAvailable: Bool = false) {
+        self.api = api; self.clientName = clientName; features = ServerFeatures(apiLevel: apiLevel); self.automaticAvailable = automaticAvailable
     }
 
     public func start(channelID: String, quality: LiveQuality, requestID: String) async throws -> LiveSession {
         try await start(channelID: channelID, quality: quality, requestID: requestID, profile: nil)
     }
     public func start(channelID: String, quality: LiveQuality, requestID: String, profile: PlaybackProfile?) async throws -> LiveSession {
-        let automatic = quality == .auto && apiLevel >= liveAutomaticAPILevel && automaticAvailable && profile != nil
+        let automatic = quality == .auto && features.liveAutomatic && automaticAvailable && profile != nil
         let selected: LiveQuality = quality == .auto && !automatic ? .p1080 : quality
         return try await liveCall {
             let response = try await api.call {
                 try await $0.startLiveTV(body: .json(.init(autoRecovery: automatic ? true : nil,
                                                           channelId: channelID, clientName: String(clientName.prefix(128)),
-                                                          profile: apiLevel >= liveProfileAPILevel ? profile?.liveProfile : nil,
+                                                          profile: features.liveProfile ? profile?.liveProfile : nil,
                                                           quality: .init(rawValue: selected.rawValue), requestId: requestID))).ok.body.json
             }
             do { return try LiveTVMapping.session(response, on: api) }
@@ -191,7 +191,7 @@ public struct APILiveSessionGateway: LiveSessionGateway {
     public func heartbeat(sessionID: String, paused: Bool, interacted: Bool, measurement: LiveMeasurement?) async throws -> LiveSession {
         try await liveCall {
             let response = try await api.call {
-                let m = apiLevel >= liveAutomaticAPILevel ? measurement : nil
+                let m = features.liveAutomatic ? measurement : nil
                 return try await $0.heartbeatLiveTV(path: .init(id: sessionID), body: .json(.init(
                     bufferedMs: m?.bufferedMs.map(Int64.init), interacted: interacted, paused: paused,
                     stalls: m?.stalls.map(Int64.init), state: m?.state.apiState,
@@ -325,7 +325,7 @@ enum LiveTVMapping {
 
 extension RealLiveTVRepository {
     private func recordingServer() throws -> (server: Server, revision: Int) {
-        guard let server = store.current?.server, server.apiLevel >= liveRecordingAPILevel,
+        guard let server = store.current?.server, server.features.liveRecordings,
               capabilities?.recordingsAvailable == true else { throw LiveTVError(reason: "unavailable") }
         return (server, store.revision)
     }

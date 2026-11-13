@@ -113,6 +113,9 @@ final class LocalStore {
 
     var user: User? { currentCredential?.user }
 
+    /// What the server in use offers at its level as last refreshed; nothing with no server.
+    var features: ServerFeatures { ServerFeatures(apiLevel: state.current?.server.apiLevel) }
+
     var deviceName: String { state.deviceName ?? baseClient.name }
 
     /// Automatic until a quality is picked; a value this version does not know is Original.

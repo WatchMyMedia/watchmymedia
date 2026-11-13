@@ -24,7 +24,7 @@ final class RealLibraryRepository: LibraryRepository {
     /// arranged Home. A reply with fixed rows and no `rows` keeps them, as
     /// older servers' do.
     func home() async throws -> HomeData {
-        let arranged = (store.current?.server.apiLevel ?? 0) >= rowsAPILevel
+        let arranged = store.features.rows
         var home = try await store.call { try await $0.getHome(query: .init(arranged: arranged ? true : nil)).ok.body.json }.model
         if !arranged {
             home.rows = nil

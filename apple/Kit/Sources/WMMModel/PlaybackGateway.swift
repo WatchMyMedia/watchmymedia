@@ -1,13 +1,5 @@
 import Foundation
 
-/// The API level that reads ``PlaybackProfile/hdrTypes`` and the dovi keys,
-/// and copies HDR only to a screen that shows it (PLAN-HDR-PROFILE.md).
-public let hdrProfileAPILevel = 8
-
-/// The API level whose decisions carry a media token (`Decision.mediaToken`),
-/// so a play needs no token request of its own (PLAN-APPLE-REVIEW.md §4.2.1).
-public let decisionTokenAPILevel = 28
-
 /// What this device can play, sent with every playback request
 /// (PLAN-CLIENTS.md §4.4; the server's `Profile`).
 public struct PlaybackProfile: Hashable, Sendable {
@@ -62,8 +54,9 @@ public struct PlaybackProfile: Hashable, Sendable {
     /// (android/core/model's `PlaybackProfile.forApiLevel`).
     public func forAPILevel(_ apiLevel: Int?) -> PlaybackProfile {
         var p = self
-        if (apiLevel ?? 0) < audioPreferencesAPILevel { p.selectsAudioTrack = nil }
-        guard (apiLevel ?? 0) < hdrProfileAPILevel, hdrTypes != nil else { return p }
+        let features = ServerFeatures(apiLevel: apiLevel)
+        if !features.audioLanguages { p.selectsAudioTrack = nil }
+        guard !features.hdrProfile, hdrTypes != nil else { return p }
         p.videoCodecs = videoCodecs.filter { !$0.hasPrefix("dovi") && ($0 != "hevc10" || hdr) }
         p.hdrTypes = nil
         return p
