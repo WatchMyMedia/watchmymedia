@@ -26,62 +26,62 @@ private let log = Logger(subsystem: "media.watchmy.client", category: "Playback"
 @MainActor
 @Observable
 public final class RealPlaybackController: PlaybackController {
-    public private(set) var state = PlayerState()
+    public internal(set) var state = PlayerState()
     public let events: AsyncStream<PlayerEvent>
     public private(set) var player: AVPlayer?
 
-    @ObservationIgnored private let continuation: AsyncStream<PlayerEvent>.Continuation
-    @ObservationIgnored private let gateway: any PlaybackGateway
-    @ObservationIgnored private let preferences: any PreferencesRepository
-    @ObservationIgnored private let client: @MainActor () -> ClientInfo
-    @ObservationIgnored private let profile: any ProfileProvider
-    @ObservationIgnored private let makePlayer: @MainActor () -> any MediaPlayer
-    @ObservationIgnored private let stillWatching: StillWatching
-    @ObservationIgnored private let system: (any PlaybackSystem)?
-    @ObservationIgnored private let lookups: any PlaybackLookups
-    @ObservationIgnored private let servers: (any ServerRepository)?
-    @ObservationIgnored private let clock: any PlaybackClock
+    @ObservationIgnored let continuation: AsyncStream<PlayerEvent>.Continuation
+    @ObservationIgnored let gateway: any PlaybackGateway
+    @ObservationIgnored let preferences: any PreferencesRepository
+    @ObservationIgnored let client: @MainActor () -> ClientInfo
+    @ObservationIgnored let profile: any ProfileProvider
+    @ObservationIgnored let makePlayer: @MainActor () -> any MediaPlayer
+    @ObservationIgnored let stillWatching: StillWatching
+    @ObservationIgnored let system: (any PlaybackSystem)?
+    @ObservationIgnored let lookups: any PlaybackLookups
+    @ObservationIgnored let servers: (any ServerRepository)?
+    @ObservationIgnored let clock: any PlaybackClock
 
-    @ObservationIgnored private var media: (any MediaPlayer)?
-    @ObservationIgnored private var session: (any SystemSession)?
-    @ObservationIgnored private var viewing: Viewing?
-    @ObservationIgnored private var generation = 0
+    @ObservationIgnored var media: (any MediaPlayer)?
+    @ObservationIgnored var session: (any SystemSession)?
+    @ObservationIgnored var viewing: Viewing?
+    @ObservationIgnored var generation = 0
     /// The viewer's pick; ``asked`` is what this server is asked for.
-    @ObservationIgnored private var quality: StreamQuality
-    @ObservationIgnored private var token: MediaToken?
-    @ObservationIgnored private var tokenRefreshAt = 0
-    @ObservationIgnored private var backgrounded = false
-    @ObservationIgnored private var preferencesLoaded = false
-    @ObservationIgnored private var preferencesReady = false
-    @ObservationIgnored private var released = false
-    @ObservationIgnored private var pausedByInterruption = false
+    @ObservationIgnored var quality: StreamQuality
+    @ObservationIgnored var token: MediaToken?
+    @ObservationIgnored var tokenRefreshAt = 0
+    @ObservationIgnored var backgrounded = false
+    @ObservationIgnored var preferencesLoaded = false
+    @ObservationIgnored var preferencesReady = false
+    @ObservationIgnored var released = false
+    @ObservationIgnored var pausedByInterruption = false
 
-    @ObservationIgnored private var ticker: TimerHandle?
-    @ObservationIgnored private var lastTickAt = 0
-    @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored var ticker: TimerHandle?
+    @ObservationIgnored var lastTickAt = 0
+    @ObservationIgnored var loadTask: Task<Void, Never>?
 
-    @ObservationIgnored private var outbox: [Outgoing] = []
-    @ObservationIgnored private var delivering = false
+    @ObservationIgnored var outbox: [Outgoing] = []
+    @ObservationIgnored var delivering = false
     /// A message is out, waiting for the server.
-    @ObservationIgnored private var sending = false
-    @ObservationIgnored private var endHold: (@MainActor () -> Void)?
-    @ObservationIgnored private var inFlight: [Int: Task<Void, Never>] = [:]
-    @ObservationIgnored private var taskCount = 0
+    @ObservationIgnored var sending = false
+    @ObservationIgnored var endHold: (@MainActor () -> Void)?
+    @ObservationIgnored var inFlight: [Int: Task<Void, Never>] = [:]
+    @ObservationIgnored var taskCount = 0
 
     /// Subtitle tracks' cues by URL (without the token), and the fetches out or failed.
-    @ObservationIgnored private var cueTracks: [URL: CueTrack] = [:]
-    @ObservationIgnored private var cueFetches: Set<URL> = []
+    @ObservationIgnored var cueTracks: [URL: CueTrack] = [:]
+    @ObservationIgnored var cueFetches: Set<URL> = []
 
     /// Now Playing's picture: the one chosen for the play, and its bytes once loaded.
-    @ObservationIgnored private var artworkImage: ArtworkImage?
-    @ObservationIgnored private var artwork: NowPlayingArtwork?
+    @ObservationIgnored var artworkImage: ArtworkImage?
+    @ObservationIgnored var artwork: NowPlayingArtwork?
 
     /// AirPlay: whether the video is on another screen, the server's LAN
     /// address once found for it, and whether the stream loaded comes from there.
-    @ObservationIgnored private var external = false
-    @ObservationIgnored private var lookingForLocal = false
-    @ObservationIgnored private var localRoute: LocalRoute?
-    @ObservationIgnored private var playingLocally = false
+    @ObservationIgnored var external = false
+    @ObservationIgnored var lookingForLocal = false
+    @ObservationIgnored var localRoute: LocalRoute?
+    @ObservationIgnored var playingLocally = false
 
     enum Outgoing {
         case report(ProgressReport, generation: Int)
@@ -175,7 +175,7 @@ public final class RealPlaybackController: PlaybackController {
 
     /// The viewer's seek to `target`: back before the credits offers the Next
     /// Episode card again, and a segment it lands in is never skipped by itself.
-    private func noteSeek(_ v: Viewing, _ d: PlaybackDecision, to target: Int) {
+    func noteSeek(_ v: Viewing, _ d: PlaybackDecision, to target: Int) {
         v.measure.excuse(at: clock.elapsedMs)
         if d.upNextMs > 0 && target < d.upNextMs { v.creditsDismissed = false }
         for s in d.segments where target >= s.startMs && target < s.end(or: duration(v, d)) { v.seekedInto.insert(s) }
@@ -226,75 +226,6 @@ public final class RealPlaybackController: PlaybackController {
             return
         }
         reload(v, at: position(v))
-    }
-
-    public func selectSubtitle(_ id: String?) {
-        stillWatching.noteInput()
-        guard let v = active(), let d = v.decision else { return }
-        let track = id.flatMap { s in d.subtitles.first { $0.option.id == s } }
-        if id != nil && track == nil { return }
-        // Even Off while no track is selected is a manual choice: a delayed
-        // automatic download must not turn it back on.
-        manualSubtitleChoice(v)
-        if id == v.selectedSubtitle { return }
-        v.selectedSubtitle = id
-        if let track, isImage(track) {
-            // Image subtitles are burned in by the server, which restarts the stream here.
-            reload(v, at: position(v), subtitleID: id, burnIn: true)
-        } else if d.burnInSubtitleID != nil {
-            // Leaving a burned-in subtitle needs a stream without it.
-            reload(v, at: position(v), subtitleID: id, burnIn: false)
-        } else {
-            // Text subtitles are drawn here: the new track's cues replace the old.
-            refresh(0)
-        }
-    }
-
-    public func downloadSubtitle(_ resultID: String) {
-        stillWatching.noteInput()
-        guard let v = active(), let d = v.decision, let online = v.online,
-              let result = online.results.first(where: { $0.id == resultID })
-        else { return }
-        // Downloaded for this file before: it is one of the decision's tracks already.
-        if let id = result.trackID, d.subtitles.contains(where: { $0.option.id == id }) {
-            selectSubtitle(id)
-            return
-        }
-        guard online.downloading == nil else { return }
-        manualSubtitleChoice(v)
-        let revision = v.subtitleRevision
-        v.online?.downloading = resultID
-        v.online?.error = nil
-        refresh(0)
-        launch { [self] in
-            do {
-                let trackID = try await gateway.downloadSubtitle(fileID: v.request.fileID, resultID: resultID)
-                guard viewing === v, !v.stopped else { return }
-                if var o = v.online {
-                    o.downloading = nil
-                    o.results = o.results.map { r in
-                        var copy = r
-                        if r.id == resultID { copy.trackID = trackID }
-                        return copy
-                    }
-                    o.remaining = o.remaining.map { max($0 - 1, 0) }
-                    v.online = o
-                }
-                // The new track comes in the next decision.
-                guard v.subtitleRevision == revision else { refresh(0); return }
-                v.selectedSubtitle = trackID
-                reload(v, at: position(v), subtitleID: trackID, burnIn: false)
-            } catch is CancellationError {
-            } catch {
-                log.warning("Subtitle download failed: \(error.localizedDescription, privacy: .public)")
-                guard viewing === v else { return }
-                let quotaSpent = (error as? APIError)?.status == 429
-                v.online?.downloading = nil
-                v.online?.error = error.displayMessage.isEmpty ? "Could not download the subtitle." : error.displayMessage
-                if quotaSpent { v.online?.remaining = 0 }
-                refresh(0)
-            }
-        }
     }
 
     /// A pick in the player becomes this device's default, and ends
@@ -435,12 +366,12 @@ public final class RealPlaybackController: PlaybackController {
         }
     }
 
-    private func active() -> Viewing? {
+    func active() -> Viewing? {
         guard let v = viewing, !v.stopped, !v.adminStopped else { return nil }
         return v
     }
 
-    private func begin(_ request: PlayRequest) {
+    func begin(_ request: PlayRequest) {
         generation += 1
         let v = Viewing(request: request, generation: generation, at: clock.elapsedMs)
         // A play handed over from another device keeps its tracks.
@@ -520,7 +451,7 @@ public final class RealPlaybackController: PlaybackController {
         }
     }
 
-    private func rename(_ v: Viewing, _ named: PlayRequest) {
+    func rename(_ v: Viewing, _ named: PlayRequest) {
         guard viewing === v else { return }
         v.request.title = named.title
         v.request.subtitle = named.subtitle
@@ -538,14 +469,14 @@ public final class RealPlaybackController: PlaybackController {
     }
 
     /// Re-requests the decision for the same play at `atMs`: track and quality changes, event seeks, a new token, recoveries.
-    private func reload(_ v: Viewing, at atMs: Int, newToken: Bool = false) {
+    func reload(_ v: Viewing, at atMs: Int, newToken: Bool = false) {
         reload(v, at: atMs, subtitleID: v.selectedSubtitle, burnIn: burnsIn(v, v.selectedSubtitle), newToken: newToken)
     }
 
     /// The stream playing goes on until the new one loads, which matters most
     /// when Automatic steps down while it still plays, and the new one starts
     /// where it got to. A seek elsewhere, or a stream that stopped, starts at `atMs`.
-    private func reload(_ v: Viewing, at atMs: Int, subtitleID: String?, burnIn: Bool, newToken: Bool = false, qualitySwitch: ProgressReply? = nil) {
+    func reload(_ v: Viewing, at atMs: Int, subtitleID: String?, burnIn: Bool, newToken: Bool = false, qualitySwitch: ProgressReply? = nil) {
         let here = v.pendingPositionMs == nil && playsOn(v) && atMs == position(v)
         if qualitySwitch == nil {
             if let pending = v.pendingSwitch, v.awaitingFrameGeneration != nil {
@@ -591,11 +522,11 @@ public final class RealPlaybackController: PlaybackController {
         refresh(0)
     }
 
-    private func decide(_ v: Viewing, startMs: Int?, playID: String?) async throws -> PlaybackDecision {
+    func decide(_ v: Viewing, startMs: Int?, playID: String?) async throws -> PlaybackDecision {
         try await decide(v, startMs: startMs, playID: playID, subtitleID: v.selectedSubtitle, burnIn: burnsIn(v, v.selectedSubtitle))
     }
 
-    private func decide(_ v: Viewing, startMs: Int?, playID: String?, subtitleID: String?, burnIn: Bool, switchGeneration: Int64? = nil) async throws -> PlaybackDecision {
+    func decide(_ v: Viewing, startMs: Int?, playID: String?, subtitleID: String?, burnIn: Bool, switchGeneration: Int64? = nil) async throws -> PlaybackDecision {
         // Automatic sends the device's own profile: the server applies the step's caps.
         var device = profile.current().capped(by: asked)
         if v.audioUnselectable { device.selectsAudioTrack = nil }
@@ -643,9 +574,9 @@ public final class RealPlaybackController: PlaybackController {
         return decision
     }
 
-    private var tokenValid: Bool { token != nil && clock.elapsedMs < tokenRefreshAt }
+    var tokenValid: Bool { token != nil && clock.elapsedMs < tokenRefreshAt }
 
-    private func keep(_ fresh: MediaToken) {
+    func keep(_ fresh: MediaToken) {
         token = fresh
         // Timed on this device's clock, with a floor, so a clock that
         // disagrees with the server's cannot cause a reload loop.
@@ -657,7 +588,7 @@ public final class RealPlaybackController: PlaybackController {
     /// request, Close, the next episode) is not played: its server session
     /// ends, as Live TV's does, and the quality switch it was for is reported
     /// failed (PLAN-APPLE-REVIEW.md §3.1.3).
-    private func overtaken(_ v: Viewing, _ d: PlaybackDecision, switchGeneration: Int64? = nil) -> Bool {
+    func overtaken(_ v: Viewing, _ d: PlaybackDecision, switchGeneration: Int64? = nil) -> Bool {
         guard Task.isCancelled else { return false }
         endUnused(d, of: v)
         if let switchGeneration, viewing === v, !v.stopped { v.failedGeneration = switchGeneration }
@@ -665,12 +596,12 @@ public final class RealPlaybackController: PlaybackController {
     }
 
     /// Ends `d`'s server session unless the viewing plays it, or keeps it to go back to.
-    private func endUnused(_ d: PlaybackDecision, of v: Viewing) {
+    func endUnused(_ d: PlaybackDecision, of v: Viewing) {
         guard let id = d.sessionID, id != v.decision?.sessionID, id != v.pendingSwitch?.previous.sessionID else { return }
         send(.endSession(id))
     }
 
-    private func apply(_ v: Viewing, _ d: PlaybackDecision, requestedStartMs: Int, playWhenReady: Bool = true, qualitySwitch: ProgressReply? = nil) {
+    func apply(_ v: Viewing, _ d: PlaybackDecision, requestedStartMs: Int, playWhenReady: Bool = true, qualitySwitch: ProgressReply? = nil) {
         guard viewing === v, !v.stopped, !v.adminStopped else { return }
         let previous = v.decision
         let seekedWhileLoading = v.pendingPositionMs.map { $0 != requestedStartMs } ?? false
@@ -733,7 +664,7 @@ public final class RealPlaybackController: PlaybackController {
     /// A direct-play file starts on the decided track, which the player
     /// selects itself (PLAN-LANGUAGES.md §5.2). A stream carries only the
     /// track the server chose; a file with one track has nothing to choose.
-    private func audioStart(_ d: PlaybackDecision, _ selected: Int?) -> AudioStart? {
+    func audioStart(_ d: PlaybackDecision, _ selected: Int?) -> AudioStart? {
         guard d.protocol == .file, d.audio.count > 1, let selected,
               let ordinal = d.audio.firstIndex(where: { $0.index == selected }) else { return nil }
         return AudioStart(ordinal: ordinal, count: d.audio.count)
@@ -742,7 +673,7 @@ public final class RealPlaybackController: PlaybackController {
     /// An offline play chooses its audio here, as the server would for a
     /// stream, from the preferences loaded (PLAN-LANGUAGES.md §5.5); once,
     /// and never over the viewer's pick.
-    private func chooseOfflineAudio(_ v: Viewing, _ d: PlaybackDecision) {
+    func chooseOfflineAudio(_ v: Viewing, _ d: PlaybackDecision) {
         guard !v.offlineAudioChosen, !v.audioManuallyChosen, d.protocol == .file else { return }
         v.offlineAudioChosen = true
         guard let preferred = preferredAudioIndex(tracks: d.audio, profile: profile.current(), languages: preferences.playback.audio.languages) else { return }
@@ -752,7 +683,7 @@ public final class RealPlaybackController: PlaybackController {
     /// The player couldn't select the decided track. A stream asks again
     /// naming it and without `selectsAudioTrack`, and gets a remux; an
     /// offline play keeps the file's default.
-    private func audioUnmatched() {
+    func audioUnmatched() {
         guard let v = active(), let d = v.decision, d.protocol == .file, !v.loading,
               let selected = v.selectedAudio ?? d.selectedAudio, selected != defaultAudioIndex(d.audio) else { return }
         log.warning("Audio options don't line up with the decision's \(d.audio.count) tracks")
@@ -766,62 +697,8 @@ public final class RealPlaybackController: PlaybackController {
         reload(v, at: position(v))
     }
 
-    /// Looks for subtitles online once the video has started, so starting it
-    /// never waits on the provider; the server keeps the answer for a day.
-    private func searchOnline(_ v: Viewing) {
-        v.searchedOnline = true
-        guard v.request.recordingID == nil else { return }
-        launch { [self] in
-            guard let found = await attempt("search subtitles online", { try await gateway.searchSubtitles(fileID: v.request.fileID) }) ?? nil,
-                  viewing === v, !v.stopped
-            else { return }
-            v.online = found
-            refresh(0)
-        }
-    }
-
-    /// The server validates ownership, current preferences and permission.
-    /// A newer local choice or play always wins over a late result.
-    private func downloadAutomaticSubtitle(_ v: Viewing) {
-        guard preferencesReady else { return }
-        v.attemptedAutomaticSubtitle = true
-        guard v.request.recordingID == nil else { return }
-        let prefs = preferences.playback.subtitles
-        guard prefs.automaticDownload, !v.subtitleManuallyChosen,
-              v.selectedSubtitle == nil, let decision = v.decision, !decision.url.isFileURL,
-              let playID = v.playID else { return }
-        // With the foreign-audio choice, only for audio the person doesn't follow.
-        let audio = decision.audio.first { $0.index == (v.selectedAudio ?? decision.selectedAudio) }
-        guard startingSubtitles(audioLanguage: audio?.language, audioLanguages: preferences.playback.audio.languages, preferences: prefs).mode == .on else { return }
-        let revision = v.subtitleRevision
-        v.automaticSubtitleInFlight = true
-        launch { [self] in
-            defer { v.automaticSubtitleInFlight = false }
-            guard let track = await attempt("download an automatic subtitle", {
-                try await gateway.automaticSubtitle(fileID: v.request.fileID, playID: playID)
-            }) ?? nil,
-                  viewing === v, !v.stopped, !v.adminStopped, v.playID == playID,
-                  v.subtitleRevision == revision, !v.subtitleManuallyChosen,
-                  v.selectedSubtitle == nil else { return }
-            v.selectedSubtitle = track.option.id
-            // The new decision brings the downloaded track and its authenticated URL.
-            reload(v, at: position(v), subtitleID: track.option.id, burnIn: false)
-        }
-    }
-
-    private func manualSubtitleChoice(_ v: Viewing) {
-        v.subtitleManuallyChosen = true
-        v.subtitleRevision += 1
-        guard v.automaticSubtitleInFlight, let playID = v.playID else { return }
-        launch { [self] in
-            _ = await attempt("cancel automatic subtitle selection") {
-                try await gateway.cancelAutomaticSubtitle(fileID: v.request.fileID, playID: playID)
-            }
-        }
-    }
-
     /// Fills in the next episode's runtime and season finale flag when they come.
-    private func describeNext(_ v: Viewing, _ next: UpNext) {
+    func describeNext(_ v: Viewing, _ next: UpNext) {
         launch { [self] in
             guard let described = await attempt("look up the next episode", { try await lookups.describe(next) }),
                   viewing === v, v.next?.fileID == next.fileID
@@ -831,7 +708,7 @@ public final class RealPlaybackController: PlaybackController {
         }
     }
 
-    private func fail(_ v: Viewing, _ error: any Error) {
+    func fail(_ v: Viewing, _ error: any Error) {
         guard viewing === v else { return }
         PerformanceSignposts.shared.playEnded(.failed)
         log.warning("Playback request failed: \(error.localizedDescription, privacy: .public)")
@@ -843,7 +720,7 @@ public final class RealPlaybackController: PlaybackController {
     }
 
     /// Ends the viewing: reports `state` and stops the server's session.
-    private func endViewing(_ playState: PlayState) {
+    func endViewing(_ playState: PlayState) {
         guard let v = viewing, !v.stopped else { return }
         PerformanceSignposts.shared.playEnded()
         loadTask?.cancel()
@@ -859,7 +736,7 @@ public final class RealPlaybackController: PlaybackController {
     }
 
     /// Leaves the player.
-    private func exit(_ v: Viewing) {
+    func exit(_ v: Viewing) {
         guard !v.exited else { return }
         v.exited = true
         endViewing(.stopped)
@@ -867,7 +744,7 @@ public final class RealPlaybackController: PlaybackController {
     }
 
     /// Starts the next episode in place; `finished` reports this one as watched to its end.
-    private func goNext(_ v: Viewing, finished: Bool) {
+    func goNext(_ v: Viewing, finished: Bool) {
         guard v.decision != nil, let next = v.next else { return }
         if finished {
             v.finished = true
@@ -885,7 +762,7 @@ public final class RealPlaybackController: PlaybackController {
         ))
     }
 
-    private func autoAdvance(_ v: Viewing) {
+    func autoAdvance(_ v: Viewing) {
         if stillWatching.shouldAsk() {
             v.askStill = true
             v.countdownMs = nil
@@ -896,7 +773,7 @@ public final class RealPlaybackController: PlaybackController {
         goNext(v, finished: true)
     }
 
-    private func skipSegment(_ v: Viewing, _ segment: Segment) {
+    func skipSegment(_ v: Viewing, _ segment: Segment) {
         guard let d = v.decision else { return }
         let end = segment.end(or: duration(v, d))
         if end < duration(v, d) - endSlackMs {
@@ -909,7 +786,7 @@ public final class RealPlaybackController: PlaybackController {
         exit(v)
     }
 
-    private func seekWithin(_ v: Viewing, _ target: Int) {
+    func seekWithin(_ v: Viewing, _ target: Int) {
         guard let p = media else { return }
         if v.loading {
             v.pendingPositionMs = target
@@ -924,7 +801,7 @@ public final class RealPlaybackController: PlaybackController {
         refresh(0)
     }
 
-    private func adminStop(_ v: Viewing, _ message: String) {
+    func adminStop(_ v: Viewing, _ message: String) {
         guard !v.adminStopped, !v.stopped else { return }
         v.adminStopped = true
         loadTask?.cancel()
@@ -941,7 +818,7 @@ public final class RealPlaybackController: PlaybackController {
         publish(s)
     }
 
-    private func onPlayerError(_ failure: PlayerFailure) {
+    func onPlayerError(_ failure: PlayerFailure) {
         guard let v = active(), v.decision != nil, !v.loading else { return }
         log.warning("Player error: \(failure.detail, privacy: .public)")
         if let pending = v.pendingSwitch {
@@ -977,13 +854,13 @@ public final class RealPlaybackController: PlaybackController {
     /// The codec to leave out after `failure`: a decoder or unreadable-source
     /// failure of a stream that copied the video, the first time in the play.
     /// Not for a download, which plays the file it has.
-    private func refusedCodec(_ v: Viewing, _ failure: PlayerFailure) -> String? {
+    func refusedCodec(_ v: Viewing, _ failure: PlayerFailure) -> String? {
         guard failure.kind == .decoder || failure.kind == .source, v.refusedVideoCodecs.isEmpty,
               let d = v.decision, !d.url.isFileURL, let codec = d.copiedVideoCodec else { return nil }
         return codec
     }
 
-    private func restorePrevious(_ v: Viewing, _ pending: Viewing.PendingSwitch, showFailureNote: Bool = true) {
+    func restorePrevious(_ v: Viewing, _ pending: Viewing.PendingSwitch, showFailureNote: Bool = true) {
         v.pendingSwitch = nil
         v.awaitingFrameGeneration = nil
         v.acceptedGeneration = nil
@@ -999,13 +876,13 @@ public final class RealPlaybackController: PlaybackController {
 
     // MARK: - The tick
 
-    private func startTicker() {
+    func startTicker() {
         guard ticker == nil else { return }
         lastTickAt = clock.elapsedMs
         scheduleTick()
     }
 
-    private func scheduleTick() {
+    func scheduleTick() {
         ticker = clock.after(ms: tickMs) { [weak self] in
             guard let self else { return }
             let now = clock.elapsedMs
@@ -1017,14 +894,14 @@ public final class RealPlaybackController: PlaybackController {
         }
     }
 
-    private func stopTicker() {
+    func stopTicker() {
         ticker?.cancel()
         ticker = nil
     }
 
     /// Brings ``state`` up to date and acts on it: heartbeats, the prompts and
     /// their timers (advanced by `dtMs`), the end of the file, the token.
-    private func refresh(_ dtMs: Int) {
+    func refresh(_ dtMs: Int) {
         guard let v = viewing, !v.stopped, !v.adminStopped else { return }
         followRoute()
         guard let d = v.decision, let p = media else {
@@ -1164,58 +1041,15 @@ public final class RealPlaybackController: PlaybackController {
         }
     }
 
-    private func publish(_ s: PlayerState) {
+    func publish(_ s: PlayerState) {
         if s != state { state = s }
-    }
-
-    // MARK: - Subtitles drawn here
-
-    /// The selected text track's URL (without the token), if it has cues to draw.
-    private func cueURL(_ v: Viewing, _ d: PlaybackDecision) -> URL? {
-        guard let id = v.selectedSubtitle, id != d.burnInSubtitleID,
-              let track = d.subtitles.first(where: { $0.option.id == id }),
-              track.format == "webvtt", !track.option.burnInOnly
-        else { return nil }
-        return track.url
-    }
-
-    /// The cues on screen now, in file time. The track's own times are player
-    /// time: the server shifts an event playlist's cues to its start.
-    private func cues(_ v: Viewing, _ d: PlaybackDecision, _ p: any MediaPlayer) -> [SubtitleCue] {
-        guard !v.loading || (playsOn(v) && v.pendingPositionMs == nil), let url = cueURL(v, d) else { return [] }
-        guard let track = cueTracks[url] else {
-            fetchCues(url, for: v)
-            return []
-        }
-        let offset = v.streamClock.offsetMs
-        return track.active(at: p.positionMs).map { SubtitleCue(startMs: $0.startMs + offset, endMs: $0.endMs + offset, text: $0.text) }
-    }
-
-    /// About 10 times a second while playing: only a change of cues is news.
-    private func updateCues() {
-        guard let v = active(), let d = v.decision, let p = media else { return }
-        let now = cues(v, d, p)
-        if now != state.cues { state.cues = now }
-    }
-
-    private func fetchCues(_ url: URL, for v: Viewing) {
-        guard !cueFetches.contains(url) else { return }
-        cueFetches.insert(url)
-        let withToken = token?.apply(to: url) ?? url
-        launch { [self] in
-            // A failed fetch stays in cueFetches, so it is not retried every tick; a new play tries again.
-            guard let text = await attempt("load subtitles", { try await gateway.subtitleText(withToken) }), viewing === v else { return }
-            cueTracks[url] = CueTrack(cues: WebVTT.parse(text))
-            cueFetches.remove(url)
-            updateCues()
-        }
     }
 
     // MARK: - Now Playing's picture
 
     /// Loads the play's picture when it is not the one shown: the next
     /// episode's still replaces the last one, and a restart keeps it.
-    private func showArtwork(for request: PlayRequest) {
+    func showArtwork(for request: PlayRequest) {
         let image = nowPlayingImage(request)
         guard image != artworkImage else { return }
         artworkImage = image
@@ -1238,7 +1072,7 @@ public final class RealPlaybackController: PlaybackController {
     /// play restarts at its position on the same server's LAN address, as a
     /// quality change restarts it. Heartbeats still go from here to the
     /// address in use. With no LAN address it plays on as it is.
-    private func followRoute() {
+    func followRoute() {
         let now = media?.externalPlaybackActive == true
         guard now != external else { return }
         external = now
@@ -1262,7 +1096,7 @@ public final class RealPlaybackController: PlaybackController {
     }
 
     /// Restarts the play on the LAN address. A play still loading picks it up by itself.
-    private func restartLocally() {
+    func restartLocally() {
         guard let v = active(), let d = v.decision, !v.loading, !playingLocally, localRoute?.apply(to: d.url) != nil else { return }
         if let pending = v.pendingSwitch {
             // AirPlay needs an address its receiver can reach. Preserve the
@@ -1275,7 +1109,7 @@ public final class RealPlaybackController: PlaybackController {
 
     // MARK: - Heartbeats
 
-    private func heartbeat(_ v: Viewing, _ status: PlayerStatus, _ pos: Int, _ buffered: Int, force: Bool) {
+    func heartbeat(_ v: Viewing, _ status: PlayerStatus, _ pos: Int, _ buffered: Int, force: Bool) {
         let s = playState(for: status)
         guard force || heartbeatDue(s, lastReported: v.lastReported, sinceLastBeatMs: clock.elapsedMs - v.lastBeatAt, auto: asked == .auto) else { return }
         report(v, s, pos, buffered)
@@ -1283,7 +1117,7 @@ public final class RealPlaybackController: PlaybackController {
 
     /// Queues a heartbeat; false when none may be sent.
     @discardableResult
-    private func report(_ v: Viewing, _ playState: PlayState, _ pos: Int, _ buffered: Int) -> Bool {
+    func report(_ v: Viewing, _ playState: PlayState, _ pos: Int, _ buffered: Int) -> Bool {
         guard let d = v.decision, let playID = v.playID, !v.stopped, !v.adminStopped else { return false }
         // After "closed", nothing but the final "stopped" until the app is back.
         if backgrounded && playState != .closed && playState != .stopped { return false }
@@ -1303,7 +1137,7 @@ public final class RealPlaybackController: PlaybackController {
         return true
     }
 
-    private func send(_ message: Outgoing) {
+    func send(_ message: Outgoing) {
         Self.enqueue(message, into: &outbox, behindDelivery: sending)
         guard !delivering else { return }
         delivering = true
@@ -1344,7 +1178,7 @@ public final class RealPlaybackController: PlaybackController {
         outbox.append(.report(new, generation: generation))
     }
 
-    private func deliver(_ message: Outgoing) async {
+    func deliver(_ message: Outgoing) async {
         switch message {
         case let .report(report, generation):
             guard let reply = await attempt("send a heartbeat", { try await gateway.reportProgress(report) }) else { return }
@@ -1354,7 +1188,7 @@ public final class RealPlaybackController: PlaybackController {
         }
     }
 
-    private func onReply(_ generation: Int, _ report: ProgressReport, _ reply: ProgressReply) {
+    func onReply(_ generation: Int, _ report: ProgressReport, _ reply: ProgressReply) {
         guard let v = viewing, v.generation == generation else { return }
         if let acknowledged = report.switchGeneration, acknowledged == v.acceptedGeneration {
             if let pending = v.pendingSwitch, let current = v.decision { endReplacedSession(pending.previous, current) }
@@ -1378,7 +1212,7 @@ public final class RealPlaybackController: PlaybackController {
 
     /// Automatic's negotiated step change: the same play again here, still
     /// at Automatic. The saved default quality stays as it is.
-    private func changeStep(_ v: Viewing, to step: StreamQuality, reply: ProgressReply) {
+    func changeStep(_ v: Viewing, to step: StreamQuality, reply: ProgressReply) {
         guard asked == .auto, let d = v.decision, !v.loading, v.error == nil,
               v.pendingSwitch == nil, v.awaitingFrameGeneration == nil,
               d.autoStep != step else { return }
@@ -1397,14 +1231,14 @@ public final class RealPlaybackController: PlaybackController {
     }
 
     /// Shows `text` over the video for a few seconds; the next refresh publishes it.
-    private func showNote(_ v: Viewing, _ text: String) {
+    func showNote(_ v: Viewing, _ text: String) {
         v.qualityNote = text
         v.qualityNoteUntil = clock.elapsedMs + qualityNoteMs
     }
 
     // MARK: - Helpers
 
-    private func ensurePlayer() {
+    func ensurePlayer() {
         guard media == nil else { return }
         let p = makePlayer()
         media = p
@@ -1438,7 +1272,7 @@ public final class RealPlaybackController: PlaybackController {
     }
 
     /// A call pauses; when it ends the system says whether to carry on.
-    private func interrupted(began: Bool, shouldResume: Bool) {
+    func interrupted(began: Bool, shouldResume: Bool) {
         if began {
             pausedByInterruption = media?.playWhenReady == true
             media?.pause()
@@ -1448,62 +1282,55 @@ public final class RealPlaybackController: PlaybackController {
         }
     }
 
-    private func foreground() {
+    func foreground() {
         guard backgrounded else { return }
         backgrounded = false
         refresh(0)
     }
 
     /// The server's API level, for what it may be asked; nil when not known.
-    private var apiLevel: Int? { servers?.current?.server.apiLevel }
+    var apiLevel: Int? { servers?.current?.server.apiLevel }
 
     /// The quality to ask for: the viewer's, with Automatic as Original on a server that cannot pick the step.
     /// A growing recording's length: what the server had recorded when it decided,
     /// plus the time since on this device's monotonic clock (never the device's
     /// date against the server's), up to the planned end. Once it stops growing, fixed.
-    private func duration(_ v: Viewing, _ d: PlaybackDecision) -> Int {
+    func duration(_ v: Viewing, _ d: PlaybackDecision) -> Int {
         guard let growing = d.growing else { return d.durationMs }
         if let fixed = v.grownMs { return fixed }
         return min(d.durationMs + max(clock.elapsedMs - v.decidedAtMs, 0), growingEnd(d, growing))
     }
 
     /// The planned length, which a recording can't grow past.
-    private func growingEnd(_ d: PlaybackDecision, _ growing: GrowingRecording) -> Int { max(growing.plannedDurationMs, d.durationMs) }
+    func growingEnd(_ d: PlaybackDecision, _ growing: GrowingRecording) -> Int { max(growing.plannedDurationMs, d.durationMs) }
 
     /// Still recording: not past its planned end, and the stream hasn't ended.
-    private func stillGrowing(_ v: Viewing, _ d: PlaybackDecision) -> GrowingRecording? {
+    func stillGrowing(_ v: Viewing, _ d: PlaybackDecision) -> GrowingRecording? {
         guard let growing = d.growing, v.grownMs == nil, duration(v, d) < growingEnd(d, growing) else { return nil }
         return growing
     }
 
-    private var asked: StreamQuality { quality.playable(apiLevel: apiLevel) }
+    var asked: StreamQuality { quality.playable(apiLevel: apiLevel) }
 
     /// The play has a stream that is playing or about to, which a reload leaves going.
-    private func playsOn(_ v: Viewing) -> Bool {
+    func playsOn(_ v: Viewing) -> Bool {
         guard v.decision != nil, let phase = media?.phase else { return false }
         return phase == .ready || phase == .buffering
     }
 
     /// The file position now: where a load will start, else the player's time mapped to the file.
-    private func position(_ v: Viewing) -> Int {
+    func position(_ v: Viewing) -> Int {
         guard let d = v.decision else { return v.pendingPositionMs ?? v.request.startMs ?? 0 }
         let raw = v.pendingPositionMs ?? media.map { v.streamClock.filePosition($0.positionMs) } ?? 0
         return min(max(raw, 0), duration(v, d))
     }
 
-    private func endReplacedSession(_ old: PlaybackDecision, _ new: PlaybackDecision) {
+    func endReplacedSession(_ old: PlaybackDecision, _ new: PlaybackDecision) {
         guard let id = old.sessionID, id != new.sessionID else { return }
         send(.endSession(id))
     }
 
-    private func burnsIn(_ v: Viewing, _ subtitleID: String?) -> Bool {
-        guard let d = v.decision, let subtitleID, let track = d.subtitles.first(where: { $0.option.id == subtitleID }) else { return false }
-        return isImage(track) || d.burnInSubtitleID == subtitleID
-    }
-
-    private func isImage(_ track: DecisionSubtitle) -> Bool { track.option.burnInOnly || track.format == "image" }
-
-    private func attempt<T>(_ what: String, _ body: () async throws -> T) async -> T? {
+    func attempt<T>(_ what: String, _ body: () async throws -> T) async -> T? {
         do {
             return try await body()
         } catch is CancellationError {
@@ -1516,7 +1343,7 @@ public final class RealPlaybackController: PlaybackController {
 
     /// Starts work on the main actor and keeps track of it until it ends, so tests can wait for quiet.
     @discardableResult
-    private func launch(_ work: @escaping @MainActor () async -> Void) -> Task<Void, Never> {
+    func launch(_ work: @escaping @MainActor () async -> Void) -> Task<Void, Never> {
         taskCount += 1
         let id = taskCount
         let task = Task { @MainActor [weak self] in
