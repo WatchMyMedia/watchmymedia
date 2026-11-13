@@ -27,6 +27,11 @@ struct SystemPlayer<Overlay: View>: UIViewControllerRepresentable {
         // The app draws subtitles and picks them in its own tab: the playlist's
         // renditions stay out of the system's subtitle menu.
         controller.allowedSubtitleOptionLanguages = []
+        // No picture in picture for files: the model pauses and closes the
+        // play when the app goes to the background, and nothing here handles
+        // AVKit's picture-in-picture callbacks, so starting it would end the
+        // film (PLAN-APPLE-REVIEW.md §3.1.6). Live TV keeps its own.
+        controller.allowsPictureInPicturePlayback = false
         controller.customInfoViewControllers = PickerTab.allCases.map { OptionsTabController(model: model, tab: $0) }
         context.coordinator.show(overlay, in: controller)
         context.coordinator.show(contextualActions, transportBarActions, in: controller)
