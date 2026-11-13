@@ -47,6 +47,7 @@ private fun argument(name: String): String? = InstrumentationRegistry.getArgumen
 
 /** core:ui's TestTags, as the journeys find them; keep the two in step. */
 internal object Tags {
+    const val TV = "tv"
     const val HOME = "home"
     const val PLAY = "play"
     const val GUIDE = "guide"
@@ -173,8 +174,18 @@ fun UiDevice.firstScreen(): FirstScreen {
     fail("None of the TV's pairing, the server picker, sign-in or Home showed")
 }
 
-/** True when the app shows the TV UI (its pairing screen), false for the phone's. */
-fun MacrobenchmarkScope.showsTv(): Boolean = device.firstScreen() == FirstScreen.TvPairing
+/**
+ * True when the app shows the TV UI, false for the phone's, once a first
+ * screen has come: the TV's root carries the tv tag. (The fake pairing can
+ * sign the TV in before the journey sees the pairing screen.)
+ */
+fun UiDevice.showsTv(): Boolean {
+    firstScreen()
+    return hasObject(tag(Tags.TV))
+}
+
+/** [UiDevice.showsTv] for the journeys. */
+fun MacrobenchmarkScope.showsTv(): Boolean = device.showsTv()
 
 /**
  * Signs in and ends on Home: on the fakes the TV pairs by itself and the

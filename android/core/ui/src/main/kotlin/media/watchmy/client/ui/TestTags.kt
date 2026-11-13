@@ -8,6 +8,9 @@ package media.watchmy.client.ui
  * strings: rename one in both places, or the journeys stop finding it.
  */
 object TestTags {
+    /** The TV UI's root, on every TV screen: how the journeys tell a TV build from a phone's. */
+    const val TV = "tv"
+
     /** Home once it has loaded from the server: its rows (and on a phone, an empty library's message). */
     const val HOME = "home"
 

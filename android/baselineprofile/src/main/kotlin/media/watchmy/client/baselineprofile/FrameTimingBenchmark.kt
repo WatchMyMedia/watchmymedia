@@ -74,7 +74,7 @@ class FrameTimingBenchmark {
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
             device.executeShellCommand("am force-stop $targetPackage")
             device.executeShellCommand("am start -W -n $targetPackage/media.watchmy.client.MainActivity")
-            return device.firstScreen() == FirstScreen.TvPairing
+            return device.showsTv()
         }
     }
 }
