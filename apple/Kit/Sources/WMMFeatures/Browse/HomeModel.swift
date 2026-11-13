@@ -46,6 +46,20 @@ public final class HomeModel {
 
     public var offersSetup: Bool { isAdmin && emptyState?.offersSetup == true }
 
+    /// The offline Home (HomeOffline.dc.html) with `downloads` to watch: Home's
+    /// request failed, or, while it is still out, the server check
+    /// (``ServerRepository/reachable``) found no server. That check gives up
+    /// in seconds where Home's request takes 30 (PLAN-APPLE-REVIEW.md §4.1.5);
+    /// the request carries on, and Home shows if it answers.
+    public func showsOffline(reachable: Bool?, downloads: Bool) -> Bool {
+        guard downloads else { return false }
+        switch state {
+        case .failed: return true
+        case .loading: return reachable == false
+        case .loaded: return false
+        }
+    }
+
     /// Loads Home, then reloads quietly whenever the library, the person's
     /// watch state, or their rows and lists change, until cancelled. Coming
     /// back to Home loads nothing unless something changed meanwhile

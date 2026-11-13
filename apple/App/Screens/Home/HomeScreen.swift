@@ -45,10 +45,10 @@ private struct HomeView: View {
     private var wideCardWidth: CGFloat { wide ? 248 : 220 }
     private var liveAvailable: Bool { services.liveTV.capabilities?.available == true }
 
-    /// No server, but downloads to watch (HomeOffline.dc.html).
+    /// No server, but downloads to watch (HomeOffline.dc.html): as soon as the
+    /// server check fails, not only when Home's own request times out.
     private var offline: Bool {
-        if case .failed = model.state { return services.downloads.enabled }
-        return false
+        model.showsOffline(reachable: services.servers.reachable, downloads: services.downloads.enabled)
     }
 
     /// The iPad draws an arranged Home as screens (PLAN-HOME.md §7.6).

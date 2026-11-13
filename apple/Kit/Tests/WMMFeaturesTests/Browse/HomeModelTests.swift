@@ -75,6 +75,21 @@ import WMMModel
         #expect(library.homeCalls == 3, "each mark loads Home once, from its own notice")
     }
 
+    @Test func theOfflineHomeShowsOnceTheServerCheckFailsWithoutWaitingForHome() async throws {
+        // Home's request is still out.
+        #expect(model.state.isLoading)
+        #expect(!model.showsOffline(reachable: nil, downloads: true), "the check hasn't answered")
+        #expect(!model.showsOffline(reachable: true, downloads: true))
+        #expect(model.showsOffline(reachable: false, downloads: true), "no server: the downloads at once")
+        #expect(!model.showsOffline(reachable: false, downloads: false), "nothing downloaded: Home keeps trying")
+        // Home's own answer decides once it comes.
+        await model.retry()
+        #expect(!model.showsOffline(reachable: false, downloads: true))
+        library.failure = APIError(status: nil, message: "Couldn't reach the server.")
+        await model.retry()
+        #expect(model.showsOffline(reachable: true, downloads: true))
+    }
+
     @Test func scansReloadOnlyAnEmptyHome() async throws {
         let running = Task { await model.run() }
         defer { running.cancel() }
