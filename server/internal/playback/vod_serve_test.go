@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"watchmymedia/server/internal/ffexec/ffexectest"
 )
 
 // fakeVODFFmpeg is a stand-in ffmpeg for VOD runs: it runs script with
@@ -25,7 +27,7 @@ func fakeVODFFmpeg(t *testing.T, script string) string {
 	}
 	bin := filepath.Join(t.TempDir(), "ffmpeg")
 	body := "#!/bin/sh\nfor a; do last=$a; done\ndir=$(dirname \"$last\"); run=$(basename \"$last\" .m3u8)\n" + script + "\nexec sleep 60\n"
-	if err := os.WriteFile(bin, []byte(body), 0o700); err != nil { //nolint:gosec // G306: a script, which must be executable
+	if err := ffexectest.WriteScript(bin, body); err != nil {
 		t.Fatal(err)
 	}
 	return bin

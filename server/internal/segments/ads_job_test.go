@@ -13,6 +13,7 @@ import (
 
 	"watchmymedia/server/internal/bgwork"
 	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/db/dbtest"
 	"watchmymedia/server/internal/events"
 	"watchmymedia/server/internal/ffexec"
 )
@@ -29,14 +30,7 @@ func TestAdDetectorRecordsWhatItCouldNotReadAndGoesOn(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
-	conn, err := db.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = conn.Close() })
-	if err := db.Migrate(ctx, conn); err != nil {
-		t.Fatal(err)
-	}
+	conn := dbtest.OpenPath(t, filepath.Join(t.TempDir(), "t.db"))
 	q := db.New(conn)
 	dir := t.TempDir()
 	lib, err := q.UpsertLibrary(ctx, db.UpsertLibraryParams{Type: "tv", Name: "Recordings", Path: dir})

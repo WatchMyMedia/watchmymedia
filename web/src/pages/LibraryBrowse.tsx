@@ -7,6 +7,7 @@ import { SegmentedControl } from '../components/Controls'
 import { EditRows, EditRowsBar } from '../components/rows/EditRowsBar'
 import { ScreenRows } from '../components/rows/ScreenRows'
 import { UnmatchedView } from '../components/UnmatchedView'
+import { useAuth } from '../authContext'
 import { relativeTime } from '../lib/format'
 import type { BrowseSearch } from '../lib/routeSearch'
 import { libraryRows, libraryScreen } from '../lib/screenRows'
@@ -21,6 +22,9 @@ export function LibraryBrowse({ type, search }: { type: 'movie' | 'tv'; search: 
   const { q, view: initialView, library: libraryId } = search
   const { library, isPending, isError, error } = useLibraryByType(type, libraryId)
   const [view, setView] = useState<View>(initialView ?? 'overview')
+  const auth = useAuth()
+  // Matching unmatched files is for admins (the server refuses members).
+  const admin = (auth.user?.isAdmin ?? false) && auth.adminAllowed
   const initial = { sort: search.sort, filter: search.filter, genre: search.genre, decade: search.decade }
   if (isPending) return <p className="text-neutral-400">Loading…</p>
   if (isError) return <p className="text-red-400">{error.message}</p>
@@ -33,7 +37,7 @@ export function LibraryBrowse({ type, search }: { type: 'movie' | 'tv'; search: 
   if (search.edit) return <LibraryEditRows library={library} type={type} search={search} />
   const unmatched = library.unmatchedCount + library.pendingCount
   const title = type === 'tv' ? 'TV Shows' : 'Movies'
-  const effectiveView: View = q ? 'all' : view
+  const effectiveView: View = q ? 'all' : view === 'unmatched' && !admin ? 'overview' : view
   return (
     <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -50,7 +54,7 @@ export function LibraryBrowse({ type, search }: { type: 'movie' | 'tv'; search: 
             { value: 'overview', label: 'Overview' },
             { value: 'all', label: type === 'tv' ? 'All shows' : 'All movies' },
             { value: 'genres', label: 'Genres' },
-            { value: 'unmatched', label: unmatched ? `Unmatched ${unmatched}` : 'Unmatched' },
+            ...(admin ? [{ value: 'unmatched' as const, label: unmatched ? `Unmatched ${unmatched}` : 'Unmatched' }] : []),
           ]}
           value={effectiveView}
           onChange={setView}

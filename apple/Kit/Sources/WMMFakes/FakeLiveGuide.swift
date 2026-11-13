@@ -22,12 +22,14 @@ public struct FakeLiveGuide: Sendable {
     public let favourites: Bool
     /// Favourites, search and reminders (API level 15); false keeps the server at G5's level 13.
     public let extras: Bool
-    /// A reminder whose alert comes 20 s after launch with the default lead time, to watch one arrive.
+    /// A reminder whose alert comes `soonAfter` seconds after launch (20 by
+    /// default) with the default lead time, to watch one arrive.
     public let soon: Date?
 
     public init(now: Date = .now, stale: Bool = false, pictures: Pictures = .series, conference: Conference = .none,
-                favourites: Bool = true, extras: Bool = true, soon: Bool = false, calendar: Calendar = .current) {
-        self.soon = soon ? now.addingTimeInterval(Double(LiveReminderLead.standard) * 60 + 20) : nil
+                favourites: Bool = true, extras: Bool = true, soon: Bool = false, soonAfter: TimeInterval = 20,
+                calendar: Calendar = .current) {
+        self.soon = soon ? now.addingTimeInterval(Double(LiveReminderLead.standard) * 60 + soonAfter) : nil
         // The boards' 7:00 PM: an hour before the half hour now is in, found
         // by subtracting so the hour repeated when clocks go back stays put.
         let c = calendar.dateComponents([.minute, .second, .nanosecond], from: now)
@@ -80,17 +82,24 @@ public struct FakeLiveGuide: Sendable {
     /// `-fakesLiveGuideNoPictures`; `-fakesLiveReminder set|moved|gone` and
     /// `-fakesLiveNoFavourites` for the extras boards' Tweaks,
     /// `-fakesLiveGuideNoExtras` for a server before them (level 13), and
-    /// `-fakesLiveReminderSoon` for a reminder that comes 20 s after launch. Nil without it.
-    public static func from(_ arguments: [String]) -> FakeLiveGuide? {
+    /// `-fakesLiveReminderSoon` for a reminder that comes 20 s after launch, or
+    /// as many seconds as the number after it (`-fakesLiveReminderSoon 8`), so
+    /// a UI test waits only as long as its screen needs. Nil without it.
+    public static func from(_ arguments: [String], now: Date = .now) -> FakeLiveGuide? {
         guard arguments.contains("-fakesLiveRecordings") || arguments.contains(where: { $0.hasPrefix("-fakesLiveGuide") }) else { return nil }
         let pictures: Pictures = arguments.contains("-fakesLiveGuideNoPictures") ? .missing : arguments.contains("-fakesLiveGuideTMDB") ? .tmdb : .series
         var conference = Conference.none
         if let i = arguments.firstIndex(of: "-fakesLiveReminder"), arguments.indices.contains(i + 1) {
             conference = Conference(rawValue: arguments[i + 1]) ?? .none
         }
-        return FakeLiveGuide(stale: arguments.contains("-fakesLiveGuideStale"), pictures: pictures, conference: conference,
+        var soonAfter: TimeInterval = 20
+        if let i = arguments.firstIndex(of: "-fakesLiveReminderSoon"), arguments.indices.contains(i + 1),
+           let seconds = TimeInterval(arguments[i + 1]), seconds >= 0 {
+            soonAfter = seconds
+        }
+        return FakeLiveGuide(now: now, stale: arguments.contains("-fakesLiveGuideStale"), pictures: pictures, conference: conference,
                              favourites: !arguments.contains("-fakesLiveNoFavourites"), extras: !arguments.contains("-fakesLiveGuideNoExtras"),
-                             soon: arguments.contains("-fakesLiveReminderSoon"))
+                             soon: arguments.contains("-fakesLiveReminderSoon"), soonAfter: soonAfter)
     }
 
     /// Every programme from `from` until listings end, by channel.

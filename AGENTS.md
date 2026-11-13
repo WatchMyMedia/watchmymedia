@@ -107,9 +107,14 @@ to keep both working.
 
 1. **Read first**: this file and the folder's `AGENTS.md` and README.
 2. **One PR per change and platform**, on a branch named `taimoorq/<kebab-name>`.
-   Small direct commits to `main` have also been normal; ask when unsure
-   whether the user wants a PR. Bring a branch up to date by merging
-   `origin/main` into it.
+   A batch of fixes, such as a review's findings, is one change: put it in
+   one PR with a commit per fix, not one PR each, since every PR runs the CI
+   jobs for what it touches (the Windows and Apple jobs take 12–20 minutes
+   each, plus any wait for a macOS runner). Split only when a
+   fix needs a different reviewer, could hold the rest back, or is on
+   another platform. Small direct commits to `main` have also been normal;
+   ask when unsure whether the user wants a PR. Bring a branch up to date by
+   merging `origin/main` into it.
 3. **Validate by what changed** (next section), and say plainly what was not
    checked, such as real devices or a Chromecast.
 4. **Update the docs in the same change**: the README or folder README when a
@@ -168,7 +173,24 @@ Several agent sessions use this repository at once.
 
 Run the checks for the surfaces you touched before handing work back. CI
 (`.github/workflows/ci.yml`) runs the same ones on GitHub-hosted runners.
-Android and Apple jobs run when their code, `api/`, or CI support changes.
+Each job runs only when what it builds or tests changed: the `changes` job's
+path filters in `ci.yml` decide (the server jobs for `server/`, the apps for
+their folder and `api/`, `scripts` for `deploy/`, the workflows and the docs),
+and a change to `ci.yml` or a manual run runs everything. When a new job or
+input is added, give it a filter; `deploy/ci/security_test.py` checks every
+job has one. The `server` job runs every Go test, the lint and the
+generated-code check on Linux; `server-macos` tests only the packages with
+macOS code of their own (`deploy/ci/security_test.py` checks that every
+package with a `_darwin.go` file is among them), since GitHub's macOS runners
+are the scarce ones. The Go jobs restore Go's build and test caches from the newest
+push to `main`, so a PR reruns only the Go packages it changes and those that
+depend on them. Only `main` saves those caches, and `main` and manual runs run
+every test again (`go clean -testcache`). A change to the pinned ffmpeg starts
+from an empty cache, since Go can't see the ffmpeg its tests run. The
+`android` job's Gradle caches, kept by Gradle's setup-gradle action, work the
+same way: restored everywhere, saved only by `main`. Its configuration cache
+is encrypted with `GRADLE_ENCRYPTION_KEY`, the only secret `ci.yml` may read
+(`security_test.py` checks); without it, as on fork PRs, that cache is skipped.
 
 | Changed | Run |
 |---|---|
@@ -178,7 +200,7 @@ Android and Apple jobs run when their code, `api/`, or CI support changes.
 | API types | `make gen-api`, `make apple-api`, `make apple-test`, `cd web && pnpm typecheck`; Android's client if used |
 | Web app | `cd web && pnpm lint && pnpm typecheck && pnpm test && pnpm build` |
 | Cast receiver | the web checks plus `cd web && pnpm build:receiver` |
-| Android | `cd android && ./gradlew testDebugUnitTest lintDebug` (CI adds `coverageReport`, `assembleDebug` and an unsigned `:app:assembleRelease`) |
+| Android | `cd android && ./gradlew testDebugUnitTest lintDebug` (CI adds `coverageReport`, `assembleDebug` and an unsigned `:app:assembleRelease` without `lintVitalRelease`) |
 | Apple Kit | `make apple-test` |
 | iPhone or iPad app, or UIKit | `make apple-test-sim` |
 | Apple TV app | `make apple-tv-test-sim` |

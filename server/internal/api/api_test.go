@@ -21,9 +21,12 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
+
 	"watchmymedia/server/internal/auth"
 	"watchmymedia/server/internal/backup"
 	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/db/dbtest"
 	"watchmymedia/server/internal/events"
 	"watchmymedia/server/internal/livetv/guide"
 	"watchmymedia/server/internal/metadata"
@@ -46,6 +49,9 @@ type testEnv struct {
 	client  *http.Client
 	bus     *events.Bus
 	dataDir string
+	// api is the server's huma API, whose OpenAPI document lists every
+	// operation with its metadata.
+	api huma.API
 }
 
 func newTestServer(t *testing.T) *testEnv {
@@ -74,14 +80,7 @@ var adminHash = sync.OnceValue(func() string {
 func startTestEnv(t *testing.T, adjust func(*Deps), start func(http.Handler) *httptest.Server) *testEnv {
 	t.Helper()
 	ctx := t.Context()
-	conn, err := db.Open(filepath.Join(t.TempDir(), "test.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = conn.Close() })
-	if err := db.Migrate(ctx, conn); err != nil {
-		t.Fatal(err)
-	}
+	conn := dbtest.OpenPath(t, filepath.Join(t.TempDir(), "test.db"))
 	q := db.New(conn)
 	lib, err := q.UpsertLibrary(ctx, db.UpsertLibraryParams{Type: "movie", Name: "Movies", Path: "/m"})
 	if err != nil {
@@ -106,7 +105,8 @@ func startTestEnv(t *testing.T, adjust func(*Deps), start func(http.Handler) *ht
 	if adjust != nil {
 		adjust(&deps)
 	}
-	r, _ := New(deps)
+	r, h := New(deps)
+	env.api = h
 	env.Server = start(r)
 	t.Cleanup(env.Close)
 	// Signed in without checking the password, which only the sign-in

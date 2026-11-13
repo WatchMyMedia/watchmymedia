@@ -2,6 +2,7 @@ package playback
 
 import (
 	"context"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,8 +13,13 @@ import (
 func TestAdapterIsBoundThroughEveryFilterPath(t *testing.T) {
 	t.Parallel()
 	n := 1
+	// On Linux QSV sits on the render node (pipelineOnOS).
+	qsv := "qsv=qs:hw,child_device=1,child_device_type=d3d11va"
+	if runtime.GOOS == "linux" {
+		qsv = "qsv=qs:hw,child_device=/dev/dri/renderD129"
+	}
 	for _, tc := range []struct{ hw, encoder, init string }{
-		{"nvenc", "h264_nvenc", "cuda=cu:1"}, {"qsv", "h264_qsv", "qsv=qs:hw,child_device=1,child_device_type=d3d11va"}, {"amf", "h264_amf", "d3d11va=dx:1"},
+		{"nvenc", "h264_nvenc", "cuda=cu:1"}, {"qsv", "h264_qsv", qsv}, {"amf", "h264_amf", "d3d11va=dx:1"},
 	} {
 		c := Capabilities{Encoder: tc.encoder, HWAccel: tc.hw, Device: &n, GPUFilters: true, gpuToneMap: true, LibASS: true, Overlay: true}
 		m := NewManager("unused", t.TempDir(), c, time.Minute, 1, testLog)

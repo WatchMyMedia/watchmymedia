@@ -28,7 +28,10 @@ jobs:
   # (v1.2.3-rc.1). The other jobs only add their files to it, which keeps
   # its notes and pre-release flag.
   check:
-    runs-on: macos-26
+    # Only shell and the changelog: Linux runners start at once, where a
+    # macOS one held the whole release back for 27 minutes on 2026-11-12
+    # before GitHub dropped the job.
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:

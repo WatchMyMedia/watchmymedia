@@ -15,7 +15,7 @@ submission checklist. The design and decisions are in
 | `template_test.py` | Checks both: structure, the elements Unraid reads, and that paths, port and variables match the image (`python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'`; CI runs it) |
 | `mirror.sh` | Assembles the public templates repository from these files |
 
-The public repository is `taimoorq/unraid-templates`: `templates/watchmymedia.xml`,
+The public repository is `WatchMyMedia/unraid-templates`: `templates/watchmymedia.xml`,
 `ca_profile.xml`, `images/watchmymedia.png` (from `brand/export/web/icon-512.png`),
 `LICENSE` (MIT, the templates only) and a README. Community Applications reads
 templates from a public repository separate from the one the image is built
@@ -29,7 +29,7 @@ from, with an OSI licence and a profile.
 2. Set `Date` to today and add a line under `Changes`: Community
    Applications shows them as "Updated" and the change log.
 3. Run the test.
-4. `deploy/unraid/mirror.sh <checkout of taimoorq/unraid-templates>`, review
+4. `deploy/unraid/mirror.sh <checkout of WatchMyMedia/unraid-templates>`, review
    its `git status`, commit and push there. Community Applications picks the
    change up at its next catalog build (every two hours or so).
 
@@ -43,7 +43,7 @@ Until the app is in Community Applications (and on any Unraid box where it
 is not), from the Unraid terminal:
 
 ```bash
-wget -O /boot/config/plugins/dockerMan/templates-user/my-WatchMyMedia.xml https://raw.githubusercontent.com/taimoorq/unraid-templates/main/templates/watchmymedia.xml
+wget -O /boot/config/plugins/dockerMan/templates-user/my-WatchMyMedia.xml https://raw.githubusercontent.com/WatchMyMedia/unraid-templates/main/templates/watchmymedia.xml
 ```
 
 Then Docker › Add Container and pick **WatchMyMedia** from the template
@@ -55,8 +55,8 @@ created, so a later install from Community Applications finds their values.
 - the Unraid terminal runs `docker login ghcr.io` with a fine-grained GitHub
   token the owner creates with read access to this one package (Unraid's
   Docker page then pulls with that login, and Check for Updates works), or
-- the owner ships a tarball: `docker pull --platform linux/amd64 ghcr.io/taimoorq/watchmymedia:X.Y.Z`
-  then `docker save ghcr.io/taimoorq/watchmymedia:X.Y.Z | gzip > watchmymedia-X.Y.Z.tar.gz`;
+- the owner ships a tarball: `docker pull --platform linux/amd64 ghcr.io/watchmymedia/watchmymedia:X.Y.Z`
+  then `docker save ghcr.io/watchmymedia/watchmymedia:X.Y.Z | gzip > watchmymedia-X.Y.Z.tar.gz`;
   on the box, `docker load < watchmymedia-X.Y.Z.tar.gz` and the template's
   Repository changed to that tag. Check for Updates cannot work this way.
 
@@ -95,11 +95,11 @@ Blocked until the repository is open-sourced and the GHCR package is public
 (PLAN-UNRAID.md Decision 1); the portal's scan refuses an image it cannot
 pull, and the policy wants a maintainer's own app to be open source. Then:
 
-1. The owner makes `ghcr.io/taimoorq/watchmymedia` public in the package's
+1. The owner makes `ghcr.io/watchmymedia/watchmymedia` public in the package's
    settings and checks that `docker pull` works signed out.
 2. Two-factor authentication is on for the GitHub account that owns the
    templates repository (a policy requirement).
-3. `taimoorq/unraid-templates` exists, is public, and holds what `mirror.sh`
+3. `WatchMyMedia/unraid-templates` exists, is public, and holds what `mirror.sh`
    assembles; its `Support` link works (the repository's Issues, or a thread
    in the forum's Docker Containers section, in which case change `Support`
    and mirror again).

@@ -1,13 +1,27 @@
 # WatchMyMedia
 
-Self-hosted media server: point it at a Movies folder and a TV folder, it builds
-libraries with metadata and streams to a web client and to the TV and phone apps.
+A self-hosted media server for movies, TV shows and live antenna TV. Point it at
+a Movies folder and a TV folder and it builds a library with posters and details,
+then streams it to any web browser and to the apps for phones, tablets and TVs.
+It is open source under the [GNU AGPL-3.0](LICENSE).
+
+**To use it**, download the Mac or Windows app from
+[watchmy.media/download](https://watchmy.media/download) and follow
+[the guide](https://watchmy.media/guide/). The phone and TV apps are on the
+[App Store](https://apps.apple.com/app/watchmymedia/id6828975407) and
+[Google Play](https://play.google.com/store/apps/details?id=media.watchmy.client).
+This README is for building and running it from source.
 
 ## Layout
 
 - `server/` — Go server (chi + huma API, SQLite via sqlc/goose, ffmpeg orchestration, embedded web UI)
-- `web/` — React + Vite web client, API types generated from the server's OpenAPI
-- `deploy/` — Dockerfile, compose example, config example
+- `web/` — React + Vite web client, API types generated from the server's OpenAPI; the Cast receiver in `web/receiver`
+- `android/` — Android app for phones, tablets, Google TV and Android TV ([android/README.md](android/README.md))
+- `apple/` — iPhone, iPad and Apple TV apps ([apple/README.md](apple/README.md))
+- `macos/` — the Mac menu bar app that runs the server
+- `windows/` — the Windows app and installer that run the server ([windows/README.md](windows/README.md))
+- `api/` — the OpenAPI spec the apps generate their clients from
+- `deploy/` — Dockerfile, compose examples, config example, release and fixture scripts
 - `Makefile` — `make help` lists every target
 
 ## Prerequisites
@@ -84,6 +98,10 @@ unsupported profiles can be left out while the others continue. Choose **Check
 what will change**, then **Import once** or **Import and keep up to date** (every
 15 minutes). Connecting alone imports nothing. Current WatchMyMedia progress,
 rewatches and explicit unwatched choices always stay; nothing is written to Plex.
+Each scheduled update writes only the items that changed; imports you start check
+every item. An item Plex re-identifies (a refreshed match, a new ID) is skipped and
+counted as unavailable while the rest keeps updating; when most items change at
+once, as after rebuilding the Plex server, updates pause until an admin checks it.
 
 Saved import results explain what was applied, kept or skipped. Pause, cancellation
 and retry keep completed changes; **Undo imported watch marks** removes only marks
@@ -100,7 +118,7 @@ checks. Backups exclude Plex grants, so a restored server must reconnect.
 
 **Docker (recommended on Linux/NAS).** Copy `deploy/.env.example` to `deploy/.env` and
 set your library folders and `PUID`/`PGID` there, then `make docker-up` (or use the
-published `ghcr.io/taimoorq/watchmymedia` image). Git ignores `deploy/.env`, so pulling
+published `ghcr.io/watchmymedia/watchmymedia` image). Git ignores `deploy/.env`, so pulling
 updates never conflicts with your settings. The container reads `/movies` and `/tv`
 (on its first start each becomes a library if it holds anything; after that, libraries are
 added and removed in setup and Settings › Libraries, and the folders aren't added again),
@@ -659,7 +677,7 @@ for it if sign-ins start failing for all users. If you changed Docker Desktop's 
 
 ## Backups
 
-A backup is a `.tar.gz` of the database (libraries, matches, users, watch history) and
+A backup is a `.tar.gz` of the database (libraries, matches, accounts, watch history) and
 `config.yaml`; artwork and subtitle caches are rebuilt on demand, and seek thumbnails are
 made again. Backups run nightly
 into `<data_dir>/backups` (keep count in Settings), can be made on demand from Settings
@@ -672,6 +690,11 @@ watchmymedia backup /path/to/file.tar.gz
 
 To restore: stop the server, unpack the archive into the data directory (replacing
 `watchmymedia.db`), and start it again.
+
+A backup keeps no one signed in: it leaves out every browser and device sign-in and the
+key that signs media and cast links, so whoever holds an archive cannot use them. After a
+restore the server makes a new key, and everyone signs in again with their password on
+each browser, app and TV; casts and downloads in progress stop until they do.
 
 A connected Plex server's sign-in (`<data_dir>/plex-credentials`) is never in a
 backup, so a restored server has to connect to Plex again.
@@ -791,10 +814,15 @@ Mac app.
   owner out from another. Unknown names are throttled like real ones, and a wrong name
   and a wrong password get the same answer in the same time. The address is the real
   client's, so set `network.trusted_proxies` when a proxy sits in front. Without it,
-  everyone shares the proxy's address and its limits.
-  At most two password operations run at once, and only one sign-in for a given
-  account/address pair. Excess attempts receive 429 with `Retry-After` rather
-  than accumulating password-hashing work in memory.
+  the limits per address count the client the proxy's headers name, which nobody
+  vouches for: one visitor cannot lock out the others, but one that forges the header
+  escapes the address limits, leaving only the account's own. (A proxy that names no
+  client gets no address limit for sign-ins, and its visitors share one allowance of
+  TV pairings.) Signed-in devices then show no address, as watch history does.
+  At most two password checks run at once, and only one sign-in for a given
+  account/address pair; the bot check runs before a sign-in takes one. Excess attempts
+  receive 429 with `Retry-After` rather than accumulating password-hashing work in
+  memory.
 - **Passwords** are stored with argon2id. New passwords need at least 8 characters;
   older, shorter ones still work.
 - **Cookies** are HttpOnly and SameSite=Lax. They are also Secure with

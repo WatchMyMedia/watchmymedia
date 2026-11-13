@@ -6,6 +6,6 @@
 -->
 <CommunityApplications>
   <Profile>Templates for WatchMyMedia, a self-hosted media server for your movies and TV shows, with live TV and recording from an HDHomeRun tuner. The server and the web app run from one container; apps for Android, Android TV, iPhone, iPad and Apple TV, and casting to Chromecast and Google TV, come from the stores.</Profile>
-  <Icon>https://raw.githubusercontent.com/taimoorq/unraid-templates/main/images/watchmymedia.png</Icon>
+  <Icon>https://raw.githubusercontent.com/WatchMyMedia/unraid-templates/main/images/watchmymedia.png</Icon>
   <WebPage>https://watchmy.media</WebPage>
 </CommunityApplications>

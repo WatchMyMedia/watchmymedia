@@ -48,8 +48,9 @@ func WithUser(ctx context.Context, u User) context.Context {
 }
 
 // Middleware authenticates every request except those exempt returns true
-// for. Media paths (mediaPath true) may instead carry a media token in the
-// access_token query parameter; session tokens are never read from URLs.
+// for. GET and HEAD requests to media paths (mediaPath true) may instead
+// carry a media token in the access_token query parameter; session tokens
+// are never read from URLs.
 // A cast token works on the routes castRoute allows (nil allows none), as a
 // bearer token or, on media paths, in access_token. An offline token works
 // only on the routes of its own download record: offlineRoute names the
@@ -113,8 +114,12 @@ func (s *Service) Middleware(exempt, mediaPath func(path string) bool, castRoute
 						user, err = s.AuthenticateCast(ctx, mt)
 						ctx = context.WithValue(ctx, castKey{}, mt)
 					}
-				} else {
+				} else if r.Method == http.MethodGet || r.Method == http.MethodHead {
 					user, err = s.AuthenticateMedia(ctx, mt)
+				} else {
+					// A media token fetches media; it never starts,
+					// changes or stops a play.
+					err = ErrUnauthenticated
 				}
 				ctx = context.WithValue(ctx, mediaKey{}, mt)
 			} else {

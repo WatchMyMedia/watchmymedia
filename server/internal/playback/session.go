@@ -374,12 +374,23 @@ type Manager struct {
 	resourceMu              sync.Mutex
 	liveRoot                string
 	stopLive                func(string)
+	// lastResources is the latest measurement, which LastResources serves
+	// without walking the disk; the watchdog (checkResources) renews it.
+	lastResources atomic.Pointer[resourceReading]
+	// watchMu serializes checkResources; stoppedLive is the Live TV outputs
+	// it has stopped whose folders are still there.
+	watchMu     sync.Mutex
+	stoppedLive map[string]struct{}
 
 	mu       sync.Mutex
 	sessions map[string]*Session
 	// retiring workers no longer authorize a viewer, but still own capacity
 	// and output until shared flights serving other viewers have finished.
 	retiring map[string]*Session
+	// removing counts, by folder name, the stopped sessions whose folder is
+	// to be deleted once their ffmpeg has exited: the storage watchdog
+	// counts those bytes as on their way out.
+	removing map[string]int
 }
 
 // NewManager makes a manager whose sessions write under dir (transcode.dir),
@@ -461,13 +472,16 @@ func (m *Manager) tooMany() error {
 // reapEvery is how often Run looks for idle sessions.
 const reapEvery = 10 * time.Second
 
+// resourceEvery is how often Run measures temporary storage (checkResources).
+const resourceEvery = 250 * time.Millisecond
+
 // Run reaps idle sessions until ctx is done, then stops them all and
 // returns once their ffmpeg has exited (or stopWait has passed). No session
 // starts after that.
 func (m *Manager) Run(ctx context.Context) {
 	t := time.NewTicker(reapEvery)
 	defer t.Stop()
-	resources := time.NewTicker(250 * time.Millisecond)
+	resources := time.NewTicker(resourceEvery)
 	defer resources.Stop()
 	for {
 		select {
@@ -631,12 +645,22 @@ func (m *Manager) stopOneLocked(id string) {
 		s.cancel()
 	}
 	producerDone := s.producerDone
+	name := filepath.Base(s.Dir)
+	if m.removing == nil {
+		m.removing = map[string]int{}
+	}
+	m.removing[name]++
 	go func() {
 		<-s.done
 		if producerDone != nil {
 			<-producerDone
 		}
 		m.removeDir(s.Dir)
+		m.mu.Lock()
+		if m.removing[name]--; m.removing[name] <= 0 {
+			delete(m.removing, name)
+		}
+		m.mu.Unlock()
 	}()
 }
 

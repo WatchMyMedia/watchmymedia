@@ -18,7 +18,8 @@ cd android
 
 CI also runs `coverageReport` (no threshold), `assembleDebug` and an unsigned
 `:app:assembleRelease`, so R8 runs on every pull request, and validates the
-Gradle wrapper. A screen change is also run on an emulator, on
+Gradle wrapper. It leaves out `lintVitalRelease`, since `lintDebug` has run the
+same checks; local and tagged release builds keep it. A screen change is also run on an emulator, on
 the fakes and against a fixture or throwaway server, and the PR says which.
 Lint warnings that were already on `main` are not yours to fix in passing.
 
@@ -170,6 +171,6 @@ bundles for Play are built locally, and only when the user asks:
   --print-certs` (signer).
 
 Uploading to Play Console is the user's, or done only on their explicit ask.
-Store screenshots are generated locally in `play-listing/` (absent in a
-fresh checkout), from `-Pfakes=true` builds on a dedicated AVD so the titles
-and artwork are fictional.
+Store screenshots are made from `-Pfakes=true` builds on a dedicated AVD, so
+the titles and artwork are fictional. They and the listing text are kept by
+the maintainers, outside this repository.

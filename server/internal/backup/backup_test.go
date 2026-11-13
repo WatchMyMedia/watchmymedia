@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"os"
@@ -14,8 +16,10 @@ import (
 	"testing"
 	"time"
 
+	"watchmymedia/server/internal/auth"
 	"watchmymedia/server/internal/db"
 	"watchmymedia/server/internal/db/dbtest"
+	"watchmymedia/server/internal/settings"
 )
 
 func TestWriteAndSave(t *testing.T) {
@@ -237,5 +241,98 @@ func TestArchiveHoldsNoPlexGrant(t *testing.T) {
 	live, _ := q.GetPlexConnectionByMachine(ctx, "fictional-machine")
 	if live.CredentialRef == nil || *live.CredentialRef != ref || live.SyncEnabled != 1 || live.Problem != "" {
 		t.Fatalf("the live connection changed: %+v", live)
+	}
+}
+
+// An archive keeps no signed-in session and no media token key: with both,
+// its holder could sign media and cast tokens for every live session. The
+// accounts and their password hashes stay, so people can sign in again
+// after a restore, and the live database keeps its sessions and key.
+func TestArchiveHoldsNoSessionsOrMediaKey(t *testing.T) {
+	dir := t.TempDir()
+	conn, q := dbtest.Open(t)
+	ctx := t.Context()
+	a := auth.New(q, time.Hour, false)
+	if _, err := a.CreateUser(ctx, "Robin", "fictional-pass", true); err != nil {
+		t.Fatal(err)
+	}
+	var tokens []string
+	for _, c := range []auth.Client{{UserAgent: "browser"}, {Kind: auth.KindDevice, DeviceKey: "fictional-device", Name: "Living room"}} {
+		_, grant, err := a.Login(ctx, auth.Credentials{Name: "Robin", Password: "fictional-pass"}, c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tokens = append(tokens, grant.Token)
+	}
+	key := auth.NewMediaKey()
+	store := settings.New(q)
+	if err := store.Set(ctx, settings.KeyMediaTokenKey, key); err != nil {
+		t.Fatal(err)
+	}
+
+	path, err := Save(ctx, conn, dir, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := tar.NewReader(gz)
+	restored := filepath.Join(t.TempDir(), "restore.db")
+	for {
+		h, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(tr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Not even in the file's free pages.
+		secrets := []string{key}
+		for _, tok := range tokens {
+			sum := sha256.Sum256([]byte(tok))
+			secrets = append(secrets, hex.EncodeToString(sum[:]))
+		}
+		for _, s := range secrets {
+			if bytes.Contains(data, []byte(s)) {
+				t.Errorf("archive member %s holds %s…", h.Name, s[:8])
+			}
+		}
+		if h.Name == "watchmymedia.db" {
+			if err := os.WriteFile(restored, data, 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	rconn, err := db.Open(restored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rconn.Close() }()
+	var sessions, keys, users int
+	if err := rconn.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM sessions), (SELECT count(*) FROM settings WHERE key = ?),
+		(SELECT count(*) FROM users WHERE name = 'Robin' AND password_hash <> '')`, settings.KeyMediaTokenKey).Scan(&sessions, &keys, &users); err != nil {
+		t.Fatal(err)
+	}
+	if sessions != 0 || keys != 0 || users != 1 {
+		t.Errorf("archive has %d sessions, %d media keys, %d of the account; want 0, 0, 1", sessions, keys, users)
+	}
+	for _, tok := range tokens {
+		if _, err := a.Authenticate(ctx, tok); err != nil {
+			t.Errorf("the live session was signed out: %v", err)
+		}
+	}
+	if live, _ := store.Get(ctx, settings.KeyMediaTokenKey, ""); live != key {
+		t.Error("the live media token key changed")
 	}
 }

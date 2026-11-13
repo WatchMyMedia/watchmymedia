@@ -93,21 +93,24 @@ GROUP BY list_id, media_type;
 -- order: a movie in two libraries comes once per library. The entries
 -- come first, so the planner looks movies up by TMDB ID rather than
 -- reading every movie; the cards come from ListMovieCardsByIDs for the
--- few a row draws.
+-- few a row draws. The + keeps media_type from being an index term: with
+-- two or more lists in the slice and no statistics, the planner otherwise
+-- reads every list's movie entries through media_list_entries_tmdb_idx
+-- rather than these lists' through the primary key.
 SELECT e.list_id, e.rank, m.id, m.library_id
 FROM media_list_entries e
 CROSS JOIN movies m ON m.tmdb_id = e.tmdb_id
-WHERE e.list_id IN (sqlc.slice(ids)) AND e.media_type = 'movie'
+WHERE e.list_id IN (sqlc.slice(ids)) AND +e.media_type = 'movie'
     AND EXISTS (SELECT 1 FROM media_files f WHERE f.movie_id = m.id AND f.status = 'present')
 ORDER BY e.list_id, e.rank, m.library_id, m.id;
 
 -- name: ListMediaListShowRanks :many
 -- ListMediaListMovieRanks for shows: a show counts once it has an episode
--- with a present file.
+-- with a present file, and the same + on media_type.
 SELECT e.list_id, e.rank, s.id, s.library_id
 FROM media_list_entries e
 CROSS JOIN shows s ON s.tmdb_id = e.tmdb_id
-WHERE e.list_id IN (sqlc.slice(ids)) AND e.media_type = 'tv'
+WHERE e.list_id IN (sqlc.slice(ids)) AND +e.media_type = 'tv'
     AND EXISTS (
         SELECT 1 FROM episodes ep
         CROSS JOIN episode_files ef ON ef.episode_id = ep.id

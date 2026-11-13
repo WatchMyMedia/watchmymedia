@@ -88,6 +88,13 @@ func (s *Service) importHistory(ctx context.Context, r db.PlexSyncRun, c db.Plex
 	// A bounded number of pages per run protects the server. Checkpoints advance
 	// only with committed events; subsequent runs continue the same fixed window.
 	remainingPages := s.historyPages
+	// Events read again whose item Plex has changed since they were imported.
+	changedEvents, changedTotal := 0, 0
+	defer func() {
+		if changedTotal > 0 {
+			s.log.Warn("plex: history events whose item changed in Plex since they were imported; skipped", "connection", c.ID, "run", r.ID, "events", changedTotal)
+		}
+	}()
 	for _, group := range historyWorkOrder(links, libs, c.HistoryCursorUser, c.HistoryCursorSection) {
 		l := group.link
 		user, err := s.q.GetUser(ctx, l.UserID)
@@ -212,6 +219,7 @@ func (s *Service) importHistory(ctx context.Context, r db.PlexSyncRun, c db.Plex
 						return err
 					}
 					imported, skipped := int64(0), int64(0)
+					changedEvents = 0
 					for i, e := range page.Events {
 						if u.RecordHistory != 1 || !e.ViewedAt.After(cutoff) {
 							skipped++
@@ -223,7 +231,11 @@ func (s *Service) importHistory(ctx context.Context, r db.PlexSyncRun, c db.Plex
 							return err
 						}
 						if err == nil && old != fp {
-							return fail(Conflict, "source_identity_changed")
+							// Plex refreshed the item since this event was imported
+							// (another GUID, a new ID): keep the imported event.
+							skipped++
+							changedEvents++
+							continue
 						}
 						f := targets[i]
 						var itemID *int64
@@ -264,6 +276,7 @@ func (s *Service) importHistory(ctx context.Context, r db.PlexSyncRun, c db.Plex
 					return "partial", err
 				}
 				s.publishHistory(l.UserID)
+				changedTotal += changedEvents
 				cp = next
 				if page.Complete {
 					break

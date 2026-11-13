@@ -365,33 +365,34 @@ func (s *posterService) reset(ctx context.Context, kind string, in *PosterInput)
 }
 
 func registerPosters(h huma.API, deps Deps) {
+	// adminOp refuses members before an upload's body is read.
 	s := &posterService{deps: deps}
 	for _, k := range []struct{ kind, name, path, a string }{
 		{"movie", "Movie", "/movies/{id}", "a movie's"},
 		{"show", "Show", "/shows/{id}", "a show's"},
 		{"season", "Season", "/seasons/{id}", "a season's"},
 	} {
-		huma.Register(h, huma.Operation{
+		huma.Register(h, adminOp(h, huma.Operation{
 			OperationID: "get" + k.name + "Posters",
 			Method:      http.MethodGet,
 			Path:        Prefix + k.path + "/posters",
 			Summary:     "The posters an admin can choose for " + strings.TrimSuffix(k.a, "'s"),
 			Description: "The poster shown now, the match's own, and TMDB's other posters. Admins only.",
 			Tags:        []string{"posters"},
-		}, func(ctx context.Context, in *PosterInput) (*PosterOptionsOutput, error) {
+		}), func(ctx context.Context, in *PosterInput) (*PosterOptionsOutput, error) {
 			return s.options(ctx, k.kind, in.ID)
 		})
-		huma.Register(h, huma.Operation{
+		huma.Register(h, adminOp(h, huma.Operation{
 			OperationID: "set" + k.name + "Poster",
 			Method:      http.MethodPut,
 			Path:        Prefix + k.path + "/poster",
 			Summary:     "Choose " + k.a + " poster: one of TMDB's, or a picture at a link",
 			Description: "A link is fetched once and the picture kept on the server; links into the server's own network are refused. The choice stays through refreshes from TMDB. Admins only.",
 			Tags:        []string{"posters"},
-		}, func(ctx context.Context, in *SetPosterInput) (*PosterOutput, error) {
+		}), func(ctx context.Context, in *SetPosterInput) (*PosterOutput, error) {
 			return s.set(ctx, k.kind, in)
 		})
-		huma.Register(h, huma.Operation{
+		huma.Register(h, adminOp(h, huma.Operation{
 			OperationID:  "upload" + k.name + "Poster",
 			Method:       http.MethodPost,
 			Path:         Prefix + k.path + "/poster/upload",
@@ -399,16 +400,16 @@ func registerPosters(h huma.API, deps Deps) {
 			Description:  "The request body is the picture itself. It is kept as a JPEG of at most 2000 by 3000. Admins only.",
 			Tags:         []string{"posters"},
 			MaxBodyBytes: artwork.MaxBytes,
-		}, func(ctx context.Context, in *UploadPosterInput) (*PosterOutput, error) {
+		}), func(ctx context.Context, in *UploadPosterInput) (*PosterOutput, error) {
 			return s.upload(ctx, k.kind, in)
 		})
-		huma.Register(h, huma.Operation{
+		huma.Register(h, adminOp(h, huma.Operation{
 			OperationID: "reset" + k.name + "Poster",
 			Method:      http.MethodDelete,
 			Path:        Prefix + k.path + "/poster",
 			Summary:     "Go back to the match's own poster for " + strings.TrimSuffix(k.a, "'s"),
 			Tags:        []string{"posters"},
-		}, func(ctx context.Context, in *PosterInput) (*PosterOutput, error) {
+		}), func(ctx context.Context, in *PosterInput) (*PosterOutput, error) {
 			return s.reset(ctx, k.kind, in)
 		})
 	}

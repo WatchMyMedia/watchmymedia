@@ -1,9 +1,11 @@
 package livetv
 
 import (
+	"context"
 	"errors"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"watchmymedia/server/internal/db/dbtest"
 	"watchmymedia/server/internal/livetv/hdhomerun"
@@ -126,5 +128,43 @@ func TestChannelOrderAndPrivatePolicy(t *testing.T) {
 	}
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestLineupHookRunsWithoutTheLock: the listings' hook may wait on a
+// recording start, which takes the tuner lock, so Add and Refresh call it
+// only after releasing that lock.
+func TestLineupHookRunsWithoutTheLock(t *testing.T) {
+	t.Parallel()
+	_, q := dbtest.Open(t)
+	fake := hdhrtest.New(nil)
+	server := httptest.NewServer(fake)
+	defer server.Close()
+	svc := New(q, settings.New(q), func(address string) (*hdhomerun.Client, error) {
+		return hdhomerun.New(address, hdhrtest.Transport(server.URL))
+	})
+	calls := 0
+	svc.OnLineup(func(context.Context) {
+		calls++
+		svc.ProtectRecording("dvr:test")
+	})
+	run := func(what string, fn func() error) {
+		t.Helper()
+		done := make(chan error, 1)
+		go func() { done <- fn() }()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatalf("%s: %v", what, err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatalf("%s called the lineup hook holding the tuner lock", what)
+		}
+	}
+	var source Source
+	run("Add", func() (err error) { source, err = svc.Add(t.Context(), "tuner.test", ""); return err })
+	run("Refresh", func() error { _, err := svc.Refresh(t.Context(), source.ID); return err })
+	if calls != 2 {
+		t.Fatalf("lineup hook ran %d times, want 2", calls)
 	}
 }

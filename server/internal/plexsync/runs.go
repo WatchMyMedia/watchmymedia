@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -551,7 +552,7 @@ func (s *Service) execute(ctx context.Context, r db.PlexSyncRun) (string, bool, 
 		return history, history == "partial", err
 	}
 	fresh := map[string]scopeCandidate{}
-	results, _, err := s.runPreview(ctx, c, users, libs, func(v scopeCandidate) error {
+	results, _, err := s.runPreview(ctx, c, users, libs, false, func(v scopeCandidate) error {
 		if len(fresh) >= 50000 {
 			return fail(Invalid, "scope_limit")
 		}
@@ -573,32 +574,6 @@ func (s *Service) execute(ctx context.Context, r db.PlexSyncRun) (string, bool, 
 	if partial {
 		return "not_read", true, fail(Unavailable, "incomplete_snapshot")
 	}
-	scope, err := s.q.ListPlexScope(ctx, r.ID)
-	if err != nil {
-		return "not_read", false, err
-	}
-	if r.Scheduled == 1 && len(scope) == 0 {
-		err = s.q.Transaction(ctx, func(q *db.Queries) error {
-			if err := s.validRun(ctx, q, r); err != nil {
-				return err
-			}
-			for _, v := range fresh {
-				if err := insertScope(ctx, q, r.ID, v); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			return "not_read", false, err
-		}
-		scope, err = s.q.ListPlexScope(ctx, r.ID)
-		if err != nil {
-			return "not_read", false, err
-		}
-	}
-	// A bounded transaction emits one private watched event per item kind,
-	// rather than disconnecting every client stream on a household-sized import.
 	exclusions, err := s.q.ListPlexExclusions(ctx, c.ID)
 	if err != nil {
 		return "not_read", false, err
@@ -607,12 +582,48 @@ func (s *Service) execute(ctx context.Context, r db.PlexSyncRun) (string, bool, 
 	for _, v := range exclusions {
 		excluded[exclusionKey(v.UserID, v.ItemType, v.ItemID)] = true
 	}
+	scope, err := s.q.ListPlexScope(ctx, r.ID)
+	if err != nil {
+		return "not_read", false, err
+	}
+	var changed map[string]bool
+	if r.Scheduled == 1 && len(scope) == 0 {
+		// A scheduled sync writes only what changed since the items were
+		// last written; the rest is counted as a full pass would count it.
+		write, err := s.planScheduled(ctx, r, fresh, excluded)
+		if err != nil {
+			return "not_read", false, err
+		}
+		if len(write) == 0 {
+			history, err := s.importHistory(ctx, r, c, users, libs)
+			return history, history == "partial", err
+		}
+		scope, err = s.q.ListPlexScope(ctx, r.ID)
+		if err != nil {
+			return "not_read", false, err
+		}
+	} else {
+		var items []sourceItem
+		for _, v := range scope {
+			f, ok := fresh[candidateKey(v.UserID, v.SectionID, v.RemoteKey)]
+			if v.Outcome == "" && v.SourceKnown == 1 && ok {
+				items = append(items, sourceItem{user: v.UserID, section: v.SectionID, key: v.RemoteKey, fresh: f.Fingerprint, approved: v.Fingerprint})
+			}
+		}
+		state, err := s.sourceChanges(ctx, r, items)
+		if err != nil {
+			return "not_read", false, err
+		}
+		changed = state.changed
+	}
+	// A bounded transaction emits one private watched event per item kind,
+	// rather than disconnecting every client stream on a household-sized import.
 	pending := make([]db.PlexRunScope, 0, 100)
 	flush := func() error {
 		if len(pending) == 0 {
 			return nil
 		}
-		err := s.applyBatch(ctx, r, pending, fresh, excluded)
+		err := s.applyBatch(ctx, r, pending, fresh, excluded, changed)
 		pending = pending[:0]
 		return err
 	}
@@ -643,6 +654,182 @@ func (s *Service) execute(ctx context.Context, r db.PlexSyncRun) (string, bool, 
 	}
 	history, err := s.importHistory(ctx, r, c, users, libs)
 	return history, history == "partial", err
+}
+
+// rebuiltSourceItems is how many items must have changed, and at least half
+// of those compared, before a run takes the source for a rebuilt Plex server
+// and stops rather than skipping them one by one.
+const rebuiltSourceItems = 10
+
+// sourceItem is one watched Plex item to compare with the identity its rating
+// key had when it was last written: fresh is what Plex says now, approved what
+// the run's preview saw (the same as fresh in a scheduled sync).
+type sourceItem struct {
+	user, section        int64
+	key, fresh, approved string
+}
+
+type sourceState struct {
+	// changed: the rating key now names another item, or not the one the
+	// preview approved. The item is skipped and counted unavailable.
+	changed map[string]bool
+	// unseen: no identity is recorded yet; writing the item records one.
+	unseen map[string]bool
+}
+
+// sourceChanges compares items with the identities recorded for their rating
+// keys, reading each person's section once. A Plex metadata refresh (a new
+// IMDb ID, another agent's GUID) changes one item: it is skipped and logged,
+// and the connection keeps syncing. When most items changed, the Plex server
+// was most likely rebuilt, and the run stops as source_identity_changed, which
+// pauses the connection until an admin checks it. Either way nothing is
+// written for a changed item.
+func (s *Service) sourceChanges(ctx context.Context, r db.PlexSyncRun, items []sourceItem) (sourceState, error) {
+	out := sourceState{changed: map[string]bool{}, unseen: map[string]bool{}}
+	known := map[[2]int64]map[string]string{}
+	compared := 0
+	for _, v := range items {
+		k := candidateKey(v.user, v.section, v.key)
+		stored, ok := known[[2]int64{v.user, v.section}]
+		if !ok {
+			rows, err := s.q.ListPlexSourceFingerprints(ctx, db.ListPlexSourceFingerprintsParams{MachineIdentifier: r.MachineIdentifier, SourceEpoch: r.SourceEpoch, UserID: v.user, SectionID: v.section})
+			if err != nil {
+				return out, err
+			}
+			stored = make(map[string]string, len(rows))
+			for _, row := range rows {
+				stored[row.RemoteKey] = row.Fingerprint
+			}
+			known[[2]int64{v.user, v.section}] = stored
+		}
+		old, seen := stored[v.key]
+		switch {
+		case v.approved != v.fresh:
+			compared++
+			out.changed[k] = true
+		case !seen:
+			out.unseen[k] = true
+		default:
+			compared++
+			if old != v.fresh {
+				out.changed[k] = true
+			}
+		}
+	}
+	n := len(out.changed)
+	if n >= rebuiltSourceItems && 2*n >= compared {
+		return out, fail(Conflict, "source_identity_changed")
+	}
+	if n > 0 {
+		s.log.Warn("plex: items changed in Plex since they were last read; skipped", "connection", *r.ConnectionID, "run", r.ID, "items", n, "compared", compared)
+	}
+	return out, nil
+}
+
+// planScheduled decides, from what is recorded here, which of a scheduled
+// sync's items need writing: one Plex now says is watched and an import would
+// mark, and one whose identity is not recorded yet. Every other item would
+// write nothing but its count, so it is only counted. A local change (a
+// mark, an exclusion, a newly added film) shows up here even though nothing
+// changed in Plex, which is why this compares states rather than Plex's
+// lastViewedAt. The items to write and the counts commit together: a retry
+// after a crash finds the scope and goes on from it, or, with nothing to
+// write, finds the watched part complete.
+func (s *Service) planScheduled(ctx context.Context, r db.PlexSyncRun, fresh map[string]scopeCandidate, excluded map[string]bool) ([]scopeCandidate, error) {
+	keys := make([]string, 0, len(fresh))
+	for k := range fresh {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	var items []sourceItem
+	for _, k := range keys {
+		v := fresh[k]
+		if v.SourceKnown {
+			n, _ := strconv.ParseInt(v.SectionID, 10, 64)
+			items = append(items, sourceItem{user: v.UserID, section: n, key: v.RemoteKey, fresh: v.Fingerprint, approved: v.Fingerprint})
+		}
+	}
+	state, err := s.sourceChanges(ctx, r, items)
+	if err != nil {
+		return nil, err
+	}
+	counts := db.AddPlexRunCountsParams{ID: r.ID, Fence: r.Fence}
+	var write []scopeCandidate
+	evaluate := map[int64][]scopeCandidate{}
+	for _, k := range keys {
+		v := fresh[k]
+		switch {
+		case state.changed[k]:
+			counts.Unavailable++
+		case state.unseen[k]:
+			write = append(write, v)
+		case v.Found.category == "matched" && excluded[exclusionKey(v.UserID, v.Found.example.ItemType, v.Found.target.ItemID)]:
+			counts.LocalKept++
+		case v.Found.category == "matched":
+			evaluate[v.UserID] = append(evaluate[v.UserID], v)
+		case v.Found.category == "unmatched":
+			counts.Unmatched++
+		case v.Found.category == "ambiguous":
+			counts.Ambiguous++
+		default:
+			write = append(write, v)
+		}
+	}
+	people := make([]int64, 0, len(evaluate))
+	for user := range evaluate {
+		people = append(people, user)
+	}
+	slices.Sort(people)
+	for _, user := range people {
+		candidates := evaluate[user]
+		targets := make([]watchstate.Target, len(candidates))
+		for i, v := range candidates {
+			targets[i] = v.Found.target
+		}
+		outcomes, err := s.watch.Evaluate(ctx, user, targets)
+		if errors.Is(err, watchstate.ErrNoUser) {
+			// Leave a removed person to the checks the writes make.
+			write = append(write, candidates...)
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		for i, o := range outcomes {
+			switch o {
+			case watchstate.AlreadyWatched:
+				counts.AlreadyWatched++
+			case watchstate.LocalKept:
+				counts.LocalKept++
+			case watchstate.Unavailable:
+				counts.Unavailable++
+			default:
+				write = append(write, candidates[i])
+			}
+		}
+	}
+	err = s.q.Transaction(ctx, func(q *db.Queries) error {
+		if err := s.validRun(ctx, q, r); err != nil {
+			return err
+		}
+		for _, v := range write {
+			if err := insertScope(ctx, q, r.ID, v); err != nil {
+				return err
+			}
+		}
+		n, err := q.AddPlexRunCounts(ctx, counts)
+		if err != nil {
+			return err
+		}
+		if n != 1 {
+			return fail(Conflict, "stale_generation")
+		}
+		if len(write) == 0 {
+			_, err = q.CompletePlexWatchScope(ctx, db.CompletePlexWatchScopeParams{ID: r.ID, Fence: r.Fence})
+		}
+		return err
+	})
+	return write, err
 }
 func (s *Service) verifyFingerprint(ctx context.Context, q *db.Queries, r db.PlexSyncRun, v db.PlexRunScope) error {
 	if v.SourceKnown != 1 {
@@ -735,24 +922,26 @@ func scheduleActor(c db.PlexConnection) *int64 {
 func exclusionKey(user int64, kind string, id int64) string {
 	return strconv.FormatInt(user, 10) + ":" + kind + ":" + strconv.FormatInt(id, 10)
 }
-func (s *Service) applyBatch(ctx context.Context, r db.PlexSyncRun, scope []db.PlexRunScope, fresh map[string]scopeCandidate, excluded map[string]bool) error {
+
+// applyBatch writes one person's batch of items. changed holds the items whose
+// identity changed in Plex (sourceChanges): they are counted unavailable and
+// written nowhere, and their recorded identity stays as it was.
+func (s *Service) applyBatch(ctx context.Context, r db.PlexSyncRun, scope []db.PlexRunScope, fresh map[string]scopeCandidate, excluded, changed map[string]bool) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	outcomes := make([]string, len(scope))
+	verify := make([]bool, len(scope))
 	targetIndexes := map[int]int{}
 	targets := []watchstate.Target{}
 	for i, v := range scope {
-		f, watched := fresh[candidateKey(v.UserID, v.SectionID, v.RemoteKey)]
+		key := candidateKey(v.UserID, v.SectionID, v.RemoteKey)
+		f, watched := fresh[key]
 		outcome := v.Category
 		approved := watchstate.Target{ItemType: v.ItemType, ItemID: v.ItemID, Identity: watchstate.Identity{LibraryID: v.LibraryID, TMDBID: v.TmdbID, Season: v.Season, Episode: v.Episode}}
+		verify[i] = watched && !changed[key] && f.Fingerprint == v.Fingerprint
 		switch {
-		case !watched:
-			outcome = "unavailable"
-		case f.Fingerprint != v.Fingerprint:
-			if v.SourceKnown == 1 {
-				return fail(Conflict, "source_identity_changed")
-			}
+		case !watched, changed[key], f.Fingerprint != v.Fingerprint:
 			outcome = "unavailable"
 		case outcome == "matched" && (f.Found.category != "matched" || f.Found.target != approved):
 			outcome = "unavailable"
@@ -769,11 +958,11 @@ func (s *Service) applyBatch(ctx context.Context, r db.PlexSyncRun, scope []db.P
 		s.beforeImportCommit()
 	}
 	_, err := s.watch.ImportChecked(ctx, scope[0].UserID, r.ID, targets, func(q *db.Queries) error {
-		for _, v := range scope {
+		for i, v := range scope {
 			if err := s.validScope(ctx, q, r, v); err != nil {
 				return err
 			}
-			if _, watched := fresh[candidateKey(v.UserID, v.SectionID, v.RemoteKey)]; watched {
+			if verify[i] {
 				if err := s.verifyFingerprint(ctx, q, r, v); err != nil {
 					return err
 				}
