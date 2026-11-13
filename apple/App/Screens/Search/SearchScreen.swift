@@ -17,7 +17,9 @@ struct SearchScreen: View {
     @Environment(LiveExtrasStore.self) private var extras
 
     var body: some View {
-        SearchView(model: SearchModel(library: services.library, navigator: navigator, requests: services.requests),
+        // Recent searches are kept between launches for this account on this server.
+        let recents = services.servers.current.flatMap { current in services.auth.user.map { RecentSearches(server: current.server.id, user: $0.id) } }
+        SearchView(model: SearchModel(library: services.library, navigator: navigator, requests: services.requests, recents: recents),
                    live: LiveSearchModel(repository: services.liveTV, extras: extras))
     }
 }
