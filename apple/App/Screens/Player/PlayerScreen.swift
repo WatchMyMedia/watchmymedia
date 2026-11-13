@@ -55,6 +55,7 @@ private struct PlayerContent: View {
     let episodes: PlayerEpisodesModel
     @State private var showsEpisodes = false
     @Environment(AppServices.self) private var services
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontal
     @Environment(\.verticalSizeClass) private var vertical
 
@@ -110,6 +111,10 @@ private struct PlayerContent: View {
         .sensoryFeedback(.impact(weight: .light), trigger: model.ripple) { _, burst in burst != nil }
     }
 
+    /// Slides in from `edge`, or only fades with Reduce Motion.
+    private func slide(_ edge: Edge) -> AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .move(edge: edge))
+    }
 
     private func video(in frame: PlayerFrame, insets: PlayerInsets, portrait: Bool) -> some View {
         let state = model.state
@@ -175,7 +180,7 @@ private struct PlayerContent: View {
                         .padding(.trailing, insets.trailing)
                         .padding(.bottom, max(insets.bottom - 2, 16))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        .transition(slide(.trailing))
                     }
 
                     if let note = state.qualityNote, model.overlay == nil {
@@ -195,7 +200,7 @@ private struct PlayerContent: View {
         switch model.overlay {
         case .picker(let tab):
             PlayerPickerSheet(model: model, tab: tab, insets: insets, sidePanel: metrics.sidePanelPicker)
-                .transition(.opacity.combined(with: .move(edge: metrics.sidePanelPicker ? .trailing : .bottom)))
+                .transition(slide(metrics.sidePanelPicker ? .trailing : .bottom))
         case .stillWatching:
             StillWatchingDialog(state: state) { model.answerStillWatching(keepWatching: $0) }
                 .transition(.opacity)

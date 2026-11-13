@@ -662,6 +662,8 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
 - **Tapping the selected tab** goes back to its first page
   (`UITests/TabReselectTests.swift`).
 - **Haptics** on taking the scrubber's thumb and on double-tap seeks.
+- **Reduce Motion** turns the player's slides into fades and stills its
+  spinner.
 
 ## Release builds, privacy and measuring
 
