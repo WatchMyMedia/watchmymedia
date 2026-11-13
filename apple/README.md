@@ -594,6 +594,16 @@ Picture in Picture or real-broadcast ad detection.
 
 ## Release builds, privacy and measuring
 
+**Privacy manifests**: `App/Resources/PrivacyInfo.xcprivacy` and
+`TV/Resources/PrivacyInfo.xcprivacy`. No tracking and no collected data; the
+required-reason APIs with Apple's reasons: UserDefaults `CA92.1`
+(`DeviceStorage`), system boot time `35F9.1` (`ProcessInfo.systemUptime` in the
+players and `PlayerChromeModel`), and on iPhone and iPad disk space `85F4.1` and
+`E174.1` (Downloads shows the free space and refuses a download that won't
+fit). The Apple TV app has no downloads, so it doesn't declare disk space. When
+code starts calling another API on [Apple's list](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api),
+add it to the manifest of each app that links that code.
+
 **Signposts** (PLAN-APPLE-REVIEW.md §4.3.1): `PerformanceSignposts.shared`
 (WMMModel) marks the intervals Instruments and `XCTOSSignpostMetric` measure,
 under subsystem `media.watchmy.client` and category `Performance`: Launch to

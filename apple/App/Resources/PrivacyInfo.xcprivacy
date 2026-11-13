@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The iPhone and iPad app's privacy manifest (PLAN-APPLE-REVIEW.md §3.4.1).
+  No tracking and no data collected: the app talks only to the person's own
+  server. The required-reason APIs it calls, with Apple's reasons:
+  - UserDefaults, CA92.1: the app's own settings (Kit/Sources/WMMData/Storage/DeviceStorage.swift).
+  - System boot time, 35F9.1: ProcessInfo.systemUptime times events inside the app
+    (the players' transfer age in WMMPlayback, PlayerChromeModel's controls timer).
+  - Disk space, 85F4.1 and E174.1: downloads show the free space and refuse a
+    download that won't fit (Kit/Sources/WMMDownloads/SystemDownloadEngine.swift space()).
+  Keep it in step with TV/Resources/PrivacyInfo.xcprivacy, and add a reason here
+  when the code starts calling another required-reason API (apple/README.md).
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>35F9.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>85F4.1</string>
+				<string>E174.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
