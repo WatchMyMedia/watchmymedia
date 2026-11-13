@@ -48,8 +48,7 @@ public final class RealPlaybackController: PlaybackController {
     @ObservationIgnored var generation = 0
     /// The viewer's pick; ``asked`` is what this server is asked for.
     @ObservationIgnored var quality: StreamQuality
-    @ObservationIgnored var token: MediaToken?
-    @ObservationIgnored var tokenRefreshAt = 0
+    @ObservationIgnored let tokens: TokenKeeper
     @ObservationIgnored var backgrounded = false
     @ObservationIgnored var preferencesLoaded = false
     @ObservationIgnored var preferencesReady = false
@@ -113,6 +112,7 @@ public final class RealPlaybackController: PlaybackController {
         self.lookups = lookups
         self.servers = servers
         self.clock = clock
+        tokens = TokenKeeper(clock: clock)
         quality = preferences.quality
         (events, continuation) = AsyncStream.makeStream(of: PlayerEvent.self)
     }
@@ -387,7 +387,7 @@ public final class RealPlaybackController: PlaybackController {
             }
         }
         // Every play gets a fresh media token (PLAN-CLIENTS.md §2.2).
-        token = nil
+        tokens.clear()
         cueTracks = [:]
         cueFetches = []
         var s = PlayerState()
@@ -486,7 +486,7 @@ public final class RealPlaybackController: PlaybackController {
         v.loading = true
         v.pendingPositionMs = here ? nil : atMs
         v.measure = StreamMeasure(requestedAt: clock.elapsedMs)
-        if newToken { token = nil }
+        if newToken { tokens.clear() }
         loadTask?.cancel()
         loadTask = launch { [weak self] in
             guard let self else { return }
@@ -545,38 +545,28 @@ public final class RealPlaybackController: PlaybackController {
         // The token is asked for at the same time as the decision, not after
         // it (PLAN-APPLE-REVIEW.md §4.2.1); a valid one is kept, and one the
         // decision brings is taken instead.
-        let beside = !tokenValid && gateway.needsTokenBeside(request)
+        let beside = !tokens.valid && gateway.needsTokenBeside(request)
         let gateway = gateway
         async let fetched: MediaToken? = beside ? gateway.mediaToken() : nil
         let decision = try await gateway.decide(request)
         // A download plays from the device and needs no media token (PLAN-DOWNLOADS.md §10.4).
         if decision.url.isFileURL {
-            token = nil
+            tokens.clear()
             return decision
         }
         do {
             if let carried = decision.mediaToken {
-                keep(carried)
+                tokens.keep(carried)
             } else if let fresh = try await fetched {
-                keep(fresh)
-            } else if !tokenValid {
-                keep(try await gateway.mediaToken())
+                tokens.keep(fresh)
+            } else if !tokens.valid {
+                tokens.keep(try await gateway.mediaToken())
             }
         } catch {
             endUnused(decision, of: v)
             throw error
         }
         return decision
-    }
-
-    var tokenValid: Bool { token != nil && clock.elapsedMs < tokenRefreshAt }
-
-    func keep(_ fresh: MediaToken) {
-        token = fresh
-        // Timed on this device's clock, with a floor, so a clock that
-        // disagrees with the server's cannot cause a reload loop.
-        let lifetime = max(Int(fresh.expiresAt.timeIntervalSince(clock.now) * 1000), tokenMinLifetimeMs)
-        tokenRefreshAt = clock.elapsedMs + lifetime - tokenMarginMs
     }
 
     /// A decision that came back after its load was cancelled (a newer
@@ -633,7 +623,7 @@ public final class RealPlaybackController: PlaybackController {
         v.pendingPositionMs = nil
         v.error = nil
         // The token goes on the server's own address, which the LAN one then replaces.
-        let tokened = token?.apply(to: d.url) ?? d.url
+        let tokened = tokens.apply(to: d.url)
         let local = localRoute?.apply(to: tokened)
         playingLocally = local != nil
         media?.load(PlayerSource(
@@ -954,7 +944,7 @@ public final class RealPlaybackController: PlaybackController {
             skipSegment(v, segment)
         } else if v.countdownMs == 0 {
             autoAdvance(v)
-        } else if !v.loading && token != nil && now >= tokenRefreshAt && status != .ended && status != .error {
+        } else if !v.loading && tokens.due && status != .ended && status != .error {
             // The play outlived its media token: a new one, and a new session here.
             reload(v, at: pos)
         }

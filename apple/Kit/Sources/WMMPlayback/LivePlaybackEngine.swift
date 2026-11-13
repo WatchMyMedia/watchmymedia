@@ -63,7 +63,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
     /// No player reads or control requests continue after failed cleanup. The
     /// shipped server's 60-second lease, plus a five-second grace, bounds ownership.
     @ObservationIgnored private var uncertainUntil: Int?
-    @ObservationIgnored private var token: MediaToken?
+    @ObservationIgnored private let tokens: TokenKeeper
     @ObservationIgnored private var worker: Task<Void, Never>?
     @ObservationIgnored private var heartbeat: Task<Void, Never>?
     @ObservationIgnored private var heartbeatPending = false
@@ -92,6 +92,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
         self.repository = repository; self.contextID = repository.contextID
         self.gateway = Result { try repository.makeSessionGateway() }
         self.media = media; self.clock = clock; self.cellular = cellular; self.profile = profile; self.beforeStart = beforeStart
+        tokens = TokenKeeper(clock: clock)
     }
 
     public func start(_ request: LivePlayRequest) {
@@ -229,8 +230,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
                     guard let request = desired, !released, identityMatches else { continue }
                     // A channel change keeps a token with time left: they last six hours
                     // (PLAN-APPLE-REVIEW.md §4.2.2). This controller is pinned to one sign-in.
-                    let fresh: MediaToken
-                    if let kept = token, tokenStillValid { fresh = kept } else { fresh = try await bound.mediaToken() }
+                    let fetched: MediaToken? = tokens.valid ? nil : try await bound.mediaToken()
                     guard version == generation, !released, identityMatches else { continue }
                     let selectedProfile = liveProfile()
                     let session = try await createSession(bound, request: request, requestID: UUID().uuidString, profile: selectedProfile)
@@ -241,7 +241,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
                         if version == generation { generation += 1; desired = nil }
                         continue
                     }
-                    token = fresh
+                    if let fetched { tokens.keep(fetched) }
                     startedProfile = selectedProfile
                     lastBeat = clock.elapsedMs; lastSuccessfulBeat = clock.elapsedMs
                     apply(session)
@@ -257,9 +257,6 @@ public final class RealLivePlaybackController: LivePlaybackController {
             worker = nil
         }
     }
-
-    /// The token has more than a minute left, the margin at which a heartbeat renews it.
-    private var tokenStillValid: Bool { token.map { $0.expiresAt.timeIntervalSince(clock.now) >= 60 } ?? false }
 
     private func liveProfile() -> PlaybackProfile {
         var result = profile()
@@ -306,7 +303,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
             finish(reason: session.reason ?? "stopped"); return
         }
         guard session.state == .playing else { state.status = .tuning; return }
-        if !loaded, let url = session.streamURL, let token {
+        if !loaded, let url = session.streamURL, let token = tokens.token {
             media.load(url: token.apply(to: url), title: session.channel.title, play: wantsPlay)
             loaded = true; loadedURL = url; lastNativePlaying = wantsPlay
         }
@@ -322,7 +319,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
         guard let directive = session.directive, pendingOutput == nil,
               directive.generation > max(handledOutputGeneration, session.outputGeneration) else { return }
         handledOutputGeneration = directive.generation
-        guard let next = directive.url, let previous = loadedURL ?? session.streamURL, let token else {
+        guard let next = directive.url, let previous = loadedURL ?? session.streamURL, let token = tokens.token else {
             failedOutputGeneration = directive.generation
             sendHeartbeat(force: true)
             return
@@ -338,7 +335,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
         failedOutputGeneration = pending.generation
         loadedURL = pending.previousURL
         state.message = "Keeping the current Live TV quality after a switch failed."
-        guard let session = activeSession, let token else { finish(reason: "signal_lost", failure: true); return }
+        guard let session = activeSession, let token = tokens.token else { finish(reason: "signal_lost", failure: true); return }
         media.load(url: token.apply(to: pending.previousURL), title: session.channel.title, play: wantsPlay)
         sendHeartbeat(force: true)
     }
@@ -421,10 +418,10 @@ public final class RealLivePlaybackController: LivePlaybackController {
                 if failedOutputGeneration == failed { failedOutputGeneration = nil }
                 apply(updated)
                 guard desired != nil else { return }
-                if !tokenStillValid {
+                if !tokens.valid {
                     let fresh = try await bound.mediaToken()
                     guard version == generation, activeSession?.id == session.id, !released else { return }
-                    token = fresh
+                    tokens.keep(fresh)
                     if let url = loadedURL ?? updated.streamURL {
                         media.load(url: fresh.apply(to: url), title: updated.channel.title, play: wantsPlay)
                         state.message = "Reconnected at live TV."

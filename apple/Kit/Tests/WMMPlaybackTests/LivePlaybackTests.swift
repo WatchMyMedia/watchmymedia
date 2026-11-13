@@ -554,10 +554,16 @@ struct LivePlaybackTests {
         #expect(rig.media.loads.last?.query()?.contains("access_token=token-1") == true)
         await rig.finish()
 
-        // One within the heartbeat's minute of running out is renewed.
+        // One within the heartbeat's minute of running out is renewed. A token
+        // that says it has 30 s left is trusted for the floor first, as the
+        // file player trusts it: the clocks may disagree (Rules.swift).
         let late = LiveRig(); late.gateway.tokenExpiry = TestClock.wallStart.addingTimeInterval(30)
         await late.start()
         late.controller.start(.init(channel: late.repository.channels[1])); await late.settle()
+        #expect(late.gateway.tokens == 1)
+        // The clock moves to the floor's minute, no tick between: the change itself renews it.
+        late.clock.elapsedMs += tokenMinLifetimeMs - tokenMarginMs
+        late.controller.start(.init(channel: late.repository.channels[2])); await late.settle()
         #expect(late.gateway.tokens == 2)
         #expect(late.media.loads.last?.query()?.contains("access_token=token-2") == true)
         await late.finish()
@@ -587,6 +593,9 @@ struct LivePlaybackTests {
     @Test func mediaTokenRenewsWithoutNewTuner() async {
         let rig = LiveRig(); rig.gateway.tokenExpiry = TestClock.wallStart.addingTimeInterval(65)
         await rig.start(); await rig.advance(10_000)
+        // The token's 65 s are under the floor: the clocks may disagree, so it is trusted for the floor.
+        #expect(rig.gateway.tokens == 1)
+        await rig.advance(tokenMinLifetimeMs - tokenMarginMs - 10_000)
         #expect(rig.gateway.tokens == 2)
         #expect(rig.media.loads.count == 2)
         #expect(rig.gateway.starts.count == 1)

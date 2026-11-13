@@ -162,7 +162,7 @@ extension RealPlaybackController {
     func fetchCues(_ url: URL, for v: Viewing) {
         guard !cueFetches.contains(url) else { return }
         cueFetches.insert(url)
-        let withToken = token?.apply(to: url) ?? url
+        let withToken = tokens.apply(to: url)
         launch { [self] in
             // A failed fetch stays in cueFetches, so it is not retried every tick; a new play tries again.
             guard let text = await attempt("load subtitles", { try await gateway.subtitleText(withToken) }), viewing === v else { return }
