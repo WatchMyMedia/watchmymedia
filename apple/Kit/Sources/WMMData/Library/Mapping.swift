@@ -289,8 +289,24 @@ extension Components.Schemas.WatchState {
     var model: WatchProgress { WatchProgress(positionMs: Int(positionMs), durationMs: Int(durationMs), completed: completed) }
 }
 
-extension Components.Schemas.Season {
-    var model: SeasonSummary? {
+/// A season as the show's list and the season's own page both send it.
+protocol SeasonFields {
+    var id: Int64 { get }
+    var number: Int64 { get }
+    var name: String { get }
+    var overview: String { get }
+    var airDate: String? { get }
+    var posterPath: String? { get }
+    var episodeCount: Int64 { get }
+    var availableCount: Int64 { get }
+    var watchedCount: Int64 { get }
+    var monitored: Bool? { get }
+    var request: Components.Schemas.RequestState? { get }
+}
+
+extension SeasonFields {
+    /// The season; nil when its request is in a state this app doesn't know.
+    var summary: SeasonSummary? {
         guard request == nil || request?.model != nil else { return nil }
         return SeasonSummary(
             id: Int(id), number: Int(number), name: name, overview: overview, airDate: Mapping.nonBlank(airDate),
@@ -299,6 +315,12 @@ extension Components.Schemas.Season {
         )
     }
 }
+
+extension Components.Schemas.Season: SeasonFields {
+    var model: SeasonSummary? { summary }
+}
+
+extension Components.Schemas.SeasonDetail: SeasonFields {}
 
 extension Components.Schemas.ShowDetail {
     var model: ShowDetail {
@@ -332,17 +354,13 @@ extension Components.Schemas.ShowDetail {
 extension Components.Schemas.SeasonDetail {
     var model: SeasonDetail {
         get throws {
-            guard request == nil || request?.model != nil else {
+            guard let season = summary else {
                 throw APIError(status: nil, message: "This season needs a newer version of WatchMyMedia.")
             }
             return SeasonDetail(
                 showID: Int(showId),
                 showTitle: show.title,
-                season: SeasonSummary(
-                    id: Int(id), number: Int(number), name: name, overview: overview, airDate: Mapping.nonBlank(airDate),
-                    posterPath: Mapping.nonBlank(posterPath), episodeCount: Int(episodeCount), availableCount: Int(availableCount),
-                    watchedCount: Int(watchedCount), monitored: monitored, request: request.flatMap(\.model)
-                ),
+                season: season,
                 episodes: episodes.map { $0.model(season: Int(number)) },
                 showBackdropPath: Mapping.nonBlank(show.backdropPath)
             )

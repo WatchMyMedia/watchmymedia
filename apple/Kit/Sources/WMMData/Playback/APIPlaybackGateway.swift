@@ -171,27 +171,15 @@ enum PlaybackMapping {
 
     static func unknownRoute(_ error: APIError) -> Bool { error.status == 404 || error.status == 405 }
 
-    /// Nil for nil, "" and whitespace.
-    static func nonBlank(_ text: String?) -> String? {
-        guard let text, !text.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        return text
-    }
+    /// Nil for nil, "" and whitespace, newlines too (``Mapping/nonBlank(_:)``).
+    static func nonBlank(_ text: String?) -> String? { Mapping.nonBlank(text) }
 
     /// The server refuses any other play ID (a pattern in the API).
     static func validPlayID(_ id: String) -> String? {
         id.count == 16 && id.allSatisfy { ("0"..."9").contains($0) || ("a"..."f").contains($0) } ? id : nil
     }
 
-    static func client(_ c: ClientInfo) -> Components.Schemas.Client {
-        .init(
-            deviceId: String(c.deviceID.prefix(64)),
-            model: nonBlank(String(c.model.prefix(64))),
-            name: String(c.name.prefix(64)),
-            platform: String(c.platform.prefix(32)),
-            product: String(c.product.prefix(64)),
-            version: String(c.version.prefix(32))
-        )
-    }
+    static func client(_ c: ClientInfo) -> Components.Schemas.Client { c.api }
 
     static func profile(_ p: PlaybackProfile) -> Components.Schemas.Profile {
         .init(

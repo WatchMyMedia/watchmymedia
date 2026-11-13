@@ -89,7 +89,7 @@ final class RealOfflineGateway: OfflineGateway {
         let body = Components.Schemas.CreateOfflineInputBody(
             audioIndex: choice.audioIndex.map(Int64.init),
             burnIn: choice.burnInSubtitleID.map { _ in true },
-            client: PlaybackMapping.client(client),
+            client: client.api,
             profile: PlaybackMapping.profile(profile.forAPILevel(level(owner))),
             quality: Components.Schemas.CreateOfflineInputBody.QualityPayload(rawValue: choice.quality.id) ?? .original,
             subtitleId: choice.burnInSubtitleID
@@ -118,7 +118,7 @@ final class RealOfflineGateway: OfflineGateway {
 
     func sync(_ owner: OfflineOwner, client: ClientInfo, sentAt: Date, downloads: [SyncedDownload], progress: [OfflineProgress]) async throws -> SyncReply {
         let body = Components.Schemas.OfflineSyncInputBody(
-            client: PlaybackMapping.client(client),
+            client: client.api,
             downloads: downloads.isEmpty ? nil : downloads.map { d in
                 Components.Schemas.OfflineSyncDownload(
                     deviceState: .init(rawValue: d.state.rawValue) ?? .queued, id: d.id,
@@ -192,12 +192,12 @@ final class RealOfflineGateway: OfflineGateway {
             movieID: i.movieId.map(Int.init),
             showID: i.showId.map(Int.init),
             episodeID: i.episodeId.map(Int.init),
-            showTitle: PlaybackMapping.nonBlank(i.showTitle),
+            showTitle: Mapping.nonBlank(i.showTitle),
             season: i.seasonNumber.map(Int.init),
             episode: i.episodeNumber.map(Int.init),
             year: i.year.flatMap { $0 > 0 ? Int($0) : nil },
-            posterPath: PlaybackMapping.nonBlank(i.posterPath),
-            artPath: PlaybackMapping.nonBlank(i.artPath)
+            posterPath: Mapping.nonBlank(i.posterPath),
+            artPath: Mapping.nonBlank(i.artPath)
         )
     }
 }

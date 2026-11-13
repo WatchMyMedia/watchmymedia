@@ -84,11 +84,11 @@ enum ClientIdentity {
 }
 
 extension ClientInfo {
-    /// The `client` object of sign-in and pairing, cut to the server's limits.
+    /// The `client` object of sign-in, pairing, playback and downloads, cut to the server's limits.
     var api: Components.Schemas.Client {
         Components.Schemas.Client(
             deviceId: String(deviceID.prefix(64)),
-            model: model.trimmingCharacters(in: .whitespaces).isEmpty ? nil : String(model.prefix(64)),
+            model: Mapping.nonBlank(model).map { String($0.prefix(64)) },
             name: String(name.prefix(ClientIdentity.maxName)),
             platform: String(platform.prefix(32)),
             product: String(product.prefix(64)),
