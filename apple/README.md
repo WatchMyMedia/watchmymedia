@@ -601,6 +601,30 @@ Home, Play to first frame, and its two halves Play to decision and Decision to
 first frame. Its calls are safe in any order: an end without its begin does
 nothing, and a new Play ends an open one as cancelled.
 
+**Diagnostics** (PLAN-APPLE-REVIEW.md §6.4; the Settings row is still to be
+designed). `Diagnostics.start()` (WMMData) subscribes to MetricKit on iPhone
+and iPad and keeps the last launch, hang and crash summaries in
+Application Support/Diagnostics, excluded from backups; MetricKit isn't on
+tvOS, so on Apple TV it does nothing. `Diagnostics.text(server:servers:names:)`
+builds what a Copy diagnostics row copies: the app version and build, the
+hardware model and OS, the server's version and API level, the summaries and
+this run's log lines from the app's own subsystem (a process can read only its
+own log). Nothing leaves the device and no SDK is added. The rule for what may
+be in it:
+
+- Never a token, password, server address, or a person's, server's, device's or
+  title's name. The server appears only as its version and API level; the
+  summaries keep a crash's type, signal and top frames as binary and offset,
+  never an exception's message.
+- Every line passes `DiagnosticsRedactor`: known names (the remembered
+  servers' names, hosts and accounts, plus any the caller passes) become
+  `<name>`; quoted text `"<text>"`; URLs, e-mail, IP addresses and host names
+  `<address>`; file paths `<path>`; the value after `token`, `password`,
+  `authorization` and the like, UUIDs and long opaque strings `<redacted>`.
+  `Kit/Tests/WMMModelTests/DiagnosticsTests.swift` holds the cases.
+- No disk space or system uptime: their required reasons don't allow them in
+  a report without a reason the manifests don't declare.
+
 ## Layout
 
 | Path | What |
