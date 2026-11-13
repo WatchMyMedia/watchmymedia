@@ -38,13 +38,27 @@ struct StoredCredential: Codable, Equatable, Sendable {
     var baseURL: URL? = nil
 }
 
+/// What reading a sign-in found.
+enum CredentialRead: Equatable, Sendable {
+    case found(StoredCredential)
+    case missing
+    /// The Keychain couldn't be read (locked since a restart): the sign-in may
+    /// be there, so it is never taken as gone.
+    case unavailable
+
+    var credential: StoredCredential? {
+        if case .found(let c) = self { return c }
+        return nil
+    }
+}
+
 /// Where the data layer keeps its state: the Keychain and UserDefaults on a
 /// device (``DeviceStorage``), memory in tests (``MemoryStorage``).
 @MainActor
 protocol LocalStorage: AnyObject {
     func loadState() -> StoredState
     func saveState(_ state: StoredState)
-    func credential(serverID: String) -> StoredCredential?
+    func readCredential(serverID: String) -> CredentialRead
     /// Nil removes it.
     func setCredential(_ credential: StoredCredential?, serverID: String)
     /// This device's random ID, made on first use and kept.
@@ -52,6 +66,8 @@ protocol LocalStorage: AnyObject {
 }
 
 extension LocalStorage {
+    func credential(serverID: String) -> StoredCredential? { readCredential(serverID: serverID).credential }
+
     /// 32 hex digits, as the Android app makes them.
     static func newDeviceID() -> String {
         UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
@@ -64,6 +80,8 @@ extension LocalStorage {
 final class MemoryStorage: LocalStorage {
     var state = StoredState()
     var credentials: [String: StoredCredential] = [:]
+    /// Servers whose sign-in can't be read now, as a locked Keychain's.
+    var unavailable: Set<String> = []
     private var id: String?
 
     init(state: StoredState = StoredState(), deviceID: String? = nil) {
@@ -73,7 +91,10 @@ final class MemoryStorage: LocalStorage {
 
     func loadState() -> StoredState { state }
     func saveState(_ state: StoredState) { self.state = state }
-    func credential(serverID: String) -> StoredCredential? { credentials[serverID] }
+    func readCredential(serverID: String) -> CredentialRead {
+        if unavailable.contains(serverID) { return .unavailable }
+        return credentials[serverID].map(CredentialRead.found) ?? .missing
+    }
     func setCredential(_ credential: StoredCredential?, serverID: String) { credentials[serverID] = credential }
 
     func deviceID() -> String {

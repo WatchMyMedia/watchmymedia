@@ -30,6 +30,9 @@ final class LocalStore {
     @ObservationIgnored private var sessionKey: String?
     @ObservationIgnored private var sessionListeners: [(_ signedIn: Bool) -> Void] = []
     @ObservationIgnored private var cachedAPI: (key: String, api: ServerAPI)?
+    /// Servers whose sign-in couldn't be read (a launch before the first
+    /// unlock), read again when protected data becomes available.
+    @ObservationIgnored private(set) var unreadable: Set<String> = []
 
     /// - Parameter client: how this device describes itself; its ID is
     ///   replaced by the stored one and its name is the first device name.
@@ -41,17 +44,15 @@ final class LocalStore {
         baseClient = client
         var loaded = storage.loadState()
         var creds: [String: StoredCredential] = [:]
+        var unreadable: Set<String> = []
         for s in loaded.servers {
-            if var c = storage.credential(serverID: s.server.id) {
-                // Upgrade an existing install using its previously saved address.
-                // An orphan Keychain credential after reinstall has no such evidence.
-                if c.baseURL == nil {
-                    c.baseURL = s.server.baseURL
-                    storage.setCredential(c, serverID: s.server.id)
-                }
-                if c.baseURL.map({ ServerAPI.sameEndpoint($0, s.server.baseURL) }) == true { creds[s.server.id] = c }
+            switch Self.read(storage, s.server) {
+            case .found(let c): creds[s.server.id] = c
+            case .unavailable: unreadable.insert(s.server.id)
+            case .missing: break
             }
         }
+        self.unreadable = unreadable
         if loaded.deviceName == nil {
             loaded.deviceName = ClientIdentity.cleanName(client.name) ?? ClientIdentity.defaultName
             storage.saveState(loaded)
@@ -59,6 +60,44 @@ final class LocalStore {
         state = loaded
         credentials = creds
         sessionKey = Self.key(loaded, creds)
+    }
+
+    /// `server`'s sign-in as kept, if it was issued by that address.
+    private static func read(_ storage: any LocalStorage, _ server: Server) -> CredentialRead {
+        switch storage.readCredential(serverID: server.id) {
+        case .found(var c):
+            // Upgrade an existing install using its previously saved address.
+            // An orphan Keychain credential after reinstall has no such evidence.
+            if c.baseURL == nil {
+                c.baseURL = server.baseURL
+                storage.setCredential(c, serverID: server.id)
+            }
+            return c.baseURL.map({ ServerAPI.sameEndpoint($0, server.baseURL) }) == true ? .found(c) : .missing
+        case .missing: return .missing
+        case .unavailable: return .unavailable
+        }
+    }
+
+    /// Protected data is available again (the first unlock after a restart):
+    /// the sign-ins that couldn't be read at launch are read now, so a run
+    /// that started locked doesn't stay signed out (PLAN-APPLE-REVIEW.md §3.4.3).
+    func readUnreadableAgain() {
+        guard !unreadable.isEmpty else { return }
+        for id in unreadable {
+            guard let server = state.servers.first(where: { $0.server.id == id })?.server else {
+                unreadable.remove(id)
+                continue
+            }
+            switch Self.read(storage, server) {
+            case .found(let c):
+                unreadable.remove(id)
+                mutate { credentials[id] = c }
+            case .missing:
+                unreadable.remove(id)
+            case .unavailable:
+                break
+            }
+        }
     }
 
     // MARK: Reading
@@ -104,6 +143,7 @@ final class LocalStore {
 
     /// Keeps (or with nil, forgets) the sign-in on a server.
     func setCredential(_ credential: StoredCredential?, serverID: String) {
+        unreadable.remove(serverID)
         mutate {
             let previous = credentials[serverID]
             credentials[serverID] = credential

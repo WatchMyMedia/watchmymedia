@@ -164,14 +164,24 @@ public final class DataServices {
     private var appObservers: [any NSObjectProtocol] = []
 
     /// Back in the foreground, the event stream connects again at once: the
-    /// system may have closed it while the app was away.
+    /// system may have closed it while the app was away. Once the device is
+    /// unlocked after a restart, the sign-ins that couldn't be read are.
     private func followTheApp() {
         let center = NotificationCenter.default
         appObservers.append(center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.events.reconnectNow() }
         })
+        appObservers.append(center.addObserver(forName: UIApplication.protectedDataDidBecomeAvailableNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.protectedDataBecameAvailable() }
+        })
     }
     #endif
+
+    /// The device was unlocked: a sign-in the launch couldn't read (before
+    /// the first unlock) is read again, so this run isn't left signed out.
+    func protectedDataBecameAvailable() {
+        store.readUnreadableAgain()
+    }
 
     /// How this device describes itself, with the device name as it is now.
     public var client: ClientInfo { store.client }
