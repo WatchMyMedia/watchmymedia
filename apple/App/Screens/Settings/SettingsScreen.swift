@@ -385,11 +385,12 @@ private struct SettingsRow: View {
     }
 }
 
-/// A root row that lights up while pressed, as a List row does.
+/// A root row that lights up while pressed, as a List row does, and under an iPad's pointer.
 private struct RowPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(configuration.isPressed ? Color.white.opacity(0.08) : .clear)
+            .hoverEffect(.highlight)
     }
 }
 

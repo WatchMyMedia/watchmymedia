@@ -354,11 +354,12 @@ private struct ResultRow<Art: View>: View {
     }
 }
 
-/// A result row lights up while pressed.
+/// A result row lights up while pressed, and under an iPad's pointer.
 private struct ResultRowStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(configuration.isPressed ? Color.white.opacity(0.06) : .clear)
+            .hoverEffect(.highlight)
     }
 }
 
