@@ -11,6 +11,8 @@ final class RealLiveTVRepository: LiveTVRepository {
     private var loadedCapabilities: LiveTVCapabilities?
     private var loadedChannels: [LiveChannel] = []
 
+    private let flight = SingleFlight<Void>()
+
     init(store: LocalStore, events: ServerEvents? = nil) { self.store = store; self.events = events }
     var contextID: String? {
         guard let current = store.current, store.user != nil else { return nil }
@@ -19,7 +21,14 @@ final class RealLiveTVRepository: LiveTVRepository {
     var capabilities: LiveTVCapabilities? { loadedRevision == store.revision ? loadedCapabilities : nil }
     var channels: [LiveChannel] { loadedRevision == store.revision ? loadedChannels : [] }
 
+    /// The capabilities and channels, one request of each for every caller at
+    /// once (launch, sign-in, the foreground refresh, a link); a caller after
+    /// a Live TV event asks again (PLAN-APPLE-REVIEW.md §4.1.3).
     func refresh() async throws {
+        try await flight.run(stamp: "\(store.revision)#\(events?.received[.liveTV] ?? 0)") { [weak self] in try await self?.load() }
+    }
+
+    private func load() async throws {
         let revision = store.revision
         guard let server = store.current?.server, server.apiLevel >= liveTVAPILevel, store.user != nil else {
             loadedRevision = revision; loadedCapabilities = .init(); loadedChannels = []

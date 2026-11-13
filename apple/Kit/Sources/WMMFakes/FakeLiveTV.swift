@@ -38,6 +38,10 @@ public final class FakeLiveTVRepository: LiveTVRepository {
     /// The clock search and reminders go by; tests set the boards' moment.
     public var now: @MainActor () -> Date = { Date() }
     private var listeners: [UUID: AsyncStream<Void>.Continuation] = [:]
+    private var typedListeners: [UUID: AsyncStream<LiveTVChange>.Continuation] = [:]
+    /// Calls made, for tests that count requests.
+    public private(set) var refreshCount = 0
+    public private(set) var remindersCount = 0
     public var contextID: String? {
         guard let servers else { return "fake-live" }
         guard servers.currentUser != nil, let current = servers.current else { return nil }
@@ -93,6 +97,7 @@ public final class FakeLiveTVRepository: LiveTVRepository {
         return guide
     }
     public func refresh() async throws {
+        refreshCount += 1
         let context = contextID
         await FakeLatency.wait()
         try Task.checkCancellation()
@@ -155,6 +160,7 @@ public final class FakeLiveTVRepository: LiveTVRepository {
     }
 
     public func reminders() async throws -> LiveReminders {
+        remindersCount += 1
         _ = try await extras()
         let now = self.now()
         reminderItems.removeAll { $0.end <= now }
@@ -192,10 +198,20 @@ public final class FakeLiveTVRepository: LiveTVRepository {
         }
     }
 
-    /// As if another device changed a favourite or reminder (the server's private events).
-    public func changedElsewhere(_ change: (FakeLiveTVRepository) -> Void) {
+    public func liveChanges() -> AsyncStream<LiveTVChange> {
+        AsyncStream { continuation in
+            let id = UUID()
+            typedListeners[id] = continuation
+            continuation.onTermination = { [weak self] _ in Task { @MainActor in self?.typedListeners[id] = nil } }
+        }
+    }
+
+    /// As if another device changed a favourite or reminder (the server's
+    /// private events): `part` says which event; `.all` is a reconnect's.
+    public func changedElsewhere(_ part: LiveTVChange = .all, _ change: (FakeLiveTVRepository) -> Void = { _ in }) {
         change(self)
         for listener in listeners.values { listener.yield() }
+        for listener in typedListeners.values { listener.yield(part) }
     }
 
     /// Stars or unstars a channel as another device would, without an event.

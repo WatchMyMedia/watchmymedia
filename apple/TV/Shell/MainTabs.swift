@@ -50,11 +50,11 @@ struct MainTabs: View {
                   let channelID = extras.channel(for: reminder)?.id ?? reminder.channelID else { return }
             extras.reveal = .init(channelID: channelID, programmeID: reminder.programmeID, start: reminder.start)
         }
-        // What the user may request, and the Inbox's count, follow the server's events.
+        // What the user may request, and the Inbox's count, follow the server's
+        // events; Live TV follows its own (PLAN-APPLE-REVIEW.md §4.1.8).
         .task {
             for await _ in services.requests.changes() {
                 await services.requests.refreshOptions()
-                try? await services.liveTV.refresh()
             }
         }
     }

@@ -552,8 +552,12 @@ Admins set folders and recording access in the server’s web app.
 
 Recordings shows Recording now, Won’t record, Upcoming, Series and Recorded,
 hiding empty sections; on iPhone and iPad a swipe left skips, stops or doesn't
-record one. Each section loads 20 at a time with Load more; server
-events refresh loaded sections, with no recording-status polling. Only the
+record one. Each section loads 20 at a time with Load more; a
+`live.recordings.changed` event refreshes the sections on screen (a screen
+says which with `LiveRecordingsStore.show(_:)`; one that has left is
+forgotten and loads again on return) and the guide's span while
+`showGuide(from:to:)` holds it, with no recording-status polling. The echo of
+a change made on this device asks for nothing more. Only the
 setter or an admin can cancel upcoming recordings, stop active ones or edit a
 series. Recording-now progress comes from the clock. Watch from the start reuses
 the ordinary player with a Recording pill, an extending duration and Go to now

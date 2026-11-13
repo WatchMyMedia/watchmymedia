@@ -142,4 +142,14 @@ public protocol ServerRepository: AnyObject, Observable {
     /// Asks the server in use who it is again (GET /api/server), so its
     /// version and API level follow an upgrade; quiet when it cannot be reached.
     func refreshCurrent() async
+
+    /// Whether the server in use answered the last ``refreshCurrent()``: nil
+    /// before one has, or for a server since chosen. The check gives up within
+    /// seconds, so a screen can show what works offline (the offline Home)
+    /// before its own request times out (PLAN-APPLE-REVIEW.md §4.1.5).
+    var reachable: Bool? { get }
+}
+
+extension ServerRepository {
+    public var reachable: Bool? { nil }
 }

@@ -14,6 +14,10 @@ final class RealServerRepository: ServerRepository {
 
     var saved: [SavedServer] { store.saved }
     var current: SavedServer? { store.current }
+    var reachable: Bool? { reachability?.serverID == current?.server.id ? reachability?.answered : nil }
+
+    /// What the last check of the server in use found.
+    private var reachability: (serverID: String, answered: Bool)?
 
     @ObservationIgnored private let store: LocalStore
     @ObservationIgnored private let discovery: any ServerDiscovery
@@ -21,6 +25,7 @@ final class RealServerRepository: ServerRepository {
     @ObservationIgnored private let probeTimeout: Duration
     @ObservationIgnored private let localAddressTimeout: Duration
     @ObservationIgnored private let now: @Sendable () -> Date
+    @ObservationIgnored private let reader: ServerInfoReader
     /// The screens browsing now; discovery runs while there is one.
     @ObservationIgnored private var browsing = 0
 
@@ -28,7 +33,9 @@ final class RealServerRepository: ServerRepository {
     ///   - probeSession: for looking up a typed address; gives up connecting quickly.
     ///   - probeTimeout: how long one address may take altogether.
     ///   - localAddressTimeout: how long ``localAddress()`` looks.
-    init(store: LocalStore, discovery: any ServerDiscovery, probeSession: URLSession, probeTimeout: Duration, localAddressTimeout: Duration = .seconds(10), now: @escaping @Sendable () -> Date) {
+    init(store: LocalStore, discovery: any ServerDiscovery, probeSession: URLSession, probeTimeout: Duration, localAddressTimeout: Duration = .seconds(10),
+         now: @escaping @Sendable () -> Date, reader: ServerInfoReader? = nil) {
+        self.reader = reader ?? ServerInfoReader(store: store, session: probeSession, timeout: probeTimeout, now: now)
         self.store = store
         self.discovery = discovery
         self.probeSession = probeSession
@@ -142,12 +149,33 @@ final class RealServerRepository: ServerRepository {
     }
 
     /// Keeps the address, the sign-in and when it was last used; a server
-    /// that now answers as another, or is too old, is left as it was.
+    /// that now answers as another, or is too old, is left as it was. An
+    /// answer from the last few seconds (Cast's check) stands in for asking.
     func refreshCurrent() async {
-        guard let saved = current?.server, let fresh = try? await lookUp(saved.baseURL, within: probeTimeout),
-              fresh.id == saved.id, !fresh.tooOld, fresh != saved
-        else { return }
-        store.update { $0.updateServer(saved.id) { $0.server = fresh } }
+        await refreshCurrent(fresh: false)
+    }
+
+    /// `fresh` asks whatever was heard lately: the event stream came back,
+    /// perhaps from a server upgraded meanwhile. True when the API level changed.
+    @discardableResult
+    func refreshCurrent(fresh: Bool) async -> Bool {
+        guard let saved = current?.server else { return false }
+        let info: Components.Schemas.ServerInfo
+        do {
+            info = try await reader.info(at: saved.baseURL, maxAge: fresh ? nil : ServerInfoReader.maxAge)
+        } catch {
+            if !(error is CancellationError), current?.server.id == saved.id { reachability = (saved.id, false) }
+            return false
+        }
+        guard current?.server.id == saved.id else { return false }
+        reachability = (saved.id, true)
+        let found = Server(
+            id: info.id, name: info.name, baseURL: saved.baseURL, version: info.version, apiLevel: Int(info.apiLevel),
+            setupRequired: info.setupRequired, turnstile: info.turnstile
+        )
+        guard found.id == saved.id, !found.tooOld, found != saved else { return false }
+        store.update { $0.updateServer(saved.id) { $0.server = found } }
+        return found.apiLevel != saved.apiLevel
     }
 
     /// Forgets the server and its sign-in, and ends the session on the server

@@ -16,6 +16,7 @@ final class RealRequestsRepository: RequestsRepository {
     @ObservationIgnored private let events: ServerEvents
     /// Bumped by each refresh and sign-in change, so only the newest reply applies.
     @ObservationIgnored private var generation = 0
+    @ObservationIgnored private let flight = SingleFlight<Void>()
 
     private static let maxSearch = 100
 
@@ -30,7 +31,14 @@ final class RealRequestsRepository: RequestsRepository {
         }
     }
 
+    /// One request (and the admin's auth status) for every caller at once:
+    /// launch, the sign-in and the foreground refresh ask together. A caller
+    /// after a requests event asks again (PLAN-APPLE-REVIEW.md §4.1.3).
     func refreshOptions() async {
+        await flight.run(stamp: "\(store.revision)#\(events.received[.requests] ?? 0)") { [weak self] in await self?.loadOptions() }
+    }
+
+    private func loadOptions() async {
         generation += 1
         let mine = generation
         guard let server = store.current?.server, server.apiLevel >= requestsAPILevel, store.currentCredential != nil else {

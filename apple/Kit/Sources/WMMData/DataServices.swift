@@ -50,6 +50,7 @@ public final class DataServices {
     let requestsRepository: RealRequestsRepository
     let preferencesRepository: RealPreferencesRepository
     let events: ServerEvents
+    let serverInfo: ServerInfoReader
 
     /// - Parameters:
     ///   - client: how this device describes itself; the ID is replaced by the
@@ -69,9 +70,11 @@ public final class DataServices {
         let store = LocalStore(storage: storage, session: session, userAgent: userAgent, client: client)
         self.store = store
         events = ServerEvents(store: store, session: eventSession ?? session, backoff: tuning.eventBackoff, linger: tuning.eventLinger, now: tuning.now)
+        let probeSession = probeSession ?? Self.probeSession(connectTimeout: tuning.probeConnectTimeout, total: tuning.probeTimeout)
+        serverInfo = ServerInfoReader(store: store, session: probeSession, timeout: tuning.probeTimeout, now: tuning.now)
         serverRepository = RealServerRepository(
-            store: store, discovery: discovery, probeSession: probeSession ?? Self.probeSession(connectTimeout: tuning.probeConnectTimeout, total: tuning.probeTimeout),
-            probeTimeout: tuning.probeTimeout, localAddressTimeout: tuning.localAddressTimeout, now: tuning.now
+            store: store, discovery: discovery, probeSession: probeSession,
+            probeTimeout: tuning.probeTimeout, localAddressTimeout: tuning.localAddressTimeout, now: tuning.now, reader: serverInfo
         )
         authRepository = RealAuthRepository(store: store, minimumPoll: tuning.minimumPoll, now: tuning.now)
         libraryRepository = RealLibraryRepository(store: store, events: events)
@@ -144,9 +147,11 @@ public final class DataServices {
         AppServices(servers: servers, auth: auth, library: library, requests: requests, preferences: preferences, playback: playback, images: images, client: client, liveTV: liveTV, livePlayback: livePlayback, downloads: downloads, casting: casting, rows: rows)
     }
 
+    /// The account and its playback settings, side by side (PLAN-APPLE-REVIEW.md §4.1.4).
     private func loadSession() async {
-        await authRepository.refreshUser()
-        try? await preferencesRepository.refresh()
+        async let user: Void = authRepository.refreshUser()
+        async let preferences: Void? = try? preferencesRepository.refresh()
+        _ = await (user, preferences)
     }
 
     private static func probeSession(connectTimeout: TimeInterval, total: Duration) -> URLSession {

@@ -62,11 +62,22 @@ struct RootView: View {
             resetAccountViews(rebuild: outcome != .cancelled)
             navigator.tab = outcome == .cancelled ? .settings : .home
         }
-        // Sign-in changes do not change scenePhase. Load this account's live
-        // access immediately, including after switching servers.
-        .task(id: account) {
-            try? await services.liveTV.refresh()
-            await extras.refresh()
+        // At launch, on every return to the app and on every sign-in (which
+        // doesn't change scenePhase): one task, so launch asks once. A server
+        // upgraded meanwhile may do more (Automatic quality from API 3), so its
+        // level comes first; the rest don't wait for each other
+        // (PLAN-APPLE-REVIEW.md §4.1.3–4).
+        .task(id: Refresh(account: account, active: scenePhase == .active)) {
+            guard scenePhase == .active else { return }
+            await services.servers.refreshCurrent()
+            let services = services, extras = extras
+            await together(
+                { await services.requests.refreshOptions() },
+                // Live TV's access, then its reminders, which need it.
+                { try? await services.liveTV.refresh(); await extras.refresh() },
+                // Offline progress and what the server decided of the downloads (PLAN-DOWNLOADS.md §6).
+                { await services.downloads.sync() }
+            )
         }
         // Reminders as notifications (PLAN-LIVE-TV-GUIDE.md §6.5): the soonest 64,
         // again whenever they or the lead time change, once the list is loaded.
@@ -80,16 +91,11 @@ struct RootView: View {
                 await notifier.reschedule([])
             }
         }
-        // A server upgraded meanwhile may do more (Automatic quality from API 3).
-        .task(id: scenePhase) {
-            guard scenePhase == .active else { return }
-            await services.servers.refreshCurrent()
-            await services.requests.refreshOptions()
-            try? await services.liveTV.refresh()
-            await extras.refresh()
-            // Offline progress and what the server decided of the downloads (PLAN-DOWNLOADS.md §6).
-            await services.downloads.sync()
-        }
+    }
+
+    private struct Refresh: Equatable {
+        let account: Account
+        let active: Bool
     }
 
     /// Changes when the notifications to schedule might.

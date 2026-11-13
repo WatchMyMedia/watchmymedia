@@ -76,11 +76,11 @@ struct MainTabView: View {
         // A note left by a page that has gone ("Deleted").
         .messageToast(Binding(get: { navigator.toast }, set: { navigator.toast = $0 }))
         .fullScreenCover(isPresented: Binding(get: { cast.remotePresented }, set: { cast.remotePresented = $0 }), onDismiss: continueOnDevice) { CastRemoteScreen() }
-        // What the user may request, and the Inbox's count, follow the server's events.
+        // What the user may request, and the Inbox's count, follow the server's
+        // events; Live TV follows its own (PLAN-APPLE-REVIEW.md §4.1.8).
         .task {
             for await _ in services.requests.changes() {
                 await services.requests.refreshOptions()
-                try? await services.liveTV.refresh()
             }
         }
     }

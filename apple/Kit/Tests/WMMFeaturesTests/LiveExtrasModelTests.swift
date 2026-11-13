@@ -98,6 +98,39 @@ struct LiveExtrasModelTests {
         try await waitFor { store.isFavourite(LiveChannel(id: "ch-7.2", number: "7.2", name: "Driftwood")) }
     }
 
+    @Test func eachEventAsksOnlyForItsOwnPartAndAnEchoAsksForNothing() async throws {
+        let (repository, store) = try await make()
+        let following = Task { await store.follow() }
+        defer { following.cancel() }
+        try await Task.sleep(for: .milliseconds(20))
+        let refreshes = repository.refreshCount, reminders = repository.remindersCount
+        repository.changedElsewhere(.reminders)
+        try await waitFor { repository.remindersCount == reminders + 1 }
+        repository.changedElsewhere(.favourites)
+        try await waitFor { repository.refreshCount == refreshes + 1 }
+        repository.changedElsewhere(.recordings)
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(repository.remindersCount == reminders + 1, "a favourites or recordings event isn't the reminders'")
+        #expect(repository.refreshCount == refreshes + 1, "nor are reminders or recordings the channels'")
+        // A star set here: its echo asks for nothing.
+        await store.setFavourite(true, channel: LiveChannel(id: "ch-7.2", number: "7.2", name: "Driftwood"))
+        repository.changedElsewhere(.favourites)
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(repository.refreshCount == refreshes + 1)
+        // The stream coming back may have missed anything: both.
+        repository.changedElsewhere(.all)
+        try await waitFor { repository.refreshCount == refreshes + 2 && repository.remindersCount == reminders + 2 }
+    }
+
+    @Test func refreshesAtOnceShareOneRequest() async throws {
+        let (repository, store) = try await make()
+        let before = repository.remindersCount
+        await together({ await store.refresh() }, { await store.refresh() })
+        #expect(repository.remindersCount == before + 1)
+        await store.refresh()
+        #expect(repository.remindersCount == before + 2, "a later one asks again")
+    }
+
     // MARK: Reminders
 
     @Test func theBoardsRemindersLoadInDayGroups() async throws {

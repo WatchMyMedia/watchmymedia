@@ -51,8 +51,8 @@ struct WatchMyMediaApp: App {
                 // The person's other devices change favourites and reminders too.
                 .task { await extras.follow() }
                 .task { await recordings.follow() }
-                .task { await cast.refresh() }
-                .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await cast.refresh() } } }
+                // Once at launch and on each return to the app.
+                .task(id: scenePhase) { if scenePhase == .active { await cast.refresh() } }
         }
     }
 }

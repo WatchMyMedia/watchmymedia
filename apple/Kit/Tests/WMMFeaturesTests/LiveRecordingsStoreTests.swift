@@ -112,8 +112,10 @@ import WMMModel
     private func following(_ repository: RecordingsRepository, _ store: LiveRecordingsStore) async -> Task<Void, Never> {
         let task = Task { await store.follow() }
         #expect(await eventually(timeout: .seconds(2)) { repository.listener != nil })
-        await store.showGuide(from: start, to: start.addingTimeInterval(3600))
-        return task
+        let guide = Task { await store.showGuide(from: start, to: start.addingTimeInterval(3600)) }
+        return Task {
+            await withTaskCancellationHandler { await task.value } onCancel: { task.cancel(); guide.cancel() }
+        }
     }
     @Test func recordKeepsItsMarkThroughItsOwnEventAndTheGuideBringsRecordingNow() async {
         let repository = RecordingsRepository()
@@ -188,18 +190,73 @@ import WMMModel
     @Test func aSpanFirstShownAfterAnEventIsAskedAgainButNotBeforeOne() async {
         let repository = RecordingsRepository()
         let store = LiveRecordingsStore(repository: repository)
-        await store.showGuide(from: start, to: start.addingTimeInterval(3600))
+        var guide = Task { await store.showGuide(from: start, to: start.addingTimeInterval(3600)) }
+        try? await Task.sleep(for: .milliseconds(20))
         #expect(repository.guideRequests == 0, "Nothing changed since the guide loaded it")
         let following = Task { await store.follow() }
         defer { following.cancel() }
         #expect(await eventually(timeout: .seconds(2)) { repository.listener != nil })
         repository.listener?.yield()
         #expect(await eventually(timeout: .seconds(2)) { repository.guideRequests == 1 })
+        guide.cancel()
         let later = start.addingTimeInterval(3600)
-        await store.showGuide(from: later, to: later.addingTimeInterval(3600))
-        #expect(repository.guideRequests == 2, "Its listings may be from before the event")
-        await store.showGuide(from: later, to: later.addingTimeInterval(3600))
+        guide = Task { await store.showGuide(from: later, to: later.addingTimeInterval(3600)) }
+        #expect(await eventually(timeout: .seconds(2)) { repository.guideRequests == 2 }, "Its listings may be from before the event")
+        guide.cancel()
+        guide = Task { await store.showGuide(from: later, to: later.addingTimeInterval(3600)) }
+        try? await Task.sleep(for: .milliseconds(20))
         #expect(repository.guideRequests == 2)
+        guide.cancel()
+        await guide.value
+        // The guide has gone: an event asks nothing for it.
+        repository.listener?.yield()
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(repository.guideRequests == 2)
+    }
+
+    @Test func onlyRecordingsEventsAskAgainAndTheEchoOfAChangeMadeHereAsksNothing() async {
+        let repository = RecordingsRepository()
+        repository.pages[.upcoming] = .init(items: [item("1")])
+        repository.recordReply = item("1")
+        let store = LiveRecordingsStore(repository: repository)
+        let following = Task { await store.follow() }
+        defer { following.cancel() }
+        #expect(await eventually(timeout: .seconds(2)) { repository.typed != nil })
+        let list = Task { await store.show([.upcoming]) }
+        defer { list.cancel() }
+        await store.load(.upcoming)
+        _ = await store.record(programme("p-1"), options: .init())
+        #expect(repository.requests.count == 2, "the change asks for what is on screen itself")
+        repository.typed?.yield(.recordings)
+        repository.typed?.yield(.favourites)
+        repository.typed?.yield(.reminders)
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(repository.requests.count == 2, "its echo, and other parts' events, ask nothing")
+        repository.typed?.yield(.recordings)
+        #expect(await eventually(timeout: .seconds(2)) { repository.requests.count == 3 }, "another device's change does")
+    }
+
+    @Test func sectionsThatLeftTheScreenAreForgottenNotAskedAgain() async {
+        let repository = RecordingsRepository()
+        repository.pages[.upcoming] = .init(items: [item("1")])
+        repository.pages[.now] = .init(items: [item("2", state: .recording)])
+        let store = LiveRecordingsStore(repository: repository)
+        let following = Task { await store.follow() }
+        defer { following.cancel() }
+        #expect(await eventually(timeout: .seconds(2)) { repository.listener != nil })
+        let list = Task { await store.show([.upcoming, .now]) }
+        await store.load(.upcoming)
+        await store.load(.now)
+        #expect(repository.requests.count == 2)
+        repository.listener?.yield()
+        #expect(await eventually(timeout: .seconds(2)) { repository.requests.count == 4 }, "both on screen: both asked again")
+        list.cancel()
+        await list.value
+        repository.listener?.yield()
+        #expect(await eventually(timeout: .seconds(2)) { store.page(.upcoming) == nil && store.page(.now) == nil })
+        #expect(repository.requests.count == 4, "gone from the screen: forgotten, not asked again")
+        await store.load(.upcoming)
+        #expect(repository.requests.count == 5, "and loaded again when it comes back")
     }
     @Test func aProgrammeWithoutASeriesRecordsOnceEvenWhenAskedForTheSeries() async {
         let repository = RecordingsRepository()
@@ -317,4 +374,14 @@ import WMMModel
     }
     func recordManual(_ request: LiveManualRecording) async throws -> LiveRecording { manualCalls += 1; throw LiveTVError(reason: "unavailable") }
     func changes() -> AsyncStream<Void> { AsyncStream { listener = $0 } }
+    /// What the server's events say; `listener` yields stand for a reconnect (`.all`).
+    var typed: AsyncStream<LiveTVChange>.Continuation?
+    func liveChanges() -> AsyncStream<LiveTVChange> {
+        let signals = changes()
+        return AsyncStream { continuation in
+            typed = continuation
+            let task = Task { for await _ in signals { continuation.yield(.all) } }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
 }
