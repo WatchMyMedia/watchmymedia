@@ -66,9 +66,25 @@ class StartupBenchmark {
             "WMM followReminders",
         )
 
-        /** Time to the first frame and to full display, bindApplication, and [SECTIONS]. */
+        /**
+         * The libraries' initializers, which androidx.startup's provider runs in
+         * bindApplication, before WatchMyMediaApp's own, each marked in the trace
+         * by its class's name (the merged manifest lists them). WorkManager's
+         * starts on first use instead (the app's manifest), so it shows only
+         * in builds from before that.
+         */
+        val INITIALIZERS = listOf(
+            "WorkManagerInitializer",
+            "EmojiCompatInitializer",
+            "ProcessLifecycleInitializer",
+            "ProfileInstallerInitializer",
+            "PlatformInitializer",
+        )
+
+        /** Time to the first frame and to full display, bindApplication, [SECTIONS] and [INITIALIZERS]. */
         @OptIn(ExperimentalMetricApi::class)
         fun startupMetrics(): List<Metric> =
-            listOf(StartupTimingMetric(), TraceSectionMetric("bindApplication")) + SECTIONS.map { TraceSectionMetric(it, targetPackageOnly = true) }
+            listOf(StartupTimingMetric(), TraceSectionMetric("bindApplication")) +
+                (SECTIONS + INITIALIZERS).map { TraceSectionMetric(it, targetPackageOnly = true) }
     }
 }

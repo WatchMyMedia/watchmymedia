@@ -47,9 +47,10 @@ import media.watchmy.client.model.ServerRepository
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.ui.CoilSeekThumbnails
 import okhttp3.OkHttpClient
+import androidx.work.Configuration as WorkConfiguration
 import java.time.Instant
 
-class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDownloads.Host {
+class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDownloads.Host, WorkConfiguration.Provider {
     /** True on Android TV and Google TV (the TV UI), false on phones and tablets. */
     val isTv: Boolean by lazy {
         val uiMode = getSystemService(UiModeManager::class.java)
@@ -75,6 +76,10 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
     private var reminders: ReminderFollower? = null
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /** WorkManager's settings, the defaults: it starts on first use, not at every process start (the manifest). */
+    override val workManagerConfiguration: WorkConfiguration
+        get() = WorkConfiguration.Builder().build()
 
     /** The process's first ON_START, when what only someone using the app needs starts. */
     private val firstForeground by lazy { FirstForeground(ProcessLifecycleOwner.get().lifecycle) }
