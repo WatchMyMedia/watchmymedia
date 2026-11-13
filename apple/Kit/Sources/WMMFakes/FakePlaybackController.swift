@@ -291,6 +291,8 @@ extension AppServices {
         let servers = FakeServerRepository(signedIn: signedIn, chosen: chosen, admin: admin, liveTV: liveTV, liveGuide: liveGuide != nil,
                                            liveExtras: liveGuide?.extras ?? false, apiLevel: apiLevel ?? (rows ? ServerFeatures.Level.rows : nil))
         let library = FakeLibraryRepository()
+        // Read here rather than passed, so both apps' fakes take it with no change to their factories.
+        library.largeLibrary = ProcessInfo.processInfo.arguments.contains("-fakesLargeLibrary")
         let rowsRepository = FakeRowsRepository(servers: servers, admin: admin)
         library.rows = rowsRepository
         let downloadRepository: any DownloadRepository = downloads ? FakeDownloadRepository() : UnavailableDownloads()

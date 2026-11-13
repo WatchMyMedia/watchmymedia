@@ -38,11 +38,12 @@ final class PerformanceTests: XCTestCase {
         fling(app)
     }
 
-    /// The Movies grid, flung up and back.
+    /// The Movies grid of a large library (about 1,200 titles,
+    /// `-fakesLargeLibrary`), flung up and back: pages load as it scrolls.
     @MainActor
     func testScrollingMovies() {
         let app = XCUIApplication()
-        app.launchArguments = ["-fakes", "-tab", "movies"]
+        app.launchArguments = ["-fakes", "-fakesLargeLibrary", "-tab", "movies"]
         app.launch()
         XCTAssertTrue(app.navigationBars["Movies"].waitForExistence(timeout: 30), "Movies shows on the fakes")
         fling(app)

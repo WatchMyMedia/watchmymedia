@@ -274,6 +274,8 @@ public final class FakeLibraryRepository: LibraryRepository {
     public var trailerKeys: [String]?
     /// First-run previews (PLAN-IOS-COMPLETION), with fictional library errors.
     public var firstRun: FakeFirstRunState?
+    /// The Movies library holds ``FakeData/largeMovies`` (about 1,200), for measuring the grid (`-fakesLargeLibrary`).
+    public var largeLibrary = false
     /// Arranged rows (PLAN-ROWS.md): from ``rowsAPILevel``, Home comes as its rows in order.
     public var rows: FakeRowsRepository?
     /// Watched marks set here, by target, so the fake reflects a mark after a refetch.
@@ -330,7 +332,7 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public func items(_ query: ItemQuery) async throws -> ItemPage {
         await FakeLatency.wait()
-        let all = query.libraryID == FakeData.movieLibrary ? FakeData.movies : FakeData.shows
+        let all = query.libraryID == FakeData.movieLibrary ? (largeLibrary ? FakeData.largeMovies : FakeData.movies) : FakeData.shows
         var list = all.filter { item in
             switch query.filter {
             case .all: true
@@ -367,10 +369,17 @@ public final class FakeLibraryRepository: LibraryRepository {
             items: Array(list.dropFirst(query.offset).prefix(query.limit)), total: list.count, offset: query.offset,
             genres: Array(Set(all.flatMap(\.genres))).sorted(),
             decades: Array(Set(all.compactMap { $0.year.map { $0 / 10 * 10 } })).sorted(by: >),
-            summary: FakeData.summary(libraryID: query.libraryID),
+            summary: summary(libraryID: query.libraryID),
             letters: query.sort == .title ? letters : nil,
             genreCounts: genreCounts
         )
+    }
+
+    /// The library's counts, with the large library's in the Movies' when it holds them.
+    private func summary(libraryID: Int) -> LibrarySummary {
+        var summary = FakeData.summary(libraryID: libraryID)
+        if largeLibrary, libraryID == FakeData.movieLibrary { summary.items = FakeData.largeMovies.count }
+        return summary
     }
 
     public func show(id: Int) async throws -> ShowDetail {

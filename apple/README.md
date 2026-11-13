@@ -89,6 +89,8 @@ episode and Continue watching item carries one of six fictional backdrops
 drawn in code (`FakeBackdrops`), so Home's row screens on iPad and Apple TV
 (PLAN-HOME.md §7) can be judged on a simulator. `-fakesSignedOut` starts at sign-in, `-fakesNoServer` at the
 server picker. The scheme's Run action lists `-fakes`, off by default.
+`-fakesLargeLibrary` gives the fakes' Movies library about 1,200 titles (the
+sample's, then made-up ones), for measuring the grid.
 `-search harbor` searches at launch. The fake player has seek thumbnails drawn in
 code, so `-open watchmymedia://play/9101 -playerKeepControls -playerScrub 0.44`
 holds the scrubber at 44 % with its tile up (PLAN-TRICKPLAY.md T4).
@@ -648,7 +650,7 @@ nothing, and a new Play ends an open one as cancelled.
 
 **Measuring**. `make apple-perf` runs
 `UITests/PerformanceTests.swift` (a signed-in launch, flinging Home and the
-Movies grid) on `SIM` and `TVUITests/PerformanceTests.swift` (a launch) on
+Movies grid of `-fakesLargeLibrary`'s 1,200 titles) on `SIM` and `TVUITests/PerformanceTests.swift` (a launch) on
 `TV_SIM`, five runs each, into `build/Perf.xcresult` and `build/TVPerf.xcresult`.
 They skip unless `WMM_PERF=1`, which the target sets, so the normal test runs
 and CI leave them out. They run on the fakes, so in Debug builds: compare runs
