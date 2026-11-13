@@ -1,6 +1,7 @@
 package media.watchmy.client.mobile.home
 
 import androidx.compose.foundation.background
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -145,6 +146,9 @@ fun HomeScreen(
     val uri = LocalUriHandler.current
     val downloads = viewModel { DownloadsViewModel(services.downloads) }
     val held by downloads.state.collectAsStateWithLifecycle()
+    // Fully drawn once Home has its rows, or has settled on an error or the offline Home: a cold start's
+    // time to full display (the startup benchmarks, :baselineprofile).
+    ReportDrawnWhen { state.home != null || state.error != null || (state.offline && held.enabled) }
 
     Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
         // Offline there is nothing to search (HomeOffline.dc.html).

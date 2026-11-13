@@ -754,20 +754,43 @@ longer in the sources; it lists them, most rules first. Run it from the
 repository root before a pull request that renames screens:
 `python3 -I deploy/ci/baseline_profile.py android`.
 
-`StartupBenchmark` measures a cold start to the first frame, as installed
-without a profile and with this one, on whatever build you choose (without
-`-Pfakes`, the real app's start into the server picker):
+Three benchmarks measure what the profiles are for, each as installed
+without a profile and with this one where it says so:
+
+- `StartupBenchmark`: a cold start to the first frame, on whatever build
+  you choose (without `-Pfakes`, the real app's start into the server
+  picker, or Home's skeleton when signed in).
+- `SignedInStartupBenchmark`: a real build's signed-in cold start against
+  a fixture server, to the first frame and to Home loaded (time to full
+  display, which both Homes report with `ReportDrawnWhen`). It needs the
+  `fixtureServer` argument and is skipped without it.
+- `FrameTimingBenchmark`: the frames drawn moving through Home's rows (a
+  phone flings, a TV uses the remote) and, on a `-PforceTv` fakes build,
+  through the Live TV guide with the remote; five runs, with the profile.
 
 ```bash
 ./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=media.watchmy.client.baselineprofile.StartupBenchmark
+python3 -I baselineprofile/fixture_server.py &   # from android/, for the next one
+./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=media.watchmy.client.baselineprofile.SignedInStartupBenchmark \
+  -Pandroid.testInstrumentationRunnerArguments.fixtureServer=10.0.2.2:28130
+./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest -Pfakes=true -PforceTv=true \
+  -Pandroid.testInstrumentationRunnerArguments.class=media.watchmy.client.baselineprofile.FrameTimingBenchmark
 ```
 
-Its results (time to the first frame, `bindApplication` and the app's own
-`WMM …` startup sections, which `WatchMyMediaApp` marks in the trace) are in
+Their results (the times to first frame and full display, `bindApplication`
+and the app's own `WMM …` startup sections, which `WatchMyMediaApp` marks in
+the trace; the frames' CPU time and overrun) are in
 `baselineprofile/build/outputs/connected_android_test_additional_output/`.
 An emulator's numbers compare builds with each other; they say little about
 devices, and a busy Mac makes them noisy, so compare medians of several runs.
+
+To count what the app asks a server for, run against `fixture_server.py`,
+whose log (at debug level, so media requests too) lists every request:
+`--log FILE` keeps it after the server stops. Count the `"msg":"http"`
+lines over a fixed stretch, such as five idle minutes on Home or five
+minutes of playing a file, before and after a change.
 
 ## Conventions
 

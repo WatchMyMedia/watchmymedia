@@ -14,6 +14,9 @@ object TestTags {
     /** The main Play (or Resume) button of a show's or a movie's page. */
     const val PLAY = "play"
 
+    /** The TV Live TV guide's channel rows. */
+    const val GUIDE = "guide"
+
     /** The phone's library grid. */
     const val LIBRARY = "library"
 

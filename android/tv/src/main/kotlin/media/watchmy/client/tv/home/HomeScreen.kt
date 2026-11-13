@@ -43,6 +43,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -157,6 +158,9 @@ fun HomeScreen(
     val user by vm.user.collectAsStateWithLifecycle()
     val server by services.servers.current.collectAsStateWithLifecycle()
     val memory = rememberFocusMemory()
+    // Fully drawn once Home has its rows or has settled on an error: a cold start's time to full display
+    // (the startup benchmarks, :baselineprofile).
+    ReportDrawnWhen { state.home != null || state.error != null }
 
     TvScaffold(RailSection.Home, onNavigate, modifier = if (state.home != null) Modifier.testTag(TestTags.HOME) else Modifier) {
         when {

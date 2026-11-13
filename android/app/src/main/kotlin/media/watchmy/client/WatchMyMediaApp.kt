@@ -124,8 +124,8 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
         } else {
             CastService.None
         }
-        val receiver = if (castable && isTv) castConnect(data, playback).also { castConnect = it } else CastReceiver.None
-        if (!isTv) followReminders(data, ::account)
+        val receiver = if (castable && isTv) traced("WMM castConnect") { castConnect(data, playback) }.also { castConnect = it } else CastReceiver.None
+        if (!isTv) traced("WMM followReminders") { followReminders(data, ::account) }
         return RealAppServices(data, playback, cast, receiver, library = playback.screensLibrary(library), downloads = downloads?.repository ?: DownloadRepository.Unavailable, seekThumbnails = CoilSeekThumbnails(this), livePlayback = playback.live(data.livePlaybackGateway))
     }
 

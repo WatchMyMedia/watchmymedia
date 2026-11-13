@@ -48,6 +48,7 @@ private fun argument(name: String): String? = InstrumentationRegistry.getArgumen
 internal object Tags {
     const val HOME = "home"
     const val PLAY = "play"
+    const val GUIDE = "guide"
     const val LIBRARY = "library"
     const val SERVER_ADDRESS = "server-address"
     const val SERVER_CONNECT = "server-connect"
@@ -278,4 +279,18 @@ fun MacrobenchmarkScope.tvPlay() {
     // Back closes the picker, then leaves the player for the show's page.
     backTo(tag(Tags.PLAY))
     device.pressBack()
+}
+
+/** The rail to Live TV's guide (the fakes have listings), from Home, and down into its programmes. */
+fun MacrobenchmarkScope.tvGuide() {
+    tvRailTo(3, tag(Tags.GUIDE))
+    press(2) { device.pressDPadDown() }
+}
+
+/** Through the guide with the remote: down the channels, along the programmes, and back to where it began. */
+fun MacrobenchmarkScope.tvGuideMoves() {
+    press(6) { device.pressDPadDown() }
+    press(4) { device.pressDPadRight() }
+    press(6) { device.pressDPadUp() }
+    press(4) { device.pressDPadLeft() }
 }

@@ -3,6 +3,7 @@ package media.watchmy.client.baselineprofile
 import androidx.benchmark.macro.BaselineProfileMode
 import androidx.benchmark.macro.CompilationMode
 import androidx.benchmark.macro.ExperimentalMetricApi
+import androidx.benchmark.macro.Metric
 import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.StartupTimingMetric
 import androidx.benchmark.macro.TraceSectionMetric
@@ -15,9 +16,11 @@ import org.junit.runner.RunWith
 /**
  * Cold start to the first screen, compiled as a fresh install without a
  * profile ([none]) and with the app's baseline profile ([baselineProfile]).
- * On a real-server build that screen is the server picker, after the data
- * layer, the player engine and casting have started (`Application.onCreate`
- * is the trace's bindApplication); on a fakes build it is sign-in.
+ * On a real-server build that screen is the server picker (Home's skeleton
+ * once signed in), after the data layer, downloads, the player engine and
+ * casting have started (`Application.onCreate` is the trace's
+ * bindApplication, and [SECTIONS] its parts); on a fakes build it is
+ * sign-in. [SignedInStartupBenchmark] goes on to Home loaded.
  *
  * ```
  * ./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest \
@@ -35,10 +38,9 @@ class StartupBenchmark {
     @Test
     fun baselineProfile() = startup(CompilationMode.Partial(BaselineProfileMode.Require))
 
-    @OptIn(ExperimentalMetricApi::class)
     private fun startup(compilation: CompilationMode) = rule.measureRepeated(
         packageName = targetPackage,
-        metrics = listOf(StartupTimingMetric(), TraceSectionMetric("bindApplication")) + SECTIONS.map { TraceSectionMetric(it, targetPackageOnly = true) },
+        metrics = startupMetrics(),
         compilationMode = compilation,
         startupMode = StartupMode.COLD,
         iterations = ITERATIONS,
@@ -47,10 +49,26 @@ class StartupBenchmark {
         startActivityAndWait()
     }
 
-    private companion object {
+    internal companion object {
         const val ITERATIONS = 15
 
-        /** The app's own startup sections (WatchMyMediaApp); a fakes build has none. */
-        val SECTIONS = listOf("WMM DataServices", "WMM PlaybackEngine", "WMM cast check", "WMM RealCastService")
+        /**
+         * The app's own startup sections (WatchMyMediaApp's `traced`); a fakes
+         * build has none, a TV no downloads or reminders, a phone no Cast Connect.
+         */
+        val SECTIONS = listOf(
+            "WMM DataServices",
+            "WMM OfflineDownloads",
+            "WMM PlaybackEngine",
+            "WMM cast check",
+            "WMM RealCastService",
+            "WMM castConnect",
+            "WMM followReminders",
+        )
+
+        /** Time to the first frame and to full display, bindApplication, and [SECTIONS]. */
+        @OptIn(ExperimentalMetricApi::class)
+        fun startupMetrics(): List<Metric> =
+            listOf(StartupTimingMetric(), TraceSectionMetric("bindApplication")) + SECTIONS.map { TraceSectionMetric(it, targetPackageOnly = true) }
     }
 }
