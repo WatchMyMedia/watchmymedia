@@ -12,6 +12,7 @@ import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 /** The background job that runs downloads while the app is away (Android 12 and later). */
+@OptIn(UnstableApi::class)
 internal interface DownloadJobs {
     /** Runs the downloads once [requirements] are met: now, when the network or space returns, and after a reboot. */
     fun schedule(requirements: Requirements)

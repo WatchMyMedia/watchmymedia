@@ -122,9 +122,6 @@ class OfflineDownloads(
 
     private val engine = Media3Engine(app, manager, cache)
 
-    /** Unfinished downloads go on after the process starts again: the manager resumes now. */
-    private val restarts = DownloadRestarts(manager, engine::startService, WorkManagerJobs(app))
-
     val repository: DownloadRepository
 
     init {
@@ -144,14 +141,19 @@ class OfflineDownloads(
         )
         repository = repo
         // At start and on coming to the foreground (PLAN-DOWNLOADS.md §6).
-        val process = ProcessLifecycleOwner.get().lifecycle
-        process.addObserver(object : DefaultLifecycleObserver {
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 scope.launch { repo.sync() }
             }
         })
-        process.addObserver(restarts)
     }
+
+    /**
+     * Unfinished downloads go on after the process starts again: the manager
+     * resumes now, once the repository has set its requirements (Wi-Fi only).
+     */
+    private val restarts = DownloadRestarts(manager, engine::startService, WorkManagerJobs(app))
+        .also { ProcessLifecycleOwner.get().lifecycle.addObserver(it) }
 
     /** The player's calls, with downloaded items played from the device. */
     fun playbackGateway(online: PlaybackGateway): PlaybackGateway = OfflinePlaybackGateway(online, repo)
