@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/db/dbtest"
 	"watchmymedia/server/internal/events"
 	"watchmymedia/server/internal/tmdb"
 	"watchmymedia/server/internal/tmdb/tmdbtest"
@@ -144,15 +145,8 @@ func setup(t *testing.T) env {
 // setupWith is setup with another TMDB client.
 func setupWith(t *testing.T, client *tmdb.Client) env {
 	t.Helper()
-	conn, err := db.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = conn.Close() })
+	conn := dbtest.OpenPath(t, filepath.Join(t.TempDir(), "t.db"))
 	ctx := context.Background()
-	if err := db.Migrate(ctx, conn); err != nil {
-		t.Fatal(err)
-	}
 	q := db.New(conn)
 	mov, _ := q.UpsertLibrary(ctx, db.UpsertLibraryParams{Type: "movie", Name: "Movies", Path: "/m"})
 	tv, _ := q.UpsertLibrary(ctx, db.UpsertLibraryParams{Type: "tv", Name: "TV", Path: "/t"})

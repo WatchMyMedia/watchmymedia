@@ -17,7 +17,7 @@ golangci-lint v2.15.0, the versions CI pins.
 | One package or test | `go test ./internal/playback -run TestVOD -count=1` |
 | Vet as CI does | `go vet ./... && GOOS=linux GOARCH=amd64 go vet ./... && GOOS=windows GOARCH=amd64 go vet ./...` |
 | Lint | `golangci-lint run ./...` (or `make lint` from the root, which also lints the web); `.golangci.yml` adds errorlint, nilerr, rowserrcheck, sqlclosecheck, bodyclose, noctx, modernize and gosec to the standard set, and `go fix ./...` applies the modernizers |
-| Race detector, as CI's `server-race` job runs it | `go test -race -short -p 1 -timeout 30m ./...` (`-short` skips the speed budgets; one package at a time and the longer limit are for GitHub's three-core macOS runners) |
+| Race detector, as CI's `server-race` job runs it | `go test -race -short -timeout 20m ./...` (`-short` skips the speed budgets; CI runs it on Linux, and the macOS-only code under the race detector in the `server-macos` job) |
 | Regenerate queries | `sqlc generate` (or `make gen-sqlc`) |
 | Regenerate the API documents and web types | `make gen-api` from the root |
 | Speed budgets | `make bench` from the root |
@@ -25,7 +25,8 @@ golangci-lint v2.15.0, the versions CI pins.
 
 The tests use ffmpeg and ffprobe from `PATH`. CI runs them with the build the
 releases ship: `deploy/macos/fetch-ffmpeg.sh arm64` from the root puts it in
-`build/ffmpeg/darwin-arm64`; put that first on `PATH` to match. Tests skip
+`build/ffmpeg/darwin-arm64` (`linux-amd64` for the race job's Linux runner);
+put that first on `PATH` to match. Tests skip
 what the local ffmpeg can't do (libx265, the overlay filter) rather than fail.
 
 ## Layout
@@ -55,7 +56,7 @@ Under `internal/`:
 | `offline` | Offline downloads outside the database: who may download (`offline.access`) and the transfers running now; the records, routes and sync are in `api` (`offline.go`, `offline_media.go`) ([PLAN-DOWNLOADS.md](../PLAN-DOWNLOADS.md)) |
 | `livetv` | Live TV: HDHomeRun tuners, channels and live HLS sessions; listings in `internal/livetv/guide`: SiliconDust's XMLTV feed (`internal/livetv/guide/xmltv`), its pictures (`internal/livetv/guide/art`), the refresh schedule and TMDB pictures and descriptions matched to listings (`internal/livetv/guide/enrich`), and each person's favourites, reminders and listings search (`internal/livetv/guide/personal.go`), with fakes in `internal/livetv/guide/guidetest` and `internal/livetv/hdhomerun/hdhrtest` ([PLAN-LIVE-TV-GUIDE.md](../PLAN-LIVE-TV-GUIDE.md)). The tuner's `DeviceAuth` is a `hdhomerun.Secret`, which never prints. `internal/livetv/dvr` owns schedules, capture, shared tuners, finalization, deletion and progress handoff ([PLAN-LIVE-TV-DVR.md](../PLAN-LIVE-TV-DVR.md)); `internal/growing` follows owned recording files, and `internal/bgwork` gates optional background analysis |
 | `plex` | The Plex adapter; `cmd/plexprobe` is its read-only probe, `internal/plex/plextest` a fictional plex.tv and server for tests. `cmd/plexsyncfixture` runs a disposable loopback provider/server for browser and client acceptance ([usage](cmd/plexsyncfixture/README.md)) |
-| `plexsync` | Plex sign-in, private grants, mappings, previews, durable opt-in watched imports, guarded undo and separate history ([PLAN-PLEX-SYNC.md](../PLAN-PLEX-SYNC.md), “P3 as built”). Watch mutations and checkpoints commit through `watchstate.ImportChecked`; worker and preview shutdown are awaited. |
+| `plexsync` | Plex sign-in, private grants, mappings, previews, durable opt-in watched imports, guarded undo and separate history ([PLAN-PLEX-SYNC.md](../PLAN-PLEX-SYNC.md), “P3 as built”). Watch mutations and checkpoints commit through `watchstate.ImportChecked`; worker and preview shutdown are awaited. A scheduled sync (`planScheduled`) writes only items an import would mark or whose source identity is not recorded yet, and adds the rest to the run's counts in one fenced update; a manual import writes every item. One item whose identity changed in Plex is skipped as unavailable (`sourceChanges`); only most of them changing stops the run as `source_identity_changed`. `TestScheduledSyncNoChangeCost` measures a 10,000-item no-change run. |
 | `httpx`, `memo`, `internal/integrations/apiclient`, `internal/tmdb/tmdbtest`, `internal/lists/mdblisttest` | What the clients for outside services share: URL redaction, size-limited reads and `Retry-After` (`httpx`); bounded TTL caches and shared calls detached from the first caller (`memo`); the Radarr, Sonarr and Seerr request and error code (`apiclient`); one fake TMDB for tests (`tmdbtest`) and one MDBList (`internal/lists/mdblisttest`) |
 
 ## Rules
@@ -65,6 +66,16 @@ Under `internal/`:
 names, so treat them as public. New reply fields take `required:"false"`. Bump
 `APILevel` in `internal/api/system.go` for changes the apps must know about. Then
 `make gen-api` and the Swift client steps in the root file.
+
+**Admin routes.** Wrap an admin-only operation in `adminOp` (`internal/api/auth.go`)
+rather than checking inside the handler: it refuses members and admins
+without access on this request before the body is read, and it marks the
+operation so `TestAdminOperationsRefuseMembers` checks it. Library
+maintenance (matching, rematching, hiding files, scans, and the TMDB
+searches behind them) is admin work, GETs included. What members' lists
+fetch from MDBList, on the admin's key, is limited in
+`internal/api/media_list_limits.go`. Media tokens (`?access_token=`) open
+GET and HEAD media routes only.
 
 **SQL.** Queries go in `internal/db/queries/*.sql` and run through sqlc;
 `internal/activity` keeps its own SQL. The server never runs `ANALYZE`, so
@@ -121,7 +132,12 @@ SQLite plans joins without statistics, and a plan that looks fine after
   with ten 250-entry lists and three library lists on Home, and times each
   page alone and the web Home's requests as one burst, arranged and not;
   `internal/activity`'s speed test seeds plays; `internal/livetv/dvr` measures list and guide-mark bursts over 10,000 recordings without statistics. `make bench` fails over budget;
-  plain `go test` runs smaller versions with looser budgets.
+  plain `go test` runs smaller versions with looser budgets. Name such a
+  test `Test...Speed`: CI's `server` and `windows-server` jobs skip `Speed$` in the
+  main test step and run those tests in a step of their own, one package at
+  a time. Beside the other packages on a three-core runner,
+  `TestHistorySpeed` went over its budget (PR #16, 2026-11-12) though alone
+  it has six times the room.
 
 **Watch state.** Change `watch_state` only through `internal/watchstate`, never
 with its queries directly: each change must also take a revision and leave a
@@ -253,9 +269,17 @@ requests with `doJSON`, and keep package globals out of tests. A test that
 waits on timers runs in a synctest bubble on an in-memory server
 (`startTestEnv` with `httptest.NewTestServer`).
 
-- Open a test database with `dbtest.Open(t)` (`internal/db/dbtest`), which
-  migrates it as the server does; `internal/db`'s own tests, which cannot
-  import it, use `openTest` and `migrateTo`.
+- Open a test database with `dbtest.Open(t)` (`internal/db/dbtest`), or
+  `dbtest.OpenPath` where the test needs the file's path. Each is a copy of
+  one database the test binary migrated as the server does: migrating takes
+  about 0.9 s under the race detector against 30 ms without, and calling
+  `db.Migrate` per test made `internal/api` three times slower there. `internal/db`'s own tests, which cannot import it,
+  use `openTest` and `migrateTo`.
+- Write a script that stands in for ffmpeg or ffprobe with
+  `ffexectest.WriteScript` (`internal/ffexec/ffexectest`), not `os.WriteFile`.
+  Linux refuses to run a file a process still has open for writing, and a
+  process a parallel test starts holds the descriptor for a moment, so a
+  script written the plain way failed now and then with "text file busy".
 - Don't sleep to wait for goroutines or timers. Use the standard library's
   synctest package for code driven by timers (the watcher's debouncer,
   coalesced scans), or wait on an event or channel; give code that compares

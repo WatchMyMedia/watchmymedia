@@ -352,15 +352,8 @@ func serve() error {
 		bot.SetKeys(site, secret)
 	}
 	authSvc.SetChallenge(bot)
-	mediaKey, _ := store.Get(ctx, settings.KeyMediaTokenKey, "")
-	if authSvc.SetMediaKey(mediaKey) != nil {
-		mediaKey = auth.NewMediaKey()
-		if err := store.Set(ctx, settings.KeyMediaTokenKey, mediaKey); err != nil {
-			return fmt.Errorf("store media token key: %w", err)
-		}
-		if err := authSvc.SetMediaKey(mediaKey); err != nil {
-			return err
-		}
+	if err := loadMediaKey(ctx, store, authSvc); err != nil {
+		return err
 	}
 	go func() {
 		t := time.NewTicker(time.Hour)
@@ -614,4 +607,19 @@ func newLogger(cfg config.LogConfig) *slog.Logger {
 		h = slog.NewTextHandler(os.Stdout, opts)
 	}
 	return slog.New(h)
+}
+
+// loadMediaKey gives the auth service the stored media token key, or makes
+// and stores a new one when there is none, as on a first start or after
+// restoring a backup (which leaves the key out).
+func loadMediaKey(ctx context.Context, store *settings.Store, a *auth.Service) error {
+	key, _ := store.Get(ctx, settings.KeyMediaTokenKey, "")
+	if a.SetMediaKey(key) == nil {
+		return nil
+	}
+	key = auth.NewMediaKey()
+	if err := store.Set(ctx, settings.KeyMediaTokenKey, key); err != nil {
+		return fmt.Errorf("store media token key: %w", err)
+	}
+	return a.SetMediaKey(key)
 }

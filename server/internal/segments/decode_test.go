@@ -5,9 +5,10 @@ package segments
 import (
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"testing"
+
+	"watchmymedia/server/internal/ffexec/ffexectest"
 )
 
 // fakeFFmpeg writes a script that fails as ffmpeg would.
@@ -15,7 +16,7 @@ func fakeFFmpeg(t *testing.T, stderr string, code string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "ffmpeg")
 	script := "#!/bin/sh\necho '" + stderr + "' >&2\nexit " + code + "\n"
-	if err := os.WriteFile(path, []byte(script), 0o700); err != nil { //nolint:gosec // G306: a script, which must be executable
+	if err := ffexectest.WriteScript(path, script); err != nil {
 		t.Fatal(err)
 	}
 	return path

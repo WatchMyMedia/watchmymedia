@@ -29,6 +29,9 @@ func TestVODPlaybackForDevices(t *testing.T) {
 	srv := newTestServerWith(t, func(d *Deps) {
 		d.Playback = mgr
 		d.Keyframes = playback.NewKeyframes(ffprobe, t.TempDir(), log)
+		// A scan writes its result into that folder after it answers: wait for
+		// it before the folder goes.
+		t.Cleanup(d.Keyframes.Close)
 		d.Subtitles = playback.NewSubtitles(ffmpeg, t.TempDir())
 	})
 	ctx := t.Context()

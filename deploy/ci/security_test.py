@@ -48,9 +48,10 @@ class WorkflowIsolationTest(unittest.TestCase):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
-        hosted = dict.fromkeys(('changes', 'web', 'contract', 'docker', 'android'), 'ubuntu-latest')
-        hosted.update(dict.fromkeys(('server', 'server-race', 'apple', 'apple-tv'), 'macos-26'))
-        hosted['windows'] = hosted['windows-signing'] = 'windows-latest'
+        hosted = dict.fromkeys(('changes', 'web', 'contract', 'docker', 'scripts', 'android', 'server', 'server-race'), 'ubuntu-latest')
+        # macOS runners are the scarce ones: only what needs a Mac runs there.
+        hosted.update(dict.fromkeys(('server-macos', 'apple', 'apple-tv'), 'macos-26'))
+        hosted['windows-server'] = hosted['windows-app'] = hosted['windows-signing'] = 'windows-latest'
         self.assertEqual(set(hosted), set(jobs))
         studio = ['self-hosted', 'macOS', 'ARM64', 'mac-studio']
         # Exercise the actual runs-on expressions, not a second routing helper.
@@ -75,24 +76,110 @@ class WorkflowIsolationTest(unittest.TestCase):
                     with self.subTest(job=job, event=event, private=visibility, head=head, ref=ref):
                         self.assertEqual(expected, evaluate_runner(runner, context))
 
+    def test_every_job_runs_only_for_what_it_checks(self):
+        # Each job waits on the changes job and runs when its own paths, this
+        # workflow or a manual run say so, so a docs or template change does
+        # not run the server's race tests or build the apps.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        gated = {'server': 'server', 'server-macos': 'server', 'server-race': 'race', 'contract': 'contract', 'web': 'web',
+                 'docker': 'docker', 'scripts': 'scripts', 'android': 'android', 'apple': 'apple',
+                 'apple-tv': 'apple-tv', 'windows-server': 'windows', 'windows-app': 'windows'}
+        self.assertEqual(set(gated) | {'changes', 'windows-signing'}, set(jobs))
+        for job, output in gated.items():
+            with self.subTest(job=job):
+                self.assertRegex(jobs[job], r'(?m)^    needs: (changes|\[changes[^\]]*\])$')
+                self.assertIn(f"needs.changes.outputs.{output} == 'true'", jobs[job])
+        outputs = dict(re.findall(r"(?m)^      ([\w-]+): (\$\{\{ github\.event_name == 'workflow_dispatch' \|\|.*)$", jobs['changes']))
+        # apple-api gates a step, not a job: the apple job's API client check.
+        self.assertEqual(set(gated.values()) | {'apple-api'}, set(outputs))
+        self.assertIn("needs.changes.outputs.apple-api == 'true'", jobs['apple'])
+        filters = jobs['changes'].split('filters: |', 1)[1]
+        for output in outputs:
+            with self.subTest(output=output):
+                block = re.search(rf'(?ms)^            {output}:\n((?:              - .*\n)+)', filters).group(1)
+                if output != 'scripts':
+                    self.assertIn("'.github/workflows/ci.yml'", block)
+        # windows-app installs the web job's build, so web runs with it.
+        self.assertIn("steps.filter.outputs.windows == 'true'", outputs['web'])
+
     def test_windows_installer_embeds_the_web_build_from_the_same_run(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
-        self.assertIn('needs: [changes, web]', jobs['windows'])
+        self.assertIn('needs: [changes, web]', jobs['windows-app'])
         self.assertIn('name: windows-embedded-web', jobs['web'])
         self.assertIn('path: web/dist/', jobs['web'])
-        self.assertIn('actions/download-artifact@', jobs['windows'])
-        self.assertIn('name: windows-embedded-web', jobs['windows'])
-        self.assertIn('path: server/internal/webui/dist', jobs['windows'])
-        self.assertNotIn('windows/build.sh --smoke', jobs['windows'])
-        self.assertNotIn('actions/download-artifact@', jobs['server'])
+        self.assertIn('actions/download-artifact@', jobs['windows-app'])
+        self.assertIn('name: windows-embedded-web', jobs['windows-app'])
+        self.assertIn('path: server/internal/webui/dist', jobs['windows-app'])
+        self.assertNotIn('windows/build.sh --smoke', jobs['windows-app'])
+        # The server's tests need no web build, so they don't wait for one.
+        for name in ('server', 'windows-server'):
+            self.assertNotIn('actions/download-artifact@', jobs[name])
+        self.assertRegex(jobs['windows-server'], r'(?m)^    needs: changes$')
+
+    def test_server_tests_run_on_linux_and_macos_keeps_its_own_code(self):
+        # Every Go test, the lint and the generated-code check run on Linux;
+        # the scarce macOS runner tests only the packages with macOS code,
+        # and that code under the race detector.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        server, mac = jobs['server'], jobs['server-macos']
+        for marker in ("go test -skip 'Speed$' ./...\n", "go test -p 1 -run 'Speed$' ./...", 'golangci/golangci-lint-action@',
+                       'cmd/sqlc@v1.31.1 generate', 'govulncheck@', 'GOOS=windows GOARCH=amd64 go vet ./...'):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, server)
+                self.assertNotIn(marker, mac)
+        self.assertIn("go test -skip 'Speed$' ./internal/ffexec ./internal/scanner ./internal/playback "
+                      "./internal/livetv ./internal/livetv/dvr\n", mac)
+        self.assertIn('go test -race -short ./internal/ffexec', mac)
+        self.assertIn("go test -race -short -run 'Watch' ./internal/scanner", mac)
+        self.assertIn('deploy/macos/fetch-ffmpeg.sh arm64', mac)
+        # Every package with a file built only for macOS is one the macOS job tests.
+        tested = set(re.search(r"go test -skip 'Speed\$' ((?:\./internal/\S+ ?)+)", mac).group(1).split())
+        for path in sorted((ROOT / 'server').rglob('*_darwin.go')):
+            with self.subTest(file=path.name):
+                self.assertIn('./' + path.parent.relative_to(ROOT / 'server').as_posix(), tested)
+        # The image is built from what the Linux job tested.
+        self.assertIn('needs: [changes, server, web]', jobs['docker'])
+
+    def test_windows_server_and_app_split_the_work_once(self):
+        # Two jobs at once instead of one after the other: the Go tests and
+        # qualifications in windows-server, the app, its installers and their
+        # smoke tests in windows-app, each step in exactly one of them.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        server, app = jobs['windows-server'], jobs['windows-app']
+        for marker in ("go test -skip 'Speed$' ./...", "go test -p 1 -run 'Speed$' ./...",
+                       "-run '^TestRemuxSession$' -count=50", 'TestLiveLadder', 'TestVODLadder',
+                       'probe-transcoder', 'windows-transcoder-report'):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, server)
+                self.assertNotIn(marker, app)
+        for marker in ('hardware-check-test.ps1', 'signing-test.ps1', 'windows/build.sh', 'TestPinnedUpdaterDLL',
+                       'hardware-check.ps1 -AppDir', 'installer.sh', 'platform-smoke.ps1', 'windows/smoke.ps1',
+                       'installer-smoke.ps1', 'windows-development-installer', 'windows-tray-logs'):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, app)
+                self.assertNotIn(marker, server)
+        # The Live TV qualification runs twice on main and manual runs, once on PRs.
+        self.assertIn("-run '^TestLiveLadder.*Qualification$' -count=${{ github.event_name == 'pull_request' && 1 || 2 }} -v", server)
 
     def test_workflow_keeps_read_only_permissions_and_fork_boundary(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         self.assertRegex(workflow, r'(?m)^  pull_request:$')
         self.assertNotIn('pull_request_target:', workflow)
-        self.assertNotIn('secrets.', workflow)
+        # One secret only: the key that encrypts Gradle's configuration cache,
+        # read by setup-gradle in the android job. Nothing else in CI may read
+        # a secret, so a pull request's code can't reach one that matters.
+        self.assertEqual(['secrets.GRADLE_ENCRYPTION_KEY'], re.findall(r'secrets\.\w+', workflow))
+        self.assertEqual(1, workflow.count('secrets'))  # no secrets['…'] or toJSON(secrets)
+        android = re.search(r'(?ms)^  android:\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
+        self.assertIn('          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}\n', android)
         self.assertNotIn('vars.CI_RUNNER', workflow)
         self.assertRegex(workflow, r'permissions:\n  contents: read\n')
 
@@ -167,6 +254,9 @@ class WorkflowIsolationTest(unittest.TestCase):
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
         self.assertEqual({'check', 'binaries', 'macos', 'image', 'ios', 'android', 'windows'}, set(jobs))
+        # check only reads the tag and the changelog: it must not wait on the
+        # scarce macOS runners, since every other job waits on it.
+        self.assertRegex(jobs['check'], r'(?m)^    runs-on: ubuntu-latest$')
         for name, job in jobs.items():
             with self.subTest(job=name):
                 self.assertRegex(job, r'(?m)^    runs-on: (macos-26|ubuntu-latest|windows-latest)$')
@@ -175,6 +265,57 @@ class WorkflowIsolationTest(unittest.TestCase):
                     self.assertRegex(job, r'(?m)^    environment: (release|windows-signing)$')
                 if 'packages: write' in job:
                     self.assertEqual('image', name)
+
+    def test_go_caches_are_saved_only_by_main_on_hosted_runners(self):
+        # Pull requests read main's Go caches and never write one, so no pull
+        # request, fork or not, can seed what the next run on main restores.
+        # main and manual runs clear Go's test results and run every test.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        self.assertNotIn('actions/cache@', workflow)
+        setups = re.findall(r'(?m)uses: actions/setup-go@[^\n]*\n        with:\n((?:          .*\n)+)', workflow)
+        self.assertEqual(7, len(setups))
+        for setup in setups:
+            self.assertIn('          cache: false\n', setup)
+        save_if = ("if: \"!cancelled() && runner.environment == 'github-hosted' && "
+                   "github.event_name == 'push' && github.ref == 'refs/heads/main'\"")
+        cached = {'server', 'server-macos', 'server-race', 'contract', 'windows-server', 'windows-app'}
+        for name, job in jobs.items():
+            with self.subTest(job=name):
+                if name not in cached:
+                    self.assertNotIn('go-cache', job)
+                    continue
+                self.assertEqual(1, job.count('uses: actions/cache/restore@'))
+                self.assertEqual(1, job.count('uses: actions/cache/save@'))
+                save = job.split('uses: actions/cache/save@', 1)[1]
+                self.assertIn(save_if, save)
+                self.assertIn('key: ${{ steps.go-cache.outputs.key }}', save)
+                # The save comes last, after every step that fills the cache.
+                self.assertNotIn('\n      - ', save)
+                self.assertIn('echo "key=$prefix$SUMS-$GITHUB_SHA"', job)
+                if name != 'contract':
+                    self.assertIn("if: github.event_name != 'pull_request'\n"
+                                  "        working-directory: server\n"
+                                  "        run: go clean -testcache\n", job)
+                    self.assertLess(job.index('go clean -testcache'), job.index('go test'))
+
+    def test_gradle_caches_are_saved_only_by_main_on_hosted_runners(self):
+        # setup-gradle caches Gradle's home and the configuration cache on
+        # GitHub's machines, written only by pushes to main like the Go
+        # caches. setup-java's cache never saved: GRADLE_USER_HOME moves.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        android = re.search(r'(?ms)^  android:\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
+        setup_java = re.search(r'(?m)uses: actions/setup-java@[^\n]*\n        with:\n((?:          .*\n)+)', android).group(1)
+        self.assertNotIn('cache', setup_java)
+        self.assertEqual(1, android.count('uses: gradle/actions/setup-gradle@'))
+        setup = android.split('uses: gradle/actions/setup-gradle@', 1)[1].split('\n      - ', 1)[0]
+        self.assertIn("if: runner.environment == 'github-hosted'", setup)
+        self.assertIn("cache-read-only: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}", setup)
+        self.assertIn('cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}', setup)
+        self.assertNotIn('cache-write-only', setup)
+        self.assertLess(android.index('GRADLE_USER_HOME='), android.index('setup-gradle@'))
+        self.assertLess(android.index('setup-gradle@'), android.index('./gradlew'))
 
     def test_actions_are_pinned_to_commits(self):
         # A tag can be moved to other code and a commit cannot. Release jobs
@@ -199,8 +340,8 @@ class WorkflowIsolationTest(unittest.TestCase):
                                     ('ANDROID_SDK_ROOT', 'android-sdk'),
                                     ('GRADLE_USER_HOME', 'gradle')):
             self.assertIn(variable + '=$RUNNER_TOOL_CACHE/' + directory, android)
-        for variable, directory, count in (('GOCACHE', 'go-build', 3),
-                                           ('GOMODCACHE', 'go-mod', 3),
+        for variable, directory, count in (('GOCACHE', 'go-build', 4),
+                                           ('GOMODCACHE', 'go-mod', 4),
                                            ('GOLANGCI_LINT_CACHE', 'golangci-lint', 1)):
             self.assertEqual(count, workflow.count(variable + '=$RUNNER_TOOL_CACHE/' + directory))
         setup = re.search(r"(?ms)- name: Keep Android tools[^\n]*\n        run: \|\n(.*?)(?=      -)", android).group(1)
@@ -269,8 +410,9 @@ case "$*" in
 esac
 ''')
             stub.chmod(0o755)
+            # The Mac Studio's runners, whatever machine runs this test.
             env = dict(os.environ, PATH=str(path) + os.pathsep + os.environ['PATH'],
-                       STUB_DIR=tmp, CREATED_ID=created)
+                       STUB_DIR=tmp, CREATED_ID=created, RUNNER_ENVIRONMENT='self-hosted')
             script = str(ROOT / 'apple/scripts/simulator.sh')
             existing = subprocess.check_output(['sh', script, 'iPhone 17 Pro'],
                                                env=dict(env, RUNNER_NAME='mac-studio-1'), text=True)
@@ -301,6 +443,28 @@ esac
                              'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro '
                              'com.apple.CoreSimulator.SimRuntime.iOS-26-0\n', (path / 'created').read_text())
 
+            # A GitHub-hosted runner is a new machine each job: it uses
+            # Xcode's own device rather than making a copy that never booted.
+            (path / 'created').unlink()
+            hosted = subprocess.check_output(['sh', script, 'iPhone 17 Pro'],
+                                             env=dict(env, RUNNER_NAME='GitHub Actions 1000001',
+                                                      RUNNER_ENVIRONMENT='github-hosted'), text=True)
+            self.assertEqual(base, hosted.strip())
+            self.assertFalse((path / 'created').exists())
+
+    def test_every_cache_is_saved_only_by_main_pushes_on_hosted_runners(self):
+        # Whatever the cache, a pull request (a fork's included) only reads
+        # what main saved, and the Mac Studio keeps its own disk instead.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        steps = re.findall(r'(?m)^      - uses: actions/cache/(restore|save)@[^\n]*\n((?:        .*\n)+)', workflow)
+        self.assertEqual({'restore', 'save'}, {kind for kind, _ in steps})
+        for kind, body in steps:
+            with self.subTest(kind=kind, step=body.splitlines()[0]):
+                guard = re.search(r'(?m)^        if: (.+)$', body).group(1)
+                self.assertIn("runner.environment == 'github-hosted'", guard)
+                if kind == 'save':
+                    self.assertIn("github.event_name == 'push' && github.ref == 'refs/heads/main'", guard)
+
     def test_git_ignores_private_files_at_nested_paths(self):
         for path in ('nested/.env', 'nested/.env.production', 'nested/signing.p8',
                      'nested/signing.p12', 'nested/private.key', 'nested/private.pem',
@@ -310,10 +474,10 @@ esac
 
     def test_tv_diagnostics_override_preserves_tests_results_and_failures(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
-        tv = re.search(r'(?ms)^  apple-tv:\n(.*?)(?=^  windows:)', workflow).group(1)
+        tv = re.search(r'(?ms)^  apple-tv:\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
         step = re.search(r'(?ms)- name: Build and test on an Apple TV simulator\n(.*?)(?=      -)', tv).group(1)
         self.assertIn('timeout-minutes: 20', step)
-        self.assertIn('make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never PATH="$PATH"', step)
+        self.assertIn("make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH=\"$PATH\"", step)
         self.assertNotIn('continue-on-error', tv)
         self.assertIn('path: apple/build/TVTests.xcresult', tv)
 
@@ -325,6 +489,8 @@ esac
             commands = {
                 'apple/scripts/simulator.sh': 'echo 00000000-0000-0000-0000-000000000001',
                 'xcodegen': 'exit 0',
+                # The early boot: a failure there must not stop the tests.
+                'xcrun': 'exit 1',
                 'xcodebuild': 'printf "%s\\n" "$@" > "$CAPTURE_PATH"\nexit "$STUB_EXIT"',
             }
             for name, script in commands.items():
@@ -348,6 +514,11 @@ esac
                         self.assertEqual(policy, args[args.index('-collect-test-diagnostics') + 1])
                     else:
                         self.assertNotIn('-collect-test-diagnostics', args)
+            subprocess.run(command + ['APPLE_TEST_FLAGS=-enableCodeCoverage NO'], cwd=tmp, env=env,
+                           check=True, capture_output=True)
+            args = capture.read_text().splitlines()
+            self.assertEqual('NO', args[args.index('-enableCodeCoverage') + 1])
+            self.assertEqual('test', args[-1])
             failed = subprocess.run(command + ['APPLE_TV_TEST_DIAGNOSTICS=never'], cwd=tmp,
                                     env=dict(env, STUB_EXIT='65'), capture_output=True)
             self.assertNotEqual(0, failed.returncode)

@@ -41,6 +41,8 @@ SIM ?= iPhone 17 Pro
 TV_SIM ?= Apple TV 4K (4th generation)
 # Optional CI override for verbose Xcode diagnostics; empty keeps local defaults.
 APPLE_TV_TEST_DIAGNOSTICS ?=
+# Extra xcodebuild arguments for the simulator tests (CI turns coverage off).
+APPLE_TEST_FLAGS ?=
 APPLE_DERIVED := apple/build/DerivedData
 APPLE_GEN := apple/Tools/.build/release/swift-openapi-generator
 # Simulator builds are signed to run locally (ad hoc, no account or profile):
@@ -69,9 +71,10 @@ apple-build: apple-gen ## Build the iPhone app for the simulator -> apple/build/
 
 apple-test-sim: apple-gen ## Build the app and run every test on the $(SIM) simulator
 	id=$$(apple/scripts/simulator.sh "$(SIM)") && \
+	{ xcrun simctl boot "$$id" 2>/dev/null || true; } && \
 	rm -rf apple/build/Tests.xcresult && \
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMedia -destination "platform=iOS Simulator,id=$$id" \
-	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/Tests.xcresult $(APPLE_SIM_SIGNING) test
+	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/Tests.xcresult $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) test
 
 apple-tv-build: apple-gen ## Build the Apple TV app for the simulator -> apple/build/DerivedData
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination 'generic/platform=tvOS Simulator' \
@@ -79,9 +82,10 @@ apple-tv-build: apple-gen ## Build the Apple TV app for the simulator -> apple/b
 
 apple-tv-test-sim: apple-gen ## Build the Apple TV app and run every test on the $(TV_SIM) simulator
 	id=$$(apple/scripts/simulator.sh "$(TV_SIM)" appletv) && \
+	{ xcrun simctl boot "$$id" 2>/dev/null || true; } && \
 	rm -rf apple/build/TVTests.xcresult && \
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
-	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVTests.xcresult $(APPLE_SIM_SIGNING) \
+	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVTests.xcresult $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) \
 	  $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) test
 
 # apple-e2e runs the app on $(SIM) against a server: E2E_SERVER as typed in

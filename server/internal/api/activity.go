@@ -438,7 +438,7 @@ func registerActivity(h huma.API, deps Deps) {
 			out.Body.Transcoder = TranscoderLoad{Sessions: deps.Playback.Running(), Max: deps.Playback.Limit(), Encoder: deps.Playback.Capabilities().Encoder,
 				Downloads: deps.Playback.DownloadsRunning()}
 			if v.Admin {
-				resources, scanErr := deps.Playback.Resources()
+				resources, scanErr := deps.Playback.LastResources()
 				out.Body.Transcoder.Cache = &PlaybackCacheLoad{TemporaryBytes: resources.TemporaryBytes,
 					TemporaryFiles: resources.TemporaryFiles, FreeBytes: resources.FreeBytes,
 					MaxCacheBytes: resources.MaxCacheBytes, MaxSessionBytes: resources.MaxSessionBytes,

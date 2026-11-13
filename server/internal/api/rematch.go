@@ -40,13 +40,13 @@ type RematchOutput struct {
 }
 
 func registerRematch(h huma.API, deps Deps) {
-	huma.Register(h, huma.Operation{
+	huma.Register(h, adminOp(h, huma.Operation{
 		OperationID: "searchLibraryCandidates",
 		Method:      http.MethodGet,
 		Path:        Prefix + "/libraries/{id}/candidates",
 		Summary:     "Search TMDB for shows or movies, by the library's type",
 		Tags:        []string{"files"},
-	}, func(ctx context.Context, in *LibraryCandidatesInput) (*SearchCandidatesOutput, error) {
+	}), func(ctx context.Context, in *LibraryCandidatesInput) (*SearchCandidatesOutput, error) {
 		lib, err := getLibrary(ctx, deps, in.ID)
 		if err != nil {
 			return nil, err
@@ -61,14 +61,14 @@ func registerRematch(h huma.API, deps Deps) {
 		return searchCandidates(ctx, deps, lib.Type, in.Query, year)
 	})
 
-	huma.Register(h, huma.Operation{
+	huma.Register(h, adminOp(h, huma.Operation{
 		OperationID: "previewShowRematch",
 		Method:      http.MethodGet,
 		Path:        Prefix + "/shows/{id}/rematch",
 		Summary:     "Preview moving a show's files to another TMDB show",
 		Description: "Saves nothing. Counts the files that keep their season and episode in the other show, and the watched episodes that carry over.",
 		Tags:        []string{"files"},
-	}, func(ctx context.Context, in *RematchPreviewInput) (*RematchPreviewOutput, error) {
+	}), func(ctx context.Context, in *RematchPreviewInput) (*RematchPreviewOutput, error) {
 		show, err := deps.Queries.GetShow(ctx, in.ID)
 		if err != nil {
 			return nil, notFound(err, "show not found")
@@ -83,14 +83,14 @@ func registerRematch(h huma.API, deps Deps) {
 		return &RematchPreviewOutput{Body: plan}, nil
 	})
 
-	huma.Register(h, huma.Operation{
+	huma.Register(h, adminOp(h, huma.Operation{
 		OperationID: "rematchShow",
 		Method:      http.MethodPost,
 		Path:        Prefix + "/shows/{id}/rematch",
 		Summary:     "Move a show's files to another TMDB show",
 		Description: "Each file keeps its season and episode numbers and is locked; files whose episode the other show lacks are left unmatched. Watch state moves to the episode with the same numbers. The old show is removed.",
 		Tags:        []string{"files"},
-	}, func(ctx context.Context, in *RematchInput) (*RematchOutput, error) {
+	}), func(ctx context.Context, in *RematchInput) (*RematchOutput, error) {
 		show, err := deps.Queries.GetShow(ctx, in.ID)
 		if err != nil {
 			return nil, notFound(err, "show not found")
@@ -113,13 +113,13 @@ func registerRematch(h huma.API, deps Deps) {
 		return &RematchOutput{Body: res}, nil
 	})
 
-	huma.Register(h, huma.Operation{
+	huma.Register(h, adminOp(h, huma.Operation{
 		OperationID: "previewMovieRematch",
 		Method:      http.MethodGet,
 		Path:        Prefix + "/movies/{id}/rematch",
 		Summary:     "Preview moving a movie's files to another TMDB movie",
 		Tags:        []string{"files"},
-	}, func(ctx context.Context, in *RematchPreviewInput) (*RematchPreviewOutput, error) {
+	}), func(ctx context.Context, in *RematchPreviewInput) (*RematchPreviewOutput, error) {
 		movie, err := deps.Queries.GetMovie(ctx, in.ID)
 		if err != nil {
 			return nil, notFound(err, "movie not found")
@@ -134,14 +134,14 @@ func registerRematch(h huma.API, deps Deps) {
 		return &RematchPreviewOutput{Body: plan}, nil
 	})
 
-	huma.Register(h, huma.Operation{
+	huma.Register(h, adminOp(h, huma.Operation{
 		OperationID: "rematchMovie",
 		Method:      http.MethodPost,
 		Path:        Prefix + "/movies/{id}/rematch",
 		Summary:     "Move a movie's files to another TMDB movie",
 		Description: "The files are locked to the other movie and watch state moves with them. The old movie is removed.",
 		Tags:        []string{"files"},
-	}, func(ctx context.Context, in *RematchInput) (*RematchOutput, error) {
+	}), func(ctx context.Context, in *RematchInput) (*RematchOutput, error) {
 		movie, err := deps.Queries.GetMovie(ctx, in.ID)
 		if err != nil {
 			return nil, notFound(err, "movie not found")

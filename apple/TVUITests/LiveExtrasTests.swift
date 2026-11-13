@@ -138,7 +138,9 @@ final class LiveExtrasTests: XCTestCase {
 
     @MainActor
     func testTheBannerComesOverHomeWithoutTakingFocus() {
-        let app = launch(["-fakesLiveReminderSoon"])
+        // The reminder comes 8 s after launch, once Home is up, rather than the
+        // fakes' default 20 s.
+        let app = launch(["-fakesLiveReminderSoon", "8"])
         let banner = app.descendants(matching: .any)["live-reminder-banner"]
         XCTAssertTrue(banner.waitForExistence(timeout: 45), "The reminder's banner comes at its time")
         XCTAssertTrue(banner.label.contains("Pro Hockey starts in 5 minutes on 9.1 PNVL-HD. Watch it from Live TV."), banner.label)
@@ -152,7 +154,9 @@ final class LiveExtrasTests: XCTestCase {
 
     @MainActor
     func testThePlayersChannelsPutTheDueReminderFirst() {
-        let app = launch(["-fakesLiveReminderSoon", "-open", "watchmymedia://live-tv/ch-7.1", "-livePanel", "channels"])
+        // 12 s: the channel plays and its Channels panel is open before the
+        // reminder comes, so the banner is the player's.
+        let app = launch(["-fakesLiveReminderSoon", "12", "-open", "watchmymedia://live-tv/ch-7.1", "-livePanel", "channels"])
         let banner = app.descendants(matching: .any)["live-reminder-banner"]
         XCTAssertTrue(banner.waitForExistence(timeout: 45))
         XCTAssertTrue(banner.label.contains("Swipe down to watch."), banner.label)

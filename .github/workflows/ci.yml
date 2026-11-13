@@ -25,18 +25,29 @@ permissions:
   contents: read
 
 jobs:
-  # Which parts changed, so that the app jobs run only when their own folder
-  # or the API documents their clients come from changed (or this file). A
-  # manual run builds everything.
+  # Which parts changed, so that each job runs only when what it builds or
+  # tests changed (or this file): a README or template change does not run
+  # the server's race tests or build the apps. A manual run runs everything,
+  # and so does a change to this file.
   changes:
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
     permissions:
       contents: read
       pull-requests: read
     outputs:
+      server: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.server == 'true' }}
+      race: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.race == 'true' }}
+      contract: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.contract == 'true' }}
+      # The windows job installs the web build this job makes.
+      web: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.web == 'true' || steps.filter.outputs.windows == 'true' }}
+      docker: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.docker == 'true' }}
+      scripts: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.scripts == 'true' }}
       android: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.android == 'true' }}
       windows: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.windows == 'true' }}
       apple: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apple == 'true' }}
+      apple-tv: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apple-tv == 'true' }}
+      # Not a job: whether the apple job checks the generated Swift API client.
+      apple-api: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apple-api == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -44,16 +55,74 @@ jobs:
         if: github.event_name != 'workflow_dispatch'
         with:
           filters: |
+            server:
+              - 'server/**'
+              - 'deploy/macos/fetch-ffmpeg.sh'
+              - 'Makefile'
+              - '.github/workflows/ci.yml'
+            race:
+              - 'server/**'
+              - 'deploy/macos/fetch-ffmpeg.sh'
+              - '.github/workflows/ci.yml'
+            contract:
+              - 'server/**'
+              - 'api/**'
+              - 'web/src/api/**'
+              - 'web/package.json'
+              - 'web/pnpm-lock.yaml'
+              - 'Makefile'
+              - '.github/workflows/ci.yml'
+            web:
+              - 'web/**'
+              - 'brand/export/web/**'
+              - '.github/workflows/ci.yml'
+            docker:
+              - 'deploy/Dockerfile'
+              - 'deploy/entrypoint.sh'
+              - '.dockerignore'
+              - 'deploy/ci/docker-smoke.sh'
+              - 'deploy/ci/prepare-docker.py'
+              - 'server/**'
+              - 'web/**'
+              - '.github/workflows/ci.yml'
+            scripts:
+              - 'deploy/**'
+              - '.github/**'
+              - 'Makefile'
+              - '**/*.md'
+              - '.gitignore'
+              - '.dockerignore'
             android:
               - 'android/**'
               - 'api/**'
               - '.github/workflows/ci.yml'
-              - 'deploy/ci/**'
+            # The iPhone app's job runs for its own folders, the TV app's for
+            # its own, and both for what they share. Docs in apple/ run neither.
             apple:
-              - 'apple/**'
+              - 'apple/App/**'
+              - 'apple/UITests/**'
+              - 'apple/Kit/**'
+              - 'apple/project.yml'
+              - 'apple/Tools/**'
+              - 'apple/scripts/**'
               - 'api/**'
               - '.github/workflows/ci.yml'
-              - 'deploy/ci/**'
+            apple-tv:
+              - 'apple/TV/**'
+              - 'apple/TVUITests/**'
+              - 'apple/Kit/**'
+              - 'apple/project.yml'
+              - 'apple/Tools/**'
+              - 'apple/scripts/**'
+              - 'api/**'
+              - '.github/workflows/ci.yml'
+            apple-api:
+              - 'api/**'
+              - 'apple/Tools/**'
+              - 'apple/Kit/Sources/WMMAPI/**'
+              - 'apple/scripts/openapi-for-swift.py'
+              - 'apple/scripts/open-response-enums.py'
+              - '.github/workflows/ci.yml'
             windows:
               - 'windows/**'
               - 'deploy/windows/**'
@@ -63,14 +132,16 @@ jobs:
               - 'server/**'
               - 'deploy/macos/fetch-ffmpeg.sh'
               - '.github/workflows/ci.yml'
-              - 'deploy/ci/**'
 
-  # Vet, lint and the generated-code check, then the Go tests with the ffmpeg
-  # build the releases ship, so the VideoToolbox paths run on real hardware.
-  # Linux is covered by building and vetting for it, Windows by vetting
-  # here and by the windows job's tests.
+  # Vet, lint and the generated-code check, then every Go test with the
+  # ffmpeg build the releases ship, on Linux: GitHub's Linux runners are the
+  # easiest to get, and its macOS ones the scarcest (five at once for every
+  # pull request and release). Windows is covered by vetting here and by the
+  # windows-server job's tests, macOS by the server-macos job.
   server:
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Keep Go caches in this runner's tool cache
@@ -82,7 +153,42 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
-          cache: ${{ runner.environment == 'github-hosted' }}
+          cache: false
+      # Go's build and test caches, on GitHub's machines. Only pushes to main
+      # save them, under their commit, and every run restores main's newest,
+      # so a pull request reruns only the packages it changes and those that
+      # depend on them (Go keys a test result on its binary, the files it
+      # read and its environment). setup-go's own cache is keyed on go.sum
+      # alone, so it was saved once and then restored ever staler. A new
+      # pinned ffmpeg starts from nothing: Go can't see the ffmpeg its tests
+      # run.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
       - name: Vet, and build for Linux and Windows
         working-directory: server
         run: |
@@ -90,8 +196,6 @@ jobs:
           GOOS=linux GOARCH=amd64 go vet ./...
           GOOS=linux GOARCH=arm64 go build ./...
           GOOS=windows GOARCH=amd64 go vet ./...
-      - name: Test the isolated streaming runner
-        run: python3 -I -m unittest discover -s deploy/fixture -p '*_test.py'
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15.0
@@ -111,16 +215,50 @@ jobs:
         env:
           FFMPEG_CACHE: ${{ runner.tool_cache }}/watchmymedia-ffmpeg
         run: |
-          deploy/macos/fetch-ffmpeg.sh arm64
-          build/ffmpeg/darwin-arm64/ffmpeg -hide_banner -version | head -1
+          case "$RUNNER_OS-$RUNNER_ARCH" in
+            macOS-ARM64) target=arm64 dir=darwin-arm64 ;;
+            Linux-X64) target=linux-amd64 dir=linux-amd64 ;;
+            Linux-ARM64) target=linux-arm64 dir=linux-arm64 ;;
+            *) echo "no ffmpeg build for $RUNNER_OS-$RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          deploy/macos/fetch-ffmpeg.sh "$target"
+          echo "$GITHUB_WORKSPACE/build/ffmpeg/$dir" >> "$GITHUB_PATH"
+          "build/ffmpeg/$dir/ffmpeg" -hide_banner -version | head -1
+      # Pull requests keep main's passing results for packages they don't
+      # change; main and manual runs run every test again, and main saves
+      # those results for the pull requests after it.
+      - name: Run every test again outside pull requests
+        if: github.event_name != 'pull_request'
+        working-directory: server
+        run: go clean -testcache
+      # The speed budgets (Test...Speed) time queries against the wall clock,
+      # so they run in a step of their own, one package at a time, rather
+      # than beside the other packages on the runner's cores.
       - name: Test
         working-directory: server
-        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test ./...
+        run: go test -skip 'Speed$' ./...
+      - name: Test the speed budgets alone
+        working-directory: server
+        run: go test -p 1 -run 'Speed$' ./...
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
 
-  # The Go tests again under the race detector, on another runner so the
-  # server job does not wait for it. -short skips the speed budgets, which
-  # mean nothing at the race detector's speed.
-  server-race:
+  # The server on macOS, where the Mac app runs it: vetted for macOS, and the
+  # tests of the packages with code of their own for it (the library
+  # watcher's kqueue, the leftover ffmpeg sweep, publishing a recording,
+  # VideoToolbox), with the Mac ffmpeg the releases ship. The other packages
+  # run the same code on every system and are tested in the server job. The
+  # server-race job runs on Linux, so the macOS-only code runs under the race
+  # detector here.
+  server-macos:
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -132,21 +270,166 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
-          cache: ${{ runner.environment == 'github-hosted' }}
+          cache: false
+      # Go's caches, saved by main and restored everywhere, as in the server job.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
+      - name: Vet for macOS
+        working-directory: server
+        run: go vet ./...
       - name: Fetch the ffmpeg build the releases ship
         env:
           FFMPEG_CACHE: ${{ runner.tool_cache }}/watchmymedia-ffmpeg
-        run: deploy/macos/fetch-ffmpeg.sh arm64
-      # GitHub's macOS runners have three cores. Under the race detector, with
-      # three packages' tests at once, the api package ran past go test's
-      # 10-minute limit and ffmpeg runs in other packages outlived the
-      # server's own deadlines. One package at a time (-p 1) keeps each
-      # package's ffmpeg runs to themselves.
+        run: |
+          deploy/macos/fetch-ffmpeg.sh arm64
+          echo "$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64" >> "$GITHUB_PATH"
+          build/ffmpeg/darwin-arm64/ffmpeg -hide_banner -version | head -1
+      # Pull requests keep main's passing results for packages they don't
+      # change; main and manual runs run every test again, and main saves
+      # those results for the pull requests after it.
+      - name: Run every test again outside pull requests
+        if: github.event_name != 'pull_request'
+        working-directory: server
+        run: go clean -testcache
+      - name: Test the packages with macOS code
+        working-directory: server
+        run: go test -skip 'Speed$' ./internal/ffexec ./internal/scanner ./internal/playback ./internal/livetv ./internal/livetv/dvr
+      # GitHub's Macs are virtual machines, so say in the log whether the
+      # VideoToolbox tests ran here or skipped for want of the hardware.
+      - name: Report which VideoToolbox tests ran
+        working-directory: server
+        run: |
+          set -o pipefail
+          go test -v -run 'VideoToolbox|^TestLiveBroadcastCaptions$' ./internal/playback ./internal/livetv | grep -E -- '--- (PASS|SKIP|FAIL)|^(ok|FAIL|PASS)'
+      - name: Test the macOS-only code with the race detector
+        working-directory: server
+        run: |
+          go test -race -short ./internal/ffexec
+          go test -race -short -run 'Watch' ./internal/scanner
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+
+  # The Go tests again under the race detector, on another runner so the
+  # server job does not wait for it. -short skips the speed budgets, which
+  # mean nothing at the race detector's speed. On Linux: GitHub's Linux
+  # runners have four cores to the macOS runners' three, are far easier to
+  # get, and run the Linux code (Pdeathsig, renameat2) that no other job
+  # tests. The macOS-only code runs under the race detector in the
+  # server-macos job.
+  server-race:
+    needs: changes
+    if: needs.changes.outputs.race == 'true'
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Keep Go caches in this runner's tool cache
+        run: |
+          echo "GOCACHE=$RUNNER_TOOL_CACHE/go-build" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$RUNNER_TOOL_CACHE/go-mod" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+          cache: false
+      # Go's caches, saved by main and restored everywhere, as in the server job.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
+      - name: Fetch the ffmpeg build the releases ship
+        env:
+          FFMPEG_CACHE: ${{ runner.tool_cache }}/watchmymedia-ffmpeg
+        run: |
+          case "$RUNNER_OS-$RUNNER_ARCH" in
+            macOS-ARM64) target=arm64 dir=darwin-arm64 ;;
+            Linux-X64) target=linux-amd64 dir=linux-amd64 ;;
+            Linux-ARM64) target=linux-arm64 dir=linux-arm64 ;;
+            *) echo "no ffmpeg build for $RUNNER_OS-$RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          deploy/macos/fetch-ffmpeg.sh "$target"
+          echo "$GITHUB_WORKSPACE/build/ffmpeg/$dir" >> "$GITHUB_PATH"
+          "build/ffmpeg/$dir/ffmpeg" -hide_banner -version | head -1
+      # Pull requests keep main's passing results for packages they don't
+      # change; main and manual runs run every test again, and main saves
+      # those results for the pull requests after it.
+      - name: Run every test again outside pull requests
+        if: github.event_name != 'pull_request'
+        working-directory: server
+        run: go clean -testcache
+      # Packages build and test in parallel again (one per core). On the
+      # three-core macOS runners, before test databases were copied rather
+      # than migrated, that ran the api package past go test's 10-minute
+      # limit and ffmpeg past the server's deadlines, and the job ran with
+      # -p 1, which also built one package at a time.
       - name: Test with the race detector
         working-directory: server
-        run: PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH" go test -race -short -p 1 -timeout 30m ./...
+        run: go test -race -short -timeout 20m ./...
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
 
   web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
     defaults:
       run:
@@ -177,24 +460,30 @@ jobs:
           overwrite: true
       # The Cast receiver, deployed separately to cast.watchmy.media.
       - run: pnpm build:receiver
-      # The downloads Worker and the release scripts (deploy/, PLAN-RELEASES.md
-      # §3), tested in this job because it has Node.
-      - name: Test the downloads Worker and the release scripts
-        working-directory: .
+
+  # The scripts under deploy/ (releases, the Unraid template, these
+  # workflows' own checks) and the guidance's paths and make targets: no
+  # build, so a change to them or to the docs costs seconds.
+  scripts:
+    needs: changes
+    if: needs.changes.outputs.scripts == 'true'
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test the release, Unraid and CI scripts
         run: |
-          # The downloads Worker and the site are not in the public repository.
-          if [ -d deploy/downloads ]; then
-            node --test deploy/downloads/worker.test.js
-            python3 -I -m unittest discover -s deploy/downloads -p '*_test.py'
-            node --test deploy/site/downloads.test.mjs
-          fi
           python3 -I -m unittest discover -s deploy/release -p '*_test.py'
           python3 -I -m unittest discover -s deploy/ci -p '*_test.py'
           python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'
+          python3 -I -m unittest discover -s deploy/fixture -p '*_test.py'
+      - name: Check the guidance's paths and make targets
+        run: python3 -I deploy/ci/check-agent-docs.py
 
   # The API documents in api/ (which the native apps generate their clients
   # from) and the web's copy and types must match the server's code.
   contract:
+    needs: changes
+    if: needs.changes.outputs.contract == 'true'
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -206,7 +495,35 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
-          cache: ${{ runner.environment == 'github-hosted' }}
+          cache: false
+      # Go's caches, saved by main and restored everywhere, as in the server job.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: 9
@@ -223,10 +540,21 @@ jobs:
         run: |
           make gen-api PATH="$PATH"
           git diff --exit-code -- api web/src/api
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
 
   docker:
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
-    needs: [server, web]
+    needs: [changes, server, web]
+    # After the server and web jobs, when they ran and passed or had nothing
+    # to check.
+    if: ${{ !cancelled() && needs.changes.outputs.docker == 'true' && needs.server.result != 'failure' && needs.web.result != 'failure' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check Docker is running
@@ -283,11 +611,21 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-          cache: ${{ runner.environment == 'github-hosted' && 'gradle' || '' }}
-          cache-dependency-path: |
-            android/**/*.gradle.kts
-            android/gradle/libs.versions.toml
-            android/gradle/wrapper/gradle-wrapper.properties
+      # Gradle's home (the wrapper, dependencies and the build cache) and the
+      # configuration cache, on GitHub's machines. setup-java's Gradle cache
+      # saved ~/.gradle, which the step above moves, so it never saved
+      # anything. As with the Go caches, only pushes to main save; every run
+      # restores. GRADLE_ENCRYPTION_KEY is the one secret this workflow
+      # reads: it only encrypts the configuration cache, and without it (fork
+      # pull requests) that cache is skipped and the rest still works. The
+      # default provider is Gradle's own caching library, free for public
+      # repositories; 'basic' is the open-source one, without the
+      # configuration cache or clean-up of stale entries.
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        if: runner.environment == 'github-hosted'
+        with:
+          cache-read-only: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
       # Both SDK variables and Gradle's home are set above: an inherited
       # machine-wide SDK must never make two runners install into one folder.
       # The licences are accepted, so the Android Gradle plugin can add
@@ -296,8 +634,10 @@ jobs:
         with:
           packages: platform-tools platforms;android-37.0 build-tools;36.0.0
           log-accepted-android-sdk-licenses: false
+      # lintVitalRelease is left out: lintDebug has just run the same checks
+      # on the same sources. Release builds on a tag and locally keep it.
       - name: Test, lint and build
-        run: ./gradlew testDebugUnitTest coverageReport lintDebug assembleDebug :app:assembleRelease --continue --console=plain
+        run: ./gradlew testDebugUnitTest coverageReport lintDebug assembleDebug :app:assembleRelease -x lintVitalRelease --continue --console=plain
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-debug-apk
@@ -312,11 +652,13 @@ jobs:
             android/**/build/test-results/testDebugUnitTest/*.xml
             android/build/reports/jacoco/coverageReport/
 
-  # The iPhone app (apple/, PLAN-IOS.md), when apple/ or api/ changed: the
-  # Swift API client against api/openapi.json, the Kit's unit tests on the
-  # Mac, then the app built and every test run on an iOS simulator. Xcode is
-  # already on the Mac Studio and hosted Macs; XcodeGen comes from Homebrew, at least
-  # the version project.yml asks for (apple/scripts/install-xcodegen.sh).
+  # The iPhone app (apple/, PLAN-IOS.md), when the iPhone app, what it shares
+  # with the TV app, or api/ changed: the Swift API client against
+  # api/openapi.json, then the app built and every test run on an iOS
+  # simulator, the Kit's included (they run on tvOS in the apple-tv job; on
+  # the Mac, make apple-test runs them locally). Xcode is already on the Mac
+  # Studio and hosted Macs; XcodeGen comes from Homebrew, at least the
+  # version project.yml asks for (apple/scripts/install-xcodegen.sh).
   apple:
     needs: changes
     if: needs.changes.outputs.apple == 'true'
@@ -325,44 +667,67 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install XcodeGen
         run: apple/scripts/install-xcodegen.sh
+      # The OpenAPI generator is built from source in release mode (two
+      # minutes cold), so its build folder is kept between runs. The check
+      # runs when the API, the generator or the generated client changed,
+      # and on every main and manual run, which also keeps the cache fresh.
+      - name: Name the generator cache
+        id: generator
+        if: needs.changes.outputs.apple-api == 'true' || github.event_name != 'pull_request'
+        run: echo "key=openapi-generator-$RUNNER_OS-$RUNNER_ARCH-$(xcodebuild -version | tail -n 1 | sed 's/^Build version //')-${{ hashFiles('apple/Tools/Package.swift', 'apple/Tools/Package.resolved') }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: generator-cache
+        if: steps.generator.outputs.key && runner.environment == 'github-hosted'
+        with:
+          path: apple/Tools/.build
+          key: ${{ steps.generator.outputs.key }}
       - name: Check the Swift API client is current
+        if: steps.generator.outputs.key
         run: |
           make apple-api PATH="$PATH"
           git diff --exit-code -- apple/Kit/Sources/WMMAPI
-      - name: Kit unit tests
-        env:
-          SWIFT_BACKTRACE: enable=yes,interactive=no
-          NSUnbufferedIO: "YES"
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && steps.generator.outputs.key && steps.generator-cache.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: apple/Tools/.build
+          key: ${{ steps.generator.outputs.key }}
+      # Xcode's Swift package checkouts (the Kit's and the app's), keyed on
+      # what pins them; only pushes to main save, as with the Go caches.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: packages
+        if: runner.environment == 'github-hosted'
+        with:
+          path: apple/build/DerivedData/SourcePackages
+          key: swift-packages-${{ runner.os }}-${{ hashFiles('apple/project.yml', 'apple/Kit/Package.swift', 'apple/Kit/Package.resolved') }}-${{ github.job }}
+          restore-keys: |
+            swift-packages-${{ runner.os }}-${{ hashFiles('apple/project.yml', 'apple/Kit/Package.swift', 'apple/Kit/Package.resolved') }}-
+            swift-packages-${{ runner.os }}-
+      # No code coverage in CI: nobody reads it, and it slows the build.
+      - name: Build and test on a simulator
         run: |
           xcodebuild -version
-          swift --version
-          mkdir -p apple/build
-          set -o pipefail
-          make apple-test PATH="$PATH" 2>&1 | tee apple/build/kit-tests.log
-      - name: Preserve failed Kit test diagnostics
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ failure() && !cancelled() }}
+          make apple-test-sim APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && steps.packages.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
         with:
-          name: apple-kit-diagnostics
-          path: |
-            apple/build/kit-tests.log
-            ~/Library/Logs/DiagnosticReports/swiftpm*.ips
-            ~/Library/Logs/DiagnosticReports/WatchMyMedia*.ips
-      - name: Build and test on a simulator
-        run: make apple-test-sim PATH="$PATH"
+          path: apple/build/DerivedData/SourcePackages
+          # The restore's key: the build adds the app's pins to the Kit's
+          # Package.resolved, so hashing it again here would differ.
+          key: ${{ steps.packages.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
           name: apple-test-results
           path: apple/build/Tests.xcresult
 
-  # The Apple TV app (apple/TV, PLAN-IOS.md §11.2), gated like the apple job:
+  # The Apple TV app (apple/TV, PLAN-IOS.md §11.2), when the TV app, what it
+  # shares with the iPhone app, or api/ changed:
   # built, and the Kit's tests and the remote UI tests (apple/TVUITests) run,
   # on an Apple TV simulator. The tvOS simulator runtime is downloaded the
   # first time a runner needs it.
   apple-tv:
     needs: changes
-    if: needs.changes.outputs.apple == 'true'
+    if: needs.changes.outputs.apple-tv == 'true'
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -370,11 +735,31 @@ jobs:
         run: apple/scripts/install-xcodegen.sh
       - name: Install the tvOS simulator runtime
         run: xcrun simctl list runtimes | grep -q tvOS || xcodebuild -downloadPlatform tvOS
+      # Swift package checkouts, as in the apple job.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: packages
+        if: runner.environment == 'github-hosted'
+        with:
+          path: apple/build/DerivedData/SourcePackages
+          key: swift-packages-${{ runner.os }}-${{ hashFiles('apple/project.yml', 'apple/Kit/Package.swift', 'apple/Kit/Package.resolved') }}-${{ github.job }}
+          restore-keys: |
+            swift-packages-${{ runner.os }}-${{ hashFiles('apple/project.yml', 'apple/Kit/Package.swift', 'apple/Kit/Package.resolved') }}-
+            swift-packages-${{ runner.os }}-
       - name: Build and test on an Apple TV simulator
         # Two Studio runners stalled after all tests passed. Avoid verbose
         # sysdiagnose collection, a possible cause; keep results and failures.
+        # One simulator: with two clones (-parallel-testing-worker-count 2)
+        # GitHub's three-core Mac ran the tests about a minute faster of ten
+        # and a timing-sensitive Kit test failed (run of 2026-11-12).
         timeout-minutes: 20
-        run: make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never PATH="$PATH"
+        run: make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && steps.packages.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: apple/build/DerivedData/SourcePackages
+          # The restore's key: the build adds the app's pins to the Kit's
+          # Package.resolved, so hashing it again here would differ.
+          key: ${{ steps.packages.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
@@ -382,53 +767,73 @@ jobs:
           path: apple/build/TVTests.xcresult
 
   # The Go tests on Windows, with the ffmpeg build the Windows app will ship
-  # (PLAN.md §7c). The Mac Studio cannot run Windows, so this is GitHub's
-  # Windows runner, billed by the minute; it runs only when the server, the
-  # ffmpeg pin or this file changed. It has no GPU: it covers the software
-  # path, Windows file handling and the GPU pipelines' arguments, not the
-  # GPUs themselves.
-  windows:
-    needs: [changes, web]
+  # (PLAN.md §7c). The Mac Studio cannot run Windows, so this and
+  # windows-app are GitHub's Windows runners; they run only when the server,
+  # the Windows app, the ffmpeg pin or this file changed. No GPU: they cover
+  # the software path, Windows file handling and the GPU pipelines'
+  # arguments, not the GPUs themselves.
+  windows-server:
+    needs: changes
     if: needs.changes.outputs.windows == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Test Windows hardware collector helpers
-        shell: pwsh
-        run: ./windows/hardware-check-test.ps1
-      - name: Test the signer identity checks
-        shell: pwsh
-        run: ./windows/signing-test.ps1
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: windows-embedded-web
-          path: server/internal/webui/dist
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
+          cache: false
+      # Go's caches, saved by main and restored everywhere, as in the server job.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum', 'windows/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
       - name: Fetch the ffmpeg build the Windows app will ship
         shell: bash
         run: |
           deploy/macos/fetch-ffmpeg.sh windows-amd64
           build/ffmpeg/windows-amd64/ffmpeg.exe -hide_banner -version | head -1
-      - name: Check Windows playlists and recording publication
+      # Pull requests keep main's passing results for packages they don't
+      # change; main and manual runs run every test again, and main saves
+      # those results for the pull requests after it.
+      - name: Run every test again outside pull requests
+        if: github.event_name != 'pull_request'
+        working-directory: server
+        run: go clean -testcache
+      # The final playlist publication against its startup reader, fifty
+      # times. Windows' playlist, shared-reader and recording-publication
+      # tests (internal/playback, internal/growing, internal/livetv/dvr) run
+      # in the Test step below, with the rest.
+      - name: Stress the final playlist publication
         working-directory: server
         shell: pwsh
         run: |
           $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          go test ./internal/playback -run '^Test(PlaylistSnapshotDoesNotBlockReplacement|EventPlaylistCachesTheLastSnapshot|FinishedPlaylist.*|VODPlaylistReadsOnlyNewPieces|SharedSegmentCanBeRenamedAwayWhileReading|SharedReaderSupportsLongPaths|SharedPathPreservesWindowsNamespaces)$' -count=1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # Exercise the final playlist publication against its startup reader.
           go test ./internal/playback -run '^TestRemuxSession$' -count=50
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # Exercise recording ownership, no-replace publication and an
-          # open growing reader across the final rename on Windows itself.
-          go test -short ./internal/growing ./internal/livetv/dvr -count=1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          go test ./internal/playback -run '^TestGrowingTransportProducesEventThenEndList$' -count=1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
+      # Twice on main and manual runs, once on pull requests: a pass takes
+      # about 3.7 minutes, and the second catches an unsteady one.
       - name: Qualify shared Live TV output, recovery and held readers
         working-directory: server
         shell: pwsh
@@ -438,7 +843,7 @@ jobs:
           WMM_LIVE_QUALIFICATION_CLAIMS: '3'
         run: |
           $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          go test -tags streamingacceptance ./internal/livetv/dvr -run '^TestLiveLadder.*Qualification$' -count=2 -v
+          go test -tags streamingacceptance ./internal/livetv/dvr -run '^TestLiveLadder.*Qualification$' -count=${{ github.event_name == 'pull_request' && 1 || 2 }} -v
       - name: Report Windows transcoder diagnostics
         working-directory: server
         shell: pwsh
@@ -464,7 +869,95 @@ jobs:
           name: windows-transcoder-report
           path: build/hardware-report/*.json
           retention-days: 7
+      - name: Test
+        working-directory: server
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          go test -skip 'Speed$' ./...
+      # As in the server job: the speed budgets alone, one package at a time.
+      - name: Test the speed budgets alone
+        working-directory: server
+        shell: pwsh
+        run: go test -p 1 -run 'Speed$' ./...
+      - name: Qualify complete software VOD rendition output
+        working-directory: server
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          go test -tags streamingacceptance ./internal/playback -run '^TestVODLadder(FullFileQualification|RejectsUnboundedCopiedAudio)$' -count=1 -v
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
 
+  # The Windows app beside windows-server, at the same time: the tray app's
+  # tests, the app and its installers built with this run's web build, and
+  # the tray, installer and platform smoke tests on the hosted Windows Server.
+  windows-app:
+    needs: [changes, web]
+    if: needs.changes.outputs.windows == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test Windows hardware collector helpers
+        shell: pwsh
+        run: ./windows/hardware-check-test.ps1
+      - name: Test the signer identity checks
+        shell: pwsh
+        run: ./windows/signing-test.ps1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-embedded-web
+          path: server/internal/webui/dist
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache: false
+      # Go's caches, saved by main and restored everywhere, as in the server job.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum', 'windows/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
+      - name: Fetch the ffmpeg build the Windows app will ship
+        shell: bash
+        run: |
+          deploy/macos/fetch-ffmpeg.sh windows-amd64
+          build/ffmpeg/windows-amd64/ffmpeg.exe -hide_banner -version | head -1
+      # Pull requests keep main's passing results for packages they don't
+      # change; main and manual runs run every test again, and main saves
+      # those results for the pull requests after it.
+      - name: Run every test again outside pull requests
+        if: github.event_name != 'pull_request'
+        working-directory: server
+        run: go clean -testcache
       - name: Test and vet the tray app
         working-directory: windows
         run: |
@@ -539,18 +1032,6 @@ jobs:
       - name: Exercise installation, upgrade and uninstall
         shell: pwsh
         run: windows/installer-smoke.ps1 -CIHost
-      - name: Test
-        working-directory: server
-        shell: pwsh
-        run: |
-          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          go test ./...
-      - name: Qualify complete software VOD rendition output
-        working-directory: server
-        shell: pwsh
-        run: |
-          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          go test -tags streamingacceptance ./internal/playback -run '^TestVODLadder(FullFileQualification|RejectsUnboundedCopiedAudio)$' -count=1 -v
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-development-installer
@@ -567,6 +1048,14 @@ jobs:
           name: windows-desktop-platform-report
           path: build/windows-platform-smoke/*.json
           retention-days: 7
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
 
   # A Windows app and installer signed with Artifact Signing and verified, on
   # a manual run that asks for it ("Also sign and verify a Windows
@@ -592,7 +1081,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
+          cache: false
       # The Artifact Signing client runs on .NET 10.
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:

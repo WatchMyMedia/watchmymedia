@@ -153,7 +153,7 @@ func (s *Service) StartPreviewFor(ctx context.Context, id int64, who Requester) 
 		defer close(p.done)
 		defer cancel()
 		var scope []scopeCandidate
-		users, unlinked, err := s.runPreview(run, c, users, libs, func(v scopeCandidate) error {
+		users, unlinked, err := s.runPreview(run, c, users, libs, true, func(v scopeCandidate) error {
 			if len(scope) >= 50000 {
 				return fail(Invalid, "scope_limit")
 			}
@@ -226,8 +226,10 @@ func reasonCode(err error) string {
 
 // runPreview reads each linked person's watched marks through their own
 // credential, matches them by exact IDs and evaluates them against what
-// the local account already decided. One Plex request at a time.
-func (s *Service) runPreview(ctx context.Context, c db.PlexConnection, links []db.PlexUserLink, libs []db.ListPlexLibraryLinksRow, collect func(scopeCandidate) error) ([]PlexPreviewUser, []PlexPerson, error) {
+// the local account already decided. One Plex request at a time. Without
+// counts it skips that last step: an import decides each item again when it
+// writes, and needs only the statuses.
+func (s *Service) runPreview(ctx context.Context, c db.PlexConnection, links []db.PlexUserLink, libs []db.ListPlexLibraryLinksRow, counts bool, collect func(scopeCandidate) error) ([]PlexPreviewUser, []PlexPerson, error) {
 	o, err := s.openOwner(ctx, c)
 	if err != nil {
 		return nil, nil, err
@@ -359,8 +361,10 @@ func (s *Service) runPreview(ctx context.Context, c db.PlexConnection, links []d
 				found = append(found, f)
 			}
 		}
-		if err := s.evaluate(ctx, c.ID, l.UserID, found, &u); err != nil {
-			return nil, nil, err
+		if counts {
+			if err := s.evaluate(ctx, c.ID, l.UserID, found, &u); err != nil {
+				return nil, nil, err
+			}
 		}
 		out = append(out, u)
 	}

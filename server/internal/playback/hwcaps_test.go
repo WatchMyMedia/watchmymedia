@@ -10,6 +10,8 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"watchmymedia/server/internal/ffexec/ffexectest"
 )
 
 func TestCapabilitiesWaitCanBeCanceledByViewer(t *testing.T) {
@@ -52,7 +54,7 @@ case "$*" in
 esac
 exit 0
 `
-	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil { //nolint:gosec // G306: a script, which must be executable
+	if err := ffexectest.WriteScript(bin, script); err != nil {
 		t.Fatal(err)
 	}
 	return bin, runs
@@ -68,6 +70,9 @@ func TestDetectInBackground(t *testing.T) {
 	log := slog.New(slog.DiscardHandler)
 
 	m := NewManager(bin, t.TempDir(), Capabilities{}, time.Minute, 1, log)
+	// Its detection keeps the result in the cache's folder; wait for
+	// that before the folder goes.
+	t.Cleanup(m.detectWG.Wait)
 	start := time.Now()
 	m.DetectInBackground("auto", cache)
 	if d := time.Since(start); d > 200*time.Millisecond {
@@ -87,6 +92,7 @@ func TestDetectInBackground(t *testing.T) {
 
 	// The next start answers from what was kept, and detects again.
 	m2 := NewManager(bin, t.TempDir(), Capabilities{}, time.Minute, 1, log)
+	t.Cleanup(m2.detectWG.Wait)
 	start = time.Now()
 	m2.DetectInBackground("auto", cache)
 	c2 := m2.Capabilities()
@@ -97,6 +103,7 @@ func TestDetectInBackground(t *testing.T) {
 
 	// Another preference is not what was kept.
 	m3 := NewManager(bin, t.TempDir(), Capabilities{}, time.Minute, 1, log)
+	t.Cleanup(m3.detectWG.Wait)
 	start = time.Now()
 	m3.DetectInBackground("software", cache)
 	m3.Capabilities()

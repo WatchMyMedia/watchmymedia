@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"watchmymedia/server/internal/ffexec/ffexectest"
 )
 
 // Stopping the server stops the transcodes, waits for ffmpeg to exit, and
@@ -56,7 +58,7 @@ func blockingFFmpeg(t *testing.T) (bin, runs string) {
 	}
 	dir := t.TempDir()
 	bin, runs = filepath.Join(dir, "ffmpeg"), filepath.Join(dir, "runs")
-	if err := os.WriteFile(bin, []byte("#!/bin/sh\necho run >> \""+runs+"\"\nexec sleep 30\n"), 0o700); err != nil { //nolint:gosec // G306: a script, which must be executable
+	if err := ffexectest.WriteScript(bin, "#!/bin/sh\necho run >> \""+runs+"\"\nexec sleep 30\n"); err != nil {
 		t.Fatal(err)
 	}
 	return bin, runs

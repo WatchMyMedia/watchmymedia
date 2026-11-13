@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"watchmymedia/server/internal/ffexec"
+	"watchmymedia/server/internal/ffexec/ffexectest"
 )
 
 // A cold request inside the ordinary 45-second lookahead must not wait for
@@ -107,7 +108,7 @@ func TestVODLadderRejectsSlowPreparationBeforeManifest(t *testing.T) {
 func slowLadderFFmpeg(t *testing.T, ffmpeg string) string {
 	t.Helper()
 	bin := filepath.Join(t.TempDir(), "slow-ffmpeg")
-	if err := os.WriteFile(bin, []byte("#!/bin/sh\nexec '"+strings.ReplaceAll(ffmpeg, "'", "'\\''")+"' -readrate 0.7 \"$@\"\n"), 0o700); err != nil { //nolint:gosec // executable test wrapper
+	if err := ffexectest.WriteScript(bin, "#!/bin/sh\nexec '"+strings.ReplaceAll(ffmpeg, "'", "'\\''")+"' -readrate 0.7 \"$@\"\n"); err != nil {
 		t.Fatal(err)
 	}
 	return bin
@@ -123,7 +124,7 @@ func TestVODLadderBoundsSlowdownAfterAdmission(t *testing.T) {
 		if slow {
 			args = " -readrate 0.7"
 		}
-		if err := os.WriteFile(bin, []byte("#!/bin/sh\nexec '"+strings.ReplaceAll(ffmpeg, "'", "'\\''")+"'"+args+" \"$@\"\n"), 0o700); err != nil { //nolint:gosec // executable test wrapper
+		if err := ffexectest.WriteScript(bin, "#!/bin/sh\nexec '"+strings.ReplaceAll(ffmpeg, "'", "'\\''")+"'"+args+" \"$@\"\n"); err != nil {
 			t.Fatal(err)
 		}
 	}

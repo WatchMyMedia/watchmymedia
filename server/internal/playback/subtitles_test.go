@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"watchmymedia/server/internal/ffexec/ffexectest"
 )
 
 // slowFFmpeg is a stand-in ffmpeg that takes a while, counts its runs, and
@@ -32,7 +34,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 `
-	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil { //nolint:gosec // G306: a script, which must be executable
+	if err := ffexectest.WriteScript(bin, script); err != nil {
 		t.Fatal(err)
 	}
 	return bin, runs
@@ -161,7 +163,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 `
-	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil { //nolint:gosec // G306: a script, which must be executable
+	if err := ffexectest.WriteScript(bin, script); err != nil {
 		t.Fatal(err)
 	}
 	video := filepath.Join(dir, "v.mkv")

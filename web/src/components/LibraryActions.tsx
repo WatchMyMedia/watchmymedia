@@ -1,5 +1,6 @@
 import { useMatchLibrary, useScanLibrary } from '../api/queries'
 import { useEventState } from '../api/events'
+import { useAuth } from '../authContext'
 import type { components } from '../api/schema'
 
 type Library = components['schemas']['Library']
@@ -8,10 +9,13 @@ export function LibraryActions({ library, tmdbConfigured }: { library: Library; 
   const scan = useScanLibrary()
   const match = useMatchLibrary()
   const state = useEventState()
+  const auth = useAuth()
   const scanning = state.scans[library.id] !== undefined
   const matching = state.matches[library.id] !== undefined
   const needsMatch = library.pendingCount + library.unmatchedCount > 0
   const btn = 'rounded-md border border-neutral-700 px-3 py-1 text-sm hover:bg-neutral-800 disabled:opacity-50'
+  // Scanning and matching are for admins (the server refuses members).
+  if (!(auth.user?.isAdmin ?? false) || !auth.adminAllowed) return null
   return (
     <div className="flex items-center gap-2">
       <button
