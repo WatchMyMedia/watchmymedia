@@ -178,6 +178,7 @@ public final class HomeModel {
         } else {
             state = result
             emptyState = empty
+            if result.value != nil { PerformanceSignposts.shared.homeShowedContent() }
         }
     }
 }

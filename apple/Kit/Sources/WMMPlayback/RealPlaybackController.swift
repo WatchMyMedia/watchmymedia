@@ -478,6 +478,7 @@ public final class RealPlaybackController: PlaybackController {
         startTicker()
         v.loading = true
         loadTask?.cancel()
+        PerformanceSignposts.shared.playStarted()
         loadTask = launch { [weak self] in
             guard let self else { return }
             // A bare play link: name the file while the server decides, and
@@ -486,6 +487,7 @@ public final class RealPlaybackController: PlaybackController {
             do {
                 var d = try await decide(v, startMs: request.startMs, playID: nil)
                 if overtaken(v, d) { return }
+                PerformanceSignposts.shared.playDecided()
                 var start = request.startMs ?? 0
                 // No explicit start: pick up where the viewer left off. A VOD
                 // playlist (or the file) just starts there; an event playlist
@@ -831,6 +833,7 @@ public final class RealPlaybackController: PlaybackController {
 
     private func fail(_ v: Viewing, _ error: any Error) {
         guard viewing === v else { return }
+        PerformanceSignposts.shared.playEnded(.failed)
         log.warning("Playback request failed: \(error.localizedDescription, privacy: .public)")
         v.loading = false
         let message = error.displayMessage
@@ -842,6 +845,7 @@ public final class RealPlaybackController: PlaybackController {
     /// Ends the viewing: reports `state` and stops the server's session.
     private func endViewing(_ playState: PlayState) {
         guard let v = viewing, !v.stopped else { return }
+        PerformanceSignposts.shared.playEnded()
         loadTask?.cancel()
         v.loading = false
         if let d = v.decision {
@@ -1410,6 +1414,7 @@ public final class RealPlaybackController: PlaybackController {
             failed: { [weak self] failure in self?.launch { self?.onPlayerError(failure) } },
             time: { [weak self] in self?.updateCues() },
             firstFrame: { [weak self] in
+                PerformanceSignposts.shared.playShowedFirstFrame()
                 self?.launch {
                     guard let v = self?.active(), let generation = v.awaitingFrameGeneration else { return }
                     v.awaitingFrameGeneration = nil

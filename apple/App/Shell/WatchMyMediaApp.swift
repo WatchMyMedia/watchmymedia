@@ -2,6 +2,7 @@ import SwiftUI
 import UserNotifications
 import WMMDownloads
 import WMMCast
+import WMMData
 import WMMFeatures
 import WMMModel
 import WMMUI
@@ -18,6 +19,9 @@ struct WatchMyMediaApp: App {
     @State private var recordings: LiveRecordingsStore
 
     init() {
+        // Launch to Home's first content, and MetricKit's reports for Copy diagnostics (PLAN-APPLE-REVIEW.md §4.3.1, §6.4).
+        PerformanceSignposts.shared.launchBegan()
+        Diagnostics.start()
         let services = ServicesFactory.make(arguments: ProcessInfo.processInfo.arguments)
         _services = State(initialValue: services)
         _cast = State(initialValue: CastServicesFactory.make(services: services, arguments: ProcessInfo.processInfo.arguments))

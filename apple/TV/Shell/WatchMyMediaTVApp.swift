@@ -1,4 +1,5 @@
 import SwiftUI
+import WMMData
 import WMMFeatures
 import WMMModel
 import WMMUI
@@ -15,6 +16,9 @@ struct WatchMyMediaTVApp: App {
     @State private var recordings: LiveRecordingsStore
 
     init() {
+        // Launch to Home's first content (PLAN-APPLE-REVIEW.md §4.3.1). tvOS has no MetricKit, so start() does nothing here.
+        PerformanceSignposts.shared.launchBegan()
+        Diagnostics.start()
         let services = ServicesFactory.make(arguments: ProcessInfo.processInfo.arguments)
         _services = State(initialValue: services)
         _extras = State(initialValue: LiveExtrasStore(repository: services.liveTV))
