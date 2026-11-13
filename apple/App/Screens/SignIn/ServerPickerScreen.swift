@@ -1,5 +1,7 @@
 import SwiftUI
+#if DEBUG
 import WMMFakes
+#endif
 import WMMFeatures
 import WMMModel
 import WMMUI
@@ -13,7 +15,9 @@ struct ServerPickerScreen: View {
         ServerPickerContent(model: ServerPickerModel(servers: services.servers))
             .onAppear {
                 // `-localNetworkDenied` (DEBUG, fakes): the state after someone said no to Local Network.
+                #if DEBUG
                 if ScreenshotLaunch.has("-localNetworkDenied") { (services.servers as? FakeServerRepository)?.localNetworkDenied = true }
+                #endif
             }
     }
 }
@@ -208,9 +212,11 @@ private struct ServerPickerContent: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ServerPickerScreen()
         .environment(AppServices.fake(signedIn: false, chosen: false))
         .environment(AppFlow())
         .preferredColorScheme(.dark)
 }
+#endif

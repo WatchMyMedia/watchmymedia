@@ -46,7 +46,15 @@ targets:
           - Info.plist
     dependencies:
       - package: WatchMyMediaKit
-        products: [WMMModel, WMMData, WMMPlayback, WMMDownloads, WMMFakes, WMMUI, WMMFeatures, WMMCast]
+        products: [WMMModel, WMMData, WMMPlayback, WMMDownloads, WMMUI, WMMFeatures, WMMCast]
+      # The fakes are debug-only (PLAN-APPLE-REVIEW.md §2.9; apple/README.md):
+      # built in every configuration so `import WMMFakes` resolves under
+      # #if DEBUG, but linked only by Debug's OTHER_LDFLAGS, since Xcode links a
+      # package product's whole object file and a Release binary would carry
+      # their code. `make apple-build-release` checks it doesn't.
+      - package: WatchMyMediaKit
+        product: WMMFakes
+        link: false
       - package: GoogleCast
         product: GoogleCastDynamic
     info:
@@ -90,6 +98,9 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
+      configs:
+        Debug:
+          OTHER_LDFLAGS: ["$(inherited)", "$(BUILT_PRODUCTS_DIR)/WMMFakes.o"]
     # Google ships GoogleCast.framework without a dSYM, so uploading an archive
     # warned "The archive did not include a dSYM for the GoogleCast.framework"
     # (1.5.8). dsymutil makes one from the embedded binary when archiving: it
@@ -118,7 +129,11 @@ targets:
           - Info.plist
     dependencies:
       - package: WatchMyMediaKit
-        products: [WMMModel, WMMData, WMMPlayback, WMMFakes, WMMUI, WMMFeatures]
+        products: [WMMModel, WMMData, WMMPlayback, WMMUI, WMMFeatures]
+      # Debug-only, as in the iPhone app.
+      - package: WatchMyMediaKit
+        product: WMMFakes
+        link: false
     info:
       path: TV/Info.plist
       properties:
@@ -150,6 +165,9 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
         GENERATE_INFOPLIST_FILE: NO
+      configs:
+        Debug:
+          OTHER_LDFLAGS: ["$(inherited)", "$(BUILT_PRODUCTS_DIR)/WMMFakes.o"]
   # The Apple TV app on the fakes, driven with the Siri Remote (TVUITests): make apple-tv-test-sim.
   WatchMyMediaTVUITests:
     type: bundle.ui-testing

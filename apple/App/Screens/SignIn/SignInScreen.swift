@@ -1,5 +1,7 @@
 import SwiftUI
+#if DEBUG
 import WMMFakes
+#endif
 import WMMFeatures
 import WMMModel
 import WMMUI
@@ -283,6 +285,7 @@ struct SignInContent: View {
     }
 }
 
+#if DEBUG
 #Preview("Password") {
     SignInScreen()
         .environment(AppServices.fake(signedIn: false))
@@ -290,3 +293,4 @@ struct SignInContent: View {
         .environment(Navigator())
         .preferredColorScheme(.dark)
 }
+#endif

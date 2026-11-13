@@ -1,5 +1,7 @@
 import SwiftUI
+#if DEBUG
 import WMMFakes
+#endif
 import WMMFeatures
 import WMMModel
 import WMMUI

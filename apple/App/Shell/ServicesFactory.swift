@@ -2,7 +2,9 @@ import Foundation
 import UIKit
 import WMMData
 import WMMDownloads
+#if DEBUG
 import WMMFakes
+#endif
 import WMMModel
 import WMMPlayback
 
@@ -25,33 +27,9 @@ import WMMPlayback
 @MainActor
 enum ServicesFactory {
     static func make(arguments: [String]) -> AppServices {
-        let member = arguments.contains("-fakesMember")
-        if arguments.contains("-fakes") || member || arguments.contains("-fakesSignedOut") || arguments.contains("-fakesNoServer") {
-            let services = AppServices.fake(
-                signedIn: !arguments.contains("-fakesSignedOut") && !arguments.contains("-fakesNoServer"),
-                chosen: !arguments.contains("-fakesNoServer"),
-                client: UIDevice.current.userInterfaceIdiom == .pad ? .fakePad : .fakePhone,
-                admin: !member,
-                seerr: arguments.contains("-fakesSeerr"),
-                seerrLinked: !arguments.contains("-fakesSeerrUnlinked"),
-                liveTV: arguments.contains("-fakesLiveTV") || arguments.contains("-fakesLiveAutomatic"),
-                liveGuide: FakeLiveGuide.from(arguments),
-                downloads: true,
-                apiLevel: arguments.contains("-fakesLiveAutomatic") ? liveAutomaticAPILevel : arguments.contains("-fakesAudioLanguages") ? audioPreferencesAPILevel : arguments.contains("-fakesLiveRecordings") ? liveRecordingAPILevel : arguments.contains("-fakesSubtitlePreferences") ? subtitlePreferencesAPILevel : nil,
-                recordings: arguments.contains("-fakesLiveRecordings"),
-                liveAutomatic: arguments.contains("-fakesLiveAutomatic"),
-                rows: arguments.contains("-fakesRows")
-            )
-            (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
-            if let i = arguments.firstIndex(of: "-fakesAudioLanguages"), arguments.indices.contains(i + 1), !arguments[i + 1].hasPrefix("-") {
-                (services.preferences as? FakePreferencesRepository)?.seedLanguages(arguments[i + 1].split(separator: ",").map(String.init))
-            }
-            (services.library as? FakeLibraryRepository)?.offline = arguments.contains("-fakesOffline")
-            if let i = arguments.firstIndex(of: "-fakesTrailerKeys"), arguments.indices.contains(i + 1) {
-                (services.library as? FakeLibraryRepository)?.trailerKeys = arguments[i + 1].split(separator: ",").map(String.init)
-            }
-            return services
-        }
+        #if DEBUG
+        if let services = fakes(arguments) { return services }
+        #endif
         let data = DataServices.live()
         let profile = DeviceProfileProvider()
         let device = UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
@@ -73,4 +51,37 @@ enum ServicesFactory {
             playback: playback, livePlayback: LivePlaybackEngine(repository: data.liveTV, profile: profile), downloads: downloads.repository
         )
     }
+
+    #if DEBUG
+    /// The fakes, when the arguments ask for them. Debug builds only
+    /// (PLAN-APPLE-REVIEW.md §2.9): a Release build ignores `-fakes…` and doesn't link WMMFakes.
+    private static func fakes(_ arguments: [String]) -> AppServices? {
+        let member = arguments.contains("-fakesMember")
+        guard arguments.contains("-fakes") || member || arguments.contains("-fakesSignedOut") || arguments.contains("-fakesNoServer") else { return nil }
+        let services = AppServices.fake(
+            signedIn: !arguments.contains("-fakesSignedOut") && !arguments.contains("-fakesNoServer"),
+            chosen: !arguments.contains("-fakesNoServer"),
+            client: UIDevice.current.userInterfaceIdiom == .pad ? .fakePad : .fakePhone,
+            admin: !member,
+            seerr: arguments.contains("-fakesSeerr"),
+            seerrLinked: !arguments.contains("-fakesSeerrUnlinked"),
+            liveTV: arguments.contains("-fakesLiveTV") || arguments.contains("-fakesLiveAutomatic"),
+            liveGuide: FakeLiveGuide.from(arguments),
+            downloads: true,
+            apiLevel: arguments.contains("-fakesLiveAutomatic") ? liveAutomaticAPILevel : arguments.contains("-fakesAudioLanguages") ? audioPreferencesAPILevel : arguments.contains("-fakesLiveRecordings") ? liveRecordingAPILevel : arguments.contains("-fakesSubtitlePreferences") ? subtitlePreferencesAPILevel : nil,
+            recordings: arguments.contains("-fakesLiveRecordings"),
+            liveAutomatic: arguments.contains("-fakesLiveAutomatic"),
+            rows: arguments.contains("-fakesRows")
+        )
+        (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
+        if let i = arguments.firstIndex(of: "-fakesAudioLanguages"), arguments.indices.contains(i + 1), !arguments[i + 1].hasPrefix("-") {
+            (services.preferences as? FakePreferencesRepository)?.seedLanguages(arguments[i + 1].split(separator: ",").map(String.init))
+        }
+        (services.library as? FakeLibraryRepository)?.offline = arguments.contains("-fakesOffline")
+        if let i = arguments.firstIndex(of: "-fakesTrailerKeys"), arguments.indices.contains(i + 1) {
+            (services.library as? FakeLibraryRepository)?.trailerKeys = arguments[i + 1].split(separator: ",").map(String.init)
+        }
+        return services
+    }
+    #endif
 }

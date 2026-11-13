@@ -1,5 +1,7 @@
 import SwiftUI
+#if DEBUG
 import WMMFakes
+#endif
 import WMMFeatures
 import WMMModel
 import WMMUI
@@ -15,7 +17,9 @@ struct PadSignInScreen: View {
         PadSignInContent(picker: ServerPickerModel(servers: services.servers))
             .onAppear {
                 // `-localNetworkDenied` (DEBUG, fakes): the state after someone said no to Local Network.
+                #if DEBUG
                 if ScreenshotLaunch.has("-localNetworkDenied") { (services.servers as? FakeServerRepository)?.localNetworkDenied = true }
+                #endif
             }
     }
 }

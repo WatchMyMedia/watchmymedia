@@ -75,7 +75,8 @@ xcrun simctl io <udid> screenshot /tmp/movies.png
 
 The launch argument `-fakes` runs the app on the fakes in `WMMFakes` (the
 mockups' fictional library, no server): any name signs in with the password
-`password`. The fakes' posters are seeded gradients, but every show, movie,
+`password`. The fakes are in Debug builds only: a Release build ignores every
+`-fakes…` argument and doesn't link `WMMFakes` (see Release builds below). The fakes' posters are seeded gradients, but every show, movie,
 episode and Continue watching item carries one of six fictional backdrops
 drawn in code (`FakeBackdrops`), so Home's row screens on iPad and Apple TV
 (PLAN-HOME.md §7) can be judged on a simulator. `-fakesSignedOut` starts at sign-in, `-fakesNoServer` at the
@@ -593,6 +594,15 @@ and fictional broadcasts do not certify a physical tuner, remote, AirPlay,
 Picture in Picture or real-broadcast ad detection.
 
 ## Release builds, privacy and measuring
+
+**The fakes are debug-only** (PLAN-APPLE-REVIEW.md §2.9): every
+`import WMMFakes` in `App/` and `TV/`, the fakes' branch of each
+`ServicesFactory` and the `#Preview`s that use them sit under `#if DEBUG`.
+`project.yml` keeps `WMMFakes` as a dependency (so it builds and the import
+resolves) with `link: false`, and only Debug's `OTHER_LDFLAGS` links its
+object file: Xcode links a package product's whole object file, so without
+that a Release binary carried all of the fakes. The UI tests, `make apple-perf`
+and the App Store screenshot recipe all run Debug builds.
 
 **Privacy manifests**: `App/Resources/PrivacyInfo.xcprivacy` and
 `TV/Resources/PrivacyInfo.xcprivacy`. No tracking and no collected data; the

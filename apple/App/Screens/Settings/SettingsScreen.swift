@@ -1,5 +1,7 @@
 import SwiftUI
+#if DEBUG
 import WMMFakes
+#endif
 import WMMFeatures
 import WMMModel
 import WMMUI
@@ -391,6 +393,7 @@ private struct RowPressStyle: ButtonStyle {
     }
 }
 
+#if DEBUG
 #Preview {
     NavigationStack {
         SettingsScreen()
@@ -402,3 +405,4 @@ private struct RowPressStyle: ButtonStyle {
     .environment(Navigator())
     .preferredColorScheme(.dark)
 }
+#endif
