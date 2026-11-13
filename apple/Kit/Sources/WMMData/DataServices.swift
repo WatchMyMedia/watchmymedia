@@ -68,7 +68,7 @@ public final class DataServices {
     ) {
         let store = LocalStore(storage: storage, session: session, userAgent: userAgent, client: client)
         self.store = store
-        events = ServerEvents(store: store, session: eventSession ?? session, backoff: tuning.eventBackoff, linger: tuning.eventLinger)
+        events = ServerEvents(store: store, session: eventSession ?? session, backoff: tuning.eventBackoff, linger: tuning.eventLinger, now: tuning.now)
         serverRepository = RealServerRepository(
             store: store, discovery: discovery, probeSession: probeSession ?? Self.probeSession(connectTimeout: tuning.probeConnectTimeout, total: tuning.probeTimeout),
             probeTimeout: tuning.probeTimeout, localAddressTimeout: tuning.localAddressTimeout, now: tuning.now

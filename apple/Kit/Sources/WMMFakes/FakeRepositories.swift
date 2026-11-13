@@ -287,6 +287,7 @@ public final class FakeLibraryRepository: LibraryRepository {
     /// Episodes whose file was deleted, by ID.
     var deleted: Set<Int> = []
     private var listeners: [UUID: AsyncStream<Void>.Continuation] = [:]
+    private var typedListeners: [UUID: AsyncStream<LibraryChange>.Continuation] = [:]
 
     struct SeasonKey: Hashable {
         var showID: Int
@@ -476,6 +477,14 @@ public final class FakeLibraryRepository: LibraryRepository {
         }
     }
 
+    public func libraryChanges() -> AsyncStream<LibraryChange> {
+        AsyncStream { continuation in
+            let id = UUID()
+            typedListeners[id] = continuation
+            continuation.onTermination = { [weak self] _ in Task { @MainActor in self?.typedListeners[id] = nil } }
+        }
+    }
+
     private func record(_ target: WatchTarget, _ watched: Bool) async throws {
         await FakeLatency.wait()
         // A season or show mark covers every episode under it, as on the
@@ -497,12 +506,18 @@ public final class FakeLibraryRepository: LibraryRepository {
         default: break
         }
         marks[target] = watched
-        changed()
+        switch target {
+        case .movie(let id): changed(.watched(.movie, ids: [id], watched: watched))
+        case .episode(let id): changed(.watched(.episode, ids: [id], watched: watched))
+        case .season(let showID, let number): changed(.markedShow(id: showID, season: number, watched: watched))
+        case .show(let id): changed(.markedShow(id: id, season: nil, watched: watched))
+        }
     }
 
-    /// Tells the screens following ``changes()`` to refetch.
-    func changed() {
+    /// Tells the screens following ``changes()`` and ``libraryChanges()`` what changed, as the real repository does.
+    public func changed(_ change: LibraryChange = .unknown) {
         for listener in listeners.values { listener.yield() }
+        for listener in typedListeners.values { listener.yield(change) }
     }
 
     private func sortTitle(_ title: String) -> String {

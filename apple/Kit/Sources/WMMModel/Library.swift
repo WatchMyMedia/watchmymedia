@@ -765,4 +765,9 @@ public protocol LibraryRepository: AnyObject {
     /// the server's watch.changed and library.changed events), so screens
     /// refetch. Each call is a new listener; it ends when the task is cancelled.
     func changes() -> AsyncStream<Void>
+
+    /// The same changes, saying what changed (``LibraryChange``), so a screen
+    /// patches or ignores what isn't its own. A repository that can't say
+    /// gives ``LibraryChange/unknown`` for each.
+    func libraryChanges() -> AsyncStream<LibraryChange>
 }

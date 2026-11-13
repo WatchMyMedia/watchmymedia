@@ -81,15 +81,25 @@ import WMMModel
         #expect(navigator.playing?.startMs == nil)
     }
 
-    @Test func markWatchedCallsTheServerAndUpdatesTheButtons() async {
+    @Test func markWatchedCallsTheServerAndUpdatesTheButtons() async throws {
         let model = model(500)
-        await model.retry()
+        let running = Task { await model.run() }
+        defer { running.cancel() }
+        #expect(await eventually { model.movie != nil })
         await model.setWatched(true)
         #expect(library.watchCalls == ["movie 500 true"])
         #expect(model.message == "Marked as watched")
-        #expect(model.watched)
-        #expect(model.watchToggleLabel == "Mark unwatched")
         #expect(!model.busy)
+        #expect(await eventually { model.watched })
+        #expect(model.watchToggleLabel == "Mark unwatched")
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(library.movieCalls == 2, "the mark's own notice loads the page, once")
+        // Another movie's mark, an episode's, or a scan, loads nothing.
+        library.announceChange(.watched(.movie, ids: [501], watched: nil))
+        library.announceChange(.watched(.episode, ids: [100037], watched: nil))
+        library.announceChange(.scan(libraryID: nil))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(library.movieCalls == 2)
     }
 
     @Test func aFailedLoadIsAnErrorWithTryAgain() async {

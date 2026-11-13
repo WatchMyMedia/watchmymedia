@@ -144,6 +144,8 @@ final class Harness {
     let probeSession: URLSession
     let client = ClientInfo(deviceID: "unused", name: "Sam’s iPhone", product: "WatchMyMedia for iOS", platform: "ios", version: "1.0 (12)", model: "iPhone")
     var tuning: DataTuning
+    /// The event stream's session; the main one when nil.
+    var eventSession: URLSession?
     private(set) var services: DataServices!
 
     init(probeTimeout: Duration = .seconds(2)) {
@@ -165,8 +167,17 @@ final class Harness {
     private func make() -> DataServices {
         DataServices(
             storage: storage, client: client, userAgent: "WatchMyMedia/1.0 (ios; iOS 18.0)", session: router.session,
-            probeSession: probeSession, discovery: discovery, tuning: tuning
+            probeSession: probeSession, eventSession: eventSession, discovery: discovery, tuning: tuning
         )
+    }
+
+    /// Moves the event stream onto one the test writes to as it goes, and
+    /// opens the services again on it; keep the stream for the test's length.
+    func liveEvents() -> LiveEventStream {
+        let stream = LiveEventStream(host: server.host)
+        eventSession = stream.session
+        reopen()
+        return stream
     }
 
     var testServer: Server { Server(id: "srv-test", name: "Test server", baseURL: router.baseURL, version: "1.0.0", apiLevel: 1) }

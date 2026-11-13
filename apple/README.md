@@ -728,6 +728,14 @@ brand views and the QR code in `WMMUI`. The two targets share no files.
   and badges; burgundy for primary fills; orange for warnings), the system
   font with Dynamic Type, 44 pt touch targets, real `Button`s with
   accessibility labels on icon-only ones.
+- **Changes come from the server's events** (PLAN-APPLE-REVIEW.md §4.1.1):
+  `LibraryRepository.libraryChanges()` says what changed (`LibraryChange`:
+  which movies or episodes were marked, which library changed, a scan). A
+  screen model follows them through `ScreenChanges`, which keeps listening
+  while the screen is away, so coming back loads nothing unless something
+  changed meanwhile or the screen is five minutes old. A mark made here
+  reloads every screen through its own notice: don't reload again after
+  `library.mark`. The server's echo of it is dropped.
 - **Concurrency**: Swift 6 language mode. Repositories, models and the
   controller are `@MainActor`; network work suspends off it.
 - **Apple TV**: every page is a `TabPage` (a scroll view from the screen's

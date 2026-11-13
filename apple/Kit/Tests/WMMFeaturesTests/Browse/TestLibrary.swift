@@ -28,6 +28,7 @@ final class TestLibrary: LibraryRepository {
     private(set) var searches: [String] = []
     private(set) var watchCalls: [String] = []
     private var listeners: [UUID: AsyncStream<Void>.Continuation] = [:]
+    private var typedListeners: [UUID: AsyncStream<LibraryChange>.Continuation] = [:]
 
     private func check() throws {
         if let failure { throw failure }
@@ -86,21 +87,21 @@ final class TestLibrary: LibraryRepository {
         try check()
         watchCalls.append("\(kind) \(id) \(watched)")
         try await fake.setWatched(kind, id: id, watched: watched)
-        announceChange()
+        announceChange(.watched(kind, ids: [id], watched: watched))
     }
 
     func setSeasonWatched(showID: Int, season: Int, watched: Bool) async throws {
         try check()
         watchCalls.append("season \(showID) \(season) \(watched)")
         try await fake.setSeasonWatched(showID: showID, season: season, watched: watched)
-        announceChange()
+        announceChange(.markedShow(id: showID, season: season, watched: watched))
     }
 
     func setShowWatched(showID: Int, watched: Bool) async throws {
         try check()
         watchCalls.append("show \(showID) \(watched)")
         try await fake.setShowWatched(showID: showID, watched: watched)
-        announceChange()
+        announceChange(.markedShow(id: showID, season: nil, watched: watched))
     }
 
     func playRequest(fileID: Int) async throws -> PlayRequest {
@@ -118,12 +119,22 @@ final class TestLibrary: LibraryRepository {
         }
     }
 
-    /// What the server's library.changed event does: every listener refetches.
-    func announceChange() {
-        for listener in listeners.values { listener.yield() }
+    func libraryChanges() -> AsyncStream<LibraryChange> {
+        AsyncStream { continuation in
+            let id = UUID()
+            typedListeners[id] = continuation
+            continuation.onTermination = { [weak self] _ in Task { @MainActor in self?.typedListeners[id] = nil } }
+        }
     }
 
-    var listenerCount: Int { listeners.count }
+    /// What the real repository does on a change: every listener hears it,
+    /// told what changed (by default, that anything may have).
+    func announceChange(_ change: LibraryChange = .unknown) {
+        for listener in listeners.values { listener.yield() }
+        for listener in typedListeners.values { listener.yield(change) }
+    }
+
+    var listenerCount: Int { listeners.count + typedListeners.count }
 }
 
 /// A play-plan source that records what it was asked.

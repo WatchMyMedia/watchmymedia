@@ -59,15 +59,31 @@ import WMMModel
         #expect(await eventually { library.homeCalls == 2 })
     }
 
-    @Test func markingWatchedCallsTheServerAndConfirms() async {
-        await model.retry()
+    @Test func markingWatchedCallsTheServerAndConfirms() async throws {
+        let running = Task { await model.run() }
+        defer { running.cancel() }
+        #expect(await eventually { model.state.value != nil })
         await model.setWatched(.movie(id: 500), true)
         #expect(library.watchCalls == ["movie 500 true"])
         #expect(model.message == "Marked as watched")
+        #expect(await eventually { library.homeCalls == 2 })
         await model.setWatched(.show(id: 100), false)
         #expect(library.watchCalls.last == "show 100 false")
         #expect(model.message == "Marked as unwatched")
-        #expect(library.homeCalls == 3, "each mark refetches Home")
+        #expect(await eventually { library.homeCalls == 3 })
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(library.homeCalls == 3, "each mark loads Home once, from its own notice")
+    }
+
+    @Test func scansReloadOnlyAnEmptyHome() async throws {
+        let running = Task { await model.run() }
+        defer { running.cancel() }
+        #expect(await eventually { model.state.value != nil })
+        library.announceChange(.scan(libraryID: 1))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(library.homeCalls == 1, "library.changed brings what a scan found")
+        library.announceChange(.library(id: 1))
+        #expect(await eventually { library.homeCalls == 2 })
     }
 
     @Test func aFailedMarkSaysWhy() async {

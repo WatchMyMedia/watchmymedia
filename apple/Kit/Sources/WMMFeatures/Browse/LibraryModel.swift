@@ -37,6 +37,13 @@ public final class LibraryModel {
     }
 
     public static let pageSize = 100
+    /// The most a quiet reload asks for at once: a grid scrolled further is
+    /// asked for in pieces, so a library above the server's limit of 1,000 a
+    /// request keeps every title it showed (PLAN-APPLE-REVIEW.md §3.3.2).
+    public static let reloadPageSize = 500
+    /// Marked titles whose watched state is fetched one by one; more than this
+    /// in one event, and the grid is loaded again.
+    static let patchLimit = 20
 
     public let type: LibraryType
     public private(set) var state: Loadable<Grid> = .loading
@@ -71,10 +78,16 @@ public final class LibraryModel {
     @ObservationIgnored private var generation = 0
     /// The search waiting out the debounce; tests await it.
     @ObservationIgnored private(set) var pendingSearch: Task<Void, Never>?
+    @ObservationIgnored private let changes: ScreenChanges
+    @ObservationIgnored private let latest = LatestLoad()
+    @ObservationIgnored private let reloadPageSize: Int
 
     /// `libraryID` skips looking the library up (the Apple TV app knows it from Home).
     /// `rows` gives the screen the library's arranged rows above the grid.
-    public init(library: any LibraryRepository, navigator: Navigator, type: LibraryType, libraryID: Int? = nil, rows: (any RowsRepository)? = nil, pageSize: Int = LibraryModel.pageSize, debounce: Duration = .milliseconds(300)) {
+    public init(library: any LibraryRepository, navigator: Navigator, type: LibraryType, libraryID: Int? = nil, rows: (any RowsRepository)? = nil, pageSize: Int = LibraryModel.pageSize, debounce: Duration = .milliseconds(300),
+                reloadPageSize: Int = LibraryModel.reloadPageSize, now: @escaping @MainActor () -> Date = { Date() }) {
+        changes = ScreenChanges(now: now)
+        self.reloadPageSize = reloadPageSize
         self.library = library
         self.rowsRepository = rows
         self.navigator = navigator
@@ -155,10 +168,91 @@ public final class LibraryModel {
 
     // MARK: Loading
 
-    /// Loads the grid, then reloads quietly whenever the library (or the
-    /// person's rows and lists) changes, until cancelled.
+    /// Loads the grid, then follows what changes until cancelled
+    /// (PLAN-APPLE-REVIEW.md §4.1.1): another library's changes and scans
+    /// are ignored, marks are drawn from the event (one request a title when
+    /// the event doesn't say watched or not), and the grid is loaded again,
+    /// in pieces, only when this library changed or a show's state can't be
+    /// told otherwise. Coming back to it loads nothing unless something
+    /// changed meanwhile (``ScreenChanges``).
     public func run() async {
-        await followChanges(of: library, also: rowsRepository?.changes(), firstQuiet: state.value != nil) { quiet in await load(quiet ? .quiet : .first) }
+        await changes.run(
+            subscribe: { merge(library.libraryChanges(), unknown: rowsRepository?.changes()) },
+            hasContent: state.value != nil,
+            load: { quiet in await load(quiet ? .quiet : .first) },
+            apply: { changes in await apply(changes) }
+        )
+    }
+
+    /// What `changes` mean for the grid and the rows above it.
+    func apply(_ changes: [LibraryChange]) async {
+        guard let grid = state.value, !noLibrary, let libraryID else { return await load(.quiet) }
+        let own: WatchKind = type == .movie ? .movie : .episode
+        let held = Set(grid.items.map(\.id))
+        var reload = false
+        var rowsChanged = false
+        var marks: [Int: Bool] = [:]
+        var fetchMovies: Set<Int> = []
+        var fetchShows: Set<Int> = []
+        for change in changes {
+            switch change {
+            case .unknown:
+                reload = true
+            case .library:
+                reload = reload || change.touches(library: libraryID)
+            case .scan:
+                break
+            case .watched(let kind, let ids, let watched):
+                guard kind == own else { continue }
+                rowsChanged = true
+                if filter == .unwatched || kind == .episode {
+                    // A show's state follows its episodes, which the grid can't tell
+                    // apart; and Unwatched gains or loses titles.
+                    reload = true
+                } else if let watched {
+                    for id in ids where held.contains(id) { marks[id] = watched }
+                } else {
+                    fetchMovies.formUnion(ids.filter(held.contains))
+                }
+            case .markedShow(let id, let season, let watched):
+                guard type == .tv else { continue }
+                rowsChanged = true
+                if filter == .unwatched {
+                    reload = true
+                } else if season == nil {
+                    if held.contains(id) { marks[id] = watched }
+                } else if held.contains(id) {
+                    fetchShows.insert(id)
+                }
+            }
+        }
+        if fetchMovies.count + fetchShows.count > Self.patchLimit { reload = true }
+        if reload { return await load(.quiet) }
+        let mine = generation
+        for id in fetchMovies {
+            guard let movie = try? await library.movie(id: id) else { continue }
+            marks[id] = movie.watched
+        }
+        for id in fetchShows {
+            guard let show = try? await library.show(id: id) else { continue }
+            marks[id] = show.allWatched
+        }
+        guard mine == generation, !Task.isCancelled else { return }
+        if !marks.isEmpty { patch(marks) }
+        if rowsChanged, !rows.isEmpty, let fetched = await fetchRows(libraryID), mine == generation { rows = fetched }
+    }
+
+    /// Draws each title's watched mark as given; a mark ends its progress either way.
+    private func patch(_ marks: [Int: Bool]) {
+        guard var grid = state.value else { return }
+        grid.items = grid.items.map { item in
+            guard let watched = marks[item.id] else { return item }
+            var copy = item
+            copy.watched = watched
+            copy.progress = nil
+            return copy
+        }
+        if grid != state.value { state = .loaded(grid) }
     }
 
     // MARK: Rows
@@ -201,10 +295,16 @@ public final class LibraryModel {
         return try? await rowsRepository.libraryRows(libraryID: libraryID)
     }
 
-    public func retry() async { await load(.first) }
+    public func retry() async {
+        await load(.first)
+        changes.loaded()
+    }
 
     /// Pull to refresh: keeps the grid, and says why if it fails.
-    public func refresh() async { await load(.quiet) }
+    public func refresh() async {
+        await load(.quiet)
+        changes.loaded()
+    }
 
     public func setSort(_ sort: ItemSort) async {
         guard sort != self.sort else { return }
@@ -336,31 +436,23 @@ public final class LibraryModel {
         navigator.play(item.playRequest)
     }
 
-    /// A mark from a row's card; the rows and grid follow.
+    /// A mark from a row's card; the rows and grid follow from the mark's
+    /// own notice (``apply(_:)``), as every screen showing it does.
     public func setWatched(_ target: WatchTarget, _ watched: Bool) async {
         do {
             try await library.mark(target, watched: watched)
             message = markedMessage(watched: watched)
-            await load(.quiet)
         } catch {
             message = error.displayMessage
         }
     }
 
+    /// A mark from a poster: drawn at once; its notice brings the rows.
     public func setWatched(_ item: BrowseItem, _ watched: Bool) async {
         guard let target = item.watchTarget else { return }
         do {
             try await library.mark(target, watched: watched)
-            if var grid = state.value {
-                grid.items = grid.items.map { i in
-                    guard i.id == item.id else { return i }
-                    var copy = i
-                    copy.watched = watched
-                    if watched { copy.progress = nil }
-                    return copy
-                }
-                state = .loaded(grid)
-            }
+            patch([item.id: watched])
             message = markedMessage(watched: watched)
         } catch {
             message = error.displayMessage
@@ -388,7 +480,12 @@ public final class LibraryModel {
         ItemQuery(libraryID: libraryID, sort: sort, filter: filter, genre: genre, decade: decade, text: queryText, offset: offset, limit: limit)
     }
 
+    /// A load still running when another starts is cancelled.
     func load(_ reason: Reason) async {
+        await latest.run { [weak self] in await self?.fetch(reason) }
+    }
+
+    private func fetch(_ reason: Reason) async {
         generation += 1
         let mine = generation
         loadingMore = false
@@ -407,7 +504,7 @@ public final class LibraryModel {
             guard let id = try await self.resolveLibrary() else { return nil }
             let rowsTask = reason == .change ? nil : Task { await self.fetchRows(id) }
             defer { rowsTask?.cancel() }
-            let page = try await self.library.items(self.query(id, offset: offset, limit: limit))
+            let page = try await self.items(id, offset: offset, count: limit)
             fetchedRows = await rowsTask?.value
             return Grid(items: page.items, total: page.total, genres: page.genres, decades: page.decades, summary: page.summary, letters: page.letters, genreCounts: page.genreCounts, offset: page.offset)
         }
@@ -429,6 +526,27 @@ public final class LibraryModel {
         case .loading:
             break
         }
+    }
+
+    /// `count` titles from `offset`, in requests of at most ``reloadPageSize``,
+    /// as one page: the first request's facets, the last one's total.
+    private func items(_ id: Int, offset: Int, count: Int) async throws -> ItemPage {
+        var asked = min(count, reloadPageSize)
+        var page = try await library.items(query(id, offset: offset, limit: asked))
+        var fetched = page.items.count
+        var last = fetched
+        var known = Set(page.items.map(\.id))
+        // A short page is the end, whatever the total said.
+        while last == asked, fetched < count, offset + fetched < page.total {
+            asked = min(count - fetched, reloadPageSize)
+            let next = try await library.items(query(id, offset: offset + fetched, limit: asked))
+            last = next.items.count
+            fetched += last
+            page.items += next.items.filter { known.insert($0.id).inserted }
+            page.total = next.total
+            page.genreCounts = next.genreCounts ?? page.genreCounts
+        }
+        return page
     }
 
     /// The library of this type: from the server's list, else from Home's IDs.

@@ -194,6 +194,8 @@ public protocol LiveTVRepository: AnyObject, Observable {
     func deleteRecordingFile(id: String, recordAgain: Bool) async throws
     func removeRecordingRule(id: String) async throws
     func changes() -> AsyncStream<Void>
+    /// The same changes, saying which part changed (``LiveTVChange``).
+    func liveChanges() -> AsyncStream<LiveTVChange>
 }
 
 /// No Live TV calls or navigation on older servers, previews and callers that have no live service.

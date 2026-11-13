@@ -73,26 +73,42 @@ final class RealLibraryRepository: LibraryRepository {
         return SearchResults(movies: r.movies.map(\.browseItem), shows: r.shows.map(\.browseItem), episodes: r.episodes.map(\.card))
     }
 
+    /// Each mark tells every listener what changed, and the server's echo of
+    /// it is dropped (``ServerEvents/expect(_:)``), so every screen showing it
+    /// loads once.
     func setWatched(_ kind: WatchKind, id: Int, watched: Bool) async throws {
-        let id = Int64(id)
-        if watched {
-            let type: Operations.MarkWatched.Input.Path._TypePayload = kind == .movie ? .movie : .episode
-            _ = try await store.call { try await $0.markWatched(path: .init(_type: type, id: id)).noContent }
-        } else {
-            let type: Operations.MarkUnwatched.Input.Path._TypePayload = kind == .movie ? .movie : .episode
-            _ = try await store.call { try await $0.markUnwatched(path: .init(_type: type, id: id)).noContent }
+        let echo = events.expect(.watched(kind, ids: [id]))
+        let id64 = Int64(id)
+        do {
+            if watched {
+                let type: Operations.MarkWatched.Input.Path._TypePayload = kind == .movie ? .movie : .episode
+                _ = try await store.call { try await $0.markWatched(path: .init(_type: type, id: id64)).noContent }
+            } else {
+                let type: Operations.MarkUnwatched.Input.Path._TypePayload = kind == .movie ? .movie : .episode
+                _ = try await store.call { try await $0.markUnwatched(path: .init(_type: type, id: id64)).noContent }
+            }
+        } catch {
+            events.forget(echo)
+            throw error
         }
-        events.notify()
+        events.notify(.watched(kind, ids: [id], watched: watched))
     }
 
     func setSeasonWatched(showID: Int, season: Int, watched: Bool) async throws {
-        try await markSeason(showID: showID, season: season, watched: watched)
-        events.notify()
+        let echo = events.expect(.episodes)
+        do {
+            try await markSeason(showID: showID, season: season, watched: watched)
+        } catch {
+            events.forget(echo)
+            throw error
+        }
+        events.notify(.markedShow(id: showID, season: season, watched: watched))
     }
 
     /// One call for the whole show; a server without it gets one per season.
     func setShowWatched(showID: Int, watched: Bool) async throws {
         let id = Int64(showID)
+        let echo = events.expect(.episodes)
         do {
             if watched {
                 _ = try await store.call { try await $0.markShowWatched(path: .init(id: id)).noContent }
@@ -100,11 +116,20 @@ final class RealLibraryRepository: LibraryRepository {
                 _ = try await store.call { try await $0.markShowUnwatched(path: .init(id: id)).noContent }
             }
         } catch let error as APIError where error.status == 404 || error.status == 405 {
-            for season in try await show(id: showID).seasons {
-                try await markSeason(showID: showID, season: season.number, watched: watched)
+            do {
+                for season in try await show(id: showID).seasons {
+                    events.expect(.episodes)
+                    try await markSeason(showID: showID, season: season.number, watched: watched)
+                }
+            } catch {
+                events.forget(echo)
+                throw error
             }
+        } catch {
+            events.forget(echo)
+            throw error
         }
-        events.notify()
+        events.notify(.markedShow(id: showID, season: nil, watched: watched))
     }
 
     private func markSeason(showID: Int, season: Int, watched: Bool) async throws {
@@ -184,6 +209,10 @@ final class RealLibraryRepository: LibraryRepository {
 
     func changes() -> AsyncStream<Void> {
         events.changes()
+    }
+
+    func libraryChanges() -> AsyncStream<LibraryChange> {
+        events.libraryChanges()
     }
 }
 

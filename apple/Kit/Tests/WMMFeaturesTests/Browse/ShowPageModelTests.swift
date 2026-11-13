@@ -178,25 +178,59 @@ import WMMModel
 
     @Test func markWatchedTogglesAndSays() async {
         let model = model()
-        await model.retry()
+        let running = Task { await model.run() }
+        defer { running.cancel() }
+        #expect(await eventually { model.episode != nil })
         await model.toggleWatched()
         #expect(library.watchCalls == ["episode 100037 true"])
         #expect(model.message == "Marked as watched")
-        #expect(model.episode?.watched == true)
+        // The mark's own notice reloads the page.
+        #expect(await eventually { model.episode?.watched == true })
         #expect(model.watchToggleLabel == "Mark unwatched")
         await model.toggleWatched()
         #expect(library.watchCalls.last == "episode 100037 false")
-        #expect(model.episode?.watched == false)
+        #expect(await eventually { model.episode?.watched == false })
+    }
+
+    @Test func aMarkLoadsTheShowAndItsSeasonOnce() async throws {
+        let model = model()
+        let running = Task { await model.run() }
+        defer { running.cancel() }
+        #expect(await eventually { model.episode != nil })
+        let shows = library.showCalls, seasons = library.seasonCalls.count
+        await model.toggleWatched()
+        #expect(await eventually { model.episode?.watched == true })
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(library.showCalls == shows + 1)
+        #expect(library.seasonCalls.count == seasons + 1)
+    }
+
+    @Test func anotherShowsOrAMoviesMarkLoadsNothing() async throws {
+        let model = model()
+        let running = Task { await model.run() }
+        defer { running.cancel() }
+        #expect(await eventually { model.episode != nil })
+        let shows = library.showCalls
+        library.announceChange(.watched(.movie, ids: [500], watched: nil))
+        library.announceChange(.watched(.episode, ids: [999_999], watched: nil))
+        library.announceChange(.markedShow(id: 101, season: nil, watched: true))
+        library.announceChange(.scan(libraryID: nil))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(library.showCalls == shows)
+        library.announceChange(.watched(.episode, ids: [100037], watched: nil))
+        #expect(await eventually { library.showCalls == shows + 1 })
     }
 
     @Test func theSeasonAndTheShowMark() async {
         let model = model()
-        await model.retry()
+        let running = Task { await model.run() }
+        defer { running.cancel() }
+        #expect(await eventually { model.episode != nil })
         #expect(model.canMarkSeason)
         #expect(model.seasonToggleLabel == "Mark season watched")
         await model.toggleSeasonWatched()
         #expect(library.watchCalls == ["season 100 3 true"])
-        #expect(model.seasonWatched)
+        #expect(await eventually { model.seasonWatched })
         #expect(model.episode?.watched == true)
 
         #expect(model.canMarkShow)
@@ -204,7 +238,7 @@ import WMMModel
         #expect(model.showToggleLabel == "Mark show unwatched")
         await model.toggleShowWatched()
         #expect(library.watchCalls.last == "show 100 false")
-        #expect(!model.showWatched && !model.seasonWatched)
+        #expect(await eventually { !model.showWatched && !model.seasonWatched })
         #expect(model.showToggleLabel == "Mark show watched")
     }
 

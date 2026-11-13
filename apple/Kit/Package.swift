@@ -65,7 +65,8 @@ let package = Package(
         .testTarget(name: "WMMModelTests", dependencies: ["WMMModel"]),
         .testTarget(
             name: "WMMDataTests",
-            dependencies: ["WMMData", "WMMModel", "WMMAPI", .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")]
+            // WMMFeatures: the screen models, fed by the real ServerEvents (ScreenEventsTests).
+            dependencies: ["WMMData", "WMMModel", "WMMAPI", "WMMFeatures", .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")]
         ),
         .testTarget(name: "WMMPlaybackTests", dependencies: ["WMMPlayback", "WMMModel", "WMMFakes"]),
         .testTarget(name: "WMMDownloadsTests", dependencies: ["WMMDownloads", "WMMModel"]),

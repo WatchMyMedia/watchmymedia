@@ -127,6 +127,10 @@ final class RealLiveTVRepository: LiveTVRepository {
         events?.changes(.liveTV) ?? AsyncStream { $0.finish() }
     }
 
+    func liveChanges() -> AsyncStream<LiveTVChange> {
+        events?.liveChanges() ?? AsyncStream { $0.finish() }
+    }
+
     func makeSessionGateway() throws -> any LiveSessionGateway {
         guard (store.current?.server.apiLevel ?? 0) >= liveTVAPILevel else { throw LiveTVError(reason: "unavailable") }
         let session = try store.signedIn()
