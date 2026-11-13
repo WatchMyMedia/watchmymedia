@@ -228,6 +228,9 @@ public final class Navigator {
         case .movie(let id):
             closePlayer()
             open(.movie(id: id))
+        case .playMovie(let id):
+            // As Play/Pause on its card: loaded, then played; its page if it can't be.
+            await playPause(.playMovie(id: id), library: library) {}
         case .mediaList(let id):
             closePlayer()
             open(.mediaList(id: id))
