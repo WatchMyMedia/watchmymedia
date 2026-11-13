@@ -106,7 +106,7 @@ final class RealOfflineGateway: OfflineGateway {
 
     func token(_ owner: OfflineOwner, downloadID: String) async throws -> MediaToken {
         let t = try await call(owner) { try await $0.createOfflineToken(path: .init(id: downloadID)).ok.body.json }
-        return MediaToken(token: t.token, expiresAt: t.expiresAt, param: PlaybackMapping.nonBlank(t.param) ?? "access_token")
+        return t.model(server: baseURL(owner))
     }
 
     /// Nil for an address that isn't on the owner's server as it is kept now:

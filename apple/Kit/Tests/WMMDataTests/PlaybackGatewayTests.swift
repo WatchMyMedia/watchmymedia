@@ -468,6 +468,12 @@ import WMMAPI
         #expect(token.server == server.baseURL)
         #expect(token.apply(to: URL(string: "http://srv/api/files/1/stream?play=a1")!).absoluteString == "http://srv/api/files/1/stream?play=a1")
 
+        // Live TV asks with the same request and maps it the same way.
+        let live = APILiveSessionGateway(api: ServerAPI(baseURL: server.baseURL, session: session, token: { "tok-viewer" }), clientName: "Sam’s iPhone")
+        let liveToken = try await live.mediaToken()
+        #expect(liveToken == token)
+        #expect(requests("POST /api/auth/media-token").count == 2)
+
         try await gateway.stopSession("a75ff047261dcc3e")
         // Already gone is fine; other failures are not.
         try await gateway.stopSession("gone")

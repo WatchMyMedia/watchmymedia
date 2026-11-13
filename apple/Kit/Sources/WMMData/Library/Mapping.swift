@@ -14,6 +14,14 @@ enum Mapping {
         return s
     }
 
+    /// A media token as the player and downloads keep it: for the server at
+    /// `server` only (``MediaToken/covers(_:)``), and access_token when the
+    /// server names no parameter. Playback's, Live TV's and a download's
+    /// tokens all come through here.
+    static func mediaToken(_ token: String, expiresAt: Date, param: String?, server: URL) -> MediaToken {
+        MediaToken(token: token, expiresAt: expiresAt, param: nonBlank(param) ?? "access_token", server: server)
+    }
+
     /// Nil for nil and anything not above zero.
     static func positive(_ n: Int64?) -> Int? {
         guard let n, n > 0 else { return nil }
@@ -261,6 +269,20 @@ extension Components.Schemas.Library {
 
 extension Components.Schemas.Credit {
     var model: Person { Person(name: name, role: Mapping.nonBlank(character), profilePath: Mapping.nonBlank(profilePath)) }
+}
+
+extension Components.Schemas.MediaToken {
+    /// The token for the server at `server`, which it goes to only.
+    func model(server: URL) -> MediaToken {
+        Mapping.mediaToken(token, expiresAt: expiresAt, param: param, server: server)
+    }
+}
+
+extension Components.Schemas.OfflineToken {
+    /// A download's token for its owner's server at `server`, which it goes to only.
+    func model(server: URL) -> MediaToken {
+        Mapping.mediaToken(token, expiresAt: expiresAt, param: param, server: server)
+    }
 }
 
 extension Components.Schemas.WatchState {

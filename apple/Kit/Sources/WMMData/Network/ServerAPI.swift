@@ -96,6 +96,11 @@ public struct ServerAPI: Sendable {
         return data
     }
 
+    /// POST /api/auth/media-token: a token for media on this server's addresses only.
+    public func mediaToken() async throws -> MediaToken {
+        try await call { try await $0.createMediaToken().ok.body.json }.model(server: baseURL)
+    }
+
     /// The server refused this API's token on a request of the caller's own
     /// (the event stream's): signs out as ``call`` would.
     func tokenRefused() async {

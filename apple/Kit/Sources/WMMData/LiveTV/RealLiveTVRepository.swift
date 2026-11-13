@@ -207,8 +207,7 @@ public struct APILiveSessionGateway: LiveSessionGateway {
         catch let error as APIError where error.status == 404 { /* Already released. */ }
     }
     public func mediaToken() async throws -> MediaToken {
-        let token = try await api.call { try await $0.createMediaToken().ok.body.json }
-        return MediaToken(token: token.token, expiresAt: token.expiresAt, param: PlaybackMapping.nonBlank(token.param) ?? "access_token")
+        try await api.mediaToken()
     }
 
     private func liveCall<T>(_ operation: () async throws -> T) async throws -> T {

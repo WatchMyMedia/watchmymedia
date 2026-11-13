@@ -99,6 +99,18 @@ private final class NoPlayback: PlaybackControllerFactory {
         #expect(own.value(forHTTPHeaderField: "User-Agent") == "WatchMyMedia/1.0 (ios; iOS 18.0)")
     }
 
+    /// A download's token goes to its owner's server only, as playback's does,
+    /// and a blank parameter name is access_token.
+    @Test func aDownloadsTokenIsForItsOwnersServer() async throws {
+        try await h.signIn()
+        let owner = try #require(h.services.offline.owner())
+        h.router.on("POST /api/offline/downloads/d1/token", .json(#"{"token":"o1.abc","expiresAt":"2099-01-01T00:00:00Z","param":" "}"#))
+        let token = try await h.services.offline.token(owner, downloadID: "d1")
+        #expect(token == MediaToken(token: "o1.abc", expiresAt: Date(timeIntervalSince1970: 4_070_908_800), param: "access_token", server: h.router.baseURL))
+        let elsewhere = URL(string: "https://elsewhere.example.net/api/offline/d1/playlist.m3u8")!
+        #expect(token.apply(to: elsewhere) == elsewhere)
+    }
+
     /// A 401 on the offline routes went unread (it arrived as SignedOutError,
     /// not the APIError the gateway caught), so the sign-in stayed.
     @Test func aRefusedTokenSignsTheOwnerOut() async throws {

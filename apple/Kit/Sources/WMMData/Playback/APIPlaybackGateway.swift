@@ -97,7 +97,7 @@ public struct APIPlaybackGateway: PlaybackGateway {
     public func mediaToken() async throws -> MediaToken {
         let api = try await api()
         let t = try await api.call { try await $0.createMediaToken().ok.body.json }
-        return PlaybackMapping.token(t, server: api.baseURL)
+        return t.model(server: api.baseURL)
     }
 
     public func stopSession(_ sessionID: String) async throws {
@@ -224,11 +224,6 @@ enum PlaybackMapping {
     /// server at ``trickplayAPILevel`` or later (nil: not known).
     static func decision(_ d: Components.Schemas.Decision, on api: ServerAPI, apiLevel: Int? = trickplayAPILevel) throws -> PlaybackDecision {
         try decision(d, base: api.baseURL, apiLevel: apiLevel)
-    }
-
-    /// A media token for the server at `server`, which it goes to only.
-    static func token(_ t: Components.Schemas.MediaToken, server: URL) -> MediaToken {
-        MediaToken(token: t.token, expiresAt: t.expiresAt, param: nonBlank(t.param) ?? "access_token", server: server)
     }
 
     /// The decision with its relative URLs made absolute on the server at
