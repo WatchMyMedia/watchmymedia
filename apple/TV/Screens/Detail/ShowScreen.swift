@@ -560,7 +560,7 @@ private struct AboutShow: View, Equatable {
                         Button { Task { await model.setShowMissing(!showMissing) } } label: {
                             HStack(spacing: 14) {
                                 Text("Show missing")
-                                SwitchKnob(on: showMissing)
+                                TVSwitch(on: showMissing, compact: true)
                             }
                         }
                         .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
@@ -575,22 +575,6 @@ private struct AboutShow: View, Equatable {
                 }
             }
         }
-    }
-}
-
-/// The switch on Show missing: gold with the knob right when on.
-private struct SwitchKnob: View {
-    let on: Bool
-
-    var body: some View {
-        Capsule()
-            .fill(on ? Palette.gold : Palette.outlineStrong)
-            .frame(width: 56, height: 32)
-            .overlay(alignment: on ? .trailing : .leading) {
-                Circle().fill(on ? Palette.ground : Palette.text).frame(width: 24, height: 24).padding(4)
-            }
-            .animation(.easeOut(duration: 0.15), value: on)
-            .accessibilityHidden(true)
     }
 }
 
