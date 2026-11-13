@@ -55,8 +55,7 @@ public final class RealPlaybackController: PlaybackController {
     @ObservationIgnored var released = false
     @ObservationIgnored var pausedByInterruption = false
 
-    @ObservationIgnored var ticker: TimerHandle?
-    @ObservationIgnored var lastTickAt = 0
+    @ObservationIgnored let ticker: Ticker
     @ObservationIgnored var loadTask: Task<Void, Never>?
 
     @ObservationIgnored var outbox: [Outgoing] = []
@@ -113,6 +112,7 @@ public final class RealPlaybackController: PlaybackController {
         self.servers = servers
         self.clock = clock
         tokens = TokenKeeper(clock: clock)
+        ticker = Ticker(clock: clock, everyMs: tickMs)
         quality = preferences.quality
         (events, continuation) = AsyncStream.makeStream(of: PlayerEvent.self)
     }
@@ -806,26 +806,12 @@ public final class RealPlaybackController: PlaybackController {
     // MARK: - The tick
 
     func startTicker() {
-        guard ticker == nil else { return }
-        lastTickAt = clock.elapsedMs
-        scheduleTick()
-    }
-
-    func scheduleTick() {
-        ticker = clock.after(ms: tickMs) { [weak self] in
-            guard let self else { return }
-            let now = clock.elapsedMs
-            let dt = now - lastTickAt
-            lastTickAt = now
-            // The next tick first: this one may end the viewing, which cancels it.
-            scheduleTick()
-            refresh(dt)
-        }
+        // The ticker sets the next tick first: this one may end the viewing, which cancels it.
+        ticker.start { [weak self] dt in self?.refresh(dt) }
     }
 
     func stopTicker() {
-        ticker?.cancel()
-        ticker = nil
+        ticker.stop()
     }
 
     /// Brings ``state`` up to date and acts on it: heartbeats, the prompts and

@@ -67,7 +67,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
     @ObservationIgnored private var worker: Task<Void, Never>?
     @ObservationIgnored private var heartbeat: Task<Void, Never>?
     @ObservationIgnored private var heartbeatPending = false
-    @ObservationIgnored private var timer: TimerHandle?
+    @ObservationIgnored private let ticker: Ticker
     @ObservationIgnored private var released = false
     @ObservationIgnored private var loaded = false
     @ObservationIgnored private var wantsPlay = true
@@ -99,6 +99,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
         self.gateway = Result { try repository.makeSessionGateway() }
         self.media = media; self.clock = clock; self.cellular = cellular; self.profile = profile; self.beforeStart = beforeStart
         tokens = TokenKeeper(clock: clock)
+        ticker = Ticker(clock: clock, everyMs: 500)
     }
 
     public func start(_ request: LivePlayRequest) {
@@ -167,7 +168,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
     public func stop() {
         generation += 1; desired = nil; loaded = false
         loadedURL = nil; pendingOutput = nil; acceptedOutputGeneration = nil; failedOutputGeneration = nil
-        timer?.cancel(); timer = nil; media.stop()
+        ticker.stop(); media.stop()
         state.status = .stopped; state.askStillWatching = false
         runSwitches()
     }
@@ -348,11 +349,10 @@ public final class RealLivePlaybackController: LivePlaybackController {
     }
 
     private func scheduleTick() {
-        timer?.cancel()
-        timer = clock.after(ms: 500) { [weak self] in
-            guard let self, !self.released, self.desired != nil else { return }
+        ticker.restart { [weak self] _ in
+            // Nothing wanted any more (a failed start, an abandoned one): the beat ends.
+            guard let self, !self.released, self.desired != nil else { self?.ticker.stop(); return }
             self.tick()
-            if self.desired != nil { self.scheduleTick() }
         }
     }
     private func tick() {
