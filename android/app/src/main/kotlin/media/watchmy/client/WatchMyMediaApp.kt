@@ -32,6 +32,7 @@ import media.watchmy.client.model.AuthRepository
 import media.watchmy.client.model.CastReceiver
 import media.watchmy.client.model.CastService
 import media.watchmy.client.model.ClientInfo
+import media.watchmy.client.model.Diagnostics
 import media.watchmy.client.model.DownloadRepository
 import media.watchmy.client.model.LIVE_CAST_API_LEVEL
 import media.watchmy.client.model.LibraryRepository
@@ -129,7 +130,7 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
         }
         val receiver = if (castable && isTv) traced("WMM castConnect") { castConnect(data, playback) }.also { castConnect = it } else CastReceiver.None
         if (!isTv) traced("WMM followReminders") { followReminders(data, ::account) }
-        return RealAppServices(data, playback, cast, receiver, library = playback.screensLibrary(library), downloads = downloads?.repository ?: DownloadRepository.Unavailable, seekThumbnails = CoilSeekThumbnails(this), livePlayback = playback.live(data.livePlaybackGateway))
+        return RealAppServices(data, playback, cast, receiver, library = playback.screensLibrary(library), downloads = downloads?.repository ?: DownloadRepository.Unavailable, seekThumbnails = CoilSeekThumbnails(this), livePlayback = playback.live(data.livePlaybackGateway), diagnostics = AndroidDiagnostics(this))
     }
 
     /** Live TV reminders' alarms on a phone or tablet ([ReminderFollower]). */
@@ -218,6 +219,7 @@ private class RealAppServices(
     override val downloads: DownloadRepository,
     override val seekThumbnails: SeekThumbnails,
     override val livePlayback: LivePlaybackControllerFactory,
+    override val diagnostics: Diagnostics,
 ) : AppServices {
     override val servers: ServerRepository get() = data.servers
     override val auth: AuthRepository get() = data.auth
