@@ -227,7 +227,10 @@ public final class RealLivePlaybackController: LivePlaybackController {
                     }
                     guard version == generation else { continue }
                     guard let request = desired, !released, identityMatches else { continue }
-                    let fresh = try await bound.mediaToken()
+                    // A channel change keeps a token with time left: they last six hours
+                    // (PLAN-APPLE-REVIEW.md §4.2.2). This controller is pinned to one sign-in.
+                    let fresh: MediaToken
+                    if let kept = token, tokenStillValid { fresh = kept } else { fresh = try await bound.mediaToken() }
                     guard version == generation, !released, identityMatches else { continue }
                     let selectedProfile = liveProfile()
                     let session = try await createSession(bound, request: request, requestID: UUID().uuidString, profile: selectedProfile)
@@ -254,6 +257,9 @@ public final class RealLivePlaybackController: LivePlaybackController {
             worker = nil
         }
     }
+
+    /// The token has more than a minute left, the margin at which a heartbeat renews it.
+    private var tokenStillValid: Bool { token.map { $0.expiresAt.timeIntervalSince(clock.now) >= 60 } ?? false }
 
     private func liveProfile() -> PlaybackProfile {
         var result = profile()
@@ -388,6 +394,9 @@ public final class RealLivePlaybackController: LivePlaybackController {
     private func sendHeartbeat(force: Bool) {
         if force, heartbeat != nil { heartbeatPending = true; return }
         guard heartbeat == nil, worker == nil, let session = activeSession, desired != nil, !released else { return }
+        // While the channel tunes this asks every second. From API level 28 a
+        // status request with `waitMs` answers the moment it plays; that needs
+        // the regenerated client (`getLiveTVSession`), so it waits for it.
         let interval = session.state == .starting ? 1_000 : 10_000
         guard force || clock.elapsedMs - lastBeat >= interval else { return }
         lastBeat = clock.elapsedMs
@@ -412,7 +421,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
                 if failedOutputGeneration == failed { failedOutputGeneration = nil }
                 apply(updated)
                 guard desired != nil else { return }
-                if token.map({ $0.expiresAt.timeIntervalSince(clock.now) < 60 }) ?? true {
+                if !tokenStillValid {
                     let fresh = try await bound.mediaToken()
                     guard version == generation, activeSession?.id == session.id, !released else { return }
                     token = fresh

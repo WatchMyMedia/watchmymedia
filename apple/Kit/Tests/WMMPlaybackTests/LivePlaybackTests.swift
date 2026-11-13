@@ -544,6 +544,46 @@ struct LivePlaybackTests {
         #expect(rig.gateway.sessions.isEmpty)
         await rig.finish()
     }
+    @Test func channelChangesKeepAValidToken() async {
+        // PLAN-APPLE-REVIEW.md §4.2.2: tokens last six hours; a change of channel needs no new one.
+        let rig = LiveRig(); await rig.start()
+        rig.controller.start(.init(channel: rig.repository.channels[1])); await rig.settle()
+        rig.controller.start(.init(channel: rig.repository.channels[2])); await rig.settle()
+        #expect(rig.gateway.starts.count == 3)
+        #expect(rig.gateway.tokens == 1)
+        #expect(rig.media.loads.last?.query()?.contains("access_token=token-1") == true)
+        await rig.finish()
+
+        // One within the heartbeat's minute of running out is renewed.
+        let late = LiveRig(); late.gateway.tokenExpiry = TestClock.wallStart.addingTimeInterval(30)
+        await late.start()
+        late.controller.start(.init(channel: late.repository.channels[1])); await late.settle()
+        #expect(late.gateway.tokens == 2)
+        #expect(late.media.loads.last?.query()?.contains("access_token=token-2") == true)
+        await late.finish()
+    }
+
+    @Test func stallsAreCountedAsTheyHappenOncePerWait() {
+        // PLAN-APPLE-REVIEW.md §3.1.7: the stall notification and the player starting to wait both say so.
+        var c = LiveStallCounter()
+        c.waiting()
+        #expect(c.count == 0, "waiting before it ever played is the start, not a stall")
+        c.playing()
+        c.waiting()
+        c.waiting()
+        #expect(c.count == 1, "the notification and the wait are one stall")
+        c.playing()
+        c.waiting()
+        #expect(c.count == 2)
+        c.playing()
+        c.excuse()
+        c.waiting()
+        #expect(c.count == 2, "the wait after a pause or a seek is the viewer's")
+        c.playing()
+        c.waiting()
+        #expect(c.count == 3)
+    }
+
     @Test func mediaTokenRenewsWithoutNewTuner() async {
         let rig = LiveRig(); rig.gateway.tokenExpiry = TestClock.wallStart.addingTimeInterval(65)
         await rig.start(); await rig.advance(10_000)

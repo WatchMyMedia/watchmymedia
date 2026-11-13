@@ -34,6 +34,35 @@ extension LiveMediaPlayer {
     public var stalls: Int { 0 }
 }
 
+/// A live stream's stalls, counted as they happen (PLAN-APPLE-REVIEW.md
+/// §3.1.7) rather than when a heartbeat reads the player: from the item's
+/// stall notification and the player starting to wait while it played. One
+/// stall until it plays again; the wait after a pause or a seek isn't one.
+struct LiveStallCounter: Equatable {
+    private(set) var count = 0
+    private var played = false
+    private var stalled = false
+
+    /// The player plays.
+    mutating func playing() {
+        played = true
+        stalled = false
+    }
+
+    /// The player waits for data: a stall when it was playing.
+    mutating func waiting() {
+        guard played, !stalled else { return }
+        stalled = true
+        count += 1
+    }
+
+    /// The viewer paused or moved: the wait that follows is theirs.
+    mutating func excuse() {
+        played = false
+        stalled = false
+    }
+}
+
 @MainActor
 public final class AVLiveMediaPlayer: LiveMediaPlayer {
     public let player: AVPlayer?
@@ -42,11 +71,18 @@ public final class AVLiveMediaPlayer: LiveMediaPlayer {
     private var counted = TransferCount()
     private var recentBps: Int?
     private var transferAt: TimeInterval?
-    private var stallCount = 0
-    private var wasPlaying = false
-    private var wasWaiting = false
+    private var stallCounter = LiveStallCounter()
+    private var statusObservation: NSKeyValueObservation?
+    private var stallNotice: NSObjectProtocol?
     private var externalProgressStart: Double?
-    public init() { player = AVPlayer() }
+    public init() {
+        let player = AVPlayer()
+        self.player = player
+        statusObservation = player.observe(\.timeControlStatus) { [weak self] _, _ in
+            Task { @MainActor in self?.statusChanged() }
+        }
+    }
+
     public var playing: Bool { player?.timeControlStatus != .paused }
     public var ready: Bool { player?.currentItem?.status == .readyToPlay }
     public var buffering: Bool { player?.timeControlStatus == .waitingToPlayAtSpecifiedRate || !ready }
@@ -88,13 +124,15 @@ public final class AVLiveMediaPlayer: LiveMediaPlayer {
         let age = max(0, Int((ProcessInfo.processInfo.systemUptime - transferAt) * 1_000))
         return age <= 20_000 ? MediaTransfer(bps: recentBps, ageMs: age) : nil
     }
-    public var stalls: Int {
-        guard ready, let player else { return stallCount }
-        let waiting = player.timeControlStatus == .waitingToPlayAtSpecifiedRate
-        if waiting && wasPlaying && !wasWaiting { stallCount += 1 }
-        if player.timeControlStatus == .playing { wasPlaying = true }
-        wasWaiting = waiting
-        return stallCount
+    public var stalls: Int { stallCounter.count }
+    private func statusChanged() {
+        guard let player else { return }
+        switch player.timeControlStatus {
+        case .playing: stallCounter.playing()
+        case .waitingToPlayAtSpecifiedRate where ready: stallCounter.waiting()
+        case .paused: stallCounter.excuse()
+        default: break
+        }
     }
     public var position: Double { player?.currentTime().seconds ?? 0 }
     public var seekable: ClosedRange<Double>? {
@@ -113,7 +151,11 @@ public final class AVLiveMediaPlayer: LiveMediaPlayer {
         item.add(output)
         videoOutput = output; frameSeen = false; counted = TransferCount(); recentBps = nil; transferAt = nil
         externalProgressStart = nil
-        stallCount = 0; wasPlaying = false; wasWaiting = false
+        stallCounter = LiveStallCounter()
+        forgetStalls()
+        stallNotice = NotificationCenter.default.addObserver(forName: AVPlayerItem.playbackStalledNotification, object: item, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.stallCounter.waiting() }
+        }
         #if os(tvOS)
         let metadata = AVMutableMetadataItem()
         metadata.identifier = .commonIdentifierTitle
@@ -131,6 +173,7 @@ public final class AVLiveMediaPlayer: LiveMediaPlayer {
     public func goLive() {
         guard let range = seekable,
               let target = Self.forwardLiveEdgeTarget(position: position, seekable: range) else { return }
+        stallCounter.excuse()
         player?.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
     }
     static func forwardLiveEdgeTarget(position: Double, seekable: ClosedRange<Double>) -> Double? {
@@ -141,5 +184,9 @@ public final class AVLiveMediaPlayer: LiveMediaPlayer {
         // only needs to resume; seeking would rewind the picture.
         return position.isFinite && position >= target ? nil : target
     }
-    public func stop() { player?.pause(); player?.replaceCurrentItem(with: nil); videoOutput = nil; frameSeen = false }
+    public func stop() { player?.pause(); player?.replaceCurrentItem(with: nil); videoOutput = nil; frameSeen = false; forgetStalls() }
+    private func forgetStalls() {
+        if let stallNotice { NotificationCenter.default.removeObserver(stallNotice) }
+        stallNotice = nil
+    }
 }
