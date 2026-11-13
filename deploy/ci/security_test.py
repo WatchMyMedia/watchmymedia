@@ -50,7 +50,7 @@ class WorkflowIsolationTest(unittest.TestCase):
                                workflow.split('jobs:\n', 1)[1]))
         hosted = dict.fromkeys(('changes', 'web', 'contract', 'docker', 'scripts', 'android', 'server-race'), 'ubuntu-latest')
         hosted.update(dict.fromkeys(('server', 'apple', 'apple-tv'), 'macos-26'))
-        hosted['windows'] = hosted['windows-signing'] = 'windows-latest'
+        hosted['windows-server'] = hosted['windows-app'] = hosted['windows-signing'] = 'windows-latest'
         self.assertEqual(set(hosted), set(jobs))
         studio = ['self-hosted', 'macOS', 'ARM64', 'mac-studio']
         # Exercise the actual runs-on expressions, not a second routing helper.
@@ -84,7 +84,7 @@ class WorkflowIsolationTest(unittest.TestCase):
                                workflow.split('jobs:\n', 1)[1]))
         gated = {'server': 'server', 'server-race': 'race', 'contract': 'contract', 'web': 'web',
                  'docker': 'docker', 'scripts': 'scripts', 'android': 'android', 'apple': 'apple',
-                 'apple-tv': 'apple-tv', 'windows': 'windows'}
+                 'apple-tv': 'apple-tv', 'windows-server': 'windows', 'windows-app': 'windows'}
         self.assertEqual(set(gated) | {'changes', 'windows-signing'}, set(jobs))
         for job, output in gated.items():
             with self.subTest(job=job):
@@ -100,21 +100,47 @@ class WorkflowIsolationTest(unittest.TestCase):
                 block = re.search(rf'(?ms)^            {output}:\n((?:              - .*\n)+)', filters).group(1)
                 if output != 'scripts':
                     self.assertIn("'.github/workflows/ci.yml'", block)
-        # The windows job installs the web job's build, so web runs with it.
+        # windows-app installs the web job's build, so web runs with it.
         self.assertIn("steps.filter.outputs.windows == 'true'", outputs['web'])
 
     def test_windows_installer_embeds_the_web_build_from_the_same_run(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
-        self.assertIn('needs: [changes, web]', jobs['windows'])
+        self.assertIn('needs: [changes, web]', jobs['windows-app'])
         self.assertIn('name: windows-embedded-web', jobs['web'])
         self.assertIn('path: web/dist/', jobs['web'])
-        self.assertIn('actions/download-artifact@', jobs['windows'])
-        self.assertIn('name: windows-embedded-web', jobs['windows'])
-        self.assertIn('path: server/internal/webui/dist', jobs['windows'])
-        self.assertNotIn('windows/build.sh --smoke', jobs['windows'])
-        self.assertNotIn('actions/download-artifact@', jobs['server'])
+        self.assertIn('actions/download-artifact@', jobs['windows-app'])
+        self.assertIn('name: windows-embedded-web', jobs['windows-app'])
+        self.assertIn('path: server/internal/webui/dist', jobs['windows-app'])
+        self.assertNotIn('windows/build.sh --smoke', jobs['windows-app'])
+        # The server's tests need no web build, so they don't wait for one.
+        for name in ('server', 'windows-server'):
+            self.assertNotIn('actions/download-artifact@', jobs[name])
+        self.assertRegex(jobs['windows-server'], r'(?m)^    needs: changes$')
+
+    def test_windows_server_and_app_split_the_work_once(self):
+        # Two jobs at once instead of one after the other: the Go tests and
+        # qualifications in windows-server, the app, its installers and their
+        # smoke tests in windows-app, each step in exactly one of them.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        server, app = jobs['windows-server'], jobs['windows-app']
+        for marker in ("go test -skip 'Speed$' ./...", "go test -p 1 -run 'Speed$' ./...",
+                       "-run '^TestRemuxSession$' -count=50", 'TestLiveLadder', 'TestVODLadder',
+                       'probe-transcoder', 'windows-transcoder-report'):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, server)
+                self.assertNotIn(marker, app)
+        for marker in ('hardware-check-test.ps1', 'signing-test.ps1', 'windows/build.sh', 'TestPinnedUpdaterDLL',
+                       'hardware-check.ps1 -AppDir', 'installer.sh', 'platform-smoke.ps1', 'windows/smoke.ps1',
+                       'installer-smoke.ps1', 'windows-development-installer', 'windows-tray-logs'):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, app)
+                self.assertNotIn(marker, server)
+        # The Live TV qualification runs twice on main and manual runs, once on PRs.
+        self.assertIn("-run '^TestLiveLadder.*Qualification$' -count=${{ github.event_name == 'pull_request' && 1 || 2 }} -v", server)
 
     def test_workflow_keeps_read_only_permissions_and_fork_boundary(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
@@ -222,12 +248,12 @@ class WorkflowIsolationTest(unittest.TestCase):
                                workflow.split('jobs:\n', 1)[1]))
         self.assertNotIn('actions/cache@', workflow)
         setups = re.findall(r'(?m)uses: actions/setup-go@[^\n]*\n        with:\n((?:          .*\n)+)', workflow)
-        self.assertEqual(5, len(setups))
+        self.assertEqual(6, len(setups))
         for setup in setups:
             self.assertIn('          cache: false\n', setup)
         save_if = ("if: \"!cancelled() && runner.environment == 'github-hosted' && "
                    "github.event_name == 'push' && github.ref == 'refs/heads/main'\"")
-        cached = {'server', 'server-race', 'contract', 'windows'}
+        cached = {'server', 'server-race', 'contract', 'windows-server', 'windows-app'}
         for name, job in jobs.items():
             with self.subTest(job=name):
                 if name not in cached:
@@ -421,7 +447,7 @@ esac
 
     def test_tv_diagnostics_override_preserves_tests_results_and_failures(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
-        tv = re.search(r'(?ms)^  apple-tv:\n(.*?)(?=^  windows:)', workflow).group(1)
+        tv = re.search(r'(?ms)^  apple-tv:\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
         step = re.search(r'(?ms)- name: Build and test on an Apple TV simulator\n(.*?)(?=      -)', tv).group(1)
         self.assertIn('timeout-minutes: 20', step)
         self.assertIn("make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH=\"$PATH\"", step)
