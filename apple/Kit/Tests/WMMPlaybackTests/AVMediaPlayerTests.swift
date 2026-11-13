@@ -10,11 +10,11 @@ import Testing
 @MainActor
 @Suite(.serialized) struct AVMediaPlayerTests {
     @Test func theItemsMetadataNamesWhatPlaysForTheTransportBar() {
-        let items = AVMediaPlayer.metadata(title: "Night Shift Diner", subtitle: "S02 E01 · Open Late")
+        let items = PlayerMetadata.items(title: "Night Shift Diner", subtitle: "S02 E01 · Open Late")
         #expect(items.map(\.identifier) == [.commonIdentifierTitle, .iTunesMetadataTrackSubTitle])
         #expect(items.map { $0.value as? String } == ["Night Shift Diner", "S02 E01 · Open Late"])
         // A bare play link has no title until the library names it.
-        #expect(AVMediaPlayer.metadata(title: "", subtitle: nil).isEmpty)
+        #expect(PlayerMetadata.items(title: "", subtitle: nil).isEmpty)
     }
 
     @Test func theLinkIsMeasuredOverTheTransfersSinceTheLastRead() {

@@ -138,16 +138,16 @@ import WMMModel
     }
 
     @Test func avPlayerFailuresAreSorted() {
-        #expect(AVMediaPlayer.httpStatus(code: 404, comment: nil) == 404)
-        #expect(AVMediaPlayer.httpStatus(code: -12938, comment: "HTTP 404: File Not Found") == 404)
-        #expect(AVMediaPlayer.httpStatus(code: -12660, comment: "HTTP 403: Forbidden") == 403)
-        #expect(AVMediaPlayer.httpStatus(code: -12642, comment: "Playlist File unchanged for longer than 1.5 * target duration") == nil)
+        #expect(PlayerFailure.httpStatus(code: 404, comment: nil) == 404)
+        #expect(PlayerFailure.httpStatus(code: -12938, comment: "HTTP 404: File Not Found") == 404)
+        #expect(PlayerFailure.httpStatus(code: -12660, comment: "HTTP 403: Forbidden") == 403)
+        #expect(PlayerFailure.httpStatus(code: -12642, comment: "Playlist File unchanged for longer than 1.5 * target duration") == nil)
         let offline = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
-        #expect(AVMediaPlayer.failure(offline, log: nil).kind == .network)
+        #expect(PlayerFailure.classify(offline, log: nil).kind == .network)
         let wrapped = NSError(domain: "CoreMediaErrorDomain", code: -1, userInfo: [NSUnderlyingErrorKey: offline])
-        #expect(AVMediaPlayer.failure(wrapped, log: nil).kind == .network)
-        #expect(AVMediaPlayer.failure(NSError(domain: AVFoundationErrorDomain, code: AVError.Code.decoderNotFound.rawValue), log: nil).kind == .decoder)
-        #expect(AVMediaPlayer.failure(NSError(domain: AVFoundationErrorDomain, code: AVError.Code.fileFormatNotRecognized.rawValue), log: nil).kind == .source)
-        #expect(AVMediaPlayer.failure(nil, log: nil).kind == .other)
+        #expect(PlayerFailure.classify(wrapped, log: nil).kind == .network)
+        #expect(PlayerFailure.classify(NSError(domain: AVFoundationErrorDomain, code: AVError.Code.decoderNotFound.rawValue), log: nil).kind == .decoder)
+        #expect(PlayerFailure.classify(NSError(domain: AVFoundationErrorDomain, code: AVError.Code.fileFormatNotRecognized.rawValue), log: nil).kind == .source)
+        #expect(PlayerFailure.classify(nil, log: nil).kind == .other)
     }
 }

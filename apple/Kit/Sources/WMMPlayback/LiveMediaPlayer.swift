@@ -66,17 +66,15 @@ struct LiveStallCounter: Equatable {
 @MainActor
 public final class AVLiveMediaPlayer: LiveMediaPlayer {
     public let player: AVPlayer?
-    private var videoOutput: AVPlayerItemVideoOutput?
-    private var frameSeen = false
-    private var counted = TransferCount()
-    private var recentBps: Int?
-    private var transferAt: TimeInterval?
+    /// The item, its first frame and its transfers, as the file player has them.
+    private let core: PlayerCore
     private var stallCounter = LiveStallCounter()
     private var statusObservation: NSKeyValueObservation?
     private var stallNotice: NSObjectProtocol?
     private var externalProgressStart: Double?
     public init() {
-        let player = AVPlayer()
+        core = PlayerCore()
+        let player = core.player
         self.player = player
         statusObservation = player.observe(\.timeControlStatus) { [weak self] _, _ in
             Task { @MainActor in self?.statusChanged() }
@@ -87,21 +85,18 @@ public final class AVLiveMediaPlayer: LiveMediaPlayer {
     public var ready: Bool { player?.currentItem?.status == .readyToPlay }
     public var buffering: Bool { player?.timeControlStatus == .waitingToPlayAtSpecifiedRate || !ready }
     public var failed: Bool { player?.currentItem?.status == .failed }
+    /// Once seen, the video output comes off the item, as the file player's
+    /// does: it decoded every frame twice for the whole session before.
     public var firstFrameRendered: Bool {
-        if frameSeen { return true }
+        if core.frameShown { return true }
         guard let player, ready, player.timeControlStatus == .playing else { return false }
-        if let output = videoOutput {
-            let time = player.currentTime()
-            if time.isValid, output.hasNewPixelBuffer(forItemTime: time), output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) != nil {
-                frameSeen = true; return true
-            }
-        }
+        if core.decodedFrame() { return true }
         // AirPlay renders on the external screen, where no local pixel buffer
         // is exposed. Require playback to advance on the new item instead.
         if player.isExternalPlaybackActive {
             let current = player.currentTime().seconds
             guard current.isFinite else { return false }
-            if let externalProgressStart, current - externalProgressStart > 0.5 { frameSeen = true; return true }
+            if let externalProgressStart, current - externalProgressStart > 0.5 { core.noteFrame(); return true }
             if externalProgressStart == nil { externalProgressStart = current }
         }
         return false
@@ -113,16 +108,8 @@ public final class AVLiveMediaPlayer: LiveMediaPlayer {
         return Int(max(0, min((end - current) * 1_000, Double(Int.max))))
     }
     public var transfer: MediaTransfer? {
-        guard let events = player?.currentItem?.accessLog()?.events else { return nil }
-        let now = TransferCount(events: events)
-        if let rate = now.rate(since: counted) {
-            recentBps = rate; counted = now; transferAt = ProcessInfo.processInfo.systemUptime
-        } else if now.bytes < counted.bytes {
-            counted = now; recentBps = nil; transferAt = nil
-        }
-        guard let recentBps, let transferAt else { return nil }
-        let age = max(0, Int((ProcessInfo.processInfo.systemUptime - transferAt) * 1_000))
-        return age <= 20_000 ? MediaTransfer(bps: recentBps, ageMs: age) : nil
+        guard core.readAccessLog() != nil, let measured = core.measuredTransfer else { return nil }
+        return measured.ageMs <= 20_000 ? measured : nil
     }
     public var stalls: Int { stallCounter.count }
     private func statusChanged() {
@@ -142,27 +129,14 @@ public final class AVLiveMediaPlayer: LiveMediaPlayer {
         return range.start.seconds...range.end.seconds
     }
     public func load(url: URL, title: String, play: Bool) {
-        #if os(iOS) || os(tvOS)
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
-        try? AVAudioSession.sharedInstance().setActive(true)
-        #endif
-        let item = AVPlayerItem(url: url)
-        let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)])
-        item.add(output)
-        videoOutput = output; frameSeen = false; counted = TransferCount(); recentBps = nil; transferAt = nil
+        PlaybackAudioSession.activate()
+        let item = core.makeItem(url: url, metadata: PlayerMetadata.items(title: title, subtitle: nil))
         externalProgressStart = nil
         stallCounter = LiveStallCounter()
         forgetStalls()
         stallNotice = NotificationCenter.default.addObserver(forName: AVPlayerItem.playbackStalledNotification, object: item, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.stallCounter.waiting() }
         }
-        #if os(tvOS)
-        let metadata = AVMutableMetadataItem()
-        metadata.identifier = .commonIdentifierTitle
-        metadata.value = title as NSString
-        metadata.extendedLanguageTag = "und"
-        item.externalMetadata = [metadata]
-        #endif
         // Let AVPlayer choose the live edge. The file player's event-HLS seek to zero
         // must never be used here, even on the first playlist load.
         player?.replaceCurrentItem(with: item)
@@ -184,7 +158,7 @@ public final class AVLiveMediaPlayer: LiveMediaPlayer {
         // only needs to resume; seeking would rewind the picture.
         return position.isFinite && position >= target ? nil : target
     }
-    public func stop() { player?.pause(); player?.replaceCurrentItem(with: nil); videoOutput = nil; frameSeen = false; forgetStalls() }
+    public func stop() { player?.pause(); player?.replaceCurrentItem(with: nil); core.clear(); forgetStalls() }
     private func forgetStalls() {
         if let stallNotice { NotificationCenter.default.removeObserver(stallNotice) }
         stallNotice = nil

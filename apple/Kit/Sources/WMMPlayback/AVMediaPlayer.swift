@@ -19,8 +19,10 @@ public final class AVMediaPlayer: MediaPlayer {
     public var avPlayer: AVPlayer? { player }
     public private(set) var playWhenReady = false
 
+    /// The item, its first frame and its transfers, as the Live TV player has them.
+    private let core: PlayerCore
     private var listener: MediaPlayerListener?
-    private var item: AVPlayerItem?
+    private var item: AVPlayerItem? { core.item }
     /// Counts loads, so a callback for an item since replaced is ignored.
     private var loads = 0
     private var itemObservations: [NSKeyValueObservation] = []
@@ -38,17 +40,11 @@ public final class AVMediaPlayer: MediaPlayer {
     /// The item has an access log entry (AVPlayerItemNewAccessLogEntry).
     private var logged = false
     private var hls = false
-    /// The log's bytes and seconds of transfer when ``throughputBps`` last
-    /// measured, and what it measured.
-    private var counted = TransferCount()
-    private var recentBps: Int?
-    private var transferAt: TimeInterval?
-    private var videoOutput: AVPlayerItemVideoOutput?
-    private var frameReported = false
     private var loadedAtPositionMs = 0
 
     public init() {
-        player = AVPlayer()
+        core = PlayerCore()
+        player = core.player
         player.allowsExternalPlayback = true
         #if os(iOS)
         // With the screen mirrored to an Apple TV, send it the video rather than a picture of the phone.
@@ -88,25 +84,13 @@ public final class AVMediaPlayer: MediaPlayer {
     /// 22–43 Mbps either way), so the server works the link out from the
     /// buffer instead (PLAN-AUTO-QUALITY.md §3.2).
     public var throughputBps: Int? {
-        guard hls, logged, let events = item?.accessLog()?.events, let last = events.last else { return nil }
-        let now = TransferCount(events: events)
-        if let rate = now.rate(since: counted) {
-            recentBps = rate
-            counted = now
-            transferAt = ProcessInfo.processInfo.systemUptime
-        } else if now.bytes < counted.bytes {
-            counted = now
-            recentBps = nil
-            transferAt = nil
-        }
-        return recentBps ?? Self.bitsPerSecond(last.observedBitrate)
+        guard hls, logged, let last = core.readAccessLog()?.last else { return nil }
+        return core.measuredBps ?? Self.bitsPerSecond(last.observedBitrate)
     }
 
     public var transfer: MediaTransfer? {
         _ = throughputBps // Poll the current item's completed access-log transfers.
-        guard let recentBps, let transferAt else { return nil }
-        let age = max(0, Int((ProcessInfo.processInfo.systemUptime - transferAt) * 1_000))
-        return MediaTransfer(bps: recentBps, ageMs: age)
+        return core.measuredTransfer
     }
 
     public var positionMs: Int {
@@ -130,20 +114,9 @@ public final class AVMediaPlayer: MediaPlayer {
 
     public func load(_ source: PlayerSource) {
         clearItem()
-        var options: [String: Any] = [:]
-        if let mimeType = source.mimeType { options[AVURLAssetOverrideMIMETypeKey] = mimeType }
-        let asset = AVURLAsset(url: source.url, options: options)
-        let item = AVPlayerItem(asset: asset)
-        let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [
-            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
-        ])
-        item.add(output)
-        videoOutput = output
+        let item = core.makeItem(url: source.url, mimeType: source.mimeType, metadata: PlayerMetadata.items(title: source.title, subtitle: source.subtitle))
+        let asset = item.asset
         loadedAtPositionMs = source.startPositionMs
-        #if os(tvOS)
-        item.externalMetadata = Self.metadata(title: source.title, subtitle: source.subtitle)
-        #endif
-        self.item = item
         hls = source.hls
         let load = loads
         playWhenReady = source.playWhenReady
@@ -216,9 +189,7 @@ public final class AVMediaPlayer: MediaPlayer {
     }
 
     public func retitle(_ title: String, subtitle: String?) {
-        #if os(tvOS)
-        item?.externalMetadata = Self.metadata(title: title, subtitle: subtitle)
-        #endif
+        core.describe(PlayerMetadata.items(title: title, subtitle: subtitle))
     }
 
     public func stop() {
@@ -243,18 +214,13 @@ public final class AVMediaPlayer: MediaPlayer {
         itemObservations = []
         for n in itemNotifications { NotificationCenter.default.removeObserver(n) }
         itemNotifications = []
-        item = nil
+        core.clear()
         audioGroup = nil
         pendingStartMs = nil
         awaitingAudio = false
         ended = false
         failed = false
         logged = false
-        counted = TransferCount()
-        recentBps = nil
-        transferAt = nil
-        videoOutput = nil
-        frameReported = false
         player.pause()
         player.replaceCurrentItem(with: nil)
     }
@@ -273,20 +239,15 @@ public final class AVMediaPlayer: MediaPlayer {
     }
 
     private func checkFirstFrame() {
-        guard !frameReported, let item, player.currentItem === item,
+        guard !core.frameShown, let item, player.currentItem === item,
               item.status == .readyToPlay, pendingStartMs == nil,
               player.timeControlStatus == .playing, playWhenReady else { return }
         if player.isExternalPlaybackActive {
             // The remote screen owns decoding; advancing playback is the observable proof.
             guard positionMs > loadedAtPositionMs else { return }
+            core.noteFrame()
         } else {
-            guard let videoOutput, videoOutput.hasNewPixelBuffer(forItemTime: player.currentTime()) else { return }
-            _ = videoOutput.copyPixelBuffer(forItemTime: player.currentTime(), itemTimeForDisplay: nil)
-        }
-        frameReported = true
-        if let videoOutput {
-            item.remove(videoOutput)
-            self.videoOutput = nil
+            guard core.decodedFrame() else { return }
         }
         listener?.firstFrame()
     }
@@ -342,59 +303,9 @@ public final class AVMediaPlayer: MediaPlayer {
     private func fail(_ error: NSError?) {
         guard !failed else { return }
         failed = true
-        let failure = Self.failure(error, log: item?.errorLog())
+        let failure = PlayerFailure.classify(error, log: item?.errorLog())
         listener?.failed(failure)
         listener?.changed()
-    }
-
-    /// What went wrong, as the controller words it: an HTTP status from the
-    /// error log when there is one (HLS failures carry it there), else the error's domain.
-    nonisolated static func failure(_ error: NSError?, log: AVPlayerItemErrorLog?) -> PlayerFailure {
-        let detail = error.map { "\($0.domain) \($0.code): \($0.localizedDescription)" } ?? "unknown error"
-        let events = log?.events ?? []
-        if let status = events.reversed().lazy.compactMap({ httpStatus(code: $0.errorStatusCode, comment: $0.errorComment) }).first {
-            return PlayerFailure(kind: .http, detail: detail, httpStatus: status)
-        }
-        guard let error else { return PlayerFailure(kind: .other, detail: detail) }
-        let underlying = error.userInfo[NSUnderlyingErrorKey] as? NSError
-        if error.domain == NSURLErrorDomain || underlying?.domain == NSURLErrorDomain {
-            return PlayerFailure(kind: .network, detail: detail)
-        }
-        if error.domain == AVFoundationErrorDomain {
-            switch AVError.Code(rawValue: error.code) {
-            case .decodeFailed?, .decoderNotFound?, .decoderTemporarilyUnavailable?, .formatUnsupported?:
-                return PlayerFailure(kind: .decoder, detail: detail)
-            case .fileFormatNotRecognized?, .failedToParse?, .mediaDiscontinuity?:
-                return PlayerFailure(kind: .source, detail: detail)
-            case .contentIsNotAuthorized?:
-                return PlayerFailure(kind: .http, detail: detail, httpStatus: 403)
-            default:
-                break
-            }
-        }
-        return PlayerFailure(kind: .other, detail: detail)
-    }
-
-    /// The HTTP status in an error log event: its code when that is one, or "HTTP 404: File Not Found" in its comment.
-    nonisolated static func httpStatus(code: Int, comment: String?) -> Int? {
-        if (400..<600).contains(code) { return code }
-        guard let comment, let match = comment.firstMatch(of: /HTTP (\d{3})/), let status = Int(match.1), (400..<600).contains(status) else { return nil }
-        return status
-    }
-
-    /// The title and subtitle as AVKit reads them, for the transport bar's title view and Now Playing.
-    nonisolated static func metadata(title: String, subtitle: String?) -> [AVMetadataItem] {
-        var items: [AVMetadataItem] = []
-        func add(_ identifier: AVMetadataIdentifier, _ value: String) {
-            let item = AVMutableMetadataItem()
-            item.identifier = identifier
-            item.value = value as NSString
-            item.extendedLanguageTag = "und"
-            items.append(item)
-        }
-        if !title.isEmpty { add(.commonIdentifierTitle, title) }
-        if let subtitle, !subtitle.isEmpty { add(.iTunesMetadataTrackSubTitle, subtitle) }
-        return items
     }
 
     /// A positive, finite bitrate as whole bits per second; nil otherwise (the log says -1 or 0 when it has none).
@@ -409,40 +320,4 @@ public final class AVMediaPlayer: MediaPlayer {
     }
 
     nonisolated static func time(_ ms: Int) -> CMTime { CMTime(value: CMTimeValue(ms), timescale: 1000) }
-}
-
-/// Bytes an item's access log has transferred, and the seconds the transfers took.
-struct TransferCount: Equatable {
-    /// Less transfer time than this says too little about the link.
-    static let minimumSeconds = 1.0
-
-    var bytes: Int64 = 0
-    var seconds: Double = 0
-
-    init(bytes: Int64 = 0, seconds: Double = 0) {
-        self.bytes = bytes
-        self.seconds = seconds
-    }
-
-    init(events: [AVPlayerItemAccessLogEvent]) {
-        bytes = events.reduce(0) { $0 + max($1.numberOfBytesTransferred, 0) }
-        seconds = events.reduce(0) { $0 + max($1.transferDuration, 0) }
-    }
-
-    /// Bits per second over what was transferred since `earlier`; nil for under a second of transfer.
-    func rate(since earlier: TransferCount) -> Int? {
-        let bytes = bytes - earlier.bytes, seconds = seconds - earlier.seconds
-        guard bytes > 0, seconds.isFinite, seconds >= Self.minimumSeconds else { return nil }
-        return Int(Double(bytes) * 8 / seconds)
-    }
-}
-
-/// Runs `body` on the main actor: at once when called there (AVFoundation
-/// usually calls back on the main thread), else as soon as it can.
-private func onMain(_ body: @escaping @MainActor @Sendable () -> Void) {
-    if Thread.isMainThread {
-        MainActor.assumeIsolated(body)
-    } else {
-        Task { @MainActor in body() }
-    }
 }

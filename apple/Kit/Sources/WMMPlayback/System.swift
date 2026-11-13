@@ -211,16 +211,13 @@ final class AppleSystemSession: SystemSession {
         targets = []
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         #endif
-        #if os(iOS) || os(tvOS)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        #endif
+        PlaybackAudioSession.deactivate()
     }
 
     private func activateAudio() {
         #if os(iOS) || os(tvOS)
+        PlaybackAudioSession.activate()
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .moviePlayback)
-        try? session.setActive(true)
         let commands = commands
         observers.append(NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: session, queue: .main) { note in
             let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init)
