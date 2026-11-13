@@ -592,6 +592,15 @@ installed SDK. Keep the server computer awake for future recordings. Simulator
 and fictional broadcasts do not certify a physical tuner, remote, AirPlay,
 Picture in Picture or real-broadcast ad detection.
 
+## Release builds, privacy and measuring
+
+**Signposts** (PLAN-APPLE-REVIEW.md §4.3.1): `PerformanceSignposts.shared`
+(WMMModel) marks the intervals Instruments and `XCTOSSignpostMetric` measure,
+under subsystem `media.watchmy.client` and category `Performance`: Launch to
+Home, Play to first frame, and its two halves Play to decision and Decision to
+first frame. Its calls are safe in any order: an end without its begin does
+nothing, and a new Play ends an open one as cancelled.
+
 ## Layout
 
 | Path | What |
