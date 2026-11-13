@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import WMMData
 import WMMModel
@@ -34,6 +35,67 @@ struct PreferencesRepositoryTests {
         #expect(p.skipMode(.preview) == .ask)
         #expect(p.skipMode(.commercial) == .ask, "an unknown mode keeps the default button")
         #expect(!p.autoplayNext)
+    }
+
+    /// A load that returns has loaded, even with another on its way. Each used
+    /// to send its own request, and the one answered first left its reply
+    /// unused because the other had started after it: its caller (the player,
+    /// before its first play) then read the defaults.
+    @Test func aLoadThatReturnsHasLoadedEvenWithAnotherOnItsWay() async throws {
+        try await signIn()
+        let loads = Mutex(0)
+        let first = ReplyGate()
+        let second = ReplyGate()
+        h.server.respondAsync { request in
+            guard request.httpMethod == "GET", request.url?.path == "/api/me/preferences" else { return (200, Data(Fixtures.preferences.utf8)) }
+            let n = loads.withLock { $0 += 1; return $0 }
+            await (n == 1 ? first : second).wait()
+            return (200, Data(#"{"skip":{"intro":"auto"},"autoplayNext":false}"#.utf8))
+        }
+        let loading = Task { try await prefs.refresh() }
+        #expect(await eventually { loads.withLock { $0 } == 1 })
+        // Another load starts while the first waits for its answer, and its own answer is slower still.
+        let other = Task { try await prefs.refresh() }
+        for _ in 0..<3 { await Task.yield() }
+        await first.release()
+        try await loading.value
+        #expect(prefs.playback.skipMode(.intro) == .auto)
+        #expect(!prefs.playback.autoplayNext)
+        await second.release()
+        try await other.value
+        #expect(prefs.playback.skipMode(.intro) == .auto)
+    }
+
+    /// A load asked for while a change is on its way leaves the preferences
+    /// to the change's reply, also when it waits its turn behind another load
+    /// and is sent only after the change was answered.
+    @Test func aLoadAskedForDuringAChangeLeavesItToTheChangeEvenAfterWaitingItsTurn() async throws {
+        try await signIn()
+        let loads = Mutex(0)
+        let firstLoad = ReplyGate()
+        let saved = ReplyGate()
+        h.server.respondAsync { request in
+            if request.httpMethod == "PUT" {
+                await saved.wait()
+                return (200, Data(#"{"skip":{"intro":"auto"},"autoplayNext":true}"#.utf8))
+            }
+            guard request.url?.path == "/api/me/preferences" else { return (200, Data(Fixtures.preferences.utf8)) }
+            // Every load reads the preferences from before the change.
+            if loads.withLock({ $0 += 1; return $0 }) == 1 { await firstLoad.wait() }
+            return (200, Data(Fixtures.preferences.utf8))
+        }
+        let loading = Task { try await prefs.refresh() }
+        #expect(await eventually { loads.withLock { $0 } == 1 })
+        let saving = Task { try await prefs.setSkip(.intro, mode: .auto) }
+        #expect(await eventually { prefs.playback.skipMode(.intro) == .auto })
+        let other = Task { try await prefs.refresh() }
+        for _ in 0..<3 { await Task.yield() }
+        await saved.release()
+        try await saving.value
+        await firstLoad.release()
+        try await loading.value
+        try await other.value
+        #expect(prefs.playback.skipMode(.intro) == .auto)
     }
 
     @Test func signingInLoadsThePreferences() async throws {

@@ -109,7 +109,7 @@ struct SubtitlePreferencesRepositoryTests {
     @Test func delayedSavesReachTheServerInUserActionOrder() async throws {
         try await signIn()
         let firstStarted = Mutex(false)
-        let releaseFirst = SubtitleReplyGate()
+        let releaseFirst = ReplyGate()
         let observed = Mutex<[String]>([])
         h.server.respondAsync { request in
             guard request.httpMethod == "PUT" else { return (200, Data(Fixtures.preferences.utf8)) }
@@ -138,7 +138,7 @@ struct SubtitlePreferencesRepositoryTests {
     @Test func signingOutCancelsQueuedWritesRatherThanRebindingThem() async throws {
         try await signIn()
         let started = Mutex(false)
-        let releaseFirst = SubtitleReplyGate()
+        let releaseFirst = ReplyGate()
         let puts = Mutex(0)
         h.server.respondAsync { request in
             if request.httpMethod == "PUT" {
@@ -161,22 +161,5 @@ struct SubtitlePreferencesRepositoryTests {
         #expect(puts.withLock { $0 } == 1)
         #expect(h.services.auth.user == nil)
         #expect(h.services.preferences.playback == PlaybackPreferences())
-    }
-}
-
-private actor SubtitleReplyGate {
-    private var open = false
-    private var waiting: [CheckedContinuation<Void, Never>] = []
-
-    func wait() async {
-        if open { return }
-        await withCheckedContinuation { waiting.append($0) }
-    }
-
-    func release() {
-        open = true
-        let all = waiting
-        waiting.removeAll()
-        for waiter in all { waiter.resume() }
     }
 }
