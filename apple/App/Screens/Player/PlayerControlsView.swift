@@ -237,6 +237,8 @@ struct PlayerScrubber: View {
                     .onEnded { _ in model.endScrub() }
             )
             .animation(.easeOut(duration: 0.12), value: dragging)
+            // A tick as the thumb is taken (PLAN-APPLE-REVIEW.md §6.3).
+            .sensoryFeedback(.impact(weight: .light), trigger: dragging) { _, now in now }
         }
         .frame(height: 44)
         .accessibilityElement()

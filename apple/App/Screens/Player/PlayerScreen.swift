@@ -106,7 +106,10 @@ private struct PlayerContent: View {
         .animation(.easeOut(duration: 0.25), value: model.overlay)
         .animation(.easeOut(duration: 0.2), value: model.ripple)
         .animation(.easeInOut(duration: 0.25), value: state.qualityNote)
+        // A tick for each double tap that seeks.
+        .sensoryFeedback(.impact(weight: .light), trigger: model.ripple) { _, burst in burst != nil }
     }
+
 
     private func video(in frame: PlayerFrame, insets: PlayerInsets, portrait: Bool) -> some View {
         let state = model.state
