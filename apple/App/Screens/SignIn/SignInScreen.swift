@@ -12,9 +12,11 @@ import WMMUI
 /// The root moves on by itself once signed in.
 struct SignInScreen: View {
     @Environment(AppServices.self) private var services
+    @Environment(AppFlow.self) private var flow
 
     var body: some View {
-        SignInContent(model: SignInModel(servers: services.servers, auth: services.auth))
+        // The root keeps the form, so a resized iPad window keeps what was typed.
+        SignInContent(model: flow.signInModel(services))
     }
 }
 

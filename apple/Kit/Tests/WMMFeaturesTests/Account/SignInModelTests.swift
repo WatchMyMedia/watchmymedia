@@ -345,3 +345,28 @@ import WMMModel
         #expect(nav.pendingLinkTV != nil)
     }
 }
+
+/// The form kept above the iPhone and iPad sign-in screens (PLAN-APPLE-REVIEW.md §3.3.4).
+@MainActor
+@Suite struct SignInFormTests {
+    init() { FakeLatency.duration = .zero }
+
+    @Test func aResizedWindowKeepsWhatWasTypedUntilTheServerOrSignInChanges() async throws {
+        let servers = FakeServerRepository(signedIn: false)
+        let auth = FakeAuthRepository(signedIn: false, servers: servers)
+        let form = SignInForm()
+        let compact = form.model(servers: servers, auth: auth)
+        compact.name = "Sam"
+        // The window widens: the iPad screen asks for the form.
+        let wide = form.model(servers: servers, auth: auth)
+        #expect(wide === compact)
+        #expect(wide.name == "Sam")
+        // Another server: a form of its own.
+        try await servers.select(FakeServers.remoteHome)
+        #expect(form.model(servers: servers, auth: auth) !== compact)
+        // Signed in or out: afresh.
+        let current = form.model(servers: servers, auth: auth)
+        form.forget()
+        #expect(form.model(servers: servers, auth: auth) !== current)
+    }
+}

@@ -12,6 +12,17 @@ final class AppFlow {
     /// the original account needed by Cancel.
     var serverSwitch: ServerSwitchModel?
     var appliedSwitchLaunch = false
+    /// The sign-in form, kept here like the server switch, so an iPad window
+    /// resized during sign-in (which swaps the iPhone and iPad screens) keeps
+    /// what was typed (PLAN-APPLE-REVIEW.md §3.3.4).
+    @ObservationIgnored private let signIn = SignInForm()
+
+    func signInModel(_ services: AppServices) -> SignInModel {
+        signIn.model(servers: services.servers, auth: services.auth)
+    }
+
+    /// A sign-in or sign-out: the next form starts afresh.
+    func forgetSignIn() { signIn.forget() }
 }
 
 /// Server picker until a server is chosen, sign-in until someone is signed
@@ -45,6 +56,7 @@ struct RootView: View {
         .animation(.default, value: services.auth.user)
         .animation(.default, value: flow.choosingServer)
         .onChange(of: account) { old, _ in
+            flow.forgetSignIn()
             // Another account's reminders never notify here.
             Task { await notifier.reschedule([]) }
             if let switching = flow.serverSwitch {

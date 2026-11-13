@@ -243,3 +243,26 @@ extension Navigator {
         setPath([.linkTV(code: code)], for: .settings)
     }
 }
+
+/// A sign-in form kept above the screens that show it, as the server switch
+/// is: an iPad window resized during sign-in swaps the iPhone and iPad
+/// screens, and each used to make its own form, losing what was typed
+/// (PLAN-APPLE-REVIEW.md §3.3.4). One per server; ``forget()`` on a sign-in
+/// or sign-out, so the next starts afresh.
+@MainActor
+public final class SignInForm {
+    private var held: (serverID: String?, model: SignInModel)?
+
+    public init() {}
+
+    /// The form for the server in use, the same one each time it is asked for.
+    public func model(servers: any ServerRepository, auth: any AuthRepository) -> SignInModel {
+        let serverID = servers.current?.server.id
+        if let held, held.serverID == serverID { return held.model }
+        let model = SignInModel(servers: servers, auth: auth)
+        held = (serverID, model)
+        return model
+    }
+
+    public func forget() { held = nil }
+}
