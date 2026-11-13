@@ -24,4 +24,28 @@ import WMMModel
         s.acknowledge(failed: 1)
         #expect(s.failed == nil)
     }
+
+    @Test func thePumpKeepsOneOutAndTheNewestWaiting() async {
+        final class Owner {}
+        var gates: [CheckedContinuation<Void, Never>] = []
+        var sent: [Int] = []
+        let pump = HeartbeatPump<Int>(owner: Owner(), coalesce: { n, waiting, behind in
+            if behind { waiting = [n] } else { waiting.append(n) }
+        }, deliver: { n in
+            sent.append(n)
+            await withCheckedContinuation { gates.append($0) }
+        })
+        pump.submit(1)
+        for _ in 0..<10 { await Task.yield() }
+        #expect(pump.sending)
+        pump.submit(2)
+        pump.submit(3)
+        #expect(sent == [1], "one out at a time")
+        gates.removeFirst().resume()
+        for _ in 0..<10 { await Task.yield() }
+        #expect(sent == [1, 3], "the newest waiting replaced the one before it")
+        gates.removeFirst().resume()
+        await pump.drained()
+        #expect(!pump.busy)
+    }
 }

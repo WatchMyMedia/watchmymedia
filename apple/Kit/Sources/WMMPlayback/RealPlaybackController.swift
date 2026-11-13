@@ -58,10 +58,8 @@ public final class RealPlaybackController: PlaybackController {
     @ObservationIgnored let ticker: Ticker
     @ObservationIgnored var loadTask: Task<Void, Never>?
 
-    @ObservationIgnored var outbox: [Outgoing] = []
-    @ObservationIgnored var delivering = false
-    /// A message is out, waiting for the server.
-    @ObservationIgnored var sending = false
+    /// Heartbeats, stops and session ends, in order, one out at a time.
+    @ObservationIgnored var reports: HeartbeatPump<Outgoing>!
     @ObservationIgnored var endHold: (@MainActor () -> Void)?
     @ObservationIgnored var inFlight: [Int: Task<Void, Never>] = [:]
     @ObservationIgnored var taskCount = 0
@@ -115,6 +113,16 @@ public final class RealPlaybackController: PlaybackController {
         ticker = Ticker(clock: clock, everyMs: tickMs)
         quality = preferences.quality
         (events, continuation) = AsyncStream.makeStream(of: PlayerEvent.self)
+        reports = HeartbeatPump(
+            owner: self,
+            coalesce: { message, waiting, behind in Self.enqueue(message, into: &waiting, behindDelivery: behind) },
+            spawn: { [weak self] work in self?.launch(work) ?? Task { await work() } },
+            deliver: { [weak self] message in await self?.deliver(message) }
+        )
+        reports.onIdle = { [weak self] in
+            self?.endHold?()
+            self?.endHold = nil
+        }
     }
 
     // MARK: - Commands
@@ -254,7 +262,7 @@ public final class RealPlaybackController: PlaybackController {
         guard let v = active(), v.decision != nil else { return }
         media?.pause()
         report(v, .closed, position(v), 0)
-        if endHold == nil, delivering, let system { endHold = system.holdForDelivery() }
+        if endHold == nil, reports.busy, let system { endHold = system.holdForDelivery() }
     }
 
     public func release() {

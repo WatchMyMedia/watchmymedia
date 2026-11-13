@@ -42,22 +42,10 @@ extension RealPlaybackController {
         return true
     }
 
+    /// Queues `message`. The pump holds the controller until the queue is
+    /// empty, so the last reports go out after release.
     func send(_ message: Outgoing) {
-        Self.enqueue(message, into: &outbox, behindDelivery: sending)
-        guard !delivering else { return }
-        delivering = true
-        // Holds the controller until the queue is empty, so the last reports go out after release.
-        launch { [self] in
-            while !outbox.isEmpty {
-                let next = outbox.removeFirst()
-                sending = true
-                await deliver(next)
-                sending = false
-            }
-            delivering = false
-            endHold?()
-            endHold = nil
-        }
+        reports.submit(message)
     }
 
     /// Adds `message` to the queue. While the server can't be reached each
