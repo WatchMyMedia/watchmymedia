@@ -373,6 +373,12 @@ public final class RealPlaybackController: PlaybackController {
         var audioUnselectable = false
         /// An offline play chose its audio from the loaded preferences.
         var offlineAudioChosen = false
+        /// Video codecs this device failed to decode when sent as they are:
+        /// left out of the profile for the rest of the play, so the server
+        /// converts the video (PLAN-APPLE-REVIEW.md §3.1.2). Asked once a play.
+        var refusedVideoCodecs = Set<String>()
+        /// The decoder failure that asked again; its message stands if that fails too.
+        var codecFailure: PlayerFailure?
         var selectedSubtitle: String?
         var subtitleManuallyChosen = false
         var subtitleRevision = 0
@@ -474,11 +480,12 @@ public final class RealPlaybackController: PlaybackController {
         loadTask?.cancel()
         loadTask = launch { [weak self] in
             guard let self else { return }
-            // A bare play link: name the file while the server decides.
+            // A bare play link: name the file while the server decides, and
+            // start without waiting for the name (PLAN-APPLE-REVIEW.md §4.2.6).
             async let named = request.title.isEmpty ? attempt("name the file") { try await self.lookups.name(request) } ?? nil : nil
             do {
                 var d = try await decide(v, startMs: request.startMs, playID: nil)
-                try Task.checkCancellation()
+                if overtaken(v, d) { return }
                 var start = request.startMs ?? 0
                 // No explicit start: pick up where the viewer left off. A VOD
                 // playlist (or the file) just starts there; an event playlist
@@ -487,17 +494,27 @@ public final class RealPlaybackController: PlaybackController {
                     start = d.resumeMs
                     if StreamClock.of(d).event {
                         let first = d
-                        d = try await decide(v, startMs: start, playID: d.playID)
-                        try Task.checkCancellation()
+                        do {
+                            d = try await decide(v, startMs: start, playID: d.playID)
+                        } catch {
+                            endUnused(first, of: v)
+                            throw error
+                        }
+                        if overtaken(v, d) {
+                            endUnused(first, of: v)
+                            return
+                        }
                         endReplacedSession(first, d)
                     }
                 }
-                if let named = await named { rename(v, named) }
                 apply(v, d, requestedStartMs: start)
             } catch is CancellationError {
+                return
             } catch {
                 fail(v, error)
+                return
             }
+            if let named = await named { rename(v, named) }
         }
     }
 
@@ -513,7 +530,9 @@ public final class RealPlaybackController: PlaybackController {
         state.backdropPath = v.request.backdropPath
         state.stillPath = v.request.stillPath
         state.posterPath = v.request.posterPath
+        media?.retitle(v.request.title, subtitle: v.request.subtitle)
         showArtwork(for: v.request)
+        refresh(0)
     }
 
     /// Re-requests the decision for the same play at `atMs`: track and quality changes, event seeks, a new token, recoveries.
@@ -545,11 +564,13 @@ public final class RealPlaybackController: PlaybackController {
             guard let self else { return }
             do {
                 let d = try await decide(v, startMs: atMs, playID: v.playID, subtitleID: subtitleID, burnIn: burnIn, switchGeneration: qualitySwitch?.switchGeneration)
-                try Task.checkCancellation()
+                if overtaken(v, d, switchGeneration: qualitySwitch?.switchGeneration) { return }
                 // Playing or paused as the viewer has it now: the picker pauses while open
                 // and resumes on closing, which is usually while the decision is out.
                 apply(v, d, requestedStartMs: atMs, playWhenReady: media?.playWhenReady ?? true, qualitySwitch: qualitySwitch)
             } catch is CancellationError {
+                // Overtaken before the server answered: the switch it was for didn't happen.
+                if let generation = qualitySwitch?.switchGeneration, viewing === v, !v.stopped { v.failedGeneration = generation }
             } catch {
                 if let generation = qualitySwitch?.switchGeneration, viewing === v, v.decision != nil {
                     if let pending = v.pendingSwitch, pending.generation == generation {
@@ -576,6 +597,7 @@ public final class RealPlaybackController: PlaybackController {
         // Automatic sends the device's own profile: the server applies the step's caps.
         var device = profile.current().capped(by: asked)
         if v.audioUnselectable { device.selectsAudioTrack = nil }
+        device.videoCodecs.removeAll(where: v.refusedVideoCodecs.contains)
         let request = DecisionRequest(
             fileID: v.request.fileID,
             profile: device,
@@ -592,29 +614,58 @@ public final class RealPlaybackController: PlaybackController {
             autoRecovery: asked == .auto && (apiLevel ?? 0) >= 24 && v.request.recordingID == nil,
             switchGeneration: switchGeneration
         )
+        // The token is asked for at the same time as the decision, not after
+        // it (PLAN-APPLE-REVIEW.md §4.2.1); a valid one is kept, and one the
+        // decision brings is taken instead.
+        let beside = !tokenValid && gateway.needsTokenBeside(request)
+        let gateway = gateway
+        async let fetched: MediaToken? = beside ? gateway.mediaToken() : nil
         let decision = try await gateway.decide(request)
         // A download plays from the device and needs no media token (PLAN-DOWNLOADS.md §10.4).
         if decision.url.isFileURL {
             token = nil
-        } else {
-            do {
-                try await ensureToken()
-            } catch {
-                if let id = decision.sessionID, id != v.decision?.sessionID { send(.endSession(id)) }
-                throw error
+            return decision
+        }
+        do {
+            if let carried = decision.mediaToken {
+                keep(carried)
+            } else if let fresh = try await fetched {
+                keep(fresh)
+            } else if !tokenValid {
+                keep(try await gateway.mediaToken())
             }
+        } catch {
+            endUnused(decision, of: v)
+            throw error
         }
         return decision
     }
 
-    private func ensureToken() async throws {
-        if token != nil && clock.elapsedMs < tokenRefreshAt { return }
-        let fresh = try await gateway.mediaToken()
+    private var tokenValid: Bool { token != nil && clock.elapsedMs < tokenRefreshAt }
+
+    private func keep(_ fresh: MediaToken) {
         token = fresh
         // Timed on this device's clock, with a floor, so a clock that
         // disagrees with the server's cannot cause a reload loop.
         let lifetime = max(Int(fresh.expiresAt.timeIntervalSince(clock.now) * 1000), tokenMinLifetimeMs)
         tokenRefreshAt = clock.elapsedMs + lifetime - tokenMarginMs
+    }
+
+    /// A decision that came back after its load was cancelled (a newer
+    /// request, Close, the next episode) is not played: its server session
+    /// ends, as Live TV's does, and the quality switch it was for is reported
+    /// failed (PLAN-APPLE-REVIEW.md §3.1.3).
+    private func overtaken(_ v: Viewing, _ d: PlaybackDecision, switchGeneration: Int64? = nil) -> Bool {
+        guard Task.isCancelled else { return false }
+        endUnused(d, of: v)
+        if let switchGeneration, viewing === v, !v.stopped { v.failedGeneration = switchGeneration }
+        return true
+    }
+
+    /// Ends `d`'s server session unless the viewing plays it, or keeps it to go back to.
+    private func endUnused(_ d: PlaybackDecision, of v: Viewing) {
+        guard let id = d.sessionID, id != v.decision?.sessionID, id != v.pendingSwitch?.previous.sessionID else { return }
+        send(.endSession(id))
     }
 
     private func apply(_ v: Viewing, _ d: PlaybackDecision, requestedStartMs: Int, playWhenReady: Bool = true, qualitySwitch: ProgressReply? = nil) {
@@ -783,7 +834,8 @@ public final class RealPlaybackController: PlaybackController {
         log.warning("Playback request failed: \(error.localizedDescription, privacy: .public)")
         v.loading = false
         let message = error.displayMessage
-        v.error = message.isEmpty ? "Could not start playback." : message
+        // Asked again without a codec this device couldn't decode, and that failed too: the decoder's message stands.
+        v.error = v.codecFailure.map(errorMessage) ?? (message.isEmpty ? "Could not start playback." : message)
         refresh(0)
     }
 
@@ -899,6 +951,15 @@ public final class RealPlaybackController: PlaybackController {
         }
         // Off AirPlay the address in use plays again: the LAN one may be gone (the phone left home).
         if playingLocally && !external { localRoute = nil }
+        if let codec = refusedCodec(v, failure) {
+            // The video sent as it is didn't decode: once a play, ask again
+            // without its codec, so the server converts it (PLAN-APPLE-REVIEW.md §3.1.2).
+            log.warning("Asking again without \(codec, privacy: .public)")
+            v.refusedVideoCodecs.insert(codec)
+            v.codecFailure = failure
+            reload(v, at: position(v))
+            return
+        }
         if failure.recoverable && v.recoveries < maxRecoveries {
             v.recoveries += 1
             v.recoveredAt = clock.elapsedMs
@@ -907,6 +968,15 @@ public final class RealPlaybackController: PlaybackController {
         }
         v.error = errorMessage(failure)
         refresh(0)
+    }
+
+    /// The codec to leave out after `failure`: a decoder or unreadable-source
+    /// failure of a stream that copied the video, the first time in the play.
+    /// Not for a download, which plays the file it has.
+    private func refusedCodec(_ v: Viewing, _ failure: PlayerFailure) -> String? {
+        guard failure.kind == .decoder || failure.kind == .source, v.refusedVideoCodecs.isEmpty,
+              let d = v.decision, !d.url.isFileURL, let codec = d.copiedVideoCodec else { return nil }
+        return codec
     }
 
     private func restorePrevious(_ v: Viewing, _ pending: Viewing.PendingSwitch, showFailureNote: Bool = true) {
@@ -987,7 +1057,10 @@ public final class RealPlaybackController: PlaybackController {
         let carrying = v.loading && playsOn(v) && v.pendingPositionMs == nil
         let buffered = v.loading && !carrying ? 0 : max(v.streamClock.filePosition(p.bufferedPositionMs) - pos, 0)
         let phase = p.phase
-        if !v.loading && phase == .ready { v.everReady = true }
+        if !v.loading && phase == .ready {
+            v.everReady = true
+            v.codecFailure = nil
+        }
         if v.everReady && !v.searchedOnline { searchOnline(v) }
         if v.everReady && !v.attemptedAutomaticSubtitle { downloadAutomaticSubtitle(v) }
         let waiting: PlayerStatus = v.everReady ? .buffering : .loading

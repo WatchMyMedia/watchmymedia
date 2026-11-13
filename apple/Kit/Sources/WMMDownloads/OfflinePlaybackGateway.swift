@@ -34,6 +34,12 @@ public final class OfflinePlaybackGateway: PlaybackGateway, @unchecked Sendable 
         return try await online.decide(request)
     }
 
+    /// A download plays from the device and needs no token.
+    @MainActor public func needsTokenBeside(_ request: DecisionRequest) -> Bool {
+        if request.recordingID == nil, downloads?.offlinePlay(request.fileID) != nil { return false }
+        return online.needsTokenBeside(request)
+    }
+
     /// A copy of the whole file plays the track the player asks for, as the
     /// server would, so a reload keeps the viewer's pick or the person's
     /// language (PLAN-LANGUAGES.md §5.5); an HLS copy has only its own.

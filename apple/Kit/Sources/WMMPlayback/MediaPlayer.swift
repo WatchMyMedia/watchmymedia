@@ -138,10 +138,18 @@ public protocol MediaPlayer: AnyObject {
     /// False when this player cannot, or does not know the tracks yet.
     func selectAudio(ordinal: Int, of count: Int) -> Bool
 
+    /// The item playing is named afresh (a bare play link named after it
+    /// started): the title and subtitle the system shows for it.
+    func retitle(_ title: String, subtitle: String?)
+
     /// Stops loading and playing; ``load(_:)`` starts again.
     func stop()
 
     func release()
+}
+
+extension MediaPlayer {
+    public func retitle(_ title: String, subtitle: String?) {}
 }
 
 public struct MediaTransfer: Hashable, Sendable {

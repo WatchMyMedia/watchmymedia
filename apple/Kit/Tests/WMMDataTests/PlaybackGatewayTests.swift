@@ -161,6 +161,22 @@ import WMMAPI
         #expect(d.trickplay == nil)
     }
 
+    @Test func aCopiedVideoNamesItsProfileKey() async throws {
+        // PLAN-APPLE-REVIEW.md §3.1.2, as the server classifies (server/internal/playback/decide.go).
+        typealias Plan = Components.Schemas.VideoPlan
+        #expect(PlaybackMapping.copiedVideoCodec(Plan(codec: "h264", copy: true, toneMap: false)) == "h264")
+        #expect(PlaybackMapping.copiedVideoCodec(Plan(bitDepth: 10, codec: "h264", copy: true, toneMap: false)) == "h264")
+        #expect(PlaybackMapping.copiedVideoCodec(Plan(bitDepth: 8, codec: "hevc", copy: true, toneMap: false)) == "hevc")
+        #expect(PlaybackMapping.copiedVideoCodec(Plan(bitDepth: 10, codec: "hevc", copy: true, hdr: "hdr10", toneMap: false)) == "hevc10")
+        #expect(PlaybackMapping.copiedVideoCodec(Plan(bitDepth: 10, codec: "hevc", copy: true, dvProfile: 8, hdr: "dolbyvision", toneMap: false)) == "dovi8")
+        #expect(PlaybackMapping.copiedVideoCodec(Plan(codec: "av1", copy: true, toneMap: false)) == "av1")
+        // Converted, or not said: none.
+        #expect(PlaybackMapping.copiedVideoCodec(Plan(codec: "hevc", copy: false, toneMap: false)) == nil)
+        #expect(PlaybackMapping.copiedVideoCodec(Plan(copy: true, toneMap: false)) == nil)
+        serve(["POST /api/files/4/playback": (200, decisionHLS)])
+        #expect(try await gateway.decide(DecisionRequest(fileID: 4, profile: profile, client: client)).copiedVideoCodec == "h264")
+    }
+
     @Test func futureSegmentKindsAreIgnoredAndFutureSourcesKeepKnownSegments() async throws {
         let future = decisionHLS.replacingOccurrences(of: "\"kind\":\"intro\"", with: "\"kind\":\"sponsor\"")
             .replacingOccurrences(of: "\"source\":\"chapter\"", with: "\"source\":\"new-detector\"")

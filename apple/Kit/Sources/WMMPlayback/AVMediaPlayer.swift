@@ -215,6 +215,12 @@ public final class AVMediaPlayer: MediaPlayer {
         return true
     }
 
+    public func retitle(_ title: String, subtitle: String?) {
+        #if os(tvOS)
+        item?.externalMetadata = Self.metadata(title: title, subtitle: subtitle)
+        #endif
+    }
+
     public func stop() {
         clearItem()
         listener?.changed()

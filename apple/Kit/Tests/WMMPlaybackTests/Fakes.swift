@@ -60,18 +60,31 @@ final class FakeGateway: PlaybackGateway {
     var subtitleFiles: [String: String] = [:]
     var subtitleFetches: [URL] = []
     var planRequests: [(PlaybackProfile, StreamQuality, [Int])] = []
+    /// Runs as each decision is asked for, before it is answered (a test can hold it there).
+    var deciding: (@MainActor (DecisionRequest) async -> Void)?
+    /// Runs as each token is asked for, before it is answered; throwing fails it.
+    var tokening: (@MainActor () async throws -> Void)?
+    /// What ``needsTokenBeside(_:)`` answers: false for a server whose decisions carry the token.
+    var tokenBeside = true
     /// The server the tokens are scoped to (``MediaToken/server``); nil goes anywhere.
     var scope: URL?
     /// While true, reports wait in ``reportProgress(_:)`` (a server that can't be reached) until ``releaseReports()``.
     var holdReports = false
     private var heldReports: [CheckedContinuation<Void, Never>] = []
+    /// The order of every call, by kind: "decide", "token", "token answered", "decision answered".
+    var calls: [String] = []
 
     init(clock: TestClock) {
         self.clock = clock
     }
 
+    func needsTokenBeside(_ request: DecisionRequest) -> Bool { tokenBeside }
+
     func decide(_ request: DecisionRequest) async throws -> PlaybackDecision {
         decisions.append(request)
+        calls.append("decide")
+        await deciding?(request)
+        calls.append("decision answered")
         return try answer(request)
     }
 
@@ -90,7 +103,11 @@ final class FakeGateway: PlaybackGateway {
 
     func mediaToken() async throws -> MediaToken {
         tokens += 1
-        return MediaToken(token: "tok\(tokens)", expiresAt: clock.now.addingTimeInterval(Double(tokenLifetimeMs) / 1000), server: scope)
+        let n = tokens
+        calls.append("token")
+        try await tokening?()
+        calls.append("token answered")
+        return MediaToken(token: "tok\(n)", expiresAt: clock.now.addingTimeInterval(Double(tokenLifetimeMs) / 1000), server: scope)
     }
 
     func stopSession(_ sessionID: String) async throws {
@@ -135,6 +152,8 @@ final class FakeMediaPlayer: MediaPlayer {
     private let clock: TestClock
     private var listener: MediaPlayerListener?
     var loads: [PlayerSource] = []
+    /// What ``retitle(_:subtitle:)`` named the item playing.
+    var titles: [String] = []
     var seeks: [Int] = []
     var audioOrdinal: Int?
     var playsAudio: (Int) -> Bool = { _ in true }
@@ -196,6 +215,8 @@ final class FakeMediaPlayer: MediaPlayer {
         audioOrdinal = ordinal
         return true
     }
+
+    func retitle(_ title: String, subtitle: String?) { titles.append(title) }
 
     func stop() { change { phase = .idle } }
 
@@ -292,6 +313,8 @@ final class RecordingLookups: PlaybackLookups {
     var named: PlayRequest?
     var described: (UpNext) throws -> UpNext = { $0 }
     private(set) var names: [Int] = []
+    /// Runs as a file is named, before the name comes (a test can hold it there).
+    var naming: (@MainActor () async -> Void)?
     /// Image bytes by path; a path not here fails to load.
     var pictures: [String: Data] = [:]
     /// Called as an image loads, before it answers.
@@ -305,6 +328,7 @@ final class RecordingLookups: PlaybackLookups {
 
     func name(_ request: PlayRequest) async throws -> PlayRequest? {
         names.append(request.fileID)
+        await naming?()
         return named
     }
 
@@ -407,7 +431,9 @@ func decision(
     selectedAudio: Int? = 1,
     mode: PlaybackMode? = nil,
     video: StreamVideo? = nil,
-    autoStep: StreamQuality? = nil
+    autoStep: StreamQuality? = nil,
+    copiedVideoCodec: String? = nil,
+    mediaToken: MediaToken? = nil
 ) -> PlaybackDecision {
     let session = proto == .file ? nil : sessionID
     return PlaybackDecision(
@@ -431,7 +457,9 @@ func decision(
         upNextMs: upNextMs,
         next: next,
         video: video,
-        autoStep: autoStep
+        autoStep: autoStep,
+        copiedVideoCodec: copiedVideoCodec,
+        mediaToken: mediaToken
     )
 }
 

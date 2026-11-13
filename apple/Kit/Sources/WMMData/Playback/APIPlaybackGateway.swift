@@ -53,6 +53,12 @@ public struct APIPlaybackGateway: PlaybackGateway {
         return try PlaybackMapping.decision(decision, on: api, apiLevel: level)
     }
 
+    /// Every decision needs its token fetched beside it until the generated
+    /// client has `Decision.mediaToken` (API level 28). Then this answers
+    /// `(apiLevel() ?? 0) < decisionTokenAPILevel`, and
+    /// ``PlaybackMapping/decision(_:base:apiLevel:)`` maps the field.
+    @MainActor public func needsTokenBeside(_ request: DecisionRequest) -> Bool { true }
+
     public func reportProgress(_ report: ProgressReport) async throws -> ProgressReply {
         let recovery = (await apiLevel() ?? 0) >= 24
         let body = Components.Schemas.ProgressInputBody(
@@ -230,6 +236,11 @@ enum PlaybackMapping {
     /// device, and its seek thumbnails stay on the server. The media token
     /// goes on these addresses, so a stream elsewhere is refused, as Live
     /// TV's is, and a subtitle or seek thumbnails elsewhere are left out.
+    ///
+    /// From ``decisionTokenAPILevel`` the decision carries a media token:
+    /// once the generated client has the field, map it here as
+    /// `mediaToken: d.mediaToken.map { token($0, server: base) }` (and
+    /// ``APIPlaybackGateway/needsTokenBeside(_:)`` answers by level).
     static func decision(_ d: Components.Schemas.Decision, base: URL, apiLevel: Int? = trickplayAPILevel) throws -> PlaybackDecision {
         guard Components.Schemas.Decision.ModePayload.allCases.contains(d.mode),
               Components.Schemas.Decision._ProtocolPayload.allCases.contains(d._protocol),
@@ -272,8 +283,19 @@ enum PlaybackMapping {
             growing: (apiLevel ?? 0) >= liveRecordingAPILevel ? d.growing.flatMap { value in
                 guard let start = value.startedAt, let end = value.endsAt, end > start else { return nil }
                 return .init(startedAt: start, endsAt: end)
-            } : nil
+            } : nil,
+            copiedVideoCodec: copiedVideoCodec(d.video)
         )
+    }
+
+    /// The profile's key for a copied video, as the server classifies it
+    /// (`classify` in server/internal/playback/decide.go): Dolby Vision kept
+    /// is its profile's dovi key, 10-bit HEVC hevc10, the rest its codec.
+    static func copiedVideoCodec(_ v: Components.Schemas.VideoPlan) -> String? {
+        guard v.copy, let codec = nonBlank(v.codec)?.lowercased() else { return nil }
+        if v.hdr == "dolbyvision", let profile = v.dvProfile, profile > 0 { return "dovi\(profile)" }
+        if codec == "hevc" && (v.bitDepth ?? 8) > 8 { return "hevc10" }
+        return codec
     }
 
     /// A decision's seek thumbnails with the sheet URL made absolute; nil

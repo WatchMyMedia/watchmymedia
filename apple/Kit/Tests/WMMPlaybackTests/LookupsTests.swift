@@ -47,15 +47,25 @@ import WMMModel
         #expect(h.state.nextEpisode == nextEpisode)
     }
 
-    @Test func anUntitledRequestIsNamedBeforeItPlays() async {
+    @Test func anUntitledRequestStartsThenIsNamed() async {
+        // PLAN-APPLE-REVIEW.md §4.2.6: the stream doesn't wait for the name.
         let lookups = RecordingLookups(named: PlayRequest(fileID: 1, title: "Harbor Lights", subtitle: "S03 E07 · The Long Dark", backdropPath: "/b.jpg"))
+        var naming: CheckedContinuation<Void, Never>?
+        lookups.naming = { await withCheckedContinuation { naming = $0 } }
         let h = Harness(lookups: lookups)
-        await h.start(PlayRequest(fileID: 1, title: ""), decision())
+        h.gateway.answer = { _ in decision() }
+        h.controller.start(PlayRequest(fileID: 1, title: ""))
+        for _ in 0..<50 where naming == nil || h.player.loads.isEmpty { await Task.yield() }
         #expect(lookups.names == [1])
+        #expect(h.player.loads.count == 1)
+        #expect(h.state.title == "")
+        naming?.resume()
+        await h.run()
         #expect(h.state.title == "Harbor Lights")
         #expect(h.state.subtitle == "S03 E07 · The Long Dark")
         #expect(h.state.backdropPath == "/b.jpg")
-        #expect(h.player.loads.first?.title == "Harbor Lights")
+        #expect(h.player.titles == ["Harbor Lights"])
+        #expect(h.player.loads.count == 1)
         #expect(h.system.nowPlaying.last?.title == "Harbor Lights")
     }
 

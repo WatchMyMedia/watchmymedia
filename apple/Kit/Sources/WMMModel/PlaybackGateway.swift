@@ -4,6 +4,10 @@ import Foundation
 /// and copies HDR only to a screen that shows it (PLAN-HDR-PROFILE.md).
 public let hdrProfileAPILevel = 8
 
+/// The API level whose decisions carry a media token (`Decision.mediaToken`),
+/// so a play needs no token request of its own (PLAN-APPLE-REVIEW.md §4.2.1).
+public let decisionTokenAPILevel = 28
+
 /// What this device can play, sent with every playback request
 /// (PLAN-CLIENTS.md §4.4; the server's `Profile`).
 public struct PlaybackProfile: Hashable, Sendable {
@@ -174,8 +178,16 @@ public struct PlaybackDecision: Hashable, Sendable {
     /// The file's seek thumbnails; nil until the server has made them, and
     /// from servers before ``trickplayAPILevel``.
     public var trickplay: Trickplay?
+    /// The profile's key for the video when it is sent as it is (direct play
+    /// or a remux): h264, hevc, hevc10, av1, dovi5…; nil when it is converted,
+    /// or the server didn't say. A decoder that fails on it asks again
+    /// without it (PLAN-APPLE-REVIEW.md §3.1.2).
+    public var copiedVideoCodec: String?
+    /// A media token sent with the decision, from ``decisionTokenAPILevel``;
+    /// the player then fetches none of its own.
+    public var mediaToken: MediaToken?
 
-    public init(mode: PlaybackMode, reasons: [String] = [], protocol: StreamProtocol, vod: Bool, url: URL, mimeType: String? = nil, playID: String, sessionID: String? = nil, durationMs: Int, startMs: Int = 0, resumeMs: Int = 0, audio: [AudioOption] = [], selectedAudio: Int? = nil, subtitles: [DecisionSubtitle] = [], selectedSubtitleID: String? = nil, burnInSubtitleID: String? = nil, segments: [Segment] = [], creditsMs: Int = 0, watchedAtMs: Int = 0, upNextMs: Int = 0, next: UpNext? = nil, video: StreamVideo? = nil, autoStep: StreamQuality? = nil, trickplay: Trickplay? = nil, growing: GrowingRecording? = nil) {
+    public init(mode: PlaybackMode, reasons: [String] = [], protocol: StreamProtocol, vod: Bool, url: URL, mimeType: String? = nil, playID: String, sessionID: String? = nil, durationMs: Int, startMs: Int = 0, resumeMs: Int = 0, audio: [AudioOption] = [], selectedAudio: Int? = nil, subtitles: [DecisionSubtitle] = [], selectedSubtitleID: String? = nil, burnInSubtitleID: String? = nil, segments: [Segment] = [], creditsMs: Int = 0, watchedAtMs: Int = 0, upNextMs: Int = 0, next: UpNext? = nil, video: StreamVideo? = nil, autoStep: StreamQuality? = nil, trickplay: Trickplay? = nil, growing: GrowingRecording? = nil, copiedVideoCodec: String? = nil, mediaToken: MediaToken? = nil) {
         self.growing = growing
         self.mode = mode
         self.reasons = reasons
@@ -201,6 +213,8 @@ public struct PlaybackDecision: Hashable, Sendable {
         self.video = video
         self.autoStep = autoStep
         self.trickplay = trickplay
+        self.copiedVideoCodec = copiedVideoCodec
+        self.mediaToken = mediaToken
     }
 }
 
@@ -359,6 +373,11 @@ public protocol PlaybackGateway: Sendable {
     @MainActor func bound() -> any PlaybackGateway
     func decide(_ request: DecisionRequest) async throws -> PlaybackDecision
 
+    /// Whether the player asks for ``mediaToken()`` at the same time as the
+    /// decision for `request`: false when that decision brings its own
+    /// (``PlaybackDecision/mediaToken``) or plays from the device.
+    @MainActor func needsTokenBeside(_ request: DecisionRequest) -> Bool
+
     func reportProgress(_ report: ProgressReport) async throws -> ProgressReply
 
     func mediaToken() async throws -> MediaToken
@@ -387,6 +406,7 @@ public protocol PlaybackGateway: Sendable {
 
 extension PlaybackGateway {
     @MainActor public func bound() -> any PlaybackGateway { self }
+    @MainActor public func needsTokenBeside(_ request: DecisionRequest) -> Bool { true }
     public func automaticSubtitle(fileID: Int, playID: String) async throws -> DecisionSubtitle? { nil }
     public func cancelAutomaticSubtitle(fileID: Int, playID: String) async throws {}
 }
