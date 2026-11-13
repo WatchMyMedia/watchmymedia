@@ -69,9 +69,17 @@ internal class RealPreferencesRepository(private val store: LocalStore, private 
      */
     private val loads = Mutex()
 
-    override suspend fun refresh() = loads.withLock {
+    override suspend fun refresh() {
+        // A change on its way when the load is asked for keeps the last word,
+        // as it does for one still on its way when the load is sent: waiting
+        // its turn below must not turn this into a load that undoes it.
+        val changing = synchronized(generation) { unanswered.isNotEmpty() }
+        loads.withLock { load(changing) }
+    }
+
+    private suspend fun load(changing: Boolean) {
         val revision = store.revision
-        val mine = synchronized(generation) { if (unanswered.isEmpty()) generation.incrementAndGet() else null }
+        val mine = synchronized(generation) { if (!changing && unanswered.isEmpty()) generation.incrementAndGet() else null }
         val loaded = http.signedIn { base, client -> UsersApi(base, client).getPreferences() }.toModel()
         // An ignored refresh must not overwrite the offline cache either.
         if (mine != null) cache(revision, loaded, mine)

@@ -123,6 +123,34 @@ class PreferencesRepositoryTest {
         assertEquals(SkipMode.Auto, prefs.playback.value.skipMode(SegmentKind.Intro))
     }
 
+    /**
+     * A load asked for while a change is on its way leaves the preferences to
+     * the change's reply, also when it waits its turn behind another load and
+     * is sent only after the change was answered.
+     */
+    @Test
+    fun `a load asked for during a change leaves it to the change, even after waiting its turn`() = runBlocking {
+        signIn()
+        val firstLoad = server.hold("GET /api/me/preferences")
+        val loading = launch(start = CoroutineStart.UNDISPATCHED) { prefs.refresh() }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { firstLoad.awaitArrival() }
+        server.on(
+            "PUT /api/me/preferences",
+            json("""{"skip":{"intro":"auto","recap":"ask","credits":"ask","preview":"none","commercial":"none"},"autoplayNext":true}"""),
+        )
+        val saved = server.hold("PUT /api/me/preferences")
+        val saving = launch(start = CoroutineStart.UNDISPATCHED) { prefs.setSkip(SegmentKind.Intro, SkipMode.Auto) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { saved.awaitArrival() }
+        // Asked for now, sent once the first load is done: by then the change has its answer.
+        val other = launch(start = CoroutineStart.UNDISPATCHED) { prefs.refresh() }
+        saved.release()
+        saving.join()
+        firstLoad.release()
+        loading.join()
+        other.join()
+        assertEquals(SkipMode.Auto, prefs.playback.value.skipMode(SegmentKind.Intro))
+    }
+
     @Test
     fun `a refused change rolls back`() = runBlocking {
         signIn()
