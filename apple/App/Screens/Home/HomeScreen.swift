@@ -37,6 +37,9 @@ private struct HomeView: View {
     /// Each row's leading card, by row id, for the panel above it.
     @State private var leadingCards: [String: String] = [:]
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The iPad's screens fade out and back in for a move with Reduce Motion on.
+    @State private var screensFaded = false
 
     private var sideBySide: Bool { wide && width >= PadLayout.sideBySide }
     private var wide: Bool { sizeClass.isWide }
@@ -197,6 +200,7 @@ private struct HomeView: View {
                     .id(endPage)
             }
             .scrollTargetLayout()
+            .opacity(screensFaded ? 0 : 1)
         }
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: $page)
@@ -283,7 +287,7 @@ private struct HomeView: View {
                 if model.canEditRows {
                     EditRowsButton(title: HomeEndScreen.editRows) { editingRows = true }
                 }
-                Button(HomeEndScreen.backToTop) { withAnimation(.easeInOut(duration: 0.35)) { page = 0 } }
+                Button(HomeEndScreen.backToTop) { goToPage(0) }
                     .buttonStyle(GhostButtonStyle(height: 44, fullWidth: false))
                     .accessibilityIdentifier("homeBackToTop")
             }
@@ -334,10 +338,23 @@ private struct HomeView: View {
         }
     }
 
+    /// Pages to the screen at `index` for a button: a slide, or with Reduce
+    /// Motion a fade out, the jump, and a fade back in.
+    private func goToPage(_ index: Int) {
+        guard reduceMotion else {
+            withAnimation(.easeInOut(duration: 0.35)) { page = index }
+            return
+        }
+        withAnimation(.easeOut(duration: 0.15)) { screensFaded = true } completion: {
+            page = index
+            withAnimation(.easeIn(duration: 0.15)) { screensFaded = false }
+        }
+    }
+
     /// The next row's name along the bottom edge, with a chevron; tapping it pages there (Pad2HomeRow's `.peek`).
     private func nextRowLine(_ name: String, to index: Int) -> some View {
         Button {
-            withAnimation(.easeInOut(duration: 0.35)) { page = index }
+            goToPage(index)
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "chevron.down").font(.system(size: 13, weight: .semibold))

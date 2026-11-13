@@ -107,10 +107,15 @@ struct LiveStarButton: View {
     var size: CGFloat = 17
     var height: CGFloat = 44
     @Environment(LiveExtrasStore.self) private var extras
+    /// Counts taps, for the tap felt with each (not when a star changes on another device).
+    @State private var taps = 0
 
     var body: some View {
         let favourite = extras.isFavourite(channel)
-        Button { Task { await extras.toggleFavourite(channel) } } label: {
+        Button {
+            taps += 1
+            Task { await extras.toggleFavourite(channel) }
+        } label: {
             Image(systemName: favourite ? "star.fill" : "star")
                 .font(.system(size: size, weight: .semibold))
                 .foregroundStyle(favourite ? Palette.gold : Color(hex: 0x6B6B72))
@@ -118,6 +123,7 @@ struct LiveStarButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .sensoryFeedback(.selection, trigger: taps)
         .accessibilityLabel(liveFavouriteLabel(channel, favourite: favourite))
         .accessibilityAddTraits(favourite ? .isSelected : [])
         .accessibilityIdentifier("live-star-\(channel.number)")
