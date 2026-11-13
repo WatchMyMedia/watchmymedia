@@ -60,6 +60,19 @@ struct ServerRepositoryTests {
         #expect(missing?.message.contains("doesn't look like a WatchMyMedia server") == true)
     }
 
+    @Test func probeSaysARestartingServerDidntAnswerAndAnUnknownReplyNeedsAnUpdate() async throws {
+        // A 502 from the proxy in front of a restarting server.
+        h.router.on("GET /api/server", .problem(502, "bad gateway"))
+        let restarting = await #expect(throws: APIError.self) { try await servers.probe(host) }
+        #expect(restarting?.message == "The server at \(host) didn't answer (error 502). If it's starting up, try again in a moment.")
+        #expect(restarting?.message.contains("doesn't look like") == false)
+
+        // JSON from a server this app doesn't know the shape of.
+        h.router.on("GET /api/server", .json(#"{"id":"x","name":"Living room server"}"#))
+        let outdated = await #expect(throws: APIError.self) { try await servers.probe(host) }
+        #expect(outdated?.message == "\(host) sent a reply this app doesn't understand. Update the app or the server.")
+    }
+
     @Test func probeTriesTheNextAddressWhenTheFirstCannotConnect() async throws {
         // A domain is tried over https first, then on the server's port.
         let domain = "probe-\(UUID().uuidString.lowercased()).example"

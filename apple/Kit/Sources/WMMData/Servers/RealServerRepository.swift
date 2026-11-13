@@ -65,8 +65,13 @@ final class RealServerRepository: ServerRepository {
 
     /// Tries each URL the address could mean, in order, and returns the first
     /// that answers as a WatchMyMedia server; refuses one that is too old.
+    /// A failure says what was found (PLAN-APPLE-REVIEW.md §3.4.4): a reply
+    /// this app can't read (update), a server error (restarting), something
+    /// else answering, or nothing.
     func probe(_ address: String) async throws -> Server {
         var reached = false
+        var outdated = false
+        var serverError: Int?
         var explained: APIError?
         for base in try ServerAddress.candidates(address) {
             try Task.checkCancellation()
@@ -82,10 +87,14 @@ final class RealServerRepository: ServerRepository {
                 case .unreachable: break
                 case .explained(let message): explained = message
                 case .reached: reached = true
+                case .serverError(let status): serverError = serverError ?? status
+                case .outdated: outdated = true
                 }
             }
         }
         let shown = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        if outdated { throw APIError(status: nil, message: Self.outdatedMessage(shown)) }
+        if let serverError { throw APIError(status: serverError, message: Self.serverErrorMessage(shown, status: serverError)) }
         if reached { throw APIError(status: nil, message: "\(shown) doesn't look like a WatchMyMedia server.") }
         if let explained { throw explained }
         throw APIError(status: nil, message: "Couldn't reach \(shown). Check the address and that the server is running.")
@@ -109,19 +118,42 @@ final class RealServerRepository: ServerRepository {
         return server.baseURL
     }
 
-    private enum Failure {
+    /// A server answered GET /api/server in a shape this app can't read: a
+    /// newer or older server than it knows. Worded as the Android app words a
+    /// reply it doesn't understand.
+    static func outdatedMessage(_ shown: String) -> String {
+        "\(shown) sent a reply this app doesn't understand. Update the app or the server."
+    }
+
+    /// A server error (5xx): usually a server, or the proxy in front of it,
+    /// that is starting up or restarting.
+    static func serverErrorMessage(_ shown: String, status: Int) -> String {
+        "The server at \(shown) didn't answer (error \(status)). If it's starting up, try again in a moment."
+    }
+
+    private enum Failure: Equatable {
         /// Nothing answered.
         case unreachable
         /// Something stopped the connection that the person can fix (https, a certificate).
         case explained(APIError)
         /// Something answered, but not as a WatchMyMedia server.
         case reached
+        /// A server error: not answering yet.
+        case serverError(Int)
+        /// JSON in a shape this app doesn't know: a WatchMyMedia server of another version.
+        case outdated
     }
 
     private static func failure(_ error: Error) -> Failure {
         var underlying = error
         while let wrapped = underlying as? ClientError { underlying = wrapped.underlyingError }
         if underlying is TimedOut { return .unreachable }
+        if let api = underlying as? APIError, let status = api.status, status >= 500 { return .serverError(status) }
+        if let decoding = underlying as? DecodingError {
+            // Not JSON at all (a web page): something else answered.
+            if case .dataCorrupted = decoding { return .reached }
+            return .outdated
+        }
         guard let url = underlying as? URLError else { return .reached }
         switch url.code {
         case .appTransportSecurityRequiresSecureConnection, .serverCertificateUntrusted, .serverCertificateHasBadDate,
