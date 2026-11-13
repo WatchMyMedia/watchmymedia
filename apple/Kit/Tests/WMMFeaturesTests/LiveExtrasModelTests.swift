@@ -89,6 +89,17 @@ struct LiveExtrasModelTests {
         #expect(repository.favouriteIDs.isEmpty)
     }
 
+    @Test func aStarFromTheChannelListFollowsTheList() async throws {
+        let (repository, store) = try await make(guide(favourites: false))
+        let channel = LiveChannel(id: "ch-7.2", number: "7.2", name: "Driftwood")
+        #expect(!store.isFavourite(channel))
+        repository.setFavouriteElsewhere(true, channelID: "ch-7.2")
+        #expect(store.isFavourite(channel), "the index is made again when the list changes")
+        #expect(!store.isFavourite(LiveChannel(id: "ch-9.1", number: "9.1", name: "Station")))
+        #expect(store.isFavourite(LiveChannel(id: "ch-unlisted", number: "99.1", name: "Gone", favourite: true)),
+                "a channel the list doesn't hold keeps its own flag")
+    }
+
     @Test func anotherDevicesStarArrivesWithTheEvent() async throws {
         let (repository, store) = try await make(guide(favourites: false))
         let following = Task { await store.follow() }

@@ -68,6 +68,8 @@ public final class LiveExtrasStore {
     /// Reminder events heard, so a refresh after one asks again rather than joining an older request.
     @ObservationIgnored private var heard = 0
     @ObservationIgnored private var echoes = LiveEchoes()
+    /// The channel list as last indexed, and each channel's star by id (``isFavourite(_:)``).
+    @ObservationIgnored private var channelIndex: (channels: [LiveChannel], favourites: [String: Bool]) = ([], [:])
 
     public init(repository: any LiveTVRepository, now: @escaping @MainActor () -> Date = { Date() }) {
         self.repository = repository
@@ -84,7 +86,20 @@ public final class LiveExtrasStore {
     public func isFavourite(_ channel: LiveChannel) -> Bool {
         guard available else { return false }
         if context == repository.contextID, let changed = favourites[channel.id] { return changed }
-        return repository.channels.first { $0.id == channel.id }?.favourite ?? channel.favourite
+        return listedFavourite(channel.id) ?? channel.favourite
+    }
+
+    /// What the channel list says of a channel's star, by id. The guide asks
+    /// for every row it draws, so the list is indexed once each time it
+    /// changes rather than scanned per call. Reading `repository.channels`
+    /// here keeps a view that asks following the list; an unchanged list is
+    /// the same storage, which compares at once.
+    private func listedFavourite(_ id: String) -> Bool? {
+        let channels = repository.channels
+        if channels != channelIndex.channels {
+            channelIndex = (channels, Dictionary(channels.map { ($0.id, $0.favourite) }, uniquingKeysWith: { first, _ in first }))
+        }
+        return channelIndex.favourites[id]
     }
 
     /// Whether any of `channels` is a favourite, so the Favourites chip shows.
