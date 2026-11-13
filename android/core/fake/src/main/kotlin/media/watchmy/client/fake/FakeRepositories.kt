@@ -36,6 +36,7 @@ import media.watchmy.client.model.ItemPage
 import media.watchmy.client.model.ItemQuery
 import media.watchmy.client.model.ItemSort
 import media.watchmy.client.model.Library
+import media.watchmy.client.model.LibraryChange
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.PairingCode
@@ -304,6 +305,8 @@ class FakeLibraryRepository(
     override fun imageUrl(path: String?, size: ImageSize): String? = fakeArtUrl(path)
 
     override val changes: Flow<Unit> = emptyFlow()
+
+    override val libraryChanges: Flow<LibraryChange> = emptyFlow()
 }
 
 /**

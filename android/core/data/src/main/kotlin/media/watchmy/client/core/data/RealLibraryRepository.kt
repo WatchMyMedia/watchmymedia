@@ -17,6 +17,7 @@ import media.watchmy.client.model.ItemPage
 import media.watchmy.client.model.ItemQuery
 import media.watchmy.client.model.ItemSort
 import media.watchmy.client.model.Library
+import media.watchmy.client.model.LibraryChange
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.MovieDetail
@@ -208,6 +209,8 @@ internal class RealLibraryRepository(
     }
 
     override val changes: Flow<Unit> = events.changes
+
+    override val libraryChanges: Flow<LibraryChange> = events.libraryChanges
 
     private fun ItemSort.toApi() = when (this) {
         ItemSort.Title -> BrowseApi.SortListLibraryItems.title

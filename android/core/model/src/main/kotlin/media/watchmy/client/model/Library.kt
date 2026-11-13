@@ -1,6 +1,7 @@
 package media.watchmy.client.model
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 enum class LibraryType { Movie, Tv }
 
@@ -416,7 +417,16 @@ interface LibraryRepository {
 
     /**
      * Emits when watch state or the library changed on the server (the
-     * watch.changed and library.changed events), so screens refetch.
+     * watch.changed and library.changed events), so screens refetch; once
+     * for a burst of events.
      */
     val changes: Flow<Unit>
+
+    /**
+     * What changed, as [changes] says that something did: which movies,
+     * episodes and libraries (PLAN-ANDROID-REVIEW.md §4.1.2), so a page can
+     * leave other items' changes alone. A repository that can't tell says
+     * [LibraryChange.Everything] each time.
+     */
+    val libraryChanges: Flow<LibraryChange> get() = changes.map { LibraryChange.Everything }
 }
