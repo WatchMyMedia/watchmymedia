@@ -6,8 +6,20 @@ import Foundation
 /// `requests` (Your requests), `inbox` (the admins' Inbox), `downloads`
 /// (Settings › Downloads, iPhone and iPad) and `lists/{id}` (a list's page),
 /// as android/mobile/.../DeepLinks.kt reads them.
+///
+/// A link that starts playback or takes a tuner (`play/…`, `live-tv/{id}`)
+/// does so only when the app published it for the server signed in
+/// (PLAN-APPLE-REVIEW.md §2.5, §3.4.7, as Android's DeepLink.open): such a
+/// link carries `source=` and `server=` (``url(publishedFor:source:)``), and
+/// one for another server opens nothing. Any other play link, from a web
+/// page, a QR code or another app, opens the file's page with Play ready
+/// (``filePage(fileID:)``), and any other channel link opens the guide.
+/// Open a link from outside with ``opening(_:signedInServer:)``; the app's
+/// own launch arguments (`-open`) are the app's, and act as they read.
 public enum DeepLink: Hashable, Sendable {
     case play(fileID: Int)
+    /// The page of the movie or episode a file plays: a play link the app didn't publish.
+    case filePage(fileID: Int)
     case liveTV(channelID: String?)
     case liveRecordings
     case show(id: Int, season: Int?, episode: Int? = nil)
@@ -53,7 +65,7 @@ public enum DeepLink: Hashable, Sendable {
         case .liveTV(let id):
             c.host = "live-tv"
             if let id { c.path = "/\(id)" }
-        case .play(let id):
+        case .play(let id), .filePage(let id):
             c.host = "play"
             c.path = "/\(id)"
         case .show(let id, let season, let episode):
@@ -77,6 +89,43 @@ public enum DeepLink: Hashable, Sendable {
             c.host = "downloads"
         }
         c.queryItems = items.isEmpty ? nil : items
+        return c.url!
+    }
+}
+
+extension DeepLink {
+    /// The server a link was published for (it says `source=` or `server=`),
+    /// "" when it names none; nil for a link the app didn't publish.
+    public static func publishedServer(_ url: URL) -> String? {
+        guard url.scheme?.lowercased() == scheme else { return nil }
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let source = query.first { $0.name == "source" }?.value
+        let server = query.first { $0.name == "server" }
+        guard source != nil || server != nil else { return nil }
+        return server?.value ?? ""
+    }
+
+    /// `url` as the app opens it with `serverID` signed in (nil when none
+    /// is): a link the app published for another server, or for none, opens
+    /// nothing; a play link the app didn't publish opens the file's page; a
+    /// channel link it didn't publish opens the guide; every other link opens
+    /// as it reads.
+    public static func opening(_ url: URL, signedInServer serverID: String?) -> DeepLink? {
+        let publisher = publishedServer(url)
+        if let publisher, serverID == nil || publisher != serverID { return nil }
+        guard let link = DeepLink(url: url) else { return nil }
+        switch link {
+        case .play(let id): return publisher != nil ? link : .filePage(fileID: id)
+        case .liveTV(let channel?): return publisher != nil ? link : .liveTV(channelID: nil)
+        default: return link
+        }
+    }
+
+    /// The link as the app publishes it (a reminder's notification, later Top
+    /// Shelf and quick actions), for `serverID`: only that server's sign-in opens it.
+    public func url(publishedFor serverID: String, source: String = "app") -> URL {
+        var c = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        c.queryItems = (c.queryItems ?? []) + [URLQueryItem(name: "source", value: source), URLQueryItem(name: "server", value: serverID)]
         return c.url!
     }
 }

@@ -86,7 +86,7 @@ struct RootView: View {
             if services.auth.user == nil {
                 await notifier.reschedule([])
             } else if extras.loaded {
-                await notifier.reschedule(extras.alerts())
+                await notifier.reschedule(extras.alerts(), serverID: services.servers.current?.server.id)
             } else if let capabilities = services.liveTV.capabilities, !capabilities.extrasAvailable {
                 await notifier.reschedule([])
             }

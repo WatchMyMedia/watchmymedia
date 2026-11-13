@@ -9,8 +9,12 @@ import WMMModel
 /// (PLAN-LIVE-TV-GUIDE.md §6.5): the soonest 64 the server keeps
 /// (``LiveExtrasStore/alerts(limit:)``), scheduled again at launch, on
 /// foreground, on the server's event and after every change here. A tap
-/// opens the channel's player. Permission is asked at the first Remind me,
-/// after the app's own explainer; Not now keeps the reminder on the server.
+/// opens the channel's player, through a link the app publishes for the
+/// server signed in when it was scheduled: another server's opens nothing,
+/// and one from before the link named its server opens the guide
+/// (``DeepLink/opening(_:signedInServer:)``). Permission is asked at the
+/// first Remind me, after the app's own explainer; Not now keeps the
+/// reminder on the server.
 @MainActor @Observable
 final class LiveReminderNotifier: NSObject, UNUserNotificationCenterDelegate {
     static let shared = LiveReminderNotifier()
@@ -22,11 +26,11 @@ final class LiveReminderNotifier: NSObject, UNUserNotificationCenterDelegate {
     private(set) var status: UNAuthorizationStatus?
     /// The explainer was answered this launch, so it doesn't come again at once.
     private(set) var askedThisLaunch = false
-    /// Opens a `watchmymedia://live-tv/<channel>` link; set once the app's navigator exists.
-    var open: ((DeepLink) -> Void)? {
+    /// Opens a `watchmymedia://live-tv/<channel>` link the app published; set once the app's navigator exists.
+    var open: ((URL) -> Void)? {
         didSet { if let open, let pending { self.pending = nil; open(pending) } }
     }
-    private var pending: DeepLink?
+    private var pending: URL?
     private var center: UNUserNotificationCenter { .current() }
 
     /// The explainer shows before iOS's own ask, while iOS hasn't asked yet.
@@ -49,14 +53,15 @@ final class LiveReminderNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// Not now: the reminder stays on the server and in Live TV › Reminders.
     func declined() { askedThisLaunch = true }
 
-    /// Replaces this app's pending reminders with `alerts`.
-    func reschedule(_ alerts: [LiveReminderAlert]) async {
+    /// Replaces this app's pending reminders with `alerts`, for `serverID`'s sign-in.
+    func reschedule(_ alerts: [LiveReminderAlert], serverID: String? = nil) async {
         let wanted = Dictionary(alerts.map { (Self.prefix + $0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let pendingRequests = await center.pendingNotificationRequests()
         var keep: Set<String> = []
         var stale: [String] = []
         for request in pendingRequests where request.identifier.hasPrefix(Self.prefix) {
-            if let alert = wanted[request.identifier], Self.matches(request, alert) { keep.insert(request.identifier) }
+            if let alert = wanted[request.identifier], Self.matches(request, alert),
+               request.content.userInfo["serverID"] as? String == serverID { keep.insert(request.identifier) }
             else { stale.append(request.identifier) }
         }
         if !stale.isEmpty { center.removePendingNotificationRequests(withIdentifiers: stale) }
@@ -66,7 +71,10 @@ final class LiveReminderNotifier: NSObject, UNUserNotificationCenterDelegate {
             content.body = alert.body
             content.sound = .default
             content.threadIdentifier = "live-tv-reminders"
-            if let channelID = alert.reminder.channelID { content.userInfo = ["channelID": channelID] }
+            var info: [String: String] = [:]
+            if let channelID = alert.reminder.channelID { info["channelID"] = channelID }
+            if let serverID { info["serverID"] = serverID }
+            content.userInfo = info
             let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: alert.date)
             let request = UNNotificationRequest(identifier: identifier, content: content,
                                                 trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false))
@@ -90,11 +98,16 @@ final class LiveReminderNotifier: NSObject, UNUserNotificationCenterDelegate {
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         guard response.notification.request.identifier.hasPrefix(Self.prefix),
               response.actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
-        let channelID = response.notification.request.content.userInfo["channelID"] as? String
-        await MainActor.run { self.handle(.liveTV(channelID: channelID)) }
+        let info = response.notification.request.content.userInfo
+        let channelID = info["channelID"] as? String
+        let serverID = info["serverID"] as? String
+        await MainActor.run {
+            let link = DeepLink.liveTV(channelID: channelID)
+            self.handle(serverID.map { link.url(publishedFor: $0, source: "reminder") } ?? link.url)
+        }
     }
 
-    private func handle(_ link: DeepLink) {
-        if let open { open(link) } else { pending = link }
+    private func handle(_ url: URL) {
+        if let open { open(url) } else { pending = url }
     }
 }

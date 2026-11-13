@@ -126,3 +126,68 @@ import WMMModel
         #expect(navigator.livePlaying == nil)
     }
 }
+
+/// Links that start playback or take a tuner only when the app published
+/// them for the server signed in (PLAN-APPLE-REVIEW.md §2.5, §3.4.7), as
+/// android/core/model's DeepLinkTest checks the same rule.
+@MainActor @Suite struct PublishedLinkTests {
+    init() { FakeLatency.duration = .zero }
+
+    private func url(_ text: String) -> URL { URL(string: text)! }
+
+    @Test func aPublishedLinkNamesTheServerItWasPublishedFor() {
+        #expect(DeepLink.publishedServer(url("watchmymedia://play/4?source=reminder&server=srv-a")) == "srv-a")
+        #expect(DeepLink.publishedServer(url("watchmymedia://play/4?source=reminder")) == "")
+        #expect(DeepLink.publishedServer(url("watchmymedia://play/4?server=")) == "")
+        #expect(DeepLink.publishedServer(url("watchmymedia://play/4")) == nil)
+        #expect(DeepLink.publishedServer(url("https://example.com/?source=reminder")) == nil)
+        #expect(DeepLink.play(fileID: 4).url(publishedFor: "srv-a", source: "reminder") == url("watchmymedia://play/4?source=reminder&server=srv-a"))
+    }
+
+    @Test func aPlayLinkPlaysOnlyWhenTheAppPublishedItForTheServerSignedIn() {
+        let published = DeepLink.play(fileID: 4).url(publishedFor: "srv-a")
+        #expect(DeepLink.opening(published, signedInServer: "srv-a") == .play(fileID: 4))
+        #expect(DeepLink.opening(published, signedInServer: "srv-b") == nil, "another server")
+        #expect(DeepLink.opening(published, signedInServer: nil) == nil, "no one signed in")
+        #expect(DeepLink.opening(url("watchmymedia://play/4?source=reminder"), signedInServer: "srv-a") == nil, "a published link naming no server")
+        // From a web page, a QR code or another app: the file's page, with Play ready.
+        #expect(DeepLink.opening(url("watchmymedia://play/4"), signedInServer: "srv-a") == .filePage(fileID: 4))
+        #expect(DeepLink.opening(url("watchmymedia://play/4"), signedInServer: nil) == .filePage(fileID: 4))
+        // Every other link opens as it reads.
+        #expect(DeepLink.opening(url("watchmymedia://shows/100?season=3&episode=100035"), signedInServer: nil) == .show(id: 100, season: 3, episode: 100035))
+        #expect(DeepLink.opening(url("watchmymedia://movies/500"), signedInServer: "srv-a") == .movie(id: 500))
+        #expect(DeepLink.opening(url("watchmymedia://link?code=KQ7F2W"), signedInServer: nil) == .linkTV(code: "KQ7F2W"))
+        #expect(DeepLink.opening(url("https://example.com/play/4"), signedInServer: "srv-a") == nil)
+    }
+
+    @Test func aChannelLinkTunesOnlyWhenTheAppPublishedIt() {
+        let reminder = DeepLink.liveTV(channelID: "a07f09").url(publishedFor: "srv-a", source: "reminder")
+        #expect(DeepLink.opening(reminder, signedInServer: "srv-a") == .liveTV(channelID: "a07f09"))
+        #expect(DeepLink.opening(reminder, signedInServer: "srv-b") == nil)
+        // Taking a tuner is the app's to do: anyone else's link opens the guide.
+        #expect(DeepLink.opening(url("watchmymedia://live-tv/a07f09"), signedInServer: "srv-a") == .liveTV(channelID: nil))
+        #expect(DeepLink.opening(url("watchmymedia://live-tv/recordings"), signedInServer: "srv-a") == .liveRecordings)
+    }
+
+    @Test func aPlayLinkFromOutsideOpensTheEpisodesPageAndPlaysNothing() async throws {
+        let nav = Navigator()
+        await nav.open(.filePage(fileID: 9001), library: FakeLibraryRepository())
+        #expect(nav.playing == nil)
+        let route = try #require(nav.path(for: .home).single)
+        guard case .episode(_, let season, _) = route else { Issue.record("not an episode page: \(route)"); return }
+        #expect(season == 2)
+    }
+
+    @Test func aPlayLinkFromOutsideForAMovieOpensTheMoviesPage() async {
+        let nav = Navigator()
+        await nav.open(.filePage(fileID: 9900), library: FakeLibraryRepository())
+        #expect(nav.playing == nil)
+        #expect(nav.path(for: .home) == [.movie(id: 500)])
+    }
+
+    @Test func theAppsOwnLaunchArgumentsStillPlay() async {
+        let nav = Navigator()
+        await nav.applyLaunchArguments(["app", "-open", "watchmymedia://play/9101"], library: FakeLibraryRepository())
+        #expect(nav.playing?.fileID == 9101)
+    }
+}

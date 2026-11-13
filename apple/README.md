@@ -69,7 +69,12 @@ reach any screen for a screenshot: `-tab tvShows` (or `home`, `movies`,
 `shows/100?season=3` with that season's first unfinished one and
 `shows/100?season=3&episode=100037` with that episode,
 `movies/500`, `play/9101`, `link?code=K7M4PQ`, and `requests` and `inbox`
-for Settings' Your requests and Inbox):
+for Settings' Your requests and Inbox). Launch arguments are the app's own,
+so `play/` and `live-tv/<channel>` act as they read; the same links from
+outside the app (Safari, a QR code, another app) open the title's page or
+the guide instead, and only a link the app published for the server signed
+in (a reminder's notification) starts playback or takes a tuner
+(`DeepLink.opening`, PLAN-APPLE-REVIEW.md §2.5):
 
 ```bash
 xcrun simctl launch <udid> media.watchmy.client -fakes -tab movies

@@ -461,6 +461,15 @@ public final class FakeLibraryRepository: LibraryRepository {
         return FakeData.playRequest(fileID: fileID)
     }
 
+    public func filePage(fileID: Int) async throws -> FilePage? {
+        await FakeLatency.wait()
+        if let m = FakeData.movies.first(where: { fileID == 9400 + $0.id || fileID == 9500 + $0.id }) { return .movie(id: m.id) }
+        if let found = FakeData.playbackEpisode(fileID: fileID) {
+            return .episode(showID: found.show.id, season: found.episode.season, episode: found.episode.id)
+        }
+        return nil
+    }
+
     private func checkOnline() throws {
         if offline { throw APIError(status: nil, message: "Couldn’t reach the server. Check the connection and try again.") }
     }

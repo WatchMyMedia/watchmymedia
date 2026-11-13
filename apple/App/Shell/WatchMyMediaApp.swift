@@ -37,16 +37,12 @@ struct WatchMyMediaApp: App {
                 .environment(\.imageLoader, services.images)
                 .preferredColorScheme(.dark)
                 .tint(Palette.gold)
-                .onOpenURL { url in
-                    guard let link = DeepLink(url: url) else { return }
-                    Task { await navigator.open(link, library: services.library, liveTV: services.liveTV) }
-                }
+                // A play or channel link acts only when the app published it for this server.
+                .onOpenURL { url in open(url) }
                 .task { await navigator.applyLaunchArguments(ProcessInfo.processInfo.arguments, library: services.library, liveTV: services.liveTV) }
                 // A reminder's notification opens its channel.
                 .task {
-                    LiveReminderNotifier.shared.open = { link in
-                        Task { await navigator.open(link, library: services.library, liveTV: services.liveTV) }
-                    }
+                    LiveReminderNotifier.shared.open = { url in open(url) }
                 }
                 // The person's other devices change favourites and reminders too.
                 .task { await extras.follow() }
@@ -54,6 +50,15 @@ struct WatchMyMediaApp: App {
                 // Once at launch and on each return to the app.
                 .task(id: scenePhase) { if scenePhase == .active { await cast.refresh() } }
         }
+    }
+}
+
+extension WatchMyMediaApp {
+    /// A `watchmymedia://` link from outside the app or one it published
+    /// (``DeepLink/opening(_:signedInServer:)``).
+    private func open(_ url: URL) {
+        guard let link = DeepLink.opening(url, signedInServer: services.servers.current?.server.id) else { return }
+        Task { await navigator.open(link, library: services.library, liveTV: services.liveTV) }
     }
 }
 

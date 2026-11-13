@@ -31,8 +31,9 @@ struct WatchMyMediaTVApp: App {
                 .environment(\.imageLoader, services.images)
                 .preferredColorScheme(.dark)
                 .tint(Palette.gold)
+                // A play or channel link acts only when the app published it for this server.
                 .onOpenURL { url in
-                    guard let link = DeepLink(url: url), link.opensOnAppleTV else { return }
+                    guard let link = DeepLink.opening(url, signedInServer: services.servers.current?.server.id), link.opensOnAppleTV else { return }
                     Task { await navigator.open(link, library: services.library, liveTV: services.liveTV) }
                 }
                 .task { await navigator.applyLaunchArguments(ProcessInfo.processInfo.arguments, library: services.library, liveTV: services.liveTV) }

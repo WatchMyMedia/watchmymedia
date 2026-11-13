@@ -195,6 +195,13 @@ final class RealLibraryRepository: LibraryRepository {
         return nil
     }
 
+    func filePage(fileID: Int) async throws -> FilePage? {
+        let file = try await fileInfo(fileID)
+        if let movieID = file.movieId { return .movie(id: Int(movieID)) }
+        guard let showID = file.showId else { return nil }
+        return .episode(showID: Int(showID), season: file.seasonNumber.map(Int.init), episode: file.episodeId.map(Int.init))
+    }
+
     /// GET /api/files/{id}: what the server knows about a file.
     private func fileInfo(_ id: Int) async throws -> Components.Schemas.MediaFileDetail {
         try await store.call { try await $0.getFile(path: .init(id: Int64(id))).ok.body.json }
