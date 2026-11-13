@@ -75,11 +75,11 @@ public final class LibraryModel {
     @ObservationIgnored private let pageSize: Int
     @ObservationIgnored private let debounce: Duration
     @ObservationIgnored private(set) var libraryID: Int?
-    @ObservationIgnored private var generation = 0
     /// The search waiting out the debounce; tests await it.
     @ObservationIgnored private(set) var pendingSearch: Task<Void, Never>?
     @ObservationIgnored private let changes: ScreenChanges
-    @ObservationIgnored private let latest = LatestLoad()
+    /// The grid's loads; a jump to a letter supersedes them too.
+    @ObservationIgnored private let loads = LoadController<Grid>()
     @ObservationIgnored private let reloadPageSize: Int
 
     /// `libraryID` skips looking the library up (the Apple TV app knows it from Home).
@@ -228,7 +228,7 @@ public final class LibraryModel {
         }
         if fetchMovies.count + fetchShows.count > Self.patchLimit { reload = true }
         if reload { return await load(.quiet) }
-        let mine = generation
+        let load = loads.current
         for id in fetchMovies {
             guard let movie = try? await library.movie(id: id) else { continue }
             marks[id] = movie.watched
@@ -237,9 +237,9 @@ public final class LibraryModel {
             guard let show = try? await library.show(id: id) else { continue }
             marks[id] = show.allWatched
         }
-        guard mine == generation, !Task.isCancelled else { return }
+        guard loads.isCurrent(load), !Task.isCancelled else { return }
         if !marks.isEmpty { patch(marks) }
-        if rowsChanged, !rows.isEmpty, let fetched = await fetchRows(libraryID), mine == generation { rows = fetched }
+        if rowsChanged, !rows.isEmpty, let fetched = await fetchRows(libraryID), loads.isCurrent(load) { rows = fetched }
     }
 
     /// Draws each title's watched mark as given; a mark ends its progress either way.
@@ -363,11 +363,11 @@ public final class LibraryModel {
     /// Loads the next page, when there is one and nothing else is loading.
     public func loadMore() async {
         guard let grid = state.value, grid.hasMore, !changingQuery, !loadingMore, moreError == nil, let id = libraryID else { return }
-        let mine = generation
+        let load = loads.current
         loadingMore = true
         do {
             let page = try await library.items(query(id, offset: grid.offset + grid.items.count, limit: pageSize))
-            guard mine == generation, var current = state.value else { return }
+            guard loads.isCurrent(load), var current = state.value else { return }
             let known = Set(current.items.map(\.id))
             current.items += page.items.filter { !known.contains($0.id) }
             current.total = page.total
@@ -375,9 +375,9 @@ public final class LibraryModel {
             state = .loaded(current)
         } catch is CancellationError {
         } catch {
-            if mine == generation { moreError = error.displayMessage }
+            if loads.isCurrent(load) { moreError = error.displayMessage }
         }
-        if mine == generation { loadingMore = false }
+        if loads.isCurrent(load) { loadingMore = false }
     }
 
     /// Uses the server's whole-list offset, so letters outside the loaded page work too.
@@ -385,8 +385,7 @@ public final class LibraryModel {
         guard sort == .title, let grid = state.value, let id = libraryID,
               letters.contains(letter), letter.offset >= 0, letter.offset < grid.total else { return }
         // Even an in-memory jump supersedes a pending page or another letter's request.
-        generation += 1
-        let mine = generation
+        let load = loads.supersede()
         loadingMore = false
         moreError = nil
         if letter.offset >= grid.offset && letter.offset < grid.offset + grid.items.count {
@@ -398,7 +397,7 @@ public final class LibraryModel {
         loadingMore = true
         do {
             let page = try await library.items(query(id, offset: letter.offset, limit: pageSize))
-            guard mine == generation else { return }
+            guard loads.isCurrent(load) else { return }
             state = .loaded(Grid(items: page.items, total: page.total, genres: page.genres, decades: page.decades,
                                  summary: page.summary, letters: page.letters, genreCounts: page.genreCounts, offset: page.offset))
             selectedLetter = letter.letter
@@ -406,9 +405,9 @@ public final class LibraryModel {
             scrollRequestID += 1
         } catch is CancellationError {
         } catch {
-            if mine == generation { message = error.displayMessage }
+            if loads.isCurrent(load) { message = error.displayMessage }
         }
-        if mine == generation { loadingMore = false }
+        if loads.isCurrent(load) { loadingMore = false }
     }
 
     public func retryMore() async {
@@ -482,15 +481,13 @@ public final class LibraryModel {
 
     /// A load still running when another starts is cancelled.
     func load(_ reason: Reason) async {
-        await latest.run { [weak self] in await self?.fetch(reason) }
+        await loads.run { [weak self] load in await self?.fetch(load, reason) }
     }
 
-    private func fetch(_ reason: Reason) async {
-        generation += 1
-        let mine = generation
+    private func fetch(_ load: LoadController<Grid>.Load, _ reason: Reason) async {
         loadingMore = false
         moreError = nil
-        if reason == .first || state.value == nil { state = .loading }
+        loads.begin(&state, quiet: reason != .first)
         if reason != .quiet {
             changingQuery = true
             selectedLetter = nil
@@ -500,7 +497,7 @@ public final class LibraryModel {
         let limit = reason == .quiet ? max(pageSize, state.value?.items.count ?? 0) : pageSize
         // The rows load beside the grid (not for a new sort or filter, which leaves them as they are).
         var fetchedRows: [ScreenRow]?
-        let result = await Loadable.run { () async throws -> Grid? in
+        let result = await loads.fetch(load) { () async throws -> Grid? in
             guard let id = try await self.resolveLibrary() else { return nil }
             let rowsTask = reason == .change ? nil : Task { await self.fetchRows(id) }
             defer { rowsTask?.cancel() }
@@ -508,8 +505,12 @@ public final class LibraryModel {
             fetchedRows = await rowsTask?.value
             return Grid(items: page.items, total: page.total, genres: page.genres, decades: page.decades, summary: page.summary, letters: page.letters, genreCounts: page.genreCounts, offset: page.offset)
         }
-        guard let result, mine == generation else { return }
+        guard let result else { return }
         changingQuery = false
+        if let text = loads.quietFailure(result, quiet: reason == .quiet, over: state) {
+            message = text
+            return
+        }
         switch result {
         case .loaded(let grid?):
             noLibrary = false
@@ -519,8 +520,6 @@ public final class LibraryModel {
             noLibrary = true
             rows = []
             state = .loaded(Grid())
-        case .failed(let text) where reason == .quiet && state.value != nil:
-            message = text
         case .failed(let text):
             state = .failed(text)
         case .loading:
