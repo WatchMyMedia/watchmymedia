@@ -133,7 +133,8 @@ func meanGrey(_ image: CGImage) -> Int {
 
     /// A request that fails after the next scrub has begun (a sheet fetched
     /// ahead, answered late) must not stop that scrub asking for the sheet.
-    @Test func aFailureFromBeforeTheScrubDoesNotStopItAsking() async {
+    @Test func aFailureFromBeforeTheScrubDoesNotStopItAsking() async throws {
+        let sheet = try #require(layout.sheetURL(1))
         let loader = SheetLoader(layout)
         loader.failing = [1]
         loader.held = [1]
@@ -145,7 +146,7 @@ func meanGrey(_ image: CGImage) -> Int {
         loader.held = []
         thumbnails.retryFailed()
         loader.release() // the first request fails only now
-        try? await Task.sleep(for: .milliseconds(50))
+        #expect(await eventually(timeout: .seconds(5)) { !thumbnails.hasFetched(sheet) }, "the late failure has come in")
         #expect(await thumbnails.tile(layout, atMs: 13_000) != nil)
         #expect(loader.requests.count == 2)
     }
