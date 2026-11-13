@@ -366,7 +366,11 @@ fun MacrobenchmarkScope.tvLibraryAndShow() {
 /** From a show's page: play, seek with the remote, open the subtitles picker, and back out. */
 fun MacrobenchmarkScope.tvPlay() {
     device.waitFor(tag(Tags.PLAY)).click()
-    device.waitFor(By.descStartsWith("Position"))
+    // The controls show as it starts and hide while it plays, on a busy emulator sometimes before the
+    // journey looks: a seek brings them back.
+    val position = By.descStartsWith("Position")
+    if (device.wait(Until.hasObject(position), LOAD_MS) != true) press(1) { device.pressDPadRight() }
+    device.waitFor(position)
     press(2) { device.pressDPadRight() }
     press(1) { device.pressKeyCode(KeyEvent.KEYCODE_CAPTIONS) }
     press(2) { device.pressDPadDown() }
