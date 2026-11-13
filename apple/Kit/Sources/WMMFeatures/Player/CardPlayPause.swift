@@ -40,6 +40,12 @@ public enum CardPlayPause: Hashable, Sendable {
     public static func card(_ channel: LiveChannel) -> Self {
         channel.available ? .tune(channel) : .select
     }
+
+    /// A guide cell: a programme on now tunes its channel; one that has
+    /// ended or is still to come does the cell's Select.
+    public static func cell(_ programme: LiveProgramme, on channel: LiveChannel, now: Date) -> Self {
+        programme.isOn(at: now) ? card(channel) : .select
+    }
 }
 
 extension Navigator {

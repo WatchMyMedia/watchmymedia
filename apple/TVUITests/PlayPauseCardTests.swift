@@ -4,7 +4,9 @@ import XCTest
 /// (PLAN-APPLE-REVIEW.md §6.2): a Continue watching item resumes, a movie
 /// plays, a channel tunes, and a show, with no single thing to play, opens
 /// as Select does. Home on the fakes, below API level 22 (its fixed rows,
-/// drawn by the arranged rows' cards). Runs in `make apple-tv-test-sim`.
+/// drawn by the arranged rows' cards); then an episode in a show page's row,
+/// where Select puts it on top, and a guide cell on now. Runs in
+/// `make apple-tv-test-sim`.
 final class PlayPauseCardTests: XCTestCase {
     @MainActor private var remote: XCUIRemote { XCUIRemote.shared }
 
@@ -95,5 +97,42 @@ final class PlayPauseCardTests: XCTestCase {
         XCTAssertTrue(focused(channel), "a channel's card takes focus")
         remote.press(.playPause)
         XCTAssertTrue(app.descendants(matching: .any)["live-player-screen"].waitForExistence(timeout: 15), "Play/Pause tunes the channel")
+    }
+
+    @MainActor
+    func testPlayPauseOnAnEpisodeInTheShowPagesRowPlaysIt() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-fakes", "-open", "watchmymedia://shows/100?season=3&episode=100037"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Play · 52 min"].waitForExistence(timeout: 15), "the show's page opens on S03 E07")
+        let onTop = app.buttons["episode-card-100037"]
+        for _ in 0..<4 where !onTop.hasFocus {
+            remote.press(.down)
+            _ = focused(onTop, timeout: 3)
+        }
+        XCTAssertTrue(focused(onTop), "Down reaches the episode on top, in the row")
+        remote.press(.right)
+        XCTAssertTrue(focused(app.buttons["episode-card-100038"]), "Right moves to E08")
+        remote.press(.playPause)
+        XCTAssertTrue(playerIsUp(app), "Play/Pause plays it")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "S03 E08")).firstMatch.exists, "E08 plays, not the episode Play would have")
+    }
+
+    @MainActor
+    func testPlayPauseOnAGuideCellOnNowTunesItsChannel() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-fakes", "-fakesLiveGuide", "-tab", "liveTV"]
+        app.launch()
+        let onNow = app.buttons["live-cell-2.1-Quiz Parlor"]
+        XCTAssertTrue(onNow.waitForExistence(timeout: 20))
+        for _ in 0..<5 where !onNow.hasFocus {
+            remote.press(.down)
+            _ = focused(onNow, timeout: 3)
+        }
+        XCTAssertTrue(focused(onNow), "Down reaches the first channel's programme on now")
+        remote.press(.playPause)
+        let title = app.staticTexts["live-player-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 15), "Play/Pause tunes its channel")
+        XCTAssertTrue(title.label.contains("Quiz Parlor"), title.label)
     }
 }

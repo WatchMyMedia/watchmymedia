@@ -222,6 +222,7 @@ struct TVLiveGuideScreen: View {
             .buttonStyle(TVChannelCellStyle())
             .disabled(!row.channel.available)
             .focused($focus, equals: "\(row.id)|ch")
+            .playPauseCard(.card(row.channel)) { navigator.playLive(.init(channel: row.channel)) }
             .contextMenu {
                 Button { Task { await extras.toggleFavourite(row.channel) } } label: {
                     Label(liveFavouriteAction(favourite: favourite), systemImage: favourite ? "star.slash" : "star")
@@ -310,6 +311,8 @@ private struct TVGuideCell: View, Equatable {
             .disabled(!row.channel.available)
             .focused(focus, equals: id)
             .onMoveCommand(perform: move)
+            // Play/Pause tunes a programme on now; on any other it does what Select does.
+            .playPauseCard(.cell(p, on: row.channel, now: now)) { navigator.playLive(.init(channel: row.channel)) }
             .contextMenu {
                 // What it offers is decided once, for every menu (LiveProgrammeActions).
                 let actions = LiveProgrammeActions(p, on: row.channel, now: now, extras: extras, recordings: recordings)
@@ -351,6 +354,7 @@ private struct TVGuideCell: View, Equatable {
             .buttonStyle(TVGuideCellStyle(progress: nil, muted: true))
             .disabled(!row.channel.available)
             .focused(focus, equals: id)
+            .playPauseCard(.card(row.channel)) { navigator.playLive(.init(channel: row.channel)) }
             .accessibilityLabel(liveNoListingsAccessibilityLabel(row.channel))
             .accessibilityIdentifier("live-cell-\(row.channel.number)-none")
         case .listingsEnd(let date):

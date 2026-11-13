@@ -31,6 +31,38 @@ import WMMModel
         #expect(CardPlayPause.card(off) == .select)
     }
 
+    @Test func aGuideCellTunesOnlyWhatIsOnNow() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let channel = LiveChannel(id: "ch-7.1", number: "7.1", name: "KQED")
+        let onNow = LiveProgramme(id: "p1", start: now - 600, end: now + 1200, title: "Station 9")
+        let later = LiveProgramme(id: "p2", start: now + 1200, end: now + 3000, title: "Harbor Lights")
+        let ended = LiveProgramme(id: "p0", start: now - 1800, end: now - 600, title: "Coast Report")
+        #expect(CardPlayPause.cell(onNow, on: channel, now: now) == .tune(channel))
+        #expect(CardPlayPause.cell(later, on: channel, now: now) == .select, "a programme still to come does what Select does")
+        #expect(CardPlayPause.cell(ended, on: channel, now: now) == .select)
+        #expect(CardPlayPause.cell(onNow, on: channel, now: onNow.end) == .select, "it ends at its end")
+        let off = LiveChannel(id: "ch-9.1", number: "9.1", name: "PNVL", available: false)
+        #expect(CardPlayPause.cell(onNow, on: off, now: now) == .select, "a channel that can't be watched isn't tuned")
+    }
+
+    @Test func anEpisodeOfTheShowPagesRowPlaysWhenOnDisk() async throws {
+        let navigator = Navigator()
+        let model = ShowPageModel(library: TestLibrary(), navigator: navigator, showID: 100, arrival: .season(3))
+        await model.retry()
+        let onDisk = try #require(model.seasonEpisodes.first { $0.playable && $0.id != model.episodeID }, "the fakes' season 3 has episodes on disk")
+        guard case .play(let request) = model.cardPlayPause(onDisk) else { Issue.record("an episode on disk plays"); return }
+        #expect(request.fileID == onDisk.fileID)
+        #expect(request.startMs == nil, "resuming where the viewer left off")
+        #expect(request.title == "Harbor Lights")
+        let notOnDisk = try #require(model.seasonEpisodes.first { !$0.playable }, "the fakes' season 3 has an episode yet to air")
+        #expect(model.cardPlayPause(notOnDisk) == .select, "one not on disk does what Select does")
+
+        var selected = 0
+        await navigator.playPause(model.cardPlayPause(onDisk), library: FakeLibraryRepository()) { selected += 1 }
+        #expect(navigator.playing?.fileID == onDisk.fileID)
+        #expect(selected == 0)
+    }
+
     @Test func aContinueWatchingCardResumes() {
         let item = FakeData.home(now: .now).continueWatching[0]
         #expect(CardPlayPause.card(item) == .play(item.playRequest))

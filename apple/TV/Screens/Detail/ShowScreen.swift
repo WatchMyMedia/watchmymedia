@@ -423,11 +423,12 @@ private struct ShowPageView: View {
         let code = episode.season == 0 ? String(format: "SP%02d", episode.number) : String(format: "E%02d", episode.number)
         let missing = !episode.hasFile
         let line = episode.rowCardLine()
-        return Button {
-            // Select never plays: it takes focus back up to the button on top.
+        // Select never plays: it takes focus back up to the button on top.
+        let select = {
             model.select(episode)
             if hasTopButton(episode) { focus = .play }
-        } label: {
+        }
+        return Button(action: select) {
             WideCard(title: episode.rowTitle, line: line, imageURL: missing ? nil : url(episode.stillPath, .w780), seed: seed(episode), width: 288, missing: missing) {
                 if missing {
                     Text(episode.aired ? "Missing" : "Not aired yet").font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.muted)
@@ -443,6 +444,8 @@ private struct ShowPageView: View {
         }
         .buttonStyle(.borderless)
         .focused($focus, equals: .card(episode.id))
+        // Play/Pause plays it, where Select puts it on top (CardPlayPause).
+        .playPauseCard(model.cardPlayPause(episode), select: select)
         .accessibilityLabel("\(code) \(episode.displayTitle), \(line)\(onTop ? ", on top" : "")")
         .accessibilityIdentifier("episode-card-\(episode.id)")
     }

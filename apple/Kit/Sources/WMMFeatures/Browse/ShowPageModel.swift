@@ -406,6 +406,14 @@ public final class ShowPageModel {
         navigator.play(request)
     }
 
+    /// What Play/Pause does on an episode of the row on Apple TV
+    /// (``CardPlayPause``): plays it, resuming, when it is on disk; else the
+    /// card's Select, which puts it on top.
+    public func cardPlayPause(_ episode: EpisodeDetail) -> CardPlayPause {
+        guard episode.playable, let request = playRequest(episode) else { return .select }
+        return .play(request)
+    }
+
     private func playRequest(_ episode: EpisodeDetail, fromStart: Bool = false) -> PlayRequest? {
         let show = loadedShow.value
         return episode.playRequest(showTitle: showTitle, backdropPath: show?.backdropPath, posterPath: show?.posterPath, fromStart: fromStart, showID: offline ? nil : showID)
