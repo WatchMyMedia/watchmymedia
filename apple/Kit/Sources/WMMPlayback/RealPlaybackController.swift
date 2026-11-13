@@ -659,11 +659,12 @@ public final class RealPlaybackController: PlaybackController {
         v.loading = false
         v.pendingPositionMs = nil
         v.error = nil
-        let local = localRoute?.apply(to: d.url)
+        // The token goes on the server's own address, which the LAN one then replaces.
+        let tokened = token?.apply(to: d.url) ?? d.url
+        let local = localRoute?.apply(to: tokened)
         playingLocally = local != nil
-        let url = local ?? d.url
         media?.load(PlayerSource(
-            url: token?.apply(to: url) ?? url,
+            url: local ?? tokened,
             mimeType: d.mimeType,
             hls: d.protocol == .hls,
             live: streamClock.event,

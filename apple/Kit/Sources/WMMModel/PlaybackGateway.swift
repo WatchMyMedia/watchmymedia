@@ -324,16 +324,31 @@ public struct MediaToken: Hashable, Sendable {
     public var token: String
     public var expiresAt: Date
     public var param: String
+    /// The server that issued it (its base URL): the token goes on its
+    /// addresses only. Nil goes anywhere, for a token whose addresses were checked already.
+    public var server: URL?
 
-    public init(token: String, expiresAt: Date, param: String = "access_token") {
+    public init(token: String, expiresAt: Date, param: String = "access_token", server: URL? = nil) {
         self.token = token
         self.expiresAt = expiresAt
         self.param = param
+        self.server = server
     }
 
-    /// `url` with this token added as a query parameter; a file on the device is left as it is.
+    /// `url` with this token added as a query parameter. A file on the
+    /// device, and an address that isn't on ``server``, are left as they are.
     public func apply(to url: URL) -> URL {
-        url.isFileURL ? url : url.appending(queryItems: [URLQueryItem(name: param, value: token)])
+        guard !url.isFileURL, covers(url) else { return url }
+        return url.appending(queryItems: [URLQueryItem(name: param, value: token)])
+    }
+
+    /// `url` is on ``server``: the same scheme, host and port, under its
+    /// path (as `ServerAPI.owns`, which this module can't see).
+    public func covers(_ url: URL) -> Bool {
+        guard let server else { return true }
+        let path = server.path.hasSuffix("/") ? server.path : server.path + "/"
+        return server.scheme?.lowercased() == url.scheme?.lowercased() && server.host?.lowercased() == url.host?.lowercased()
+            && server.port == url.port && (url.path + "/").hasPrefix(path)
     }
 }
 

@@ -139,6 +139,18 @@ import Testing
         #expect(t.apply(to: URL(string: "http://h/a.m3u8?x=1")!).absoluteString == "http://h/a.m3u8?x=1&access_token=abc")
     }
 
+    @Test func aScopedMediaTokenGoesOnlyToItsServer() {
+        // PLAN-APPLE-REVIEW.md §3.4.8.
+        let t = MediaToken(token: "abc", expiresAt: .now, server: URL(string: "https://home.example.net/wmm")!)
+        #expect(t.apply(to: URL(string: "https://home.example.net/wmm/api/files/1/stream")!).absoluteString == "https://home.example.net/wmm/api/files/1/stream?access_token=abc")
+        #expect(t.apply(to: URL(string: "https://HOME.example.net/wmm")!).absoluteString == "https://HOME.example.net/wmm?access_token=abc")
+        for elsewhere in ["https://cdn.example.net/wmm/api/files/1/stream", "http://home.example.net/wmm/api", "https://home.example.net:8443/wmm/api", "https://home.example.net/wmmx/api", "https://home.example.net/api"] {
+            #expect(t.apply(to: URL(string: elsewhere)!).absoluteString == elsewhere)
+        }
+        #expect(t.apply(to: URL(fileURLWithPath: "/tmp/a.mp4")).isFileURL)
+        #expect(t.apply(to: URL(fileURLWithPath: "/tmp/a.mp4")).query() == nil)
+    }
+
     @Test func unmatchedFilmsPlayTheirFile() {
         let film = BrowseItem(kind: .unmatched, id: 7, libraryID: 1, title: "Glass Tide (2023).mkv", fileName: "Glass Tide (2023)/Glass Tide (2023).mkv", fileCount: 1)
         #expect(film.unmatchedPlayRequest == PlayRequest(fileID: 7, title: "Glass Tide (2023).mkv"))

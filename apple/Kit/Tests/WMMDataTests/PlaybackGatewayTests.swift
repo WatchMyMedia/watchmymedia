@@ -142,6 +142,25 @@ import WMMAPI
         #expect(d.video?.quality == "1080p")
     }
 
+    @Test func aStreamOutsideTheServerIsRefusedAndASubtitleOrThumbnailsThereLeftOut() async throws {
+        // PLAN-APPLE-REVIEW.md §3.4.8: the media token goes on these addresses.
+        let elsewhere = decisionDirect.replacingOccurrences(of: #""url":"/api/files/8/stream?play=e0b6acbb09202287""#, with: #""url":"https://elsewhere.example/api/files/8/stream""#)
+        serve(["POST /api/files/8/playback": (200, elsewhere)])
+        await #expect(throws: APIError.self) { try await gateway.decide(DecisionRequest(fileID: 8, profile: profile, client: client)) }
+
+        let own = "\(server.baseURL.absoluteString)/api/files/8/stream?play=e0b6acbb09202287"
+        let absolute = decisionDirect
+            .replacingOccurrences(of: #""url":"/api/files/8/stream?play=e0b6acbb09202287""#, with: "\"url\":\"\(own)\"")
+            .replacingOccurrences(of: #""url":"/api/files/8/subtitles/s3.vtt""#, with: #""url":"https://elsewhere.example/s3.vtt""#)
+        let manifest = #""trickplay":{"intervalMs":10000,"width":320,"height":180,"columns":10,"rows":10,"count":724,"sheets":8,"url":"https://elsewhere.example/{sheet}.jpg"},"#
+        serve(["POST /api/files/8/playback": (200, "{" + manifest + absolute.dropFirst())])
+        let d = try await gateway(level: trickplayAPILevel).decide(DecisionRequest(fileID: 8, profile: profile, client: client))
+        #expect(d.url.absoluteString == own)
+        #expect(d.subtitles[0].url != nil)
+        #expect(d.subtitles[1].url == nil)
+        #expect(d.trickplay == nil)
+    }
+
     @Test func futureSegmentKindsAreIgnoredAndFutureSourcesKeepKnownSegments() async throws {
         let future = decisionHLS.replacingOccurrences(of: "\"kind\":\"intro\"", with: "\"kind\":\"sponsor\"")
             .replacingOccurrences(of: "\"source\":\"chapter\"", with: "\"source\":\"new-detector\"")
@@ -427,7 +446,11 @@ import WMMAPI
         #expect(token.token.hasPrefix("m1."))
         #expect(token.param == "access_token")
         #expect(token.expiresAt == Date(timeIntervalSince1970: 1_793_315_375))
-        #expect(token.apply(to: URL(string: "http://srv/api/files/1/stream?play=a1")!).absoluteString == "http://srv/api/files/1/stream?play=a1&access_token=\(token.token)")
+        let stream = "\(server.baseURL.absoluteString)/api/files/1/stream?play=a1"
+        #expect(token.apply(to: URL(string: stream)!).absoluteString == "\(stream)&access_token=\(token.token)")
+        // PLAN-APPLE-REVIEW.md §3.4.8: it goes to the server that issued it, and nowhere else.
+        #expect(token.server == server.baseURL)
+        #expect(token.apply(to: URL(string: "http://srv/api/files/1/stream?play=a1")!).absoluteString == "http://srv/api/files/1/stream?play=a1")
 
         try await gateway.stopSession("a75ff047261dcc3e")
         // Already gone is fine; other failures are not.

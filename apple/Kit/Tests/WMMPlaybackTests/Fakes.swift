@@ -60,6 +60,8 @@ final class FakeGateway: PlaybackGateway {
     var subtitleFiles: [String: String] = [:]
     var subtitleFetches: [URL] = []
     var planRequests: [(PlaybackProfile, StreamQuality, [Int])] = []
+    /// The server the tokens are scoped to (``MediaToken/server``); nil goes anywhere.
+    var scope: URL?
     /// While true, reports wait in ``reportProgress(_:)`` (a server that can't be reached) until ``releaseReports()``.
     var holdReports = false
     private var heldReports: [CheckedContinuation<Void, Never>] = []
@@ -88,7 +90,7 @@ final class FakeGateway: PlaybackGateway {
 
     func mediaToken() async throws -> MediaToken {
         tokens += 1
-        return MediaToken(token: "tok\(tokens)", expiresAt: clock.now.addingTimeInterval(Double(tokenLifetimeMs) / 1000))
+        return MediaToken(token: "tok\(tokens)", expiresAt: clock.now.addingTimeInterval(Double(tokenLifetimeMs) / 1000), server: scope)
     }
 
     func stopSession(_ sessionID: String) async throws {
