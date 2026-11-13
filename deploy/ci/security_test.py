@@ -118,7 +118,13 @@ class WorkflowIsolationTest(unittest.TestCase):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         self.assertRegex(workflow, r'(?m)^  pull_request:$')
         self.assertNotIn('pull_request_target:', workflow)
-        self.assertNotIn('secrets.', workflow)
+        # One secret only: the key that encrypts Gradle's configuration cache,
+        # read by setup-gradle in the android job. Nothing else in CI may read
+        # a secret, so a pull request's code can't reach one that matters.
+        self.assertEqual(['secrets.GRADLE_ENCRYPTION_KEY'], re.findall(r'secrets\.\w+', workflow))
+        self.assertEqual(1, workflow.count('secrets'))  # no secrets['…'] or toJSON(secrets)
+        android = re.search(r'(?ms)^  android:\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
+        self.assertIn('          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}\n', android)
         self.assertNotIn('vars.CI_RUNNER', workflow)
         self.assertRegex(workflow, r'permissions:\n  contents: read\n')
 
@@ -238,6 +244,23 @@ class WorkflowIsolationTest(unittest.TestCase):
                                   "        working-directory: server\n"
                                   "        run: go clean -testcache\n", job)
                     self.assertLess(job.index('go clean -testcache'), job.index('go test'))
+
+    def test_gradle_caches_are_saved_only_by_main_on_hosted_runners(self):
+        # setup-gradle caches Gradle's home and the configuration cache on
+        # GitHub's machines, written only by pushes to main like the Go
+        # caches. setup-java's cache never saved: GRADLE_USER_HOME moves.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        android = re.search(r'(?ms)^  android:\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
+        setup_java = re.search(r'(?m)uses: actions/setup-java@[^\n]*\n        with:\n((?:          .*\n)+)', android).group(1)
+        self.assertNotIn('cache', setup_java)
+        self.assertEqual(1, android.count('uses: gradle/actions/setup-gradle@'))
+        setup = android.split('uses: gradle/actions/setup-gradle@', 1)[1].split('\n      - ', 1)[0]
+        self.assertIn("if: runner.environment == 'github-hosted'", setup)
+        self.assertIn("cache-read-only: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}", setup)
+        self.assertIn('cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}', setup)
+        self.assertNotIn('cache-write-only', setup)
+        self.assertLess(android.index('GRADLE_USER_HOME='), android.index('setup-gradle@'))
+        self.assertLess(android.index('setup-gradle@'), android.index('./gradlew'))
 
     def test_actions_are_pinned_to_commits(self):
         # A tag can be moved to other code and a commit cannot. Release jobs

@@ -182,7 +182,11 @@ job has one. The Go jobs restore Go's build and test caches from the newest
 push to `main`, so a PR reruns only the Go packages it changes and those that
 depend on them. Only `main` saves those caches, and `main` and manual runs run
 every test again (`go clean -testcache`). A change to the pinned ffmpeg starts
-from an empty cache, since Go can't see the ffmpeg its tests run.
+from an empty cache, since Go can't see the ffmpeg its tests run. The
+`android` job's Gradle caches, kept by Gradle's setup-gradle action, work the
+same way: restored everywhere, saved only by `main`. Its configuration cache
+is encrypted with `GRADLE_ENCRYPTION_KEY`, the only secret `ci.yml` may read
+(`security_test.py` checks); without it, as on fork PRs, that cache is skipped.
 
 | Changed | Run |
 |---|---|
@@ -192,7 +196,7 @@ from an empty cache, since Go can't see the ffmpeg its tests run.
 | API types | `make gen-api`, `make apple-api`, `make apple-test`, `cd web && pnpm typecheck`; Android's client if used |
 | Web app | `cd web && pnpm lint && pnpm typecheck && pnpm test && pnpm build` |
 | Cast receiver | the web checks plus `cd web && pnpm build:receiver` |
-| Android | `cd android && ./gradlew testDebugUnitTest lintDebug` (CI adds `coverageReport`, `assembleDebug` and an unsigned `:app:assembleRelease`) |
+| Android | `cd android && ./gradlew testDebugUnitTest lintDebug` (CI adds `coverageReport`, `assembleDebug` and an unsigned `:app:assembleRelease` without `lintVitalRelease`) |
 | Apple Kit | `make apple-test` |
 | iPhone or iPad app, or UIKit | `make apple-test-sim` |
 | Apple TV app | `make apple-tv-test-sim` |
