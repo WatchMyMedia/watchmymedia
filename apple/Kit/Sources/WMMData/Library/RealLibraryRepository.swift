@@ -149,16 +149,13 @@ final class RealLibraryRepository: LibraryRepository {
         let file = try await fileInfo(fileID)
         if let movieID = file.movieId {
             let movie = try await movie(id: Int(movieID))
-            return PlayRequest(fileID: fileID, title: movie.title, subtitle: movie.year.map(String.init), backdropPath: movie.backdropPath, posterPath: movie.posterPath)
+            return PlayRequest(fileID: fileID, title: movie.title, subtitle: movie.year.map(String.init), backdropPath: movie.backdropPath, posterPath: movie.posterPath,
+                               overview: Mapping.nonBlank(movie.overview), year: movie.year, contentRating: movie.contentRating, genres: movie.genres)
         }
         if let showID = file.showId, let number = file.seasonNumber {
             let detail = try await season(showID: Int(showID), number: Int(number))
             if let episode = detail.episodes.first(where: { file.episodeId == Int64($0.id) }) {
-                return PlayRequest(
-                    fileID: fileID, title: detail.showTitle,
-                    subtitle: "\(episodeCode(season: episode.season, episode: episode.number)) · \(episode.title)",
-                    backdropPath: detail.showBackdropPath ?? episode.stillPath, stillPath: episode.stillPath, posterPath: detail.season.posterPath, showID: Int(showID), seasonNumber: Int(number)
-                )
+                return Self.episodeRequest(fileID: fileID, episode, showTitle: detail.showTitle, backdropPath: detail.showBackdropPath, posterPath: detail.season.posterPath, showID: Int(showID))
             }
         }
         let guess = file.parsed
@@ -186,13 +183,21 @@ final class RealLibraryRepository: LibraryRepository {
                 continue
             }
             guard let episode = detail.episodes.first(where: { $0.versions.contains { $0.fileID == fileID } }) else { continue }
-            return PlayRequest(
-                fileID: fileID, title: detail.showTitle,
-                subtitle: "\(episodeCode(season: episode.season, episode: episode.number)) · \(episode.title)",
-                backdropPath: show.backdropPath ?? episode.stillPath, stillPath: episode.stillPath, posterPath: show.posterPath, showID: show.id, seasonNumber: season
-            )
+            return Self.episodeRequest(fileID: fileID, episode, showTitle: detail.showTitle, backdropPath: show.backdropPath, posterPath: show.posterPath, showID: show.id)
         }
         return nil
+    }
+
+    /// Plays `fileID` as `episode` of its show, named and pictured as the
+    /// episode's page names it, with its description. `fileID` rather than the
+    /// episode's first file, since a play link names one version.
+    private static func episodeRequest(fileID: Int, _ episode: EpisodeDetail, showTitle: String, backdropPath: String?, posterPath: String?, showID: Int) -> PlayRequest {
+        PlayRequest(
+            fileID: fileID, title: showTitle,
+            subtitle: "\(episodeCode(season: episode.season, episode: episode.number)) · \(episode.title)",
+            backdropPath: backdropPath ?? episode.stillPath, stillPath: episode.stillPath, posterPath: posterPath, showID: showID, seasonNumber: episode.season,
+            overview: Mapping.nonBlank(episode.overview)
+        )
     }
 
     func filePage(fileID: Int) async throws -> FilePage? {

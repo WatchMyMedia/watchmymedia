@@ -370,7 +370,8 @@ struct LibraryRepositoryTests {
         h.router.on("GET /api/files/7", .json(Fixtures.file(links: #", "movieId": 21"#, kind: "movie", title: "Paper Moons")))
         h.router.on("GET /api/movies/21", .json(Fixtures.movie))
         let request = try await library.playRequest(fileID: 7)
-        #expect(request == PlayRequest(fileID: 7, title: "Paper Moons", subtitle: "2021", backdropPath: "/pm-backdrop.jpg", posterPath: "/pm-poster.jpg"))
+        #expect(request == PlayRequest(fileID: 7, title: "Paper Moons", subtitle: "2021", backdropPath: "/pm-backdrop.jpg", posterPath: "/pm-poster.jpg",
+                                       overview: "Two cartographers.", year: 2021, genres: ["Romance"]), "with the Info panel's details from the movie it loaded")
     }
 
     @Test func anEpisodeFileTheServerNamesIsFoundInItsSeason() async throws {
@@ -381,6 +382,7 @@ struct LibraryRepositoryTests {
         #expect(request.subtitle == "S01 E01 · Pilot")
         #expect(request.backdropPath == "/e1.jpg")
         #expect(request.stillPath == "/e1.jpg", "Now Playing shows the episode's still")
+        #expect(request.overview == "It begins.", "the Info panel has the episode's description")
         #expect(h.router.requests("GET /api/search").isEmpty, "no search for the guessed title")
     }
 
@@ -391,6 +393,7 @@ struct LibraryRepositoryTests {
         let found = try await library.playRequest(fileID: 4)
         #expect(found.title == "Harbor Lights")
         #expect(found.subtitle == "S01 E01 · Pilot")
+        #expect(found.overview == "It begins.")
         #expect(h.router.requests("GET /api/shows/11/seasons/1").count == 1)
 
         // The show is not found: the file name's guess.

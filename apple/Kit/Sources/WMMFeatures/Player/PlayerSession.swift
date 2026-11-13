@@ -101,13 +101,16 @@ public final class PlayerSession {
         return true
     }
 
-    /// The request for the episode that started after `request`'s, named from
+    /// The request for the episode that started after `previous`, named from
     /// the controller's state. The still and poster too, so a retry keeps the
-    /// episode's Now Playing picture.
-    public static func next(fileID: Int, state: PlayerState) -> PlayRequest {
+    /// episode's Now Playing picture; and what belongs to the show (the year,
+    /// certification and genres) from `previous`, the same show's. The next
+    /// episode's description isn't known here, so it has none.
+    public static func next(fileID: Int, state: PlayerState, after previous: PlayRequest? = nil) -> PlayRequest {
         PlayRequest(
             fileID: fileID, title: state.title, subtitle: state.subtitle,
-            backdropPath: state.backdropPath, stillPath: state.stillPath, posterPath: state.posterPath
+            backdropPath: state.backdropPath, stillPath: state.stillPath, posterPath: state.posterPath,
+            year: previous?.year, contentRating: previous?.contentRating, genres: previous?.genres ?? []
         )
     }
 
@@ -117,7 +120,7 @@ public final class PlayerSession {
             // An admin's stop shows its message first; Back leaves.
             if controller.state.stopMessage == nil { finish() }
         case .startedNext(let fileID):
-            request = Self.next(fileID: fileID, state: controller.state)
+            request = Self.next(fileID: fileID, state: controller.state, after: request)
             startedNext()
         }
     }

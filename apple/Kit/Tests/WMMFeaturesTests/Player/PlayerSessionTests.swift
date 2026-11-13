@@ -70,6 +70,27 @@ import WMMModel
         #expect(spy.calls == ["start 9101", "start 9104", "start 9104"], "Try again plays the episode chosen")
     }
 
+    @Test func theNextEpisodeKeepsWhatBelongsToTheShow() async {
+        let spy = SpyPlaybackController()
+        let session = PlayerSession(
+            controller: spy,
+            request: PlayRequest(fileID: 9101, title: "Harbor Lights", subtitle: "S03 E07 · The Long Dark", showID: 100, seasonNumber: 3,
+                                 overview: "A storm closes the harbour.", year: 2022, contentRating: "TV-14", genres: ["Drama", "Crime"]),
+            onExit: {}
+        )
+        let nexts = Counter()
+        session.start(startedNext: { nexts.count += 1 })
+        spy.state.title = "Harbor Lights"
+        spy.state.subtitle = "S03 E08 · Squall Line"
+        spy.send(.startedNext(fileID: 9102))
+        #expect(await eventually { nexts.count == 1 })
+        #expect(session.request.contentRating == "TV-14")
+        #expect(session.request.genres == ["Drama", "Crime"])
+        #expect(session.request.year == 2022)
+        #expect(session.request.overview == nil, "the last episode's description isn't the next one's")
+        #expect(PlayerSession.next(fileID: 9102, state: spy.state).contentRating == nil, "nothing to keep without the request before")
+    }
+
     @Test func theEndLeavesOnceButAnAdminsStopWaitsForBack() async {
         session.start()
         spy.state.stopMessage = "Dinner’s ready."
