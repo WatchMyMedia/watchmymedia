@@ -93,6 +93,7 @@ private struct LiveTVContent: View {
                     }
                     .buttonStyle(.borderless)
                     .disabled(!channel.available)
+                    .playPauseCard(.card(channel)) { navigator.playLive(.init(channel: channel)) }
                     .focused($focused, equals: channel.id)
                     .accessibilityLabel("Watch \(channel.title)")
                     .accessibilityIdentifier("live-channel-\(channel.id)")
@@ -169,6 +170,7 @@ struct TVLiveHomeRow: View {
                                 TVLiveChannelCard(channel: channel, width: 320, height: 180)
                             }
                             .buttonStyle(.borderless)
+                            .playPauseCard(.card(channel)) { navigator.playLive(.init(channel: channel)) }
                             .focused($focused, equals: .channel(channel.id))
                             .accessibilityLabel("Watch \(channel.title)")
                             .accessibilityIdentifier("home-live-channel-\(channel.id)")
@@ -243,6 +245,7 @@ private struct TVLiveOnNowRow: View {
                                                 nextReminded: channel.programme(after: context.date).map(extras.isReminded) ?? false)
                             }
                             .buttonStyle(TVLiveCardButtonStyle())
+                            .playPauseCard(.card(channel)) { navigator.playLive(.init(channel: channel)) }
                             .focused($focused, equals: .channel(channel.id))
                             .accessibilityIdentifier("home-live-channel-\(channel.id)")
                         }

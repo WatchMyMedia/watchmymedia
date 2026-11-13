@@ -197,6 +197,7 @@ private struct LibraryView: View {
                             PosterCard(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w500), width: 218)
                         }
                         .buttonStyle(.borderless)
+                        .playPauseCard(.card(item)) { model.open(item) }
                         .contextMenu {
                             if item.watchTarget != nil {
                                 WatchToggleButton(watched: item.watched) { await model.setWatched(item, $0) }

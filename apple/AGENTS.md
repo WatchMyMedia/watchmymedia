@@ -123,6 +123,10 @@ server, and on iPad in both a regular and a compact width.
     until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
     up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable
     itself while it works.
+  - On Apple TV Play/Pause goes to the focused view's `.onPlayPauseCommand`
+    and nowhere else: a card plays with `playPauseCard(_:select:)`, whose
+    rule is `CardPlayPause` in the Kit (a show's card opens, as Select does),
+    and a new card needs it too (`TVUITests/PlayPauseCardTests.swift`).
   - A note pill's timer is cancelled while a page settles in after Back, so
     clear the note only when the sleep finished (`MessagePill`).
   - On iPad the toolbar beside the tab bar holds little: a third trailing

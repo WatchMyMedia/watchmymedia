@@ -96,6 +96,7 @@ private struct TVMediaListView: View {
                 EntryFace(entry: entry, imageURL: services.library.imageURL(item.posterPath, size: .w500))
             }
             .buttonStyle(.borderless)
+            .playPauseCard(.card(item)) { model.open(entry) }
             .accessibilityLabel(entry.accessibilityLine)
             .contextMenu {
                 if let target = item.watchTarget {
