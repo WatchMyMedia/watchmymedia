@@ -275,6 +275,11 @@ waits on timers runs in a synctest bubble on an in-memory server
   about 0.9 s under the race detector against 30 ms without, and calling
   `db.Migrate` per test made `internal/api` three times slower there. `internal/db`'s own tests, which cannot import it,
   use `openTest` and `migrateTo`.
+- Write a script that stands in for ffmpeg or ffprobe with
+  `ffexectest.WriteScript` (`internal/ffexec/ffexectest`), not `os.WriteFile`.
+  Linux refuses to run a file a process still has open for writing, and a
+  process a parallel test starts holds the descriptor for a moment, so a
+  script written the plain way failed now and then with "text file busy".
 - Don't sleep to wait for goroutines or timers. Use the standard library's
   synctest package for code driven by timers (the watcher's debouncer,
   coalesced scans), or wait on an event or channel; give code that compares

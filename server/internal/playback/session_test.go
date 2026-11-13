@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"watchmymedia/server/internal/ffexec/ffexectest"
 )
 
 func needFFmpeg(t *testing.T) string {
@@ -489,7 +491,7 @@ case "$*" in
 esac
 exit 0
 `
-	if err := os.WriteFile(fake, []byte(script), 0o700); err != nil { //nolint:gosec // G306: a script, which must be executable
+	if err := ffexectest.WriteScript(fake, script); err != nil {
 		t.Fatal(err)
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))

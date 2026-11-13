@@ -10,6 +10,8 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"watchmymedia/server/internal/ffexec/ffexectest"
 )
 
 func TestCapabilitiesWaitCanBeCanceledByViewer(t *testing.T) {
@@ -52,7 +54,7 @@ case "$*" in
 esac
 exit 0
 `
-	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil { //nolint:gosec // G306: a script, which must be executable
+	if err := ffexectest.WriteScript(bin, script); err != nil {
 		t.Fatal(err)
 	}
 	return bin, runs
