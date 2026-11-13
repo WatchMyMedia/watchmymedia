@@ -99,7 +99,7 @@ public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
 
     public var canDownload: Bool {
         guard let owner else { return false }
-        return owner.apiLevel >= offlineAPILevel && stored.allowed[owner.key] == true
+        return ServerFeatures(apiLevel: owner.apiLevel).offline && stored.allowed[owner.key] == true
     }
 
     public var enabled: Bool { canDownload || !downloads.isEmpty }
