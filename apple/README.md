@@ -24,9 +24,12 @@ make apple-tv-test-sim # build it and run every test on the Apple TV 4K simulato
 The Apple TV app needs the tvOS simulator runtime too
 (`xcodebuild -downloadPlatform tvOS`; CI downloads it the first time).
 
-When the hosted Kit tests fail, CI saves their output and Swift test-process
-crash reports in the `apple-kit-diagnostics` artifact. Simulator test results
-are in `apple-test-results` and `apple-tv-test-results`.
+CI runs the Kit's tests on the simulators, inside the `apple` and `apple-tv`
+jobs, not on the Mac (`make apple-test` is the quick local check). The
+`apple` job runs for `App/` and `UITests/`, the `apple-tv` job for `TV/` and
+`TVUITests/`, and both for the Kit, `project.yml`, `Tools/`, `scripts/` and
+the API. Their results are in the `apple-test-results` and
+`apple-tv-test-results` artifacts, without code coverage.
 
 `make apple-e2e` installs the app fresh on the simulator and runs
 `UITests/EndToEndTests.swift`: it types the server's address, signs in,
