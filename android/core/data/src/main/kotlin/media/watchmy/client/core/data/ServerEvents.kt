@@ -2,7 +2,6 @@ package media.watchmy.client.core.data
 
 import java.io.EOFException
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -187,15 +186,14 @@ internal class ServerEvents(
     private fun stream(session: Session): Flow<ServerEvent> = callbackFlow {
         val account = session.account ?: run { close(); return@callbackFlow }
         val token = store.tokenForRequest(session.server.id, account) ?: run { close(); return@callbackFlow }
-        val client = http.withToken(token).newBuilder().readTimeout(45, TimeUnit.SECONDS).callTimeout(0, TimeUnit.SECONDS).build()
         val baseUrl = session.server.baseUrl
-        val call = client.newCall(
+        // The stream client's interceptor sends the token and clears the sign-in on a 401, as for any call.
+        val call = http.calls(http.accountCredential(session.server, token), http.streamClient).newCall(
             Request.Builder().url("$baseUrl/api/events").header("Accept", "text/event-stream").build(),
         )
         launch(Dispatchers.IO) {
             try {
                 call.execute().use { response ->
-                    if (response.code == 401) store.tokenRejected(session.server.id, token)
                     if (!response.isSuccessful) throw EventStreamException(response.code)
                     val parser = SseParser { trySendBlocking(it) }
                     readEventLines(response.body.source(), each = parser::line)

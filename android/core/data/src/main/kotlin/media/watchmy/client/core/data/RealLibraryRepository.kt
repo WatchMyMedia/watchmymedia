@@ -34,7 +34,7 @@ internal class RealLibraryRepository(
     private val http: Http,
     events: ServerEvents,
 ) : LibraryRepository {
-    private fun browse(base: String, client: okhttp3.OkHttpClient) = BrowseApi(base, client)
+    private fun browse(base: String, client: okhttp3.Call.Factory) = BrowseApi(base, client)
 
     override suspend fun home(): HomeData = http.signedIn { base, client -> browse(base, client).getHome() }.toModel()
 

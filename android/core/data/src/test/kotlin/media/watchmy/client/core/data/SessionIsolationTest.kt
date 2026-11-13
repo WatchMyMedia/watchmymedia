@@ -111,4 +111,30 @@ class SessionIsolationTest {
             assertEquals("Bearer token-a", h.server.requests.single().getHeader("Authorization"))
         }
     }
+
+    @Test
+    fun `one interceptor sends each request's own token, and only to its server`() = runBlocking {
+        Harness().use { h ->
+            TestServer().use { other ->
+                h.signIn()
+                // An image (no credential of its own) goes as the current sign-in, to its server only.
+                h.server.always("GET /api/images/w342/a.jpg", TestServer.noContent())
+                other.always("GET /api/images/w342/a.jpg", TestServer.noContent())
+                for (base in listOf(h.server.baseUrl, other.baseUrl)) {
+                    h.services.imageHttpClient.newCall(okhttp3.Request.Builder().url("$base/api/images/w342/a.jpg").build()).execute().close()
+                }
+                assertEquals("Bearer tok-viewer", h.server.last("GET /api/images/w342/a.jpg").getHeader("Authorization"))
+                assertEquals(null, other.last("GET /api/images/w342/a.jpg").getHeader("Authorization"))
+
+                // A cast token goes as itself, never as this device's sign-in, and its 401 signs nobody out here.
+                other.on("GET /api/me/preferences", TestServer.json(TestServer.PREFERENCES), TestServer.problem(401, "sign in required"))
+                val cast = h.services.castPlayback(ReachedServer(other.baseUrl, 27), "c1.cast", 1_900_000_000_000, null)
+                cast.preferences.refresh()
+                assertEquals("Bearer c1.cast", other.last("GET /api/me/preferences").getHeader("Authorization"))
+                assertTrue(runCatching { cast.preferences.refresh() }.isFailure)
+                assertEquals("viewer", h.services.auth.user.value?.name)
+                assertTrue(h.server.requests.none { it.getHeader("Authorization") == "Bearer c1.cast" })
+            }
+        }
+    }
 }

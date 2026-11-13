@@ -27,12 +27,12 @@ import media.watchmy.client.model.SkipMode
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleSize
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import okhttp3.OkHttpClient
+import okhttp3.Call
 import java.net.URLEncoder
 
-/** How a gateway reaches the server: its base URL, and an HTTP client that signs the request in. */
+/** How a gateway reaches the server: its base URL, and calls that sign the request in. */
 internal interface ServerAccess {
-    suspend fun <T> call(block: suspend (baseUrl: String, client: OkHttpClient) -> T): T
+    suspend fun <T> call(block: suspend (baseUrl: String, client: Call.Factory) -> T): T
     fun bind(): ServerAccess = this
 
     /** The server's API level as last read, which decides what a request may carry. */
@@ -44,7 +44,7 @@ internal interface ServerAccess {
 
 /** As this device's signed-in user, on the server in use. */
 internal class SignedInAccess(private val http: Http) : ServerAccess {
-    override suspend fun <T> call(block: suspend (baseUrl: String, client: OkHttpClient) -> T): T =
+    override suspend fun <T> call(block: suspend (baseUrl: String, client: Call.Factory) -> T): T =
         http.signedIn(block)
 
     override fun bind(): ServerAccess = http.bind()
@@ -65,15 +65,15 @@ internal class CastTokenAccess(
     private val apiLevel: Int,
 ) : ServerAccess {
     private val lock = Mutex()
-    private var current = token to http.withToken(token)
+    private var current = http.calls(Credential(baseUrl, token))
     private var expiresAt = expiresAtMs
 
     /** The cast token in use: the sender's, then each renewed one. */
     @Volatile var token: String = token
         private set
 
-    override suspend fun <T> call(block: suspend (baseUrl: String, client: OkHttpClient) -> T): T {
-        val client = lock.withLock { current.second }
+    override suspend fun <T> call(block: suspend (baseUrl: String, client: Call.Factory) -> T): T {
+        val client = lock.withLock { current }
         return Http.call(signedIn = false) { block(baseUrl, client) }
     }
 
@@ -84,7 +84,7 @@ internal class CastTokenAccess(
         val t = call { base, client -> AuthApi(base, client).createCastToken() }
         val exp = epochMs(t.expiresAt) ?: (System.currentTimeMillis() + 60 * 60_000L)
         lock.withLock {
-            current = t.token to http.withToken(t.token)
+            current = http.calls(Credential(baseUrl, t.token))
             expiresAt = exp
             token = t.token
         }

@@ -130,7 +130,7 @@ internal class RealServerRepository(
     /** POST /api/auth/logout with [token], ignoring every failure. */
     suspend fun signOutQuietly(baseUrl: String, token: String) {
         withTimeoutOrNull(5_000) {
-            runCatching { AuthApi(baseUrl, http.withToken(token)).logout() }
+            runCatching { AuthApi(baseUrl, http.calls(Credential(baseUrl, token))).logout() }
         }
     }
 }

@@ -17,10 +17,12 @@ import media.watchmy.client.core.api.models.ErrorModel
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.SignedOutException
 import media.watchmy.client.model.isOnServer
+import okhttp3.Call
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
 import okhttp3.MediaType
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody
 import okio.Buffer
@@ -29,10 +31,17 @@ import okio.ForwardingSource
 import okio.buffer
 
 /**
- * The HTTP side: one OkHttp client whose interceptors add the bearer token to
- * requests for the current server (never to other hosts) and clear the
- * sign-in when the server answers 401, plus [signedIn] and [call], which turn
- * every failure into [ApiException].
+ * Who a request is sent as: [token], added only to requests for the server at
+ * [baseUrl] (never to other hosts). [onRejected] runs when that server
+ * answers 401: an account's clears its sign-in; a cast token's has none.
+ */
+internal class Credential(val baseUrl: String, val token: String, val onRejected: (() -> Unit)? = null)
+
+/**
+ * The HTTP side: one OkHttp client whose interceptor adds the bearer token of
+ * the request's [Credential] (its tag, else the current sign-in) to requests
+ * for that server, and clears the sign-in when the server answers 401, plus
+ * [signedIn] and [call], which turn every failure into [ApiException].
  */
 internal class Http(base: OkHttpClient, private val store: LocalStore, private val userAgent: String) {
     /**
@@ -42,13 +51,8 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
      * calls are never redirected that way (a probe handles an upgrade itself).
      */
     val publicClient: OkHttpClient = base.newBuilder().followSslRedirects(false).addInterceptor(ReplyLimit()).addInterceptor(::userAgent).build()
-    /** API calls and images. */
-    val client: OkHttpClient = base.newBuilder()
-        .followSslRedirects(false)
-        .addInterceptor(ReplyLimit())
-        .addInterceptor(::userAgent)
-        .addInterceptor(::authorize)
-        .build()
+    /** API calls and images: a request goes as its [Credential] tag ([calls]), or else as the current sign-in. */
+    val client: OkHttpClient = publicClient.newBuilder().addInterceptor(::authorize).build()
 
     /**
      * Signing in and pairing follow no redirects at all: a 307 or 308 would
@@ -76,13 +80,22 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
         .callTimeout(0, TimeUnit.SECONDS)
         .build()
 
-    /** A client that sends [token] itself, for a server that is no longer the current one. */
-    fun withToken(token: String): OkHttpClient = publicClient.newBuilder().apply {
-        interceptors().add(0, Interceptor { it.proceed(it.request().newBuilder().header(AUTHORIZATION, "Bearer $token").build()) })
-    }.build()
+    /**
+     * Calls on [on] (the API client unless said) sent as [credential],
+     * whoever is signed in now: a sign-in captured earlier, an offline
+     * download's owner, a cast token, or a session being signed out. Each
+     * request carries the credential as its tag, so one client serves them
+     * all and [authorize] handles their 401s in one place.
+     */
+    fun calls(credential: Credential, on: OkHttpClient = client): Call.Factory = Call.Factory { request ->
+        on.newCall(request.newBuilder().tag(Credential::class.java, credential).build())
+    }
+
+    /** [token] as the account it signs in on [server]: a 401 clears that sign-in, unless it has been replaced. */
+    fun accountCredential(server: StoredServer, token: String) = Credential(server.baseUrl, token) { store.tokenRejected(server.id, token) }
 
     /** Runs [block] with the current server's base URL as the signed-in user. */
-    suspend fun <T> signedIn(block: suspend (baseUrl: String, client: OkHttpClient) -> T): T {
+    suspend fun <T> signedIn(block: suspend (baseUrl: String, client: Call.Factory) -> T): T {
         val (session, revision) = store.requestSnapshot()
         val result = bind(session).call(block)
         if (store.revision != revision) throw CancellationException("The signed-in account changed.")
@@ -112,19 +125,12 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
     /** Bind an already captured atomic identity/revision snapshot (Live TV). */
     internal fun bind(session: Session?): ServerAccess {
         return object : ServerAccess {
-            override suspend fun <T> call(block: suspend (baseUrl: String, client: OkHttpClient) -> T): T {
+            override suspend fun <T> call(block: suspend (baseUrl: String, client: Call.Factory) -> T): T {
                 val account = session?.account ?: throw SignedOutException()
                 val token = Http.call(signedIn = true) { withContext(Dispatchers.IO) { store.tokenForRequest(session.server.id, account) } }
                     ?: throw SignedOutException()
-                val baseUrl = session.server.baseUrl
-                val fixed = publicClient.newBuilder().addInterceptor { chain ->
-                    val request = chain.request()
-                    val signed = if (owns(baseUrl, request.url)) request.newBuilder().header(AUTHORIZATION, "Bearer $token").build() else request
-                    val response = chain.proceed(signed)
-                    if (response.code == 401) store.tokenRejected(session.server.id, token)
-                    response
-                }.build()
-                return Http.call(signedIn = true) { block(baseUrl, fixed) }
+                val calls = calls(accountCredential(session.server, token))
+                return Http.call(signedIn = true) { block(session.server.baseUrl, calls) }
             }
 
             // The bound server's level as refreshed since, which the start-up check may still change.
@@ -149,19 +155,29 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
         return chain.proceed(request.newBuilder().header("User-Agent", userAgent).build())
     }
 
+    /**
+     * The one place a token is added and a 401 handled. A request tagged with
+     * a [Credential] goes as that and nothing else; an untagged one (an image)
+     * as the current sign-in. Either way only to its server, and never to the
+     * sign-in call itself.
+     */
     private fun authorize(chain: Interceptor.Chain): Response {
         val request = chain.request()
-        val session = store.session()
-        val account = session?.account
-        if (account == null || request.header(AUTHORIZATION) != null || !owns(session.server.baseUrl, request.url) ||
-            request.url.encodedPath.endsWith(LOGIN_PATH)
-        ) {
-            return chain.proceed(request)
-        }
-        val token = store.tokenForRequest(session.server.id, account) ?: return chain.proceed(request)
-        val response = chain.proceed(request.newBuilder().header(AUTHORIZATION, "Bearer $token").build())
-        if (response.code == 401) store.tokenRejected(session.server.id, token)
+        if (request.header(AUTHORIZATION) != null || request.url.encodedPath.endsWith(LOGIN_PATH)) return chain.proceed(request)
+        val credential = request.tag(Credential::class.java) ?: current(request) ?: return chain.proceed(request)
+        if (!owns(credential.baseUrl, request.url)) return chain.proceed(request)
+        val response = chain.proceed(request.newBuilder().header(AUTHORIZATION, "Bearer ${credential.token}").build())
+        if (response.code == 401) credential.onRejected?.invoke()
         return response
+    }
+
+    /** The current sign-in, for an untagged [request] to the current server; its token is opened only then. */
+    private fun current(request: Request): Credential? {
+        val session = store.session() ?: return null
+        val account = session.account ?: return null
+        if (!owns(session.server.baseUrl, request.url)) return null
+        val token = store.tokenForRequest(session.server.id, account) ?: return null
+        return accountCredential(session.server, token)
     }
 
     companion object {
