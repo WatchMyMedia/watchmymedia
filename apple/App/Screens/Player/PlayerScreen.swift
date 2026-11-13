@@ -49,6 +49,9 @@ struct PlayerScreen: View {
     }
 }
 
+/// The screen around the video. It reads the model's steady state, which
+/// changes when something other than the position does; what ticks is read
+/// only by the small views that draw it (``PlayerClock``).
 private struct PlayerContent: View {
     let model: PlayerChromeModel
     let episodes: PlayerEpisodesModel
@@ -135,7 +138,7 @@ private struct PlayerContent: View {
                 )
 
                 if !pictureInPicture.isActive {
-                    SubtitleCuesView(cues: state.cues, bottomPadding: model.showsControls ? insets.bottom + (portrait ? 56 : metrics.skipLift) + 8 : insets.bottom + 8, sidePadding: insets.leading)
+                    PlayerCues(clock: model.clock, bottomPadding: model.showsControls ? insets.bottom + (portrait ? 56 : metrics.skipLift) + 8 : insets.bottom + 8, sidePadding: insets.leading)
 
                     // Taps on the video: show or hide the controls; double taps on a side seek.
                     Color.clear
@@ -158,7 +161,7 @@ private struct PlayerContent: View {
                     }
 
                     if let skip = state.skip, model.showsSkip {
-                        SkipButton(prompt: skip, metrics: metrics) { model.skip() }
+                        SkipButton(prompt: skip, clock: model.clock, metrics: metrics) { model.skip() }
                             .padding(.trailing, insets.trailing)
                             .padding(.bottom, model.showsControls ? insets.bottom + (portrait ? 56 : metrics.skipLift) : insets.bottom)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
@@ -166,7 +169,7 @@ private struct PlayerContent: View {
                     }
 
                     if model.showsMiniProgress {
-                        MiniProgress(positionMs: state.positionMs, durationMs: state.durationMs)
+                        ClockMiniProgress(clock: model.clock)
                             .opacity(model.overlay == .stillWatching ? 0.7 : 1)
                             .padding(.leading, insets.leading)
                             .padding(.bottom, max(insets.bottom - 2, 16))
@@ -177,6 +180,7 @@ private struct PlayerContent: View {
                     if let upNext = state.upNext, model.showsUpNext {
                         NextEpisodeCard(
                             prompt: upNext,
+                            clock: model.clock,
                             width: metrics.sidePanelPicker ? min(400, geo.size.width * 0.48) : 320,
                             still: services.library.imageURL(upNext.next.stillPath, size: .w342),
                             onPlay: { model.playNext() },
@@ -231,5 +235,25 @@ private struct PlayerContent: View {
         case nil:
             EmptyView()
         }
+    }
+}
+
+/// The subtitle cues, the only part of the video's overlay that follows them.
+private struct PlayerCues: View {
+    let clock: PlayerClock
+    let bottomPadding: CGFloat
+    let sidePadding: CGFloat
+
+    var body: some View {
+        SubtitleCuesView(cues: clock.cues, bottomPadding: bottomPadding, sidePadding: sidePadding)
+    }
+}
+
+/// ``MiniProgress`` at the clock's position.
+private struct ClockMiniProgress: View {
+    let clock: PlayerClock
+
+    var body: some View {
+        MiniProgress(positionMs: clock.positionMs, durationMs: clock.durationMs)
     }
 }

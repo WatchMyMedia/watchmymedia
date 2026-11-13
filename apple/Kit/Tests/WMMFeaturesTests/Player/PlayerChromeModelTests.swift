@@ -15,16 +15,19 @@ import WMMModel
         #expect(h.spy.calls == ["start 9101"])
     }
 
-    @Test func overlaysComeOneAtATimeMostImportantFirst() {
+    @Test func overlaysComeOneAtATimeMostImportantFirst() async {
         let h = PlayerHarness()
         #expect(h.model.overlay == nil)
         h.model.openPicker(.subtitles)
         #expect(h.model.overlay == .picker(.subtitles))
         h.spy.state.askStillWatching = true
+        await h.time.settle()
         #expect(h.model.overlay == .stillWatching)
         h.spy.state.stopMessage = "Dinner’s ready."
+        await h.time.settle()
         #expect(h.model.overlay == .stopped("Dinner’s ready."))
         h.spy.state.error = "ffmpeg exited"
+        await h.time.settle()
         #expect(h.model.overlay == .failed("ffmpeg exited"))
         #expect(!h.model.showsControls)
     }
@@ -33,6 +36,7 @@ import WMMModel
         let h = PlayerHarness()
         h.spy.state.upNext = upNext()
         h.spy.state.skip = SkipPrompt(segment: Segment(kind: .credits, startMs: 2_970_000, endMs: nil), label: "Skip Credits")
+        await h.time.settle()
         #expect(!h.model.showsUpNext)
         #expect(h.model.showsSkip)
         await h.time.advance(byMs: 3_000)

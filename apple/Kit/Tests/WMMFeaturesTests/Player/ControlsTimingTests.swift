@@ -100,8 +100,8 @@ import WMMModel
         let h = PlayerHarness()
         await h.time.advance(byMs: 3_000)
         #expect(!h.model.controlsVisible)
+        // They show at once, so the three seconds run from the tap.
         h.model.tap(x: 450, width: 900)
-        await h.time.advance(byMs: PlayerChromeModel.doubleTapMs)
         #expect(h.model.controlsVisible)
         await h.time.advance(byMs: 2_999)
         #expect(h.model.controlsVisible)
@@ -191,6 +191,64 @@ import WMMModel
         #expect(!h.model.controlsVisible)
         h.model.tap(x: 880, width: 915)
         await h.time.advance(byMs: PlayerChromeModel.doubleTapMs)
+        #expect(h.model.controlsVisible)
+        #expect(!h.spy.calls.contains { $0.hasPrefix("seekBy") })
+    }
+}
+
+/// A tap on hidden controls shows them at once (PLAN-APPLE-REVIEW.md §6.3):
+/// only the hide waits to see whether a second tap follows.
+@MainActor
+@Suite struct ImmediateTapTests {
+    private func hidden(_ status: PlayerStatus = .paused) async -> PlayerHarness {
+        let h = PlayerHarness(status: status)
+        h.model.tap(x: 450, width: 900)
+        await h.time.advance(byMs: PlayerChromeModel.doubleTapMs)
+        #expect(!h.model.controlsVisible)
+        return h
+    }
+
+    @Test func aTapShowsHiddenControlsWithoutWaiting() async {
+        let h = await hidden()
+        h.model.tap(x: 450, width: 900)
+        #expect(h.model.controlsVisible, "no 300 ms wait")
+        await h.time.advance(byMs: 1_000)
+        #expect(h.model.controlsVisible)
+    }
+
+    @Test func aTapStillWaitsBeforeHidingShownControls() async {
+        let h = PlayerHarness(status: .paused)
+        h.model.tap(x: 450, width: 900)
+        #expect(h.model.controlsVisible)
+        await h.time.advance(byMs: PlayerChromeModel.doubleTapMs - 1)
+        #expect(h.model.controlsVisible)
+        await h.time.advance(byMs: 1)
+        #expect(!h.model.controlsVisible)
+    }
+
+    @Test func aDoubleTapOnASideStillSeeksAndKeepsTheControlsItShowed() async {
+        let h = await hidden()
+        h.model.tap(x: 880, width: 915)
+        #expect(h.model.controlsVisible)
+        await h.time.advance(byMs: 120)
+        h.model.tap(x: 880, width: 915)
+        #expect(h.spy.calls.last == "seekBy 10000")
+        #expect(h.model.ripple?.label == "+10 s")
+        #expect(h.model.controlsVisible)
+        // A third tap carries the run on, without hiding anything.
+        await h.time.advance(byMs: 200)
+        h.model.tap(x: 880, width: 915)
+        #expect(h.model.ripple?.label == "+20 s")
+        await h.time.advance(byMs: PlayerChromeModel.doubleTapMs)
+        #expect(h.model.controlsVisible)
+    }
+
+    @Test func aDoubleTapInTheMiddleOfHiddenControlsShowsThemOnce() async {
+        let h = await hidden()
+        h.model.tap(x: 450, width: 915)
+        h.model.tap(x: 460, width: 915)
+        #expect(h.model.controlsVisible)
+        await h.time.advance(byMs: 1_000)
         #expect(h.model.controlsVisible)
         #expect(!h.spy.calls.contains { $0.hasPrefix("seekBy") })
     }

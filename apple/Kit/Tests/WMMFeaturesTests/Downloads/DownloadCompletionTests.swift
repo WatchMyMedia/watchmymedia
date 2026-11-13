@@ -254,10 +254,11 @@ import WMMModel
 
 @MainActor
 @Suite struct OfflinePlayerChoicesTests {
-    @Test func theCopyHasNoStreamingQualityControlsOrEffectiveQualityAction() {
+    @Test func theCopyHasNoStreamingQualityControlsOrEffectiveQualityAction() async {
         let h = PlayerHarness()
         h.spy.state.isOffline = true
         h.spy.state.quality = .auto
+        await h.time.settle()
         #expect(h.model.pickerTabs == [.audio, .subtitles])
         #expect(h.model.pickerTitle == "Audio and subtitles")
         h.model.openPicker(.quality)

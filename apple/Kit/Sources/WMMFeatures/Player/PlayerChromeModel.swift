@@ -12,6 +12,37 @@ public enum PlayerOverlay: Hashable, Sendable {
     case picker(PickerTab)
 }
 
+/// What changes as the video plays, about ten times a second: the position,
+/// the length (which grows while a recording records), how far is buffered,
+/// the subtitle cues on screen, Skip's auto-skip fill and the Next Episode
+/// countdown. Only the views that draw these read it (the scrubber, the
+/// times, the small progress line, the cues, Skip and the card's button), so
+/// a tick redraws them and not the whole player (PLAN-APPLE-REVIEW.md §4.3.3).
+/// Each value is set only when it changes.
+@MainActor
+@Observable
+public final class PlayerClock {
+    public fileprivate(set) var positionMs = 0
+    public fileprivate(set) var durationMs = 0
+    public fileprivate(set) var bufferedMs = 0
+    public fileprivate(set) var cues: [SubtitleCue] = []
+    /// Skip's fill in auto-delay mode, 0–1; nil otherwise.
+    public fileprivate(set) var skipProgress: Double?
+    /// The Next Episode countdown; nil when autoplay is off or the card is not up.
+    public fileprivate(set) var upNextCountdownMs: Int?
+
+    public init() {}
+
+    fileprivate func update(from s: PlayerState) {
+        if positionMs != s.positionMs { positionMs = s.positionMs }
+        if durationMs != s.durationMs { durationMs = s.durationMs }
+        if bufferedMs != s.bufferedMs { bufferedMs = s.bufferedMs }
+        if cues != s.cues { cues = s.cues }
+        if skipProgress != s.skip?.autoProgress { skipProgress = s.skip?.autoProgress }
+        if upNextCountdownMs != s.upNext?.countdownMs { upNextCountdownMs = s.upNext?.countdownMs }
+    }
+}
+
 /// The player screen's own state around a ``PlaybackController``: whether the
 /// controls show (they hide 3 s after the last touch while the video plays),
 /// taps and double taps on the video, the scrubber's preview while dragging
@@ -34,6 +65,16 @@ public final class PlayerChromeModel {
     public static let holdMs = 1_000
 
     public let controller: any PlaybackController
+    /// The controller's state without what ticks (see ``PlayerClock``): it
+    /// changes only when something else does, so the screen that reads it is
+    /// not rebuilt ten times a second. It follows the controller a moment
+    /// after each change. Its `positionMs`, `bufferedMs` and `cues` are zero
+    /// and empty, Skip's `autoProgress` nil and the card's `countdownMs` its
+    /// total; a recording that grows has a `durationMs` of zero. Read those
+    /// from ``clock``.
+    public private(set) var state = PlayerState()
+    /// What ticks.
+    public let clock = PlayerClock()
     /// What plays now: the request the screen opened with, or the next episode once it started in place.
     public private(set) var request: PlayRequest
     public private(set) var controlsVisible = true
@@ -73,6 +114,8 @@ public final class PlayerChromeModel {
     @ObservationIgnored private var lastTrickplay: Trickplay?
     @ObservationIgnored private var seeker = DoubleTapSeek()
     @ObservationIgnored private var pendingTapMs: Int?
+    /// The pending tap showed the controls itself, so its second tap doesn't toggle them.
+    @ObservationIgnored private var pendingTapShowed = false
     @ObservationIgnored private var resumeAfterPicker = false
     @ObservationIgnored private var awaitingDownload: String?
     @ObservationIgnored private var closedInBackground = false
@@ -105,11 +148,34 @@ public final class PlayerChromeModel {
         self.sleep = sleep ?? { try await Task.sleep(for: $0) }
     }
 
-    public var state: PlayerState { controller.state }
+    /// The controller's state now, for decisions (not for views: reading it follows every tick).
+    private var live: PlayerState { controller.state }
+
+    /// `s` without what ticks: what ``state`` holds.
+    public static func steady(_ s: PlayerState) -> PlayerState {
+        var steady = s
+        steady.positionMs = 0
+        steady.bufferedMs = 0
+        steady.cues = []
+        if s.growing != nil { steady.durationMs = 0 }
+        steady.skip?.autoProgress = nil
+        if let upNext = s.upNext, upNext.countdownMs != nil { steady.upNext?.countdownMs = upNext.totalMs }
+        return steady
+    }
+
+    /// Copies the controller's state into ``clock`` and, when more than what ticks changed, ``state``.
+    private func refresh() {
+        let s = live
+        clock.update(from: s)
+        let steady = Self.steady(s)
+        if steady != state { state = steady }
+    }
+
+    private static func pickerTabs(offline: Bool) -> [PickerTab] { offline ? [.audio, .subtitles] : PickerTab.allCases }
 
     /// The copy's quality is fixed when downloaded; changing a streaming
     /// preference cannot change its bytes or restart it at a new quality.
-    public var pickerTabs: [PickerTab] { state.isOffline ? [.audio, .subtitles] : PickerTab.allCases }
+    public var pickerTabs: [PickerTab] { Self.pickerTabs(offline: state.isOffline) }
     public var pickerTitle: String { state.isOffline ? "Audio and subtitles" : "Audio, subtitles and quality" }
 
     // MARK: - Lifecycle
@@ -157,7 +223,7 @@ public final class PlayerChromeModel {
     public func enteredBackground(externalPlayback: Bool = false, pictureInPictureMayStart: Bool = false) {
         guard !externalPlayback, !pictureInPictureActive, !closedInBackground, !disposed else { return }
         backgroundTask?.cancel()
-        guard pictureInPictureMayStart, isPlaying else { return closeInBackground() }
+        guard pictureInPictureMayStart, live.status == .playing || live.status == .buffering else { return closeInBackground() }
         let sleep = sleep
         backgroundTask = Task { [weak self] in
             do { try await sleep(.milliseconds(Self.pictureInPictureGraceMs)) } catch { return }
@@ -238,7 +304,7 @@ public final class PlayerChromeModel {
     /// Where the scrubber's thumb and the elapsed time are: the drag, a seek's target until the player gets there, or the player.
     public var shownPositionMs: Int {
         if let scrubMs { return scrubMs }
-        let position = state.positionMs
+        let position = clock.positionMs
         if let heldMs, abs(heldMs - position) >= 1_500 { return heldMs }
         return position
     }
@@ -256,14 +322,16 @@ public final class PlayerChromeModel {
     }
 
     private var autoHides: Bool {
-        Self.autoHides(status: state.status, scrubbing: scrubMs != nil, pickerOpen: picker != nil) && !pictureInPictureActive && !keepsControlsUp
+        Self.autoHides(status: live.status, scrubbing: scrubMs != nil, pickerOpen: picker != nil) && !pictureInPictureActive && !keepsControlsUp
     }
 
     // MARK: - Touches
 
-    /// A tap on the video at `x` across `width`: shows or hides the controls
-    /// once it is clear no second tap follows; a double tap on a side seeks
-    /// 10 s, and further taps there keep seeking (see ``DoubleTapSeek``).
+    /// A tap on the video at `x` across `width`: shows hidden controls at
+    /// once, and hides shown ones once it is clear no second tap follows; a
+    /// double tap on a side seeks 10 s, and further taps there keep seeking
+    /// (see ``DoubleTapSeek``). Controls the first tap showed stay up through
+    /// the seek.
     public func tap(x: Double, width: Double) {
         input()
         let t = now()
@@ -273,16 +341,23 @@ public final class PlayerChromeModel {
             return
         }
         if let first = pendingTapMs, t - first <= Self.doubleTapMs {
+            let showed = pendingTapShowed
             cancelPendingTap()
             if let delta = seeker.onDoubleTap(x: x, width: width, nowMs: t) {
                 seekByTaps(delta)
-            } else {
+            } else if !showed {
                 toggleControls()
             }
             return
         }
         cancelPendingTap()
         pendingTapMs = t
+        if !controlsVisible {
+            // Nothing a second tap does takes them away again: show them now.
+            pendingTapShowed = true
+            toggleControls()
+            return
+        }
         let sleep = sleep
         tapTask = Task { [weak self] in
             do { try await sleep(.milliseconds(Self.doubleTapMs)) } catch { return }
@@ -313,7 +388,7 @@ public final class PlayerChromeModel {
 
     public func seek(byMs delta: Int) {
         input()
-        hold(state.positionMs + delta)
+        hold(live.positionMs + delta)
         controller.seek(byMs: delta)
     }
 
@@ -326,7 +401,8 @@ public final class PlayerChromeModel {
     /// The viewer drags the scrubber (or holds it) at `x` across `width`: previews that position.
     public func scrub(x: Double, width: Double) {
         let starting = scrubMs == nil
-        scrubMs = min(position(atX: x, width: width, durationMs: state.timelineDurationMs), state.durationMs)
+        let s = live
+        scrubMs = min(position(atX: x, width: width, durationMs: s.timelineDurationMs), s.durationMs)
         input()
         if starting {
             refreshAutoHide()
@@ -355,7 +431,7 @@ public final class PlayerChromeModel {
     /// Cuts the tile under the thumb when the drag reaches another one; the
     /// last stays up until it is ready.
     private func updateScrubTile() {
-        guard let thumbnails, let t = state.trickplay, let ms = scrubMs, !scrubTileFailed else { return }
+        guard let thumbnails, let t = live.trickplay, let ms = scrubMs, !scrubTileFailed else { return }
         let index = t.tile(atMs: ms).index
         guard index != tileIndex else { return }
         tileIndex = index
@@ -378,8 +454,8 @@ public final class PlayerChromeModel {
     /// The sheet under the playhead, when the controls appear; the sheets
     /// either side of it when a scrub starts (its own comes with its tile).
     private func prefetchTiles(scrubbing: Bool) {
-        guard let thumbnails, let t = state.trickplay else { return }
-        let sheet = t.tile(atMs: scrubMs ?? state.positionMs).sheet
+        guard let thumbnails, let t = live.trickplay else { return }
+        let sheet = t.tile(atMs: scrubMs ?? live.positionMs).sheet
         if scrubbing {
             thumbnails.prefetch(t, sheet: sheet - 1)
             thumbnails.prefetch(t, sheet: sheet + 1)
@@ -425,17 +501,17 @@ public final class PlayerChromeModel {
 
     /// The compact sheet pauses playback; tablet side panels pass `false` to keep it playing.
     public func openPicker(_ tab: PickerTab, pausesPlayback: Bool = true) {
-        guard pickerTabs.contains(tab) else { return }
+        guard Self.pickerTabs(offline: live.isOffline).contains(tab) else { return }
         input()
         guard picker == nil else { return selectTab(tab) }
-        resumeAfterPicker = pausesPlayback && state.status == .playing
+        resumeAfterPicker = pausesPlayback && live.status == .playing
         if resumeAfterPicker { controller.pause() }
         picker = tab
         refreshAutoHide()
     }
 
     public func selectTab(_ tab: PickerTab) {
-        guard pickerTabs.contains(tab) else { return }
+        guard Self.pickerTabs(offline: live.isOffline).contains(tab) else { return }
         input()
         if picker != nil { picker = tab }
     }
@@ -463,7 +539,7 @@ public final class PlayerChromeModel {
     }
 
     public func pickQuality(_ quality: StreamQuality) {
-        guard !state.isOffline else { return }
+        guard !live.isOffline else { return }
         input()
         controller.selectQuality(quality)
         closePicker()
@@ -495,8 +571,9 @@ public final class PlayerChromeModel {
         switch event {
         case .exit:
             // An admin's stop shows its message first; Back leaves.
-            if state.stopMessage == nil { finish() }
+            if live.stopMessage == nil { finish() }
         case .startedNext(let fileID):
+            let state = live
             request = PlayRequest(
                 fileID: fileID, title: state.title, subtitle: state.subtitle,
                 backdropPath: state.backdropPath, stillPath: state.stillPath, posterPath: state.posterPath
@@ -526,7 +603,8 @@ public final class PlayerChromeModel {
     }
 
     private func stateChanged() {
-        let s = state
+        refresh()
+        let s = live
         if s.status != lastStatus {
             lastStatus = s.status
             refreshAutoHide()
@@ -542,7 +620,7 @@ public final class PlayerChromeModel {
     }
 
     private func downloadChanged() {
-        guard let id = awaitingDownload, let online = state.online, online.downloading == nil else { return }
+        guard let id = awaitingDownload, let online = live.online, online.downloading == nil else { return }
         awaitingDownload = nil
         let done = online.results.first { $0.id == id }?.trackID
         if done != nil, online.error == nil { closePicker() }
@@ -585,12 +663,13 @@ public final class PlayerChromeModel {
 
     private func cancelPendingTap() {
         pendingTapMs = nil
+        pendingTapShowed = false
         tapTask?.cancel()
         tapTask = nil
     }
 
     private func seekByTaps(_ delta: Int) {
-        hold(state.positionMs + delta)
+        hold(live.positionMs + delta)
         controller.seek(byMs: delta)
         ripple = seeker.burst
         rippleTask?.cancel()
@@ -603,7 +682,7 @@ public final class PlayerChromeModel {
     }
 
     private func hold(_ target: Int) {
-        heldMs = min(max(target, 0), max(state.durationMs, 0))
+        heldMs = min(max(target, 0), max(live.durationMs, 0))
         holdTask?.cancel()
         let sleep = sleep
         holdTask = Task { [weak self] in
