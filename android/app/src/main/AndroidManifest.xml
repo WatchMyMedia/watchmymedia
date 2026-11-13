@@ -43,10 +43,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WatchMyMedia">
 
-        <!-- Listed in both launchers; at launch it shows the TV or the phone UI. -->
+        <!-- Listed in both launchers; at launch it shows the TV or the phone UI. Compose takes
+             these changes in place (LocalConfiguration, LocalDensity, the layout direction), so the
+             activity is not recreated for them: a recreated activity ended the play and started
+             the route's first file again, as a font size change during picture-in-picture did. -->
         <activity
             android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|layoutDirection|locale"
             android:exported="true"
             android:launchMode="singleTask"
             android:supportsPictureInPicture="true"
