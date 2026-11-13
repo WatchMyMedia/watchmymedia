@@ -27,9 +27,8 @@ public final class MovieModel {
     @ObservationIgnored private let navigator: Navigator
     @ObservationIgnored private let device: String
     @ObservationIgnored private let downloads: (any DownloadRepository)?
-    @ObservationIgnored private var generation = 0
     @ObservationIgnored private let changes: ScreenChanges
-    @ObservationIgnored private let latest = LatestLoad()
+    @ObservationIgnored private let loads = LoadController<MovieDetail>()
 
     /// `device` names this device in how a version would play: "this phone", "this TV".
     /// With `downloads`, a downloaded movie's page opens with no server, and its marks wait for one (PLAN-DOWNLOADS.md §6).
@@ -185,14 +184,12 @@ public final class MovieModel {
 
     /// A load still running when another starts is cancelled.
     func load(quiet: Bool) async {
-        await latest.run { [weak self] in await self?.fetch(quiet: quiet) }
+        await loads.run { [weak self] load in await self?.fetch(load, quiet: quiet) }
     }
 
-    private func fetch(quiet: Bool) async {
-        generation += 1
-        let mine = generation
-        if !quiet || state.value == nil { state = .loading }
-        guard var result = await Loadable.run({ try await self.library.movie(id: self.movieID) }), mine == generation else { return }
+    private func fetch(_ load: LoadController<MovieDetail>.Load, quiet: Bool) async {
+        loads.begin(&state, quiet: quiet)
+        guard var result = await loads.fetch(load, { try await self.library.movie(id: self.movieID) }) else { return }
         if case .failed = result, let detail = held?.movieDetail() {
             // No server, but the movie is here: its page from the download.
             offline = true
@@ -200,7 +197,7 @@ public final class MovieModel {
             return
         }
         offline = false
-        if case .failed(let text) = result, quiet, state.value != nil {
+        if let text = loads.quietFailure(result, quiet: quiet, over: state) {
             message = text
             return
         }
@@ -214,6 +211,6 @@ public final class MovieModel {
         if let selectedVersionID, !movie.versions.contains(where: { $0.id == selectedVersionID }) { self.selectedVersionID = nil }
         // A version list without the play mode is still right, so this cannot fail the page.
         let found = await playback.plans(fileIDs: movie.versions.map(\.fileID))
-        if mine == generation { plans = found }
+        if loads.isCurrent(load) { plans = found }
     }
 }
