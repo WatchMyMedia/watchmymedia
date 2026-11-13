@@ -5,6 +5,34 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 1.4.3
+
+A fix for Home on Android TV, where the next row could come in with nothing on it highlighted,
+and two smaller fixes: one for playback preferences right after signing in, one for high bit
+rate films the server copies.
+
+- The server's database is the same as 1.4.2's, so updating needs no backup to go back.
+- On Android TV, pressing ◀ or ▶ just after ▼ on Home, while the next row was still sliding in,
+  could leave that row on screen with nothing highlighted. Its cards stayed small, and the next
+  ▼ only highlighted the row without moving on. The highlight now moves to the next row as soon
+  as you press ▼, and the screen follows it.
+- A quick ▶ or OK after ▼ now acts on the row coming in. Before, OK in that moment opened a
+  card from the row above. Back also works while a row is sliding in.
+- In the Android app, a play started right after signing in could use the default skip,
+  autoplay, audio and subtitle preferences in place of yours, when two requests for them
+  crossed. The app now asks for them one at a time.
+- The server could stop a film it was copying at a high bit rate from a fast disk as over its
+  share of the playback storage, in the moment before it trimmed what the player no longer
+  needed. It now trims first, and stops the play only when it is still over. This showed in a
+  test on busy build machines; no real play was reported stopping this way.
+- The server, the Docker image, the Mac app, the Windows app and the Android app are 1.4.3. The
+  Mac app and the Windows app of 1.4.2 offer the update under Check for updates. The iPhone,
+  iPad and Apple TV apps stay at 1.8.0 in the App Store; they have the same preferences fix
+  waiting for their next version there.
+- The Home fix has been tried in tests and on an Android emulator with key presses standing in
+  for a remote, not yet on a real TV. The preferences fix and the server fix have been tried
+  in tests only.
+
 ## 1.4.2
 
 A small release that hardens sign-in on servers using Cloudflare Turnstile, and moves the Unraid
