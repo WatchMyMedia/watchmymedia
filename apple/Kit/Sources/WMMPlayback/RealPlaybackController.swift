@@ -83,11 +83,6 @@ public final class RealPlaybackController: PlaybackController {
     @ObservationIgnored var localRoute: LocalRoute?
     @ObservationIgnored var playingLocally = false
 
-    enum Outgoing {
-        case report(ProgressReport, generation: Int)
-        case endSession(String)
-    }
-
     /// - Parameters:
     ///   - client: this device as the server sees it, read at every request (the name is editable).
     ///   - makePlayer: the player, made at the first ``start(_:)``.
@@ -593,12 +588,6 @@ public final class RealPlaybackController: PlaybackController {
         endUnused(d, of: v)
         if let switchGeneration, viewing === v, !v.stopped { v.failedGeneration = switchGeneration }
         return true
-    }
-
-    /// Ends `d`'s server session unless the viewing plays it, or keeps it to go back to.
-    func endUnused(_ d: PlaybackDecision, of v: Viewing) {
-        guard let id = d.sessionID, id != v.decision?.sessionID, id != v.pendingSwitch?.previous.sessionID else { return }
-        send(.endSession(id))
     }
 
     func apply(_ v: Viewing, _ d: PlaybackDecision, requestedStartMs: Int, playWhenReady: Bool = true, qualitySwitch: ProgressReply? = nil) {
@@ -1109,107 +1098,6 @@ public final class RealPlaybackController: PlaybackController {
 
     // MARK: - Heartbeats
 
-    func heartbeat(_ v: Viewing, _ status: PlayerStatus, _ pos: Int, _ buffered: Int, force: Bool) {
-        let s = playState(for: status)
-        guard force || heartbeatDue(s, lastReported: v.lastReported, sinceLastBeatMs: clock.elapsedMs - v.lastBeatAt, auto: asked == .auto) else { return }
-        report(v, s, pos, buffered)
-    }
-
-    /// Queues a heartbeat; false when none may be sent.
-    @discardableResult
-    func report(_ v: Viewing, _ playState: PlayState, _ pos: Int, _ buffered: Int) -> Bool {
-        guard let d = v.decision, let playID = v.playID, !v.stopped, !v.adminStopped else { return false }
-        // After "closed", nothing but the final "stopped" until the app is back.
-        if backgrounded && playState != .closed && playState != .stopped { return false }
-        v.lastReported = playState
-        v.lastBeatAt = clock.elapsedMs
-        let position = v.finished ? duration(v, d) : pos
-        let now = clock.elapsedMs
-        let transfer = media?.transfer
-        send(.report(ProgressReport(
-            fileID: v.request.fileID, positionMs: position, durationMs: duration(v, d), playID: playID, state: playState, bufferedMs: buffered,
-            throughputBps: transfer?.bps ?? media?.throughputBps,
-            throughputAgeMs: transfer?.ageMs,
-            switchGeneration: playState == .playing ? v.acceptedGeneration : nil,
-            switchFailedGeneration: v.failedGeneration,
-            stalls: v.measure.stalls, stallMs: v.measure.stallMs(at: now), startupMs: v.measure.takeStartup(), recordingID: v.request.recordingID
-        ), generation: v.generation))
-        return true
-    }
-
-    func send(_ message: Outgoing) {
-        Self.enqueue(message, into: &outbox, behindDelivery: sending)
-        guard !delivering else { return }
-        delivering = true
-        // Holds the controller until the queue is empty, so the last reports go out after release.
-        launch { [self] in
-            while !outbox.isEmpty {
-                let next = outbox.removeFirst()
-                sending = true
-                await deliver(next)
-                sending = false
-            }
-            delivering = false
-            endHold?()
-            endHold = nil
-        }
-    }
-
-    /// Adds `message` to the queue. While the server can't be reached each
-    /// report waits for its time-out (`behindDelivery`: one is out), so a
-    /// progress report replaces the one of the same viewing still waiting:
-    /// only the newest position is worth sending (PLAN-APPLE-REVIEW.md
-    /// §3.1.4). Stops, "closed", session ends and reports that acknowledge or
-    /// refuse a quality switch are never dropped, and the rest keep their
-    /// order. A dropped report's startup time goes with its replacement.
-    static func enqueue(_ message: Outgoing, into outbox: inout [Outgoing], behindDelivery: Bool = true) {
-        guard behindDelivery, case .report(var new, let generation) = message, new.isProgress else {
-            outbox.append(message)
-            return
-        }
-        outbox.removeAll { queued in
-            guard case let .report(old, g) = queued, g == generation, old.isProgress,
-                  old.switchGeneration == nil || old.switchGeneration == new.switchGeneration,
-                  old.switchFailedGeneration == nil || old.switchFailedGeneration == new.switchFailedGeneration
-            else { return false }
-            if new.startupMs == nil { new.startupMs = old.startupMs }
-            return true
-        }
-        outbox.append(.report(new, generation: generation))
-    }
-
-    func deliver(_ message: Outgoing) async {
-        switch message {
-        case let .report(report, generation):
-            guard let reply = await attempt("send a heartbeat", { try await gateway.reportProgress(report) }) else { return }
-            onReply(generation, report, reply)
-        case let .endSession(id):
-            _ = await attempt("stop the session") { try await gateway.stopSession(id) }
-        }
-    }
-
-    func onReply(_ generation: Int, _ report: ProgressReport, _ reply: ProgressReply) {
-        guard let v = viewing, v.generation == generation else { return }
-        if let acknowledged = report.switchGeneration, acknowledged == v.acceptedGeneration {
-            if let pending = v.pendingSwitch, let current = v.decision { endReplacedSession(pending.previous, current) }
-            v.acceptedGeneration = nil
-            v.pendingSwitch = nil
-            if let message = v.stepMessage { showNote(v, message) }
-            v.stepMessage = nil
-            refresh(0)
-        }
-        if let failed = report.switchFailedGeneration, failed == v.failedGeneration { v.failedGeneration = nil }
-        if reply.completed { v.watched = true }
-        guard !v.stopped else { return }
-        // The play had ended (timed out, server restarted): the server carries on with a new one.
-        if let id = reply.newPlayID { v.playID = id }
-        if let message = reply.stopMessage {
-            adminStop(v, message)
-        } else if let step = reply.lowerTo {
-            changeStep(v, to: step, reply: reply)
-        }
-    }
-
     /// Automatic's negotiated step change: the same play again here, still
     /// at Automatic. The saved default quality stays as it is.
     func changeStep(_ v: Viewing, to step: StreamQuality, reply: ProgressReply) {
@@ -1325,11 +1213,6 @@ public final class RealPlaybackController: PlaybackController {
         return min(max(raw, 0), duration(v, d))
     }
 
-    func endReplacedSession(_ old: PlaybackDecision, _ new: PlaybackDecision) {
-        guard let id = old.sessionID, id != new.sessionID else { return }
-        send(.endSession(id))
-    }
-
     func attempt<T>(_ what: String, _ body: () async throws -> T) async -> T? {
         do {
             return try await body()
@@ -1360,9 +1243,4 @@ public final class RealPlaybackController: PlaybackController {
             await task.value
         }
     }
-}
-
-private extension ProgressReport {
-    /// Where the play is, which a newer report of the same viewing says better.
-    var isProgress: Bool { state == .playing || state == .paused || state == .buffering }
 }
