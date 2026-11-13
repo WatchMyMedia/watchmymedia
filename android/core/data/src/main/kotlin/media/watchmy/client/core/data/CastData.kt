@@ -1,5 +1,6 @@
 package media.watchmy.client.core.data
 
+import media.watchmy.client.model.ServerFeatures
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -36,6 +37,9 @@ internal interface ServerAccess {
 
     /** The server's API level as last read, which decides what a request may carry. */
     fun apiLevel(): Int
+
+    /** What the server offers at [apiLevel]. */
+    fun features(): ServerFeatures = ServerFeatures(apiLevel())
 }
 
 /** As this device's signed-in user, on the server in use. */
@@ -101,13 +105,13 @@ internal fun castImageUrl(baseUrl: String, token: String, path: String?, size: I
 /** A sender's server calls: whether the server in use can cast, and a token for the TV. */
 internal class RealCastGateway(private val store: LocalStore, private val http: Http) : CastGateway {
     override suspend fun liveAutomaticAvailable(): Boolean =
-        http.apiLevel() >= media.watchmy.client.model.LIVE_AUTOMATIC_API_LEVEL &&
+        http.features().liveAutomatic &&
             http.signedIn { base, client -> LiveTvApi(base, client).getLiveTVCapabilities() }.automatic == true
 
     override suspend fun castServer(): CastServer? {
         val base = store.session()?.server?.baseUrl ?: return null
         val info = Http.call(signedIn = false) { SystemApi(base, http.probeClient).getServer() }
-        return CastServer(info.id, base, casting = info.apiLevel >= CAST_API_LEVEL && info.casting == true)
+        return CastServer(info.id, base, casting = ServerFeatures(info.apiLevel.toInt()).castTokens && info.casting == true)
     }
 
     override suspend fun castToken(): CastToken {
@@ -117,7 +121,7 @@ internal class RealCastGateway(private val store: LocalStore, private val http: 
 
     companion object {
         /** The API level that brought cast tokens. */
-        const val CAST_API_LEVEL = 2
+        const val CAST_API_LEVEL = media.watchmy.client.model.CAST_API_LEVEL
     }
 }
 

@@ -1,8 +1,8 @@
 package media.watchmy.client.core.data
 
+import media.watchmy.client.model.ServerFeatures
 import media.watchmy.client.core.api.apis.LiveTvApi
 import media.watchmy.client.model.GrowingRecording
-import media.watchmy.client.model.LIVE_RECORDING_API_LEVEL
 import media.watchmy.client.core.api.apis.AuthApi
 import media.watchmy.client.core.api.apis.PlaybackApi
 import media.watchmy.client.core.api.apis.WatchApi
@@ -33,13 +33,9 @@ import media.watchmy.client.model.QualityChange
 import media.watchmy.client.model.StreamProtocol
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleRequestMode
-import media.watchmy.client.model.SUBTITLE_PREFERENCES_API_LEVEL
 import media.watchmy.client.core.api.models.AutomaticSubtitleInputBody
-import media.watchmy.client.model.TRICKPLAY_API_LEVEL
 import media.watchmy.client.model.Trickplay
 import java.net.URLEncoder
-
-private const val AUTO_RECOVERY_API_LEVEL = 24
 
 /**
  * The player's server calls. URLs come back absolute and without a token;
@@ -60,34 +56,36 @@ internal class RealPlaybackGateway(
         return RealPlaybackGateway(fixed, deviceName, deviceId, { signedInMediaToken(fixed) }, onlineSubtitles)
     }
     override suspend fun decide(request: DecisionRequest): PlaybackDecision {
+        val features = server.features()
         val body = Request(
             profile = request.profile.forApiLevel(server.apiLevel()).narrowedTo(request.quality).toApi(),
             audioIndex = request.audioIndex?.toLong(), burnIn = request.burnIn.takeIf { it }, client = request.client.current().toApi(),
             playId = request.playId, playlist = if (request.vod && request.recordingId == null) Request.Playlist.vod else null,
             quality = request.quality.id, startMs = request.startMs?.coerceAtLeast(0), subtitleId = request.subtitleId,
-            autoRecovery = request.autoRecovery.takeIf { it && request.quality == StreamQuality.Auto && request.recordingId == null && server.apiLevel() >= AUTO_RECOVERY_API_LEVEL },
-            switchGeneration = request.switchGeneration?.takeIf { request.autoRecovery && server.apiLevel() >= AUTO_RECOVERY_API_LEVEL },
-            subtitleMode = request.subtitleMode.takeIf { server.apiLevel() >= SUBTITLE_PREFERENCES_API_LEVEL }?.let {
+            autoRecovery = request.autoRecovery.takeIf { it && request.quality == StreamQuality.Auto && request.recordingId == null && features.autoRecovery },
+            switchGeneration = request.switchGeneration?.takeIf { request.autoRecovery && features.autoRecovery },
+            subtitleMode = request.subtitleMode.takeIf { features.subtitlePreferences }?.let {
                 if (it == SubtitleRequestMode.Off) Request.SubtitleMode.off else Request.SubtitleMode.auto
             },
         )
         val recordingId = request.recordingId
-        if (recordingId != null && server.apiLevel() < LIVE_RECORDING_API_LEVEL) throw ApiException(404, "Recording playback needs a newer server.")
+        if (recordingId != null && !features.liveRecordings) throw ApiException(404, "Recording playback needs a newer server.")
         val (base, reply) = server.call { base, client ->
             base to if (recordingId != null) LiveTvApi(base, client).startLiveTVRecordingPlayback(recordingId, body)
             else PlaybackApi(base, client).startPlayback(request.fileId, body)
         }
-        return reply.toModel(base, server.apiLevel(), sheetToken = (server as? CastTokenAccess)?.token)
+        return reply.toModel(base, server.features(), sheetToken = (server as? CastTokenAccess)?.token)
     }
 
     override suspend fun reportProgress(report: ProgressReport): ProgressReply {
+        val recovery = server.features().autoRecovery
         val body = ProgressInputBody(
             positionMs = report.positionMs.coerceAtLeast(0), bufferedMs = report.bufferedMs.coerceAtLeast(0),
             durationMs = report.durationMs.coerceAtLeast(0), playId = report.playId?.takeIf { PLAY_ID.matches(it) },
             state = report.state.toApi(), throughputBps = report.throughputBps?.takeIf { it > 0 },
-            throughputAgeMs = report.throughputAgeMs?.takeIf { server.apiLevel() >= AUTO_RECOVERY_API_LEVEL && it >= 0 },
-            switchGeneration = report.switchGeneration?.takeIf { server.apiLevel() >= AUTO_RECOVERY_API_LEVEL && it > 0 },
-            switchFailedGeneration = report.switchFailedGeneration?.takeIf { server.apiLevel() >= AUTO_RECOVERY_API_LEVEL && it > 0 },
+            throughputAgeMs = report.throughputAgeMs?.takeIf { recovery && it >= 0 },
+            switchGeneration = report.switchGeneration?.takeIf { recovery && it > 0 },
+            switchFailedGeneration = report.switchFailedGeneration?.takeIf { recovery && it > 0 },
             stalls = report.stalls?.toLong()?.coerceAtLeast(0), stallMs = report.stallMs?.coerceAtLeast(0), startupMs = report.startupMs?.takeIf { it > 0 },
         )
         val recordingId = report.recordingId
@@ -104,7 +102,7 @@ internal class RealPlaybackGateway(
             stopMessage = stop?.let { it.message?.takeIf { m -> m.isNotBlank() } ?: "Playback was stopped by the server's admin." },
             newPlayId = reply.playId?.takeIf { it.isNotBlank() && it != report.playId },
             qualityChange = step?.takeIf { it != StreamQuality.Auto }?.let { QualityChange(it, directive.message?.takeIf { m -> m.isNotBlank() },
-                directive.generation?.takeIf { server.apiLevel() >= AUTO_RECOVERY_API_LEVEL && it > 0 }) },
+                directive.generation?.takeIf { recovery && it > 0 }) },
         )
     }
 
@@ -147,13 +145,13 @@ internal class RealPlaybackGateway(
         server.call { base, client -> PlaybackApi(base, client).downloadSubtitle(fileId, DownloadSubtitleInputBody(resultId = resultId)) }.id
 
     override suspend fun automaticSubtitle(fileId: Long, playId: String): DecisionSubtitle? {
-        if (!onlineSubtitles || server.apiLevel() < SUBTITLE_PREFERENCES_API_LEVEL) return null
+        if (!onlineSubtitles || !server.features().subtitlePreferences) return null
         val (base, reply) = server.call { base, client -> base to PlaybackApi(base, client).automaticSubtitle(fileId, AutomaticSubtitleInputBody(playId = playId)) }
         return reply.track?.let { s -> DecisionSubtitle(s.toOption(), s.format.value, s.url?.takeIf { it.isNotBlank() }?.let { absolute(base, it) }) }
     }
 
     override suspend fun cancelAutomaticSubtitle(fileId: Long, playId: String) {
-        if (!onlineSubtitles || server.apiLevel() < SUBTITLE_PREFERENCES_API_LEVEL) return
+        if (!onlineSubtitles || !server.features().subtitlePreferences) return
         server.call { base, client -> PlaybackApi(base, client).automaticSubtitle(fileId, AutomaticSubtitleInputBody(playId = playId, cancel = true)) }
     }
 
@@ -218,11 +216,11 @@ internal class RealPlaybackGateway(
 
         /**
          * The decision, with its URLs made absolute on [base]. Seek thumbnails
-         * come from a server at [apiLevel] [TRICKPLAY_API_LEVEL] or later; a
-         * cast's sheets carry its [sheetToken], as the image loader signs in
-         * only to this device's own server.
+         * come from a server whose [features] have them; a cast's sheets carry
+         * its [sheetToken], as the image loader signs in only to this device's
+         * own server.
          */
-        fun Decision.toModel(base: String, apiLevel: Int, sheetToken: String? = null): PlaybackDecision {
+        fun Decision.toModel(base: String, features: ServerFeatures, sheetToken: String? = null): PlaybackDecision {
             val protocol = when (protocol) {
                 Decision.Protocol.file -> StreamProtocol.File
                 Decision.Protocol.hls -> StreamProtocol.Hls
@@ -260,10 +258,10 @@ internal class RealPlaybackGateway(
                 video = video.toModel(),
                 autoStep = auto?.step?.let { StreamQuality.byId(it.value) },
                 bitrate = bitrate?.coerceAtLeast(0) ?: 0,
-                trickplay = trickplay?.takeIf { apiLevel >= TRICKPLAY_API_LEVEL }?.toModel(base, sheetToken),
+                trickplay = trickplay?.takeIf { features.trickplay }?.toModel(base, sheetToken),
                 subtitleId = subtitleId,
-                subtitlePreferencesSupported = apiLevel >= SUBTITLE_PREFERENCES_API_LEVEL,
-                growing = growing?.takeIf { apiLevel >= LIVE_RECORDING_API_LEVEL && playlist == Decision.Playlist.event }?.let {
+                subtitlePreferencesSupported = features.subtitlePreferences,
+                growing = growing?.takeIf { features.liveRecordings && playlist == Decision.Playlist.event }?.let {
                     val start = epochMs(it.startedAt)
                     val end = epochMs(it.endsAt)
                     if (start != null && end != null && end > start) GrowingRecording(start, end) else null

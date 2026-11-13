@@ -40,12 +40,12 @@ internal class RealLibraryRepository(
 
     /** arranged=true only from [ROWS_API_LEVEL]: an older server sends its fixed rows. */
     override suspend fun arrangedHome(): HomeData {
-        if (http.apiLevel() < ROWS_API_LEVEL) return home()
+        if (!http.features().rows) return home()
         return http.signedIn { base, client -> browse(base, client).getHome(arranged = true) }.toModel(arranged = true)
     }
 
     override suspend fun libraryRows(libraryId: Long): List<ScreenRow> {
-        if (http.apiLevel() < ROWS_API_LEVEL) return emptyList()
+        if (!http.features().rows) return emptyList()
         return http.signedIn { base, client -> browse(base, client).getLibraryRows(libraryId, arranged = true) }.rows.toRows()
     }
 

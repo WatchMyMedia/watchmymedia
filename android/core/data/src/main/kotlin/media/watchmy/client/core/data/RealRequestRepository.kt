@@ -1,5 +1,6 @@
 package media.watchmy.client.core.data
 
+import media.watchmy.client.model.ServerFeatures
 import kotlinx.coroutines.flow.Flow
 import media.watchmy.client.core.api.apis.DeleteApi
 import media.watchmy.client.core.api.apis.RequestsApi
@@ -57,9 +58,9 @@ internal class RealRequestRepository(
     private val http: Http,
     events: ServerEvents,
 ) : RequestRepository {
-    private fun level() = store.current.value?.server?.apiLevel ?: 0
+    private fun features() = ServerFeatures(store.current.value?.server?.apiLevel ?: 0)
 
-    private fun supported() = level() >= REQUESTS_API_LEVEL
+    private fun supported() = features().requests
 
     private suspend fun <T> api(block: suspend (RequestsApi) -> T): T = http.signedIn { base, client -> block(RequestsApi(base, client)) }
 
@@ -88,7 +89,7 @@ internal class RealRequestRepository(
         }
         val canOpenInbox = reply.manage || status?.let { it.adminAllowed && it.user?.isAdmin == true } == true
         // Below level 6 members can't delete, whatever a reply says, so nothing offers it.
-        return reply.toModel().copy(canOpenInbox = canOpenInbox, delete = reply.delete == true && level() >= DELETE_API_LEVEL)
+        return reply.toModel().copy(canOpenInbox = canOpenInbox, delete = reply.delete == true && features().delete)
     }
 
     override suspend fun search(text: String): List<Requestable> {
@@ -155,7 +156,7 @@ internal class RealRequestRepository(
     override suspend fun deleteEpisode(episodeId: Long, connections: List<Long>): DeleteOutcome = deleteEpisode(episodeId, connections, recordAgain = false)
 
     override suspend fun deleteEpisode(episodeId: Long, connections: List<Long>, recordAgain: Boolean): DeleteOutcome =
-        DeleteOptions(connections = connections, recordAgain = recordAgain.takeIf { http.apiLevel() >= media.watchmy.client.model.LIVE_RECORDING_API_LEVEL }).let { options ->
+        DeleteOptions(connections = connections, recordAgain = recordAgain.takeIf { http.features().liveRecordings }).let { options ->
             http.signedIn { base, client -> DeleteApi(base, client).deleteEpisode(episodeId, options) }.toModel()
         }
 

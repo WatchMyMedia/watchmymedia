@@ -1,5 +1,6 @@
 package media.watchmy.client.core.data
 
+import media.watchmy.client.model.ServerFeatures
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
@@ -15,7 +16,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import media.watchmy.client.model.AUTO_API_LEVEL
 import media.watchmy.client.model.AuthRepository
 import media.watchmy.client.model.CastGateway
 import media.watchmy.client.model.ClientInfo
@@ -125,7 +125,7 @@ class DataServices internal constructor(
     fun castPlayback(server: ReachedServer, token: String, expiresAtMs: Long, quality: StreamQuality?): CastPlayback {
         val access = CastTokenAccess(server.baseUrl.trimEnd('/'), http, token, expiresAtMs, server.apiLevel)
         val gateway = RealPlaybackGateway(access, { store.deviceName.value }, { deviceId }, access::renew, onlineSubtitles = false)
-        val auto = server.apiLevel >= AUTO_API_LEVEL
+        val auto = ServerFeatures(server.apiLevel).automaticQuality
         return CastPlayback(gateway, CastPreferences(access, preferencesRepository, quality, auto)) { path -> castImageUrl(access.baseUrl, access.token, path) }
     }
 

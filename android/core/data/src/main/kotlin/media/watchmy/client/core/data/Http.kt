@@ -1,5 +1,6 @@
 package media.watchmy.client.core.data
 
+import media.watchmy.client.model.ServerFeatures
 import android.util.Log
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -93,6 +94,9 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
 
     /** The current server's API level as last read; 0 before one is chosen. */
     fun apiLevel(): Int = store.session()?.server?.apiLevel ?: 0
+
+    /** What the current server offers, by its level as last read. */
+    fun features(): ServerFeatures = ServerFeatures(apiLevel())
 
     /**
      * Access to the saved server [serverId] as [userId], whether or not it is

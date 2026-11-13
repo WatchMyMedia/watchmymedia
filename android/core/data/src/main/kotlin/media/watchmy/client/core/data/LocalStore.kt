@@ -1,5 +1,6 @@
 package media.watchmy.client.core.data
 
+import media.watchmy.client.model.ServerFeatures
 import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -22,7 +23,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import media.watchmy.client.model.AUTO_API_LEVEL
 import media.watchmy.client.model.AudioPassthrough
 import media.watchmy.client.model.DevicePlayback
 import media.watchmy.client.model.SavedServer
@@ -337,7 +337,7 @@ internal class LocalStore(
         return if (saved == StreamQuality.Auto && !autoQuality(s)) StreamQuality.Original else saved
     }
 
-    private fun autoQuality(s: Stored) = (s.current?.apiLevel ?: 0) >= AUTO_API_LEVEL
+    private fun autoQuality(s: Stored) = ServerFeatures(s.current?.apiLevel ?: 0).automaticQuality
 
     /** What a value this app doesn't know reads as: the default. */
     private fun device(s: Stored): DevicePlayback {
