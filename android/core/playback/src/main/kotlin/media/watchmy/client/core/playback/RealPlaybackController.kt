@@ -138,6 +138,10 @@ class RealPlaybackController(
     private var released = false
 
     private var loadJob: Job? = null
+    private var renewing: Job? = null
+
+    /** A failed renewal waits until then before the next try. */
+    private var renewAfter = 0L
 
     private val outbox = Channel<Outgoing>(Channel.UNLIMITED)
 
@@ -472,6 +476,7 @@ class RealPlaybackController(
             scope.launch { attempt("load preferences") { preferences.refresh() }; preferencesReady = true }
         }
         // Every play gets a fresh media token (PLAN-CLIENTS.md §2.2).
+        renewing?.cancel()
         tokens.forget()
         quality = choice.current()
         _state.value = PlayerUiState(
@@ -674,6 +679,8 @@ class RealPlaybackController(
         v.startupSent = false
         if (qualitySwitch?.generation == null) noteStepChange(v, previous, d)
         val token = tokens.token
+        // The stream's further requests carry this token, and a renewed one after it.
+        token?.let { media?.updateMediaToken(it) }
         host.load(
             PlayerSource(
                 url = token?.signing(d.url) ?: d.url,
@@ -1042,8 +1049,28 @@ class RealPlaybackController(
             action == SkipAction.AutoDelay && v.fillMs >= AUTO_DELAY_MS -> skipSegment(v, segment!!)
             v.countdownMs == 0L -> autoAdvance(v)
             !v.loading && tokens.due && status != PlayerStatus.Ended && status != PlayerStatus.Error ->
-                // The play outlived its media token: a new one, and a new session here.
-                reload(v)
+                // The play is outliving its media token: a new one on the stream's further requests, without a reload.
+                renewToken()
+        }
+    }
+
+    /**
+     * Renews the media token in place, as Live TV does: the player puts the
+     * new one on the playlists, segments and file ranges it fetches from now
+     * on, so the stream plays on in the same session. A failure tries again
+     * after [TOKEN_RETRY_MS]; a stream refused meanwhile recovers as any 401.
+     */
+    private fun renewToken() {
+        if (renewing?.isActive == true || clock.elapsedMs() < renewAfter) return
+        renewing = scope.launch {
+            val fresh = attempt("renew the media token") { withContext(io) { gateway.mediaToken() } }
+            if (fresh == null) {
+                renewAfter = clock.elapsedMs() + TOKEN_RETRY_MS
+                return@launch
+            }
+            if (released) return@launch
+            tokens.accept(fresh)
+            media?.updateMediaToken(fresh)
         }
     }
 
@@ -1337,6 +1364,7 @@ class RealPlaybackController(
     private companion object {
         const val TAG = "WmmPlayback"
         const val NOTE_MS = 5_000L
+        const val TOKEN_RETRY_MS = 30_000L
         const val MAX_RECOVERIES = 2
         const val RECOVERY_RESET_MS = 60_000L
         const val EVENT_START_TOLERANCE_MS = 15_000L

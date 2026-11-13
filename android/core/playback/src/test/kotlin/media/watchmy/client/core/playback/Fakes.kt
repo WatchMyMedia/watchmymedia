@@ -95,7 +95,15 @@ class FakeGateway(private val clock: Clock) : PlaybackGateway {
         return reply(report)
     }
 
-    override suspend fun mediaToken(): MediaToken = MediaToken("tok${++tokens}", clock.wallMs() + tokenLifetimeMs, serverUrl = "http://srv")
+    /** Set, token requests fail with it. */
+    var tokenError: Exception? = null
+    var tokenCalls = 0
+
+    override suspend fun mediaToken(): MediaToken {
+        tokenCalls++
+        tokenError?.let { throw it }
+        return MediaToken("tok${++tokens}", clock.wallMs() + tokenLifetimeMs, serverUrl = "http://srv")
+    }
 
     override suspend fun stopSession(sessionId: String) {
         stoppedSessions += sessionId
