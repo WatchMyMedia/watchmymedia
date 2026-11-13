@@ -82,6 +82,24 @@ final class Router: Sendable {
     }
 }
 
+/// Keeps a stub server's reply waiting until the test releases it.
+actor ReplyGate {
+    private var open = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        if open { return }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    func release() {
+        open = true
+        let all = waiting
+        waiting.removeAll()
+        for waiter in all { waiter.resume() }
+    }
+}
+
 /// A clock tests move by hand.
 final class TestClock: Sendable {
     private let value = Mutex(Date(timeIntervalSince1970: 1_800_000_000))

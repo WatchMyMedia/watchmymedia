@@ -25,12 +25,31 @@ final class RealPreferencesRepository: PreferencesRepository {
     /// Writes leave in user-action order, so a delayed update cannot
     /// overwrite a newer choice on the server.
     @ObservationIgnored private var writeTail: Task<Void, Never>?
+    /// One load at a time. Two at once each sent a request, and the one
+    /// answered first left its reply unused because the other had started
+    /// after it: it returned with nothing loaded, to a caller (the player,
+    /// before its first play, beside the load each sign-in starts) that then
+    /// read the defaults. A load waiting here starts once the one before it
+    /// has applied its reply, so each returns with what it loaded in place.
+    @ObservationIgnored private var loadTail: Task<Void, Never>?
 
     init(store: LocalStore) {
         self.store = store
     }
 
     func refresh() async throws {
+        let prior = loadTail
+        let loading = Task { @MainActor in
+            await prior?.value
+            try Task.checkCancellation()
+            try await self.load()
+        }
+        loadTail = Task { _ = await loading.result }
+        // The caller giving up ends its own load, as it did when the request was the caller's.
+        try await withTaskCancellationHandler { try await loading.value } onCancel: { loading.cancel() }
+    }
+
+    private func load() async throws {
         let mine: Int?
         if unanswered.isEmpty {
             generation += 1
@@ -100,6 +119,8 @@ final class RealPreferencesRepository: PreferencesRepository {
         generation += 1
         unanswered.removeAll()
         writeTail = nil
+        // The next account's load doesn't wait for the last one's, whose reply no longer applies.
+        loadTail = nil
         playback = PlaybackPreferences()
     }
 
