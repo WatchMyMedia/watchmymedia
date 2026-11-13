@@ -15,6 +15,8 @@ protocol PlayerShellModel: AnyObject {
     func becameActive()
     func pictureInPictureChanged(active: Bool, appActive: Bool)
     func close()
+    /// A hardware keyboard's key; false when the player doesn't take it now.
+    func handle(_ key: PlayerKey) -> Bool
 }
 
 extension PlayerChromeModel: PlayerShellModel {
@@ -23,6 +25,44 @@ extension PlayerChromeModel: PlayerShellModel {
 
 extension LivePlayerModel: PlayerShellModel {
     var shellPlayer: AVPlayer? { controller.player }
+}
+
+/// The player on screen, for Escape (``EscapeKeyCommand``).
+@MainActor
+enum PlayerEscape {
+    static weak var current: (any PlayerShellModel)?
+
+    /// True when a player took it.
+    static func press() -> Bool { current?.handle(.escape) ?? false }
+}
+
+/// Adds Escape, ahead of the system's own use of it, to the view controller
+/// the player is presented in, so it reaches the player wherever the
+/// keyboard's focus is inside it.
+private struct EscapeKeyCommand: UIViewRepresentable {
+    func makeUIView(context: Context) -> InstallerView { InstallerView() }
+    func updateUIView(_ view: InstallerView, context: Context) {}
+
+    final class InstallerView: UIView {
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            guard window != nil else { return }
+            var responder: UIResponder? = self
+            while let r = responder, !(r is UIViewController) { responder = r.next }
+            guard let controller = responder as? UIViewController,
+                  !(controller.keyCommands ?? []).contains(where: { $0.action == #selector(UIResponder.wmmPlayerEscape) }) else { return }
+            let escape = UIKeyCommand(input: UIKeyCommand.inputEscape, modifierFlags: [], action: #selector(UIResponder.wmmPlayerEscape))
+            escape.wantsPriorityOverSystemBehavior = true
+            controller.addKeyCommand(escape)
+        }
+    }
+}
+
+extension UIResponder {
+    /// Escape in a player, sent up the responder chain from wherever the keyboard's focus is.
+    @objc func wmmPlayerEscape() {
+        MainActor.assumeIsolated { _ = PlayerEscape.press() }
+    }
 }
 
 /// Where the player's content lays itself out: the whole screen, the safe
@@ -52,7 +92,9 @@ struct PlayerFrame {
 /// and home indicator hidden, the iPhone turned while it shows, the scene
 /// phase and Picture in Picture passed to the model (which gives Picture in
 /// Picture its moment to start), the controls held up for VoiceOver, and
-/// Escape for VoiceOver's scrub. The content draws the video and its
+/// Escape for VoiceOver's scrub, and a hardware keyboard's keys (space,
+/// the arrows, Escape) passed to the model, which says what each does
+/// (PLAN-APPLE-REVIEW.md §6.3). The content draws the video and its
 /// controls, as its own boards draw them.
 struct PlayerShell<Content: View>: View {
     let model: any PlayerShellModel
@@ -60,6 +102,8 @@ struct PlayerShell<Content: View>: View {
     var orientations: UIInterfaceOrientationMask = .landscape
     @ViewBuilder let content: (PlayerFrame) -> Content
     @State private var pictureInPicture = PictureInPicture()
+    /// The shell holds the keyboard's focus, so its keys reach the player without a tap first.
+    @FocusState private var keyboardFocus: Bool
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
     @Environment(\.horizontalSizeClass) private var horizontal
@@ -98,6 +142,37 @@ struct PlayerShell<Content: View>: View {
         // There is nothing to tap blindly to bring the controls back.
         .onChange(of: voiceOver, initial: true) { _, on in model.controls.hold("voiceOver", on) }
         .accessibilityAction(.escape) { model.close() }
+        .focusable()
+        .focusEffectDisabled()
+        .focused($keyboardFocus)
+        .defaultFocus($keyboardFocus, true)
+        .onAppear { keyboardFocus = true }
+        // Once the cover has finished presenting, in case focus went elsewhere on the way.
+        .task {
+            try? await Task.sleep(for: .milliseconds(600))
+            keyboardFocus = true
+        }
+        .onKeyPress(keys: [.space, .leftArrow, .rightArrow, .upArrow, .downArrow], phases: .down) { press in
+            guard let key = Self.key(press.key) else { return .ignored }
+            return model.handle(key) ? .handled : .ignored
+        }
+        // Escape doesn't reach a key press handler (the keyboard's focus takes
+        // it): a key command on the player's own view controller passes it on.
+        .background(EscapeKeyCommand())
+        .onAppear { PlayerEscape.current = model }
+        .onDisappear { if PlayerEscape.current === model { PlayerEscape.current = nil } }
+    }
+
+    static func key(_ key: KeyEquivalent) -> PlayerKey? {
+        switch key {
+        case .space: .space
+        case .leftArrow: .left
+        case .rightArrow: .right
+        case .upArrow: .up
+        case .downArrow: .down
+        case .escape: .escape
+        default: nil
+        }
     }
 
     static func insets(safe: CGRect, full: CGRect) -> EdgeInsets {

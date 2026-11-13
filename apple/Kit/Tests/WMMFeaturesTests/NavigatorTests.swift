@@ -191,3 +191,21 @@ import WMMModel
         #expect(nav.playing?.fileID == 9101)
     }
 }
+
+@Suite @MainActor
+struct FindInSearchTests {
+    @Test func commandFOpensSearchWithTheFieldAskedForButNotOverAPlayer() {
+        let navigator = Navigator()
+        navigator.open(.movie(id: 500))
+        navigator.findInSearch()
+        #expect(navigator.tab == .search)
+        #expect(navigator.searchFieldRequested)
+        #expect(navigator.path(for: .home) == [.movie(id: 500)], "Home keeps its place")
+        navigator.searchFieldRequested = false
+        navigator.select(.home)
+        navigator.play(PlayRequest(fileID: 9101, title: "Harbor Lights"))
+        navigator.findInSearch()
+        #expect(navigator.tab == .home)
+        #expect(!navigator.searchFieldRequested)
+    }
+}

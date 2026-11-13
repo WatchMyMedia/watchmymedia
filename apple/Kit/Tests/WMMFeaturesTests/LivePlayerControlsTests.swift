@@ -124,3 +124,53 @@ struct LivePlayerControlsTests {
         h.model.dispose()
     }
 }
+
+/// Keys on a hardware keyboard in the Live TV player (PLAN-APPLE-REVIEW.md §6.3).
+@Suite @MainActor
+struct LivePlayerKeyTests {
+    private func model(onExit: @escaping @MainActor () -> Void = {}) async throws -> (LivePlayerModel, FakeLivePlaybackController, FakeLiveTVRepository) {
+        FakeLatency.duration = .zero
+        let repository = FakeLiveTVRepository(); try await repository.refresh()
+        let controller = FakeLivePlaybackController()
+        let model = LivePlayerModel(request: .init(channel: repository.channels[0]), repository: repository, controller: controller, onExit: onExit)
+        model.start()
+        return (model, controller, repository)
+    }
+
+    @Test func spacePausesAndUpAndDownChangeChannel() async throws {
+        let (model, _, repository) = try await model()
+        #expect(model.handle(.space))
+        #expect(model.state.status == .paused)
+        #expect(model.handle(.space))
+        #expect(model.state.status == .playing)
+        #expect(model.handle(.up))
+        #expect(model.state.channel?.id == repository.channels[1].id)
+        #expect(model.handle(.down))
+        #expect(model.state.channel?.id == repository.channels[0].id)
+        #expect(!model.handle(.left), "Live TV doesn't seek")
+        #expect(!model.handle(.right))
+        model.dispose()
+    }
+
+    @Test func escapeClosesChannelsFirstThenLeaves() async throws {
+        var exits = 0
+        let (model, _, _) = try await model(onExit: { exits += 1 })
+        model.toggleChannels()
+        #expect(model.handle(.escape))
+        #expect(!model.channelsOpen)
+        #expect(exits == 0)
+        #expect(model.handle(.escape))
+        #expect(exits == 1)
+    }
+
+    @Test func stoppedTakesNoTransportKeysAndSpaceAnswersStillWatching() async throws {
+        let (model, controller, _) = try await model()
+        controller.showStillWatching()
+        #expect(model.handle(.space))
+        #expect(!model.state.askStillWatching)
+        controller.showStopped(reason: "pause_expired")
+        #expect(!model.handle(.space))
+        #expect(!model.handle(.up))
+        model.dispose()
+    }
+}

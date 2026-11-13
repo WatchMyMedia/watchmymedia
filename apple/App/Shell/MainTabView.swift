@@ -122,8 +122,9 @@ struct MainTabView: View {
     }
 }
 
-/// What the tabs do besides showing: keeping where the person was for when
-/// the system evicts the app (PLAN-APPLE-REVIEW.md §6.3).
+/// What the tabs do besides showing: ⌘F for Search on a hardware keyboard,
+/// and keeping where the person was for when the system evicts the app
+/// (PLAN-APPLE-REVIEW.md §6.3).
 private struct TabShellKeys: ViewModifier {
     @Environment(Navigator.self) private var navigator
     @Environment(AppFlow.self) private var flow
@@ -132,6 +133,14 @@ private struct TabShellKeys: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .background {
+                Button("Search") { navigator.findInSearch() }
+                    .keyboardShortcut("f", modifiers: .command)
+                    .disabled(flow.serverSwitch != nil)
+                    .opacity(0)
+                    .frame(width: 0, height: 0)
+                    .accessibilityHidden(true)
+            }
             .onAppear { PlaceKeeping.restoreOnce(navigator, services: services) }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background, flow.serverSwitch == nil { PlaceKeeping.save(navigator, services: services) }

@@ -98,7 +98,19 @@ public final class Navigator {
     /// had it has gone.
     public var toast: String?
 
+    /// ⌘F asked for Search: the Search screen puts the cursor in its field, then clears this.
+    public var searchFieldRequested = false
+
     public init() {}
+
+    /// ⌘F on a hardware keyboard (PLAN-APPLE-REVIEW.md §6.3): the Search tab,
+    /// with the cursor in its field. Nothing while a player is open.
+    public func findInSearch() {
+        guard playbackPresentation == nil else { return }
+        liveIntent += 1
+        tab = .search
+        searchFieldRequested = true
+    }
 
     public func path(for tab: AppTab) -> [Route] { paths[tab] ?? [] }
 

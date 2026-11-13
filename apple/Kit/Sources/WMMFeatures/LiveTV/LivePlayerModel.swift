@@ -92,6 +92,34 @@ public final class LivePlayerModel {
     public func answerStillWatching(keepWatching: Bool) { input(); controller.answerStillWatching(keepWatching: keepWatching) }
     public func toggleChannels() { input(); channelsOpen.toggle() }
 
+    /// A key on a hardware keyboard: space plays or pauses (or answers Still
+    /// watching), up and down change channel as the chevrons do, Escape
+    /// closes Channels or leaves. Live TV has no seeking, so left and right
+    /// do nothing. False for a key it doesn't take now.
+    @discardableResult
+    public func handle(_ key: PlayerKey) -> Bool {
+        let s = state
+        let stopped = s.status == .stopped || s.status == .error
+        switch key {
+        case .escape:
+            if channelsOpen { input(); channelsOpen = false } else { close() }
+        case .space where s.askStillWatching:
+            answerStillWatching(keepWatching: true)
+        case .space where !stopped:
+            togglePlayPause()
+            showControls()
+        case .up where !stopped:
+            nextChannel()
+            showControls()
+        case .down where !stopped:
+            previousChannel()
+            showControls()
+        default:
+            return false
+        }
+        return true
+    }
+
     /// Follows the controller's state: the status and Still watching decide whether the controls may hide.
     private func observeState() {
         guard !disposed else { return }

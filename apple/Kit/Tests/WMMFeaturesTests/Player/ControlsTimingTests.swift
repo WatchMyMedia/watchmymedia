@@ -253,3 +253,50 @@ import WMMModel
         #expect(!h.spy.calls.contains { $0.hasPrefix("seekBy") })
     }
 }
+
+/// Keys on a hardware keyboard in the film player (PLAN-APPLE-REVIEW.md §6.3).
+@MainActor
+@Suite struct PlayerKeyTests {
+    @Test func spacePlaysAndPausesAndBringsTheControlsBack() async {
+        let h = PlayerHarness()
+        await h.time.advance(byMs: 3_000)
+        #expect(!h.model.controlsVisible)
+        #expect(h.model.handle(.space))
+        #expect(h.spy.calls.last == "pause")
+        #expect(h.model.controlsVisible)
+    }
+
+    @Test func leftAndRightSeekTenSeconds() {
+        let h = PlayerHarness()
+        #expect(h.model.handle(.right))
+        #expect(h.spy.calls.last == "seekBy 10000")
+        #expect(h.model.handle(.left))
+        #expect(h.spy.calls.last == "seekBy -10000")
+        #expect(h.model.shownPositionMs == 50_000)
+    }
+
+    @Test func upAndDownAreNotTheFilmPlayers() {
+        let h = PlayerHarness()
+        #expect(!h.model.handle(.up))
+        #expect(!h.model.handle(.down))
+    }
+
+    @Test func escapeClosesThePickerFirstThenLeaves() {
+        let h = PlayerHarness()
+        h.model.openPicker(.audio)
+        #expect(!h.model.handle(.space), "The picker keeps the video paused")
+        #expect(h.model.handle(.escape))
+        #expect(h.model.picker == nil)
+        #expect(h.exits.count == 0)
+        #expect(h.model.handle(.escape))
+        #expect(h.exits.count == 1)
+    }
+
+    @Test func spaceAnswersStillWatching() async {
+        let h = PlayerHarness()
+        h.spy.state.askStillWatching = true
+        await h.time.settle()
+        #expect(h.model.handle(.space))
+        #expect(h.spy.calls.contains("stillWatching true"))
+    }
+}

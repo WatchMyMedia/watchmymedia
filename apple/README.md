@@ -626,6 +626,16 @@ Picture in Picture or real-broadcast ad detection.
 What the iPhone and iPad apps take from the platform without a screen of
 their own (PLAN-APPLE-REVIEW.md §6.3):
 
+- **A hardware keyboard.** In either player, space plays or pauses (or
+  answers Still watching) and Escape closes the picker or Channels, then
+  leaves; in the film player left and right seek 10 s, in Live TV up and
+  down change channel. The rules are `PlayerChromeModel.handle(_:)` and
+  `LivePlayerModel.handle(_:)`; the apps have no volume or mute of their
+  own, so there is no M. Escape is a key command on the player's view
+  controller (`PlayerShell.swift`). ⌘F opens Search with the cursor in its
+  field (`Navigator.findInSearch()`). `UITests/KeyboardTests.swift` presses
+  space, the arrows and ⌘F on an iPad simulator; XCUITest's Escape never
+  reached the app there, so Escape needs a real keyboard.
 - **A pointer on iPad.** Cards (`CardButtonStyle`) lift and Search's and
   Settings' rows highlight under the pointer, as the system draws it.
 - **Coming back to where you were** (`App/Shell/PlaceKeeping.swift`,

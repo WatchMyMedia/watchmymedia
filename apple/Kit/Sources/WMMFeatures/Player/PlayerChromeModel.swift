@@ -43,6 +43,13 @@ public final class PlayerClock {
     }
 }
 
+/// A key on a hardware keyboard, as the players read it (PLAN-APPLE-REVIEW.md
+/// §6.3). The apps have no volume or mute of their own (the device's
+/// buttons do that), so there is no M.
+public enum PlayerKey: Hashable, Sendable {
+    case space, left, right, up, down, escape
+}
+
 /// Whether a player's controls show, for the film player and the Live TV
 /// player alike (PLAN-APPLE-REVIEW.md §5.3): they hide by themselves
 /// ``hideDelayMs`` after the last input while the owner's rule allows it,
@@ -431,6 +438,35 @@ public final class PlayerChromeModel {
 
     private var autoHides: Bool {
         Self.autoHides(status: live.status, scrubbing: scrubMs != nil, pickerOpen: picker != nil) && !pictureInPictureActive
+    }
+
+    // MARK: - Keys
+
+    /// A key on a hardware keyboard: space plays or pauses (or answers Still
+    /// watching), left and right seek 10 s with the controls up, Escape closes
+    /// the picker or leaves. False for a key the player doesn't take, or one
+    /// it doesn't take now (the can't-play and stopped states have their own
+    /// buttons; the picker its own list).
+    @discardableResult
+    public func handle(_ key: PlayerKey) -> Bool {
+        switch (key, overlay) {
+        case (.escape, .picker?):
+            input()
+            closePicker()
+        case (.escape, _):
+            close()
+        case (.space, .stillWatching?):
+            answerStillWatching(keepWatching: true)
+        case (.space, nil):
+            togglePlayPause()
+            showControls()
+        case (.left, nil), (.right, nil):
+            seek(byMs: key == .left ? -DoubleTapSeek.stepMs : DoubleTapSeek.stepMs)
+            showControls()
+        default:
+            return false
+        }
+        return true
     }
 
     // MARK: - Touches
