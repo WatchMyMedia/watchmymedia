@@ -178,7 +178,11 @@ path filters in `ci.yml` decide (the server jobs for `server/`, the apps for
 their folder and `api/`, `scripts` for `deploy/`, the workflows and the docs),
 and a change to `ci.yml` or a manual run runs everything. When a new job or
 input is added, give it a filter; `deploy/ci/security_test.py` checks every
-job has one. The Go jobs restore Go's build and test caches from the newest
+job has one. The `server` job runs every Go test, the lint and the
+generated-code check on Linux; `server-macos` tests only the packages with
+macOS code of their own (`deploy/ci/security_test.py` checks that every
+package with a `_darwin.go` file is among them), since GitHub's macOS runners
+are the scarce ones. The Go jobs restore Go's build and test caches from the newest
 push to `main`, so a PR reruns only the Go packages it changes and those that
 depend on them. Only `main` saves those caches, and `main` and manual runs run
 every test again (`go clean -testcache`). A change to the pinned ffmpeg starts

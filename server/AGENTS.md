@@ -17,7 +17,7 @@ golangci-lint v2.15.0, the versions CI pins.
 | One package or test | `go test ./internal/playback -run TestVOD -count=1` |
 | Vet as CI does | `go vet ./... && GOOS=linux GOARCH=amd64 go vet ./... && GOOS=windows GOARCH=amd64 go vet ./...` |
 | Lint | `golangci-lint run ./...` (or `make lint` from the root, which also lints the web); `.golangci.yml` adds errorlint, nilerr, rowserrcheck, sqlclosecheck, bodyclose, noctx, modernize and gosec to the standard set, and `go fix ./...` applies the modernizers |
-| Race detector, as CI's `server-race` job runs it | `go test -race -short -timeout 20m ./...` (`-short` skips the speed budgets; CI runs it on Linux, and the macOS-only code under the race detector in the `server` job) |
+| Race detector, as CI's `server-race` job runs it | `go test -race -short -timeout 20m ./...` (`-short` skips the speed budgets; CI runs it on Linux, and the macOS-only code under the race detector in the `server-macos` job) |
 | Regenerate queries | `sqlc generate` (or `make gen-sqlc`) |
 | Regenerate the API documents and web types | `make gen-api` from the root |
 | Speed budgets | `make bench` from the root |
