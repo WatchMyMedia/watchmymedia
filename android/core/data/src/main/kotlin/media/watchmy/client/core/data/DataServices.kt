@@ -61,6 +61,12 @@ class DataServices internal constructor(
     private val scope: CoroutineScope,
     clock: () -> Long,
     eventBackoffMs: (attempt: Int) -> Long = ServerEvents.BACKOFF,
+    /**
+     * Whether the app is in front until [setInFront] says otherwise. The app
+     * starts not in front and reports its process lifecycle; tests start in
+     * front.
+     */
+    inFront: Boolean = true,
     /** What storage holds, when the caller has just read it; null reads it here. */
     stored: Stored? = null,
 ) {
@@ -76,6 +82,7 @@ class DataServices internal constructor(
         sealer = KeystoreSealer(),
         scope = scope,
         clock = System::currentTimeMillis,
+        inFront = false,
         stored = stored,
     )
 
@@ -102,8 +109,27 @@ class DataServices internal constructor(
         // The clients' TLS set-up, off the main thread, before the first call needs it.
         scope.launch { http.warm() }
     }
-    private val events = ServerEvents(store, http, scope, eventBackoffMs)
+
+    private val events = ServerEvents(store, http, scope, eventBackoffMs, network, inFront, onReconnect = ::reconnected)
     private val serverRepository = RealServerRepository(store, http, discovery, scope, clock)
+
+    /**
+     * Whether the app is in front, which the app reports from its process
+     * lifecycle (PLAN-ANDROID-REVIEW.md §4.1.5): the event stream connects
+     * only in front, and the return to the front reconnects it at once. The
+     * start-up checks of a saved sign-in also wait for it, so a start in the
+     * background (a boot, a download's sync) asks the server nothing.
+     */
+    fun setInFront(inFront: Boolean) = events.setInFront(inFront)
+
+    /**
+     * The event stream reconnected after a gap: the server may have been
+     * upgraded meanwhile, and a TV app can stay open for weeks, so its level
+     * is read again (§4.1.6).
+     */
+    private fun reconnected() {
+        scope.launch { runCatching { serverRepository.refreshCurrent() } }
+    }
     private val authRepository = RealAuthRepository(store, http, serverRepository, { client }, clock)
     private val preferencesRepository = RealPreferencesRepository(store, http)
 
@@ -203,7 +229,14 @@ class DataServices internal constructor(
             preferencesRepository.reset()
             restartSessionLoad(signedIn)
         }
-        if (store.session()?.account != null) restartSessionLoad(true)
+        if (store.session()?.account != null) {
+            // The saved sign-in's checks, once the app is in front; a sign-in meanwhile has made its own.
+            val revision = store.revision
+            scope.launch {
+                events.awaitInFront()
+                if (store.revision == revision) restartSessionLoad(true)
+            }
+        }
     }
 
     private fun restartSessionLoad(signedIn: Boolean) = synchronized(sessionLoadLock) {

@@ -11,7 +11,12 @@ import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.filter
@@ -168,24 +173,57 @@ internal class EventStreamException(val status: Int) : IOException("event stream
  * and problems.changed, [liveChanges] for the Live TV ones, [rowChanges] for
  * rows.changed and lists.changed. Connected only while collected (shared by every
  * collector, and kept 5 s after the last one leaves so moving between screens
- * does not reconnect). A dropped stream reconnects with backoff, and both emit
- * once after reconnecting, since events may have been missed.
+ * does not reconnect), and only while the app is in front ([setInFront]) and
+ * the device has a default network ([network]): PLAN-ANDROID-REVIEW.md
+ * §4.1.5. A dropped stream reconnects with backoff; the return to the front,
+ * or to a network, reconnects at once. Each reconnection emits once on every
+ * flow, since events may have been missed, and calls [onReconnect].
  */
 internal class ServerEvents(
     private val store: LocalStore,
     private val http: Http,
     scope: CoroutineScope,
     private val backoffMs: (attempt: Int) -> Long = BACKOFF,
+    private val network: NetworkMonitor = NetworkMonitor.Always,
+    inFront: Boolean = true,
+    /** Called on each reconnection of a sign-in's stream, on the stream's thread: what was missed may need asking again. */
+    private val onReconnect: () -> Unit = {},
 ) {
+    private val front = MutableStateFlow(inFront)
+
+    /** The app came to the front (true) or left it; the stream connects only in front. */
+    fun setInFront(inFront: Boolean) {
+        front.value = inFront
+    }
+
+    /** True once the app has been in front, at once if it is now. */
+    suspend fun awaitInFront() {
+        front.first { it }
+    }
+
+    /** When to connect: a sign-in ([revision]), in front, on a network ([network], a new one reconnects). */
+    private data class Gate(val revision: Long, val open: Boolean, val network: Long?)
+
+    /**
+     * The sign-in whose stream has connected since this flow started: its
+     * next connection follows a gap, so it emits [RECONNECTED]. A new
+     * sign-in's first doesn't (its screens load afresh anyway), nor does the
+     * first after nothing collected for a while.
+     */
+    @Volatile private var connected: Long? = null
 
     /** The events screens refetch for, and [RECONNECTED]. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val events: Flow<ServerEvent> = store.sessionChanges
-        .transformLatest {
+    private val events: Flow<ServerEvent> = combine(store.sessionChanges, front, network.network) { revision, inFront, net ->
+        Gate(revision, inFront && net != null, net)
+    }
+        .distinctUntilChanged()
+        .onStart { connected = null }
+        .transformLatest { gate ->
+            if (!gate.open) return@transformLatest
             val target = store.requestSnapshot().first ?: return@transformLatest
             if (target.account == null) return@transformLatest
             var attempt = 0
-            var connectedBefore = false
             while (true) {
                 var pinged = false
                 try {
@@ -196,9 +234,12 @@ internal class ServerEvents(
                                 // Only a connection's first ping can follow missed events;
                                 // servers up to 0.4.1 also ping every 15 s to keep it open.
                                 if (!pinged) {
-                                    if (connectedBefore) emit(ServerEvent(RECONNECTED, ""))
-                                    connectedBefore = true
                                     pinged = true
+                                    if (connected == gate.revision) {
+                                        onReconnect()
+                                        emit(ServerEvent(RECONNECTED, ""))
+                                    }
+                                    connected = gate.revision
                                 }
                             }
                             WATCH_CHANGED, in LIBRARY_EVENTS, in REQUEST_EVENTS, in LIVE_EVENTS, in ROW_EVENTS -> emit(e)

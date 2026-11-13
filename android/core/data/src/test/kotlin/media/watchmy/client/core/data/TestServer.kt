@@ -123,6 +123,8 @@ class Harness internal constructor(
     httpCache: Boolean = false,
     /** The default network as the data layer sees it; [network] sets it, null for none. */
     private val network: TestNetwork = TestNetwork(),
+    /** How long the event stream waits before its next try. */
+    private val eventBackoffMs: (attempt: Int) -> Long = { 20L },
 ) : Closeable {
     val server = TestServer()
     val dir: File = Files.createTempDirectory("wmm-data").toFile()
@@ -136,7 +138,7 @@ class Harness internal constructor(
     var services = create()
         private set
 
-    private fun create() = DataServices(
+    private fun create(inFront: Boolean = true) = DataServices(
         baseClient = client,
         dataStore = dataStore,
         httpClient = { httpClient },
@@ -146,13 +148,15 @@ class Harness internal constructor(
         sealer = sealer,
         scope = scope,
         clock = { now },
-        eventBackoffMs = { 20L },
+        eventBackoffMs = eventBackoffMs,
+        inFront = inFront,
     )
 
-    fun reopen(): DataServices {
+    /** Another DataServices on the same storage, as after a restart; [inFront] false as for a start in the background. */
+    fun reopen(inFront: Boolean = true): DataServices {
         // As after a restart: what the last one wrote behind is on disk before the next one reads it.
         runBlocking { services.awaitWrites() }
-        return create().also { services = it }
+        return create(inFront).also { services = it }
     }
 
     /**
