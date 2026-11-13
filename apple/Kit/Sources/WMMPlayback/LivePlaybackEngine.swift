@@ -85,6 +85,12 @@ public final class RealLivePlaybackController: LivePlaybackController {
     @ObservationIgnored private var pendingOutput: (generation: Int, previousURL: URL)?
     @ObservationIgnored private var acceptedOutputGeneration: Int?
     @ObservationIgnored private var failedOutputGeneration: Int?
+    /// A new token is being fetched after the stream refused the last one.
+    @ObservationIgnored private var renewingToken = false
+    /// Tokens renewed for a refused stream, and when the last was: as many
+    /// as the file player's recoveries, counted afresh after a minute of playing.
+    @ObservationIgnored private var tokenRenewals = 0
+    @ObservationIgnored private var renewedAt = 0
 
     public init(repository: any LiveTVRepository, media: any LiveMediaPlayer, clock: any PlaybackClock, cellular: @escaping @MainActor () -> Bool = { false },
                 profile: @escaping @MainActor () -> PlaybackProfile = { PlaybackProfile(name: "Apple Live TV", containers: ["mpegts"], videoCodecs: ["h264"], audioCodecs: ["aac"], maxHeight: 1080) },
@@ -103,6 +109,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
         generation += 1; desired = request; lastRequest = request
         loaded = false; wantsPlay = true; pausedAt = nil; pauseBudget = 300_000
         loadedURL = nil; handledOutputGeneration = 0; pendingOutput = nil; acceptedOutputGeneration = nil; failedOutputGeneration = nil
+        renewingToken = false; tokenRenewals = 0
         noteUserInput()
         media.stop()
         state = LivePlayerState(); state.channel = request.channel; state.quality = request.quality
@@ -380,9 +387,38 @@ public final class RealLivePlaybackController: LivePlaybackController {
             state.pauseRemainingSeconds = max(0, (pauseBudget - (clock.elapsedMs - pausedAt) + 999) / 1000)
             if state.pauseRemainingSeconds == 0 { finish(reason: "pause_expired"); return }
         }
-        if media.failed { finish(reason: "signal_lost", failure: true); return }
+        if tokenRenewals > 0, media.playing, !media.buffering, clock.elapsedMs - renewedAt >= recoveryResetMs { tokenRenewals = 0 }
+        if media.failed && !renewingToken {
+            if media.failure?.refusedToken == true, tokenRenewals < maxRecoveries { renewToken() }
+            else { finish(reason: "signal_lost", failure: true); return }
+        }
         sendHeartbeat(force: false)
     }
+    /// The stream refused the media token (a 401 or 403 for a playlist or a
+    /// segment): a new token and the same stream again, as the file player
+    /// does, rather than "signal lost". The tuner's session is kept.
+    private func renewToken() {
+        guard let session = activeSession, let url = loadedURL ?? session.streamURL else {
+            finish(reason: "signal_lost", failure: true); return
+        }
+        renewingToken = true; tokenRenewals += 1; renewedAt = clock.elapsedMs
+        let version = generation
+        Task { [self] in
+            defer { if version == generation { renewingToken = false } }
+            do {
+                let fresh = try await gateway.get().mediaToken()
+                guard version == generation, activeSession?.id == session.id, !released else { return }
+                tokens.keep(fresh)
+                media.load(url: fresh.apply(to: url), title: session.channel.title, play: wantsPlay)
+                lastNativePlaying = wantsPlay
+                state.message = "Reconnected at live TV."
+            } catch {
+                guard version == generation, !released else { return }
+                finish(reason: "signal_lost", failure: true)
+            }
+        }
+    }
+
     private func updateNetworkState() {
         state.cellular = cellular()
         state.qualities = (repository.capabilities?.automatic == true ? [.auto] : [])

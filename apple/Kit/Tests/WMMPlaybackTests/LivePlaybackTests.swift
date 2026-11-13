@@ -94,6 +94,7 @@ private final class LiveMediaSpy: LiveMediaPlayer {
     var playing = false
     var ready = true
     var failed = false
+    var failure: PlayerFailure?
     var position: Double = 58
     var seekable: ClosedRange<Double>? = 0...60
     var loads: [URL] = []
@@ -102,7 +103,7 @@ private final class LiveMediaSpy: LiveMediaPlayer {
     var transfer: MediaTransfer? = .init(bps: 4_000_000, ageMs: 300)
     var stalls = 1
     var goLives = 0
-    func load(url: URL, title: String, play: Bool) { loads.append(url); playing = play; firstFrameRendered = false; failed = false }
+    func load(url: URL, title: String, play: Bool) { loads.append(url); playing = play; firstFrameRendered = false; failed = false; failure = nil }
     func play() { playing = true }
     func pause() { playing = false }
     func goLive() { goLives += 1; position = (seekable?.upperBound ?? 60) - 2 }
@@ -588,6 +589,43 @@ struct LivePlaybackTests {
         c.playing()
         c.waiting()
         #expect(c.count == 3)
+    }
+
+    @Test func aRefusedTokenIsRenewedOnTheSameTunerNotReportedAsSignalLost() async {
+        // PLAN-APPLE-REVIEW.md §5.1: the file player's new token on a 401 or 403, for Live TV.
+        let rig = LiveRig(); await rig.start()
+        rig.media.failed = true
+        rig.media.failure = PlayerFailure(kind: .http, detail: "HTTP 403", httpStatus: 403)
+        await rig.advance(500)
+        #expect(rig.gateway.tokens == 2)
+        #expect(rig.media.loads.count == 2)
+        #expect(rig.media.loads.last?.path == rig.media.loads.first?.path)
+        #expect(rig.media.loads.last?.query()?.contains("access_token=token-2") == true)
+        #expect(rig.gateway.starts.count == 1)
+        #expect(rig.controller.state.status != .error)
+        #expect(rig.controller.state.message == "Reconnected at live TV.")
+
+        // Refused again at once, past the recoveries: the signal is lost, as before.
+        for _ in 0..<maxRecoveries {
+            rig.media.failed = true
+            rig.media.failure = PlayerFailure(kind: .http, detail: "HTTP 401", httpStatus: 401)
+            await rig.advance(500)
+        }
+        #expect(rig.gateway.tokens == 1 + maxRecoveries)
+        #expect(rig.controller.state.status == .error)
+        #expect(rig.controller.state.stopReason == "signal_lost")
+        await rig.finish()
+    }
+
+    @Test func aFailureThatIsntTheTokensStillLosesTheSignal() async {
+        let rig = LiveRig(); await rig.start()
+        rig.media.failed = true
+        rig.media.failure = PlayerFailure(kind: .http, detail: "HTTP 404", httpStatus: 404)
+        await rig.advance(500)
+        #expect(rig.gateway.tokens == 1)
+        #expect(rig.controller.state.status == .error)
+        #expect(rig.controller.state.stopReason == "signal_lost")
+        await rig.finish()
     }
 
     @Test func mediaTokenRenewsWithoutNewTuner() async {

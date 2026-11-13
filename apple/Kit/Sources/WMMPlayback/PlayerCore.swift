@@ -214,6 +214,10 @@ extension PlayerFailure {
         guard let comment, let match = comment.firstMatch(of: /HTTP (\d{3})/), let status = Int(match.1), (400..<600).contains(status) else { return nil }
         return status
     }
+
+    /// The server refused the media token (it ran out, or was revoked with a
+    /// sign-in): a new one may play.
+    var refusedToken: Bool { kind == .http && (httpStatus == 401 || httpStatus == 403) }
 }
 
 /// The title and subtitle as AVKit reads them, for the transport bar's title view and Now Playing.

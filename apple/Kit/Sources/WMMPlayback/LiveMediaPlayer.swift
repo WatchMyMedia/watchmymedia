@@ -12,6 +12,8 @@ public protocol LiveMediaPlayer: AnyObject {
     var ready: Bool { get }
     var buffering: Bool { get }
     var failed: Bool { get }
+    /// What the failure was, when ``failed``; nil when the player can't say.
+    var failure: PlayerFailure? { get }
     /// A decoded frame from the current item, reset by every load.
     var firstFrameRendered: Bool { get }
     var bufferedMs: Int? { get }
@@ -27,6 +29,7 @@ public protocol LiveMediaPlayer: AnyObject {
 }
 
 extension LiveMediaPlayer {
+    public var failure: PlayerFailure? { nil }
     public var buffering: Bool { !ready }
     public var firstFrameRendered: Bool { ready && playing }
     public var bufferedMs: Int? { nil }
@@ -85,6 +88,10 @@ public final class AVLiveMediaPlayer: LiveMediaPlayer {
     public var ready: Bool { player?.currentItem?.status == .readyToPlay }
     public var buffering: Bool { player?.timeControlStatus == .waitingToPlayAtSpecifiedRate || !ready }
     public var failed: Bool { player?.currentItem?.status == .failed }
+    public var failure: PlayerFailure? {
+        guard let item = player?.currentItem, item.status == .failed else { return nil }
+        return PlayerFailure.classify(item.error as NSError?, log: item.errorLog())
+    }
     /// Once seen, the video output comes off the item, as the file player's
     /// does: it decoded every frame twice for the whole session before.
     public var firstFrameRendered: Bool {
