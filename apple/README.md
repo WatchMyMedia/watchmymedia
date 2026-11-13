@@ -177,7 +177,12 @@ download takes a few seconds. `-open watchmymedia://downloads` opens Settings â€
 Downloads. The Apple TV app has none (`UnavailableDownloads`).
 
 A download keeps going in the background through the system's sessions, so
-`AppDelegate` hands their events to `DownloadServices.handleEvents`. Its files
+`AppDelegate` hands their events to `DownloadServices.handleEvents`. When one
+finishes while the app is away, the session's completion handler waits (at
+most 20 seconds, under a background task) until the next download has been
+handed to the system, since an HLS download is made ready by the app first
+(`HandoverHold`). Wi-Fi only also waits on a personal hotspot and in Low Data
+Mode, which the system marks expensive and constrained. Its files
 are in `Library/Application Support/Downloads` (`state.json`, `engine.json` and
 a folder per original file) and, for HLS, the package the system made under
 `Library/com.apple.UserManagedAssetsâ€¦`; read them from the simulator's app
