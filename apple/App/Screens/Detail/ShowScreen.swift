@@ -54,6 +54,7 @@ private struct ShowPageView: View {
                 ErrorState(message: message, retry: model.retry)
             case .loaded(let show):
                 page(show, topInset: geo.safeAreaInsets.top, width: geo.size.width)
+                    .refreshable { await model.refresh() }
             }
         }
         .groundBackground()

@@ -341,6 +341,34 @@ final class NoRequests: RequestsRepository {
         #expect(model.state.value?.map(\.id) == [2], "the older reply came last and was dropped")
     }
 
+    @Test func pullToRefreshKeepsYourRequestsWhenItFails() async {
+        let repository = HeldRequests()
+        let model = MyRequestsModel(requests: repository)
+        repository.reply = [request(1)]
+        await model.retry()
+        repository.reply = [request(2), request(1)]
+        await model.refresh()
+        #expect(model.state.value?.map(\.id) == [2, 1])
+        repository.failure = APIError(status: nil, message: "Couldn't reach the server.")
+        await model.refresh()
+        #expect(model.state.value?.map(\.id) == [2, 1], "the list stays on screen")
+        #expect(model.message == "Couldn't reach the server.")
+    }
+
+    @Test func pullToRefreshKeepsTheInboxWhenItFails() async {
+        let repository = HeldRequests()
+        let model = InboxModel(requests: repository)
+        repository.reply = [request(1)]
+        await model.retry()
+        repository.reply = [request(2), request(1)]
+        await model.refresh()
+        #expect(model.requestList.map(\.id) == [2, 1])
+        repository.failure = APIError(status: nil, message: "Couldn't reach the server.")
+        await model.refresh()
+        #expect(model.requestList.map(\.id) == [2, 1], "the inbox stays on screen")
+        #expect(model.message == "Couldn't reach the server.")
+    }
+
     @Test func anOlderInboxNeverOverwritesANewerOne() async {
         let repository = HeldRequests()
         let model = InboxModel(requests: repository)
@@ -364,6 +392,7 @@ final class HeldRequests: RequestsRepository {
     let options = RequestOptions(movies: true, shows: true, problems: true)
     var hold = false
     var reply: [MediaRequest] = []
+    var failure: APIError?
     private(set) var held: CheckedContinuation<[MediaRequest], Never>?
     private(set) var heldInbox: CheckedContinuation<Inbox, Never>?
 
@@ -375,11 +404,13 @@ final class HeldRequests: RequestsRepository {
     func lookup(_ type: MediaType, tmdbID: Int) async throws -> Requestable { throw APIError(status: 404, message: "Not found.") }
     func ask(_ type: MediaType, tmdbID: Int, seasons: [Int]) async throws -> CreatedRequest { throw APIError(status: 404, message: "Not found.") }
     func mine() async throws -> [MediaRequest] {
+        if let failure { throw failure }
         if hold { return await withCheckedContinuation { held = $0 } }
         return reply
     }
     func cancel(requestID: Int) async throws {}
     func inbox() async throws -> Inbox {
+        if let failure { throw failure }
         if hold { return await withCheckedContinuation { heldInbox = $0 } }
         return Inbox(requests: reply)
     }

@@ -112,6 +112,17 @@ import WMMModel
         #expect(model.movie?.title == "Dead Reckoning Bay")
     }
 
+    @Test func pullToRefreshFetchesAgainAndKeepsThePageWhenItFails() async {
+        let model = model(500)
+        await model.retry()
+        await model.refresh()
+        #expect(library.movieCalls == 2)
+        library.failure = APIError(status: nil, message: "Couldn't reach the server.")
+        await model.refresh()
+        #expect(model.movie?.title == "Dead Reckoning Bay", "the page stays on screen")
+        #expect(model.message == "Couldn't reach the server.")
+    }
+
     @Test func refetchesWhenTheLibraryChanges() async {
         let model = model(500)
         let running = Task { await model.run() }

@@ -191,6 +191,12 @@ public final class ShowPageModel {
         changes.loaded()
     }
 
+    /// Pull to refresh: keeps the page as it is, and says why if it fails.
+    public func refresh() async {
+        await load(quiet: true)
+        changes.loaded()
+    }
+
     public func retrySeason() async {
         guard let selectedSeason else { return }
         await loadSeason(selectedSeason, quiet: false, place: placed ? .season : .arrival)

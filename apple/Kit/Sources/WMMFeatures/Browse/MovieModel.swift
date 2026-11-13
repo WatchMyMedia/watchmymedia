@@ -116,6 +116,12 @@ public final class MovieModel {
         changes.loaded()
     }
 
+    /// Pull to refresh: keeps the page as it is, and says why if it fails.
+    public func refresh() async {
+        await load(quiet: true)
+        changes.loaded()
+    }
+
     // MARK: Taps
 
     /// Shows a version's tracks, and makes it the one Play plays.

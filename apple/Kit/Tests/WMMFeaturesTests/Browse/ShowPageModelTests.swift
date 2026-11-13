@@ -90,6 +90,18 @@ import WMMModel
         #expect(model.episode?.id == 100037)
     }
 
+    @Test func pullToRefreshFetchesAgainAndKeepsThePageWhenItFails() async {
+        let model = model()
+        await model.retry()
+        await model.refresh()
+        #expect(library.showCalls == 2 && library.seasonCalls == [3, 3])
+        #expect(model.episode?.id == 100037, "the episode on top stays")
+        library.failure = APIError(status: nil, message: "Couldn't reach the server.")
+        await model.refresh()
+        #expect(model.episode?.id == 100037, "the page stays on screen")
+        #expect(model.message == "Couldn't reach the server.")
+    }
+
     @Test func refetchesWhenTheLibraryChangesAndKeepsTheEpisodeOnTop() async {
         let model = model()
         let running = Task { await model.run() }

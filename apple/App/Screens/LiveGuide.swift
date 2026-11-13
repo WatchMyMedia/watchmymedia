@@ -55,6 +55,7 @@ struct LiveGuideScreen: View {
                         controls
                         HStack(alignment: .top, spacing: 20) {
                             ScrollView { content(now: now) }
+                                .refreshable { await refresh() }
                                 .background(Palette.surface, in: RoundedRectangle(cornerRadius: 14))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
                             panel(now: now).frame(width: 380)

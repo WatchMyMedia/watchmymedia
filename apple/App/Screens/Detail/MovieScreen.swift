@@ -39,6 +39,8 @@ private struct MovieView: View {
                 ErrorState(message: message, retry: model.retry)
             case .loaded(let movie):
                 page(movie, topInset: geo.safeAreaInsets.top, width: geo.size.width)
+                    // Both of iPad's side-by-side columns pull to refresh.
+                    .refreshable { await model.refresh() }
             }
         }
         .groundBackground()

@@ -36,6 +36,9 @@ public final class MyRequestsModel {
 
     public func retry() async { await load(quiet: false) }
 
+    /// Pull to refresh: keeps the list, and says why if it fails.
+    public func refresh() async { await load(quiet: true) }
+
     public func cancel(_ request: MediaRequest) async {
         guard cancelling == nil, request.status == .pending else { return }
         cancelling = request.id
@@ -113,6 +116,9 @@ public final class InboxModel {
     }
 
     public func retry() async { await load(quiet: false) }
+
+    /// Pull to refresh: keeps the list, and says why if it fails.
+    public func refresh() async { await load(quiet: true) }
 
     public func approve(_ request: MediaRequest) async {
         await act(request.id) { try await self.requests.decide(requestID: request.id, approve: true, note: "") }
