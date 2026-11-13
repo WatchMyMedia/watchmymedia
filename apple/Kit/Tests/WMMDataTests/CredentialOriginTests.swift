@@ -37,7 +37,8 @@ struct CredentialOriginTests {
         }
         let pending = Task { try await h.services.auth.signIn(name: "viewer", password: "fixture-viewer-1") }
         defer { resume.signal() }
-        #expect(await eventually { reached.withLock { $0 } })
+        // Long: the stub blocks a thread while it holds the reply, which a full run feels.
+        #expect(await eventually(.seconds(20)) { reached.withLock { $0 } })
         var moved = h.testServer
         moved.baseURL = URL(string: "https://different.example/wmm")!
         try await h.services.servers.select(moved)
