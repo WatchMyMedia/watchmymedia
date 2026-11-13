@@ -18,8 +18,10 @@ dependencies {
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.tvprovider)
     implementation(libs.kotlinx.coroutines.android)
+    testImplementation(libs.androidx.media3.test.utils)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.robolectric)
     testImplementation(libs.turbine)
 }
