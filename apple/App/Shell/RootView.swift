@@ -94,6 +94,10 @@ struct RootView: View {
         // Reminders as notifications (PLAN-LIVE-TV-GUIDE.md §6.5): the soonest 64,
         // again whenever they or the lead time change, once the list is loaded.
         // A server that keeps none clears them; offline, they stay as they were.
+        // The quick actions on the app's icon follow the sign-in and what its server offers.
+        .onChange(of: quickActions, initial: true) { _, key in
+            QuickActions.shared.update(serverID: key.serverID, liveTV: key.liveTV, downloads: key.downloads)
+        }
         .task(id: reminderSchedule) {
             if services.auth.user == nil {
                 await notifier.reschedule([])
@@ -103,6 +107,19 @@ struct RootView: View {
                 await notifier.reschedule([])
             }
         }
+    }
+
+    private struct QuickActionsKey: Equatable {
+        let serverID: String?
+        let liveTV: Bool
+        let downloads: Bool
+    }
+
+    private var quickActions: QuickActionsKey {
+        let signedIn = services.auth.user != nil && services.servers.current?.signedIn == true
+        return QuickActionsKey(serverID: signedIn ? services.servers.current?.server.id : nil,
+                               liveTV: signedIn && services.liveTV.capabilities?.available == true,
+                               downloads: signedIn && services.downloads.enabled)
     }
 
     private struct Refresh: Equatable {

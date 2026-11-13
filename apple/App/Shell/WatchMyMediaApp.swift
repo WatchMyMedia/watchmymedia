@@ -48,6 +48,10 @@ struct WatchMyMediaApp: App {
                 .task {
                     LiveReminderNotifier.shared.open = { url in open(url) }
                 }
+                // A quick action on the app's icon, or an App Shortcut.
+                .task {
+                    QuickActions.shared.open = { url in open(url) }
+                }
                 // The person's other devices change favourites and reminders too.
                 .task { await extras.follow() }
                 .task { await recordings.follow() }
@@ -76,6 +80,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         MainActor.assumeIsolated { UNUserNotificationCenter.current().delegate = LiveReminderNotifier.shared }
         return true
+    }
+
+    /// The scene's delegate takes the Home Screen quick actions (``QuickActions``).
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = QuickActionSceneDelegate.self
+        return configuration
     }
 
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {

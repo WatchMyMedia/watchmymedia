@@ -638,6 +638,12 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
   reached the app there, so Escape needs a real keyboard.
 - **A pointer on iPad.** Cards (`CardButtonStyle`) lift and Search's and
   Settings' rows highlight under the pointer, as the system draws it.
+- **Quick actions and App Shortcuts** (`App/Shell/QuickActions.swift`):
+  Continue watching (Home at its top), Search, Live TV when the server offers
+  it and Downloads when they are on. Each opens a link published for the
+  server signed in (`watchmymedia://home`, `search`, `live-tv`, `downloads`
+  with `source=` and `server=`), so another server's opens nothing; signed
+  out there are none and a shortcut opens the app as it is.
 - **Coming back to where you were** (`App/Shell/PlaceKeeping.swift`,
   `SavedPlace` in the Kit): the tab and each tab's pages are saved per
   account and server as the app goes to the background and restored once a

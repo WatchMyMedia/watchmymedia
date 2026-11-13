@@ -77,6 +77,8 @@ import WMMModel
         ("watchmymedia://link?code=K7M4PQ", .linkTV(code: "K7M4PQ")),
         ("watchmymedia://link", .linkTV(code: nil)),
         ("watchmymedia://lists/9001", .mediaList(id: 9001)),
+        ("watchmymedia://search", .search),
+        ("watchmymedia://home", .home),
     ])
     func parses(_ text: String, _ expected: DeepLink) throws {
         #expect(DeepLink(url: try #require(URL(string: text))) == expected)
@@ -87,7 +89,7 @@ import WMMModel
         #expect(DeepLink(url: try #require(URL(string: text))) == nil)
     }
 
-    @Test(arguments: [DeepLink.play(fileID: 1), .show(id: 2, season: 3), .show(id: 2, season: 3, episode: 2037), .movie(id: 4), .linkTV(code: "ABC234"), .mediaList(id: 9)])
+    @Test(arguments: [DeepLink.play(fileID: 1), .show(id: 2, season: 3), .show(id: 2, season: 3, episode: 2037), .movie(id: 4), .linkTV(code: "ABC234"), .mediaList(id: 9), .search, .home, .downloads, .liveTV(channelID: nil)])
     func roundTrips(_ link: DeepLink) {
         #expect(DeepLink(url: link.url) == link)
     }
@@ -207,5 +209,35 @@ struct FindInSearchTests {
         navigator.findInSearch()
         #expect(navigator.tab == .home)
         #expect(!navigator.searchFieldRequested)
+    }
+}
+
+/// The Home Screen quick actions and App Shortcuts open the app's own links,
+/// published for the server signed in (PLAN-APPLE-REVIEW.md §2.5, §6.3).
+@MainActor @Suite struct QuickActionLinkTests {
+    @Test func searchAndHomeOpenTheirTabsOverAPlayer() async {
+        FakeLatency.duration = .zero
+        let nav = Navigator()
+        nav.select(.movies)
+        nav.open(.movie(id: 500))
+        nav.play(PlayRequest(fileID: 9101, title: "Harbor Lights"))
+        await nav.open(.search, library: FakeLibraryRepository())
+        #expect(nav.tab == .search)
+        #expect(nav.searchFieldRequested)
+        #expect(nav.playbackPresentation == nil)
+        nav.open(.show(id: 100))
+        await nav.open(.home, library: FakeLibraryRepository())
+        #expect(nav.tab == .home)
+        #expect(nav.path(for: .home).isEmpty)
+        #expect(nav.path(for: .movies) == [.movie(id: 500)], "Other tabs keep their place")
+    }
+
+    @Test func aQuickActionsLinkOpensOnlyForItsServer() throws {
+        for link in [DeepLink.search, .home, .downloads, .liveTV(channelID: nil)] {
+            let url = link.url(publishedFor: "server-a", source: "quick-action")
+            #expect(DeepLink.opening(url, signedInServer: "server-a") == link)
+            #expect(DeepLink.opening(url, signedInServer: "server-b") == nil)
+            #expect(DeepLink.opening(url, signedInServer: nil) == nil, "Signed out, the app opens as it is")
+        }
     }
 }

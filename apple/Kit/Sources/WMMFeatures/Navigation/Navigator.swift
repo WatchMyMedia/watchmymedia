@@ -247,6 +247,13 @@ public final class Navigator {
             closePlayer()
             tab = .settings
             paths[.settings] = [.downloads]
+        case .search:
+            closePlayer()
+            findInSearch()
+        case .home:
+            closePlayer()
+            tab = .home
+            paths[.home] = []
         }
     }
 }

@@ -4,7 +4,9 @@ import Foundation
 /// `shows/{id}` (optionally `?season=` and `&episode=`, which opens that
 /// episode's page), `movies/{id}`, `link?code=` (a TV's pairing code),
 /// `requests` (Your requests), `inbox` (the admins' Inbox), `downloads`
-/// (Settings › Downloads, iPhone and iPad) and `lists/{id}` (a list's page),
+/// (Settings › Downloads, iPhone and iPad), `lists/{id}` (a list's page),
+/// `search` (Search, with the cursor in its field) and `home` (Home at its
+/// top, where Continue watching is: the quick actions'),
 /// as android/mobile/.../DeepLinks.kt reads them.
 ///
 /// A link that starts playback or takes a tuner (`play/…`, `live-tv/{id}`)
@@ -29,6 +31,8 @@ public enum DeepLink: Hashable, Sendable {
     case myRequests
     case inbox
     case downloads
+    case search
+    case home
 
     public static let scheme = "watchmymedia"
 
@@ -51,6 +55,8 @@ public enum DeepLink: Hashable, Sendable {
         case "requests": self = .myRequests
         case "inbox": self = .inbox
         case "downloads": self = .downloads
+        case "search": self = .search
+        case "home": self = .home
         default: return nil
         }
     }
@@ -87,6 +93,10 @@ public enum DeepLink: Hashable, Sendable {
             c.host = "inbox"
         case .downloads:
             c.host = "downloads"
+        case .search:
+            c.host = "search"
+        case .home:
+            c.host = "home"
         }
         c.queryItems = items.isEmpty ? nil : items
         return c.url!
