@@ -106,6 +106,14 @@ class RealPlaybackController(
     private val clock: Clock = DeviceClock,
     dispatcher: CoroutineDispatcher = Dispatchers.Main,
     private val io: CoroutineDispatcher = Dispatchers.IO,
+    /**
+     * On a TV: the app leaving stops the stream and ends the server's
+     * session, rather than holding the decoder and a transcode until the
+     * server's idle timeout, and coming back loads it again where it was,
+     * paused. Phones and tablets pause, for picture-in-picture and the
+     * notification's controls.
+     */
+    private val stopInBackground: Boolean = false,
 ) : PlaybackController {
     private val gateway = gateway.bind()
 
@@ -187,6 +195,9 @@ class RealPlaybackController(
          * Once a viewing, as [playerSelectsAudio] is.
          */
         var videoNarrowing: VideoNarrowing? = null
+
+        /** Stopped while the app was away ([stopInBackground]): where to load it again on return. */
+        var parkedAtMs: Long? = null
 
         /** The profile the last decision was asked with, which an offline play's audio choice reads. */
         var profile: PlaybackProfile? = null
@@ -273,6 +284,8 @@ class RealPlaybackController(
             return
         }
         media?.play()
+        // Stopped while away: load it again, playing.
+        unpark(v)
     }
 
     override fun pause() {
@@ -837,17 +850,39 @@ class RealPlaybackController(
     private fun onVisibility(visible: Boolean) {
         if (visible) {
             backgrounded = false
+            active()?.let(::unpark)
             refresh(0)
             return
         }
         if (backgrounded) return
         backgrounded = true
         val v = active() ?: return
-        if (v.decision == null) return
+        val d = v.decision ?: return
         media?.pause()
         val pos = position(v)
         report(v, PlayState.Closed, pos, 0)
         leftPartway(v, pos)
+        if (stopInBackground) park(v, d, pos)
+    }
+
+    /** A TV's app left: the stream stops, its server session ends, and the position is kept for the return. */
+    private fun park(v: Viewing, d: PlaybackDecision, pos: Long) {
+        loadJob?.cancel()
+        v.loading = false
+        v.switch.abandon()?.fallback?.decision?.sessionId?.takeIf { it != d.sessionId }?.let { outbox.trySend(Outgoing.EndSession(it)) }
+        d.sessionId?.let { outbox.trySend(Outgoing.EndSession(it)) }
+        // Ended here: the next decision doesn't end it again.
+        v.decision = d.copy(sessionId = null)
+        v.parkedAtMs = pos
+        v.pendingPositionMs = pos
+        media?.stop()
+    }
+
+    /** Back from [park]: a new decision where it was, playing or paused as the player has it. */
+    private fun unpark(v: Viewing) {
+        val at = v.parkedAtMs ?: return
+        v.parkedAtMs = null
+        reload(v, seekMs = at)
     }
 
     /**
@@ -951,7 +986,8 @@ class RealPlaybackController(
      */
     private fun refresh(dtMs: Long) {
         val v = viewing ?: return
-        if (v.stopped || v.adminStopped) return
+        // Parked, nothing runs: no countdown, no skip, no token renewal until the app is back.
+        if (v.stopped || v.adminStopped || v.parkedAtMs != null) return
         val initial = v.decision
         val p = media
         if (initial == null || p == null) {

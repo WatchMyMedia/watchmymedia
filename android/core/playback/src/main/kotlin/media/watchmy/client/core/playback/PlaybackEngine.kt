@@ -136,6 +136,7 @@ class PlaybackEngine(
             visibility = ProcessVisibility,
             lookups = lookups,
             network = network,
+            stopInBackground = isTv,
         )
 
     /** Plans for this device's profile at the default quality for the network in use. */

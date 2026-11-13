@@ -450,6 +450,7 @@ class Harness(
     lookups: PlaybackLookups = PlaybackLookups.None,
     profileProvider: ProfileProvider = ProfileProvider { TV_PROFILE },
     quality: StreamQuality = StreamQuality.Original,
+    stopInBackground: Boolean = false,
 ) {
     val scheduler = TestCoroutineScheduler()
     private val dispatcher = StandardTestDispatcher(scheduler)
@@ -480,6 +481,7 @@ class Harness(
         clock = clock,
         dispatcher = dispatcher,
         io = io,
+        stopInBackground = stopInBackground,
     )
     val events = mutableListOf<PlayerEvent>()
 

@@ -1,5 +1,6 @@
 package media.watchmy.client.core.playback
 
+import org.junit.Assert.assertFalse
 import media.watchmy.client.core.playback.player.PlayerPhase
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.PlayState
@@ -164,6 +165,49 @@ class HeartbeatTest {
         h.visibility.set(true)
         h.run()
         assertEquals(PlayState.Playing, h.states.last())
+    }
+
+    @Test
+    fun onATvLeavingTheAppStopsTheStreamAndItsSessionAndComingBackLoadsItWhereItWas() {
+        val tv = Harness(stopInBackground = true)
+        tv.start(PlayRequest(1, 0, "Harbor Lights", "S03 E07 · The Long Dark"), decision())
+        tv.advance(20_000)
+        tv.controller.pause()
+        tv.visibility.set(false)
+        tv.run()
+        assertEquals(PlayState.Closed, tv.states.last())
+        assertEquals("The decoder goes", PlayerPhase.Idle, tv.player.phase)
+        assertEquals("The server's session ends now, not at its idle timeout", listOf("s1"), tv.gateway.stoppedSessions)
+        val sent = tv.gateway.reports.size
+        tv.advance(30 * MIN)
+        assertEquals("Nothing while away: no reports, no new decision", sent, tv.gateway.reports.size)
+        assertEquals(1, tv.gateway.decisions.size)
+
+        tv.gateway.decide = { decision(sessionId = "s2") }
+        tv.visibility.set(true)
+        tv.run()
+        assertEquals(2, tv.gateway.decisions.size)
+        assertEquals("Where it was, in the same play", 20_000L, tv.gateway.decisions.last().startMs)
+        assertEquals("a1", tv.gateway.decisions.last().playId)
+        assertEquals(20_000L, tv.player.loads.last().startPositionMs)
+        assertFalse("Paused, as it was left", tv.player.loads.last().playWhenReady)
+        assertEquals("The ended session isn't ended twice", listOf("s1"), tv.gateway.stoppedSessions)
+        tv.controller.play()
+        tv.run()
+        assertEquals(PlayState.Playing, tv.states.last())
+    }
+
+    @Test
+    fun onATvPlayWhileAwayLoadsTheStreamAgainPlaying() {
+        val tv = Harness(stopInBackground = true)
+        tv.start(PlayRequest(1, 0, "Harbor Lights"), decision())
+        tv.advance(10_000)
+        tv.visibility.set(false)
+        tv.run()
+        tv.controller.play()
+        tv.run()
+        assertEquals(2, tv.gateway.decisions.size)
+        assertTrue(tv.player.loads.last().playWhenReady)
     }
 
     @Test
