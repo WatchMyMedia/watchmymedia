@@ -25,6 +25,7 @@ import media.watchmy.client.model.PlaybackControllerFactory
 import media.watchmy.client.model.PlaybackGateway
 import media.watchmy.client.model.PlaybackPlan
 import media.watchmy.client.model.PreferencesRepository
+import media.watchmy.client.model.userAgent
 
 /**
  * The app's player: one for the app (build it in `Application.onCreate`,
@@ -50,7 +51,8 @@ class PlaybackEngine(
     artwork: BitmapLoader? = null,
 ) : PlaybackControllerFactory {
     private val app = context.applicationContext
-    private val userAgent = "WatchMyMedia/${client.version} (${client.platform}; Android ${Build.VERSION.RELEASE})"
+    /** What the players and the downloader say they are, as the API's requests do. */
+    val userAgent = userAgent(client, Build.VERSION.RELEASE)
 
     /**
      * This device's profile, rebuilt when the HDMI output or audio route

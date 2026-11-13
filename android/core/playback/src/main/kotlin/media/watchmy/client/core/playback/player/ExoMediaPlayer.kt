@@ -23,7 +23,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import media.watchmy.client.model.MediaToken
-import media.watchmy.client.model.isOnServer
+import media.watchmy.client.model.signing
 import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -465,11 +465,7 @@ private fun isSideloaded(formatId: String?, id: String) = formatId == id || form
 
 /** Replaces an old playlist token on each read, confined to the signed-in server. */
 internal fun renewableMediaUri(uri: Uri, token: MediaToken): Uri {
-    val server = token.serverUrl ?: return uri
-    if (!isOnServer(server, uri.toString())) return uri
-    val builder = uri.buildUpon().clearQuery()
-    uri.queryParameterNames.filter { it != token.param }.forEach { name ->
-        uri.getQueryParameters(name).forEach { builder.appendQueryParameter(name, it) }
-    }
-    return builder.appendQueryParameter(token.param, token.token).build()
+    val url = uri.toString()
+    val signed = token.signing(url)
+    return if (signed === url) uri else Uri.parse(signed)
 }

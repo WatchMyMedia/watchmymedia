@@ -43,6 +43,7 @@ import media.watchmy.client.model.SyncedDownload
 import media.watchmy.client.model.WatchProgress
 import media.watchmy.client.model.downloadTitle
 import media.watchmy.client.model.neededSize
+import media.watchmy.client.model.watchedFromMs
 
 /** What a download's end says to the person: notifications, on the real device. */
 internal interface DownloadNotices {
@@ -573,10 +574,8 @@ internal class RealDownloadRepository(
     }
 
     /** Past the credits (or 92% without them) counts as watched, as on the server. */
-    private fun watchedPast(positionMs: Long, durationMs: Long, record: OfflineRecord): Boolean {
-        val at = record.decision?.watchedAtMs?.takeIf { it > 0 } ?: (durationMs * 0.92).toLong()
-        return durationMs > 0 && positionMs >= at
-    }
+    private fun watchedPast(positionMs: Long, durationMs: Long, record: OfflineRecord): Boolean =
+        durationMs > 0 && positionMs >= watchedFromMs(durationMs, record.decision?.watchedAtMs)
 
     private companion object {
         const val TAG = "WmmDownloads"

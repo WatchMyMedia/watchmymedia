@@ -23,14 +23,12 @@ import media.watchmy.client.model.CastGateway
 import media.watchmy.client.model.ClientInfo
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.PlaybackController
-import media.watchmy.client.model.PlaybackMode
 import media.watchmy.client.model.PlaybackProgress
 import media.watchmy.client.model.PlayerEvent
 import media.watchmy.client.model.PlayerStatus
 import media.watchmy.client.model.PlayerUiState
 import media.watchmy.client.model.PreferencesRepository
 import media.watchmy.client.model.Segment
-import media.watchmy.client.model.SegmentKind
 import media.watchmy.client.model.SkipPrompt
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleOption
@@ -38,6 +36,11 @@ import media.watchmy.client.model.UpNext
 import media.watchmy.client.model.UpNextPrompt
 import media.watchmy.client.model.audioTrackLabel
 import media.watchmy.client.model.subtitleTrackLabel
+import media.watchmy.client.model.STOPPED_BY_ADMIN
+import media.watchmy.client.model.automaticStepNote
+import media.watchmy.client.model.playbackModeOf
+import media.watchmy.client.model.segmentKindOf
+import media.watchmy.client.model.skipLabel
 
 /**
  * The TV's play as a remote (PLAN-CAST.md §5.2): the receiver runs the play
@@ -298,11 +301,7 @@ class CastPlaybackController(
         val was = StreamQuality.byId(before.autoStep) ?: return
         val now = StreamQuality.byId(m.autoStep) ?: return
         if (now == was) return
-        note = when {
-            now.ordinal > was.ordinal -> "Lowered to ${now.label.substringBefore(" · ")} for your connection."
-            now == StreamQuality.Original -> "Connection recovered; playing the original file."
-            else -> "Raised to ${now.label.substringBefore(" · ")} for your connection."
-        }
+        note = automaticStepNote(was, now)
         noteJob?.cancel()
         noteJob = scope.launch {
             delay(NOTE_MS)
@@ -370,10 +369,10 @@ class CastPlaybackController(
             quality = quality,
             qualities = StreamQuality.offered(preferences.autoQuality.value),
             autoStep = StreamQuality.byId(r?.autoStep)?.takeIf { quality == StreamQuality.Auto && it != StreamQuality.Auto },
-            mode = r?.mode?.let(::playbackMode),
+            mode = playbackModeOf(r?.mode),
             note = note,
             stopMessage = r?.stopMessage?.takeIf { r.phase == StateMessage.STOPPED }
-                ?: if (r?.phase == StateMessage.STOPPED) "Playback was stopped by the server's admin." else null,
+                ?: if (r?.phase == StateMessage.STOPPED) STOPPED_BY_ADMIN else null,
             error = shownError ?: if (status == PlayerStatus.Error) "The TV couldn't play this." else null,
         )
     }
@@ -385,39 +384,10 @@ class CastPlaybackController(
         /** How long Automatic's switch note shows. */
         const val NOTE_MS = 5_000L
 
-        internal fun withToken(url: String, token: String) = url + (if ('?' in url) "&" else "?") + "access_token=" + token
-
-        internal fun segmentKind(kind: String): SegmentKind? = when (kind) {
-            "intro" -> SegmentKind.Intro
-            "recap" -> SegmentKind.Recap
-            "credits" -> SegmentKind.Credits
-            "preview" -> SegmentKind.Preview
-            "commercial" -> SegmentKind.Commercial
-            else -> null
-        }
-
-        internal fun SegmentKind.wireName(): String = name.lowercase()
-
-        private fun skipLabel(kind: SegmentKind): String = when (kind) {
-            SegmentKind.Intro -> "Skip Intro"
-            SegmentKind.Recap -> "Skip Recap"
-            SegmentKind.Credits -> "Skip Credits"
-            SegmentKind.Preview -> "Skip Preview"
-            SegmentKind.Commercial -> "Skip Ad"
-        }
-
-        private fun playbackMode(mode: String): PlaybackMode? = when (mode) {
-            "direct" -> PlaybackMode.Direct
-            "remux" -> PlaybackMode.Remux
-            "audio" -> PlaybackMode.AudioTranscode
-            "transcode" -> PlaybackMode.Transcode
-            else -> null
-        }
-
-        private fun SegmentInfo.toModel() = segmentKind(kind)?.let { Segment(it, startMs, endMs, final == true) }
+        private fun SegmentInfo.toModel() = segmentKindOf(kind)?.let { Segment(it, startMs, endMs, final == true) }
 
         private fun skipPrompt(skip: SkipInfo, segments: List<Segment>): SkipPrompt? {
-            val kind = segmentKind(skip.kind) ?: return null
+            val kind = segmentKindOf(skip.kind) ?: return null
             val segment = segments.firstOrNull { it.kind == kind && it.endMs == skip.endMs } ?: Segment(kind, 0, skip.endMs)
             return SkipPrompt(segment, skipLabel(kind), autoProgress = null)
         }

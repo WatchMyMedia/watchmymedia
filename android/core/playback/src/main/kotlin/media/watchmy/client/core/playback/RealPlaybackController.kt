@@ -60,6 +60,13 @@ import media.watchmy.client.model.StreamProtocol
 import media.watchmy.client.model.SubtitleRequestMode
 import media.watchmy.client.model.SubtitleMode
 import media.watchmy.client.model.requiresBurnIn
+import media.watchmy.client.model.SLOW_CONNECTION_NOTE
+import media.watchmy.client.model.automaticStepNote
+import media.watchmy.client.model.capped
+import media.watchmy.client.model.loweredNote
+import media.watchmy.client.model.signing
+import media.watchmy.client.model.skipLabel
+import media.watchmy.client.model.stillPlayingNote
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleOption
 import media.watchmy.client.model.SubtitleSource
@@ -574,7 +581,7 @@ class RealPlaybackController(
                     v.loading = false
                     v.failedGeneration = switchGeneration
                     v.stepMessage = null
-                    showNote(v, "Still playing at ${stepName(prior.autoStep ?: StreamQuality.Original)}. Quality will retry later.")
+                    showNote(v, stillPlayingNote(prior.autoStep ?: StreamQuality.Original))
                     refresh(0)
                 } else fail(v, e)
             }
@@ -696,7 +703,7 @@ class RealPlaybackController(
         val token = token
         media?.load(
             PlayerSource(
-                url = token?.let { withToken(d.url, it) } ?: d.url,
+                url = token?.signing(d.url) ?: d.url,
                 hls = d.protocol == StreamProtocol.Hls,
                 live = streamClock.event,
                 startPositionMs = streamClock.playerPosition(start),
@@ -930,7 +937,7 @@ class RealPlaybackController(
         v.acceptedGeneration = null
         v.failedGeneration = pending.generation
         v.pendingPositionMs = pending.atMs
-        v.stepMessage = "Still playing at ${stepName(pending.previous.autoStep ?: StreamQuality.Original)}. Quality will retry later."
+        v.stepMessage = stillPlayingNote(pending.previous.autoStep ?: StreamQuality.Original)
         apply(v, pending.previous, pending.atMs, playWhenReady = true)
         v.stepMessage?.let { showNote(v, it) }
         v.stepMessage = null
@@ -1015,7 +1022,7 @@ class RealPlaybackController(
         // Automatic at its lowest step and still stalling: say so, once.
         if (quality == StreamQuality.Auto && d.autoStep == StreamQuality.entries.last() && !v.loading && !v.floorNoted && p.stalls.count > 0) {
             v.floorNoted = true
-            showNote(v, FLOOR_NOTE)
+            showNote(v, SLOW_CONNECTION_NOTE)
         }
 
         val segment = if (v.loading || ended || status == PlayerStatus.Error || showNext) null else activeSegment(d, pos, nextOffered)
@@ -1178,11 +1185,7 @@ class RealPlaybackController(
             if (generation <= v.handledGeneration) return
             v.handledGeneration = generation
         }
-        val currentStep = d.autoStep
-        v.stepMessage = change.message ?: if (currentStep != null && change.step.ordinal < currentStep.ordinal) {
-            if (change.step == StreamQuality.Original) "Connection recovered; playing the original file."
-            else "Raised to ${stepName(change.step)} for your connection."
-        } else "Lowered to ${stepName(change.step)} for your connection."
+        v.stepMessage = change.message ?: automaticStepNote(d.autoStep, change.step)
         reload(v, qualitySwitch = change)
     }
 
@@ -1193,7 +1196,7 @@ class RealPlaybackController(
         val message = v.stepMessage
         v.stepMessage = null
         if (quality != StreamQuality.Auto || was == null || now == null || now.ordinal <= was.ordinal) return
-        showNote(v, message ?: "Lowered to ${stepName(now)} for your connection.")
+        showNote(v, message ?: loweredNote(now))
     }
 
     private fun showNote(v: Viewing, text: String) {
@@ -1386,7 +1389,7 @@ class RealPlaybackController(
             "ass" -> "text/x-ssa"
             else -> return null
         }
-        return SideloadedSubtitle(t.option.id, token?.let { withToken(url, it) } ?: url, mime, t.option.label, t.option.language)
+        return SideloadedSubtitle(t.option.id, token?.signing(url) ?: url, mime, t.option.label, t.option.language)
     }
 
     private inline fun <T> attempt(what: String, block: () -> T): T? = try {
@@ -1402,7 +1405,6 @@ class RealPlaybackController(
         const val TAG = "WmmPlayback"
         const val TICK_MS = 250L
         const val NOTE_MS = 5_000L
-        const val FLOOR_NOTE = "Your connection is too slow to play this smoothly."
         const val MAX_RECOVERIES = 2
         const val RECOVERY_RESET_MS = 60_000L
         const val EVENT_START_TOLERANCE_MS = 15_000L
