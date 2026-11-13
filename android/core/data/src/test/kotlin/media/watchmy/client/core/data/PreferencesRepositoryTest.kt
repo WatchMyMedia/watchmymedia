@@ -64,6 +64,31 @@ class PreferencesRepositoryTest {
         assertFalse(p.autoplayNext)
     }
 
+    /**
+     * A load that returns has loaded, even with another on its way. Each
+     * used to send its own request, and the one answered first left its
+     * reply unused because the other had started after it: its caller (the
+     * player, before its first play) then read the defaults.
+     */
+    @Test
+    fun `a load that returns has loaded, even with another on its way`() = runBlocking {
+        signIn()
+        server.always("GET /api/me/preferences", json("""{"skip":{"intro":"auto"},"autoplayNext":false}"""))
+        val first = server.hold("GET /api/me/preferences")
+        val loading = launch(start = CoroutineStart.UNDISPATCHED) { prefs.refresh() }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { first.awaitArrival() }
+        // Another load starts while the first waits for its answer, and its own answer is slower still.
+        val second = server.hold("GET /api/me/preferences")
+        val other = launch(start = CoroutineStart.UNDISPATCHED) { prefs.refresh() }
+        first.release()
+        loading.join()
+        assertEquals(SkipMode.Auto, prefs.playback.value.skipMode(SegmentKind.Intro))
+        assertFalse(prefs.playback.value.autoplayNext)
+        second.release()
+        other.join()
+        assertEquals(SkipMode.Auto, prefs.playback.value.skipMode(SegmentKind.Intro))
+    }
+
     @Test
     fun `changes are sent as partial updates`() = runBlocking {
         signIn()
@@ -95,6 +120,34 @@ class PreferencesRepositoryTest {
         val saving = launch(start = CoroutineStart.UNDISPATCHED) { prefs.setSkip(SegmentKind.Intro, SkipMode.Auto) }
         prefs.refresh()
         saving.join()
+        assertEquals(SkipMode.Auto, prefs.playback.value.skipMode(SegmentKind.Intro))
+    }
+
+    /**
+     * A load asked for while a change is on its way leaves the preferences to
+     * the change's reply, also when it waits its turn behind another load and
+     * is sent only after the change was answered.
+     */
+    @Test
+    fun `a load asked for during a change leaves it to the change, even after waiting its turn`() = runBlocking {
+        signIn()
+        val firstLoad = server.hold("GET /api/me/preferences")
+        val loading = launch(start = CoroutineStart.UNDISPATCHED) { prefs.refresh() }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { firstLoad.awaitArrival() }
+        server.on(
+            "PUT /api/me/preferences",
+            json("""{"skip":{"intro":"auto","recap":"ask","credits":"ask","preview":"none","commercial":"none"},"autoplayNext":true}"""),
+        )
+        val saved = server.hold("PUT /api/me/preferences")
+        val saving = launch(start = CoroutineStart.UNDISPATCHED) { prefs.setSkip(SegmentKind.Intro, SkipMode.Auto) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { saved.awaitArrival() }
+        // Asked for now, sent once the first load is done: by then the change has its answer.
+        val other = launch(start = CoroutineStart.UNDISPATCHED) { prefs.refresh() }
+        saved.release()
+        saving.join()
+        firstLoad.release()
+        loading.join()
+        other.join()
         assertEquals(SkipMode.Auto, prefs.playback.value.skipMode(SegmentKind.Intro))
     }
 
