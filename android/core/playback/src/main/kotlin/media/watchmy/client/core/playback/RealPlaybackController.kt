@@ -11,7 +11,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -121,28 +120,24 @@ class RealPlaybackController(
     private val _events = MutableSharedFlow<PlayerEvent>(extraBufferCapacity = 8)
     override val events: Flow<PlayerEvent> = _events.asSharedFlow()
 
-    private var media: MediaPlayer? = null
-    private var sessionHandle: AutoCloseable? = null
-    private var visibilityHandle: AutoCloseable? = null
+    private val host = PlayerHost(scope, playerFactory, sessions, visibility, clock)
+    private val media: MediaPlayer? get() = host.media
 
-    private val _player = MutableStateFlow<Player?>(null)
-    override val player: StateFlow<Player?> = _player.asStateFlow()
+    override val player: StateFlow<Player?> = host.player
 
     private var viewing: Viewing? = null
     private var generation = 0
-    /** What decisions ask for: the viewer's pick in this player, else the default for the network in use, read at each decision. */
-    private var quality: StreamQuality = preferences.qualityOn(network)
-    private var qualityPicked = false
-    private var token: MediaToken? = null
-    private var tokenRefreshAt = 0L
+    private val choice = QualityChoice(preferences, network)
+
+    /** What decisions ask for ([choice]), as of the last one. */
+    private var quality: StreamQuality = choice.current()
+    private val tokens = MediaTokenClock(clock)
     private var backgrounded = false
     private var preferencesReady = false
     private var preferencesLoaded = false
     private var released = false
 
-    private var tickJob: Job? = null
     private var loadJob: Job? = null
-    private var lastTickAt = 0L
 
     private val outbox = Channel<Outgoing>(Channel.UNLIMITED)
 
@@ -154,14 +149,13 @@ class RealPlaybackController(
 
     /** One file being watched: from [start] (or the next episode starting) until it stops. */
     private class Viewing(var request: PlayRequest, val generation: Int) {
-        data class PendingSwitch(val previous: PlaybackDecision, val atMs: Long, val generation: Long)
+        /** What an Automatic step change goes back to if it fails: the decision before it, and where it had got to. */
+        data class Previous(val decision: PlaybackDecision, val atMs: Long)
 
         var decision: PlaybackDecision? = null
-        var pendingSwitch: PendingSwitch? = null
-        var awaitingFrameGeneration: Long? = null
-        var acceptedGeneration: Long? = null
-        var failedGeneration: Long? = null
-        var handledGeneration = 0L
+
+        /** Automatic's step changes; the old stream stays until the server takes the new one. */
+        val switch = OutputSwitch<Previous>(keepFallbackUntilReported = true)
 
         /** The decision's subtitles as the pickers list them, mapped once per decision. */
         var subtitles: List<SubtitleOption> = emptyList()
@@ -433,9 +427,7 @@ class RealPlaybackController(
         val q = if (quality == StreamQuality.Auto && !preferences.autoQuality.value) StreamQuality.Original else quality
         if (q == this.quality) return
         this.quality = q
-        qualityPicked = true
-        val mobile = preferences.device.value.mobileQuality != null && network.metered()
-        scope.launch { attempt("save quality") { if (mobile) preferences.setMobileQuality(q) else preferences.setQuality(q) } }
+        choice.pick(q, scope)
         _state.update { it.copy(quality = q) }
         val v = active() ?: return
         if (v.decision != null) reload(v)
@@ -454,16 +446,8 @@ class RealPlaybackController(
         endViewing(PlayState.Stopped)
         released = true
         viewing = null
-        tickJob?.cancel()
         loadJob?.cancel()
-        visibilityHandle?.close()
-        visibilityHandle = null
-        sessionHandle?.close()
-        sessionHandle = null
-        _player.value = null
-        media?.setListener(null)
-        media?.release()
-        media = null
+        host.release()
         // The queue drains (the last report goes out), then the scope ends.
         outbox.close()
         job.complete()
@@ -482,14 +466,14 @@ class RealPlaybackController(
         v.subtitleManuallyChosen = request.subtitleId != null || request.subtitleMode == SubtitleRequestMode.Off
         viewing = v
         ensurePlayer()
-        if (visibilityHandle == null) visibilityHandle = visibility.observe(::onVisibility)
+        host.followVisibility(::onVisibility)
         if (!preferencesLoaded) {
             preferencesLoaded = true
             scope.launch { attempt("load preferences") { preferences.refresh() }; preferencesReady = true }
         }
         // Every play gets a fresh media token (PLAN-CLIENTS.md §2.2).
-        token = null
-        if (!qualityPicked) quality = preferences.qualityOn(network)
+        tokens.forget()
+        quality = choice.current()
         _state.value = PlayerUiState(
             status = PlayerStatus.Loading,
             title = request.title,
@@ -500,7 +484,7 @@ class RealPlaybackController(
             qualities = StreamQuality.offered(preferences.autoQuality.value),
         )
         _progress.value = PlaybackProgress(positionMs = request.startMs ?: 0)
-        startTicker()
+        host.startTicker(::refresh)
         v.loading = true
         loadJob?.cancel()
         loadJob = scope.launch {
@@ -554,13 +538,10 @@ class RealPlaybackController(
         val atMs = seekMs ?: position(v)
         v.loading = true
         if (qualitySwitch == null) {
-            v.pendingSwitch?.previous?.sessionId?.let { outbox.trySend(Outgoing.EndSession(it)) }
-            v.pendingSwitch = null
-            v.awaitingFrameGeneration = null
-            v.acceptedGeneration = null
+            v.switch.abandon()?.fallback?.decision?.sessionId?.let { outbox.trySend(Outgoing.EndSession(it)) }
         }
         if (seekMs != null) v.pendingPositionMs = seekMs
-        if (newToken) token = null
+        if (newToken) tokens.forget()
         loadJob?.cancel()
         loadJob = scope.launch {
             try {
@@ -574,12 +555,11 @@ class RealPlaybackController(
             } catch (e: Exception) {
                 val prior = v.decision
                 val switchGeneration = qualitySwitch?.generation
-                val pending = v.pendingSwitch
-                if (switchGeneration != null && pending?.generation == switchGeneration && viewing === v) {
-                    restorePrevious(v, pending)
+                if (switchGeneration != null && v.switch.pending?.generation == switchGeneration && viewing === v && restorePrevious(v)) {
+                    // Back on the stream before the switch.
                 } else if (switchGeneration != null && prior != null && viewing === v) {
                     v.loading = false
-                    v.failedGeneration = switchGeneration
+                    v.switch.failed(switchGeneration)
                     v.stepMessage = null
                     showNote(v, stillPlayingNote(prior.autoStep ?: StreamQuality.Original))
                     refresh(0)
@@ -598,7 +578,7 @@ class RealPlaybackController(
         switchGeneration: Long? = null,
     ): PlaybackDecision {
         // Onto mobile data or off it since the last decision: this one takes that network's default.
-        if (!qualityPicked) quality = preferences.qualityOn(network)
+        quality = choice.current()
         // Automatic has no caps: the device's own profile, and the server picks the step.
         val device = withContext(io) { profileProvider.current() }.capped(quality)
         val profile = if (v.playerSelectsAudio) device else device.copy(selectsAudioTrack = null)
@@ -641,13 +621,8 @@ class RealPlaybackController(
     }
 
     private suspend fun ensureToken() {
-        if (token != null && clock.elapsedMs() < tokenRefreshAt) return
-        val fresh = withContext(io) { gateway.mediaToken() }
-        token = fresh
-        // Timed on this device's clock, with a floor, so a clock that
-        // disagrees with the server's cannot cause a reload loop.
-        val lifetime = (fresh.expiresAtMs - clock.wallMs()).coerceAtLeast(TOKEN_MIN_LIFETIME_MS)
-        tokenRefreshAt = clock.elapsedMs() + lifetime - TOKEN_MARGIN_MS
+        if (tokens.fresh() != null) return
+        tokens.accept(withContext(io) { gateway.mediaToken() })
     }
 
     private fun apply(v: Viewing, decided: PlaybackDecision, requestedStartMs: Long, playWhenReady: Boolean = true,
@@ -685,10 +660,8 @@ class RealPlaybackController(
         }
         if (d.burnInSubtitleId != null) v.selectedSubtitle = d.burnInSubtitleId
         if (previous != null && !negotiated) endReplacedSession(previous, d)
-        if (switchGeneration != null && previous != null) {
-            v.pendingSwitch = Viewing.PendingSwitch(previous, start, switchGeneration)
-        }
-        v.awaitingFrameGeneration = qualitySwitch?.generation
+        // The load below is the switch's: its first frame accepts it.
+        if (switchGeneration != null) v.switch.begin(switchGeneration, previous?.let { Viewing.Previous(it, start) }, host.loads + 1)
         // A seek while an event session was being fetched went somewhere else: fetch one there.
         if (streamClock.event && seekedWhileLoading && abs(start - d.startMs) > EVENT_START_TOLERANCE_MS) {
             reload(v, start)
@@ -700,8 +673,8 @@ class RealPlaybackController(
         v.startupMs = null
         v.startupSent = false
         if (qualitySwitch?.generation == null) noteStepChange(v, previous, d)
-        val token = token
-        media?.load(
+        val token = tokens.token
+        host.load(
             PlayerSource(
                 url = token?.signing(d.url) ?: d.url,
                 hls = d.protocol == StreamProtocol.Hls,
@@ -767,10 +740,10 @@ class RealPlaybackController(
             report(v, state, pos, 0)
             leftPartway(v, pos)
             d.sessionId?.let { outbox.trySend(Outgoing.EndSession(it)) }
-            v.pendingSwitch?.previous?.sessionId?.takeIf { it != d.sessionId }?.let { outbox.trySend(Outgoing.EndSession(it)) }
+            v.switch.pending?.fallback?.decision?.sessionId?.takeIf { it != d.sessionId }?.let { outbox.trySend(Outgoing.EndSession(it)) }
         }
         v.stopped = true
-        tickJob?.cancel()
+        host.stopTicker()
         media?.stop()
     }
 
@@ -841,7 +814,7 @@ class RealPlaybackController(
         loadJob?.cancel()
         v.loading = false
         media?.stop()
-        tickJob?.cancel()
+        host.stopTicker()
         leftPartway(v, pos)
         _state.update { it.copy(status = PlayerStatus.Paused, stopMessage = message, skip = null, upNext = null, askStillWatching = false) }
     }
@@ -905,13 +878,10 @@ class RealPlaybackController(
             return
         }
         Log.w(TAG, "Player error: ${failure.detail}")
-        v.pendingSwitch?.let { pending ->
-            restorePrevious(v, pending)
-            return
-        }
-        v.awaitingFrameGeneration?.let {
-            v.failedGeneration = it
-            v.awaitingFrameGeneration = null
+        if (restorePrevious(v)) return
+        // A switch with nothing to go back to: it failed, and the error is handled as any other.
+        if (v.switch.awaitingFrame) {
+            v.switch.reject()
             v.stepMessage = null
         }
         // A decoder the device lists but that fails (a Pixel's Dolby E-AC-3): ask again
@@ -931,34 +901,20 @@ class RealPlaybackController(
         refresh(0)
     }
 
-    private fun restorePrevious(v: Viewing, pending: Viewing.PendingSwitch) {
-        v.pendingSwitch = null
-        v.awaitingFrameGeneration = null
-        v.acceptedGeneration = null
-        v.failedGeneration = pending.generation
-        v.pendingPositionMs = pending.atMs
-        v.stepMessage = stillPlayingNote(pending.previous.autoStep ?: StreamQuality.Original)
-        apply(v, pending.previous, pending.atMs, playWhenReady = true)
+    /** Back to the stream before a failed step change, where it had got to; false when there is none to go back to. */
+    private fun restorePrevious(v: Viewing): Boolean {
+        val previous = v.switch.pending?.fallback ?: return false
+        v.switch.reject()
+        v.pendingPositionMs = previous.atMs
+        v.stepMessage = stillPlayingNote(previous.decision.autoStep ?: StreamQuality.Original)
+        apply(v, previous.decision, previous.atMs, playWhenReady = true)
         v.stepMessage?.let { showNote(v, it) }
         v.stepMessage = null
         refresh(0)
+        return true
     }
 
     // --- the tick ---
-
-    private fun startTicker() {
-        if (tickJob?.isActive == true) return
-        lastTickAt = clock.elapsedMs()
-        tickJob = scope.launch {
-            while (true) {
-                delay(TICK_MS)
-                val now = clock.elapsedMs()
-                val dt = now - lastTickAt
-                lastTickAt = now
-                refresh(dt)
-            }
-        }
-    }
 
     /**
      * Brings [state] and [progress] up to date and acts on them: heartbeats,
@@ -1085,7 +1041,7 @@ class RealPlaybackController(
             action == SkipAction.AutoNow -> skipSegment(v, segment!!)
             action == SkipAction.AutoDelay && v.fillMs >= AUTO_DELAY_MS -> skipSegment(v, segment!!)
             v.countdownMs == 0L -> autoAdvance(v)
-            !v.loading && token != null && now >= tokenRefreshAt && status != PlayerStatus.Ended && status != PlayerStatus.Error ->
+            !v.loading && tokens.due && status != PlayerStatus.Ended && status != PlayerStatus.Error ->
                 // The play outlived its media token: a new one, and a new session here.
                 reload(v)
         }
@@ -1124,18 +1080,17 @@ class RealPlaybackController(
         v.lastReported = state
         v.lastBeatAt = clock.elapsedMs()
         val position = if (v.finished) duration(d) else pos
-        val p = media
-        val stalls = p?.stalls
-        val transfer = p?.transfer
+        // Measured here, on the player's thread, before the report goes to the queue.
+        val m = measure(media, buffered, v.switch)
         val startup = v.startupMs?.takeIf { !v.startupSent }?.also { v.startupSent = true }
         val report = ProgressReport(
             v.request.fileId, position, duration(d), playId, state, buffered,
-            throughputBps = transfer?.bps ?: p?.throughputBps,
-            throughputAgeMs = transfer?.ageMs,
-            switchGeneration = v.acceptedGeneration.takeIf { state == PlayState.Playing },
-            switchFailedGeneration = v.failedGeneration,
-            stalls = stalls?.count,
-            stallMs = stalls?.ms,
+            throughputBps = m.transfer?.bps ?: m.estimateBps,
+            throughputAgeMs = m.transfer?.ageMs,
+            switchGeneration = m.switchGeneration.takeIf { state == PlayState.Playing },
+            switchFailedGeneration = m.switchFailedGeneration,
+            stalls = m.stalls?.count,
+            stallMs = m.stalls?.ms,
             startupMs = startup,
             recordingId = v.request.recordingId,
         )
@@ -1155,14 +1110,11 @@ class RealPlaybackController(
 
     private fun onReply(generation: Int, report: ProgressReport, reply: ProgressReply) {
         val v = viewing?.takeIf { it.generation == generation } ?: return
-        if (report.switchGeneration != null && v.acceptedGeneration == report.switchGeneration) {
-            v.acceptedGeneration = null
-            v.pendingSwitch = null
+        if (v.switch.reported(report.switchGeneration, report.switchFailedGeneration)) {
             v.stepMessage?.let { showNote(v, it) }
             v.stepMessage = null
             refresh(0)
         }
-        if (report.switchFailedGeneration != null && v.failedGeneration == report.switchFailedGeneration) v.failedGeneration = null
         if (reply.completed) markWatched(v)
         if (v.stopped) return
         // The play had ended (timed out, server restarted): the server carries on with a new one.
@@ -1181,10 +1133,7 @@ class RealPlaybackController(
         val d = v.decision ?: return
         if (v.loading || d.autoStep == change.step) return
         val generation = change.generation
-        if (generation != null) {
-            if (generation <= v.handledGeneration) return
-            v.handledGeneration = generation
-        }
+        if (generation != null && !v.switch.take(generation)) return
         v.stepMessage = change.message ?: automaticStepNote(d.autoStep, change.step)
         reload(v, qualitySwitch = change)
     }
@@ -1242,38 +1191,22 @@ class RealPlaybackController(
     // --- helpers ---
 
     private fun ensurePlayer() {
-        if (media != null) return
-        val p = playerFactory()
-        media = p
-        p.setListener(object : MediaPlayer.Listener {
-            // Posted, so a callback inside a player call never re-enters the machine.
-            override fun onChanged() {
-                scope.launch { refresh(0) }
-            }
+        host.ensure(playerEvents) { SessionPlayer(it, controls) }
+    }
 
-            override fun onError(failure: PlayerFailure) {
-                scope.launch { onPlayerError(failure) }
-            }
+    /** The player's callbacks, posted by [host], so one inside a player call never re-enters the machine. */
+    private val playerEvents = object : PlayerHost.Events {
+        override fun onChanged() = refresh(0)
 
-            override fun onFirstFrame() {
-                scope.launch {
-                    val v = active() ?: return@launch
-                    v.awaitingFrameGeneration?.let {
-                        v.awaitingFrameGeneration = null
-                        v.acceptedGeneration = it
-                        refresh(0)
-                    }
-                }
-            }
+        override fun onError(failure: PlayerFailure) = onPlayerError(failure)
 
-            override fun onAudioUnavailable() {
-                scope.launch { audioUnavailable() }
-            }
-        })
-        val media3 = p.media3 ?: return
-        val wrapped = SessionPlayer(media3, controls)
-        _player.value = wrapped
-        sessionHandle = sessions.open(wrapped)
+        override fun onFirstFrame(load: Int) {
+            val v = active() ?: return
+            // The new step's own first frame: the next heartbeat says it plays.
+            if (v.switch.frame(load) != null) refresh(0)
+        }
+
+        override fun onAudioUnavailable() = audioUnavailable()
     }
 
     private val controls = object : SessionControls {
@@ -1403,7 +1336,6 @@ class RealPlaybackController(
 
     private companion object {
         const val TAG = "WmmPlayback"
-        const val TICK_MS = 250L
         const val NOTE_MS = 5_000L
         const val MAX_RECOVERIES = 2
         const val RECOVERY_RESET_MS = 60_000L

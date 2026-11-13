@@ -363,14 +363,28 @@ class LivePlaybackTest {
 
     @Test fun `token renewal changes future media requests without loading a new source or starting a session`() = runTest {
         val h = harness()
-        h.gateway.tokenLifetime = 20_000
+        h.gateway.tokenLifetime = 40 * 60_000L
         h.controller.start(ONE)
         runCurrent()
-        advanceTimeBy(17_000)
+        advanceTimeBy(38 * 60_000L)
+        runCurrent()
+        assertEquals("Not before its last minute", 1, h.media.liveTokens.size)
+        advanceTimeBy(60_500)
         runCurrent()
         assertEquals(2, h.media.liveTokens.size)
         assertEquals(1, h.gateway.requests.size)
         assertEquals(1, h.media.loads.size)
+        h.close()
+    }
+
+    @Test fun `a token that seems to have expired by this device's clock is still trusted for half an hour`() = runTest {
+        val h = harness()
+        h.gateway.tokenLifetime = -60 * 60_000L
+        h.controller.start(ONE)
+        runCurrent()
+        advanceTimeBy(5 * 60_000L)
+        runCurrent()
+        assertEquals("No renewal loop", 1, h.media.liveTokens.size)
         h.close()
     }
 

@@ -140,7 +140,7 @@ interface MediaPlayer {
      */
     val endedEventDurationMs: Long? get() = null
 
-    /** Renew credentials for future live manifest/segment reads without retuning or discarding the pause. */
+    /** Puts [token] on the stream's further requests (playlists, segments, a file's ranges) in place of the one they carry: a renewal that neither reloads nor retunes. */
     fun updateMediaToken(token: MediaToken) = Unit
 
     /** Seek to the broadcast edge; file controllers never call this. */

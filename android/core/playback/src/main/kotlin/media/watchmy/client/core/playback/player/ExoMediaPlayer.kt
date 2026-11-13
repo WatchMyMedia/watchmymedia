@@ -67,7 +67,8 @@ class ExoMediaPlayer(
     private var firstFramePending = false
     private var mediaPathPrefix: String? = null
     private var videoFrameRate: Float? = null
-    @Volatile private var liveToken: MediaToken? = null
+    /** The media token the stream's further requests carry, in place of the one they were made with. */
+    @Volatile private var mediaToken: MediaToken? = null
 
     /** The source loaded is an event or live playlist, which may grow. */
     private var live = false
@@ -75,7 +76,7 @@ class ExoMediaPlayer(
     init {
         val network = OkHttpDataSource.Factory(http).setUserAgent(userAgent)
         val renewable = ResolvingDataSource.Factory(sources(network)) { spec ->
-            liveToken?.let { spec.withUri(renewableMediaUri(spec.uri, it)) } ?: spec
+            mediaToken?.let { spec.withUri(renewableMediaUri(spec.uri, it)) } ?: spec
         }
         exo = ExoPlayer.Builder(context)
             .setRenderersFactory((if (options.passthrough) DefaultRenderersFactory(context) else PcmOnlyRenderersFactory(context)).setEnableDecoderFallback(true))
@@ -179,7 +180,7 @@ class ExoMediaPlayer(
     override val endedEventDurationMs: Long?
         get() = exo.duration.takeIf { live && !exo.currentTimeline.isEmpty && !exo.isCurrentMediaItemDynamic && it != C.TIME_UNSET && it >= 0 }
 
-    override fun updateMediaToken(token: MediaToken) { liveToken = token }
+    override fun updateMediaToken(token: MediaToken) { mediaToken = token }
 
     override fun seekToLiveEdge() {
         exo.seekToDefaultPosition()
@@ -460,7 +461,7 @@ private val RENDITION_GROUP = Regex("""^(\d+:)?subtitle:""")
 
 private fun isSideloaded(formatId: String?, id: String) = formatId == id || formatId?.endsWith(":$id") == true
 
-/** Replaces an old playlist token on each read, confined to the signed-in server. */
+/** Replaces an old token on each read (a playlist's, a segment's, a file's), confined to the signed-in server. */
 internal fun renewableMediaUri(uri: Uri, token: MediaToken): Uri {
     val url = uri.toString()
     val signed = token.signing(url)
