@@ -15,8 +15,11 @@ dependencies {
     api(project(":core:model"))
     // The app hands the player's data source and the download cache through Media3's types.
     api(libs.androidx.media3.exoplayer)
+    // The downloader fetches over the app's OkHttp client (its connection pool), which OfflineDownloads takes.
+    api(libs.okhttp)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidx.media3.datasource.okhttp)
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.exoplayer.workmanager)
     implementation(libs.androidx.work.runtime)

@@ -19,7 +19,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
-import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.NoOpCacheEvictor
@@ -37,6 +37,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.io.File
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,6 +48,9 @@ import media.watchmy.client.model.OfflineGateway
 import media.watchmy.client.model.PlaybackGateway
 import media.watchmy.client.model.PlaybackProfile
 import media.watchmy.client.model.downloadTitle
+import okhttp3.Call
+import okhttp3.Dispatcher
+import okhttp3.OkHttpClient
 
 /**
  * Offline downloads for the phone app (PLAN-DOWNLOADS.md §10): made once by
@@ -64,6 +68,11 @@ class OfflineDownloads(
     client: () -> ClientInfo,
     profile: suspend () -> PlaybackProfile,
     userAgent: String,
+    /**
+     * The app's HTTP client without the API's sign-in, whose connection pool
+     * the downloader shares; asked for with the first download.
+     */
+    httpClient: () -> OkHttpClient = ::OkHttpClient,
 ) {
     /** Implemented by the Application, so [WmmDownloadService] and [OfflineSyncWorker] find the downloads. */
     interface Host {
@@ -88,12 +97,9 @@ class OfflineDownloads(
     private val tokens = OfflineTokens(gateway::token, owner = { id -> store.record(id)?.owner })
 
     internal val manager: DownloadManager = run {
-        // The player's read timeout: a VOD segment can wait while the server starts ffmpeg.
-        val http = DefaultHttpDataSource.Factory()
-            .setUserAgent(userAgent)
-            .setAllowCrossProtocolRedirects(false)
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(45_000)
+        // Built with the first fetch, on the downloader's thread, not at the app's start.
+        val client by lazy { downloaderHttpClient(httpClient()) }
+        val http = OkHttpDataSource.Factory(Call.Factory { client.newCall(it) }).setUserAgent(userAgent)
         val events = object : FetchEvents {
             override fun preparing(id: String) { ready?.preparing(id) }
             override fun fetching(id: String) { ready?.fetching(id) }
@@ -191,6 +197,20 @@ class OfflineDownloads(
                 Log.w(TAG, "could not schedule a sync", e)
             }
         }
+
+        /**
+         * The downloader's client, made from the app's [shared] one as the
+         * players' is: the same connection pool, its own dispatcher, no
+         * response cache, reads that wait out a server starting ffmpeg, and
+         * no redirect between http and https (the token is in the URL).
+         */
+        internal fun downloaderHttpClient(shared: OkHttpClient): OkHttpClient = shared.newBuilder()
+            .dispatcher(Dispatcher())
+            .cache(null)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(45, TimeUnit.SECONDS)
+            .followSslRedirects(false)
+            .build()
 
         internal fun launchIntent(context: Context): PendingIntent? {
             val intent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return null

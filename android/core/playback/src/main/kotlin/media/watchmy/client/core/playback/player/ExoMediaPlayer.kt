@@ -19,7 +19,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import media.watchmy.client.model.MediaToken
@@ -34,19 +34,23 @@ import androidx.media3.exoplayer.source.LoadEventInfo
 import androidx.media3.exoplayer.source.MediaLoadData
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DataSource
+import okhttp3.Call
 
 /**
  * [MediaPlayer] on ExoPlayer with the HLS module. Create it on the main
  * thread; ExoPlayer runs its callbacks there. It measures for Automatic
  * quality as it plays: the bandwidth meter's estimate ([ThroughputMeter])
- * and rebuffers ([StallCounter]). [options] are the device's settings when
- * the player screen opened; [sources] wraps its HTTP data source: the
- * phone app reads downloaded items from the download cache through it.
+ * and rebuffers ([StallCounter]). It fetches over [http] ([mediaHttpClient]),
+ * which carries the timeouts and the redirect rule. [options] are the
+ * device's settings when the player screen opened; [sources] wraps its HTTP
+ * data source: the phone app reads downloaded items from the download cache
+ * through it.
  */
 @OptIn(UnstableApi::class)
 class ExoMediaPlayer(
     context: Context,
     userAgent: String,
+    http: Call.Factory,
     options: PlayerOptions = PlayerOptions(),
     sources: (DataSource.Factory) -> DataSource.Factory = { it },
 ) : MediaPlayer {
@@ -69,15 +73,8 @@ class ExoMediaPlayer(
     private var live = false
 
     init {
-        // A VOD segment can wait several seconds while the server starts
-        // ffmpeg at a new place, so reads get longer than the default 8 s.
-        val http = DefaultHttpDataSource.Factory()
-            .setUserAgent(userAgent)
-            // An https stream that redirects to http would carry the media token in the clear.
-            .setAllowCrossProtocolRedirects(false)
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(45_000)
-        val renewable = ResolvingDataSource.Factory(sources(http)) { spec ->
+        val network = OkHttpDataSource.Factory(http).setUserAgent(userAgent)
+        val renewable = ResolvingDataSource.Factory(sources(network)) { spec ->
             liveToken?.let { spec.withUri(renewableMediaUri(spec.uri, it)) } ?: spec
         }
         exo = ExoPlayer.Builder(context)

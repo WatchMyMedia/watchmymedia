@@ -8,8 +8,11 @@ android {
 
 dependencies {
     api(project(":core:model"))
+    // The players fetch over the app's OkHttp client (its connection pool), which PlaybackEngine takes.
+    api(libs.okhttp)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidx.media3.datasource.okhttp)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.session)
