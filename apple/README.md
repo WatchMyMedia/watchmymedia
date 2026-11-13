@@ -664,6 +664,7 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
 - **Haptics** on taking the scrubber's thumb and on double-tap seeks.
 - **Reduce Motion** turns the player's slides into fades and stills its
   spinner.
+- **Pull to refresh** on Downloads syncs them.
 
 ## Release builds, privacy and measuring
 
