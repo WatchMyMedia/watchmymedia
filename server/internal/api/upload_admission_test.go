@@ -77,6 +77,12 @@ func TestUploadRollbackDrainsActiveMediaResponse(t *testing.T) {
 	if err != nil || !bytes.Equal(append(first, rest...), data) {
 		t.Fatalf("active response did not drain intact after rollback: %v (%d bytes)", err, len(first)+len(rest))
 	}
+	// The response stops counting as a view when its handler returns, which
+	// can be a moment after the client has read the last byte (a CI runner
+	// saw ActiveViews still 1). One that never ends still fails.
+	for deadline := time.Now().Add(5 * time.Second); l.Snapshot().ActiveViews != 0 && time.Now().Before(deadline); {
+		time.Sleep(5 * time.Millisecond)
+	}
 	if snapshot := l.Snapshot(); snapshot.Enforcing || snapshot.ActiveViews != 0 || snapshot.PacedBytes == 0 {
 		t.Fatalf("rollback left a paced response: %+v", snapshot)
 	}

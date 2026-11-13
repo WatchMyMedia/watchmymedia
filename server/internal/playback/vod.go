@@ -443,6 +443,26 @@ func (v *vodState) watch(r *vodRun) {
 	}
 }
 
+// catchUp indexes what the session's run has written so far and brings the
+// pieces within the byte budget now, rather than at the run's next look at
+// its playlist. A run that copies can write many pieces between two looks,
+// and the storage watchdog asks for this before it judges the folder.
+func (v *vodState) catchUp() {
+	v.mu.Lock()
+	r := v.run
+	v.mu.Unlock()
+	if r == nil {
+		return
+	}
+	finished := false
+	select {
+	case <-r.done:
+		finished = true
+	default:
+	}
+	v.refreshRun(r, finished)
+}
+
 // refreshRun indexes what is new of run r, which must still be the
 // session's run, and wakes the waiting requests when there is something.
 // It reports whether r is still the session's run.

@@ -449,6 +449,11 @@ func TestRecorderSharesUpstreamKeepsLiveViewerAndOwnsDeletion(t *testing.T) {
 			t.Fatal("partial survived", err)
 		}
 	}
+	// A joined source lease is dormant until it reads, and drops the bytes
+	// that come before. Activate it before the chunk is sent: on a loaded
+	// runner the chunk reached the capture before this test's Read began,
+	// passed the viewer by, and the Read waited out the deadline.
+	live.(*liveReader).active.Store(true)
 	select {
 	case chunks <- data:
 	case <-ctx.Done():

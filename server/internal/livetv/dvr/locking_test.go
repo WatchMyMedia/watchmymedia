@@ -110,8 +110,13 @@ func TestSourceMutationCanStopAStartingSharedViewerWhileScheduling(t *testing.T)
 	p := fixturePipeline(t, f, service)
 	entered := make(chan struct{})
 	sessions.SetRecordingInput(service.sharing, func(ctx context.Context, channel string) (io.ReadCloser, error) {
+		// Signal once the viewer has joined the pipeline, still under the
+		// held schedule mutex. Signalled on the way in, the source change
+		// could stop the viewer before it joined: the join was then refused,
+		// nothing held this fixture's pipeline, and nothing cancelled it.
+		reader, err := service.LiveInput(ctx, channel)
 		close(entered)
-		return service.LiveInput(ctx, channel)
+		return reader, err
 	})
 	service.mu.Lock()
 	if _, err := sessions.Start(t.Context(), owner, f.channels[0].ID, "480", "starting-shared-viewer", "Test"); err != nil {

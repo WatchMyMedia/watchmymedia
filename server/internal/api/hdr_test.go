@@ -36,6 +36,9 @@ func TestHDRProfileLevel8(t *testing.T) {
 	srv := newTestServerWith(t, func(d *Deps) {
 		d.Playback = mgr
 		d.Keyframes = playback.NewKeyframes(ffprobe, t.TempDir(), log)
+		// A scan writes its result into that folder after it answers: wait for
+		// it before the folder goes.
+		t.Cleanup(d.Keyframes.Close)
 	})
 	ctx := t.Context()
 	clip := probetest.DolbyVisionClip(t, ffmpeg, probetest.DolbyVision{Profile: 8, Level: 6, Compat: 1, MKV: true})

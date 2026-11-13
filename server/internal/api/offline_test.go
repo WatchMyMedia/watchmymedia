@@ -600,6 +600,9 @@ func TestOfflineHLSDownloads(t *testing.T) {
 	e := newOfflineEnv(t, func(d *Deps) {
 		d.Playback = mgr
 		d.Keyframes = playback.NewKeyframes(filepath.Join(filepath.Dir(ffmpeg), "ffprobe"), t.TempDir(), log)
+		// A scan writes its result into that folder after it answers: wait for
+		// it before the folder goes.
+		t.Cleanup(d.Keyframes.Close)
 		d.Subtitles = playback.NewSubtitles(ffmpeg, t.TempDir())
 	})
 	ctx := t.Context()

@@ -327,6 +327,19 @@ func (m *Manager) checkResources() {
 	var kept []candidate
 	freed := leaving
 	for _, c := range candidates {
+		if r.MaxSessionBytes > 0 && c.item.Bytes > r.MaxSessionBytes && c.s != nil && c.s.vod != nil {
+			// A VOD run that copies can write pieces faster than the session
+			// reads its playlist, and the session trims them to its byte
+			// budget when it does. Have it do that now and measure again, so
+			// the limit stops a session that is over it, not one caught
+			// between two looks at its playlist.
+			c.s.vod.catchUp()
+			var again ResourceSnapshot
+			if err := scanSession(c.s.Dir, c.item.Kind, c.item.ID, &again); err == nil && len(again.Sessions) == 1 {
+				r.TemporaryBytes += again.Sessions[0].Bytes - c.item.Bytes
+				c.item.Bytes = again.Sessions[0].Bytes
+			}
+		}
 		if r.MaxSessionBytes > 0 && c.item.Bytes > r.MaxSessionBytes {
 			stop(c, "session byte limit")
 			freed += c.item.Bytes
