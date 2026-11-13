@@ -188,3 +188,31 @@ private class WholeIntoViewNode : Modifier.Node(), BringIntoViewModifierNode {
         bringIntoView(bounds = null)
     }
 }
+
+/**
+ * Bring-into-view requests from inside this element stop here. A focus
+ * change asks every scrolling parent to show the focused item, and a pager
+ * answers even when told not to scroll: mid-move it settles on a page of
+ * its own choosing and takes the scroll from whoever was moving it. Put
+ * this on each page of a pager that only the D-pad pages (Home's screens),
+ * so a card focused inside a page never moves the pager.
+ */
+fun Modifier.stopBringIntoView(): Modifier = this then StopBringIntoViewElement
+
+private object StopBringIntoViewElement : ModifierNodeElement<StopBringIntoViewNode>() {
+    override fun create() = StopBringIntoViewNode()
+
+    override fun update(node: StopBringIntoViewNode) = Unit
+
+    override fun hashCode() = "stopBringIntoView".hashCode()
+
+    override fun equals(other: Any?) = other === this
+
+    override fun InspectorInfo.inspectableProperties() {
+        name = "stopBringIntoView"
+    }
+}
+
+private class StopBringIntoViewNode : Modifier.Node(), BringIntoViewModifierNode {
+    override suspend fun bringIntoView(childCoordinates: LayoutCoordinates, boundsProvider: () -> Rect?) = Unit
+}

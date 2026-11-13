@@ -67,6 +67,14 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   state (the TV show page's row puts the focused episode on top), remember
   each item's focus modifier and click lambda by its key. Built inline they
   are new on every move, and every visible card draws again.
+- **Pagers the D-pad pages.** A focus change asks every scrolling parent to
+  bring the focused item into view, and a pager answers even under a
+  `BringIntoViewSpec` that says not to scroll: mid-move it settles on a page
+  of its own choosing and cancels whoever was scrolling it. Home's rows
+  arrived without focus that way when ◀ or ▶ was pressed during the slide.
+  Put `stopBringIntoView()` on each page, move focus first and have the pager
+  follow it (`ArrangedHomeContent`'s `goal`), and test keys pressed partway
+  through a slide with the test clock stopped, as `HomeFocusTest` does.
 - **Dependency verification.** Gradle checks every download against
   `gradle/verification-metadata.xml` (README, "Dependency verification").
   After changing a library, a plugin or the wrapper, run
