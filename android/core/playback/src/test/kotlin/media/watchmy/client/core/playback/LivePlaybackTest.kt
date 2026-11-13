@@ -417,15 +417,56 @@ class LivePlaybackTest {
         h.gateway.automatic = true
         h.controller.selectQuality(StreamQuality.Auto)
         runCurrent()
-        // The already loaded session cannot offer a choice until a fresh
-        // capabilities read; retuning then exposes Automatic.
+        // The loaded session cannot offer a choice until a fresh capabilities read.
         assertEquals(1, h.gateway.requests.size)
         h.controller.start(TWO)
         runCurrent()
+        assertEquals("A channel change goes by the capabilities held", 1, h.gateway.capabilityReads)
+        assertFalse(h.controller.state.value.automaticAvailable)
+        assertEquals(StreamQuality.FullHd, h.gateway.requests.last().quality)
+        // Once they are old, a start reads them again in the background, and the picker offers Automatic.
+        advanceTimeBy(5 * 60_000L)
+        h.controller.start(ONE)
+        runCurrent()
+        assertEquals(2, h.gateway.capabilityReads)
         assertTrue(h.controller.state.value.automaticAvailable)
+        h.controller.start(TWO)
+        runCurrent()
         assertEquals(StreamQuality.Auto, h.gateway.requests.last().quality)
         assertEquals(1, h.gateway.maximumTuners)
         assertEquals("Android Live TV", h.gateway.profiles.last().name)
+        h.close()
+    }
+
+    @Test fun `a channel change keeps the media token while it is fresh`() = runTest {
+        val h = harness()
+        h.controller.start(ONE)
+        runCurrent()
+        h.controller.start(TWO)
+        runCurrent()
+        h.controller.start(THREE)
+        runCurrent()
+        assertEquals(3, h.gateway.requests.size)
+        assertEquals(1, h.gateway.tokenReads)
+        assertEquals(listOf("token-1"), h.media.liveTokens.map { it.token }.distinct())
+        h.close()
+    }
+
+    @Test fun `a tuning channel's status is asked at every tick, one call at a time`() = runTest {
+        val h = harness()
+        h.gateway.initialState = LiveSessionState.Starting
+        h.controller.start(ONE)
+        runCurrent()
+        advanceTimeBy(1_010)
+        runCurrent()
+        // The first tick carries the start's input as a heartbeat; the rest ask for the status.
+        assertEquals(4, h.gateway.statusCalls + h.gateway.beats.size)
+        assertEquals(3, h.gateway.statusCalls)
+        h.gateway.nextReply = h.gateway.view().copy(state = LiveSessionState.Playing)
+        advanceTimeBy(250)
+        runCurrent()
+        assertEquals(PlayerStatus.Playing, h.controller.state.value.status)
+        assertEquals(1, h.media.loads.size)
         h.close()
     }
 
@@ -603,7 +644,13 @@ class LivePlaybackTest {
         val profiles = mutableListOf<PlaybackProfile>()
         val measurements = mutableListOf<LiveMeasurement>()
         var startDirective: LiveOutputDirective? = null
-        override suspend fun liveCapabilities() = LiveCapabilities(automatic = automatic)
+        var capabilityReads = 0
+        var statusCalls = 0
+        val tokenReads get() = tokens
+        override suspend fun liveCapabilities(): LiveCapabilities {
+            capabilityReads++
+            return LiveCapabilities(automatic = automatic)
+        }
         override suspend fun startNegotiated(target: LiveTarget, quality: StreamQuality, requestId: String, client: ClientInfo, profile: PlaybackProfile): LiveSession {
             profiles += profile
             return start(target, quality, requestId, client)
@@ -634,7 +681,10 @@ class LivePlaybackTest {
             return session
         }
         fun view() = allocated.values.last()
-        override suspend fun status(sessionId: String): LiveSession = nextReply ?: allocated.getValue(sessionId)
+        override suspend fun status(sessionId: String): LiveSession {
+            statusCalls++
+            return nextReply ?: allocated.getValue(sessionId)
+        }
         override suspend fun heartbeat(sessionId: String, paused: Boolean, interacted: Boolean): LiveSession {
             beats += Beat(sessionId, paused, interacted)
             beforeHeartbeat()

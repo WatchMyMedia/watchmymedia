@@ -106,6 +106,11 @@ class RealLivePlaybackController(
     private var lastPollAt = 0L
     private var lastBeatAt = 0L
     private val tokens = MediaTokenClock(clock)
+
+    /** The server's Live TV capabilities as last read, and when; a channel change uses them rather than asking again. */
+    private var capabilities: LiveCapabilities? = null
+    private var capabilitiesAt = 0L
+    private var capabilitiesJob: Job? = null
     private var interaction = 0L
     private var sentInteraction = 0L
     private var lastInputAt = clock.elapsedMs()
@@ -152,9 +157,7 @@ class RealLivePlaybackController(
             lane.withLock {
                 if (!current(currentGeneration)) return@withLock
                 try {
-                    val capabilities = try { withContext(io) { gateway.liveCapabilities() } }
-                        catch (e: CancellationException) { throw e }
-                        catch (_: Exception) { LiveCapabilities() }
+                    val capabilities = capabilitiesForStart()
                     if (!current(currentGeneration)) return@withLock
                     val chosen = choice.current().forLiveTV(capabilities.automatic)
                     quality = chosen
@@ -276,6 +279,33 @@ class RealLivePlaybackController(
         host.release()
         // Already queued network work drains, including a late POST's DELETE.
         job.complete()
+    }
+
+    /**
+     * The capabilities a start goes by: read once, then held, and read again
+     * in the background once older than [CAPABILITIES_FRESH_MS], so a
+     * channel change never waits for them. A failed read is not kept.
+     */
+    private suspend fun capabilitiesForStart(): LiveCapabilities {
+        val held = capabilities ?: return readCapabilities() ?: LiveCapabilities()
+        if (clock.elapsedMs() - capabilitiesAt >= CAPABILITIES_FRESH_MS && capabilitiesJob?.isActive != true) {
+            capabilitiesJob = scope.launch {
+                val fresh = readCapabilities() ?: return@launch
+                if (!released) mutableState.update { it.copy(automaticAvailable = fresh.automatic) }
+            }
+        }
+        return held
+    }
+
+    private suspend fun readCapabilities(): LiveCapabilities? = try {
+        withContext(io) { gateway.liveCapabilities() }.also {
+            capabilities = it
+            capabilitiesAt = clock.elapsedMs()
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
     }
 
     private fun current(value: Long): Boolean = !released && generation == value && gateway.isCurrent
@@ -594,7 +624,9 @@ class RealLivePlaybackController(
 
     private companion object {
         val REASON = Regex("^[a-z_]+$")
-        const val STATUS_MS = 1_000L
+        /** While the server tunes, its status is asked at every tick (one call at a time). */
+        const val STATUS_MS = PlayerHost.TICK_MS
+        const val CAPABILITIES_FRESH_MS = 5 * 60_000L
         const val TUNE_TIMEOUT_MS = 35_000L
         const val HEARTBEAT_MS = 10_000L
         const val LIVE_EDGE_TOLERANCE_MS = 10_000L
