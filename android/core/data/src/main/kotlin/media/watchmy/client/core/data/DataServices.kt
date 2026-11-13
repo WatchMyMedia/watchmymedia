@@ -51,9 +51,11 @@ import java.util.concurrent.TimeUnit
 class DataServices internal constructor(
     baseClient: ClientInfo,
     dataStore: DataStore<Preferences>,
-    httpClient: OkHttpClient,
+    /** The shared client, asked for only when a call is first made, off the main thread. */
+    httpClient: () -> OkHttpClient,
     /** The API client's HTTP cache; null keeps none. */
     httpCache: Cache? = null,
+    network: NetworkMonitor = NetworkMonitor.Always,
     discovery: ServerDiscovery,
     sealer: TokenSealer,
     private val scope: CoroutineScope,
@@ -64,14 +66,15 @@ class DataServices internal constructor(
 ) {
     constructor(context: Context, client: ClientInfo) : this(context, client, stored = null)
 
-    private constructor(context: Context, client: ClientInfo, stored: Stored?) : this(
+    private constructor(context: Context, client: ClientInfo, stored: Stored?, scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)) : this(
         baseClient = client,
         dataStore = dataStore(context),
-        httpClient = sharedHttpClient,
+        httpClient = { sharedHttpClient },
         httpCache = Cache(File(context.cacheDir, "http"), HTTP_CACHE_BYTES),
+        network = SystemNetworkMonitor(context, scope),
         discovery = NsdDiscovery(context),
         sealer = KeystoreSealer(),
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+        scope = scope,
         clock = System::currentTimeMillis,
         stored = stored,
     )
@@ -93,7 +96,12 @@ class DataServices internal constructor(
     /** How this device describes itself, with the name as it is now (it is editable in Settings). */
     val client: ClientInfo get() = base.copy(name = store.deviceName.value.ifBlank { base.name })
 
-    private val http = Http(httpClient, store, "WatchMyMedia/${base.version} (${base.platform}; Android ${Build.VERSION.RELEASE})", httpCache)
+    private val http = Http(httpClient, store, "WatchMyMedia/${base.version} (${base.platform}; Android ${Build.VERSION.RELEASE})", httpCache, network)
+
+    init {
+        // The clients' TLS set-up, off the main thread, before the first call needs it.
+        scope.launch { http.warm() }
+    }
     private val events = ServerEvents(store, http, scope, eventBackoffMs)
     private val serverRepository = RealServerRepository(store, http, discovery, scope, clock)
     private val authRepository = RealAuthRepository(store, http, serverRepository, { client }, clock)
@@ -170,6 +178,18 @@ class DataServices internal constructor(
             .dispatcher(Dispatcher().apply { maxRequestsPerHost = IMAGE_REQUESTS_PER_HOST })
             .build()
     }
+
+    /**
+     * For the player and the downloader (Media3's OkHttpDataSource,
+     * PLAN-ANDROID-REVIEW.md §4.2.1): derived from the API's client, so it
+     * shares the connection pool and dispatcher and the first playlist
+     * request reuses the API's connection. No token interceptor (media URLs
+     * carry their own `access_token`), no reply limit, no HTTP cache;
+     * 15 s to connect and 45 s between reads, as the player had, and no
+     * timeout on the whole call. Built off the main thread at start; a caller
+     * on the main thread can wrap it as `Call.Factory { mediaHttpClient.newCall(it) }`.
+     */
+    val mediaHttpClient: OkHttpClient get() = http.mediaClient
 
     /** The latest sign-in's [loadSession]; the next sign-in or sign-out cancels it, so an older one can't answer last. */
     private var sessionLoad: Job? = null

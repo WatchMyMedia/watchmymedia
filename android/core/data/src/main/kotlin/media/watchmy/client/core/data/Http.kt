@@ -44,20 +44,55 @@ internal class Credential(val baseUrl: String, val token: String, val onRejected
  * for that server, and clears the sign-in when the server answers 401, plus
  * [signedIn] and [call], which turn every failure into [ApiException].
  */
-internal class Http(base: OkHttpClient, private val store: LocalStore, private val userAgent: String, cache: Cache? = null) {
+internal class Http(
+    /** The shared client: its connection pool and dispatcher. Asked for only when a client is first used, which [warm] does off the main thread. */
+    base: () -> OkHttpClient,
+    private val store: LocalStore,
+    private val userAgent: String,
+    cache: Cache? = null,
+    private val network: NetworkMonitor = NetworkMonitor.Always,
+) {
+    constructor(base: OkHttpClient, store: LocalStore, userAgent: String) : this({ base }, store, userAgent)
+
     /**
-     * Public probes and sign-in never inherit the current account's token.
      * No client follows a redirect between http and https: one to http would
      * send on in the clear what was meant to be encrypted, and the app's own
      * calls are never redirected that way (a probe handles an upgrade itself).
+     * Building the first client sets up TLS, tens of milliseconds, so none is
+     * built until it is used.
      */
-    val publicClient: OkHttpClient = base.newBuilder().followSslRedirects(false).addInterceptor(ReplyLimit()).addInterceptor(::userAgent).build()
+    private val plain: OkHttpClient by lazy { base().newBuilder().followSslRedirects(false).addInterceptor(::userAgent).build() }
+
+    /** Public probes and sign-in never inherit the current account's token. */
+    val publicClient: OkHttpClient by lazy { plain.newBuilder().addInterceptor(ReplyLimit()).addInterceptor(::reachable).build() }
+
     /**
      * Signed requests without the HTTP cache: images (the image loader keeps
      * its own) and the event stream. A request goes as its [Credential] tag
      * ([calls]), or else as the current sign-in.
      */
-    val signedClient: OkHttpClient = publicClient.newBuilder().addInterceptor(::authorize).build()
+    val signedClient: OkHttpClient by lazy { publicClient.newBuilder().addInterceptor(::authorize).build() }
+
+    /**
+     * Media for the player and the downloader (PLAN-ANDROID-REVIEW.md
+     * §4.2.1): the shared pool and dispatcher, so the first playlist request
+     * reuses the API's connection. No token (media URLs carry theirs), no
+     * reply limit (files are gigabytes), no cache, and the player's timeouts:
+     * 15 s to connect, 45 s between reads, none on the whole call.
+     */
+    val mediaClient: OkHttpClient by lazy {
+        plain.newBuilder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(45, TimeUnit.SECONDS)
+            .callTimeout(0, TimeUnit.SECONDS)
+            .build()
+    }
+
+    /** Builds the clients now, on the caller's thread: the data layer calls it on an IO thread at start. */
+    fun warm() {
+        client
+        mediaClient
+    }
 
     /**
      * API calls, signed as [signedClient] is, with [cache] (PLAN-ANDROID-REVIEW.md
@@ -66,33 +101,37 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
      * Only replies with an ETag are kept, and each is asked again before
      * it is used ([revalidated]).
      */
-    val client: OkHttpClient = signedClient.newBuilder().cache(cache).addNetworkInterceptor(::revalidated).build()
+    val client: OkHttpClient by lazy { signedClient.newBuilder().cache(cache).addNetworkInterceptor(::revalidated).build() }
 
     /**
      * Signing in and pairing follow no redirects at all: a 307 or 308 would
      * send the password, or the pairing secret that collects the token, on
      * to wherever it points.
      */
-    val authClient: OkHttpClient = publicClient.newBuilder().followRedirects(false).build()
+    val authClient: OkHttpClient by lazy { publicClient.newBuilder().followRedirects(false).build() }
 
     /**
      * Looking up an address someone typed: give up quickly. A redirect is
      * not followed but reported ([RedirectException]), for the probe to
      * follow the ones that stay on the same host.
      */
-    val probeClient: OkHttpClient = publicClient.newBuilder()
-        .followRedirects(false)
-        .addInterceptor(::reportRedirect)
-        .connectTimeout(4, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
-        .callTimeout(10, TimeUnit.SECONDS)
-        .build()
+    val probeClient: OkHttpClient by lazy {
+        publicClient.newBuilder()
+            .followRedirects(false)
+            .addInterceptor(::reportRedirect)
+            .connectTimeout(4, TimeUnit.SECONDS)
+            .readTimeout(8, TimeUnit.SECONDS)
+            .callTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
 
     /** The event stream: the server pings every 15 s, so silence for longer means the connection is gone. */
-    val streamClient: OkHttpClient = signedClient.newBuilder()
-        .readTimeout(45, TimeUnit.SECONDS)
-        .callTimeout(0, TimeUnit.SECONDS)
-        .build()
+    val streamClient: OkHttpClient by lazy {
+        signedClient.newBuilder()
+            .readTimeout(45, TimeUnit.SECONDS)
+            .callTimeout(0, TimeUnit.SECONDS)
+            .build()
+    }
 
     /**
      * Calls on [on] (the API client unless said) sent as [credential],
@@ -170,6 +209,24 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
         return response.newBuilder().header("Cache-Control", if (keep) "no-cache" else "no-store").removeHeader("Expires").build()
     }
 
+    /**
+     * Away from the server's network, a call to it waited out the 10 s
+     * connect timeout before the offline Home could show
+     * (PLAN-ANDROID-REVIEW.md §4.1.6). With no network at all a call fails at
+     * once (this device itself still answers); an address on the local
+     * network, which answers within milliseconds when it is there, gets
+     * [PRIVATE_CONNECT_MS] to connect.
+     */
+    private fun reachable(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val host = request.url.host
+        if (!network.available && !isLoopbackHost(host)) throw NoNetworkException()
+        if (isPrivateHost(host) && chain.connectTimeoutMillis() > PRIVATE_CONNECT_MS) {
+            return chain.withConnectTimeout(PRIVATE_CONNECT_MS, TimeUnit.MILLISECONDS).proceed(request)
+        }
+        return chain.proceed(request)
+    }
+
     private fun reportRedirect(chain: Interceptor.Chain): Response {
         val response = chain.proceed(chain.request())
         if (!response.isRedirect) return response
@@ -212,6 +269,9 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
     companion object {
         const val AUTHORIZATION = "Authorization"
         private const val TAG = "WatchMyMedia"
+
+        /** How long an address on the local network gets to connect ([reachable]). */
+        const val PRIVATE_CONNECT_MS = 3_000
         private const val LOGIN_PATH = "/api/auth/login"
 
         /** True when [url] is on the server at [baseUrl] (same origin, under its path): [isOnServer], which the player uses for media URLs too. */

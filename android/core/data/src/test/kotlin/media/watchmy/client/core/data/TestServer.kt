@@ -121,6 +121,8 @@ class Harness internal constructor(
     private val httpClient: OkHttpClient = OkHttpClient(),
     /** Gives the API client an HTTP cache, in the harness's folder. */
     httpCache: Boolean = false,
+    /** The default network as the data layer sees it; [network] sets it, null for none. */
+    private val network: TestNetwork = TestNetwork(),
 ) : Closeable {
     val server = TestServer()
     val dir: File = Files.createTempDirectory("wmm-data").toFile()
@@ -137,8 +139,9 @@ class Harness internal constructor(
     private fun create() = DataServices(
         baseClient = client,
         dataStore = dataStore,
-        httpClient = httpClient,
+        httpClient = { httpClient },
         httpCache = cache,
+        network = network,
         discovery = ServerDiscovery.None,
         sealer = sealer,
         scope = scope,
@@ -180,4 +183,9 @@ class Harness internal constructor(
         server.close()
         dir.deleteRecursively()
     }
+}
+
+/** A default network a test turns off and on ([network] null for none). */
+internal class TestNetwork : NetworkMonitor {
+    override val network = kotlinx.coroutines.flow.MutableStateFlow<Long?>(1L)
 }
