@@ -22,9 +22,8 @@ public final class HomeModel {
     @ObservationIgnored private let auth: any AuthRepository
     @ObservationIgnored private let navigator: Navigator
     @ObservationIgnored private let rows: (any RowsRepository)?
-    @ObservationIgnored private var generation = 0
     @ObservationIgnored private let changes: ScreenChanges
-    @ObservationIgnored private let latest = LatestLoad()
+    @ObservationIgnored private let loads = LoadController<HomeData>()
 
     /// `rows` brings the person's other devices' changes to the layout and lists (rows.changed, lists.changed).
     public init(library: any LibraryRepository, auth: any AuthRepository, navigator: Navigator, rows: (any RowsRepository)? = nil,
@@ -154,14 +153,12 @@ public final class HomeModel {
     /// `quiet` keeps what is on screen: a failure then is a message, not an
     /// error page. A load still running when another starts is cancelled.
     func load(quiet: Bool) async {
-        await latest.run { [weak self] in await self?.fetch(quiet: quiet) }
+        await loads.run { [weak self] load in await self?.fetch(load, quiet: quiet) }
     }
 
-    private func fetch(quiet: Bool) async {
-        generation += 1
-        let mine = generation
-        if !quiet || state.value == nil { state = .loading }
-        guard let result = await Loadable.run({ try await self.library.home() }), mine == generation else { return }
+    private func fetch(_ load: LoadController<HomeData>.Load, quiet: Bool) async {
+        loads.begin(&state, quiet: quiet)
+        guard let result = await loads.fetch(load, { try await self.library.home() }) else { return }
         var empty: HomeEmptyState?
         if result.value?.isEmpty == true {
             do {
@@ -171,9 +168,9 @@ public final class HomeModel {
             } catch {
                 empty = .unavailable
             }
-            guard mine == generation else { return }
+            guard loads.isCurrent(load) else { return }
         }
-        if case .failed(let reason) = result, state.value != nil {
+        if let reason = loads.quietFailure(result, quiet: quiet, over: state) {
             message = reason
         } else {
             state = result
