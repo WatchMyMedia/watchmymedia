@@ -29,7 +29,7 @@ enum ServicesFactory {
             gateway: APIPlaybackGateway(api: { try data.api() }, apiLevel: { data.apiLevel }),
             preferences: data.preferences,
             client: { data.client },
-            // An Apple TV set to Dolby output takes eight channels (PLAN-CLIENTS.md §4.4).
+            // Asks for the output's audio channels at every request (PLAN-APPLE-REVIEW.md §3.1.1).
             profile: profile,
             library: data.library,
             // Now Playing's picture. No `servers`: the AirPlay restart is the sender's, never the TV's.
