@@ -79,7 +79,9 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         # Playback keeps going over AirPlay and in Picture in Picture with the phone locked.
-        UIBackgroundModes: [audio]
+        # fetch: a background refresh sends what was watched offline (the task below).
+        UIBackgroundModes: [audio, fetch]
+        BGTaskSchedulerPermittedIdentifiers: [media.watchmy.client.sync]
         NSLocalNetworkUsageDescription: WatchMyMedia uses the local network to find and reach your WatchMyMedia server.
         NSBonjourServices: [_watchmymedia._tcp, _googlecast._tcp, _0A4D0B6A._googlecast._tcp]
         # Plain http to an IP address or a .local name (your own network); a host name needs https.
