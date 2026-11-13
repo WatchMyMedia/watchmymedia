@@ -17,6 +17,7 @@ import androidx.media3.exoplayer.scheduler.Requirements
 import androidx.work.NetworkType
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -140,11 +141,10 @@ class DownloadRestartsTest {
         until("the index to load") { manager.isInitialized }
         assertEquals("No ON_START: the job carries on", 1, jobs.scheduled.size)
         assertEquals(0, services)
-        val done = runBlocking(Dispatchers.Unconfined) {
-            val work = async(start = CoroutineStart.UNDISPATCHED) { restarts.runUntilIdle() }
-            until("the download to finish") { work.isCompleted }
-            work.await()
-        }
+        // Started here, outside any coroutine, so the manager's callbacks on the main thread resume it in place.
+        val work = CoroutineScope(Dispatchers.Unconfined).async(start = CoroutineStart.UNDISPATCHED) { restarts.runUntilIdle() }
+        until("the download to finish") { work.isCompleted }
+        val done = runBlocking { work.await() }
         assertTrue("Nothing left: the job is done", done)
         assertFalse(restarts.unfinished())
     }
