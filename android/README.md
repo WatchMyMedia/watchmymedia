@@ -703,25 +703,48 @@ first launches and the first scrolls don't run interpreted; the startup
 profile puts the code a cold start runs first in the dex files (R8's dex
 layout, `dexLayoutOptimization`). Debug builds don't use them.
 
-The journeys run on the fakes, so they need no server: a cold start to Home
-(the startup profile), then Home's rows, the TV Shows grid, a show, and the
-player with its controls and a picker; on the TV build, pairing, Home with
-the remote, the rail, the library grid and the player. The fakes' player has
-no video, so ExoPlayer itself isn't in the profile. Regenerate them after a
-change to what a start or those screens run, on throwaway `android-35`
-emulators (`google_apis`; AGENTS.md, Emulators), with `ANDROID_SERIAL`
-naming the one to use. A portrait phone draws the TV UI oddly, so make the
-TV half on a `tv_1080p` AVD:
+The journeys come in three parts. Two run on the fakes and need no server:
+on a phone build, a cold start to Home (the startup profile), then Home's
+rows, the TV Shows grid, a show, and the player with its controls and a
+picker; on the TV build, pairing, Home with the remote, the rail, the
+library grid and the player. The fakes' player has no video and their
+cards no posters, so the third part runs a real phone build against a
+throwaway fixture server: it signs in, loads Home's posters and the Movies
+grid through the image loader, and plays a file through ExoPlayer, so the
+data layer, the images and the player are in the profiles too. The fakes'
+own rules (`core:fake`, which a release never runs) are left out of the
+merged files.
+
+`baselineprofile/fixture_server.py` runs that server: a copy of the
+fixture library's database (Test environments in the root `AGENTS.md`;
+`make fixture`, then `make fixture-serve` once) on `127.0.0.1:$FIXTURE_PORT`
+(28130 unless set), with each movie file given a page and a test-pattern
+poster through the admin's upload route, deleted when it stops. It needs
+the server built (`make build`); `FIXTURE_DIR` points it at a fixture
+elsewhere. The emulator reaches it at `10.0.2.2`, and the journey types
+that address in the server picker, never a server discovery lists.
+
+The journeys find the screens by test tags (`TestTags` in `core:ui`,
+spelled again in `Journeys.kt`), which `MainActivity` exposes as resource
+ids, not by their wording: renaming a button doesn't break them, and a tag
+removed does.
+
+Regenerate the profiles after a change to what a start or those screens
+run, on throwaway `android-35` emulators (`google_apis`; AGENTS.md,
+Emulators), with `ANDROID_SERIAL` naming the one to use. A portrait phone
+draws the TV UI oddly, so make the TV part on a `tv_1080p` AVD:
 
 ```bash
 baselineprofile/generate.sh phone   # on a phone emulator (pixel_8)
-baselineprofile/generate.sh tv      # on a TV-shaped one (tv_1080p); then commit what changes
+baselineprofile/generate.sh tv      # on a TV-shaped one (tv_1080p)
+baselineprofile/generate.sh real    # on the phone emulator again; then commit what changes
 ```
 
-Each half keeps its rules in `baselineprofile/build/profiles/`, and the
-app's files are written, phone rules first, once both are there;
-`generate.sh` alone runs both on one device. A half installs the release
-build with the debug key and takes about a quarter of an hour on a busy Mac.
+Each part keeps its rules in `baselineprofile/build/profiles/`, and the
+app's files are written, phone rules first, once all three are there;
+`generate.sh` alone runs them all on one device. A part installs the
+release build with the debug key and takes about a quarter of an hour on a
+busy Mac.
 
 The profiles go stale quietly: a renamed screen's rules match nothing, and
 its replacement runs interpreted. CI's android job runs

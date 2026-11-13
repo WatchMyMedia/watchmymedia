@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
@@ -77,6 +78,7 @@ import media.watchmy.client.model.displayAddress
 import media.watchmy.client.model.versionLabel
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.BrandMark
 import media.watchmy.client.ui.components.WmmIcons
@@ -166,7 +168,7 @@ fun SignInScreen(onSwitchServer: () -> Unit, linkTv: DeepLink.LinkTv? = null, on
                             textStyle = FieldText,
                             colors = fieldColors(),
                             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-                            modifier = Modifier.fillMaxWidth().focusRequester(nameFocus).semantics { contentType = ContentType.Username },
+                            modifier = Modifier.fillMaxWidth().focusRequester(nameFocus).semantics { contentType = ContentType.Username }.testTag(TestTags.SIGN_IN_NAME),
                         )
                         OutlinedTextField(
                             value = state.password,
@@ -190,7 +192,7 @@ fun SignInScreen(onSwitchServer: () -> Unit, linkTv: DeepLink.LinkTv? = null, on
                                     )
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.Password },
+                            modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.Password }.testTag(TestTags.SIGN_IN_PASSWORD),
                         )
                     }
                     FilledButton(
@@ -198,7 +200,7 @@ fun SignInScreen(onSwitchServer: () -> Unit, linkTv: DeepLink.LinkTv? = null, on
                         onClick = vm::signIn,
                         large = true,
                         busy = state.busy,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag(TestTags.SIGN_IN),
                     )
                     }
                     // Linking a TV needs an account, which a server that isn't set up has none of.

@@ -43,6 +43,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
@@ -116,6 +117,7 @@ import media.watchmy.client.tv.components.overflowHeight
 import media.watchmy.client.tv.components.rememberFocusMemory
 import media.watchmy.client.tv.components.stopBringIntoView
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.rememberNotMatchedNotice
 import media.watchmy.client.ui.open
 import media.watchmy.client.ui.WmmColors
@@ -156,7 +158,7 @@ fun HomeScreen(
     val server by services.servers.current.collectAsStateWithLifecycle()
     val memory = rememberFocusMemory()
 
-    TvScaffold(RailSection.Home, onNavigate) {
+    TvScaffold(RailSection.Home, onNavigate, modifier = if (state.home != null) Modifier.testTag(TestTags.HOME) else Modifier) {
         when {
             state.loading && state.home == null -> HomeSkeleton()
             state.home == null && state.error != null -> ErrorState(state.error.orEmpty(), vm::retry, title = "Couldn't load Home")

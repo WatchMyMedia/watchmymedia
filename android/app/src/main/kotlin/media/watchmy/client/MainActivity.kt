@@ -5,10 +5,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import media.watchmy.client.mobile.MobileApp
 import media.watchmy.client.tv.TvApp
@@ -28,9 +33,12 @@ class MainActivity : ComponentActivity() {
         val app = application as WatchMyMediaApp
         if (savedInstanceState == null) receive(intent)
         setContent {
-            LocalNetworkGate(isTv = app.isTv, question = app.localNetwork) {
-                ProvideAppServices(app.services) {
-                    if (app.isTv) TvApp(deepLink, deepLinkKey = deepLinkCount) else MobileApp(deepLink, deepLinkKey = deepLinkCount)
+            // Test tags (TestTags) read as resource ids, for the baseline-profile journeys and benchmarks.
+            Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
+                LocalNetworkGate(isTv = app.isTv, question = app.localNetwork) {
+                    ProvideAppServices(app.services) {
+                        if (app.isTv) TvApp(deepLink, deepLinkKey = deepLinkCount) else MobileApp(deepLink, deepLinkKey = deepLinkCount)
+                    }
                 }
             }
         }

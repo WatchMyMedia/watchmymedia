@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -103,6 +104,7 @@ import media.watchmy.client.ui.TabletLayout
 import media.watchmy.client.ui.rememberTabletLayout
 import media.watchmy.client.mobile.components.PressableCard
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.rememberNotMatchedNotice
 import media.watchmy.client.ui.open
 import media.watchmy.client.ui.WmmColors
@@ -172,7 +174,7 @@ fun HomeScreen(
                         isRefreshing = state.refreshing,
                         onRefresh = vm::refresh,
                         state = pull,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().testTag(TestTags.HOME),
                         indicator = {
                             PullToRefreshDefaults.Indicator(
                                 state = pull,

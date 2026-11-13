@@ -39,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +63,7 @@ import media.watchmy.client.model.MIN_SERVER_VERSION
 import media.watchmy.client.model.needsHttpsNudge
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
@@ -122,7 +124,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                             colors = fieldColors(),
                             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
                             keyboardActions = KeyboardActions(onGo = { vm.connectToAddress() }),
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().testTag(TestTags.SERVER_ADDRESS),
                         )
                         Text(
                             "An IP address or a .local name works over http on your own network. A hostname needs https; Tailscale Serve or a reverse proxy gives it one.",
@@ -132,7 +134,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                             "Connect",
                             onClick = vm::connectToAddress,
                             busy = state.connecting == ServerPickerViewModel.ADDRESS,
-                            modifier = Modifier.align(Alignment.End),
+                            modifier = Modifier.align(Alignment.End).testTag(TestTags.SERVER_CONNECT),
                         )
                     }
                     Spacer(Modifier.weight(1f).heightIn(min = 24.dp))

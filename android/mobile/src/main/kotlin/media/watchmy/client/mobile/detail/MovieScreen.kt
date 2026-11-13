@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -81,6 +82,7 @@ import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.TabletLayout
 import media.watchmy.client.ui.rememberTabletLayout
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
@@ -206,7 +208,7 @@ private fun MovieActions(movie: MovieDetail, state: MovieViewModel.State, vm: Mo
             }
             if (hasTrailer) TonalButton(markLabel, { vm.setWatched(!state.watched) }, Modifier.fillMaxWidth(), busy = state.busy)
         } else {
-            if (default != null) FilledButton("Play", { vm.playRequest()?.let(onPlay) }, large = true, icon = WmmIcons.Play, modifier = Modifier.fillMaxWidth())
+            if (default != null) FilledButton("Play", { vm.playRequest()?.let(onPlay) }, large = true, icon = WmmIcons.Play, modifier = Modifier.fillMaxWidth().testTag(TestTags.PLAY))
             if (hasTrailer) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TrailerButton(onTrailer, Modifier.weight(1f))
@@ -324,7 +326,7 @@ private fun TrailerButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 private fun ResumeButton(remainingMs: Long, progress: Float, onClick: () -> Unit) {
     Box(Modifier.fillMaxWidth().clip(CircleShape)) {
-        FilledButton("Resume · ${formatRemaining(remainingMs)}", onClick, large = true, icon = WmmIcons.Play, modifier = Modifier.fillMaxWidth())
+        FilledButton("Resume · ${formatRemaining(remainingMs)}", onClick, large = true, icon = WmmIcons.Play, modifier = Modifier.fillMaxWidth().testTag(TestTags.PLAY))
         Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color.Black.copy(alpha = 0.35f))) {
             Box(Modifier.fillMaxHeight().fillMaxWidth(progress.coerceIn(0f, 1f)).background(WmmColors.Accent))
         }
