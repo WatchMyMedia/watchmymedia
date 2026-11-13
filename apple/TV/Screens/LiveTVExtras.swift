@@ -336,7 +336,10 @@ struct TVLiveSearchSection: View {
                     if let hit = hits.first(where: { $0.id == focused }) ?? hits.first {
                         HStack(spacing: 16) {
                             TVLiveHint(systemImage: "list.bullet.rectangle", text: "Show it in the guide")
-                            TVLiveHint(systemImage: "hand.tap", text: "Hold · \(liveSearchHoldHint(hit, reminded: extras.isReminded(hit.programme), now: context.date))")
+                            // Only what the result's menu offers (LiveProgrammeActions).
+                            if let hold = LiveProgrammeActions(hit.programme, on: hit.channel, now: context.date, extras: extras).searchHoldHint(hit, now: context.date) {
+                                TVLiveHint(systemImage: "hand.tap", text: "Hold · \(hold)")
+                            }
                         }
                         .foregroundStyle(Palette.text)
                         .padding(.horizontal, TVLayout.gutter)

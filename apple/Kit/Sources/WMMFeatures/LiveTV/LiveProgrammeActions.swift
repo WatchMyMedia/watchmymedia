@@ -88,6 +88,55 @@ extension LiveProgrammeActions {
     }
 }
 
+// MARK: The Apple TV's hold hints
+
+extension LiveProgrammeActions {
+    /// The reminder item the menu shows: "Remind me" or "Remove reminder".
+    private var reminderTitle: String? {
+        switch reminder {
+        case .set?: liveRemoveReminder
+        case .offered?: liveRemindMe
+        case .unavailable?, nil: nil
+        }
+    }
+
+    /// The recording item the menu shows for a programme still to come:
+    /// "Record", or "Don’t record" for this person's own; nil for a mark
+    /// they may not stop.
+    private var recordingTitle: String? {
+        switch recording {
+        case .record?: liveRecordTitle(rest: false)
+        case .marked?: cancel.map { liveCancelRecordingTitle($0.state) }
+        case nil: nil
+        }
+    }
+
+    /// The Apple TV guide hero's "Hold ·" hint for a programme still to
+    /// come: what its long-press menu offers beside Watch, "Record or remind
+    /// me", "Remove reminder", "Don’t record or remind me". Nil once the
+    /// programme has started (the hero says it is on), and when the menu
+    /// offers no recording and no reminder, so the hint never promises an
+    /// item the menu lacks.
+    public var guideHoldHint: String? {
+        guard reminder != nil else { return nil }
+        return Self.either([recordingTitle, reminderTitle].compactMap { $0 })
+    }
+
+    /// Search's "Hold ·" hint for a result (which offers no Record): its
+    /// reminder item, then Watch while the channel can be watched, "Remind me
+    /// or watch 2.1 now", "Watch 20.1" while it is on. Nil when the menu
+    /// offers neither.
+    public func searchHoldHint(_ hit: LiveSearchHit, now: Date) -> String? {
+        Self.either([reminderTitle, watch ? liveWatchLabel(hit.channel, programme: hit.programme, now: now) : nil].compactMap { $0 })
+    }
+
+    /// "Record or remind me": each choice after the first starts in lower case.
+    private static func either(_ choices: [String]) -> String? {
+        guard let first = choices.first else { return nil }
+        return ([first] + choices.dropFirst().map { $0.prefix(1).lowercased() + $0.dropFirst() }).joined(separator: " or ")
+    }
+}
+
 /// What a row in Recordings offers (DvrRecordings), decided once for both apps.
 public struct LiveRecordingActions: Hashable, Sendable {
     /// Watch a finished recording, or Watch from the start while it records.

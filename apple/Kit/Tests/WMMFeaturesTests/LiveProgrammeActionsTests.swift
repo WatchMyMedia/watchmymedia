@@ -29,6 +29,40 @@ struct LiveProgrammeActionsTests {
                              recordingAvailable: recording, mark: mark, reminded: reminded, canRemind: canRemind)
     }
 
+    // MARK: The Apple TV's hold hints
+
+    @Test func theGuidesHoldHintNamesOnlyWhatTheMenuOffers() {
+        #expect(actions(.later).guideHoldHint == "Record or remind me")
+        #expect(actions(.later, reminded: true).guideHoldHint == "Record or remove reminder")
+        #expect(actions(.later, canRemind: false).guideHoldHint == "Record", "within the lead time: no Remind me")
+        #expect(actions(.later, recording: false).guideHoldHint == "Remind me")
+        #expect(actions(.later, recording: false, reminded: true).guideHoldHint == "Remove reminder")
+        #expect(actions(.later, recording: false, canRemind: false).guideHoldHint == nil)
+        let mine = LiveRecordingMark(id: "r", state: .scheduled, canCancel: true)
+        let theirs = LiveRecordingMark(id: "r", state: .scheduled, canCancel: false)
+        #expect(actions(.later, mark: mine).guideHoldHint == "Don’t record or remind me")
+        #expect(actions(.later, mark: theirs).guideHoldHint == "Remind me", "someone else's recording: nothing to stop")
+        #expect(actions(.later, mark: theirs, canRemind: false).guideHoldHint == nil, "the menu has only Watch")
+        #expect(actions(.onNow).guideHoldHint == nil, "on now, the hero says so instead")
+        #expect(actions(.past).guideHoldHint == nil)
+    }
+
+    @Test func searchsHoldHintNamesOnlyWhatTheMenuOffers() {
+        func hint(_ timing: Timing, reminded: Bool = false, canRemind: Bool = true, channel: LiveChannel? = nil) -> String? {
+            let channel = channel ?? self.channel
+            let hit = LiveSearchHit(channel: channel, programme: programme(timing))
+            return actions(timing, recording: false, reminded: reminded, canRemind: canRemind, channel: channel).searchHoldHint(hit, now: now)
+        }
+        #expect(hint(.later) == "Remind me or watch 4.1 now")
+        #expect(hint(.later, reminded: true) == "Remove reminder or watch 4.1 now")
+        #expect(hint(.later, canRemind: false) == "Watch 4.1 now", "within the lead time: no Remind me")
+        #expect(hint(.onNow) == "Watch 4.1")
+        let off = LiveChannel(id: "ch-9.1", number: "9.1", name: "PNVL", available: false)
+        #expect(hint(.later, channel: off) == "Remind me", "a channel that can't be watched: no Watch")
+        #expect(hint(.later, canRemind: false, channel: off) == nil)
+        #expect(hint(.onNow, channel: off) == nil)
+    }
+
     // MARK: Record
 
     @Test func recordIsOfferedUntilTheProgrammeEndsAndOnlyWhereTheServerRecordsForThisPerson() {

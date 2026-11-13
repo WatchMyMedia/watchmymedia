@@ -548,13 +548,12 @@ struct TVLiveHero: View {
         .foregroundStyle(Palette.text)
     }
 
-    /// What a long press does here: star the channel, or remind about a later programme.
+    /// What a long press does here: star the channel, or what the menu of a
+    /// later programme offers (``LiveProgrammeActions/guideHoldHint``).
     private func holdHint(_ channel: LiveChannel, _ programme: LiveProgramme?) -> String? {
         guard extras.available else { return nil }
         if channelFocused { return liveFavouriteAction(favourite: extras.isFavourite(channel)) }
-        guard let programme, programme.start > now else { return nil }
-        if recordings.available { return "Record or remind me" }
-        if extras.isReminded(programme) { return liveRemoveReminder }
-        return extras.canRemind(programme) ? liveRemindMe : nil
+        guard let programme else { return nil }
+        return LiveProgrammeActions(programme, on: channel, now: now, extras: extras, recordings: recordings).guideHoldHint
     }
 }
