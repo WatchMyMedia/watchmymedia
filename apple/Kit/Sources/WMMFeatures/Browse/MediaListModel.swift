@@ -34,9 +34,8 @@ public final class MediaListModel {
     @ObservationIgnored private let library: any LibraryRepository
     @ObservationIgnored private let requests: (any RequestsRepository)?
     @ObservationIgnored private let navigator: Navigator
-    @ObservationIgnored private var generation = 0
     @ObservationIgnored private let changes: ScreenChanges
-    @ObservationIgnored private let latest = LatestLoad()
+    @ObservationIgnored private let loads = LoadController<Page>()
 
     public init(listID: Int, rows: any RowsRepository, library: any LibraryRepository, requests: (any RequestsRepository)?, navigator: Navigator,
                 now: @escaping @MainActor () -> Date = { Date() }) {
@@ -140,22 +139,20 @@ public final class MediaListModel {
 
     /// A load still running when another starts is cancelled.
     func load(quiet: Bool) async {
-        await latest.run { [weak self] in await self?.fetch(quiet: quiet) }
+        await loads.run { [weak self] load in await self?.fetch(load, quiet: quiet) }
     }
 
-    private func fetch(quiet: Bool) async {
-        generation += 1
-        let mine = generation
-        if !quiet || state.value == nil { state = .loading }
-        let result = await Loadable.run { () async throws -> Page in
+    private func fetch(_ load: LoadController<Page>.Load, quiet: Bool) async {
+        loads.begin(&state, quiet: quiet)
+        let result = await loads.fetch(load) { () async throws -> Page in
             // The list and its entries at once.
             let list = Task { try await self.rows.list(id: self.listID) }
             defer { list.cancel() }
             let entries = try await self.rows.entries(listID: self.listID, offset: 0, limit: Self.pageSize)
             return Page(list: try await list.value, entries: entries.items, total: entries.total, inLibrary: entries.inLibrary)
         }
-        guard let result, mine == generation else { return }
-        if case .failed(let reason) = result, state.value != nil {
+        guard let result else { return }
+        if let reason = loads.quietFailure(result, quiet: quiet, over: state) {
             message = reason
         } else {
             state = result
