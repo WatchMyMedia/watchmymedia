@@ -658,10 +658,11 @@ jobs:
       - name: Build and test on an Apple TV simulator
         # Two Studio runners stalled after all tests passed. Avoid verbose
         # sysdiagnose collection, a possible cause; keep results and failures.
-        # The remote UI tests take most of the step one at a time, so two
-        # clones of the simulator run them, a test class each at a time.
+        # One simulator: with two clones (-parallel-testing-worker-count 2)
+        # GitHub's three-core Mac ran the tests about a minute faster of ten
+        # and a timing-sensitive Kit test failed (run of 2026-11-12).
         timeout-minutes: 20
-        run: make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO -parallel-testing-enabled YES -parallel-testing-worker-count 2' PATH="$PATH"
+        run: make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: "!cancelled() && steps.packages.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
         with:
