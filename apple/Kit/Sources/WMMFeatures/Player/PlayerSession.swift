@@ -6,10 +6,8 @@ import WMMModel
 /// screen's model needs it (PLAN-APPLE-REVIEW.md §5.2): it starts the
 /// controller and listens to it, follows its state, swaps in the next episode
 /// when one starts in place, closes the play once when the app goes to the
-/// background, and leaves once. ``TVPlayerModel`` is built on it; the phone's
-/// ``PlayerChromeModel`` still writes the same steps itself and can move onto
-/// it (its `start`, `dispose`, `finish`, `handle(_:)`, `observeState`,
-/// `closeInBackground` and `becameActive`'s guard).
+/// background, and leaves once. ``TVPlayerModel`` and the phone's
+/// ``PlayerChromeModel`` are built on it.
 ///
 /// The screen's own model keeps what is only its own: which overlay shows,
 /// the controls, the remote's keys, how long picture in picture gets.
@@ -56,6 +54,14 @@ public final class PlayerSession {
 
     /// The same play again, from the start of it (Try again).
     public func restart() {
+        controller.start(request)
+    }
+
+    /// Plays `request` on the same controller instead, and it becomes
+    /// ``request`` (the phone's episodes panel switches episodes this way,
+    /// keeping its Picture in Picture).
+    public func play(_ request: PlayRequest) {
+        self.request = request
         controller.start(request)
     }
 

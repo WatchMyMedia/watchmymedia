@@ -170,7 +170,9 @@ public final class PlayerChromeModel {
     /// After a seek, the thumb stays at the target this long, or until the player's position catches up.
     public static let holdMs = 1_000
 
-    public let controller: any PlaybackController
+    /// The play itself: starting, following the controller, the next episode, the background, leaving.
+    @ObservationIgnored private let session: PlayerSession
+    public var controller: any PlaybackController { session.controller }
     /// The controller's state without what ticks (see ``PlayerClock``): it
     /// changes only when something else does, so the screen that reads it is
     /// not rebuilt ten times a second. It follows the controller a moment
@@ -181,8 +183,9 @@ public final class PlayerChromeModel {
     public private(set) var state = PlayerState()
     /// What ticks.
     public let clock = PlayerClock()
-    /// What plays now: the request the screen opened with, or the next episode once it started in place.
-    public private(set) var request: PlayRequest
+    /// What plays now: the request the screen opened with, the episode chosen
+    /// in the episodes panel, or the next episode once it started in place.
+    public var request: PlayRequest { session.request }
     /// Whether the controls show, and when they hide by themselves.
     public let controls: ControlsAutoHide
     public var controlsVisible: Bool { controls.visible }
@@ -218,7 +221,6 @@ public final class PlayerChromeModel {
     @ObservationIgnored private let thumbnails: SeekThumbnails?
     @ObservationIgnored private var tileIndex: Int?
     @ObservationIgnored private var tileTask: Task<Void, Never>?
-    @ObservationIgnored private let onExit: @MainActor () -> Void
     @ObservationIgnored private let now: @MainActor () -> Int
     @ObservationIgnored private let sleep: @MainActor (Duration) async throws -> Void
     @ObservationIgnored private var lastStatus: PlayerStatus?
@@ -229,14 +231,10 @@ public final class PlayerChromeModel {
     @ObservationIgnored private var pendingTapShowed = false
     @ObservationIgnored private var resumeAfterPicker = false
     @ObservationIgnored private var awaitingDownload: String?
-    @ObservationIgnored private var closedInBackground = false
-    @ObservationIgnored private var finished = false
-    @ObservationIgnored private var disposed = false
     @ObservationIgnored private var tapTask: Task<Void, Never>?
     @ObservationIgnored private var rippleTask: Task<Void, Never>?
     @ObservationIgnored private var holdTask: Task<Void, Never>?
     @ObservationIgnored private var backgroundTask: Task<Void, Never>?
-    @ObservationIgnored private var eventsTask: Task<Void, Never>?
 
     /// `now` is a monotonic clock in ms and `sleep` waits; tests pass their
     /// own. `thumbnails` cuts the seek thumbnails; nil shows none.
@@ -248,10 +246,8 @@ public final class PlayerChromeModel {
         now: @escaping @MainActor () -> Int = { Int(ProcessInfo.processInfo.systemUptime * 1000) },
         sleep: (@MainActor (Duration) async throws -> Void)? = nil
     ) {
-        self.controller = controller
-        self.request = request
+        session = PlayerSession(controller: controller, request: request, onExit: onExit)
         self.thumbnails = thumbnails
-        self.onExit = onExit
         self.now = now
         // Define this closure in the library, rather than copying an async
         // default argument into every caller (swiftlang/swift#92017).
@@ -296,22 +292,18 @@ public final class PlayerChromeModel {
     /// Starts playing and listening to the controller.
     public func start() {
         controls.noteInput()
-        controller.start(request)
-        let events = controller.events
-        eventsTask = Task { [weak self] in
-            for await event in events { self?.handle(event) }
-        }
-        observeState()
+        session.start(
+            stateChanged: { [weak self] in self?.stateChanged() },
+            startedNext: { [weak self] in self?.startedNext() }
+        )
     }
 
     /// The screen went away: reports "stopped" and lets go of the player. Safe to call twice.
     public func dispose() {
-        guard !disposed else { return }
-        disposed = true
+        guard !session.isDisposed else { return }
         controls.cancel()
-        for task in [tapTask, rippleTask, holdTask, eventsTask, backgroundTask, tileTask] { task?.cancel() }
-        controller.stop()
-        controller.release()
+        for task in [tapTask, rippleTask, holdTask, backgroundTask, tileTask] { task?.cancel() }
+        session.dispose()
     }
 
     /// The viewer leaves (Close, Back).
@@ -324,7 +316,7 @@ public final class PlayerChromeModel {
     public func retry() {
         input()
         resetSeekInteraction()
-        controller.start(request)
+        session.restart()
     }
 
     /// How long to wait, in the background, for Picture in Picture to start
@@ -338,7 +330,7 @@ public final class PlayerChromeModel {
     /// start by itself it gets a moment to. Otherwise the video pauses and
     /// the server hears "closed".
     public func enteredBackground(externalPlayback: Bool = false, pictureInPictureMayStart: Bool = false) {
-        guard !externalPlayback, !pictureInPictureActive, !closedInBackground, !disposed else { return }
+        guard !externalPlayback, !pictureInPictureActive, !session.isClosedInBackground, !session.isDisposed else { return }
         backgroundTask?.cancel()
         guard pictureInPictureMayStart, live.status == .playing || live.status == .buffering else { return closeInBackground() }
         let sleep = sleep
@@ -350,10 +342,7 @@ public final class PlayerChromeModel {
     }
 
     private func closeInBackground() {
-        guard !closedInBackground, !disposed else { return }
-        closedInBackground = true
-        controller.pause()
-        controller.close()
+        session.closeInBackground()
     }
 
     /// The app is in front again. A video paused on the way out stays paused,
@@ -361,9 +350,7 @@ public final class PlayerChromeModel {
     public func becameActive() {
         backgroundTask?.cancel()
         backgroundTask = nil
-        guard closedInBackground else { return }
-        closedInBackground = false
-        showControls()
+        if session.reopen() { showControls() }
     }
 
     /// Picture in Picture started or ended. Ending it while the app is in the
@@ -609,9 +596,8 @@ public final class PlayerChromeModel {
         input()
         resumeAfterPicker = false
         closePicker()
-        self.request = request
         resetSeekInteraction()
-        controller.start(request)
+        session.play(request)
         showControls()
     }
 
@@ -701,46 +687,21 @@ public final class PlayerChromeModel {
     }
 
     private func finish() {
-        guard !finished else { return }
-        finished = true
-        onExit()
+        session.finish()
     }
 
-    private func handle(_ event: PlayerEvent) {
-        switch event {
-        case .exit:
-            // An admin's stop shows its message first; Back leaves.
-            if live.stopMessage == nil { finish() }
-        case .startedNext(let fileID):
-            let state = live
-            request = PlayRequest(
-                fileID: fileID, title: state.title, subtitle: state.subtitle,
-                backdropPath: state.backdropPath, stillPath: state.stillPath, posterPath: state.posterPath
-            )
-            resumeAfterPicker = false
-            resetSeekInteraction()
-            closePicker()
-            showControls()
-        }
+    /// The next episode started in place and is now ``request``: this file's
+    /// gestures and the picker end, and the controls come up.
+    private func startedNext() {
+        resumeAfterPicker = false
+        resetSeekInteraction()
+        closePicker()
+        showControls()
     }
 
-    /// Follows the controller's state: the status decides whether the
-    /// controls may hide, the stop message gets its time, and a finished
-    /// download closes the picker.
-    private func observeState() {
-        guard !disposed else { return }
-        withObservationTracking {
-            _ = controller.state
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.stateChanged()
-                self.observeState()
-            }
-        }
-        stateChanged()
-    }
-
+    /// After every change to the controller's state (``PlayerSession``): the
+    /// status decides whether the controls may hide, the stop message gets its
+    /// time, and a finished download closes the picker.
     private func stateChanged() {
         refresh()
         let s = live

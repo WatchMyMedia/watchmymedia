@@ -61,6 +61,15 @@ import WMMModel
         #expect(spy.calls.last == "start 9102", "Try again plays the episode now playing")
     }
 
+    @Test func anotherEpisodePlaysOnTheSameControllerAndBecomesTheRequest() {
+        session.start()
+        let other = PlayRequest(fileID: 9104, title: "Harbor Lights", subtitle: "S03 E10 · Slack Water")
+        session.play(other)
+        #expect(session.request == other)
+        session.restart()
+        #expect(spy.calls == ["start 9101", "start 9104", "start 9104"], "Try again plays the episode chosen")
+    }
+
     @Test func theEndLeavesOnceButAnAdminsStopWaitsForBack() async {
         session.start()
         spy.state.stopMessage = "Dinner’s ready."
