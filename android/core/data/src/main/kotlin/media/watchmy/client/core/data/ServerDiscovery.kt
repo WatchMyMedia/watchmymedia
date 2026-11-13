@@ -31,35 +31,111 @@ internal fun interface ServerDiscovery {
 }
 
 /**
- * mDNS through [NsdManager]: browses `_watchmymedia._tcp` while collected,
- * resolves each service to an address and its TXT records (`id`, `version`,
- * `api`, `path`), and drops services when they say goodbye. Resolves run one
- * at a time, since older Android refuses concurrent ones.
+ * What [NsdDiscovery] needs of [NsdManager]: browsing for a service type, and
+ * resolving one service to its address and TXT records. Behind an interface
+ * so tests can find, lose and resolve services in any order.
  */
-internal class NsdDiscovery(context: Context) : ServerDiscovery {
-    private val nsd = context.applicationContext.getSystemService(NsdManager::class.java)
+internal interface NsdBrowser {
+    /**
+     * Starts browsing for [type]; services found and lost go to [found] and
+     * [lost]. Returns how to stop, or null when browsing can't start (no
+     * network permission, or no NSD on this device).
+     */
+    fun browse(type: String, found: (NsdServiceInfo) -> Unit, lost: (NsdServiceInfo) -> Unit): (() -> Unit)?
+
+    /** [info] with its address and TXT records, or null when it can't be resolved. */
+    suspend fun resolve(info: NsdServiceInfo): NsdServiceInfo?
+}
+
+/**
+ * mDNS through [NsdBrowser] (NsdManager on a device): browses
+ * `_watchmymedia._tcp` while collected, resolves each service to an address
+ * and its TXT records (`id`, `version`, `api`, `path`), and drops services
+ * when they say goodbye. Resolves run one at a time, since older Android
+ * refuses concurrent ones.
+ */
+internal class NsdDiscovery(private val browser: NsdBrowser) : ServerDiscovery {
+    constructor(context: Context) : this(AndroidNsdBrowser(context))
+
     private val resolving = Mutex()
 
     override fun servers(): Flow<List<DiscoveredServer>> = callbackFlow {
         val found = LinkedHashMap<String, DiscoveredServer>()
+        // Each service's latest find or loss, by name: a resolve that finishes after
+        // a newer one (it was lost meanwhile, or found again) is dropped. Without it a
+        // server lost while it resolved came back and stayed in the list.
+        val latest = HashMap<String, Int>()
         fun publish() = trySend(found.values.toList())
 
-        val listener = object : NsdManager.DiscoveryListener {
-            override fun onServiceFound(info: NsdServiceInfo) {
+        fun turn(name: String): Int = (latest[name] ?: 0).plus(1).also { latest[name] = it }
+
+        publish()
+        val stop = browser.browse(
+            SERVICE_TYPE,
+            found = { info ->
+                val name = info.serviceName
+                val mine = synchronized(found) { turn(name) }
                 launch {
-                    val server = resolve(info)?.let(::toDiscovered) ?: return@launch
+                    val server = resolve(info)?.let(::toDiscovered)
                     synchronized(found) {
-                        found[info.serviceName] = server
+                        if (latest[name] != mine || server == null) return@launch
+                        found[name] = server
                         publish()
                     }
                 }
-            }
-
-            override fun onServiceLost(info: NsdServiceInfo) {
+            },
+            lost = { info ->
                 synchronized(found) {
+                    turn(info.serviceName)
                     if (found.remove(info.serviceName) != null) publish()
                 }
-            }
+            },
+        )
+        awaitClose { stop?.invoke() }
+    }
+
+    private suspend fun resolve(info: NsdServiceInfo): NsdServiceInfo? = resolving.withLock {
+        withTimeoutOrNull(RESOLVE_TIMEOUT_MS) { browser.resolve(info) }
+    }
+
+    private fun toDiscovered(info: NsdServiceInfo): DiscoveredServer? {
+        val address = addresses(info).sortedBy { if (it is Inet4Address) 0 else 1 }.firstOrNull() ?: return null
+        val txt = info.attributes.mapValues { (_, v) -> v?.toString(Charsets.UTF_8) }
+        return discoveredServer(info.serviceName, address, info.port, txt)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun addresses(info: NsdServiceInfo): List<InetAddress> =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) info.hostAddresses else listOfNotNull(info.host)
+
+    companion object {
+        const val SERVICE_TYPE = "_watchmymedia._tcp"
+        private const val RESOLVE_TIMEOUT_MS = 5_000L
+
+        /** A resolved service as the server picker lists it. */
+        fun discoveredServer(serviceName: String, address: InetAddress, port: Int, txt: Map<String, String?>): DiscoveredServer {
+            val host = address.hostAddress.orEmpty().substringBefore('%').let { if (address is Inet4Address) it else "[$it]" }
+            val path = txt["path"].orEmpty().trim('/').let { if (it.isEmpty()) "" else "/$it" }
+            return DiscoveredServer(
+                id = txt["id"]?.takeIf { it.isNotBlank() } ?: serviceName,
+                name = serviceName,
+                baseUrl = "http://$host:$port$path",
+                version = txt["version"].orEmpty(),
+                apiLevel = txt["api"]?.toIntOrNull() ?: 0,
+            )
+        }
+    }
+}
+
+/** [NsdBrowser] on the device's NsdManager. */
+internal class AndroidNsdBrowser(context: Context) : NsdBrowser {
+    private val nsd = context.applicationContext.getSystemService(NsdManager::class.java)
+
+    override fun browse(type: String, found: (NsdServiceInfo) -> Unit, lost: (NsdServiceInfo) -> Unit): (() -> Unit)? {
+        val listener = object : NsdManager.DiscoveryListener {
+            override fun onServiceFound(info: NsdServiceInfo) = found(info)
+
+            override fun onServiceLost(info: NsdServiceInfo) = lost(info)
 
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
                 Log.w(TAG, "mDNS discovery failed to start ($errorCode)")
@@ -71,26 +147,19 @@ internal class NsdDiscovery(context: Context) : ServerDiscovery {
 
             override fun onDiscoveryStopped(serviceType: String) = Unit
         }
-
-        publish()
-        val started = try {
-            nsd.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener)
-            true
+        return try {
+            nsd.discoverServices(type, NsdManager.PROTOCOL_DNS_SD, listener)
+            val stop: () -> Unit = { runCatching { nsd.stopServiceDiscovery(listener) } }
+            stop
         } catch (e: RuntimeException) {
             // No network permission or no NSD on this device: nothing to list, typing an address still works.
             Log.w(TAG, "mDNS discovery unavailable", e)
-            false
-        }
-        awaitClose {
-            if (started) runCatching { nsd.stopServiceDiscovery(listener) }
+            null
         }
     }
 
-    private suspend fun resolve(info: NsdServiceInfo): NsdServiceInfo? = resolving.withLock {
-        withTimeoutOrNull(RESOLVE_TIMEOUT_MS) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) resolveWithCallback(info) else resolveLegacy(info)
-        }
-    }
+    override suspend fun resolve(info: NsdServiceInfo): NsdServiceInfo? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) resolveWithCallback(info) else resolveLegacy(info)
 
     @Suppress("DEPRECATION")
     private suspend fun resolveLegacy(info: NsdServiceInfo): NsdServiceInfo? = suspendCancellableCoroutine { cont ->
@@ -137,33 +206,8 @@ internal class NsdDiscovery(context: Context) : ServerDiscovery {
         }
     }
 
-    private fun toDiscovered(info: NsdServiceInfo): DiscoveredServer? {
-        val address = addresses(info).sortedBy { if (it is Inet4Address) 0 else 1 }.firstOrNull() ?: return null
-        val txt = info.attributes.mapValues { (_, v) -> v?.toString(Charsets.UTF_8) }
-        return discoveredServer(info.serviceName, address, info.port, txt)
-    }
-
-    @Suppress("DEPRECATION")
-    private fun addresses(info: NsdServiceInfo): List<InetAddress> =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) info.hostAddresses else listOfNotNull(info.host)
-
-    companion object {
-        private const val TAG = "WatchMyMedia"
-        const val SERVICE_TYPE = "_watchmymedia._tcp"
-        private const val RESOLVE_TIMEOUT_MS = 5_000L
-        private val executor = Executors.newSingleThreadExecutor()
-
-        /** A resolved service as the server picker lists it. */
-        fun discoveredServer(serviceName: String, address: InetAddress, port: Int, txt: Map<String, String?>): DiscoveredServer {
-            val host = address.hostAddress.orEmpty().substringBefore('%').let { if (address is Inet4Address) it else "[$it]" }
-            val path = txt["path"].orEmpty().trim('/').let { if (it.isEmpty()) "" else "/$it" }
-            return DiscoveredServer(
-                id = txt["id"]?.takeIf { it.isNotBlank() } ?: serviceName,
-                name = serviceName,
-                baseUrl = "http://$host:$port$path",
-                version = txt["version"].orEmpty(),
-                apiLevel = txt["api"]?.toIntOrNull() ?: 0,
-            )
-        }
+    private companion object {
+        const val TAG = "WatchMyMedia"
+        val executor = Executors.newSingleThreadExecutor()
     }
 }
