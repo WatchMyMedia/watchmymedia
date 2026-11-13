@@ -36,13 +36,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param autoplayNext Play the next episode by itself after the credits.
  * @param skip Per segment kind: none (no button), ask (a Skip button), auto (skip at once) or auto-delay (skip after 3 s).
- * @param audio 
+ * @param audio
  * @param liveTVReminderMinutes Minutes before a programme starts that a Live TV reminder comes: 0, 1, 5, 10 or 15 (API level 15).
- * @param subtitles 
+ * @param subtitles
  */
 @Serializable
 

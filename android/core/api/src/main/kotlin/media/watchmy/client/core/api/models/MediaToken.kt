@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param expiresAt Request a new token (and new playback URLs) after this.
  * @param `param` The query parameter name, access_token.
  * @param token Append as ?access_token= to media URLs (streams, HLS playlists, subtitles, images).

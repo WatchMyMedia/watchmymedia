@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param endMs 0 means to the end of the file.
- * @param kind 
- * @param startMs 
+ * @param kind
+ * @param startMs
  * @param `final` Credits only: the last block, after which the next episode may start.
  */
 @Serializable
@@ -62,8 +60,6 @@ data class ManualSegment (
 ) {
 
     /**
-     * 
-     *
      * Values: intro,recap,credits,preview,commercial,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

@@ -38,16 +38,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param facets 
- * @param items 
- * @param limit 
- * @param offset 
+ * @param facets
+ * @param items
+ * @param limit
+ * @param offset
  * @param total Items matching the filter.
  * @param genreCounts Items per genre after filter, decade and q, before the genre filter and pagination. Includes every library genre, with zero when none match.
  * @param letters Sorting by title: each letter present in the whole filtered list, in list order, with its first item's offset.
- * @param totals 
+ * @param totals
  */
 @Serializable
 

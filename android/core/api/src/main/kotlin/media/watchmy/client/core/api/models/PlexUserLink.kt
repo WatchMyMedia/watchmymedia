@@ -34,9 +34,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param plexUserId 
+ * @param plexUserId
  * @param userId The local account.
  */
 @Serializable

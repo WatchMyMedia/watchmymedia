@@ -35,12 +35,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param fileId 
+ * @param fileId
  * @param outcome applied; newer (a later play or mark on the server stands); unavailable (the item or file is gone). Every outcome is final: drop the entry.
- * @param downloadId 
- * @param watchState 
+ * @param downloadId
+ * @param watchState
  */
 @Serializable
 

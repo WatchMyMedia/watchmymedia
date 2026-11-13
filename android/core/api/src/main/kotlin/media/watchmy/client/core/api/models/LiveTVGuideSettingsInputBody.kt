@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param enabled 
- * @param tmdb 
+ * @param enabled
+ * @param tmdb
  * @param email Empty to send DeviceAuth only.
  */
 @Serializable

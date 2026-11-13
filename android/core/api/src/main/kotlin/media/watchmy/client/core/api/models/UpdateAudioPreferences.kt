@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param languages Ordered BCP 47 languages. An empty list clears them. Saving languages for a person who never saved a subtitle mode also turns on subtitles.foreignAudio.
  */
 @Serializable

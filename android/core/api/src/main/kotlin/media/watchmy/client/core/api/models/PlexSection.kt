@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param sectionId 
+ * @param sectionId
  * @param title The library's name in Plex.
- * @param type 
+ * @param type
  * @param linkedLibraryId The local library it is linked to.
  */
 @Serializable
@@ -62,8 +60,6 @@ data class PlexSection (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,show,unknown_default_open_api
      */
     @Serializable(with = TypeSerializer::class)

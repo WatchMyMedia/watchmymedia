@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param kind 
- * @param url 
+ * @param kind
+ * @param url
  * @param apiKey Omit with id to test the saved key.
  * @param id A saved connection whose key to use when apiKey is omitted.
  */
@@ -62,8 +60,6 @@ data class TestIntegrationInputBody (
 ) {
 
     /**
-     * 
-     *
      * Values: radarr,sonarr,seerr,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

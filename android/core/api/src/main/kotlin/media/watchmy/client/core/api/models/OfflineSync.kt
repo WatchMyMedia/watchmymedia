@@ -36,12 +36,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param downloads Every download this device has on the server, with its state. A download the device holds that is not listed is unknown here: delete it.
  * @param offline This person may download now. When false every download is revoked.
  * @param progress One per progress entry, in the order sent.
- * @param serverTime 
+ * @param serverTime
  */
 @Serializable
 

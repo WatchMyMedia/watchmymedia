@@ -36,12 +36,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param channels 
- * @param end 
- * @param start 
- * @param state 
+ * @param channels
+ * @param end
+ * @param start
+ * @param state
  */
 @Serializable
 

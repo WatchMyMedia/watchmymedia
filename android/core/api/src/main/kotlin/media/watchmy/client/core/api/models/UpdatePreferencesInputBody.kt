@@ -36,13 +36,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param audio 
- * @param autoplayNext 
+ * @param audio
+ * @param autoplayNext
  * @param liveTVReminderMinutes 0, 1, 5, 10 or 15.
  * @param skip Kinds to change; others keep their setting.
- * @param subtitles 
+ * @param subtitles
  */
 @Serializable
 

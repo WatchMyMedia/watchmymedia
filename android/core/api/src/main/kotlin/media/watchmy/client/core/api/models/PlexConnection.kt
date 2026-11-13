@@ -34,17 +34,15 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param generation Goes up with every change to the links; send it back when saving them.
  * @param historyCapability Whether the server let its owner read play history when connected.
- * @param id 
- * @param linkedLibraries 
- * @param linkedUsers 
- * @param machineIdentifier 
+ * @param id
+ * @param linkedLibraries
+ * @param linkedUsers
+ * @param machineIdentifier
  * @param name The server's name in Plex.
  * @param origin The address WatchMyMedia reads the server at.
- * @param serverVersion 
+ * @param serverVersion
  * @param status needs_reconnect: sign in to Plex again (Plex withdrew the grant, or the server was restored from a backup). needs_authorization: the admin who connected it is gone; another admin connects it again.
  * @param syncEnabled Whether imports run on a schedule. Connecting alone imports nothing; recurring sync is explicitly enabled.
  * @param hasApprovedImport A completed or partial import approved the current mapping generation, so recurring checks may be resumed. Independent of run-list pagination.

@@ -34,16 +34,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param channelName 
- * @param end 
- * @param id 
- * @param number 
+ * @param channelName
+ * @param end
+ * @param id
+ * @param number
  * @param running Already recording, so it can't give way.
- * @param start 
- * @param title 
- * @param userName 
+ * @param start
+ * @param title
+ * @param userName
  */
 @Serializable
 

@@ -35,8 +35,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param detail A human-readable explanation specific to this occurrence of the problem.
  * @param errors Optional list of individual error details
  * @param instance A URI reference that identifies the specific occurrence of the problem.

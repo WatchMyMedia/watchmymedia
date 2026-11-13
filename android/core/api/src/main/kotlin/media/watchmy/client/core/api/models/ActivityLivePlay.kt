@@ -40,33 +40,31 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param bandwidth Bits per second over the last 30 seconds.
  * @param bufferedMs How far ahead of the position the player has buffered.
- * @param bytesSent 
- * @param device 
- * @param durationMs 
- * @param fileId 
- * @param id 
- * @param item 
- * @param lastSeenAt 
- * @param network 
- * @param pausedMs 
- * @param playedMs 
- * @param positionMs 
- * @param startedAt 
- * @param state 
- * @param stream 
- * @param user 
- * @param auto 
+ * @param bytesSent
+ * @param device
+ * @param durationMs
+ * @param fileId
+ * @param id
+ * @param item
+ * @param lastSeenAt
+ * @param network
+ * @param pausedMs
+ * @param playedMs
+ * @param positionMs
+ * @param startedAt
+ * @param state
+ * @param stream
+ * @param user
+ * @param auto
  * @param ip Shown to admins and to the person watching.
  * @param serverPaced The server's configured upload ceiling applied to recent delivery; bandwidth then is not a spare-link measurement.
  * @param stallMs Time those rebuffers took.
  * @param stalls Rebuffers the player reported in this play.
  * @param startupMs From the first decision to its first frame; 0 when not reported.
  * @param throughput The player's own estimate of its link, in bits per second; 0 when it sends none.
- * @param transcode 
+ * @param transcode
  * @param uploadGeneration Upload policy and contention version at the last ceiling-governed delivery.
  */
 @Serializable
@@ -163,8 +161,6 @@ data class ActivityLivePlay (
 ) {
 
     /**
-     * 
-     *
      * Values: local,tailnet,remote,unknown_default_open_api
      */
     @Serializable(with = NetworkSerializer::class)
@@ -189,8 +185,6 @@ data class ActivityLivePlay (
         }
     }
     /**
-     * 
-     *
      * Values: playing,paused,buffering,unknown_default_open_api
      */
     @Serializable(with = StateSerializer::class)

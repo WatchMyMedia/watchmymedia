@@ -36,11 +36,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param access 
- * @param channels 
- * @param sources 
+ * @param access
+ * @param channels
+ * @param sources
  */
 @Serializable
 
@@ -58,8 +56,6 @@ data class LiveTVSettings (
 ) {
 
     /**
-     * 
-     *
      * Values: none,admins,everyone,unknown_default_open_api
      */
     @Serializable(with = AccessSerializer::class)

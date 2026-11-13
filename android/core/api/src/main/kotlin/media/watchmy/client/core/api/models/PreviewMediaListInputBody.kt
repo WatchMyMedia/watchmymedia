@@ -35,11 +35,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param mediaType 
- * @param source 
- * @param limit 
+ * @param mediaType
+ * @param source
+ * @param limit
  */
 @Serializable
 
@@ -57,8 +55,6 @@ data class PreviewMediaListInputBody (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,tv,all,unknown_default_open_api
      */
     @Serializable(with = MediaTypeSerializer::class)

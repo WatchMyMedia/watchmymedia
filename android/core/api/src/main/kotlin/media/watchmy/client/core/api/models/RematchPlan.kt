@@ -34,9 +34,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param files 
+ * @param files
  * @param found Files that land on an episode of the new show; for movies, all of them.
  * @param watched TV: episodes anyone has watch state on. Movies: people with watch state on it.
  * @param watchedKept Of those, how many keep their state: episodes with the same season and number in the new show.

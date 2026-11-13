@@ -35,14 +35,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param audio 
- * @param bandwidth 
- * @param direct 
- * @param remux 
- * @param streams 
- * @param transcode 
+ * @param audio
+ * @param bandwidth
+ * @param direct
+ * @param remux
+ * @param streams
+ * @param transcode
  */
 @Serializable
 

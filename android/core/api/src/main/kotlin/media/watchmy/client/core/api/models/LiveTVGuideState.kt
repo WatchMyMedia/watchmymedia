@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param enabled Listings are turned on.
  * @param stale Listings haven't been fetched for over 36 hours and may be out of date. Channels still play.
  * @param listedThrough When the last listing ends.

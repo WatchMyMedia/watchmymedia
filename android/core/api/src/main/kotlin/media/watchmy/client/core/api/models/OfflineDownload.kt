@@ -37,30 +37,28 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param createdAt 
- * @param fileId 
+ * @param createdAt
+ * @param fileId
  * @param id The record's ID: the offline routes and tokens name it.
- * @param item 
+ * @param item
  * @param mode direct, remux, audio or transcode, as the playback decision's mode.
  * @param protocol file: fetch url with Range requests, the original file. hls: url is a VOD master playlist; fetch its playlists, init segment and segments in order.
  * @param quality original, 1080, 720 or 480.
  * @param sizeBytes The file's size for file; an estimate for hls (sizeEstimated), or what the device reported once downloaded.
- * @param sizeEstimated 
+ * @param sizeEstimated
  * @param state ready: plays and downloads. replaced: the server has a new version of the file (replacedBy); gone: the file was deleted; keep playing the copy, mark it, and sync no progress for gone. revoked: delete the copy (an admin revoked it, or the person may no longer download). restart: a remade download session's init segment differs, so delete what was downloaded and start over. Read a value you don't know as revoked.
  * @param url Add an offline token (createOfflineToken) as access_token, or send the device's session as a bearer token.
  * @param bytesSent Everything the server has sent for this download, retries included.
- * @param completedAt 
- * @param decision 
- * @param deviceName 
+ * @param completedAt
+ * @param decision
+ * @param deviceName
  * @param deviceState queued, downloading, downloaded or removed, as the device last reported.
  * @param replacedBy replaced only: the item's file now, to download again.
- * @param revokedAt 
+ * @param revokedAt
  * @param revokedBy revoked only: admin, access (the person may no longer download) or user.
- * @param revokedByName 
+ * @param revokedByName
  * @param syncedAt When the device last synced or fetched.
- * @param user 
+ * @param user
  */
 @Serializable
 

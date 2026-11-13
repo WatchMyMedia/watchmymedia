@@ -36,9 +36,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param durationMs 
+ * @param durationMs
  * @param effective What the player gets: one source per kind, manual first.
  * @param segments Every stored segment, by start.
  */

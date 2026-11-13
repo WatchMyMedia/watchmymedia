@@ -39,35 +39,34 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param credits 
- * @param fileCount 
- * @param files 
- * @param genres 
- * @param hdr 
- * @param id 
- * @param libraryId 
- * @param overview 
- * @param title 
- * @param tmdbId 
- * @param totalSize 
- * @param addedAt 
- * @param backdropPath 
+ * @param credits
+ * @param fileCount
+ * @param files
+ * @param genres
+ * @param hdr
+ * @param id
+ * @param libraryId
+ * @param overview
+ * @param title
+ * @param tmdbId
+ * @param totalSize
+ * @param addedAt
+ * @param backdropPath
  * @param contentRating US certification from TMDB; empty when it has none.
- * @param download 
- * @param imdbId 
+ * @param download
+ * @param imdbId
  * @param managedBy The Radarr connection that has the movie.
- * @param originalTitle 
- * @param posterPath TMDB image path; fetch via /api/images/{size}{posterPath}.
- * @param quality 
+ * @param originalTitle
+ * @param posterPath Image path; fetch via /api/images/{size}{posterPath}. TMDB's, or a picture an admin chose.
+ * @param posterSource Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster.
+ * @param quality
  * @param rating TMDB vote average, 0-10.
- * @param releaseDate 
- * @param runtimeMin 
- * @param tagline 
+ * @param releaseDate
+ * @param runtimeMin
+ * @param tagline
  * @param trailers The movie's trailers, best first: trailer files in the library, then YouTube trailers while they are on. Apps play the first one whose source they know. Absent when it has none, and on older servers.
- * @param watch 
- * @param year 
+ * @param watch
+ * @param year
  */
 @Serializable
 
@@ -129,9 +128,13 @@ data class MovieDetail (
     @SerialName(value = "originalTitle")
     val originalTitle: kotlin.String? = null,
 
-    /* TMDB image path; fetch via /api/images/{size}{posterPath}. */
+    /* Image path; fetch via /api/images/{size}{posterPath}. TMDB's, or a picture an admin chose. */
     @SerialName(value = "posterPath")
     val posterPath: kotlin.String? = null,
+
+    /* Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster. */
+    @SerialName(value = "posterSource")
+    val posterSource: MovieDetail.PosterSource? = null,
 
     @SerialName(value = "quality")
     val quality: MovieDetail.Quality? = null,
@@ -162,8 +165,32 @@ data class MovieDetail (
 ) {
 
     /**
-     * 
+     * Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster.
      *
+     * Values: tmdb,upload,url,unknown_default_open_api
+     */
+    @Serializable(with = PosterSourceSerializer::class)
+    enum class PosterSource(val value: kotlin.String) {
+        @SerialName(value = "tmdb") tmdb("tmdb"),
+        @SerialName(value = "upload") upload("upload"),
+        @SerialName(value = "url") url("url"),
+        @SerialName(value = "unknown_default_open_api") unknown_default_open_api("unknown_default_open_api");
+    }
+
+    internal object PosterSourceSerializer : KSerializer<PosterSource> {
+        override val descriptor = kotlin.String.serializer().descriptor
+
+        override fun deserialize(decoder: Decoder): PosterSource {
+            val value = decoder.decodeSerializableValue(kotlin.String.serializer())
+            return PosterSource.entries.firstOrNull { it.value == value }
+                ?: PosterSource.unknown_default_open_api
+        }
+
+        override fun serialize(encoder: Encoder, value: PosterSource) {
+            encoder.encodeSerializableValue(kotlin.String.serializer(), value.value)
+        }
+    }
+    /**
      * Values: none,_4K,_1080p,_720p,SD,unknown_default_open_api
      */
     @Serializable(with = QualitySerializer::class)

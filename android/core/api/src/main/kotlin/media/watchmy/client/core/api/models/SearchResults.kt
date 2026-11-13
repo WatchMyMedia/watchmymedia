@@ -37,11 +37,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param episodes 
- * @param movies 
- * @param shows 
+ * @param episodes
+ * @param movies
+ * @param shows
  */
 @Serializable
 

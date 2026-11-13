@@ -35,10 +35,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param error Why an optional automatic download failed; playback continues without it.
- * @param track 
+ * @param track
  */
 @Serializable
 

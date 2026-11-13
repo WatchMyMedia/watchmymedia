@@ -34,9 +34,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param max 
+ * @param max
  * @param propertyValues Seven rows (Sunday first) of 24 hours.
  */
 @Serializable

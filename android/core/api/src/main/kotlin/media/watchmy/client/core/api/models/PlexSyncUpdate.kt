@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param enabled 
- * @param generation 
+ * @param enabled
+ * @param generation
  */
 @Serializable
 

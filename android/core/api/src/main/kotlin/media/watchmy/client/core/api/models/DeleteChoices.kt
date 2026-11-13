@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param airing The season is still airing.
  * @param exclude Movies and shows: don't add it again from import lists. Off.
  * @param keep Movies and shows: keep it in the app unmonitored rather than remove it. Off.

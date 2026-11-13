@@ -34,20 +34,18 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param title 
- * @param type 
- * @param artPath 
- * @param episodeId 
- * @param episodeNumber 
- * @param libraryId 
- * @param movieId 
- * @param posterPath 
- * @param seasonNumber 
- * @param showId 
- * @param showTitle 
- * @param year 
+ * @param title
+ * @param type
+ * @param artPath
+ * @param episodeId
+ * @param episodeNumber
+ * @param libraryId
+ * @param movieId
+ * @param posterPath
+ * @param seasonNumber
+ * @param showId
+ * @param showTitle
+ * @param year
  */
 @Serializable
 
@@ -92,8 +90,6 @@ data class ActivityItem (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,episode,file,unknown_default_open_api
      */
     @Serializable(with = TypeSerializer::class)

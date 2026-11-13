@@ -36,11 +36,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param `data` 
+ * @param `data`
  * @param event The event name.
- * @param id 
+ * @param id
  * @param retry The retry time in milliseconds.
  */
 @Serializable

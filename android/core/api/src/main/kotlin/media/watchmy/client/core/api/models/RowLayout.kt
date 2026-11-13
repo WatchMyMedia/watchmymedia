@@ -35,11 +35,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param customized Saved by this person (or, for the household default, by an admin); false means it follows the default.
- * @param rows 
- * @param screen 
+ * @param rows
+ * @param screen
  */
 @Serializable
 

@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param tmdbId The TMDB show or movie to move to.
  * @param remember Use it for new files in the files' shared folder.
  */

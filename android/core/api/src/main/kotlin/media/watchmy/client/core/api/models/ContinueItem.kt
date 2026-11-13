@@ -34,23 +34,21 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param durationMs 
- * @param fileId 
- * @param kind 
- * @param positionMs 
- * @param title 
- * @param updatedAt 
- * @param backdropPath 
- * @param episodeId 
- * @param episodeNumber 
- * @param movieId 
- * @param posterPath 
- * @param seasonNumber 
- * @param showId 
- * @param stillPath 
- * @param subtitle 
+ * @param durationMs
+ * @param fileId
+ * @param kind
+ * @param positionMs
+ * @param title
+ * @param updatedAt
+ * @param backdropPath
+ * @param episodeId
+ * @param episodeNumber
+ * @param movieId
+ * @param posterPath
+ * @param seasonNumber
+ * @param showId
+ * @param stillPath
+ * @param subtitle
  */
 @Serializable
 
@@ -104,8 +102,6 @@ data class ContinueItem (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,episode,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

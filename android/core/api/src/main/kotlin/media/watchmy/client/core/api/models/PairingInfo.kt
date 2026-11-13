@@ -34,17 +34,15 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param approved 
- * @param code 
- * @param expiresAt 
+ * @param approved
+ * @param code
+ * @param expiresAt
  * @param name The device's name, as it described itself.
  * @param ip The address the device asked from.
- * @param model 
- * @param platform 
- * @param product 
- * @param version 
+ * @param model
+ * @param platform
+ * @param product
+ * @param version
  */
 @Serializable
 

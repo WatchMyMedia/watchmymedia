@@ -36,16 +36,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param audio 
+ * @param audio
  * @param mode direct, remux, audio or transcode.
  * @param protocol file or hls.
  * @param quality original, 1080, 720 or 480.
  * @param reasons Why a cheaper mode was not possible.
- * @param sizeBytes 
+ * @param sizeBytes
  * @param sizeEstimated The size is about this much: anything but the original file.
- * @param video 
+ * @param video
  */
 @Serializable
 

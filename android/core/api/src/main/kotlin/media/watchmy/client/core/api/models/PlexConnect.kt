@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param machineIdentifier 
+ * @param machineIdentifier
  * @param origin The server's address: http or https, a host and a port, as http://192.168.1.20:32400.
- * @param signInId 
+ * @param signInId
  */
 @Serializable
 

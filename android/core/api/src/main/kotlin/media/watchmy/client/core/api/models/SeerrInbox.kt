@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param requestsUrl Seerr's requests page, where admins approve and decline.
  * @param pending Requests waiting for approval in Seerr; absent when Seerr couldn't be reached.
  */

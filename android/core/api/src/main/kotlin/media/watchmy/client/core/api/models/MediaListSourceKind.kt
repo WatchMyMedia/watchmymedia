@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param kind tmdb, mdblist, library or import. A plain string: offer only the kinds you know.
- * @param name 
+ * @param name
  * @param ready It can be used now.
  * @param charts tmdb: the charts MediaListSource.chart takes.
  * @param reason Why it isn't ready.

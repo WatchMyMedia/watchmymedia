@@ -34,9 +34,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param fileIds 
+ * @param fileIds
  * @param ignored True to ignore the files, false to bring them back.
  */
 @Serializable

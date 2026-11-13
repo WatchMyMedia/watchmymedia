@@ -35,12 +35,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param addresses Addresses Plex knows for it, relays left out. Another address can be given when connecting.
- * @param machineIdentifier 
+ * @param machineIdentifier
  * @param name The server's name in Plex.
- * @param version 
+ * @param version
  */
 @Serializable
 

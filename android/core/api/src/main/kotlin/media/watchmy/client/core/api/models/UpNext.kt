@@ -34,18 +34,16 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param episodeId 
- * @param episodeNumber 
- * @param fileId 
- * @param seasonNumber 
- * @param showId 
- * @param showTitle 
- * @param title 
+ * @param episodeId
+ * @param episodeNumber
+ * @param fileId
+ * @param seasonNumber
+ * @param showId
+ * @param showTitle
+ * @param title
  * @param runtimeMin Its file's length, else TMDB's runtime.
  * @param seasonFinale The last episode of its season (not for specials).
- * @param stillPath 
+ * @param stillPath
  */
 @Serializable
 

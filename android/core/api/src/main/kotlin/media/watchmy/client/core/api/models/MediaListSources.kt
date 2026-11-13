@@ -36,12 +36,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param lists The person's own lists.
  * @param maxLists Most lists a person may make.
  * @param movieGenres TMDB's movie genres, for discover; empty without a TMDB key.
- * @param sources 
+ * @param sources
  * @param tvGenres TMDB's TV genres, for discover.
  */
 @Serializable

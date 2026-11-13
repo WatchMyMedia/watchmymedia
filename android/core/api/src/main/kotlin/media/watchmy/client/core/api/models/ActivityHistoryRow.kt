@@ -38,29 +38,27 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param completed 
- * @param durationMs 
- * @param endReason 
+ * @param completed
+ * @param durationMs
+ * @param endReason
  * @param groupCount Plays in the group; resumed plays of an item join the one they pick up.
- * @param groupId 
- * @param groupStartedAt 
+ * @param groupId
+ * @param groupStartedAt
  * @param id The play; for a group, its newest play.
- * @param ip 
- * @param item 
- * @param mode 
- * @param network 
- * @param pausedMs 
+ * @param ip
+ * @param item
+ * @param mode
+ * @param network
+ * @param pausedMs
  * @param percent Furthest position reached, as a share of the duration.
  * @param playedMs Time played; for a group, across the group.
  * @param positionMs Where it stopped.
- * @param startedAt 
- * @param stoppedAt 
- * @param user 
- * @param detail 
- * @param device 
- * @param fileId 
+ * @param startedAt
+ * @param stoppedAt
+ * @param user
+ * @param detail
+ * @param device
+ * @param fileId
  */
 @Serializable
 
@@ -137,8 +135,6 @@ data class ActivityHistoryRow (
 ) {
 
     /**
-     * 
-     *
      * Values: stopped,ended,closed,timeout,terminated,unknown_default_open_api
      */
     @Serializable(with = EndReasonSerializer::class)
@@ -165,8 +161,6 @@ data class ActivityHistoryRow (
         }
     }
     /**
-     * 
-     *
      * Values: direct,remux,audio,transcode,unknown_default_open_api
      */
     @Serializable(with = ModeSerializer::class)
@@ -192,8 +186,6 @@ data class ActivityHistoryRow (
         }
     }
     /**
-     * 
-     *
      * Values: local,tailnet,remote,unknown_default_open_api
      */
     @Serializable(with = NetworkSerializer::class)

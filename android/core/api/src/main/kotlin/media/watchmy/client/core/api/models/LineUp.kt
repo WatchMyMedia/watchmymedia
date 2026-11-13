@@ -35,13 +35,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param dated TV files named by air date, as daily shows are.
  * @param datedFound Of those, files dated within the show's run on TMDB.
  * @param found Files that would land on an episode (TV) or the movie.
- * @param seasons 
- * @param total 
+ * @param seasons
+ * @param total
  * @param unnumbered TV files whose names have no season and episode numbers.
  */
 @Serializable

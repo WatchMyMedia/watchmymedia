@@ -34,17 +34,15 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param copy 
+ * @param copy
  * @param toneMap HDR source converted to SDR.
- * @param bitDepth 
- * @param codec 
+ * @param bitDepth
+ * @param codec
  * @param dvProfile The Dolby Vision profile sent (5, 7, 8); set only when the video is copied with its Dolby Vision. From apiLevel 8.
  * @param encoder ffmpeg encoder used when not copying.
  * @param hdr The HDR the screen gets when the video is copied: hdr10 for a Dolby Vision 8.1 base layer, hlg for 8.4, dolbyvision when Dolby Vision is kept. A transcode is made from it, and with toneMap the screen gets SDR.
- * @param height 
- * @param width 
+ * @param height
+ * @param width
  */
 @Serializable
 

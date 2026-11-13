@@ -35,10 +35,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param created False when it was asked for already: by this user (the seasons were added) or by someone else.
- * @param request 
+ * @param request
  */
 @Serializable
 

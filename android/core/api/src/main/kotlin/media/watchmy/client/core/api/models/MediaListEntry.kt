@@ -35,18 +35,16 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param found False for an imported title TMDB could not find: show it as Not found.
  * @param mediaType movie or tv.
  * @param rank 1 for the first.
- * @param title 
- * @param imdbId 
- * @param item 
+ * @param title
+ * @param imdbId
+ * @param item
  * @param posterPath TMDB's poster, for titles the library doesn't have.
  * @param requestState requestable, requested, downloading or available, as Requestable.state, when the person may request. Absent when requests aren't set up. A plain string.
  * @param tmdbId Absent when TMDB could not find the title (imports).
- * @param year 
+ * @param year
  */
 @Serializable
 

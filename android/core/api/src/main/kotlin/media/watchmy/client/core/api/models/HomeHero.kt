@@ -34,23 +34,21 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param facts 
- * @param kicker 
- * @param kind 
- * @param overview 
- * @param title 
- * @param backdropPath 
- * @param contentRating 
- * @param episodeId 
- * @param fileId 
- * @param hdr 
- * @param movieId 
- * @param posterPath 
+ * @param facts
+ * @param kicker
+ * @param kind
+ * @param overview
+ * @param title
+ * @param backdropPath
+ * @param contentRating
+ * @param episodeId
+ * @param fileId
+ * @param hdr
+ * @param movieId
+ * @param posterPath
  * @param quality The episode's best file, or the movie's or show's best.
- * @param seasonNumber 
- * @param showId 
+ * @param seasonNumber
+ * @param showId
  */
 @Serializable
 
@@ -105,8 +103,6 @@ data class HomeHero (
 ) {
 
     /**
-     * 
-     *
      * Values: episode,movie,show,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

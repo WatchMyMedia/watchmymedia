@@ -36,15 +36,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param generation The links' generation it was made from.
  * @param history Play history is not read by previews; only current watched marks are.
- * @param id 
- * @param startedAt 
+ * @param id
+ * @param startedAt
  * @param status stale: the links changed since; start another.
- * @param expiresAt 
- * @param finishedAt 
+ * @param expiresAt
+ * @param finishedAt
  * @param reason Why it failed, as a reason code.
  * @param unlinked Everyone on the server who isn't linked, with why not (needs_pin, …). Nothing of theirs is read.
  * @param users One per linked person, once complete.

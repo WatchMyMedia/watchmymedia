@@ -36,12 +36,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param client 
- * @param profile 
+ * @param client
+ * @param profile
  * @param audioIndex hls downloads carry one audio track; omit for the one the player would pick: the person's audio languages, else the file's default.
- * @param burnIn 
+ * @param burnIn
  * @param quality Default original.
  * @param subtitleId With burnIn: a subtitle to burn into an hls download.
  */

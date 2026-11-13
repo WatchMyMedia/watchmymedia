@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param remaining Downloads left; -1 when not known yet.
  * @param signedIn Downloads count against the server's OpenSubtitles account; without one, against the server's IP (5 a day).
- * @param resetAt 
+ * @param resetAt
  */
 @Serializable
 

@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param items The app's movies or series in it.
  * @param localPath The folder as this server sees it, after the path mappings.
- * @param path 
+ * @param path
  * @param libraryId The library it is inside; absent when none.
  */
 @Serializable

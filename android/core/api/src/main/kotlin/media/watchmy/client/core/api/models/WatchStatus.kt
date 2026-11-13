@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param folders Folders watched.
  * @param state watching: every folder; partial: the system's limit on watches was reached; off: the folder is unreachable or watching is unavailable. Changes the watcher does not see are found by the scheduled scan.
  * @param unwatched Folders found but not watched.

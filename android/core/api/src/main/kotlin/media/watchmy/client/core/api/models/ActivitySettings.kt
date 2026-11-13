@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param groupPlays Join a play that picks up an unfinished one into the same history row.
  * @param household Let everyone see what is playing now (not history or statistics).
  * @param minPlaySeconds Plays shorter than this are not kept unless they reach the credits; 0 keeps every play.

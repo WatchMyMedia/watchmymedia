@@ -37,35 +37,33 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param addedAt When the file was added: when a scan first found it, or its modified date if that was the library's first scan; a moved or renamed file keeps its date. Recently added sorts by it.
- * @param firstSeenAt 
- * @param id 
+ * @param firstSeenAt
+ * @param id
  * @param lastSeenAt When a scan last wrote this file's record (found, changed or back). Scans do not write to unchanged files.
- * @param libraryId 
+ * @param libraryId
  * @param matchIgnored True when a person said the file is not library content.
  * @param matchLocked True when a person chose the match; automatic runs leave it alone.
- * @param matchStatus 
- * @param modifiedAt 
- * @param parsed 
+ * @param matchStatus
+ * @param modifiedAt
+ * @param parsed
  * @param path Absolute path on the server.
  * @param relativePath Path relative to the library root, forward slashes.
  * @param propertySize Bytes.
- * @param status 
- * @param audioCodec 
- * @param candidates 
- * @param container 
- * @param durationMs 
+ * @param status
+ * @param audioCodec
+ * @param candidates
+ * @param container
+ * @param durationMs
  * @param dvProfile Dolby Vision profile (5, 7, 8…); omitted for other files, and for Dolby Vision files the scanner has not probed again since profiles were kept.
  * @param hdr HDR kind of the main video stream.
- * @param height 
+ * @param height
  * @param matchError Why the file could not be matched.
- * @param movieId 
+ * @param movieId
  * @param probeError Set when ffprobe could not read the file.
- * @param recording 
- * @param videoCodec 
- * @param width 
+ * @param recording
+ * @param videoCodec
+ * @param width
  */
 @Serializable
 
@@ -166,8 +164,6 @@ data class MediaFile (
 ) {
 
     /**
-     * 
-     *
      * Values: pending,matched,unmatched,failed,unknown_default_open_api
      */
     @Serializable(with = MatchStatusSerializer::class)
@@ -193,8 +189,6 @@ data class MediaFile (
         }
     }
     /**
-     * 
-     *
      * Values: present,missing,unknown_default_open_api
      */
     @Serializable(with = StatusSerializer::class)

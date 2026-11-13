@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param expiresAt Renew before this by calling this route with the cast token.
  * @param `param` The query parameter name for media URLs, access_token.
  * @param token Send as Authorization: Bearer to the playback routes, and as ?access_token= on media URLs.

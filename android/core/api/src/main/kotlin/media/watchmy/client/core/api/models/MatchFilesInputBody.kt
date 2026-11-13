@@ -34,9 +34,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param fileIds 
+ * @param fileIds
  * @param tmdbId TMDB movie ID (movie libraries) or show ID (TV libraries).
  * @param remember Use this show or movie for new files in the files' shared folder.
  */

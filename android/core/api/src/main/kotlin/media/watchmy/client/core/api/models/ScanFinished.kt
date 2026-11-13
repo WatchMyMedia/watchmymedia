@@ -34,19 +34,17 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param added 
- * @param durationMs 
+ * @param added
+ * @param durationMs
  * @param failed Files ffprobe could not read; stored with an error.
- * @param libraryId 
+ * @param libraryId
  * @param missing Files that were present before and are now gone.
  * @param partial Only the paths the watcher saw change were read, not the whole library.
  * @param reparsed Unchanged files whose names now read differently, such as date-named episodes; unmatched ones are matched again.
  * @param restored Files that were missing and are back unchanged.
  * @param skipped Files still changing on disk; the scan will run again.
- * @param unchanged 
- * @param updated 
+ * @param unchanged
+ * @param updated
  */
 @Serializable
 

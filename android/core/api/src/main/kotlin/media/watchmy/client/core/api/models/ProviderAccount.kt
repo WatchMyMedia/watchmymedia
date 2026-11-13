@@ -34,13 +34,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param allowedDownloads 
- * @param level 
- * @param remainingDownloads 
- * @param vip 
- * @param resetAt 
+ * @param allowedDownloads
+ * @param level
+ * @param remainingDownloads
+ * @param vip
+ * @param resetAt
  */
 @Serializable
 

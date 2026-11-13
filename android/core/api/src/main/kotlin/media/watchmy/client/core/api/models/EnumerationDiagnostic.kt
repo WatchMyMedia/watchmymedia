@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param namespace 
- * @param ok 
- * @param detail 
+ * @param namespace
+ * @param ok
+ * @param detail
  */
 @Serializable
 
@@ -56,8 +54,6 @@ data class EnumerationDiagnostic (
 ) {
 
     /**
-     * 
-     *
      * Values: cuda,directx,unknown_default_open_api
      */
     @Serializable(with = NamespaceSerializer::class)

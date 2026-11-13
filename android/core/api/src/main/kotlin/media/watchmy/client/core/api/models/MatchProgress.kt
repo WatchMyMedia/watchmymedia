@@ -34,12 +34,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param done 
- * @param libraryId 
- * @param total 
- * @param current 
+ * @param done
+ * @param libraryId
+ * @param total
+ * @param current
  */
 @Serializable
 

@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param automaticDownload When mode is on (or forced with foreignAudio, for foreign audio) and no local track matches, allow one exact-file subtitle download per play. Off by default.
  * @param languages Preferred BCP 47 languages, in order; empty until the person chooses or accepts their device's language.
  * @param mode off, forced (only foreign-language parts in the audio's language), or on.

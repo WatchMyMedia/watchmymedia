@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param access admins: only admins delete; everyone: anyone signed in may delete episodes and movies. Shows, whole seasons and replacing a file stay with admins.
  */
 @Serializable

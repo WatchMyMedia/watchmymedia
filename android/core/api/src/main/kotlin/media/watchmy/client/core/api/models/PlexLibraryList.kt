@@ -35,10 +35,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param generation Send back when saving mappings.
- * @param libraries 
+ * @param libraries
  */
 @Serializable
 

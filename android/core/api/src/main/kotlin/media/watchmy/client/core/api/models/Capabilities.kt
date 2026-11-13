@@ -34,21 +34,19 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param detected 
- * @param encoder 
+ * @param detected
+ * @param encoder
  * @param encoders Video encoders available.
- * @param ffmpeg 
+ * @param ffmpeg
  * @param gpuFilters Scaling runs on the GPU, and tone mapping too where the GPU can.
- * @param hwaccel 
+ * @param hwaccel
  * @param libass subtitles filter present; text subtitles can be burned in.
  * @param maxHeight Tallest transcode output, 1080 or 2160.
- * @param overlay 
+ * @param overlay
  * @param toneMap HDR sources can be mapped to SDR (zscale and tonemap filters, or on the GPU).
  * @param device Selected adapter: a CUDA index for NVENC, the render node number for QSV and VAAPI on Linux (N is /dev/dri/renderD128+N), a DirectX index for QSV/AMF on Windows; absent uses the backend default.
  * @param doviToneMap Dolby Vision profile 5 is converted to SDR through its RPU, so its colours come out right; without it, its transcodes play with the wrong colours. From apiLevel 8.
- * @param hevcEncoder 
+ * @param hevcEncoder
  * @param speed4k Frames per second of the 4K HEVC Main 10 HDR-to-SDR decode/filter/encode benchmark; 0 when unavailable or failed.
  */
 @Serializable
@@ -108,8 +106,6 @@ data class Capabilities (
 ) {
 
     /**
-     * 
-     *
      * Values: software,videotoolbox,nvenc,qsv,vaapi,amf,unknown_default_open_api
      */
     @Serializable(with = HwaccelSerializer::class)

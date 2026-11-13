@@ -35,10 +35,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param buckets Days (YYYY-MM-DD) or months (YYYY-MM), oldest first.
- * @param lines 
+ * @param lines
  */
 @Serializable
 

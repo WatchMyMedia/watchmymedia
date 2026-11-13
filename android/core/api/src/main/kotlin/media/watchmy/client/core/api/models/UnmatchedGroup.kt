@@ -37,18 +37,16 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param candidates 
- * @param files 
- * @param key 
- * @param kind 
+ * @param candidates
+ * @param files
+ * @param key
+ * @param kind
  * @param reason Why these files need a person, in plain words.
- * @param seasons 
+ * @param seasons
  * @param title Title read from the folder or file names.
  * @param folder Folder relative to the library root that names the show or movie; empty when the file names alone do.
- * @param show 
- * @param year 
+ * @param show
+ * @param year
  */
 @Serializable
 
@@ -90,8 +88,6 @@ data class UnmatchedGroup (
 ) {
 
     /**
-     * 
-     *
      * Values: show,episodes,lookup,ignored,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

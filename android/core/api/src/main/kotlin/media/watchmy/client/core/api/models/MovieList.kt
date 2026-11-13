@@ -35,12 +35,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param items 
- * @param limit 
- * @param offset 
- * @param total 
+ * @param items
+ * @param limit
+ * @param offset
+ * @param total
  */
 @Serializable
 

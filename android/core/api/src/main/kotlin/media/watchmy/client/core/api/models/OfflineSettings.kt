@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param access Who may download to watch offline in the apps: none, admins (the default) or everyone with an account. Withdrawing it removes a person's downloads when their device next syncs.
  */
 @Serializable

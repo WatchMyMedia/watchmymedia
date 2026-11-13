@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param deviceState removed: the copy is gone from the device (deleted, or never made); the record goes.
- * @param id 
+ * @param id
  * @param sizeBytes What the download takes on the device, once downloaded.
  */
 @Serializable

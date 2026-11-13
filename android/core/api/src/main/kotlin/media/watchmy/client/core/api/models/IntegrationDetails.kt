@@ -37,10 +37,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param qualityProfiles 
- * @param rootFolders 
+ * @param qualityProfiles
+ * @param rootFolders
  * @param suggestions Mappings that would put root folders outside every library inside one.
  * @param recycleBin Where the app moves deleted files; empty when it deletes them for good.
  */

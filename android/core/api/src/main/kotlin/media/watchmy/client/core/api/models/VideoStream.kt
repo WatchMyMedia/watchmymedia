@@ -34,22 +34,20 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param codec 
- * @param default 
- * @param height 
- * @param index 
- * @param width 
- * @param bitDepth 
- * @param bitRate 
- * @param dvProfile 
- * @param frameRate 
- * @param hdr 
- * @param language 
- * @param pixelFormat 
- * @param profile 
- * @param title 
+ * @param codec
+ * @param default
+ * @param height
+ * @param index
+ * @param width
+ * @param bitDepth
+ * @param bitRate
+ * @param dvProfile
+ * @param frameRate
+ * @param hdr
+ * @param language
+ * @param pixelFormat
+ * @param profile
+ * @param title
  */
 @Serializable
 
@@ -100,8 +98,6 @@ data class VideoStream (
 ) {
 
     /**
-     * 
-     *
      * Values: none,hdr10,hlg,dolbyvision,unknown_default_open_api
      */
     @Serializable(with = HdrSerializer::class)

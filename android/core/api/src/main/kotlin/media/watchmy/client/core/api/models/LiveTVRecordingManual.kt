@@ -34,15 +34,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param channelId 
- * @param end 
- * @param name 
- * @param repeat 
- * @param start 
- * @param zone 
- * @param days 
+ * @param channelId
+ * @param end
+ * @param name
+ * @param repeat
+ * @param start
+ * @param zone
+ * @param days
  */
 @Serializable
 
@@ -72,8 +70,6 @@ data class LiveTVRecordingManual (
 ) {
 
     /**
-     * 
-     *
      * Values: once,daily,weekdays,weekly,unknown_default_open_api
      */
     @Serializable(with = RepeatSerializer::class)

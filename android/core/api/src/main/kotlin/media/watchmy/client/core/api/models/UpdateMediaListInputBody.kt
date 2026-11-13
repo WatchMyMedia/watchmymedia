@@ -35,12 +35,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param limit 
- * @param name 
+ * @param limit
+ * @param name
  * @param shared Admins only.
- * @param source 
+ * @param source
  */
 @Serializable
 

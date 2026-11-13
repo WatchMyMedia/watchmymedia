@@ -37,16 +37,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param audio 
- * @param container 
- * @param durationMs 
- * @param formatName 
- * @param subtitles 
- * @param video 
- * @param bitRate 
- * @param propertySize 
+ * @param audio
+ * @param container
+ * @param durationMs
+ * @param formatName
+ * @param subtitles
+ * @param video
+ * @param bitRate
+ * @param propertySize
  */
 @Serializable
 

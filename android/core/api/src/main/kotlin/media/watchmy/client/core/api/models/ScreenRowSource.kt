@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param kind tmdb, mdblist, library or import. A plain string.
  * @param name The words to show: From <name>.
  * @param url A link to the list on the source's site, when it has one.

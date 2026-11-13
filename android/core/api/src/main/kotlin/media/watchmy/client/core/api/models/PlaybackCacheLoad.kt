@@ -34,17 +34,15 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param eventAheadMs 
- * @param eventKeepBehindMs 
- * @param maxCacheBytes 
- * @param maxSessionBytes 
- * @param minFreeBytes 
- * @param scanComplete 
- * @param temporaryBytes 
- * @param temporaryFiles 
- * @param freeBytes 
+ * @param eventAheadMs
+ * @param eventKeepBehindMs
+ * @param maxCacheBytes
+ * @param maxSessionBytes
+ * @param minFreeBytes
+ * @param scanComplete
+ * @param temporaryBytes
+ * @param temporaryFiles
+ * @param freeBytes
  */
 @Serializable
 

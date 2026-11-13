@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param letter A–Z, or # for titles starting with a digit or symbol. Leading The, A and An are skipped.
  * @param offset Offset of the letter's first item in the filtered list.
  */

@@ -35,26 +35,25 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param credits 
- * @param fileCount 
- * @param genres 
- * @param id 
- * @param libraryId 
- * @param overview 
- * @param title 
- * @param tmdbId 
- * @param backdropPath 
+ * @param credits
+ * @param fileCount
+ * @param genres
+ * @param id
+ * @param libraryId
+ * @param overview
+ * @param title
+ * @param tmdbId
+ * @param backdropPath
  * @param contentRating US certification from TMDB; empty when it has none.
- * @param imdbId 
- * @param originalTitle 
- * @param posterPath TMDB image path; fetch via /api/images/{size}{posterPath}.
+ * @param imdbId
+ * @param originalTitle
+ * @param posterPath Image path; fetch via /api/images/{size}{posterPath}. TMDB's, or a picture an admin chose.
+ * @param posterSource Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster.
  * @param rating TMDB vote average, 0-10.
- * @param releaseDate 
- * @param runtimeMin 
- * @param tagline 
- * @param year 
+ * @param releaseDate
+ * @param runtimeMin
+ * @param tagline
+ * @param year
  */
 @Serializable
 
@@ -97,9 +96,13 @@ data class Movie (
     @SerialName(value = "originalTitle")
     val originalTitle: kotlin.String? = null,
 
-    /* TMDB image path; fetch via /api/images/{size}{posterPath}. */
+    /* Image path; fetch via /api/images/{size}{posterPath}. TMDB's, or a picture an admin chose. */
     @SerialName(value = "posterPath")
     val posterPath: kotlin.String? = null,
+
+    /* Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster. */
+    @SerialName(value = "posterSource")
+    val posterSource: Movie.PosterSource? = null,
 
     /* TMDB vote average, 0-10. */
     @SerialName(value = "rating")
@@ -119,6 +122,32 @@ data class Movie (
 
 ) {
 
+    /**
+     * Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster.
+     *
+     * Values: tmdb,upload,url,unknown_default_open_api
+     */
+    @Serializable(with = PosterSourceSerializer::class)
+    enum class PosterSource(val value: kotlin.String) {
+        @SerialName(value = "tmdb") tmdb("tmdb"),
+        @SerialName(value = "upload") upload("upload"),
+        @SerialName(value = "url") url("url"),
+        @SerialName(value = "unknown_default_open_api") unknown_default_open_api("unknown_default_open_api");
+    }
+
+    internal object PosterSourceSerializer : KSerializer<PosterSource> {
+        override val descriptor = kotlin.String.serializer().descriptor
+
+        override fun deserialize(decoder: Decoder): PosterSource {
+            val value = decoder.decodeSerializableValue(kotlin.String.serializer())
+            return PosterSource.entries.firstOrNull { it.value == value }
+                ?: PosterSource.unknown_default_open_api
+        }
+
+        override fun serialize(encoder: Encoder, value: PosterSource) {
+            encoder.encodeSerializableValue(kotlin.String.serializer(), value.value)
+        }
+    }
 
 }
 

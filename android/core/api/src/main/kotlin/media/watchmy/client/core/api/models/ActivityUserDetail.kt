@@ -39,21 +39,19 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param deviceList 
- * @param devices 
- * @param isAdmin 
+ * @param deviceList
+ * @param devices
+ * @param isAdmin
  * @param playedMs All time.
  * @param playing Plays running now.
  * @param plays All time.
- * @param recordHistory 
- * @param topMovies 
- * @param topShows 
- * @param user 
- * @param windows 
- * @param lastPlayed 
- * @param lastSeenAt 
+ * @param recordHistory
+ * @param topMovies
+ * @param topShows
+ * @param user
+ * @param windows
+ * @param lastPlayed
+ * @param lastSeenAt
  */
 @Serializable
 

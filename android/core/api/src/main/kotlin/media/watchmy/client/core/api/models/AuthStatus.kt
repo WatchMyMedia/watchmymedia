@@ -35,14 +35,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param adminAllowed Whether this signed-in admin may administer here; for others, whether first-run setup works on this network.
  * @param setupRequired True until the first admin account is created.
- * @param adminLimit 
- * @param onAdminNetwork 
+ * @param adminLimit
+ * @param onAdminNetwork
  * @param turnstileSiteKey Set while password sign-in and setup need a Cloudflare Turnstile token: render the widget with this site key and send its token as turnstileToken.
- * @param user 
+ * @param user
  */
 @Serializable
 
@@ -72,8 +70,6 @@ data class AuthStatus (
 ) {
 
     /**
-     * 
-     *
      * Values: network,https,unknown_default_open_api
      */
     @Serializable(with = AdminLimitSerializer::class)

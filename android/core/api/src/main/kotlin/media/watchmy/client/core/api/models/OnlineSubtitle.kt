@@ -34,13 +34,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param aiTranslated 
+ * @param aiTranslated
  * @param downloads How often it was downloaded on OpenSubtitles.
  * @param forced Only the foreign-language parts.
  * @param hashMatch Made for this exact file, so in sync.
- * @param hearingImpaired 
+ * @param hearingImpaired
  * @param id What to download it by.
  * @param language ISO 639-1, with a region for some (pt-br, zh-cn).
  * @param release The release it was made for.

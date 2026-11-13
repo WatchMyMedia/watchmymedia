@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param languages Preferred BCP 47 languages for the audio track, in order. Empty plays the file's default track.
  */
 @Serializable

@@ -34,13 +34,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param itemId 
- * @param itemType 
- * @param kind 
+ * @param itemId
+ * @param itemType
+ * @param kind
  * @param fileId The file that was playing, if any.
- * @param note 
+ * @param note
  */
 @Serializable
 
@@ -65,8 +63,6 @@ data class ReportProblemInputBody (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,episode,unknown_default_open_api
      */
     @Serializable(with = ItemTypeSerializer::class)
@@ -90,8 +86,6 @@ data class ReportProblemInputBody (
         }
     }
     /**
-     * 
-     *
      * Values: video,audio,subtitles,other,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

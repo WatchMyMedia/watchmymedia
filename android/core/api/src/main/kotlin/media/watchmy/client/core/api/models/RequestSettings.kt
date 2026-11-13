@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param approval admins: everyone else's requests wait for an admin; everyone: all go straight through.
  */
 @Serializable

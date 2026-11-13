@@ -34,16 +34,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param itemId 
- * @param itemType 
- * @param userId 
- * @param episode 
- * @param season 
- * @param show 
- * @param title 
- * @param userName 
+ * @param itemId
+ * @param itemType
+ * @param userId
+ * @param episode
+ * @param season
+ * @param show
+ * @param title
+ * @param userName
  */
 @Serializable
 
@@ -76,8 +74,6 @@ data class PlexExclusion (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,episode,unknown_default_open_api
      */
     @Serializable(with = ItemTypeSerializer::class)

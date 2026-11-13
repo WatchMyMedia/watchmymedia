@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param reason 
- * @param step 
+ * @param reason
+ * @param step
  * @param generation Accepted negotiated quality switch generation; acknowledge after the new stream plays its first frame.
  */
 @Serializable
@@ -57,8 +55,6 @@ data class AutoChoice (
 ) {
 
     /**
-     * 
-     *
      * Values: original,_2160,_1080,_720,_480,_360,unknown_default_open_api
      */
     @Serializable(with = StepSerializer::class)

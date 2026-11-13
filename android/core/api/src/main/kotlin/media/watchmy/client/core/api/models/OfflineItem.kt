@@ -34,19 +34,17 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param title 
+ * @param title
  * @param type movie, episode, or file for a file not matched yet.
  * @param artPath The movie's backdrop, or the episode's still.
- * @param episodeId 
- * @param episodeNumber 
- * @param movieId 
+ * @param episodeId
+ * @param episodeNumber
+ * @param movieId
  * @param posterPath The movie's or the show's poster.
- * @param seasonNumber 
- * @param showId 
- * @param showTitle 
- * @param year 
+ * @param seasonNumber
+ * @param showId
+ * @param showTitle
+ * @param year
  */
 @Serializable
 
