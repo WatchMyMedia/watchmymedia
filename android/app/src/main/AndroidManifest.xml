@@ -81,12 +81,15 @@
              the system's Output Switcher on Android 17, where the in-app chooser finds no devices
              without local network access and the switcher needs none. -->
         <receiver android:name="androidx.mediarouter.media.MediaTransferReceiver" />
-        <!-- Live TV reminders: the alarm's notification, and the alarms again after a reboot or an update. -->
+        <!-- Live TV reminders: the alarm's notification, and the alarms again after a reboot or an
+             update. The boot receiver is off until LiveReminderAlarms keeps an alarm, and off again
+             once it keeps none, so a boot starts the app only when there is something to set. -->
         <receiver
             android:name=".reminders.LiveReminderReceiver"
             android:exported="false" />
         <receiver
             android:name=".reminders.LiveReminderBoot"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

@@ -138,7 +138,12 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
      * reboot, LiveReminderBoot. Servers below API level 15 have no list.
      */
     private fun followReminders(data: DataServices, account: () -> String?) {
-        val alarms = LiveReminderAlarms(this).also { it.createChannel(); reminderAlarms = it }
+        val alarms = LiveReminderAlarms(this).also {
+            it.createChannel()
+            // The boot receiver follows the alarms; a version before it was always on.
+            it.matchBootReceiver()
+            reminderAlarms = it
+        }
         var logos: Pair<Long, Map<String, String>>? = null
         var scheduledFor: String? = null
         appScope.launch {
