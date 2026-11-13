@@ -122,6 +122,7 @@ private struct EntryFace: View {
     let imageURL: URL?
     var canRequest = false
     @Environment(\.isFocused) private var focused
+    @Environment(\.displayScale) private var scale
 
     private let width: CGFloat = 218
 
@@ -151,7 +152,7 @@ private struct EntryFace: View {
 
     @ViewBuilder private var artwork: some View {
         if let item = entry.item {
-            Artwork(url: imageURL, seed: item.title, maxPixel: width * 2.4)
+            Artwork(url: imageURL, seed: item.title, maxPixel: cardPixels(width: width, height: width * 1.5, scale: scale))
                 .overlay {
                     if let quality = item.quality { TVBadge(quality).pinned(.topTrailing) }
                     if item.watched {
@@ -166,7 +167,7 @@ private struct EntryFace: View {
                 .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Palette.outlineStrong, style: StrokeStyle(lineWidth: 2, dash: [8, 5])))
                 .overlay { TVBadge("Not found", style: .warning).pinned(.bottomLeading, padding: 10) }
         } else {
-            Artwork(url: imageURL, seed: entry.title, maxPixel: width * 2.4)
+            Artwork(url: imageURL, seed: entry.title, maxPixel: cardPixels(width: width, height: width * 1.5, scale: scale))
                 .overlay { Color(hex: 0x0F0F10).opacity(focused ? 0.35 : 0.62) }
         }
     }
