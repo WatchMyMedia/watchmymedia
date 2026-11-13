@@ -95,6 +95,9 @@ public final class TVLivePlayerModel {
     public func switchChannel(_ channel: LiveChannel) { guard !disposed else { return }; live.switchChannel(channel) }
     public func previousChannel() { guard videoTakesInput else { return }; live.previousChannel() }
     public func nextChannel() { guard videoTakesInput else { return }; live.nextChannel() }
+    /// The channel watched before this one (not the one before it in the list); no button yet.
+    public var lastChannel: LiveChannel? { live.lastChannel }
+    public func switchToLastChannel() { guard videoTakesInput else { return }; live.switchToLastChannel() }
     public func enteredBackground() {
         live.enteredBackground(externalPlayback: controller.player?.isExternalPlaybackActive ?? false, pictureInPictureMayStart: pictureInPicturePossible)
     }

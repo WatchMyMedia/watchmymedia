@@ -34,8 +34,20 @@ public final class LivePlayerModel {
     }
     public func switchChannel(_ channel: LiveChannel) {
         guard !disposed, channel.available else { return }
+        if channel.id != request.channel.id { lastChannel = request.channel }
         request = LivePlayRequest(channel: channel, quality: state.quality)
         controller.start(request)
+    }
+    /// The channel watched before this one, for a remote's Last key
+    /// (PLAN-APPLE-REVIEW.md §6.2): set by every switch, from a list, a guide
+    /// or Ch− and Ch+. Nil until the first switch.
+    public private(set) var lastChannel: LiveChannel?
+    /// Back to ``lastChannel``, as the channel list has it now; pressed
+    /// again, back to the one before. Nothing when there is none or it
+    /// can't be watched now.
+    public func switchToLastChannel() {
+        guard let last = lastChannel else { return }
+        switchChannel(channels.first { $0.id == last.id } ?? last)
     }
     public func previousChannel() { step(-1) }
     public func nextChannel() { step(1) }
