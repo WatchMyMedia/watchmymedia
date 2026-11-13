@@ -31,8 +31,11 @@ class HttpCacheTest {
     private fun notModified(tag: String) = MockResponse().setResponseCode(304).setHeader("ETag", tag).setHeader("Cache-Control", "private, no-cache")
 
     private fun signInAs(name: String, id: Int, token: String) = runBlocking {
+        // The sign-in's own check of who this is answers as the same person, and has finished before the test asks.
+        h.server.always("GET /api/auth/me", json("""{"id":$id,"name":"$name","isAdmin":false}"""))
         h.server.on("POST /api/auth/login", json(TestServer.SIGN_IN.replace("tok-viewer", token).replace("\"id\":2", "\"id\":$id").replace("\"viewer\"", "\"$name\"")))
         h.services.auth.signIn(name, "password")
+        h.services.awaitIdle()
     }
 
     @Test
