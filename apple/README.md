@@ -665,6 +665,10 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
 - **Reduce Motion** turns the player's slides into fades and stills its
   spinner.
 - **Pull to refresh** on Downloads syncs them.
+- **A background refresh** (`App/Shell/BackgroundSync.swift`) sends what was
+  watched offline. It stays off until `project.yml` gives the app
+  `BGTaskSchedulerPermittedIdentifiers: [media.watchmy.client.sync]` and
+  `UIBackgroundModes: [fetch]`.
 
 ## Release builds, privacy and measuring
 

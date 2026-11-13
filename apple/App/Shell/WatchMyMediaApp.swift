@@ -24,6 +24,7 @@ struct WatchMyMediaApp: App {
         Diagnostics.start()
         let services = ServicesFactory.make(arguments: ProcessInfo.processInfo.arguments)
         _services = State(initialValue: services)
+        BackgroundSync.register(services)
         _cast = State(initialValue: CastServicesFactory.make(services: services, arguments: ProcessInfo.processInfo.arguments))
         _extras = State(initialValue: LiveExtrasStore(repository: services.liveTV))
         _recordings = State(initialValue: LiveRecordingsStore(repository: services.liveTV))
@@ -57,6 +58,8 @@ struct WatchMyMediaApp: App {
                 .task { await recordings.follow() }
                 // Once at launch and on each return to the app.
                 .task(id: scenePhase) { if scenePhase == .active { await cast.refresh() } }
+                // Offline watching reaches the server in a background refresh too.
+                .onChange(of: scenePhase) { _, phase in if phase == .background { BackgroundSync.schedule() } }
         }
     }
 }
