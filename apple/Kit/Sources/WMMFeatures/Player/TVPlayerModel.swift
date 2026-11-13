@@ -68,25 +68,19 @@ public struct TVPlayerAction: Hashable, Sendable, Identifiable {
 @MainActor
 @Observable
 public final class TVPlayerModel {
-    public let controller: any PlaybackController
+    /// The play from start to finish, as the phone's player has it too.
+    @ObservationIgnored private let session: PlayerSession
+    public var controller: any PlaybackController { session.controller }
     /// What plays now: the request the screen opened with, or the next episode once it started in place.
-    public private(set) var request: PlayRequest
+    public var request: PlayRequest { session.request }
     /// The system's transport bar is up.
     public private(set) var transportBarVisible = false
     /// When the admin's stop message appeared, and where the video was then, for its small print.
     public private(set) var stoppedAt: Date?
     public private(set) var stoppedAtMs: Int?
 
-    @ObservationIgnored private let onExit: @MainActor () -> Void
-    @ObservationIgnored private var closedInBackground = false
-    @ObservationIgnored private var finished = false
-    @ObservationIgnored private var disposed = false
-    @ObservationIgnored private var eventsTask: Task<Void, Never>?
-
     public init(controller: any PlaybackController, request: PlayRequest, onExit: @escaping @MainActor () -> Void) {
-        self.controller = controller
-        self.request = request
-        self.onExit = onExit
+        session = PlayerSession(controller: controller, request: request, onExit: onExit)
     }
 
     public var state: PlayerState { controller.state }
@@ -95,46 +89,34 @@ public final class TVPlayerModel {
 
     /// Starts playing and listening to the controller.
     public func start() {
-        controller.start(request)
-        let events = controller.events
-        eventsTask = Task { [weak self] in
-            for await event in events { self?.handle(event) }
-        }
-        observeState()
+        session.start(stateChanged: { [weak self] in self?.stateChanged() })
     }
 
     /// The screen went away: reports "stopped" and lets go of the player. Safe to call twice.
     public func dispose() {
-        guard !disposed else { return }
-        disposed = true
-        eventsTask?.cancel()
-        controller.stop()
-        controller.release()
+        session.dispose()
     }
 
     /// The viewer leaves (Back on the stopped and can't-play states, Stop, Menu).
     public func close() {
         controller.noteUserInput()
-        finish()
+        session.finish()
     }
 
     /// Try again after the can't-play state: the same play, from the start of it.
     public func retry() {
         controller.noteUserInput()
-        controller.start(request)
+        session.restart()
     }
 
     /// The app went to the background (the TV button): the video pauses and the server hears "closed".
     public func enteredBackground() {
-        guard !closedInBackground, !disposed else { return }
-        closedInBackground = true
-        controller.pause()
-        controller.close()
+        session.closeInBackground()
     }
 
     /// The app is in front again; the video stays paused until the viewer plays.
     public func becameActive() {
-        closedInBackground = false
+        session.reopen()
     }
 
     // MARK: - What shows
@@ -272,41 +254,7 @@ public final class TVPlayerModel {
 
     // MARK: - Private
 
-    private func finish() {
-        guard !finished else { return }
-        finished = true
-        onExit()
-    }
-
-    private func handle(_ event: PlayerEvent) {
-        switch event {
-        case .exit:
-            // An admin's stop shows its message first; Back leaves.
-            if state.stopMessage == nil { finish() }
-        case .startedNext(let fileID):
-            // The still and poster too, so a retry keeps the episode's Now Playing picture.
-            request = PlayRequest(
-                fileID: fileID, title: state.title, subtitle: state.subtitle,
-                backdropPath: state.backdropPath, stillPath: state.stillPath, posterPath: state.posterPath
-            )
-        }
-    }
-
     /// Notes when the admin's stop message came, and where the video was.
-    private func observeState() {
-        guard !disposed else { return }
-        withObservationTracking {
-            _ = controller.state
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.stateChanged()
-                self.observeState()
-            }
-        }
-        stateChanged()
-    }
-
     private func stateChanged() {
         let s = state
         if s.stopMessage != nil, stoppedAt == nil {
