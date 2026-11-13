@@ -54,7 +54,6 @@ jobs:
           filters: |
             server:
               - 'server/**'
-              - 'deploy/fixture/**'
               - 'deploy/macos/fetch-ffmpeg.sh'
               - 'Makefile'
               - '.github/workflows/ci.yml'
@@ -127,7 +126,42 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
-          cache: ${{ runner.environment == 'github-hosted' }}
+          cache: false
+      # Go's build and test caches, on GitHub's machines. Only pushes to main
+      # save them, under their commit, and every run restores main's newest,
+      # so a pull request reruns only the packages it changes and those that
+      # depend on them (Go keys a test result on its binary, the files it
+      # read and its environment). setup-go's own cache is keyed on go.sum
+      # alone, so it was saved once and then restored ever staler. A new
+      # pinned ffmpeg starts from nothing: Go can't see the ffmpeg its tests
+      # run.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
       - name: Vet, and build for Linux and Windows
         working-directory: server
         run: |
@@ -135,8 +169,6 @@ jobs:
           GOOS=linux GOARCH=amd64 go vet ./...
           GOOS=linux GOARCH=arm64 go build ./...
           GOOS=windows GOARCH=amd64 go vet ./...
-      - name: Test the isolated streaming runner
-        run: python3 -I -m unittest discover -s deploy/fixture -p '*_test.py'
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15.0
@@ -158,6 +190,13 @@ jobs:
         run: |
           deploy/macos/fetch-ffmpeg.sh arm64
           build/ffmpeg/darwin-arm64/ffmpeg -hide_banner -version | head -1
+      # Pull requests keep main's passing results for packages they don't
+      # change; main and manual runs run every test again, and main saves
+      # those results for the pull requests after it.
+      - name: Run every test again outside pull requests
+        if: github.event_name != 'pull_request'
+        working-directory: server
+        run: go clean -testcache
       # The speed budgets (Test...Speed) time queries against the wall clock,
       # so they run in a step of their own, one package at a time, rather
       # than beside the other packages on the runner's three cores.
@@ -176,6 +215,14 @@ jobs:
           export PATH="$GITHUB_WORKSPACE/build/ffmpeg/darwin-arm64:$PATH"
           go test -race -short ./internal/ffexec
           go test -race -short -run 'Watch' ./internal/scanner
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
 
   # The Go tests again under the race detector, on another runner so the
   # server job does not wait for it. -short skips the speed budgets, which
@@ -198,7 +245,35 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
-          cache: ${{ runner.environment == 'github-hosted' }}
+          cache: false
+      # Go's caches, saved by main and restored everywhere, as in the server job.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
       - name: Fetch the ffmpeg build the releases ship
         env:
           FFMPEG_CACHE: ${{ runner.tool_cache }}/watchmymedia-ffmpeg
@@ -212,6 +287,13 @@ jobs:
           deploy/macos/fetch-ffmpeg.sh "$target"
           echo "$GITHUB_WORKSPACE/build/ffmpeg/$dir" >> "$GITHUB_PATH"
           "build/ffmpeg/$dir/ffmpeg" -hide_banner -version | head -1
+      # Pull requests keep main's passing results for packages they don't
+      # change; main and manual runs run every test again, and main saves
+      # those results for the pull requests after it.
+      - name: Run every test again outside pull requests
+        if: github.event_name != 'pull_request'
+        working-directory: server
+        run: go clean -testcache
       # Packages build and test in parallel again (one per core). On the
       # three-core macOS runners, before test databases were copied rather
       # than migrated, that ran the api package past go test's 10-minute
@@ -220,6 +302,14 @@ jobs:
       - name: Test with the race detector
         working-directory: server
         run: go test -race -short -timeout 20m ./...
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
 
   web:
     needs: changes
@@ -269,6 +359,7 @@ jobs:
           python3 -I -m unittest discover -s deploy/release -p '*_test.py'
           python3 -I -m unittest discover -s deploy/ci -p '*_test.py'
           python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'
+          python3 -I -m unittest discover -s deploy/fixture -p '*_test.py'
       - name: Check the guidance's paths and make targets
         run: python3 -I deploy/ci/check-agent-docs.py
 
@@ -288,7 +379,35 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
-          cache: ${{ runner.environment == 'github-hosted' }}
+          cache: false
+      # Go's caches, saved by main and restored everywhere, as in the server job.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: 9
@@ -305,6 +424,14 @@ jobs:
         run: |
           make gen-api PATH="$PATH"
           git diff --exit-code -- api web/src/api
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
 
   docker:
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
@@ -491,12 +618,47 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
+          cache: false
+      # Go's caches, saved by main and restored everywhere, as in the server job.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum', 'windows/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
       - name: Fetch the ffmpeg build the Windows app will ship
         shell: bash
         run: |
           deploy/macos/fetch-ffmpeg.sh windows-amd64
           build/ffmpeg/windows-amd64/ffmpeg.exe -hide_banner -version | head -1
+      # Pull requests keep main's passing results for packages they don't
+      # change; main and manual runs run every test again, and main saves
+      # those results for the pull requests after it.
+      - name: Run every test again outside pull requests
+        if: github.event_name != 'pull_request'
+        working-directory: server
+        run: go clean -testcache
       - name: Check Windows playlists and recording publication
         working-directory: server
         shell: pwsh
@@ -657,6 +819,14 @@ jobs:
           name: windows-desktop-platform-report
           path: build/windows-platform-smoke/*.json
           retention-days: 7
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
 
   # A Windows app and installer signed with Artifact Signing and verified, on
   # a manual run that asks for it ("Also sign and verify a Windows
@@ -682,7 +852,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
+          cache: false
       # The Artifact Signing client runs on .NET 10.
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:

@@ -205,6 +205,40 @@ class WorkflowIsolationTest(unittest.TestCase):
                 if 'packages: write' in job:
                     self.assertEqual('image', name)
 
+    def test_go_caches_are_saved_only_by_main_on_hosted_runners(self):
+        # Pull requests read main's Go caches and never write one, so no pull
+        # request, fork or not, can seed what the next run on main restores.
+        # main and manual runs clear Go's test results and run every test.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        self.assertNotIn('actions/cache@', workflow)
+        setups = re.findall(r'(?m)uses: actions/setup-go@[^\n]*\n        with:\n((?:          .*\n)+)', workflow)
+        self.assertEqual(5, len(setups))
+        for setup in setups:
+            self.assertIn('          cache: false\n', setup)
+        save_if = ("if: \"!cancelled() && runner.environment == 'github-hosted' && "
+                   "github.event_name == 'push' && github.ref == 'refs/heads/main'\"")
+        cached = {'server', 'server-race', 'contract', 'windows'}
+        for name, job in jobs.items():
+            with self.subTest(job=name):
+                if name not in cached:
+                    self.assertNotIn('actions/cache/', job)
+                    continue
+                self.assertEqual(1, job.count('uses: actions/cache/restore@'))
+                self.assertEqual(1, job.count('uses: actions/cache/save@'))
+                save = job.split('uses: actions/cache/save@', 1)[1]
+                self.assertIn(save_if, save)
+                self.assertIn('key: ${{ steps.go-cache.outputs.key }}', save)
+                # The save comes last, after every step that fills the cache.
+                self.assertNotIn('\n      - ', save)
+                self.assertIn('echo "key=$prefix$SUMS-$GITHUB_SHA"', job)
+                if name != 'contract':
+                    self.assertIn("if: github.event_name != 'pull_request'\n"
+                                  "        working-directory: server\n"
+                                  "        run: go clean -testcache\n", job)
+                    self.assertLess(job.index('go clean -testcache'), job.index('go test'))
+
     def test_actions_are_pinned_to_commits(self):
         # A tag can be moved to other code and a commit cannot. Release jobs
         # hold signing keys, so every action runs at a commit someone
