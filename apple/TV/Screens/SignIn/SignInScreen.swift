@@ -178,6 +178,7 @@ private struct SignInContent: View {
                     }
                     .buttonStyle(TVButtonStyle(kind: .primary))
                     .disabled(model.busy)
+                    .accessibilityIdentifier("signInButton")
                     Button("Use a pairing code instead") { model.usePairingCode() }
                         .buttonStyle(TVButtonStyle())
                     Button("Switch server") { flow.choosingServer = true }

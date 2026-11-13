@@ -108,6 +108,10 @@ server, and on iPad in both a regular and a compact width.
     below lands on whatever is nearest, so the page moves it to the card on
     top (or the chosen tab) before following it; otherwise coming up from the
     row would choose the season over the card.
+  - On Apple TV a focused button that becomes disabled keeps focus, dimmed,
+    until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
+    up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable
+    itself while it works.
   - A note pill's timer is cancelled while a page settles in after Back, so
     clear the note only when the sleep finished (`MessagePill`).
   - On iPad the toolbar beside the tab bar holds little: a third trailing

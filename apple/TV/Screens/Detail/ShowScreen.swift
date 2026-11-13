@@ -271,6 +271,7 @@ private struct ShowPageView: View {
                     }
                     .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
                     .disabled(model.busy)
+                    .accessibilityIdentifier("episodeWatchToggle")
                 }
                 if model.hasMenu || episode.versions.count > 1 { moreMenu(episode) }
             } else if episode.aired {
