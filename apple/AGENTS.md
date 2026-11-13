@@ -87,7 +87,10 @@ server, and on iPad in both a regular and a compact width.
   `.focused($page, equals: n)` reports which screen holds focus and, set,
   moves focus into that screen (Back to the top, Menu). The Siri Remote in the
   simulator tool has no Menu key: `TVUITests/HomeScreensTests.swift` checks
-  Menu with `XCUIRemote`.
+  Menu with `XCUIRemote`. On Apple TV each screen is identified by what it
+  shows (`HomePage`), not its place, and a row's screen (`HomeRowScreen`)
+  holds its own focused card: a row appearing above keeps the others' cards,
+  and moving along a row redraws that screen alone.
 - **Dialogs and focus.**
   - iOS 27's Back is a bare chevron. Hiding it for a labelled Back of your
     own turns off the edge swipe, and on iPad a leading toolbar item goes into
