@@ -154,6 +154,8 @@ final class FakeMediaPlayer: MediaPlayer {
     var loads: [PlayerSource] = []
     /// What ``retitle(_:subtitle:)`` named the item playing.
     var titles: [String] = []
+    /// What ``describe(_:)`` said about the item playing.
+    var described: [ItemDetails] = []
     var seeks: [Int] = []
     var audioOrdinal: Int?
     var playsAudio: (Int) -> Bool = { _ in true }
@@ -217,6 +219,8 @@ final class FakeMediaPlayer: MediaPlayer {
     }
 
     func retitle(_ title: String, subtitle: String?) { titles.append(title) }
+
+    func describe(_ details: ItemDetails) { described.append(details) }
 
     func stop() { change { phase = .idle } }
 

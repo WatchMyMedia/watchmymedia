@@ -220,20 +220,41 @@ extension PlayerFailure {
     var refusedToken: Bool { kind == .http && (httpStatus == 401 || httpStatus == 403) }
 }
 
-/// The title and subtitle as AVKit reads them, for the transport bar's title view and Now Playing.
+/// What AVKit reads about the item: the title and subtitle for the
+/// transport bar's title view and Now Playing, and on Apple TV the Info
+/// panel's description, picture, certification, genre and year.
 enum PlayerMetadata {
-    nonisolated static func items(title: String, subtitle: String?) -> [AVMetadataItem] {
+    nonisolated static func items(title: String, subtitle: String?, details: ItemDetails = ItemDetails()) -> [AVMetadataItem] {
         var items: [AVMetadataItem] = []
-        func add(_ identifier: AVMetadataIdentifier, _ value: String) {
+        func add(_ identifier: AVMetadataIdentifier, _ value: any NSCopying & NSObjectProtocol, dataType: String? = nil) {
             let item = AVMutableMetadataItem()
             item.identifier = identifier
-            item.value = value as NSString
+            item.value = value
+            if let dataType { item.dataType = dataType }
             item.extendedLanguageTag = "und"
             items.append(item)
         }
-        if !title.isEmpty { add(.commonIdentifierTitle, title) }
-        if let subtitle, !subtitle.isEmpty { add(.iTunesMetadataTrackSubTitle, subtitle) }
+        func add(_ identifier: AVMetadataIdentifier, _ text: String?) {
+            guard let text, !text.isEmpty else { return }
+            add(identifier, text as NSString)
+        }
+        add(.commonIdentifierTitle, title)
+        add(.iTunesMetadataTrackSubTitle, subtitle)
+        add(.commonIdentifierDescription, details.overview)
+        if let artwork = details.artwork, let type = imageType(artwork.data) {
+            add(.commonIdentifierArtwork, artwork.data as NSData, dataType: type)
+        }
+        add(.iTunesMetadataContentRating, details.contentRating)
+        add(.quickTimeMetadataGenre, details.genres.isEmpty ? nil : details.genres.joined(separator: ", "))
+        add(.quickTimeMetadataCreationDate, details.year.map(String.init))
         return items
+    }
+
+    /// The picture's type for AVKit, from its first bytes: JPEG or PNG; nil for another.
+    nonisolated static func imageType(_ data: Data) -> String? {
+        if data.starts(with: [0xFF, 0xD8, 0xFF]) { return kCMMetadataBaseDataType_JPEG as String }
+        if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return kCMMetadataBaseDataType_PNG as String }
+        return nil
     }
 }
 

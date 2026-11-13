@@ -472,6 +472,7 @@ public final class RealPlaybackController: PlaybackController {
         state.stillPath = v.request.stillPath
         state.posterPath = v.request.posterPath
         media?.retitle(v.request.title, subtitle: v.request.subtitle)
+        media?.describe(details(v.request))
         showArtwork(for: v.request)
         refresh(0)
     }
@@ -648,7 +649,8 @@ public final class RealPlaybackController: PlaybackController {
             playWhenReady: playWhenReady,
             title: v.request.title,
             subtitle: v.request.subtitle,
-            audio: audioStart(d, v.selectedAudio)
+            audio: audioStart(d, v.selectedAudio),
+            details: details(v.request)
         ))
         refresh(0)
     }
@@ -968,8 +970,15 @@ public final class RealPlaybackController: PlaybackController {
                   artworkImage == image
             else { return }
             artwork = NowPlayingArtwork(id: image.id, data: data)
+            if let v = active() { media?.describe(details(v.request)) }
             refresh(0)
         }
+    }
+
+    /// What the Apple TV player's Info panel shows beside the title: what the
+    /// request carries, and the picture Now Playing loaded for it.
+    func details(_ request: PlayRequest) -> ItemDetails {
+        ItemDetails(overview: request.overview, year: request.year, contentRating: request.contentRating, genres: request.genres, artwork: artwork)
     }
 
     // MARK: - Automatic's step changes

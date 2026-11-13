@@ -41,6 +41,8 @@ public final class AVMediaPlayer: MediaPlayer {
     private var logged = false
     private var hls = false
     private var loadedAtPositionMs = 0
+    /// What the system shows about the item, kept so a new name or picture replaces only its part.
+    private var named: (title: String, subtitle: String?, details: ItemDetails) = ("", nil, ItemDetails())
 
     public init() {
         core = PlayerCore()
@@ -114,7 +116,8 @@ public final class AVMediaPlayer: MediaPlayer {
 
     public func load(_ source: PlayerSource) {
         clearItem()
-        let item = core.makeItem(url: source.url, mimeType: source.mimeType, metadata: PlayerMetadata.items(title: source.title, subtitle: source.subtitle))
+        named = (source.title, source.subtitle, source.details)
+        let item = core.makeItem(url: source.url, mimeType: source.mimeType, metadata: PlayerMetadata.items(title: source.title, subtitle: source.subtitle, details: source.details))
         let asset = item.asset
         loadedAtPositionMs = source.startPositionMs
         hls = source.hls
@@ -189,7 +192,15 @@ public final class AVMediaPlayer: MediaPlayer {
     }
 
     public func retitle(_ title: String, subtitle: String?) {
-        core.describe(PlayerMetadata.items(title: title, subtitle: subtitle))
+        named.title = title
+        named.subtitle = subtitle
+        core.describe(PlayerMetadata.items(title: title, subtitle: subtitle, details: named.details))
+    }
+
+    public func describe(_ details: ItemDetails) {
+        guard details != named.details else { return }
+        named.details = details
+        core.describe(PlayerMetadata.items(title: named.title, subtitle: named.subtitle, details: details))
     }
 
     public func stop() {

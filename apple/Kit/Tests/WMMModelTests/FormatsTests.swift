@@ -178,6 +178,22 @@ import Testing
         let request = e.playRequest(showTitle: "Harbor Lights", backdropPath: "/b.jpg", posterPath: "/p.jpg")
         #expect((request?.stillPath, request?.posterPath, request?.backdropPath) == ("/s.jpg", "/p.jpg", "/b.jpg"))
     }
+
+    @Test func playRequestsCarryWhatTheAppleTVInfoPanelShows() {
+        // PLAN-APPLE-REVIEW.md §6.2: the page's own description, year, certification and genres.
+        var movie = MovieDetail(
+            id: 21, libraryID: 1, title: "Paper Moons", year: 2021, tagline: nil, overview: "Two letters a year.", releaseDate: nil, runtimeMin: nil, genres: ["Drama"],
+            rating: nil, posterPath: nil, backdropPath: nil, quality: nil, hdr: false, versions: [MediaVersion(fileID: 5, label: "a", sizeBytes: 1)], cast: [], watch: nil
+        )
+        movie.contentRating = "PG"
+        let m = movie.playRequest()
+        #expect((m?.overview, m?.year, m?.contentRating, m?.genres) == ("Two letters a year.", 2021, "PG", ["Drama"]))
+        let e = EpisodeDetail(id: 1, season: 3, number: 7, title: "The Long Dark", overview: "The harbour freezes.", hasFile: true, aired: true, versions: [MediaVersion(fileID: 5, label: "a", sizeBytes: 1)])
+        #expect(e.playRequest(showTitle: "Harbor Lights", backdropPath: nil)?.overview == "The harbour freezes.")
+        // An empty description is none.
+        let quiet = EpisodeDetail(id: 1, season: 3, number: 7, title: "The Long Dark", hasFile: true, aired: true, versions: [MediaVersion(fileID: 5, label: "a", sizeBytes: 1)])
+        #expect(quiet.playRequest(showTitle: "Harbor Lights", backdropPath: nil)?.overview == nil)
+    }
 }
 
 @Suite struct LoadableTests {
