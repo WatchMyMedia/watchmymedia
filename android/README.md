@@ -727,7 +727,10 @@ that address in the server picker, never a server discovery lists.
 The journeys find the screens by test tags (`TestTags` in `core:ui`,
 spelled again in `Journeys.kt`), which `MainActivity` exposes as resource
 ids, not by their wording: renaming a button doesn't break them, and a tag
-removed does.
+removed does. A journey that fails leaves `journey-failure.png` and
+`journey-failure.xml` (the window's hierarchy, with each element's
+resource id) in
+`baselineprofile/build/outputs/connected_android_test_additional_output/`.
 
 Regenerate the profiles after a change to what a start or those screens
 run, on throwaway `android-35` emulators (`google_apis`; AGENTS.md,

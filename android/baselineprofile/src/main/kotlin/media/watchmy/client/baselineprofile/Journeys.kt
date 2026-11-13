@@ -11,6 +11,7 @@ import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import java.io.File
 
 /*
  * What people do first in the app (README, "Baseline profile"). On the fakes
@@ -68,15 +69,30 @@ internal const val LOAD_MS = 20_000L
 /** The fake pairing signs the TV in after a few seconds. */
 private const val PAIRING_MS = 20_000L
 
+/**
+ * Fails the journey, leaving what was on screen in the test's output
+ * (baselineprofile/build/outputs/connected_android_test_additional_output/):
+ * journey-failure.png and journey-failure.xml, the window's hierarchy.
+ */
+internal fun UiDevice.fail(message: String): Nothing {
+    argument("additionalTestOutputDir")?.let { dir ->
+        runCatching {
+            takeScreenshot(File(dir, "journey-failure.png"))
+            dumpWindowHierarchy(File(dir, "journey-failure.xml"))
+        }
+    }
+    error(message)
+}
+
 /** Waits for [selector] and returns it; fails the journey when it doesn't come. */
 internal fun UiDevice.waitFor(selector: BySelector, timeoutMs: Long = WAIT_MS): UiObject2 =
-    wait(Until.findObject(selector), timeoutMs) ?: error("Nothing on screen matches $selector")
+    wait(Until.findObject(selector), timeoutMs) ?: fail("Nothing on screen matches $selector")
 
 private fun UiDevice.waitForText(text: String, timeoutMs: Long = WAIT_MS) = waitFor(By.text(text), timeoutMs)
 
 /** Of the elements matching [selector], the lowest on screen: the bottom bar's "TV Shows". */
 private fun UiDevice.lowest(selector: BySelector): UiObject2 =
-    findObjects(selector).maxByOrNull { it.visibleBounds.top } ?: error("Nothing on screen matches $selector")
+    findObjects(selector).maxByOrNull { it.visibleBounds.top } ?: fail("Nothing on screen matches $selector")
 
 private val UiObject2.bounds: Rect get() = visibleBounds
 
@@ -96,14 +112,46 @@ private fun UiDevice.scrollable(pick: (List<UiObject2>) -> UiObject2?): UiObject
     return null
 }
 
-/** Flings [list] along and back to its start, as a person scanning it would. */
-private fun UiDevice.scan(list: UiObject2, forward: Direction, back: Direction) {
-    // Clear of the system's edge gestures.
-    list.setGestureMargin(displayWidth / 5)
-    repeat(2) { list.fling(forward) }
+/** The tallest list on screen, or in [within]: a page, rather than a row of cards on it. */
+private fun UiDevice.tallestList(within: UiObject2? = null): UiObject2? =
+    (within?.findObjects(By.scrollable(true)) ?: findObjects(By.scrollable(true))).maxByOrNull { it.bounds.height() }
+
+/**
+ * [selector], once on screen: scrolled to, toward [direction], when it is
+ * below (or above) the fold, as the picker's Connect and sign-in's button can
+ * be on a short landscape screen, and as a page's Play is after a scan.
+ */
+private fun UiDevice.reveal(selector: BySelector, direction: Direction = Direction.DOWN): UiObject2 {
+    if (!hasObject(selector)) tallestList()?.scrollUntil(direction, Until.findObject(selector))
+    return waitFor(selector)
+}
+
+/**
+ * Flings the list [find] finds along and back to its start, as a person
+ * scanning it would. The list is found again for each fling: a fling back
+ * past the top pulls to refresh, which can replace what was found.
+ */
+private fun UiDevice.scan(forward: Direction, back: Direction, find: UiDevice.() -> UiObject2?) {
+    fun fling(direction: Direction) {
+        repeat(3) {
+            try {
+                val list = find() ?: return
+                // Clear of the system's edge gestures, and along the fling only: a margin across a short row
+                // leaves a swipe of a few pixels, which is a tap on whatever card is under it.
+                val height = list.visibleBounds.height()
+                val across = if (direction == Direction.LEFT || direction == Direction.RIGHT) height / 4 else height / 5
+                list.setGestureMargins(displayWidth / 5, across, displayWidth / 5, across)
+                list.fling(direction)
+                return
+            } catch (_: StaleObjectException) {
+                waitForIdle()
+            }
+        }
+    }
+    repeat(2) { fling(forward) }
     waitForIdle()
     // One more than forward: a fling back can stop short of the start.
-    repeat(3) { list.fling(back) }
+    repeat(3) { fling(back) }
     waitForIdle()
 }
 
@@ -122,7 +170,7 @@ fun UiDevice.firstScreen(): FirstScreen {
         screens.firstOrNull { (_, selector) -> hasObject(selector) }?.let { return it.first }
         waitForIdle(500)
     }
-    error("None of the TV's pairing, the server picker, sign-in or Home showed")
+    fail("None of the TV's pairing, the server picker, sign-in or Home showed")
 }
 
 /** True when the app shows the TV UI (its pairing screen), false for the phone's. */
@@ -142,9 +190,9 @@ fun MacrobenchmarkScope.signIn(tv: Boolean) = when {
 
 /** The sign-in screen: name and password, then Home. */
 fun MacrobenchmarkScope.phoneSignIn(name: String, password: String) {
-    device.waitFor(tag(Tags.SIGN_IN_NAME)).text = name
-    device.waitFor(tag(Tags.SIGN_IN_PASSWORD)).text = password
-    device.waitFor(tag(Tags.SIGN_IN)).click()
+    device.reveal(tag(Tags.SIGN_IN_NAME)).text = name
+    device.reveal(tag(Tags.SIGN_IN_PASSWORD)).text = password
+    device.reveal(tag(Tags.SIGN_IN)).click()
     device.waitFor(tag(Tags.HOME), LOAD_MS)
 }
 
@@ -156,8 +204,8 @@ fun MacrobenchmarkScope.fixtureSignIn() {
     val server = fixtureServer ?: error("No fixtureServer argument: the real-build journeys need a fixture server")
     when (device.firstScreen()) {
         FirstScreen.ServerPicker -> {
-            device.waitFor(tag(Tags.SERVER_ADDRESS)).text = server
-            device.waitFor(tag(Tags.SERVER_CONNECT)).click()
+            device.reveal(tag(Tags.SERVER_ADDRESS)).text = server
+            device.reveal(tag(Tags.SERVER_CONNECT)).click()
             phoneSignIn(fixtureUser, fixturePassword)
         }
         FirstScreen.SignIn -> phoneSignIn(fixtureUser, fixturePassword)
@@ -166,23 +214,22 @@ fun MacrobenchmarkScope.fixtureSignIn() {
     }
 }
 
-/** Home: down the rows and back, then along the first row. */
+/** Home: along the first row and back, then down the rows and back. */
 fun MacrobenchmarkScope.phoneHome() {
-    val home = device.waitFor(tag(Tags.HOME), LOAD_MS)
-    val row = device.scrollable { all -> all.firstOrNull { it.bounds.height() < it.bounds.width() / 2 } }
-    row?.let { device.scan(it, Direction.RIGHT, Direction.LEFT) }
-    val page = home.findObject(By.scrollable(true)) ?: error("No scrolling list on Home")
-    device.scan(page, Direction.DOWN, Direction.UP)
+    device.waitFor(tag(Tags.HOME), LOAD_MS)
+    device.scan(Direction.RIGHT, Direction.LEFT) { scrollable { all -> all.firstOrNull { it.bounds.height() < it.bounds.width() / 2 } } }
+    // Home's page: the tallest list in it (its rows scroll too).
+    device.scan(Direction.DOWN, Direction.UP) { findObject(tag(Tags.HOME))?.let { tallestList(it) } }
 }
 
 /** A library from the bottom bar ("TV Shows", "Movies"): down its grid and back, then [title]'s page. */
 private fun MacrobenchmarkScope.phoneLibrary(section: String, title: String) {
     device.lowest(By.text(section)).click()
-    val grid = device.waitFor(tag(Tags.LIBRARY), LOAD_MS)
-    device.scan(grid, Direction.DOWN, Direction.UP)
+    device.waitFor(tag(Tags.LIBRARY), LOAD_MS)
+    device.scan(Direction.DOWN, Direction.UP) { findObject(tag(Tags.LIBRARY)) }
     device.waitFor(By.textStartsWith(title)).click()
-    val page = device.waitFor(By.scrollable(true).hasDescendant(tag(Tags.PLAY)), LOAD_MS)
-    device.scan(page, Direction.DOWN, Direction.UP)
+    device.waitFor(tag(Tags.PLAY), LOAD_MS)
+    device.scan(Direction.DOWN, Direction.UP) { tallestList() }
 }
 
 /** TV Shows: the grid, then a show's page. */
@@ -196,13 +243,15 @@ fun MacrobenchmarkScope.fixtureMovies() = phoneLibrary("Movies", "Paper Moons")
  * and back out. On a real build the file plays through ExoPlayer meanwhile.
  */
 fun MacrobenchmarkScope.phonePlay() {
-    device.waitFor(tag(Tags.PLAY)).click()
+    // The scan can stop short of the top, and a page's list composes only what is on screen.
+    device.reveal(tag(Tags.PLAY), Direction.UP).click()
     // The system's first-time note about full screen, on a fresh device.
     device.wait(Until.findObject(By.text("Got it")), 3_000)?.click()
-    device.waitFor(By.desc("Back"), LOAD_MS)
-    // Let the controls hide while it plays, then bring them back.
+    // The controls show as it starts and hide while it plays, on a busy emulator sometimes before the
+    // journey looks: let them hide, then bring them back unless they are up.
+    device.wait(Until.hasObject(By.desc("Back")), LOAD_MS)
     device.wait(Until.gone(By.desc("Back")), WAIT_MS)
-    device.click(device.displayWidth / 2, device.displayHeight / 3)
+    if (!device.hasObject(By.text("Subtitles"))) device.click(device.displayWidth / 2, device.displayHeight / 3)
     device.waitForText("Subtitles").click()
     device.waitForIdle()
     // Back closes the picker, then leaves the player for the page.

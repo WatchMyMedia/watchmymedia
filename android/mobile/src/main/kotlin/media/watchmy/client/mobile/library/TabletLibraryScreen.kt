@@ -43,6 +43,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,6 +69,7 @@ import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.filterOptions
 import media.watchmy.client.model.label
 import media.watchmy.client.model.sortOptions
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.TabletLayout
 import media.watchmy.client.ui.WmmColors
@@ -133,7 +135,7 @@ internal fun TabletLibraryScreen(
                     state.items.isEmpty() && state.filtered -> EmptyState("Nothing matches", "No ${noun}s match these filters.", action = "Clear filters", onAction = vm::clearFilters)
                     state.items.isEmpty() -> EmptyState("No ${noun}s yet", "Pull down to check again.", action = "Check again", onAction = vm::retry)
                     else -> androidx.compose.material3.pulltorefresh.PullToRefreshBox(state.refreshing, vm::refresh, Modifier.fillMaxSize()) {
-                        LazyVerticalGrid(GridCells.Adaptive(TabletLayout.posterMinimum), state = grid, contentPadding = PaddingValues(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        LazyVerticalGrid(GridCells.Adaptive(TabletLayout.posterMinimum), state = grid, modifier = Modifier.testTag(TestTags.LIBRARY), contentPadding = PaddingValues(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             if (arranged && rowActions != null) {
                                 libraryRows(drawn, library, rowActions, tablet = true, edge = 0.dp, onNavigate = onNavigate)
                                 item(key = "edit", span = { GridItemSpan(maxLineSpan) }, contentType = "edit") {

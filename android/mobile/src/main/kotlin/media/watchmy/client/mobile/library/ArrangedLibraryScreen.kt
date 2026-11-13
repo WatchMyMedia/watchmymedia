@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -62,6 +63,7 @@ import media.watchmy.client.model.RowStyle
 import media.watchmy.client.model.drawn
 import media.watchmy.client.model.formatCount
 import media.watchmy.client.presentation.rows.LibraryRowsViewModel
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
@@ -117,7 +119,7 @@ internal fun ArrangedLibraryScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     state = grid,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().testTag(TestTags.LIBRARY),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),

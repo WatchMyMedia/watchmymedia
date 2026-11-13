@@ -17,7 +17,7 @@ object TestTags {
     /** The TV Live TV guide's channel rows. */
     const val GUIDE = "guide"
 
-    /** The phone's library grid. */
+    /** The phone's and tablet's library grid, with or without arranged rows above it. */
     const val LIBRARY = "library"
 
     /** The phone server picker's address field and its Connect button. */
