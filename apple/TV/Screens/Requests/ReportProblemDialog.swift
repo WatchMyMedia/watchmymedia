@@ -20,7 +20,7 @@ struct ReportProblemDialog: View {
                     .font(.system(size: 18, weight: .bold))
                     .tracking(2)
                     .foregroundStyle(Palette.gold)
-                Text("Report a problem")
+                Text(reportProblemTitle)
                     .font(.system(size: 56, weight: .heavy))
                     .foregroundStyle(Palette.text)
                     .accessibilityAddTraits(.isHeader)

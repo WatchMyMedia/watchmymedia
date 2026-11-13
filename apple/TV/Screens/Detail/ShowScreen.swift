@@ -344,7 +344,7 @@ private struct ShowPageView: View {
                 }
             }
             if model.canReport {
-                Button { model.reportProblem() } label: { Label("Report a problem", systemImage: "flag") }
+                Button { model.reportProblem() } label: { Label(reportProblemTitle, systemImage: "flag") }
             }
             if model.canReplace {
                 Button { model.askReplace() } label: { Label("Replace file", systemImage: "arrow.triangle.2.circlepath") }

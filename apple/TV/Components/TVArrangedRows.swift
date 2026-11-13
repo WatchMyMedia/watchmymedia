@@ -114,7 +114,7 @@ struct TVArrangedRow: View {
             }
         }
         .buttonStyle(.borderless)
-        .accessibilityHint("Resumes playing")
+        .accessibilityHint(resumesPlayingHint)
         .playPauseCard(.card(item)) { actions.resume(item) }
         .contextMenu {
             Button { actions.resume(item) } label: { Label("Resume", systemImage: "play.fill") }
@@ -132,7 +132,7 @@ struct TVArrangedRow: View {
             WideCard(title: episode.showTitle, line: episode.airedLine(), imageURL: url(episode.stillPath ?? episode.showBackdropPath, .w780), seed: episode.showTitle) {
                 if episode.isNew { TVBadge("New", style: .gold).pinned(.topLeading, padding: 10) }
                 if !episode.hasFile {
-                    TVBadge("Not in library", style: .warning).pinned(.topTrailing, padding: 10)
+                    TVBadge(notInLibraryBadge, style: .warning).pinned(.topTrailing, padding: 10)
                 } else if episode.watched {
                     WatchedCheck(size: 28).pinned(.topTrailing, padding: 10)
                 }

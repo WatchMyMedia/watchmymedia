@@ -259,7 +259,7 @@ private struct HomeView: View {
                 Text("Open this address on your phone or computer.")
                     .foregroundStyle(Palette.muted)
             }
-            Button("Check again") { Task { await model.refresh() } }
+            Button(checkAgainTitle) { Task { await model.refresh() } }
                 .accessibilityIdentifier("homeCheckAgain")
         }
         .frame(maxWidth: .infinity)
@@ -279,23 +279,6 @@ private struct HomeView: View {
             .clipped()
             .padding(.top, -200)
             .accessibilityHidden(true)
-    }
-}
-
-private extension HomeData {
-    /// The fixed rows of a server below API level 22, as arranged rows: their
-    /// titles split at " · " into the heading and its detail, as an arranged
-    /// Home's built-in rows are. The Live TV row draws nothing without Live TV.
-    var fixedRows: [ScreenRow] {
-        [
-            ScreenRow(id: "continue", style: .continue, title: "Continue watching", continueItems: continueWatching),
-            ScreenRow(id: "live", style: .live, title: "Live TV"),
-            ScreenRow(id: "recentlyAddedShows", style: .poster, title: "Recently added · TV Shows", items: recentlyAddedShows),
-            ScreenRow(id: "recentlyAired", style: .episode, title: "Recently aired · Episodes", episodes: recentlyAired),
-            ScreenRow(id: "recentlyAddedMovies", style: .poster, title: "Recently added · Movies", items: recentlyAddedMovies),
-            ScreenRow(id: "recentlyReleased", style: .wide, title: "Recently released · Movies", items: recentlyReleased),
-        ]
-        .filter { !$0.isEmpty }
     }
 }
 
@@ -398,7 +381,7 @@ private struct NextRowLine: View {
         .overlay(alignment: .top) { Rectangle().fill(Palette.separator).frame(height: 1) }
         .padding(.horizontal, TVLayout.gutter)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Next row: \(name)")
+        .accessibilityLabel(nextRowLabel(name))
         .accessibilityIdentifier("homeNextRow-\(index)")
     }
 }

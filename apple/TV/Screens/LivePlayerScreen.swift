@@ -221,7 +221,7 @@ private struct LiveVideoOverlay: View {
                         .accessibilityIdentifier("live-player-title")
                     Text("No programme listings").font(.system(size: 20)).foregroundStyle(Palette.muted)
                     if state.status == .paused {
-                        Text("Paused · Tuner releases in \(state.pauseRemainingSeconds / 60):\(String(format: "%02d", state.pauseRemainingSeconds % 60))")
+                        Text("Paused · \(liveTunerReleasesIn(seconds: state.pauseRemainingSeconds))")
                             .font(.system(size: 22)).foregroundStyle(Palette.gold)
                     }
                 }
@@ -503,7 +503,7 @@ private struct TVLiveBanner: View {
                         Text("No listings for this channel.").font(.system(size: 21)).foregroundStyle(Palette.muted)
                     }
                     if state.status == .paused {
-                        Text("Paused · Tuner releases in \(state.pauseRemainingSeconds / 60):\(String(format: "%02d", state.pauseRemainingSeconds % 60))")
+                        Text("Paused · \(liveTunerReleasesIn(seconds: state.pauseRemainingSeconds))")
                             .font(.system(size: 21)).foregroundStyle(Palette.gold)
                     }
                 }

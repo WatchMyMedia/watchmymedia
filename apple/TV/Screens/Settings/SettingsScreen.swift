@@ -122,7 +122,7 @@ private struct SettingsView: View {
         } message: { _ in
             Text("It will need to sign in again, with a password or a code.")
         }
-        .alert(model.server.map { "Sign out of \($0.name)?" } ?? "Sign out?", isPresented: $confirmingSignOut) {
+        .alert(signOutQuestion(serverName: model.server?.name), isPresented: $confirmingSignOut) {
             Button("Sign out", role: .destructive) { Task { await model.signOut() } }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -385,7 +385,7 @@ private struct SettingsView: View {
                 FactRow(label: "Admin tools", value: server.adminToolsLine)
             }
             Button { flow.choosingServer = true } label: {
-                SettingsRow(title: "Switch server", gold: true, compact: true) { Image(systemName: "chevron.right").font(.system(size: 17, weight: .bold)) }
+                SettingsRow(title: switchServerTitle, gold: true, compact: true) { Image(systemName: "chevron.right").font(.system(size: 17, weight: .bold)) }
             }
             .buttonStyle(SettingsRowStyle())
             Button { showingPrivacy = true } label: {

@@ -23,6 +23,14 @@ import WMMModel
         #expect(reportProblemTitle == "Report a problem")
     }
 
+    @Test func fixedHomeRowsAsApplesTVDrawsThem() {
+        let show = BrowseItem(kind: .show, id: 1, libraryID: 1, title: "Harbor Lights")
+        let movie = BrowseItem(kind: .movie, id: 2, libraryID: 2, title: "Night Ferry")
+        let home = HomeData(hero: nil, continueWatching: [], recentlyAddedShows: [show], recentlyAired: [], recentlyAddedMovies: [movie], recentlyReleased: [movie], totals: LibraryTotals(movies: 1, shows: 1, episodes: 0, files: 2, totalSizeBytes: 0), lastScannedAt: nil, movieLibraryID: 2, tvLibraryID: 1)
+        #expect(home.fixedRows.map(\.title) == ["Live TV", "Recently added · TV Shows", "Recently added · Movies", "Recently released · Movies"],
+                "empty rows are left out; the Live TV row stays, drawing nothing without Live TV")
+    }
+
     @Test func liveTVGuideAndChannels() {
         let channel = LiveChannel(id: "ch-4.3", number: "4.3", name: "Coast Shop")
         #expect(liveNoListingsAccessibilityLabel(channel) == "4.3 Coast Shop, No listings. It still plays.")

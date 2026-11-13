@@ -436,3 +436,21 @@ public let checkAgainTitle = "Check again"
 public func nextRowLabel(_ name: String) -> String { "Next row: \(name)" }
 /// A movie's or episode's Report a problem, its button and its sheet's title.
 public let reportProblemTitle = "Report a problem"
+
+extension HomeData {
+    /// The fixed rows of a server below API level 22, as arranged rows (Apple
+    /// TV draws them so): their titles split at " · " into the heading and its
+    /// detail, as an arranged Home's built-in rows are. The Live TV row draws
+    /// nothing without Live TV.
+    public var fixedRows: [ScreenRow] {
+        [
+            ScreenRow(id: "continue", style: .continue, title: continueWatchingTitle, continueItems: continueWatching),
+            ScreenRow(id: "live", style: .live, title: "Live TV"),
+            ScreenRow(id: "recentlyAddedShows", style: .poster, title: "\(recentlyAddedTitle) · \(tvShowsDetail)", items: recentlyAddedShows),
+            ScreenRow(id: "recentlyAired", style: .episode, title: "\(recentlyAiredTitle) · \(episodesDetail)", episodes: recentlyAired),
+            ScreenRow(id: "recentlyAddedMovies", style: .poster, title: "\(recentlyAddedTitle) · \(moviesDetail)", items: recentlyAddedMovies),
+            ScreenRow(id: "recentlyReleased", style: .wide, title: "\(recentlyReleasedTitle) · \(moviesDetail)", items: recentlyReleased),
+        ]
+        .filter { !$0.isEmpty }
+    }
+}
