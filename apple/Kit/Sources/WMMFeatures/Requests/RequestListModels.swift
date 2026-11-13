@@ -82,8 +82,9 @@ public final class InboxModel {
     public var message: String?
 
     @ObservationIgnored private let requests: any RequestsRepository
-    /// Bumped by every load, so an older reply never overwrites a newer one.
-    @ObservationIgnored private var generation = 0
+    /// An older reply never overwrites a newer one. A load runs to its end,
+    /// as an approval or a resolve waits for its own.
+    @ObservationIgnored private let loads = LoadController<Inbox>(cancelsOlder: false)
 
     public init(requests: any RequestsRepository, tab: Tab = .requests) {
         self.requests = requests
@@ -154,10 +155,11 @@ public final class InboxModel {
     }
 
     private func load(quiet: Bool) async {
-        generation += 1
-        let mine = generation
-        if !quiet || state.value == nil { state = .loading }
-        guard let result = await Loadable.run({ try await self.requests.inbox() }), mine == generation else { return }
-        if case .failed(let text) = result, quiet, state.value != nil { message = text } else { state = result }
+        await loads.run { [weak self] load in
+            guard let self else { return }
+            loads.begin(&state, quiet: quiet)
+            guard let result = await loads.fetch(load, { try await self.requests.inbox() }) else { return }
+            if let text = loads.quietFailure(result, quiet: quiet, over: state) { message = text } else { state = result }
+        }
     }
 }
