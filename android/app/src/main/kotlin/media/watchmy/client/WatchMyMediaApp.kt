@@ -64,7 +64,7 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
     private var data: DataServices? = null
 
     /** Whether the local network question (Android 17) is still open; [LocalNetworkGate] answers it. */
-    val localNetwork: LocalNetworkQuestion by lazy { LocalNetworkQuestion.of(this) }
+    val localNetwork: LocalNetworkQuestion by lazy { allowingStartupReads { LocalNetworkQuestion.of(this) } }
 
     /** Cast Connect on a TV with a receiver App ID; null elsewhere. */
     var castConnect: CastConnectReceiver? = null
@@ -84,6 +84,7 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
 
     override fun onCreate() {
         super.onCreate()
+        if (BuildConfig.DEBUG) StrictModeChecks.install()
         services = if (BuildConfig.FAKE_DATA) FakeAppServices(signedIn = false, tv = isTv, seerr = BuildConfig.FAKE_SEERR, offline = BuildConfig.FAKE_OFFLINE, cast = BuildConfig.FAKE_CAST) else realServices()
     }
 
@@ -96,7 +97,7 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
      * process started for a broadcast or a job.
      */
     private fun realServices(): AppServices {
-        val data = traced("WMM DataServices") { DataServices.create(this, tv = isTv, version = BuildConfig.VERSION_NAME) }.also { data = it }
+        val data = traced("WMM DataServices") { allowingStartupReads { DataServices.create(this, tv = isTv, version = BuildConfig.VERSION_NAME) } }.also { data = it }
         fun account() = media.watchmy.client.model.watchNextAccount(data.servers.current.value?.server, data.auth.user.value)
         // Downloads (PLAN-DOWNLOADS.md) are for phones and tablets: the TV app never shows them.
         lateinit var engine: PlaybackEngine
@@ -133,13 +134,16 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
 
     /** Live TV reminders' alarms on a phone or tablet ([ReminderFollower]). */
     private fun followReminders(data: DataServices, account: () -> String?) {
-        val alarms = LiveReminderAlarms(this).also {
-            it.createChannel()
-            // The boot receiver follows the alarms; a version before it was always on.
-            it.matchBootReceiver()
-        }
         val session = combine(data.auth.user, data.servers.current) { user, server -> user to server }
-        reminders = ReminderFollower(alarms, data.live, session, account, appScope).also { it.start(ProcessLifecycleOwner.get().lifecycle) }
+        // The alarms kept, and whose they are, are read now, on purpose: the follower starts from them.
+        reminders = allowingStartupReads {
+            val alarms = LiveReminderAlarms(this).also {
+                it.createChannel()
+                // The boot receiver follows the alarms; a version before it was always on.
+                it.matchBootReceiver()
+            }
+            ReminderFollower(alarms, data.live, session, account, appScope)
+        }.also { it.start(ProcessLifecycleOwner.get().lifecycle) }
     }
 
     /** Reads the reminders again, which sets the alarms; false when the server couldn't be asked (LiveReminderSync). */
