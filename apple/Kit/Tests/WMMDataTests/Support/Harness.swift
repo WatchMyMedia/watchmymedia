@@ -146,12 +146,18 @@ final class Harness {
     var tuning: DataTuning
     /// The event stream's session; the main one when nil.
     var eventSession: URLSession?
+    /// The device's network path, when a test drives it.
+    var network: FakeNetworkPath?
+    /// The API's HTTP cache, when a test looks in it.
+    var apiCache: URLCache?
     private(set) var services: DataServices!
 
     init(probeTimeout: Duration = .seconds(2)) {
         probeSession = Router.stubSession(hanging: true)
         let clock = clock
-        tuning = DataTuning(probeTimeout: probeTimeout, minimumPoll: .milliseconds(5), eventBackoff: { _ in .milliseconds(20) }, eventLinger: .zero, now: { clock.now })
+        // The longest wait (after a 404, a server without events) outlasts a test.
+        tuning = DataTuning(probeTimeout: probeTimeout, minimumPoll: .milliseconds(5), eventBackoff: { $0 >= 6 ? .seconds(60) : .milliseconds(20) },
+                            eventLinger: .zero, now: { clock.now })
         services = make()
     }
 
@@ -167,7 +173,7 @@ final class Harness {
     private func make() -> DataServices {
         DataServices(
             storage: storage, client: client, userAgent: "WatchMyMedia/1.0 (ios; iOS 18.0)", session: router.session,
-            probeSession: probeSession, eventSession: eventSession, discovery: discovery, tuning: tuning
+            probeSession: probeSession, eventSession: eventSession, discovery: discovery, apiCache: apiCache, network: network, tuning: tuning
         )
     }
 
@@ -216,4 +222,18 @@ func eventually(_ timeout: Duration = .seconds(5), _ condition: () -> Bool) asyn
         try? await Task.sleep(for: .milliseconds(10))
     }
     return condition()
+}
+
+/// A network path the test turns off and on.
+final class FakeNetworkPath: NetworkPath, @unchecked Sendable {
+    private var continuation: AsyncStream<Bool>.Continuation?
+
+    func updates() -> AsyncStream<Bool> {
+        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            self.continuation = continuation
+            continuation.yield(true)
+        }
+    }
+
+    func set(_ satisfied: Bool) { continuation?.yield(satisfied) }
 }

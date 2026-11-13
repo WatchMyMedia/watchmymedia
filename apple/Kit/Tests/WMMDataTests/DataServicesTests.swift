@@ -57,3 +57,28 @@ private final class NoPlayback: PlaybackControllerFactory {
     func make() -> any PlaybackController { fatalError("not used") }
     func plans(fileIDs: [Int]) async -> [Int: PlaybackPlan] { [:] }
 }
+
+/// The API's own HTTP cache (PLAN-APPLE-REVIEW.md §4.1.6).
+@MainActor
+@Suite struct APICacheTests {
+    let h = Harness()
+
+    @Test func theCacheIsEmptiedWhenTheSignInChanges() async throws {
+        let cache = URLCache(memoryCapacity: 1 << 20, diskCapacity: 0, directory: nil)
+        h.apiCache = cache
+        h.reopen()
+        try await h.signIn()
+        let request = URLRequest(url: URL(string: h.router.baseURL.absoluteString + "/api/home")!)
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["ETag": "\"v1\""])!
+        cache.storeCachedResponse(CachedURLResponse(response: response, data: Data("{}".utf8)), for: request)
+        #expect(cache.cachedResponse(for: request) != nil)
+        await h.services.auth.signOut()
+        #expect(cache.cachedResponse(for: request) == nil, "one account's replies never wait on disk for another")
+    }
+
+    @Test func theAppsCacheIsItsOwnUnderCaches() throws {
+        let cache = DataServices.apiCache()
+        #expect(cache !== URLCache.shared)
+        #expect(cache.diskCapacity > 0)
+    }
+}

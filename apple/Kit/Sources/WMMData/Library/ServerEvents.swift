@@ -125,6 +125,14 @@ enum ExpectedEcho: Hashable, Sendable {
 /// been missed. Marks and requests made on this device tell listeners too
 /// (``notify(_:)-swift.method``), and the server's echo of a mark made here
 /// is dropped (``expect(_:)``), so a mark loads each screen once.
+///
+/// It follows the network (PLAN-APPLE-REVIEW.md §4.1.7): when a path
+/// returns, or the app comes back to the foreground (``reconnectNow()``), it
+/// connects again at once rather than at its next backoff. A server without
+/// events (404) is asked again at the longest backoff, so one that comes back
+/// with them is followed again. Before telling listeners a reconnect may have
+/// missed events, it asks the server's level again (``onReconnect``): a
+/// restart is usually an upgrade.
 @MainActor
 final class ServerEvents {
     private enum Delivery {
@@ -164,18 +172,36 @@ final class ServerEvents {
     /// Events of each topic received from the server (and reconnects), so a
     /// request made before one is not taken as an answer after it.
     private(set) var received: [EventTopic: Int] = [:]
+    /// Runs when a connection comes back after another, before listeners are
+    /// told: DataServices asks the server's level again.
+    var onReconnect: (@MainActor () async -> Void)?
+    private var pathWatch: Task<Void, Never>?
 
     /// 1 s, 2 s, 4 s … up to a minute.
     nonisolated static let defaultBackoff: @Sendable (Int) -> Duration = { attempt in .seconds(min(1 << min(attempt, 6), 60)) }
 
     init(store: LocalStore, session: URLSession, backoff: @escaping @Sendable (Int) -> Duration = ServerEvents.defaultBackoff,
-         linger: Duration = .seconds(5), now: @escaping @Sendable () -> Date = { .now }) {
+         linger: Duration = .seconds(5), now: @escaping @Sendable () -> Date = { .now }, network: (any NetworkPath)? = nil) {
         self.store = store
         self.session = session
         self.backoff = backoff
         self.linger = linger
         self.now = now
         store.onSessionChange { [weak self] _ in self?.reconnect() }
+        if let network {
+            let updates = network.updates()
+            pathWatch = Task { [weak self] in
+                var satisfied = true
+                for await now in updates {
+                    if now && !satisfied { self?.reconnectNow() }
+                    satisfied = now
+                }
+            }
+        }
+    }
+
+    isolated deinit {
+        pathWatch?.cancel()
     }
 
     /// A new listener to `topic`; it ends when the iterating task is cancelled.
@@ -289,6 +315,19 @@ final class ServerEvents {
         }
     }
 
+    /// The network or the app came back: connect again at once, rather than
+    /// waiting out a backoff or reading a connection that died meanwhile.
+    /// Listeners hear of it as a reconnect, since events may have been missed.
+    func reconnectNow() {
+        guard connection != nil || !listeners.isEmpty else { return }
+        let before = connectedBefore
+        connection?.cancel()
+        connection = nil
+        guard !listeners.isEmpty else { return }
+        connect()
+        connectedBefore = before
+    }
+
     /// The sign-in changed: follow it.
     private func reconnect() {
         connection?.cancel()
@@ -319,8 +358,12 @@ final class ServerEvents {
                     store.tokenRejected(serverID: signedIn.serverID, token: signedIn.token)
                     return
                 case 404:
-                    // A server without events.
-                    return
+                    // A server without events (or a proxy in front of a restarting
+                    // one): asked again at the longest wait, or when the network
+                    // or the app comes back.
+                    attempt = max(attempt, 6)
+                    let delay = backoff(attempt)
+                    try? await Task.sleep(for: delay)
                 default:
                     let delay = backoff(attempt)
                     attempt += 1
@@ -341,7 +384,13 @@ final class ServerEvents {
             pinged = true
             if connectedBefore {
                 for topic in [EventTopic.library, .requests, .liveTV, .rows] { received[topic, default: 0] += 1 }
-                notify(nil)
+                // A restart is usually an upgrade: its level first, so what
+                // listeners load next uses what the server now offers.
+                Task { [weak self] in
+                    await self?.onReconnect?()
+                    guard let self, generation == self.generation else { return }
+                    notify(nil)
+                }
             }
             connectedBefore = true
         case "watch.changed":

@@ -64,8 +64,9 @@ struct ServerEventsTests {
     private static let ping = "event: ping\ndata: {\"time\":\"t\"}\n\n"
 
     @Test func changesComeFromWatchAndLibraryEventsAndAgainAfterAReconnect() async throws {
-        // Long enough between connections for each one's news to arrive on its own.
-        h.tuning.eventBackoff = { _ in .milliseconds(300) }
+        // Long enough between connections for each one's news to arrive on its
+        // own; after a 404, longer than the test.
+        h.tuning.eventBackoff = { $0 >= 6 ? .seconds(60) : .milliseconds(300) }
         h.reopen()
         try await h.signIn()
         h.router.on(
@@ -81,7 +82,7 @@ struct ServerEventsTests {
         #expect(await eventually { changes.count == 1 }, "watch.changed")
         #expect(await eventually { changes.count == 2 }, "the second connection's ping: events may have been missed")
         #expect(await eventually { changes.count >= 3 }, "the third connection")
-        // The fourth answers 404 (no events on this server): no more connections.
+        // The fourth answers 404 (no events on this server): asked again only at the longest wait.
         #expect(await eventually { h.router.requests("GET /api/events").count == 4 })
         try await Task.sleep(for: .milliseconds(400))
         #expect(h.router.requests("GET /api/events").count == 4)
@@ -174,5 +175,64 @@ struct ServerEventsTests {
         let after = h.router.requests("GET /api/events").count
         try await Task.sleep(for: .milliseconds(150))
         #expect(h.router.requests("GET /api/events").count == after)
+    }
+
+    @Test func aServerWithoutEventsIsAskedAgainAndFollowedOnceItHasThem() async throws {
+        h.tuning.eventBackoff = { _ in .milliseconds(20) }
+        h.reopen()
+        try await h.signIn()
+        h.router.on("GET /api/events", .problem(404, "no such route"), stream(Self.ping + "event: watch.changed\ndata: {}\n\n"))
+        let changes = Counter()
+        let listening = Task { for await _ in h.services.library.changes() { changes.count += 1 } }
+        defer { listening.cancel() }
+        #expect(await eventually { changes.count >= 1 }, "after the 404, the next connection's event")
+    }
+
+    @Test func theNetworkComingBackReconnectsAtOnce() async throws {
+        let network = FakeNetworkPath()
+        h.network = network
+        // Waits longer than the test after a failure.
+        h.tuning.eventBackoff = { _ in .seconds(60) }
+        let events = h.liveEvents()
+        try await h.signIn()
+        events.answer(503)
+        let changes = Counter()
+        let listening = Task { for await _ in h.services.library.changes() { changes.count += 1 } }
+        defer { listening.cancel() }
+        #expect(await eventually { events.requests.count == 1 })
+        network.set(false)
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(events.requests.count == 1, "nothing while the network is gone")
+        network.set(true)
+        #expect(await eventually { events.requests.count == 2 && events.openCount == 1 }, "at once, not after the backoff")
+    }
+
+    @Test func comingBackToTheAppReconnectsAndTellsListenersAfterAskingTheLevelAgain() async throws {
+        let events = h.liveEvents()
+        try await h.signIn()
+        let changes = Counter()
+        let listening = Task { for await _ in h.services.library.changes() { changes.count += 1 } }
+        defer { listening.cancel() }
+        #expect(await eventually { events.openCount == 1 })
+        events.send(event: "ping", data: #"{"time":"t"}"#)
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(changes.count == 0, "a first connection misses nothing")
+        // An upgrade while the app was away.
+        h.router.always("GET /api/server", .json(Fixtures.serverInfo(apiLevel: 9).replacingOccurrences(of: "2321341d1a4a571c275b88b68f88d3c5", with: h.testServer.id)))
+        h.services.events.reconnectNow()
+        #expect(await eventually { events.requests.count == 2 && events.openCount == 1 })
+        events.send(event: "ping", data: #"{"time":"t"}"#)
+        #expect(await eventually { changes.count == 1 }, "events may have been missed")
+        #expect(h.services.servers.current?.server.apiLevel == 9, "the level was asked again before listeners heard")
+        #expect(h.router.requests("GET /api/server").count == 1)
+    }
+
+    @Test func eventsNobodyHandlesNeverReachTheMainActor() {
+        for name in ["scan.progress", "match.progress", "activity.updated", "plex.changed", "trickplay.ready"] {
+            #expect(!ServerEvents.handled.contains(name))
+        }
+        for name in ["ping", "watch.changed", "library.changed", "scan.finished", "requests.changed", "live.recordings.changed", "rows.changed"] {
+            #expect(ServerEvents.handled.contains(name))
+        }
     }
 }
