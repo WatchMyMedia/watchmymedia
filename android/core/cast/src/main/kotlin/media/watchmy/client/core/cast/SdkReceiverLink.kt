@@ -1,7 +1,6 @@
 package media.watchmy.client.core.cast
 
 import android.util.Log
-import androidx.core.net.toUri
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadRequestData
 import com.google.android.gms.cast.MediaMetadata
@@ -9,7 +8,6 @@ import com.google.android.gms.cast.MediaSeekOptions
 import com.google.android.gms.cast.MediaStatus
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
-import com.google.android.gms.common.images.WebImage
 import org.json.JSONObject
 
 /** A [ReceiverLink] over a Cast SDK session. Main thread only, as the SDK requires. */
@@ -56,7 +54,6 @@ internal class SdkReceiverLink(private val session: CastSession) : ReceiverLink 
         val metadata = MediaMetadata(type).apply {
             putString(MediaMetadata.KEY_TITLE, request.title)
             request.subtitle?.let { putString(MediaMetadata.KEY_SUBTITLE, it) }
-            request.imageUrl?.let { addImage(WebImage(it.toUri())) }
         }
         val info = MediaInfo.Builder(request.contentId)
             .setStreamType(if (request.live) MediaInfo.STREAM_TYPE_LIVE else MediaInfo.STREAM_TYPE_BUFFERED)

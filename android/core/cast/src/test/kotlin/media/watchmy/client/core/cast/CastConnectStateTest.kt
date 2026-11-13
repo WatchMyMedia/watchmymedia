@@ -64,7 +64,6 @@ class CastConnectStateTest {
             },
             FakePreferencesRepository(),
             client = { ClientInfo("p", "Phone", "WatchMyMedia for Android", "android", "1") },
-            imageUrl = { null },
             dispatcher = dispatcher,
             io = dispatcher,
         )

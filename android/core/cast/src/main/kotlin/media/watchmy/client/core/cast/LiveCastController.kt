@@ -49,7 +49,7 @@ class LiveCastController(
     private val _state = MutableStateFlow(LiveCastState())
     override val state: StateFlow<LiveCastState> = _state.asStateFlow()
 
-    private var link: ReceiverLink? = null
+    private var link: SharedLink? = null
     private var remote: StateMessage? = null
     private var status: ReceiverStatus? = null
     private var automaticAvailable = false
@@ -64,29 +64,33 @@ class LiveCastController(
     private var cast: LiveChannel? = null
     private var loadError: String? = null
     private var loadJob: Job? = null
-    private var lastInputAt = Long.MIN_VALUE / 2
 
-    private val listener = object : ReceiverLink.Listener {
+    private val listener = object : SharedLink.Listener {
         override fun onStatus(status: ReceiverStatus) {
             this@LiveCastController.status = status
             render()
         }
 
-        override fun onMessage(message: String) {
-            CastProtocol.decodeState(message)?.let(::onReceiverState)
-        }
+        override fun onState(state: StateMessage) = onReceiverState(state)
     }
 
-    /** A Cast session started or resumed. */
-    fun attach(link: ReceiverLink) {
+    /** A Cast session started or resumed, as this remote's alone. */
+    fun attach(link: ReceiverLink) = attach(SharedLink(link, elapsedMs))
+
+    /** A Cast session started or resumed, shared with the file remote; what the last session's receiver said goes, as the file remote's does. */
+    internal fun attach(link: SharedLink) {
         if (this.link === link) return
-        this.link?.setListener(null)
+        this.link?.stopListening(listener)
         this.link = link
+        loadJob?.cancel()
+        loadError = null
+        pending = null
+        pendingQuality = null
         automaticAvailable = false
         remote = null
         status = link.status
-        link.setListener(listener)
-        link.send(CastCommand.GetState.encode())
+        link.state?.let(::onReceiverState)
+        link.listen(listener)
         render()
         capabilityJob?.cancel()
         capabilityJob = scope.launch {
@@ -105,7 +109,7 @@ class LiveCastController(
         loadJob?.cancel()
         capabilityJob?.cancel()
         automaticAvailable = false
-        link?.setListener(null)
+        link?.stopListening(listener)
         link = null
         remote = null
         status = null
@@ -129,20 +133,11 @@ class LiveCastController(
         loadJob?.cancel()
         loadJob = scope.launch {
             try {
-                val server = withContext(io) { gateway.castServer() } ?: throw ApiException(null, "No server is in use.")
-                val token = withContext(io) { gateway.castToken() }
+                val base = l.loadData(gateway, io, client().name)
                 if (link !== l) return@launch
-                val data = LoadData(
-                    server = LoadServer(server.id, (token.urls + server.baseUrl).distinct()),
-                    token = token.token,
-                    tokenExpiresAt = Instant.ofEpochMilli(token.expiresAtMs).toString(),
-                    live = LiveLoad(channel.id, q.id),
-                    quality = q.id,
-                    device = LoadDevice(l.deviceId, l.deviceName),
-                    sender = LoadSender(client().name),
-                )
-                // The receiver names the channel the same way once it plays; no private artwork in LOAD.
-                l.load(LoadRequest(CastProtocol.liveContentId(channel.id), "${channel.number} ${channel.name}", null, null, data, live = true))
+                val data = base.copy(live = LiveLoad(channel.id, q.id), quality = q.id)
+                // The receiver names the channel the same way once it plays.
+                l.load(LoadRequest(CastProtocol.liveContentId(channel.id), "${channel.number} ${channel.name}", null, data, live = true))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -159,11 +154,10 @@ class LiveCastController(
             cast(channel, current().quality)
             return
         }
-        lastInputAt = elapsedMs()
         pending = channel
         pendingQuality = null
         loadError = null
-        l.send(CastCommand.Channel(channel.id).encode())
+        l.command(CastCommand.Channel(channel.id))
         render()
     }
 
@@ -189,25 +183,20 @@ class LiveCastController(
         val q = quality.forLiveTV(receiverAutomatic)
         val on = remote?.live ?: return
         if (StreamQuality.byId(on.quality) == q) return
-        lastInputAt = elapsedMs()
         // The TV tunes the channel again at the new quality.
         pending = LiveChannel(on.channelId, "", on.number, on.name)
         pendingQuality = q
-        l.send(CastCommand.Quality(q.id).encode())
+        l.command(CastCommand.Quality(q.id))
         render()
     }
 
-    /** Throttled: the remote calls this on every touch. */
+    /** Throttled ([SharedLink.noteInput]): the remote calls this on every touch. */
     override fun noteUserInput() {
-        val now = elapsedMs()
-        if (now - lastInputAt < CastPlaybackController.INPUT_EVERY_MS) return
-        lastInputAt = now
-        link?.send(CastCommand.Input.encode())
+        link?.noteInput()
     }
 
     override fun answerStillWatching(keepWatching: Boolean) {
-        lastInputAt = elapsedMs()
-        link?.send(CastCommand.StillWatching(keepWatching).encode())
+        link?.command(CastCommand.StillWatching(keepWatching))
     }
 
     override fun stop() {

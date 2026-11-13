@@ -49,7 +49,6 @@ class LiveCastControllerTest {
         assertEquals("wmm:live:ch-41", load.contentId)
         assertNull("no file", load.fileId)
         assertEquals("4.1 NFLD-HD", load.title)
-        assertNull(load.imageUrl)
         val d = load.data
         assertNull(d.fileId)
         assertEquals(LiveLoad("ch-41", "720"), d.live)
@@ -245,15 +244,68 @@ class LiveCastControllerTest {
 
     @Test
     fun `the file remote leaves a channel to the live remote`() = runTest(dispatcher) {
-        val files = CastPlaybackController(gateway, FakePreferencesRepository(), { client }, { null }, elapsedMs = { nowMs }, dispatcher = dispatcher, io = dispatcher)
-        val shared = SharedLink(link)
-        files.attach(shared.view())
-        controller.attach(shared.view())
+        val files = CastPlaybackController(gateway, FakePreferencesRepository(), { client }, elapsedMs = { nowMs }, dispatcher = dispatcher, io = dispatcher)
+        val shared = SharedLink(link) { nowMs }
+        files.attach(shared)
+        controller.attach(shared)
         link.state(StateMessage(features = listOf("live"), phase = StateMessage.PLAYING, fileId = 9101, title = "Harbor Lights"))
         assertEquals(9101L, files.nowPlaying.value?.fileId)
         link.state(live())
         assertNull("a channel on the TV is not a file", files.nowPlaying.value)
         assertEquals("both remotes hear the TV", LiveCastPhase.Playing, controller.state.value.phase)
+    }
+
+    @Test
+    fun `one session asks for the state once, decodes it once for both remotes, and throttles both remotes' input together`() = runTest(dispatcher) {
+        val files = CastPlaybackController(gateway, FakePreferencesRepository(), { client }, elapsedMs = { nowMs }, dispatcher = dispatcher, io = dispatcher)
+        val shared = SharedLink(link) { nowMs }
+        files.attach(shared)
+        link.state(live())
+        // The live remote attaches after the TV answered: it starts from that state, without asking again.
+        controller.attach(shared)
+        assertEquals(1, link.sent.count { it == """{"type":"getState"}""" })
+        assertEquals(LiveCastPhase.Playing, controller.state.value.phase)
+        assertEquals(1, link.decodedBy)
+
+        link.sent.clear()
+        nowMs = 100_000
+        files.noteUserInput()
+        nowMs += 1_000
+        controller.noteUserInput()
+        assertEquals("One input for touches on either remote", 1, link.sent.count { it == """{"type":"input"}""" })
+        nowMs += CastPlaybackController.INPUT_EVERY_MS
+        controller.noteUserInput()
+        assertEquals(2, link.sent.count { it == """{"type":"input"}""" })
+
+        // Both build LOAD the same way: the session's server, token, TV and this phone.
+        controller.cast(sleuth, StreamQuality.FullHd)
+        files.start(media.watchmy.client.model.PlayRequest(9101, startMs = 0, title = "Harbor Lights"))
+        val (channel, file) = link.loads
+        assertEquals(channel.data.server, file.data.server)
+        assertEquals(channel.data.device, file.data.device)
+        assertEquals(channel.data.sender, file.data.sender)
+        assertEquals("ch-41", channel.data.live?.channelId)
+        assertEquals(9101L, file.data.fileId)
+    }
+
+    @Test
+    fun `a new session forgets what the last TV said, in both remotes`() = runTest(dispatcher) {
+        val files = CastPlaybackController(gateway, FakePreferencesRepository(), { client }, elapsedMs = { nowMs }, dispatcher = dispatcher, io = dispatcher)
+        val first = SharedLink(link) { nowMs }
+        files.attach(first)
+        controller.attach(first)
+        link.state(StateMessage(phase = StateMessage.PLAYING, fileId = 9101, title = "Harbor Lights"))
+        files.detach()
+        controller.detach()
+
+        val other = Link()
+        val second = SharedLink(other) { nowMs }
+        files.attach(second)
+        controller.attach(second)
+        // Not "already on the TV": the other TV plays nothing yet, so the file loads.
+        files.start(media.watchmy.client.model.PlayRequest(9101, title = "Harbor Lights"))
+        assertEquals(1, other.loads.size)
+        assertEquals(LiveCastPhase.Idle, controller.state.value.phase)
     }
 
     private class Gateway : CastGateway {
@@ -311,7 +363,11 @@ class LiveCastControllerTest {
             attached?.onStatus(s)
         }
 
+        /** How many listeners a state message reached at the link (one, however many remotes listen). */
+        var decodedBy = 0
+
         fun state(m: StateMessage) {
+            if (attached != null) decodedBy++
             attached?.onMessage(CastProtocol.encodeState(m))
         }
     }
