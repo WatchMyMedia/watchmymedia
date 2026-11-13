@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import media.watchmy.client.model.AuthRepository
@@ -248,16 +249,27 @@ class DataServices internal constructor(
     /** Returns once the settings written behind have landed, for tests that write storage themselves. */
     internal suspend fun awaitWrites() = store.awaitWrites()
 
+    /**
+     * Returns once the latest sign-in's checks have finished and what they
+     * wrote has landed: for tests that open another DataServices on the same
+     * storage, which a check finishing late would write over.
+     */
+    internal suspend fun awaitIdle() {
+        synchronized(sessionLoadLock) { sessionLoad }?.join()
+        store.awaitWrites()
+    }
+
     /** The current sign-in's token as it is stored (sealed), for tests. */
     internal fun storedToken(): String? = store.session()?.account?.token
 
     /** Lets OS integrations clear account-specific state synchronously on sign-out or switching. */
     fun onSessionChange(listener: () -> Unit) { store.onSessionChange { listener() } }
 
-    private suspend fun loadSession() {
-        authRepository.refreshUser()
-        runCatching { preferencesRepository.refresh() }
-        runCatching { serverRepository.refreshCurrent() }
+    /** The three are independent, so they go together rather than one after another (PLAN-ANDROID-REVIEW.md §4.1.6). */
+    private suspend fun loadSession() = coroutineScope {
+        launch { authRepository.refreshUser() }
+        launch { runCatching { preferencesRepository.refresh() } }
+        launch { runCatching { serverRepository.refreshCurrent() } }
     }
 
     companion object {

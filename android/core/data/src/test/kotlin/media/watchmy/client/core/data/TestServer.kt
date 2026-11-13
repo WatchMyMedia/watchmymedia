@@ -154,8 +154,9 @@ class Harness internal constructor(
 
     /** Another DataServices on the same storage, as after a restart; [inFront] false as for a start in the background. */
     fun reopen(inFront: Boolean = true): DataServices {
-        // As after a restart: what the last one wrote behind is on disk before the next one reads it.
-        runBlocking { services.awaitWrites() }
+        // As after a restart: what the last one wrote behind, its sign-in's checks included, is on disk
+        // before the next one reads it. A check finishing late wrote the old sign-in back (AuthRepositoryTest, 2026-11-13).
+        runBlocking { services.awaitIdle() }
         return create(inFront).also { services = it }
     }
 
