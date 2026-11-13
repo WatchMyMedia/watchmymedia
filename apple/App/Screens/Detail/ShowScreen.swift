@@ -90,7 +90,7 @@ private struct ShowPageView: View {
             }
         }
         .task { await model.run() }
-        .onChange(of: services.downloads.downloads) { model.refreshOffline() }
+        .background { DownloadsChangeWatcher(downloads: services.downloads) { model.refreshOffline() } }
         .messageToast($model.message)
     }
 
