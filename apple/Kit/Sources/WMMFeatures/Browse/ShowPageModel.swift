@@ -62,10 +62,11 @@ public final class ShowPageModel {
     @ObservationIgnored private let downloadSession: (@MainActor () -> String?)?
     @ObservationIgnored private let downloadSessionAtOpen: String?
     @ObservationIgnored private let navigator: Navigator
-    @ObservationIgnored private var showGeneration = 0
-    @ObservationIgnored private var seasonGeneration = 0
     @ObservationIgnored private let changes: ScreenChanges
-    @ObservationIgnored private let latest = LatestLoad()
+    /// The show's loads; one still running when another starts is cancelled.
+    @ObservationIgnored private let showLoads = LoadController<ShowDetail>()
+    /// The row's season: a newer one (another tab) wins, and an older reply is dropped.
+    @ObservationIgnored private let seasonLoads = LoadController<SeasonDetail>(cancelsOlder: false)
     /// The episode on top was chosen by the rule or the person at least once.
     @ObservationIgnored private var placed = false
 
@@ -225,20 +226,18 @@ public final class ShowPageModel {
     /// Loads the show, then the chosen season. `quiet` keeps the page as it is
     /// meanwhile. A load still running when another starts is cancelled.
     func load(quiet: Bool) async {
-        await latest.run { [weak self] in await self?.fetch(quiet: quiet) }
+        await showLoads.run { [weak self] load in await self?.fetch(load, quiet: quiet) }
     }
 
-    private func fetch(quiet: Bool) async {
-        showGeneration += 1
-        let mine = showGeneration
-        if !quiet || loadedShow.value == nil { loadedShow = .loading }
-        guard let result = await Loadable.run({ try await self.library.show(id: self.showID) }), mine == showGeneration else { return }
-        switch result {
-        case .failed where loadOffline():
-            return
-        case .failed(let text) where quiet && loadedShow.value != nil:
+    private func fetch(_ load: LoadController<ShowDetail>.Load, quiet: Bool) async {
+        showLoads.begin(&loadedShow, quiet: quiet)
+        guard let result = await showLoads.fetch(load, { try await self.library.show(id: self.showID) }) else { return }
+        if case .failed = result, loadOffline() { return }
+        if let text = showLoads.quietFailure(result, quiet: quiet, over: loadedShow) {
             message = text
             return
+        }
+        switch result {
         case .failed, .loading:
             loadedShow = result
             return
@@ -254,7 +253,7 @@ public final class ShowPageModel {
                     selectedSeason = number
                     await loadSeason(number, quiet: false, place: .arrival)
                 } else {
-                    await findSeason(full, generation: mine)
+                    await findSeason(full, load: load)
                 }
             } else if let first = ShowPageRule.firstSeason(visible) {
                 // The chosen season went (deleted, or only Show missing listed it).
@@ -270,14 +269,16 @@ public final class ShowPageModel {
     /// top, chosen by `place` (the arrival's rule or the season's first
     /// unfinished), kept when still there, else the season's first unfinished.
     private func loadSeason(_ number: Int, quiet: Bool, place: Placing?) async {
-        seasonGeneration += 1
-        let mine = seasonGeneration
-        if !quiet || loadedSeason?.value == nil { loadedSeason = .loading }
-        guard let result = await Loadable.run({ try await self.library.season(showID: self.showID, number: number) }),
-              mine == seasonGeneration, selectedSeason == number else { return }
+        await seasonLoads.run { [weak self] load in await self?.fetchSeason(load, number: number, quiet: quiet, place: place) }
+    }
+
+    private func fetchSeason(_ load: LoadController<SeasonDetail>.Load, number: Int, quiet: Bool, place: Placing?) async {
+        seasonLoads.begin(&loadedSeason, quiet: quiet)
+        guard let result = await seasonLoads.fetch(load, { try await self.library.season(showID: self.showID, number: number) }),
+              selectedSeason == number else { return }
         if case .failed = result, !placed, loadOffline() { return }
         guard case .loaded(let season) = result else {
-            if case .failed(let text) = result, quiet, loadedSeason?.value != nil {
+            if let text = seasonLoads.quietFailure(result, quiet: quiet, over: loadedSeason ?? .loading) {
                 message = text
             } else {
                 loadedSeason = result
@@ -315,11 +316,11 @@ public final class ShowPageModel {
     /// The season holding the episode, opened without one (Home's hero): the
     /// next episode's, else the first from the newest that has it, which is
     /// where a new episode is.
-    private func findSeason(_ show: ShowDetail, generation mine: Int) async {
+    private func findSeason(_ show: ShowDetail, load: LoadController<ShowDetail>.Load) async {
         guard case .episode(let id, _) = arrival else { return }
         loadedSeason = .loading
         for number in show.seasons.map(\.number).sorted(by: >) {
-            guard let season = try? await library.season(showID: showID, number: number), mine == showGeneration else { continue }
+            guard let season = try? await library.season(showID: showID, number: number), showLoads.isCurrent(load) else { continue }
             if season.episodes.contains(where: { $0.id == id }) {
                 selectedSeason = number
                 loadedSeason = .loaded(season)
@@ -327,7 +328,7 @@ public final class ShowPageModel {
                 return
             }
         }
-        guard mine == showGeneration else { return }
+        guard showLoads.isCurrent(load) else { return }
         // Not in any season: the show's own first season, saying so.
         guard let first = ShowPageRule.firstSeason(show) else { return }
         selectedSeason = first
