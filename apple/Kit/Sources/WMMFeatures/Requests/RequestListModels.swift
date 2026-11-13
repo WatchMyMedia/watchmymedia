@@ -13,6 +13,8 @@ public final class MyRequestsModel {
     public var message: String?
 
     @ObservationIgnored private let requests: any RequestsRepository
+    /// Bumped by every load, so an older reply never overwrites a newer one.
+    @ObservationIgnored private var generation = 0
 
     public init(requests: any RequestsRepository) {
         self.requests = requests
@@ -47,8 +49,10 @@ public final class MyRequestsModel {
     }
 
     private func load(quiet: Bool) async {
+        generation += 1
+        let mine = generation
         if !quiet || state.value == nil { state = .loading }
-        guard let result = await Loadable.run({ try await self.requests.mine() }) else { return }
+        guard let result = await Loadable.run({ try await self.requests.mine() }), mine == generation else { return }
         if case .failed(let text) = result, quiet, state.value != nil { message = text } else { state = result }
     }
 }
@@ -76,6 +80,8 @@ public final class InboxModel {
     public var message: String?
 
     @ObservationIgnored private let requests: any RequestsRepository
+    /// Bumped by every load, so an older reply never overwrites a newer one.
+    @ObservationIgnored private var generation = 0
 
     public init(requests: any RequestsRepository, tab: Tab = .requests) {
         self.requests = requests
@@ -146,8 +152,10 @@ public final class InboxModel {
     }
 
     private func load(quiet: Bool) async {
+        generation += 1
+        let mine = generation
         if !quiet || state.value == nil { state = .loading }
-        guard let result = await Loadable.run({ try await self.requests.inbox() }) else { return }
+        guard let result = await Loadable.run({ try await self.requests.inbox() }), mine == generation else { return }
         if case .failed(let text) = result, quiet, state.value != nil { message = text } else { state = result }
     }
 }
