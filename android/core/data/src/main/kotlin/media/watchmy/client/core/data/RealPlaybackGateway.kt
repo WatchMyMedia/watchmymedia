@@ -59,7 +59,7 @@ internal class RealPlaybackGateway(
         if (fixed === server) return this
         return RealPlaybackGateway(fixed, deviceName, deviceId, { signedInMediaToken(fixed) }, onlineSubtitles)
     }
-    override suspend fun decide(request: DecisionRequest): PlaybackDecision = server.call { base, client ->
+    override suspend fun decide(request: DecisionRequest): PlaybackDecision {
         val body = Request(
             profile = request.profile.forApiLevel(server.apiLevel()).narrowedTo(request.quality).toApi(),
             audioIndex = request.audioIndex?.toLong(), burnIn = request.burnIn.takeIf { it }, client = request.client.current().toApi(),
@@ -72,25 +72,26 @@ internal class RealPlaybackGateway(
             },
         )
         val recordingId = request.recordingId
-        val reply = if (recordingId != null) {
-            if (server.apiLevel() < LIVE_RECORDING_API_LEVEL) throw ApiException(404, "Recording playback needs a newer server.")
-            LiveTvApi(base, client).startLiveTVRecordingPlayback(recordingId, body)
-        } else PlaybackApi(base, client).startPlayback(request.fileId, body)
-        reply.toModel(base, server.apiLevel(), sheetToken = (server as? CastTokenAccess)?.token)
+        if (recordingId != null && server.apiLevel() < LIVE_RECORDING_API_LEVEL) throw ApiException(404, "Recording playback needs a newer server.")
+        val (base, reply) = server.call { base, client ->
+            base to if (recordingId != null) LiveTvApi(base, client).startLiveTVRecordingPlayback(recordingId, body)
+            else PlaybackApi(base, client).startPlayback(request.fileId, body)
+        }
+        return reply.toModel(base, server.apiLevel(), sheetToken = (server as? CastTokenAccess)?.token)
     }
 
     override suspend fun reportProgress(report: ProgressReport): ProgressReply {
+        val body = ProgressInputBody(
+            positionMs = report.positionMs.coerceAtLeast(0), bufferedMs = report.bufferedMs.coerceAtLeast(0),
+            durationMs = report.durationMs.coerceAtLeast(0), playId = report.playId?.takeIf { PLAY_ID.matches(it) },
+            state = report.state.toApi(), throughputBps = report.throughputBps?.takeIf { it > 0 },
+            throughputAgeMs = report.throughputAgeMs?.takeIf { server.apiLevel() >= AUTO_RECOVERY_API_LEVEL && it >= 0 },
+            switchGeneration = report.switchGeneration?.takeIf { server.apiLevel() >= AUTO_RECOVERY_API_LEVEL && it > 0 },
+            switchFailedGeneration = report.switchFailedGeneration?.takeIf { server.apiLevel() >= AUTO_RECOVERY_API_LEVEL && it > 0 },
+            stalls = report.stalls?.toLong()?.coerceAtLeast(0), stallMs = report.stallMs?.coerceAtLeast(0), startupMs = report.startupMs?.takeIf { it > 0 },
+        )
+        val recordingId = report.recordingId
         val reply = server.call { base, client ->
-            val body = ProgressInputBody(
-                positionMs = report.positionMs.coerceAtLeast(0), bufferedMs = report.bufferedMs.coerceAtLeast(0),
-                durationMs = report.durationMs.coerceAtLeast(0), playId = report.playId?.takeIf { PLAY_ID.matches(it) },
-                state = report.state.toApi(), throughputBps = report.throughputBps?.takeIf { it > 0 },
-                throughputAgeMs = report.throughputAgeMs?.takeIf { server.apiLevel() >= AUTO_RECOVERY_API_LEVEL && it >= 0 },
-                switchGeneration = report.switchGeneration?.takeIf { server.apiLevel() >= AUTO_RECOVERY_API_LEVEL && it > 0 },
-                switchFailedGeneration = report.switchFailedGeneration?.takeIf { server.apiLevel() >= AUTO_RECOVERY_API_LEVEL && it > 0 },
-                stalls = report.stalls?.toLong()?.coerceAtLeast(0), stallMs = report.stallMs?.coerceAtLeast(0), startupMs = report.startupMs?.takeIf { it > 0 },
-            )
-            val recordingId = report.recordingId
             if (recordingId != null) LiveTvApi(base, client).reportLiveTVRecordingProgress(recordingId, body)
             else WatchApi(base, client).reportProgress(report.fileId, body)
         }
@@ -142,17 +143,13 @@ internal class RealPlaybackGateway(
         }
     }
 
-    override suspend fun downloadSubtitle(fileId: Long, resultId: String): String = server.call { base, client ->
-        PlaybackApi(base, client).downloadSubtitle(fileId, DownloadSubtitleInputBody(resultId = resultId)).id
-    }
+    override suspend fun downloadSubtitle(fileId: Long, resultId: String): String =
+        server.call { base, client -> PlaybackApi(base, client).downloadSubtitle(fileId, DownloadSubtitleInputBody(resultId = resultId)) }.id
 
     override suspend fun automaticSubtitle(fileId: Long, playId: String): DecisionSubtitle? {
         if (!onlineSubtitles || server.apiLevel() < SUBTITLE_PREFERENCES_API_LEVEL) return null
-        return server.call { base, client ->
-            PlaybackApi(base, client).automaticSubtitle(fileId, AutomaticSubtitleInputBody(playId = playId)).track?.let { s ->
-                DecisionSubtitle(s.toOption(), s.format.value, s.url?.takeIf { it.isNotBlank() }?.let { absolute(base, it) })
-            }
-        }
+        val (base, reply) = server.call { base, client -> base to PlaybackApi(base, client).automaticSubtitle(fileId, AutomaticSubtitleInputBody(playId = playId)) }
+        return reply.track?.let { s -> DecisionSubtitle(s.toOption(), s.format.value, s.url?.takeIf { it.isNotBlank() }?.let { absolute(base, it) }) }
     }
 
     override suspend fun cancelAutomaticSubtitle(fileId: Long, playId: String) {

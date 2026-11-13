@@ -102,7 +102,7 @@ internal fun castImageUrl(baseUrl: String, token: String, path: String?, size: I
 internal class RealCastGateway(private val store: LocalStore, private val http: Http) : CastGateway {
     override suspend fun liveAutomaticAvailable(): Boolean =
         http.apiLevel() >= media.watchmy.client.model.LIVE_AUTOMATIC_API_LEVEL &&
-            http.signedIn { base, client -> LiveTvApi(base, client).getLiveTVCapabilities().automatic == true }
+            http.signedIn { base, client -> LiveTvApi(base, client).getLiveTVCapabilities() }.automatic == true
 
     override suspend fun castServer(): CastServer? {
         val base = store.session()?.server?.baseUrl ?: return null

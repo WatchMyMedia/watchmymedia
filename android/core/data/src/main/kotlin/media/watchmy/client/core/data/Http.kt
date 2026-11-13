@@ -1,5 +1,6 @@
 package media.watchmy.client.core.data
 
+import android.util.Log
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
@@ -161,6 +162,7 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
 
     companion object {
         const val AUTHORIZATION = "Authorization"
+        private const val TAG = "WatchMyMedia"
         private const val LOGIN_PATH = "/api/auth/login"
 
         /** True when [url] is on the server at [baseUrl] (same origin, under its path): [isOnServer], which the player uses for media URLs too. */
@@ -171,6 +173,14 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
          * the server's message for a refused request, [SignedOutException] for
          * 401 when [signedIn], and a plain sentence for network trouble or a
          * reply it doesn't understand.
+         *
+         * [block] is the generated call alone; the caller maps its reply
+         * outside. The generated client fails with NullPointerException,
+         * ClassCastException and IllegalStateException on replies and
+         * addresses it can't use, so those are caught here, and a mistake in
+         * the app's own mapping inside [block] would have read as "That server
+         * address is not valid" (PLAN-ANDROID-REVIEW.md §3.4.3). A reply it
+         * doesn't understand is logged with its cause.
          */
         suspend fun <T> call(signedIn: Boolean, block: suspend () -> T): T = try {
             block()
@@ -186,21 +196,28 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
         } catch (e: TokenUnavailableException) {
             throw ApiException(null, "Couldn't read this device's saved sign-in. Try again.", e)
         } catch (e: ReplyTooLargeException) {
-            throw ApiException(null, "The server sent a reply this app doesn't understand.", e)
+            throw notUnderstood(e, "The server sent a reply this app doesn't understand.")
         } catch (e: IOException) {
             throw ApiException(null, "Couldn't reach the server. Check the connection and try again.", e)
         } catch (e: SerializationException) {
-            throw ApiException(null, "The server sent a reply this app doesn't understand. Update the app or the server.", e)
+            throw notUnderstood(e, "The server sent a reply this app doesn't understand. Update the app or the server.")
         } catch (e: UnsupportedOperationException) {
             // The generated client met a reply that is not JSON: not a WatchMyMedia server, or a proxy's error page.
-            throw ApiException(null, "The server sent a reply this app doesn't understand.", e)
+            throw notUnderstood(e, "The server sent a reply this app doesn't understand.")
         } catch (e: NullPointerException) {
             // A success with no body: the generated client casts its null to the reply's type.
-            throw ApiException(null, "The server sent a reply this app doesn't understand.", e)
+            throw notUnderstood(e, "The server sent a reply this app doesn't understand.")
         } catch (e: ClassCastException) {
-            throw ApiException(null, "The server sent a reply this app doesn't understand.", e)
+            throw notUnderstood(e, "The server sent a reply this app doesn't understand.")
         } catch (e: IllegalStateException) {
+            // The generated client's "baseUrl is invalid."
             throw ApiException(null, "That server address is not valid.", e)
+        }
+
+        /** [message] for a reply the app can't read, with its cause logged, which the sentence alone would hide. */
+        private fun notUnderstood(e: Exception, message: String): ApiException {
+            Log.w(TAG, "a reply this app doesn't understand", e)
+            return ApiException(null, message, e)
         }
 
         /** The `detail` of the server's problem+json body, as a sentence. */

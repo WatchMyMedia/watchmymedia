@@ -65,28 +65,30 @@ internal class RealRequestRepository(
 
     override suspend fun options(): RequestOptions {
         if (!supported()) return RequestOptions.None
-        return try {
+        val admin = store.user.value?.isAdmin == true
+        val (reply, status) = try {
             http.signedIn { base, client ->
                 val reply = RequestsApi(base, client).getRequestOptions()
                 // manage already includes the network boundary. Seerr-only admins also
                 // need their local problem Inbox; ask auth/status using this same session.
-                val canOpenInbox = reply.manage || if (store.user.value?.isAdmin == true) {
+                val status = if (!reply.manage && admin) {
                     try {
-                        val status = AuthApi(base, client).getAuthStatus()
-                        status.adminAllowed && status.user?.isAdmin == true
+                        AuthApi(base, client).getAuthStatus()
                     } catch (e: CancellationException) {
                         throw e
                     } catch (_: Exception) {
-                        false
+                        null
                     }
-                } else false
-                // Below level 6 members can't delete, whatever a reply says, so nothing offers it.
-                reply.toModel().copy(canOpenInbox = canOpenInbox, delete = reply.delete == true && level() >= DELETE_API_LEVEL)
+                } else null
+                reply to status
             }
         } catch (e: media.watchmy.client.model.ApiException) {
             // A server that turned integrations off answers 503: nothing to offer.
-            if (e.unknownRoute() || e.status == 503) RequestOptions.None else throw e
+            if (e.unknownRoute() || e.status == 503) return RequestOptions.None else throw e
         }
+        val canOpenInbox = reply.manage || status?.let { it.adminAllowed && it.user?.isAdmin == true } == true
+        // Below level 6 members can't delete, whatever a reply says, so nothing offers it.
+        return reply.toModel().copy(canOpenInbox = canOpenInbox, delete = reply.delete == true && level() >= DELETE_API_LEVEL)
     }
 
     override suspend fun search(text: String): List<Requestable> {
@@ -153,7 +155,9 @@ internal class RealRequestRepository(
     override suspend fun deleteEpisode(episodeId: Long, connections: List<Long>): DeleteOutcome = deleteEpisode(episodeId, connections, recordAgain = false)
 
     override suspend fun deleteEpisode(episodeId: Long, connections: List<Long>, recordAgain: Boolean): DeleteOutcome =
-        http.signedIn { base, client -> DeleteApi(base, client).deleteEpisode(episodeId, DeleteOptions(connections = connections, recordAgain = recordAgain.takeIf { http.apiLevel() >= media.watchmy.client.model.LIVE_RECORDING_API_LEVEL })) }.toModel()
+        DeleteOptions(connections = connections, recordAgain = recordAgain.takeIf { http.apiLevel() >= media.watchmy.client.model.LIVE_RECORDING_API_LEVEL }).let { options ->
+            http.signedIn { base, client -> DeleteApi(base, client).deleteEpisode(episodeId, options) }.toModel()
+        }
 
     override suspend fun replaceFile(fileId: Long): ReplaceOutcome =
         http.signedIn { base, client -> DeleteApi(base, client).replaceFile(fileId) }.let { ReplaceOutcome(it.connection, it.blocklisted, it.note?.takeIf { n -> n.isNotBlank() }) }
