@@ -434,9 +434,14 @@ Android 12 and later stretch a window under 10 minutes to 10 for such apps,
 as `adb shell dumpsys alarm` shows, and Doze may hold one back further, so
 the notification says how long is left as it comes. The alarms follow the
 list as it is read at start, on coming to the foreground, on
-`live.reminders.changed` while in the foreground and after any change here (`WatchMyMediaApp.followReminders`, `app/reminders/`).
-After a reboot `LiveReminderBoot` sets them again from what it kept and a
-WorkManager job reads the list once there is a network. The notification
+`live.reminders.changed` while in the foreground and after any change here
+(`ReminderFollower`, `app/reminders/`). The alarms belong to the account
+that set them: a sign-out or another account cancels them, also at a start
+with alarms kept from before. After a reboot `LiveReminderBoot` sets them
+again from what it kept and a WorkManager job reads the list once there is
+a network. That receiver is off in the manifest and on only while alarms
+are kept, so a boot with none, and every boot of a TV, doesn't start the
+app. The notification
 ("Starting in 5 min", "Dollar Dash · 2.1 HRBR-HD", the channel's logo, Watch)
 opens the channel only for the account that set it
 (`watchmymedia://live/{channelId}?source=reminder&account=`; any other
@@ -562,7 +567,7 @@ against `cmd/livetvfixture`.
 
 | Module | What |
 |---|---|
-| `app` | Application (builds `DataServices` and `PlaybackEngine`, the image loader, which also fetches the media notification's artwork), the one activity for both launchers, deep links, the local network prompt, manifest, icons |
+| `app` | Application (builds `DataServices` and `PlaybackEngine`, the image loader, which also fetches the media notification's artwork; starts the Cast SDK at the first `ON_START`, `FirstForeground`; WorkManager starts on first use), the one activity for both launchers and its routing of casts and links (`IntentRouter`), the local network prompt, reminders' alarms (`app/reminders/`), debug builds' StrictMode (`StrictModeChecks`), the process's past exits (`AndroidDiagnostics`), manifest, icons |
 | `core:model` | Domain models and the interfaces everything builds against: `ServerRepository`, `AuthRepository`, `LibraryRepository`, `PreferencesRepository`, `PlaybackController`, `PlaybackGateway`, `LiveRepository`, `LivePlaybackController`, `AppServices`; and the pure helpers both UIs share, so the phone and the TV say the same thing: labels, dates and counts, error messages and `attempt`, play requests, deep links |
 | `core:presentation` | The ViewModels the phone and the TV share, so both pages behave alike (the Apple apps' WMMFeatures models): their state, with what loads as a `Load` (loading, failed or ready), and their one-shot events. Depends only on `core:model`, lifecycle's ViewModel and SavedStateHandle, and coroutines: no Compose, no Android UI |
 | `core:ui` | Brand tokens (`WmmColors`), Inter, the phone Material 3 theme, `LocalAppServices`, shared pieces: `Artwork`, `Badge`, `ProgressStrip`, `WatchedCheck`, `BrandMark`, `WmmIcons`, the loading skeletons' blocks, lines and sheen (`Skeleton.kt`, still with animations off), `SubtitleCues` (both players' text subtitles, in a `CaptionLook`: the TV's Subtitle size, the phone's system caption settings), `playerKey` (both players' remote and keyboard keys), `SeekThumbnail` and `ScrubberLayout` (both players' seek thumbnails) and `CoilSeekThumbnails` (their tiles), `PRIVACY_POLICY_URL` |
@@ -574,7 +579,7 @@ against `cmd/livetvfixture`.
 | `core:cast` | Casting ([PLAN-CAST.md](../PLAN-CAST.md)): the phone's `RealCastService` and its remote `CastPlaybackController` on the Cast SDK, Cast Connect's `CastConnectReceiver` for the TV app, and `CastProtocol`, the Kotlin side of `web/src/cast/protocol.ts` |
 | `tv` | Compose for TV screens; `tv/player/` is the TV player, with a debug harness in `tv/src/debug` |
 | `mobile` | Material 3 phone screens; `mobile/player/` is the phone player, with a debug harness in `mobile/src/debug` |
-| `baselineprofile` | Tests that drive `app` on a device: the journeys that write its baseline and startup profiles, and the cold-start benchmark (Macrobenchmark; "Baseline profile" below) |
+| `baselineprofile` | Tests that drive `app` on a device: the journeys that write its baseline and startup profiles, the startup and frame-timing benchmarks (Macrobenchmark), and `fixture_server.py`, the seeded fixture server the real-build journey uses ("Baseline profile" below) |
 
 ## Build conventions
 
