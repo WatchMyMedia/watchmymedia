@@ -46,8 +46,9 @@ server, and on iPad in both a regular and a compact width.
   authorization under the root rules.
 - **Older servers.** The generated client rejects a reply missing a required
   field, which is why new server reply fields must be optional (root file).
-  Gate features on the server's `apiLevel`, refreshed at launch and on
-  foreground, without raising the app's minimum.
+  Gate features on the server's `apiLevel`, refreshed at launch, on
+  foreground and when the event stream reconnects, without raising the
+  app's minimum.
 - **Models, not views, decide.** Put state and rules in a `WMMFeatures` model
   and test it in `Kit/Tests/WMMFeaturesTests` against the fakes with
   `FakeLatency.duration = .zero`. Formatting goes in a `WMMModel` helper with a

@@ -116,7 +116,7 @@ extension DeepLink {
         guard let link = DeepLink(url: url) else { return nil }
         switch link {
         case .play(let id): return publisher != nil ? link : .filePage(fileID: id)
-        case .liveTV(let channel?): return publisher != nil ? link : .liveTV(channelID: nil)
+        case .liveTV(_?): return publisher != nil ? link : .liveTV(channelID: nil)
         default: return link
         }
     }

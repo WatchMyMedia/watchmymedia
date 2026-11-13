@@ -122,7 +122,8 @@ final class ScreenChanges {
     }
 
     private func receive(_ change: LibraryChange) {
-        pending.append(change)
+        // A screen away for long hears a great many: past a point, everything.
+        if pending.count >= 100 { pending = [.unknown] } else { pending.append(change) }
         wake?.continuation.yield()
     }
 }
