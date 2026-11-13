@@ -248,7 +248,7 @@ private struct HomeView: View {
         let panel = panel(for: row, card: key)
         return VStack(alignment: .leading, spacing: 16) {
             if let panel {
-                LeadPanel(panel: panel, imageURL: panel.pictureURL ?? url(panel.picturePath, .w780), compact: !sideBySide, perform: perform)
+                LeadPanel(panel: panel, imageURL: panel.pictureURL ?? url(panel.picturePath, .w1280), compact: !sideBySide, perform: perform)
                     .frame(maxHeight: .infinity)
                     .padding(.horizontal, margin)
                     .padding(.top, 8)
@@ -263,7 +263,7 @@ private struct HomeView: View {
         // The cards either side are fetched ahead, so a swipe does not flash the placeholder.
         .task(id: key) {
             for neighbour in RowPanel.neighbours(for: row, card: key) {
-                await Artwork.prefetch(neighbour.pictureURL ?? url(neighbour.picturePath, .w780), maxPixel: 1600, loader: imageLoader)
+                await Artwork.prefetch(neighbour.pictureURL ?? url(neighbour.picturePath, .w1280), maxPixel: 1600, loader: imageLoader)
             }
         }
     }
