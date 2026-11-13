@@ -7,6 +7,13 @@ const val CAST_API_LEVEL = 2
 const val AUTO_RECOVERY_API_LEVEL = 24
 
 /**
+ * The level that brought the media token with the decision, a Live TV status
+ * call that waits while the channel tunes, and ETags on Live TV's
+ * capabilities and channels (PLAN-ANDROID-REVIEW.md §4.2.2–3a).
+ */
+const val DECISION_TOKEN_API_LEVEL = 28
+
+/**
  * What a server at API [level] offers, by name, so a check says what it gates
  * rather than a number (PLAN-ANDROID-REVIEW.md §5.7). The levels are the
  * server's (`APILevel` in server/internal/api/system.go, whose comment says
@@ -72,4 +79,10 @@ value class ServerFeatures(val level: Int) {
 
     /** 26: opt-in Live TV Automatic. */
     val liveAutomatic: Boolean get() = level >= LIVE_AUTOMATIC_API_LEVEL
+
+    /** 28: a play's decision carries its media token (Decision.mediaToken), so the player needn't ask for one. */
+    val tokenWithDecision: Boolean get() = level >= DECISION_TOKEN_API_LEVEL
+
+    /** 28: the Live TV status call waits (waitMs) while the channel tunes, so the player needn't poll. */
+    val liveStatusWaits: Boolean get() = level >= DECISION_TOKEN_API_LEVEL
 }

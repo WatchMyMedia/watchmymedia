@@ -28,6 +28,8 @@ class ServerFeaturesTest {
             "autoRecovery" to (24 to { it.autoRecovery }),
             "liveProfile" to (25 to { it.liveProfile }),
             "liveAutomatic" to (26 to { it.liveAutomatic }),
+            "tokenWithDecision" to (28 to { it.tokenWithDecision }),
+            "liveStatusWaits" to (28 to { it.liveStatusWaits }),
         )
         for ((name, entry) in features) {
             val (level, has) = entry
