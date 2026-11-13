@@ -222,7 +222,7 @@ enum PlaybackMapping {
     ///
     /// From ``decisionTokenAPILevel`` the decision carries a media token:
     /// once the generated client has the field, map it here as
-    /// `mediaToken: d.mediaToken.map { token($0, server: base) }` (and
+    /// `mediaToken: d.mediaToken.map { $0.model(server: base) }` (and
     /// ``APIPlaybackGateway/needsTokenBeside(_:)`` answers by level).
     static func decision(_ d: Components.Schemas.Decision, base: URL, apiLevel: Int? = trickplayAPILevel) throws -> PlaybackDecision {
         guard Components.Schemas.Decision.ModePayload.allCases.contains(d.mode),
