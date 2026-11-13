@@ -9,6 +9,9 @@ import WMMModel
 import WMMUI
 
 /// A dedicated live surface: no file scrubber, progress or next episode.
+/// It is drawn inside the players' shell (``PlayerShell``), so its controls
+/// hide by themselves as the film player's do and the status bar and home
+/// indicator stay off the picture (PLAN-APPLE-REVIEW.md §3.3.1, §5.3).
 struct LivePlayerScreen: View {
     let request: LivePlayRequest
     @Environment(AppServices.self) private var services
@@ -22,12 +25,13 @@ struct LivePlayerScreen: View {
             else { ProgressView("Opening live channel") }
         }
         .onAppear {
-            if UIDevice.current.userInterfaceIdiom != .pad { OrientationLock.allow(.allButUpsideDown) }
             guard model == nil, let factory = services.livePlayback else { return }
             let model = LivePlayerModel(request: request, repository: services.liveTV, controller: factory.make(), onExit: { navigator.closePlayer() })
             self.model = model
             model.start()
             #if DEBUG
+            // Screenshots and UI tests: the controls stay up, as in the film player.
+            if ProcessInfo.processInfo.arguments.contains("-playerKeepControls") { model.controls.hold("kept", true) }
             if let fake = model.controller as? FakeLivePlaybackController {
                 let args = ProcessInfo.processInfo.arguments
                 if args.contains("-liveStillWatching") { fake.showStillWatching() }
@@ -39,23 +43,15 @@ struct LivePlayerScreen: View {
             }
             #endif
         }
-        .onDisappear {
-            model?.dispose()
-            if UIDevice.current.userInterfaceIdiom != .pad { OrientationLock.allow(.portrait) }
-        }
-        .accessibilityAction(.escape) { model?.close() }
+        .onDisappear { model?.dispose() }
     }
 }
 
 private struct LivePlayerContent: View {
     let model: LivePlayerModel
-    @Environment(\.scenePhase) private var scenePhase
     @Environment(Navigator.self) private var navigator
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(LiveRecordingsStore.self) private var recordings
-    @State private var pip = PictureInPicture()
-    @State private var showsChannels = false
-    @State private var showsControls = true
     /// The takeover warning OK'd, by its recording.
     @State private var dismissedTakeover: String?
     @State private var takeoverError: String?
@@ -64,11 +60,18 @@ private struct LivePlayerContent: View {
     private var stopped: Bool { state.status == .stopped || state.status == .error }
 
     var body: some View {
-        GeometryReader { geo in
-            let portrait = geo.size.height > geo.size.width
-            VStack(spacing: 0) {
-                video(portrait: portrait)
-                    .frame(height: portrait ? geo.size.width * 9 / 16 : geo.size.height)
+        PlayerShell(model: model, orientations: .allButUpsideDown) { frame in
+            content(frame)
+        }
+        .task(id: model.listings) { if model.listings { await model.followSchedule() } }
+    }
+
+    private func content(_ frame: PlayerFrame) -> some View {
+        let portrait = frame.tall
+        let pip = frame.pictureInPicture
+        return VStack(spacing: 0) {
+                video(frame, portrait: portrait, pip: pip)
+                    .frame(height: portrait ? frame.size.width * 9 / 16 : frame.size.height)
                 if portrait {
                     if let channel = model.listedChannel {
                         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -103,8 +106,11 @@ private struct LivePlayerContent: View {
                     channelList
                 }
             }
+            // Under the camera housing on a tall screen; a full-screen picture goes edge to edge.
+            .padding(.top, portrait ? frame.safeArea.top : 0)
+            .background(portrait ? Palette.ground : .black)
             .overlay(alignment: .trailing) {
-                if showsChannels && !portrait {
+                if model.channelsOpen && !portrait && !pip.isActive {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             if model.listings {
@@ -118,39 +124,31 @@ private struct LivePlayerContent: View {
                                 Text("Channels").font(.title2.bold())
                                 Spacer()
                             }
-                            Button { showsChannels = false } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Close channels")
-                        }.padding(.horizontal, 16).padding(.top, 8)
+                            Button { model.channelsOpen = false } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Close channels")
+                        }.padding(.horizontal, 16).padding(.top, 8 + frame.safeArea.top)
                         channelList
                     }
-                    .frame(width: min(380, geo.size.width * 0.48))
+                    .padding(.trailing, frame.safeArea.trailing)
+                    .frame(width: min(380, frame.size.width * 0.48) + frame.safeArea.trailing)
                     .background(Palette.ground.opacity(0.97))
                 }
             }
             .overlay { if state.askStillWatching { stillWatching } }
-        }
-        .background(Palette.ground)
-        .foregroundStyle(Palette.text)
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .background {
-                model.enteredBackground(externalPlayback: model.controller.player?.isExternalPlaybackActive ?? false, pictureInPictureMayStart: pip.mayStartAutomatically)
-            } else if phase == .active { model.becameActive() }
-        }
-        .onChange(of: pip.isActive) { _, active in model.pictureInPictureChanged(active: active, appActive: scenePhase == .active) }
-        .task(id: model.listings) { if model.listings { await model.followSchedule() } }
+            .foregroundStyle(Palette.text)
+            .animation(.easeInOut(duration: 0.2), value: model.showsControls)
     }
 
-    private func video(portrait: Bool) -> some View {
-        ZStack {
+    private func video(_ frame: PlayerFrame, portrait: Bool, pip: PictureInPicture) -> some View {
+        let insets = frame.insets(portrait: portrait)
+        let metrics = frame.metrics
+        return ZStack {
             PlayerVideo(player: model.controller.player, backdrop: nil, seed: state.channel?.name ?? "Live TV", pictureInPicture: pip)
-            Color.clear.contentShape(Rectangle()).onTapGesture {
-                model.controller.noteUserInput()
-                showsControls.toggle()
-            }.accessibilityHidden(true)
+            Color.clear.contentShape(Rectangle()).onTapGesture { model.tap() }.accessibilityHidden(true)
             if stopped { stoppedPrompt }
-            else if showsControls && !pip.isActive {
+            else if model.showsControls && !pip.isActive {
                 VStack(spacing: 12) {
-                    HStack {
-                        icon("xmark", label: "Stop and close live TV") { model.close() }
+                    HStack(spacing: 10) {
+                        RoundIconButton(systemImage: "xmark", label: "Stop and close live TV", size: metrics.button, iconSize: metrics.buttonIcon) { model.close() }
                         if !portrait {
                             let programme = model.listedChannel?.programme(at: .now)
                             Text([state.channel?.title ?? "Live TV", programme?.title].compactMap(\.self).joined(separator: " · "))
@@ -158,22 +156,31 @@ private struct LivePlayerContent: View {
                         }
                         Spacer()
                         CastLiveHandoverButton(model: model)
-                        AirPlayButton().frame(width: 44, height: 44).accessibilityLabel("AirPlay")
-                        if pip.isPossible { icon("pip.enter", label: "Picture in Picture") { pip.toggle() } }
+                        AirPlayButton()
+                            .frame(width: metrics.button, height: metrics.button)
+                            .background(PlayerStyle.scrim, in: Circle())
+                            .accessibilityLabel("AirPlay")
+                        if pip.isPossible {
+                            RoundIconButton(systemImage: "pip.enter", label: "Picture in Picture", size: metrics.button, iconSize: metrics.buttonIcon) {
+                                model.input()
+                                pip.toggle()
+                            }
+                        }
                     }
                     Spacer(minLength: 0)
                     if state.status == .tuning || state.status == .buffering {
                         ProgressView(state.status == .tuning ? "Tuning channel" : "Buffering").tint(.white)
                     } else {
-                        HStack(spacing: portrait ? 32 : 60) {
-                            icon("chevron.down", label: "Previous channel", size: 24) { model.previousChannel() }
-                            icon(state.status == .paused ? "play.fill" : "pause.fill", label: state.status == .paused ? "Play live TV" : "Pause live TV", size: 36) { model.controller.togglePlayPause() }
+                        HStack(spacing: portrait ? 32 : metrics.transportSpacing) {
+                            RoundIconButton(systemImage: "chevron.down", label: "Previous channel", size: metrics.seekButton, iconSize: 24) { model.previousChannel() }
+                            RoundIconButton(systemImage: state.status == .paused ? "play.fill" : "pause.fill", label: state.status == .paused ? "Play live TV" : "Pause live TV",
+                                            size: portrait ? 56 : metrics.playButton, iconSize: portrait ? 32 : metrics.playIcon, background: .clear) { model.togglePlayPause() }
                                 .accessibilityIdentifier("live-play-pause")
-                            icon("chevron.up", label: "Next channel", size: 24) { model.nextChannel() }
+                            RoundIconButton(systemImage: "chevron.up", label: "Next channel", size: metrics.seekButton, iconSize: 24) { model.nextChannel() }
                         }
                     }
                     Spacer(minLength: 0)
-                    if !portrait, !showsChannels, let channel = model.listedChannel {
+                    if !portrait, !model.channelsOpen, let channel = model.listedChannel {
                         TimelineView(.periodic(from: .now, by: 30)) { context in
                             LivePlayerBanner(channel: channel, now: context.date)
                         }
@@ -182,7 +189,7 @@ private struct LivePlayerContent: View {
                         if state.isAtLiveEdge && state.status != .paused {
                             Label("LIVE", systemImage: "circle.fill").font(.caption.bold()).foregroundStyle(Palette.gold)
                         } else {
-                            Button("Go live") { model.controller.goLive() }.font(.subheadline.bold()).foregroundStyle(Palette.gold)
+                            Button("Go live") { model.goLive() }.font(.subheadline.bold()).foregroundStyle(Palette.gold)
                         }
                         if state.status == .paused {
                             Text("Tuner releases in \(state.pauseRemainingSeconds / 60):\(String(format: "%02d", state.pauseRemainingSeconds % 60))")
@@ -190,16 +197,22 @@ private struct LivePlayerContent: View {
                         }
                         Spacer(minLength: 0)
                         if !portrait {
-                            Button("Channels") { model.controller.noteUserInput(); showsChannels.toggle() }.font(.subheadline.bold())
+                            Button("Channels") { model.toggleChannels() }.font(.subheadline.bold())
                             qualityMenu
                         }
-                        icon(portrait ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left", label: portrait ? "Full screen" : "Portrait view") {
+                        RoundIconButton(systemImage: portrait ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left", label: portrait ? "Full screen" : "Portrait view",
+                                        size: metrics.button, iconSize: metrics.buttonIcon) {
+                            model.input()
                             OrientationLock.allow(portrait ? .landscape : .portrait)
                         }
                     }
                 }
-                .padding(portrait ? 12 : 24)
-                .background(LinearGradient(colors: [.black.opacity(0.65), .clear, .black.opacity(0.65)], startPoint: .top, endPoint: .bottom))
+                .padding(.leading, portrait ? 12 : insets.leading)
+                .padding(.trailing, portrait ? 12 : insets.trailing)
+                .padding(.top, portrait ? 12 : insets.top)
+                .padding(.bottom, portrait ? 12 : insets.bottom)
+                .background(LinearGradient(colors: [.black.opacity(0.65), .clear, .black.opacity(0.65)], startPoint: .top, endPoint: .bottom).allowsHitTesting(false))
+                .transition(.opacity)
             }
             if let takeover = state.takeover, !stopped, dismissedTakeover != takeover.recordingID {
                 takeoverBanner(takeover)
@@ -230,13 +243,17 @@ private struct LivePlayerContent: View {
     private var qualityMenu: some View {
         Menu {
             ForEach(state.qualities, id: \.self) { quality in
-                Button { model.controller.selectQuality(quality) } label: {
+                Button { model.selectQuality(quality) } label: {
                     if quality == state.quality { Label(quality == .auto ? state.qualityLabel : quality.title, systemImage: "checkmark") }
                     else { Text(quality.title) }
                 }
             }
             if state.qualities.contains(.auto) { Text("Automatic adjusts to this connection. Fixed quality tunes again at live.") }
             if state.cellular { Text("720p maximum on mobile data") }
+            // Open: the controls stay, so the menu keeps its button.
+            Color.clear.frame(width: 0, height: 0)
+                .onAppear { model.qualityMenuOpen = true }
+                .onDisappear { model.qualityMenuOpen = false }
         } label: { Label("Quality · \(state.qualityLabel)", systemImage: "slider.horizontal.3").font(.subheadline) }
         .frame(minHeight: 44).accessibilityIdentifier("live-quality")
     }
@@ -249,12 +266,12 @@ private struct LivePlayerContent: View {
                     if model.listings {
                         TimelineView(.periodic(from: .now, by: 30)) { context in
                             LiveChannelNowRow(channel: channel, now: context.date, watching: selected) {
-                                model.switchChannel(channel); showsChannels = false
+                                model.switchChannel(channel); model.channelsOpen = false
                             }
                         }
                     } else {
                         LiveChannelRow(channel: channel, selected: selected) {
-                            model.switchChannel(channel); showsChannels = false
+                            model.switchChannel(channel); model.channelsOpen = false
                         }
                     }
                     Divider().overlay(Palette.separator)
@@ -331,19 +348,13 @@ private struct LivePlayerContent: View {
             VStack(spacing: 18) {
                 Text("Are you still watching?").font(.title2.bold())
                 Text("The tuner will be released in \(state.stillWatchingSeconds) seconds.").multilineTextAlignment(.center)
-                Button("Keep watching") { model.controller.answerStillWatching(keepWatching: true) }
+                Button("Keep watching") { model.answerStillWatching(keepWatching: true) }
                     .buttonStyle(.borderedProminent).tint(Palette.burgundy)
-                Button("Stop watching") { model.controller.answerStillWatching(keepWatching: false) }
+                Button("Stop watching") { model.answerStillWatching(keepWatching: false) }
             }.padding(24).frame(maxWidth: 480)
         }
     }
 
-    private func icon(_ symbol: String, label: String, size: CGFloat = 20, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol).font(.system(size: size, weight: .semibold))
-                .frame(width: 48, height: 48).background(.black.opacity(0.2), in: Circle())
-        }.buttonStyle(.plain).accessibilityLabel(label)
-    }
 }
 
 /// The programme under the video (`LiveWatch`, `Pad2LiveWatchListings`): the

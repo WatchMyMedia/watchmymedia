@@ -463,6 +463,15 @@ when the call ends, it carries on (at live once the pause passed the buffer),
 and unplugged headphones pause it. A stream that refuses the media token gets
 a new one on the same tuner, as films do, before it reports a lost signal.
 
+On iPhone and iPad the film and Live TV players share one shell
+(`App/Screens/Player/PlayerShell.swift`, PLAN-APPLE-REVIEW.md §5.3): the status
+bar and home indicator hidden, the scene phase and Picture in Picture (2 s for
+it to start by itself in the background, `PlayerChromeModel.pictureInPictureGraceMs`),
+the safe area for the camera housing, and controls that hide 3 s after the last
+touch while playing (`ControlsAutoHide`, tested in the Kit; up for VoiceOver,
+and for Channels and the Quality menu on Live TV). `-playerKeepControls` keeps
+either player's controls up for screenshots and UI tests.
+
 Quality is fixed at 1080p, 720p, 480p or 360p. Mobile data caps Live TV at 720p,
 including when the connection changes during playback. AirPlay and Picture in
 Picture use the live player; backgrounding without either stops the live session.

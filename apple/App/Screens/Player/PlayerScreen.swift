@@ -25,9 +25,6 @@ struct PlayerScreen: View {
             Color.black.ignoresSafeArea()
             if let model, let episodes { PlayerContent(model: model, episodes: episodes) }
         }
-        .statusBarHidden()
-        .persistentSystemOverlays(.hidden)
-        .landscapeWhileShown()
         .onAppear(perform: begin)
         .onDisappear { model?.dispose() }
     }
@@ -49,51 +46,23 @@ struct PlayerScreen: View {
     }
 }
 
-/// The screen around the video. It reads the model's steady state, which
-/// changes when something other than the position does; what ticks is read
-/// only by the small views that draw it (``PlayerClock``).
+/// The screen around the video, inside the players' shell. It reads the
+/// model's steady state, which changes when something other than the
+/// position does; what ticks is read only by the small views that draw it
+/// (``PlayerClock``).
 private struct PlayerContent: View {
     let model: PlayerChromeModel
     let episodes: PlayerEpisodesModel
     @State private var showsEpisodes = false
-    @State private var pictureInPicture = PictureInPicture()
     @Environment(AppServices.self) private var services
-    @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
     @Environment(\.horizontalSizeClass) private var horizontal
     @Environment(\.verticalSizeClass) private var vertical
 
     var body: some View {
-        let state = model.state
         let metrics = PlayerMetrics.for(horizontal: horizontal, vertical: vertical)
-        GeometryReader { geo in
-            let portrait = metrics.sidePanelPicker && geo.size.height > geo.size.width
-            let videoHeight = portrait ? geo.size.width * 9 / 16 : geo.size.height
-            let insets = PlayerInsets(portrait ? EdgeInsets(top: geo.safeAreaInsets.top, leading: 0, bottom: 0, trailing: 0) : geo.safeAreaInsets, metrics: metrics)
-            ZStack(alignment: .top) {
-                VStack(spacing: 0) {
-                    video(in: geo, insets: insets, metrics: metrics, portrait: portrait)
-                        .frame(height: videoHeight)
-                        .clipped()
-                    if portrait {
-                        PlayerPortraitDetails(model: model, episodes: episodes)
-                    }
-                }
-                if !pictureInPicture.isActive {
-                    overlay(state, insets: insets, metrics: metrics)
-                    if showsEpisodes, model.overlay == nil {
-                        PlayerEpisodesPanel(model: model, episodes: episodes) { showsEpisodes = false }
-                    }
-                }
-            }
-            .animation(.easeInOut(duration: 0.2), value: model.showsControls)
-            .animation(.easeInOut(duration: 0.2), value: model.showsUpNext)
-            .animation(.easeInOut(duration: 0.2), value: model.showsSkip)
-            .animation(.easeOut(duration: 0.25), value: model.overlay)
-            .animation(.easeOut(duration: 0.2), value: model.ripple)
-            .animation(.easeInOut(duration: 0.25), value: state.qualityNote)
+        PlayerShell(model: model, orientations: .landscape) { frame in
+            content(frame)
         }
-        .ignoresSafeArea()
         .task(id: "\(model.request.fileID)-\(metrics.sidePanelPicker)") {
             if metrics.sidePanelPicker { await episodes.load(for: model.request) }
         }
@@ -101,34 +70,48 @@ private struct PlayerContent: View {
             if !tablet { showsEpisodes = false }
         }
         .onChange(of: showsEpisodes) { _, open in
-            model.keepsControlsUp = open || voiceOver
+            model.hold("panel", open)
             model.showControls()
         }
         .onChange(of: model.overlay) { _, overlay in
             if overlay != nil { showsEpisodes = false }
         }
-        .onChange(of: scenePhase) { _, phase in
-            switch phase {
-            case .background:
-                model.enteredBackground(
-                    externalPlayback: model.controller.player?.isExternalPlaybackActive ?? false,
-                    pictureInPictureMayStart: pictureInPicture.mayStartAutomatically
-                )
-            case .active: model.becameActive()
-            default: break
-            }
-        }
-        .onChange(of: pictureInPicture.isActive) { _, active in
-            model.pictureInPictureChanged(active: active, appActive: scenePhase == .active)
-        }
-        .onChange(of: voiceOver, initial: true) { was, on in
-            if on || was != on { model.keepsControlsUp = on || showsEpisodes }
-        }
-        .accessibilityAction(.escape) { model.close() }
     }
 
-    private func video(in geo: GeometryProxy, insets: PlayerInsets, metrics: PlayerMetrics, portrait: Bool) -> some View {
+    private func content(_ frame: PlayerFrame) -> some View {
         let state = model.state
+        let metrics = frame.metrics
+        let pictureInPicture = frame.pictureInPicture
+        let portrait = metrics.sidePanelPicker && frame.tall
+        let insets = frame.insets(portrait: portrait)
+        return ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                video(in: frame, insets: insets, portrait: portrait)
+                    .frame(height: portrait ? frame.size.width * 9 / 16 : frame.size.height)
+                    .clipped()
+                if portrait {
+                    PlayerPortraitDetails(model: model, episodes: episodes)
+                }
+            }
+            if !pictureInPicture.isActive {
+                overlay(state, insets: insets, metrics: metrics)
+                if showsEpisodes, model.overlay == nil {
+                    PlayerEpisodesPanel(model: model, episodes: episodes) { showsEpisodes = false }
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: model.showsControls)
+        .animation(.easeInOut(duration: 0.2), value: model.showsUpNext)
+        .animation(.easeInOut(duration: 0.2), value: model.showsSkip)
+        .animation(.easeOut(duration: 0.25), value: model.overlay)
+        .animation(.easeOut(duration: 0.2), value: model.ripple)
+        .animation(.easeInOut(duration: 0.25), value: state.qualityNote)
+    }
+
+    private func video(in frame: PlayerFrame, insets: PlayerInsets, portrait: Bool) -> some View {
+        let state = model.state
+        let metrics = frame.metrics
+        let pictureInPicture = frame.pictureInPicture
         return ZStack {
                 PlayerVideo(
                     player: model.controller.player,
@@ -143,12 +126,12 @@ private struct PlayerContent: View {
                     // Taps on the video: show or hide the controls; double taps on a side seek.
                     Color.clear
                         .contentShape(Rectangle())
-                        .onTapGesture(coordinateSpace: .local) { model.tap(x: $0.x, width: geo.size.width + geo.safeAreaInsets.leading + geo.safeAreaInsets.trailing) }
+                        .onTapGesture(coordinateSpace: .local) { model.tap(x: $0.x, width: frame.fullWidth) }
                         .accessibilityHidden(true)
 
                     if let ripple = model.ripple {
                         SeekRipple(burst: ripple)
-                            .frame(width: geo.size.width * 0.4)
+                            .frame(width: frame.size.width * 0.4)
                             .frame(maxWidth: .infinity, alignment: ripple.zone == .back ? .leading : .trailing)
                             .transition(.opacity)
                     }
@@ -181,7 +164,7 @@ private struct PlayerContent: View {
                         NextEpisodeCard(
                             prompt: upNext,
                             clock: model.clock,
-                            width: metrics.sidePanelPicker ? min(400, geo.size.width * 0.48) : 320,
+                            width: metrics.sidePanelPicker ? min(400, frame.size.width * 0.48) : 320,
                             still: services.library.imageURL(upNext.next.stillPath, size: .w342),
                             onPlay: { model.playNext() },
                             onWatchCredits: { model.watchCredits() }

@@ -43,6 +43,105 @@ public final class PlayerClock {
     }
 }
 
+/// Whether a player's controls show, for the film player and the Live TV
+/// player alike (PLAN-APPLE-REVIEW.md §5.3): they hide by themselves
+/// ``hideDelayMs`` after the last input while the owner's rule allows it,
+/// counting from the later of that input and the moment the rule began to
+/// allow it (a long load doesn't hide them the moment playback starts), and
+/// stay while anything holds them up (VoiceOver, where there is nothing to
+/// tap blindly to bring them back; an open panel).
+@MainActor
+@Observable
+public final class ControlsAutoHide {
+    /// The controls hide this long after the last input.
+    public static let hideDelayMs = 3_000
+
+    public private(set) var visible = true
+    /// Why they are held up ("voiceOver", "panel"); empty when nothing holds them.
+    public private(set) var holds: Set<String> = []
+
+    /// The owner's rule: whether they may hide by themselves now (playing, nothing open).
+    @ObservationIgnored public var allows: @MainActor () -> Bool = { false }
+    @ObservationIgnored private let now: @MainActor () -> Int
+    @ObservationIgnored private let sleep: @MainActor (Duration) async throws -> Void
+    @ObservationIgnored private var lastInputMs = 0
+    @ObservationIgnored private var allowedSinceMs = 0
+    @ObservationIgnored private var allowed = false
+    @ObservationIgnored private var hideTask: Task<Void, Never>?
+
+    public init(now: @escaping @MainActor () -> Int, sleep: @escaping @MainActor (Duration) async throws -> Void) {
+        self.now = now
+        self.sleep = sleep
+    }
+
+    public var heldUp: Bool { !holds.isEmpty }
+
+    /// Holds the controls up for `reason`, or lets go of it.
+    public func hold(_ reason: String, _ on: Bool) {
+        guard holds.contains(reason) != on else { return }
+        if on { holds.insert(reason) } else { holds.remove(reason) }
+        if on { show() } else { refresh() }
+    }
+
+    /// When they hide by themselves (monotonic ms), or nil while they stay.
+    public var hideAtMs: Int? {
+        visible && autoHides ? max(lastInputMs, allowedSinceMs) + Self.hideDelayMs : nil
+    }
+
+    private var autoHides: Bool { holds.isEmpty && allows() }
+
+    /// A touch, a key or a button: the hide starts again from now.
+    public func noteInput() {
+        lastInputMs = now()
+        schedule()
+    }
+
+    public func show() {
+        visible = true
+        lastInputMs = now()
+        refresh()
+    }
+
+    public func toggle() {
+        visible.toggle()
+        lastInputMs = now()
+        refresh()
+    }
+
+    /// Hides them at once (Picture in Picture took the video).
+    public func hide() {
+        visible = false
+        refresh()
+    }
+
+    /// The owner's rule may say otherwise now.
+    public func refresh() {
+        let allowedNow = autoHides
+        if allowedNow, !allowed { allowedSinceMs = now() }
+        allowed = allowedNow
+        schedule()
+    }
+
+    public func cancel() {
+        hideTask?.cancel()
+        hideTask = nil
+    }
+
+    private func schedule() {
+        hideTask?.cancel()
+        guard let at = hideAtMs else { return }
+        let wait = at - now()
+        let sleep = sleep
+        hideTask = Task { [weak self] in
+            if wait > 0 {
+                do { try await sleep(.milliseconds(wait)) } catch { return }
+            }
+            guard let self, !Task.isCancelled, self.hideAtMs == at else { return }
+            self.visible = false
+        }
+    }
+}
+
 /// The player screen's own state around a ``PlaybackController``: whether the
 /// controls show (they hide 3 s after the last touch while the video plays),
 /// taps and double taps on the video, the scrubber's preview while dragging
@@ -56,7 +155,7 @@ public final class PlayerClock {
 @Observable
 public final class PlayerChromeModel {
     /// The controls hide this long after the last touch while playing.
-    public static let hideDelayMs = 3_000
+    public static let hideDelayMs = ControlsAutoHide.hideDelayMs
     /// A second tap within this long makes a double tap.
     public static let doubleTapMs = 300
     /// How long the "+30 s" stays after the last tap of a run.
@@ -77,7 +176,9 @@ public final class PlayerChromeModel {
     public let clock = PlayerClock()
     /// What plays now: the request the screen opened with, or the next episode once it started in place.
     public private(set) var request: PlayRequest
-    public private(set) var controlsVisible = true
+    /// Whether the controls show, and when they hide by themselves.
+    public let controls: ControlsAutoHide
+    public var controlsVisible: Bool { controls.visible }
     public private(set) var picker: PickerTab?
     /// The position under the scrubber's thumb while the viewer drags it.
     public private(set) var scrubMs: Int?
@@ -91,12 +192,18 @@ public final class PlayerChromeModel {
     public private(set) var pictureInPictureActive = false
     /// When the admin's stop message appeared, for its small print.
     public private(set) var stoppedAt: Date?
-    /// Holds the controls up (VoiceOver is running: there is nothing to tap blindly to bring them back).
-    public var keepsControlsUp = false {
-        didSet {
-            guard keepsControlsUp != oldValue else { return }
-            if keepsControlsUp { showControls() } else { refreshAutoHide() }
-        }
+    /// Holds the controls up (a launch argument for screenshots; the screen
+    /// holds them for VoiceOver and the episodes panel through ``controls``).
+    public var keepsControlsUp: Bool {
+        get { controls.holds.contains("kept") }
+        set { hold("kept", newValue) }
+    }
+
+    /// Holds the controls up for `reason` ("voiceOver", "panel"), or lets go.
+    public func hold(_ reason: String, _ on: Bool) {
+        let was = controls.heldUp
+        controls.hold(reason, on)
+        if controls.heldUp, !was { prefetchTiles(scrubbing: false) }
     }
     /// A seek's target, held under the thumb until the player gets there.
     private var heldMs: Int?
@@ -107,9 +214,6 @@ public final class PlayerChromeModel {
     @ObservationIgnored private let onExit: @MainActor () -> Void
     @ObservationIgnored private let now: @MainActor () -> Int
     @ObservationIgnored private let sleep: @MainActor (Duration) async throws -> Void
-    @ObservationIgnored private var lastInputMs = 0
-    @ObservationIgnored private var autoHideSinceMs = 0
-    @ObservationIgnored private var autoHid = false
     @ObservationIgnored private var lastStatus: PlayerStatus?
     @ObservationIgnored private var lastTrickplay: Trickplay?
     @ObservationIgnored private var seeker = DoubleTapSeek()
@@ -121,7 +225,6 @@ public final class PlayerChromeModel {
     @ObservationIgnored private var closedInBackground = false
     @ObservationIgnored private var finished = false
     @ObservationIgnored private var disposed = false
-    @ObservationIgnored private var hideTask: Task<Void, Never>?
     @ObservationIgnored private var tapTask: Task<Void, Never>?
     @ObservationIgnored private var rippleTask: Task<Void, Never>?
     @ObservationIgnored private var holdTask: Task<Void, Never>?
@@ -145,7 +248,10 @@ public final class PlayerChromeModel {
         self.now = now
         // Define this closure in the library, rather than copying an async
         // default argument into every caller (swiftlang/swift#92017).
-        self.sleep = sleep ?? { try await Task.sleep(for: $0) }
+        let sleep = sleep ?? { try await Task.sleep(for: $0) }
+        self.sleep = sleep
+        controls = ControlsAutoHide(now: now, sleep: sleep)
+        controls.allows = { [weak self] in self?.autoHides ?? false }
     }
 
     /// The controller's state now, for decisions (not for views: reading it follows every tick).
@@ -182,7 +288,7 @@ public final class PlayerChromeModel {
 
     /// Starts playing and listening to the controller.
     public func start() {
-        lastInputMs = now()
+        controls.noteInput()
         controller.start(request)
         let events = controller.events
         eventsTask = Task { [weak self] in
@@ -195,7 +301,8 @@ public final class PlayerChromeModel {
     public func dispose() {
         guard !disposed else { return }
         disposed = true
-        for task in [hideTask, tapTask, rippleTask, holdTask, eventsTask, backgroundTask, tileTask] { task?.cancel() }
+        controls.cancel()
+        for task in [tapTask, rippleTask, holdTask, eventsTask, backgroundTask, tileTask] { task?.cancel() }
         controller.stop()
         controller.release()
     }
@@ -213,8 +320,11 @@ public final class PlayerChromeModel {
         controller.start(request)
     }
 
-    /// How long to wait, in the background, for Picture in Picture to start by itself.
-    public static let pictureInPictureGraceMs = 1_500
+    /// How long to wait, in the background, for Picture in Picture to start
+    /// by itself: the film and the Live TV players both wait this long. 2 s,
+    /// the longer of the two they had (1.5 s and 2 s), so a slow device's
+    /// start isn't cut short; leaving without it ends half a second later.
+    public static let pictureInPictureGraceMs = 2_000
 
     /// The app went to the background. AirPlay (`externalPlayback`) and
     /// Picture in Picture keep playing; when Picture in Picture may still
@@ -255,7 +365,7 @@ public final class PlayerChromeModel {
         pictureInPictureActive = active
         if active {
             closePicker()
-            controlsVisible = false
+            controls.hide()
         } else if appActive {
             showControls()
         } else {
@@ -312,9 +422,7 @@ public final class PlayerChromeModel {
     public var bands: [ScrubberBand] { scrubberBands(state.segments, durationMs: state.timelineDurationMs) }
 
     /// When the controls hide by themselves (monotonic ms), or nil while they stay.
-    public var hideAtMs: Int? {
-        controlsVisible && autoHides ? max(lastInputMs, autoHideSinceMs) + Self.hideDelayMs : nil
-    }
+    public var hideAtMs: Int? { controls.hideAtMs }
 
     /// They hide by themselves only while playing or buffering, not while scrubbing or with the picker open.
     public static func autoHides(status: PlayerStatus, scrubbing: Bool, pickerOpen: Bool) -> Bool {
@@ -322,7 +430,7 @@ public final class PlayerChromeModel {
     }
 
     private var autoHides: Bool {
-        Self.autoHides(status: live.status, scrubbing: scrubMs != nil, pickerOpen: picker != nil) && !pictureInPictureActive && !keepsControlsUp
+        Self.autoHides(status: live.status, scrubbing: scrubMs != nil, pickerOpen: picker != nil) && !pictureInPictureActive
     }
 
     // MARK: - Touches
@@ -368,16 +476,12 @@ public final class PlayerChromeModel {
     }
 
     public func toggleControls() {
-        controlsVisible.toggle()
-        lastInputMs = now()
-        refreshAutoHide()
-        if controlsVisible { prefetchTiles(scrubbing: false) }
+        controls.toggle()
+        if controls.visible { prefetchTiles(scrubbing: false) }
     }
 
     public func showControls() {
-        controlsVisible = true
-        lastInputMs = now()
-        refreshAutoHide()
+        controls.show()
         prefetchTiles(scrubbing: false)
     }
 
@@ -557,8 +661,7 @@ public final class PlayerChromeModel {
 
     private func input() {
         controller.noteUserInput()
-        lastInputMs = now()
-        scheduleHide()
+        controls.noteInput()
     }
 
     private func finish() {
@@ -626,26 +729,7 @@ public final class PlayerChromeModel {
         if done != nil, online.error == nil { closePicker() }
     }
 
-    private func refreshAutoHide() {
-        let allowed = autoHides
-        if allowed, !autoHid { autoHideSinceMs = now() }
-        autoHid = allowed
-        scheduleHide()
-    }
-
-    private func scheduleHide() {
-        hideTask?.cancel()
-        guard let at = hideAtMs else { return }
-        let wait = at - now()
-        let sleep = sleep
-        hideTask = Task { [weak self] in
-            if wait > 0 {
-                do { try await sleep(.milliseconds(wait)) } catch { return }
-            }
-            guard let self, !Task.isCancelled, self.hideAtMs == at else { return }
-            self.controlsVisible = false
-        }
-    }
+    private func refreshAutoHide() { controls.refresh() }
 
     /// Gestures and their delayed feedback belong to one file, never its successor.
     private func resetSeekInteraction() {
