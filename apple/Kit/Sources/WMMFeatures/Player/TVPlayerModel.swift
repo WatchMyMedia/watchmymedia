@@ -284,7 +284,11 @@ public final class TVPlayerModel {
             // An admin's stop shows its message first; Back leaves.
             if state.stopMessage == nil { finish() }
         case .startedNext(let fileID):
-            request = PlayRequest(fileID: fileID, title: state.title, subtitle: state.subtitle, backdropPath: state.backdropPath)
+            // The still and poster too, so a retry keeps the episode's Now Playing picture.
+            request = PlayRequest(
+                fileID: fileID, title: state.title, subtitle: state.subtitle,
+                backdropPath: state.backdropPath, stillPath: state.stillPath, posterPath: state.posterPath
+            )
         }
     }
 
