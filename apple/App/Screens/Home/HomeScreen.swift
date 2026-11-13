@@ -127,7 +127,7 @@ private struct HomeView: View {
                     .buttonStyle(PrimaryButtonStyle())
                     .accessibilityIdentifier("homeOpenWeb")
             }
-            Button("Check again") { Task { await model.refresh() } }
+            Button(checkAgainTitle) { Task { await model.refresh() } }
                 .buttonStyle(GoldTextButtonStyle())
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("homeCheckAgain")
@@ -355,7 +355,7 @@ private struct HomeView: View {
         .padding(.trailing, 40)
         // Above the home indicator, since the screens run under it.
         .padding(.bottom, 16)
-        .accessibilityLabel("Next row: \(name)")
+        .accessibilityLabel(nextRowLabel(name))
         .accessibilityHint("Shows that row")
         .accessibilityIdentifier("homeNextRow-\(index - 1)")
     }
@@ -392,51 +392,26 @@ private struct HomeView: View {
                 heroCard(hero, home: home).padding(.horizontal, margin)
             }
             if !home.continueWatching.isEmpty && (!sideBySide || home.hero == nil || showAllContinue) {
-                CardRow("Continue watching", spacing: wide ? 18 : 12) {
-                    ForEach(home.continueWatching) { item in
-                        Button { model.resume(item) } label: {
-                            WideCard(title: item.title, subtitle: item.remainingLine, imageURL: url(item.stillPath ?? item.backdropPath, .w780), seed: item.title, width: wideCardWidth) {
-                                ProgressStrip(progress: item.progress).pinned(.bottom, padding: 0)
-                            }
-                        }
-                        .buttonStyle(CardButtonStyle())
-                        .accessibilityHint("Resumes playing")
-                        .contextMenu {
-                            if let target = item.watchTarget {
-                                WatchToggleButton(watched: false) { await model.setWatched(target, $0) }
-                            }
-                            if item.pageRoute != nil {
-                                Button { model.openPage(of: item) } label: { Label(item.pageLabel, systemImage: "info.circle") }
-                            }
-                        }
-                    }
+                CardRow(continueWatchingTitle, spacing: wide ? 18 : 12) {
+                    ForEach(home.continueWatching) { item in ContinueCard(item: item, actions: rowActions, width: wideCardWidth) }
                 }
             }
             // With listings, On now follows Continue watching (LiveHome); without, L8's channel row stays at the top.
             LiveOnNowRow()
             if !home.recentlyAddedShows.isEmpty {
-                posterRow("Recently added", detail: "TV Shows", items: home.recentlyAddedShows, library: .tvShows)
+                posterRow(recentlyAddedTitle, detail: tvShowsDetail, items: home.recentlyAddedShows, library: .tvShows)
             }
             if !home.recentlyAired.isEmpty {
-                CardRow("Recently aired", detail: "Episodes", spacing: wide ? 18 : 12) {
-                    ForEach(home.recentlyAired) { episode in airedCard(episode) }
+                CardRow(recentlyAiredTitle, detail: episodesDetail, spacing: wide ? 18 : 12) {
+                    ForEach(home.recentlyAired) { episode in EpisodeRowCard(episode: episode, actions: rowActions, width: wideCardWidth) }
                 }
             }
             if !home.recentlyAddedMovies.isEmpty {
-                posterRow("Recently added", detail: "Movies", items: home.recentlyAddedMovies, library: .movies)
+                posterRow(recentlyAddedTitle, detail: moviesDetail, items: home.recentlyAddedMovies, library: .movies)
             }
             if !home.recentlyReleased.isEmpty {
-                CardRow("Recently released", detail: "Movies", spacing: wide ? 18 : 12, seeAll: seeAll(.movies)) {
-                    ForEach(home.recentlyReleased) { item in
-                        Button { model.open(item) } label: {
-                            WideCard(title: item.title, imageURL: url(item.backdropPath, .w780), seed: item.title, width: wideCardWidth) {
-                                if let date = formatDate(item.releaseDate) { Badge(date).pinned(.bottomLeading) }
-                                if item.watched { WatchedCheck().pinned(.bottomTrailing) }
-                            }
-                        }
-                        .buttonStyle(CardButtonStyle())
-                        .contextMenu { watchMenu(item) }
-                    }
+                CardRow(recentlyReleasedTitle, detail: moviesDetail, spacing: wide ? 18 : 12, seeAll: seeAll(.movies)) {
+                    ForEach(home.recentlyReleased) { item in WideItemCard(item: item, actions: rowActions, width: wideCardWidth) }
                 }
             }
             VStack(alignment: .leading, spacing: 12) {
@@ -514,7 +489,7 @@ private struct HomeView: View {
     private func continuePanel(_ items: [ContinueItem], counter: String? = nil, limit: Int = 3) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Continue watching").scaledFont(20, weight: .semibold).foregroundStyle(Palette.text)
+                Text(continueWatchingTitle).scaledFont(20, weight: .semibold).foregroundStyle(Palette.text)
                 if let counter { Text(counter).scaledFont(13).foregroundStyle(Palette.muted).lineLimit(1) }
                 Spacer(minLength: 4)
                 if counter == nil {
@@ -537,15 +512,8 @@ private struct HomeView: View {
                     }
                 }
                 .buttonStyle(CardButtonStyle())
-                .accessibilityHint("Resumes playing")
-                .contextMenu {
-                    if let target = item.watchTarget {
-                        WatchToggleButton(watched: false) { await model.setWatched(target, $0) }
-                    }
-                    if item.pageRoute != nil {
-                        Button { model.openPage(of: item) } label: { Label(item.pageLabel, systemImage: "info.circle") }
-                    }
-                }
+                .accessibilityHint(resumesPlayingHint)
+                .contextMenu { ContinueWatchingMenu(item: item, actions: rowActions) }
             }
             Spacer(minLength: 0)
         }
@@ -564,41 +532,7 @@ private struct HomeView: View {
 
     private func posterRow(_ title: String, detail: String, items: [BrowseItem], library: AppTab) -> some View {
         CardRow(title, detail: detail, spacing: wide ? 16 : 10, seeAll: seeAll(library)) {
-            ForEach(items) { item in
-                Button { model.open(item) } label: {
-                    PosterCard(item: item, imageURL: url(item.posterPath, .w342), width: wide ? 150 : 110)
-                }
-                .buttonStyle(CardButtonStyle())
-                .contextMenu { watchMenu(item) }
-            }
-        }
-    }
-
-    private func airedCard(_ episode: EpisodeCard) -> some View {
-        Button { model.open(episode) } label: {
-            WideCard(title: episode.showTitle, subtitle: episode.airedLine(), imageURL: url(episode.stillPath ?? episode.showBackdropPath, .w780), seed: episode.showTitle, width: wideCardWidth) {
-                if episode.isNew { Badge("New", style: .gold).pinned(.topLeading) }
-                if !episode.hasFile {
-                    Badge("Not in library", style: .warning).pinned(.topTrailing)
-                } else if episode.watched {
-                    WatchedCheck().pinned(.topTrailing)
-                }
-                Badge(episode.codeBadge).pinned(.bottomLeading)
-            }
-        }
-        .buttonStyle(CardButtonStyle())
-        .accessibilityHint("Opens the episode")
-        .contextMenu {
-            if episode.playRequest != nil {
-                Button { model.play(episode) } label: { Label("Play", systemImage: "play.fill") }
-            }
-            WatchToggleButton(watched: episode.watched) { await model.setWatched(.episode(id: episode.episodeID), $0) }
-        }
-    }
-
-    @ViewBuilder private func watchMenu(_ item: BrowseItem) -> some View {
-        if let target = item.watchTarget {
-            WatchToggleButton(watched: item.watched) { await model.setWatched(target, $0) }
+            ForEach(items) { item in PosterItemCard(item: item, actions: rowActions, width: wide ? 150 : 110) }
         }
     }
 }
