@@ -144,23 +144,27 @@ private fun UiDevice.closeCardMenu() {
 
 /**
  * Flings the list [find] finds along and back to its start, as a person
- * scanning it would. The list is found again for each fling: a fling back
- * past the top pulls to refresh, which can replace what was found.
+ * scanning it would. The list found is kept while it lasts and found again
+ * once it goes stale (a fling back past the top pulls to refresh, which can
+ * replace it): every search walks the window's accessibility tree, which the
+ * app builds on its main thread, and searching around every fling held up
+ * the fling's own touches long enough for an ANR on a busy emulator.
  */
 private fun UiDevice.scan(forward: Direction, back: Direction, find: UiDevice.() -> UiObject2?) {
+    var list: UiObject2? = null
     fun fling(direction: Direction) {
         repeat(3) {
             try {
-                val list = find() ?: return
+                val target = list ?: find()?.also { list = it } ?: return
                 // Clear of the system's edge gestures, and along the fling only: a margin across a short row
                 // leaves a swipe of a few pixels, which is a tap on whatever card is under it.
-                val height = list.visibleBounds.height()
+                val height = target.visibleBounds.height()
                 val across = if (direction == Direction.LEFT || direction == Direction.RIGHT) height / 4 else height / 5
-                list.setGestureMargins(displayWidth / 5, across, displayWidth / 5, across)
-                list.fling(direction)
-                closeCardMenu()
+                target.setGestureMargins(displayWidth / 5, across, displayWidth / 5, across)
+                target.fling(direction)
                 return
             } catch (_: StaleObjectException) {
+                list = null
                 waitForIdle()
             }
         }
@@ -170,6 +174,7 @@ private fun UiDevice.scan(forward: Direction, back: Direction, find: UiDevice.()
     // One more than forward: a fling back can stop short of the start.
     repeat(3) { fling(back) }
     waitForIdle()
+    closeCardMenu()
 }
 
 /** What the app opens on. */
