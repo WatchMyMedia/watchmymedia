@@ -7,8 +7,10 @@ import WMMUI
 /// permission and conflicts; a request is never started by opening the sheet.
 struct LiveRecordControls: View {
     let programme: LiveProgramme
+    let channel: LiveChannel
     let now: Date
     @Environment(LiveRecordingsStore.self) private var recordings
+    @Environment(LiveExtrasStore.self) private var extras
     @Environment(Navigator.self) private var navigator
     @State private var choosing = false
     @State private var options = false
@@ -18,9 +20,10 @@ struct LiveRecordControls: View {
     /// After Keep: "Coastline Rescue stays under Won’t record in Recordings."
     @State private var kept: (programmeID: String, note: String)?
     var body: some View {
-        if recordings.available, !programme.hasEnded(at: now) {
+        // What it offers is decided once, for every menu (LiveProgrammeActions).
+        if let recording = actions.recording {
             VStack(spacing: 10) {
-                controls
+                controls(recording)
                 if let kept, kept.programmeID == programme.id {
                     Text(kept.note).font(.footnote).foregroundStyle(Palette.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("live-clash-kept")
@@ -33,49 +36,52 @@ struct LiveRecordControls: View {
             }
         }
     }
-    @ViewBuilder private var controls: some View {
-            let mark = recordings.mark(for: programme)
-            if let mark, mark.state.marked {
+    private var actions: LiveProgrammeActions {
+        LiveProgrammeActions(programme, on: channel, now: now, extras: extras, recordings: recordings)
+    }
+    @ViewBuilder private func controls(_ recording: LiveProgrammeActions.Recording) -> some View {
+            switch recording {
+            case .marked(let mark):
                 HStack(spacing: 12) {
                     RecordingMark(mark, compact: false).frame(maxWidth: .infinity, alignment: .leading)
-                    if mark.state == .recording {
-                        Button("Watch from the start") {
-                            navigator.play(.init(fileID: 0, startMs: 0, title: programme.title, subtitle: programme.episodeLine, recordingID: mark.id))
+                    if let recordingNow = actions.recordingNow {
+                        Button(liveWatchFromTheStart) {
+                            navigator.play(.init(fileID: 0, startMs: 0, title: programme.title, subtitle: programme.episodeLine, recordingID: recordingNow.id))
                         }.buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
                     }
-                    if mark.canCancel && mark.state.mayCancel {
-                        Button(mark.state == .recording ? "Stop" : "Don’t record") {
+                    if let cancel = actions.cancel {
+                        Button(liveCancelRecordingTitle(cancel.state, short: true)) {
                             let id = programme.id
-                            Task { await recordings.cancel(mark, programmeID: id); failure = recordings.message.map { (id, $0) } }
+                            Task { await recordings.cancel(cancel, programmeID: id); failure = recordings.message.map { (id, $0) } }
                         }
                             .buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
-                            .disabled(recordings.changing.contains(mark.id))
+                            .disabled(recordings.changing.contains(cancel.id))
                     }
-                    if mark.state == .conflict { Button("Resolve") { navigator.open(.liveRecordings) } }
+                    if actions.clashes { Button("Resolve") { navigator.open(.liveRecordings) } }
                 }
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("live-recording-status")
-            } else {
+            case .record(let rest, let asks, let note):
                 // "Already recorded", "Not a new episode": said, and Record is still offered.
-                if let note = mark?.note {
+                if let note {
                     Text(note).font(.subheadline).foregroundStyle(Palette.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("live-recording-note")
                 }
                 // A programme of a series asks which; a film or a special records at once.
-                Button { if programme.seriesKey != nil { choosing = true } else { save(.init()) } } label: {
-                    Label(programme.isOn(at: now) ? "Record the rest" : "Record", systemImage: "record.circle")
+                Button { if asks { choosing = true } else { save(.init()) } } label: {
+                    Label(liveRecordTitle(rest: rest), systemImage: "record.circle")
                 }
                 .buttonStyle(GhostButtonStyle(height: 48))
                 .disabled(recordings.changing.contains(programme.id))
                 .accessibilityIdentifier("live-record")
-                .confirmationDialog("Record \(programme.title)", isPresented: $choosing, titleVisibility: .visible) {
-                    Button("Just this episode") { save(.init()) }
-                    Button("Every new episode") { save(.init(series: true)) }
-                    Button("Options…") { options = true }
+                .confirmationDialog(liveRecordHeading(programme.title), isPresented: $choosing, titleVisibility: .visible) {
+                    Button(liveRecordJustThisEpisode) { save(.init()) }
+                    Button(liveRecordEveryNewEpisode) { save(.init(series: true)) }
+                    Button(liveRecordOptionsChoice) { options = true }
                     Button("Cancel", role: .cancel) {}
                 } message: { Text("A recording takes a tuner from live viewing if needed.") }
                 .sheet(isPresented: $options) {
-                    LiveRecordingOptionsSheet(title: programme.title, allowsSeries: programme.seriesKey != nil) { save($0) }
+                    LiveRecordingOptionsSheet(title: programme.title, form: .programme(programme)) { save($0) }
                 }
             }
             if let failure, failure.programmeID == programme.id {
@@ -161,7 +167,7 @@ struct LiveRecordingClashSheet: View {
     private func giveWay(_ holder: LiveRecordingHolder) async {
         failure = nil
         guard let updated = await recordings.prefer(clash.recording, over: holder) else {
-            failure = recordings.message ?? "Couldn’t change the recording. Try again."
+            failure = recordings.message ?? liveRecordingChangeFailed
             return
         }
         // The plan may have moved on meanwhile: show what holds the tuners now.
@@ -172,39 +178,38 @@ struct LiveRecordingClashSheet: View {
 
 struct LiveRecordingOptionsSheet: View {
     let title: String
-    var allowsSeries = true
-    var allowsServerPadding = true
-    var initial = LiveRecordingOptions()
+    /// Which parts the form shows, and what it starts with (LiveRecordingForm).
+    let form: LiveRecordingForm
     let save: (LiveRecordingOptions) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var options = LiveRecordingOptions()
     var body: some View {
+        let shown = LiveRecordingForm(options: options, like: form)
         NavigationStack {
             Form {
                 Section(title) {
-                    if allowsSeries { Toggle("Record the series", isOn: $options.series) }
-                    if options.series {
-                        Toggle("New episodes only", isOn: $options.newOnly)
-                        Toggle("Any channel", isOn: $options.anyChannel)
-                        Picker("Keep", selection: $options.keep) {
-                            Text("All recordings").tag(0)
-                            ForEach(1...10, id: \.self) { Text("The latest \($0)").tag($0) }
+                    if form.offersSeries { Toggle("Record the series", isOn: $options.series) }
+                    if shown.showsSeriesSettings {
+                        Toggle(liveNewEpisodesOnly, isOn: $options.newOnly)
+                        Toggle(liveAnyChannel, isOn: $options.anyChannel)
+                        Picker(liveKeepTitle, selection: $options.keep) {
+                            ForEach(LiveRecordingForm.keepChoices, id: \.self) { Text(liveKeepChoice($0)).tag($0) }
                         }
                     }
                 }
                 Section("Padding") {
-                    if allowsServerPadding { Toggle("Use server padding defaults", isOn: $options.useServerPadding) }
-                    if !options.useServerPadding {
-                        Picker("Start early", selection: $options.padBefore) {
-                            ForEach(LiveRecordingOptions.paddingChoices, id: \.self) { Text("\($0) min").tag($0) }
+                    if form.offersServerPadding { Toggle(liveUseServerPadding, isOn: $options.useServerPadding) }
+                    if shown.showsPadding {
+                        Picker(liveStartEarly, selection: $options.padBefore) {
+                            ForEach(LiveRecordingForm.paddingChoices, id: \.self) { Text(livePaddingChoice($0)).tag($0) }
                         }
-                        Picker("End late", selection: $options.padAfter) {
-                            ForEach(LiveRecordingOptions.paddingChoices, id: \.self) { Text("\($0) min").tag($0) }
+                        Picker(liveEndLate, selection: $options.padAfter) {
+                            ForEach(LiveRecordingForm.paddingChoices, id: \.self) { Text(livePaddingChoice($0)).tag($0) }
                         }
                     }
                 }
-                if options.keep > 0 {
-                    Section { Text("The oldest by air time are deleted, watched or not. Only recordings from this rule are removed.").foregroundStyle(Palette.muted) }
+                if shown.showsKeepNote {
+                    Section { Text(liveKeepNote).foregroundStyle(Palette.muted) }
                 }
             }
             .scrollContentBackground(.hidden).groundBackground()
@@ -214,7 +219,7 @@ struct LiveRecordingOptionsSheet: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save(options); dismiss() }.fontWeight(.semibold) }
             }
         }
-        .onAppear { options = initial }
+        .onAppear { options = form.options }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .preferredColorScheme(.dark)
@@ -242,7 +247,7 @@ struct LiveRecordingsScreen: View {
                     sectionView(section)
                 }
                 if recordings.pages.values.allSatisfy({ $0.items.isEmpty && $0.rules.isEmpty }), recordings.loading.isEmpty {
-                    plain { ContentUnavailableView("No recordings", systemImage: "record.circle", description: Text("Choose Record in the guide or make a recording by channel and time.")) }
+                    plain { ContentUnavailableView(liveNoRecordings, systemImage: "record.circle", description: Text("Choose Record in the guide or make a recording by channel and time.")) }
                 }
                 plain {
                     Text("Recordings go into your library. The server must be awake when they start. Set folders and access in the server’s web app, under Settings › Live TV › Recordings.")
@@ -250,7 +255,7 @@ struct LiveRecordingsScreen: View {
                 }
                 if compact { plain { Button("New recording") { manual = true }.buttonStyle(PrimaryButtonStyle()) } }
             } else {
-                plain { ContentUnavailableView("Recording isn’t available", systemImage: "record.circle", description: Text("Ask the server’s admin to enable recording and allow your account.")) }
+                plain { ContentUnavailableView(liveRecordingUnavailable, systemImage: "record.circle", description: Text("Ask the server’s admin to enable recording and allow your account.")) }
             }
         }
         .listStyle(.insetGrouped)
@@ -271,17 +276,15 @@ struct LiveRecordingsScreen: View {
         .sheet(item: $deleting) { item in LiveRecordingDeleteSheet(recording: item) }
         .sheet(item: $clash) { LiveRecordingClashSheet(clash: $0) }
         .sheet(item: $editingRule) { rule in
-            LiveRecordingOptionsSheet(title: rule.title, allowsSeries: rule.kind == "series", allowsServerPadding: false,
-                                      initial: .init(series: rule.kind == "series", newOnly: rule.newOnly, anyChannel: rule.anyChannel, keep: rule.keep, padBefore: rule.padBefore, padAfter: rule.padAfter, useServerPadding: false)) { value in
+            LiveRecordingOptionsSheet(title: rule.title, form: .rule(rule)) { value in
                 Task { await recordings.edit(rule, options: value) }
             }
         }
         .sheet(item: $editing) { item in
-            LiveRecordingOptionsSheet(title: item.title, allowsSeries: false, allowsServerPadding: false,
-                                      initial: .init(padBefore: item.padBefore, padAfter: item.padAfter, useServerPadding: false)) { value in Task { await recordings.edit(item, options: value) } }
+            LiveRecordingOptionsSheet(title: item.title, form: .recording(item)) { value in Task { await recordings.edit(item, options: value) } }
         }
         .alert("Stop recording this series?", isPresented: Binding(get: { removeRule != nil }, set: { if !$0 { removeRule = nil } }), presenting: removeRule) { rule in
-            Button("Stop series", role: .destructive) { Task { await recordings.remove(rule) } }
+            Button(liveStopSeries, role: .destructive) { Task { await recordings.remove(rule) } }
             Button("Cancel", role: .cancel) {}
         } message: { _ in Text("Upcoming episodes are cancelled. Recordings already made stay in the library.") }
         .messageToast(Binding(get: { recordings.message }, set: { recordings.message = $0 }))
@@ -295,9 +298,9 @@ struct LiveRecordingsScreen: View {
     @ViewBuilder private func sectionView(_ section: LiveRecordingSection) -> some View {
         let page = recordings.page(section)
         if let error = recordings.errors[section] {
-            plain { ErrorState(title: "Couldn’t load \(section.title.lowercased())", message: error) { await recordings.load(section, force: true) } }
+            plain { ErrorState(title: liveRecordingsFailed(section), message: error) { await recordings.load(section, force: true) } }
         } else if recordings.loading.contains(section) && page == nil {
-            plain { ProgressView("Loading \(section.title.lowercased())").frame(maxWidth: .infinity) }
+            plain { ProgressView(liveRecordingsLoading(section)).frame(maxWidth: .infinity) }
         } else if let page, !page.items.isEmpty || !page.rules.isEmpty {
             Section {
                 ForEach(page.items) { item in recordingRow(item).listRowBackground(Palette.surface) }
@@ -308,15 +311,15 @@ struct LiveRecordingsScreen: View {
                         if rule.canCancel {
                             HStack {
                                 Button("Edit") { editingRule = rule }
-                                Button("Stop series", role: .destructive) { removeRule = rule }
+                                Button(liveStopSeries, role: .destructive) { removeRule = rule }
                             }.buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
-                        } else { Text("Set by \(rule.userName)").font(.caption).foregroundStyle(Palette.muted) }
+                        } else { Text(liveSetBy(rule.userName)).font(.caption).foregroundStyle(Palette.muted) }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 6)
                     .listRowBackground(Palette.surface)
                 }
                 if page.nextCursor != nil {
-                    Button("Load more") { Task { await recordings.load(section, more: true) } }
+                    Button(liveLoadMore) { Task { await recordings.load(section, more: true) } }
                         .buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
                         .disabled(recordings.loading.contains(section))
                         .listRowBackground(Palette.surface)
@@ -334,9 +337,9 @@ struct LiveRecordingsScreen: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.title).font(.headline)
                     if let line = item.episodeLine { Text(line).font(.subheadline).foregroundStyle(Palette.textSecondary) }
-                    Text("\(LiveClock.device.weekdayName(item.start)) \(LiveClock.device.range(item.start, item.end)) · \(item.number)")
+                    Text(liveRecordingWhen(item))
                         .font(.caption).foregroundStyle(Palette.muted)
-                    if !item.canCancel && !item.userName.isEmpty { Text("Set by \(item.userName)").font(.caption).foregroundStyle(Palette.muted) }
+                    if !item.canCancel && !item.userName.isEmpty { Text(liveSetBy(item.userName)).font(.caption).foregroundStyle(Palette.muted) }
                 }
                 Spacer(minLength: 0)
             }
@@ -352,33 +355,32 @@ struct LiveRecordingsScreen: View {
         }
         .padding(.vertical, 6).frame(maxWidth: .infinity, alignment: .leading)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if item.canCancel && item.state.mayCancel {
-                Button(swipeTitle(item), role: .destructive) { Task { await recordings.cancel(item.mark, programmeID: item.programmeID) } }
+            let actions = item.actions
+            if actions.cancel {
+                Button(actions.swipeTitle, role: .destructive) { Task { await recordings.cancel(item.mark, programmeID: item.programmeID) } }
             }
         }
         .accessibilityElement(children: .contain).accessibilityIdentifier("recording-\(item.id)")
     }
-    /// The swipe's words: "Stop recording", "Skip this one" for a series' episode, else "Don’t record".
-    private func swipeTitle(_ item: LiveRecording) -> String {
-        item.state == .recording ? "Stop recording" : item.ruleID != nil ? "Skip this one" : "Don’t record"
-    }
+    /// What a row offers is decided once, for both apps (LiveRecordingActions).
     @ViewBuilder private func actions(_ item: LiveRecording) -> some View {
-        if item.playable {
-            Button(item.state == .recording ? "Watch from the start" : "Watch") { navigator.play(item.playRequest(fromStart: item.state == .recording)) }
+        let actions = item.actions
+        if let watch = actions.watch {
+            Button(watch == .fromStart ? liveWatchFromTheStart : "Watch") { navigator.play(item.playRequest(fromStart: watch == .fromStart)) }
                 .buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
         }
-        if item.canDelete && [.done, .partial].contains(item.state) {
+        if actions.delete {
             Button("Delete", role: .destructive) { deleting = item }.buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
         }
-        if item.canCancel && item.state.mayCancel {
-            if item.state == .conflict {
-                // The same choice as when it was set: which holder gives way.
-                Button("Record this instead") {
-                    if item.conflictsWith.isEmpty { Task { await recordings.prefer(item) } } else { clash = LiveRecordingClash(item) }
-                }.buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
-            }
-            if item.state == .scheduled { Button("Edit") { editing = item }.buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold))) }
-            Button(item.state == .recording ? "Stop recording" : "Don’t record") { Task { await recordings.cancel(item.mark, programmeID: item.programmeID) } }
+        if actions.recordInstead {
+            // The same choice as when it was set: which holder gives way.
+            Button(liveRecordThisInstead) {
+                if item.conflictsWith.isEmpty { Task { await recordings.prefer(item) } } else { clash = LiveRecordingClash(item) }
+            }.buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
+        }
+        if actions.edit { Button("Edit") { editing = item }.buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold))) }
+        if actions.cancel {
+            Button(actions.cancelTitle) { Task { await recordings.cancel(item.mark, programmeID: item.programmeID) } }
                 .buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
                 .disabled(recordings.changing.contains(item.id))
         }
@@ -444,12 +446,12 @@ struct LiveRecordingDeleteSheet: View {
         NavigationStack {
             Form {
                 Section(recording.title) {
-                    Text("This permanently deletes the file WatchMyMedia recorded. Your watch history and the series rule stay.")
-                    Toggle("Don’t record it again", isOn: $doNotRecordAgain)
+                    Text(liveDeleteRecordingNote)
+                    Toggle(liveDontRecordAgain, isOn: $doNotRecordAgain)
                 }
                 if let message = recordings.message { Section { Text(message).foregroundStyle(Palette.warning) } }
                 Section {
-                    Button("Delete recording", role: .destructive) {
+                    Button(liveDeleteRecording, role: .destructive) {
                         Task { if await recordings.deleteFile(recording, recordAgain: !doNotRecordAgain) { dismiss() } }
                     }.disabled(recordings.changing.contains(recording.id))
                 }

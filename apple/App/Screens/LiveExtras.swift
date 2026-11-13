@@ -443,6 +443,8 @@ struct LiveSearchRow: View {
 
     @ViewBuilder private func action(onNow: Bool, reminded: Bool) -> some View {
         let label = liveSearchActionLabel(hit, reminded: reminded, now: now)
+        // Search's board offers one button: Watch while it is on, else the bell (LiveProgrammeActions).
+        let reminder = LiveProgrammeActions(hit.programme, on: hit.channel, now: now, extras: extras).reminder
         if onNow {
             Button { navigator.playLive(.init(channel: hit.channel)) } label: {
                 Image(systemName: "play.fill").font(.system(size: 15)).foregroundStyle(.white)
@@ -451,14 +453,14 @@ struct LiveSearchRow: View {
                     .overlay(Circle().strokeBorder(Palette.burgundyEdge))
             }
             .buttonStyle(.plain).accessibilityLabel(label).disabled(!hit.channel.available)
-        } else if reminded {
+        } else if reminder == .set {
             Button { Task { await extras.removeReminder(for: hit.programme) } } label: {
                 Image(systemName: "bell.fill").font(.system(size: 16)).foregroundStyle(Palette.gold)
                     .frame(width: 44, height: 44).background(Palette.gold.opacity(0.16), in: Circle())
             }
             .buttonStyle(.plain).accessibilityLabel(label).accessibilityAddTraits(.isSelected)
             .accessibilityIdentifier("live-search-bell-set")
-        } else if extras.canRemind(hit.programme) {
+        } else if reminder == .offered {
             Button { remind?(hit.programme, on: hit.channel) } label: {
                 Image(systemName: "bell").font(.system(size: 16)).foregroundStyle(Palette.text)
                     .frame(width: 44, height: 44).background(.white.opacity(0.12), in: Circle())

@@ -672,7 +672,9 @@ struct LiveSelectedCard: View {
             .accessibilityHint("Shows the programme's details")
             .accessibilityIdentifier("live-selected-card")
             HStack(spacing: 10) {
-                if let programme, programme.start > now, extras.isReminded(programme) {
+                // What it offers is decided once, for every menu (LiveProgrammeActions).
+                let reminder = programme.flatMap { LiveProgrammeActions($0, on: channel, now: now, extras: extras).reminder }
+                if let programme, reminder == .set {
                     // Reminder set, or where it moved to; the details have Remove.
                     let moved = extras.reminder(for: programme).flatMap { $0.state == .moved ? $0 : nil }
                     Button(action: showDetails) {
@@ -684,12 +686,12 @@ struct LiveSelectedCard: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("live-card-reminder-set")
                     watchNow(programme)
-                } else if let programme, programme.start > now, extras.canRemind(programme) {
+                } else if let programme, reminder == .offered {
                     Button { remind?(programme, on: channel) } label: { Label(liveRemindMe, systemImage: "bell") }
                         .buttonStyle(GhostButtonStyle(height: 44))
                         .accessibilityIdentifier("live-card-remind")
                     watchNow(programme)
-                } else if let programme, programme.start > now {
+                } else if let programme, reminder == .unavailable {
                     Text(liveOnAt(channel, programme: programme, now: now)).font(.subheadline.weight(.semibold))
                     Spacer()
                     watchNow(programme)
@@ -800,17 +802,19 @@ struct LiveProgrammeDetails: View {
             }
             Divider().overlay(Palette.separator)
             VStack(spacing: 10) {
-                if let programme { LiveRecordControls(programme: programme, now: now) }
+                if let programme { LiveRecordControls(programme: programme, channel: channel, now: now) }
                 if let programme, programme.start > now, let reminder = extras.reminder(for: programme), reminder.state != .gone {
                     LiveReminderStatus(reminder: reminder, now: now)
                 }
                 HStack(spacing: 12) {
-                    if let programme, programme.start > now, extras.isReminded(programme) {
+                    // What it offers is decided once, for every menu (LiveProgrammeActions).
+                    let reminder = programme.flatMap { LiveProgrammeActions($0, on: channel, now: now, extras: extras).reminder }
+                    if let programme, reminder == .set {
                         Button(action: watch) { Label(liveWatchLabel(channel, programme: programme, now: now), systemImage: "play.fill") }
                             .buttonStyle(GhostButtonStyle(height: 50))
                             .disabled(!channel.available)
                             .accessibilityIdentifier("live-details-watch")
-                    } else if let programme, programme.start > now, extras.canRemind(programme) {
+                    } else if let programme, reminder == .offered {
                         Button { remind?(programme, on: channel) } label: { Label(liveRemindMe, systemImage: "bell") }
                             .buttonStyle(PrimaryButtonStyle(height: 50))
                             .accessibilityIdentifier("live-details-remind")
@@ -818,7 +822,7 @@ struct LiveProgrammeDetails: View {
                             .buttonStyle(GhostButtonStyle(height: 50, fullWidth: false))
                             .disabled(!channel.available)
                             .accessibilityIdentifier("live-details-watch")
-                    } else if let programme, programme.start > now {
+                    } else if let programme, reminder == .unavailable {
                         Text(liveOnAt(channel, programme: programme, now: now)).font(.body.weight(.semibold))
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Button(action: watch) { Label(liveWatchLabel(channel, programme: programme, now: now), systemImage: "play.fill") }

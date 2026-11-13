@@ -311,27 +311,31 @@ private struct TVGuideCell: View, Equatable {
             .focused(focus, equals: id)
             .onMoveCommand(perform: move)
             .contextMenu {
-                if recordings.available, p.end > now {
-                    if let mark, mark.state.marked {
-                        // Set to record already, by this person or someone else: no second Record.
-                        if mark.canCancel {
-                            Button(mark.state == .recording ? "Stop recording" : "Don’t record") { Task { await recordings.cancel(mark, programmeID: p.id) } }
-                        }
-                    } else if p.seriesKey != nil {
-                        Button(p.isOn(at: now) ? "Record the rest…" : "Record…") { recordChoice = p }
-                    } else {
-                        // A film or a special has nothing to choose.
-                        Button(p.isOn(at: now) ? "Record the rest" : "Record") {
-                            Task { if let result = await recordings.record(p, options: .init()) { clash = LiveRecordingClash(result) } }
-                        }
+                // What it offers is decided once, for every menu (LiveProgrammeActions).
+                let actions = LiveProgrammeActions(p, on: row.channel, now: now, extras: extras, recordings: recordings)
+                switch actions.recording {
+                case .marked?:
+                    // Set to record already, by this person or someone else: no second Record.
+                    if let cancel = actions.cancel {
+                        Button(liveCancelRecordingTitle(cancel.state)) { Task { await recordings.cancel(cancel, programmeID: p.id) } }
                     }
+                case .record(let rest, true, _)?:
+                    Button(liveRecordTitle(rest: rest, choosing: true)) { recordChoice = p }
+                case .record(let rest, false, _)?:
+                    // A film or a special has nothing to choose.
+                    Button(liveRecordTitle(rest: rest)) {
+                        Task { if let result = await recordings.record(p, options: .init()) { clash = LiveRecordingClash(result) } }
+                    }
+                case nil:
+                    EmptyView()
                 }
-                if extras.available, p.start > now {
-                    if reminded {
-                        Button { Task { await extras.removeReminder(for: p) } } label: { Label(liveRemoveReminder, systemImage: "bell.slash") }
-                    } else if extras.canRemind(p) {
-                        Button { Task { await extras.remind(p, on: row.channel) } } label: { Label(liveRemindMe, systemImage: "bell") }
-                    }
+                switch actions.reminder {
+                case .set?:
+                    Button { Task { await extras.removeReminder(for: p) } } label: { Label(liveRemoveReminder, systemImage: "bell.slash") }
+                case .offered?:
+                    Button { Task { await extras.remind(p, on: row.channel) } } label: { Label(liveRemindMe, systemImage: "bell") }
+                case .unavailable?, nil:
+                    EmptyView()
                 }
                 Button { navigator.playLive(.init(channel: row.channel)) } label: {
                     Label(liveWatchLabel(row.channel, programme: p, now: now), systemImage: "play.fill")

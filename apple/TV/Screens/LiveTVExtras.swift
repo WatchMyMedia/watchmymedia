@@ -357,17 +357,20 @@ struct TVLiveSearchSection: View {
         .buttonStyle(TVLiveCardButtonStyle())
         .focused($focused, equals: hit.id)
         .contextMenu {
-            if !hit.programme.isOn(at: now) {
-                if reminded {
-                    Button { Task { await extras.removeReminder(for: hit.programme) } } label: { Label(liveRemoveReminder, systemImage: "bell.slash") }
-                } else if extras.canRemind(hit.programme) {
-                    Button { Task { await extras.remind(hit.programme, on: hit.channel) } } label: { Label(liveRemindMe, systemImage: "bell") }
-                }
+            // Search's board offers no Record: the guide's menu does.
+            let actions = LiveProgrammeActions(hit.programme, on: hit.channel, now: now, extras: extras)
+            switch actions.reminder {
+            case .set?:
+                Button { Task { await extras.removeReminder(for: hit.programme) } } label: { Label(liveRemoveReminder, systemImage: "bell.slash") }
+            case .offered?:
+                Button { Task { await extras.remind(hit.programme, on: hit.channel) } } label: { Label(liveRemindMe, systemImage: "bell") }
+            case .unavailable?, nil:
+                EmptyView()
             }
             Button { navigator.playLive(.init(channel: hit.channel)) } label: {
                 Label(liveWatchLabel(hit.channel, programme: hit.programme, now: now), systemImage: "play.fill")
             }
-            .disabled(!hit.channel.available)
+            .disabled(!actions.watch)
         }
         .accessibilityLabel(liveSearchAccessibilityLabel(hit, reminded: reminded, now: now))
         .accessibilityHint("Shows it in the guide")

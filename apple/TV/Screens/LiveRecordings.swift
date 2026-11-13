@@ -26,27 +26,28 @@ struct TVLiveRecordChoice: View {
     private var choice: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                Text("Record \(programme.title)").font(.system(size: 46, weight: .bold)).accessibilityAddTraits(.isHeader)
+                Text(liveRecordHeading(programme.title)).font(.system(size: 46, weight: .bold)).accessibilityAddTraits(.isHeader)
                 if showingOptions {
-                    Toggle("Every new episode", isOn: $options.series)
-                    if options.series {
-                        Toggle("New episodes only", isOn: $options.newOnly)
-                        Toggle("Any channel", isOn: $options.anyChannel)
-                        Picker("Keep", selection: $options.keep) {
-                            Text("All recordings").tag(0)
-                            ForEach(1...10, id: \.self) { Text("The latest \($0)").tag($0) }
+                    // The options form's parts (LiveRecordingForm); the board's keeps no note on Keep.
+                    let form = LiveRecordingForm(options: options, like: .programme(programme))
+                    if form.offersSeries { Toggle(liveRecordEveryNewEpisode, isOn: $options.series) }
+                    if form.showsSeriesSettings {
+                        Toggle(liveNewEpisodesOnly, isOn: $options.newOnly)
+                        Toggle(liveAnyChannel, isOn: $options.anyChannel)
+                        Picker(liveKeepTitle, selection: $options.keep) {
+                            ForEach(LiveRecordingForm.keepChoices, id: \.self) { Text(liveKeepChoice($0)).tag($0) }
                         }
                     }
-                    Toggle("Use server padding defaults", isOn: $options.useServerPadding)
-                    if !options.useServerPadding {
-                    Picker("Start early", selection: $options.padBefore) { ForEach(LiveRecordingOptions.paddingChoices, id: \.self) { Text("\($0) min").tag($0) } }
-                    Picker("End late", selection: $options.padAfter) { ForEach(LiveRecordingOptions.paddingChoices, id: \.self) { Text("\($0) min").tag($0) } }
+                    if form.offersServerPadding { Toggle(liveUseServerPadding, isOn: $options.useServerPadding) }
+                    if form.showsPadding {
+                    Picker(liveStartEarly, selection: $options.padBefore) { ForEach(LiveRecordingForm.paddingChoices, id: \.self) { Text(livePaddingChoice($0)).tag($0) } }
+                    Picker(liveEndLate, selection: $options.padAfter) { ForEach(LiveRecordingForm.paddingChoices, id: \.self) { Text(livePaddingChoice($0)).tag($0) } }
                     }
                     Button("Record with these options") { save(options) }.buttonStyle(TVButtonStyle(kind: .primary))
                 } else {
-                    Button("Just this episode") { save(.init()) }.buttonStyle(TVButtonStyle(kind: .primary))
-                    Button("Every new episode") { save(.init(series: true)) }.buttonStyle(TVButtonStyle())
-                    Button("Options…") { showingOptions = true }.buttonStyle(TVButtonStyle())
+                    Button(liveRecordJustThisEpisode) { save(.init()) }.buttonStyle(TVButtonStyle(kind: .primary))
+                    Button(liveRecordEveryNewEpisode) { save(.init(series: true)) }.buttonStyle(TVButtonStyle())
+                    Button(liveRecordOptionsChoice) { showingOptions = true }.buttonStyle(TVButtonStyle())
                 }
                 if let message = recordings.message { Text(message).font(.system(size: 24)).foregroundStyle(Palette.warning) }
                 Text("Recordings may take a tuner from a live viewer.").font(.system(size: 23)).foregroundStyle(Palette.muted)
@@ -113,7 +114,7 @@ struct TVLiveRecordingClashView: View {
     private func giveWay(_ holder: LiveRecordingHolder) async {
         failure = nil
         guard let updated = await recordings.prefer(clash.recording, over: holder) else {
-            failure = recordings.message ?? "Couldn’t change the recording. Try again."
+            failure = recordings.message ?? liveRecordingChangeFailed
             return
         }
         if let next = LiveRecordingClash(updated) { clash = next } else { done(false) }
@@ -136,10 +137,10 @@ struct TVLiveRecordingsScreen: View {
                         sectionView(section)
                     }
                     if recordings.pages.values.allSatisfy({ $0.items.isEmpty && $0.rules.isEmpty }), recordings.loading.isEmpty {
-                        TVEmptyState(systemImage: "record.circle", title: "No recordings", message: "Hold Select on a programme in the guide and choose Record. Make manual recordings on your phone or in the web app.")
+                        TVEmptyState(systemImage: "record.circle", title: liveNoRecordings, message: "Hold Select on a programme in the guide and choose Record. Make manual recordings on your phone or in the web app.")
                     }
                 } else {
-                    TVEmptyState(systemImage: "record.circle", title: "Recording isn’t available", message: "Ask the server’s admin to turn recording on and allow your account.")
+                    TVEmptyState(systemImage: "record.circle", title: liveRecordingUnavailable, message: "Ask the server’s admin to turn recording on and allow your account.")
                 }
             }
             .padding(.horizontal, TVLayout.gutter).padding(.vertical, 40)
@@ -156,9 +157,9 @@ struct TVLiveRecordingsScreen: View {
     @ViewBuilder private func sectionView(_ section: LiveRecordingSection) -> some View {
         let page = recordings.page(section)
         if let error = recordings.errors[section] {
-            TVErrorState(title: "Couldn’t load \(section.title.lowercased())", message: error) { await recordings.load(section, force: true) }
+            TVErrorState(title: liveRecordingsFailed(section), message: error) { await recordings.load(section, force: true) }
         } else if recordings.loading.contains(section) && page == nil {
-            ProgressView("Loading \(section.title.lowercased())")
+            ProgressView(liveRecordingsLoading(section))
         } else if let page, !page.items.isEmpty || !page.rules.isEmpty {
             VStack(alignment: .leading, spacing: 18) {
                 Text(section.title).font(.system(size: 28, weight: .bold))
@@ -171,11 +172,11 @@ struct TVLiveRecordingsScreen: View {
                         }.frame(maxWidth: .infinity, alignment: .leading)
                         if rule.canCancel {
                             Button("Edit") { editing = rule }.buttonStyle(TVButtonStyle())
-                            Button("Stop series") { Task { await recordings.remove(rule) } }.buttonStyle(TVButtonStyle())
-                        } else { Text("Set by \(rule.userName)").font(.system(size: 20)).foregroundStyle(Palette.muted) }
+                            Button(liveStopSeries) { Task { await recordings.remove(rule) } }.buttonStyle(TVButtonStyle())
+                        } else { Text(liveSetBy(rule.userName)).font(.system(size: 20)).foregroundStyle(Palette.muted) }
                     }.focusSection()
                 }
-                if page.nextCursor != nil { Button("Load more") { Task { await recordings.load(section, more: true) } }.buttonStyle(TVButtonStyle()) }
+                if page.nextCursor != nil { Button(liveLoadMore) { Task { await recordings.load(section, more: true) } }.buttonStyle(TVButtonStyle()) }
             }.frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -185,24 +186,26 @@ struct TVLiveRecordingsScreen: View {
             VStack(alignment: .leading, spacing: 7) {
                 Text(item.title).font(.system(size: 28, weight: .semibold))
                 if let line = item.episodeLine { Text(line).font(.system(size: 21)).foregroundStyle(Palette.textSecondary) }
-                Text("\(LiveClock.device.weekdayName(item.start)) \(LiveClock.device.range(item.start, item.end)) · \(item.number)").font(.system(size: 20)).foregroundStyle(Palette.muted)
+                Text(liveRecordingWhen(item)).font(.system(size: 20)).foregroundStyle(Palette.muted)
                 RecordingMark(item.mark, compact: false, title: item.statusTitle)
                 if let reason = item.reasonMessage { Text(reason).font(.system(size: 20)).foregroundStyle(Palette.muted) }
                 if item.state == .recording { TimelineView(.periodic(from: .now, by: 5)) { context in LiveProgressBar(progress: item.progress(at: context.date)) } }
             }.frame(maxWidth: .infinity, alignment: .leading)
-            if item.playable {
-                Button(item.state == .recording ? "Watch from the start" : "Watch") { navigator.play(item.playRequest(fromStart: item.state == .recording)) }
+            // What a row offers is decided once, for both apps (LiveRecordingActions); this board has no Edit.
+            let actions = item.actions
+            if let watch = actions.watch {
+                Button(watch == .fromStart ? liveWatchFromTheStart : "Watch") { navigator.play(item.playRequest(fromStart: watch == .fromStart)) }
                     .buttonStyle(TVButtonStyle(kind: .primary))
             }
-            if item.canDelete && [.done, .partial].contains(item.state) { Button("Delete") { deleting = item }.buttonStyle(TVButtonStyle()) }
-            if item.canCancel && item.state.mayCancel {
-                if item.state == .conflict {
-                    // The same choice as when it was set: which holder gives way.
-                    Button("Record this instead") {
-                        if item.conflictsWith.isEmpty { Task { await recordings.prefer(item) } } else { clash = LiveRecordingClash(item) }
-                    }.buttonStyle(TVButtonStyle())
-                }
-                Button(item.state == .recording ? "Stop recording" : "Don’t record") { Task { await recordings.cancel(item.mark, programmeID: item.programmeID) } }.buttonStyle(TVButtonStyle())
+            if actions.delete { Button("Delete") { deleting = item }.buttonStyle(TVButtonStyle()) }
+            if actions.recordInstead {
+                // The same choice as when it was set: which holder gives way.
+                Button(liveRecordThisInstead) {
+                    if item.conflictsWith.isEmpty { Task { await recordings.prefer(item) } } else { clash = LiveRecordingClash(item) }
+                }.buttonStyle(TVButtonStyle())
+            }
+            if actions.cancel {
+                Button(actions.cancelTitle) { Task { await recordings.cancel(item.mark, programmeID: item.programmeID) } }.buttonStyle(TVButtonStyle())
             }
         }
         .padding(20).background(Palette.surface, in: RoundedRectangle(cornerRadius: 16))
@@ -217,23 +220,24 @@ private struct TVLiveRecordingRuleOptions: View {
     @Environment(\.dismiss) private var dismiss
     @State private var options = LiveRecordingOptions(series: true)
     var body: some View {
+        // The options form's parts (LiveRecordingForm); this board has no Record the series switch.
+        let form = LiveRecordingForm.rule(rule)
         Form {
             Section(rule.title) {
-                if rule.kind == "series" {
-                    Toggle("New episodes only", isOn: $options.newOnly)
-                    Toggle("Any channel", isOn: $options.anyChannel)
-                    Picker("Keep", selection: $options.keep) {
-                        Text("All recordings").tag(0)
-                        ForEach(1...10, id: \.self) { Text("The latest \($0)").tag($0) }
+                if form.showsSeriesSettings {
+                    Toggle(liveNewEpisodesOnly, isOn: $options.newOnly)
+                    Toggle(liveAnyChannel, isOn: $options.anyChannel)
+                    Picker(liveKeepTitle, selection: $options.keep) {
+                        ForEach(LiveRecordingForm.keepChoices, id: \.self) { Text(liveKeepChoice($0)).tag($0) }
                     }
                 }
-                Picker("Start early", selection: $options.padBefore) { ForEach(LiveRecordingOptions.paddingChoices, id: \.self) { Text("\($0) min").tag($0) } }
-                Picker("End late", selection: $options.padAfter) { ForEach(LiveRecordingOptions.paddingChoices, id: \.self) { Text("\($0) min").tag($0) } }
+                Picker(liveStartEarly, selection: $options.padBefore) { ForEach(LiveRecordingForm.paddingChoices, id: \.self) { Text(livePaddingChoice($0)).tag($0) } }
+                Picker(liveEndLate, selection: $options.padAfter) { ForEach(LiveRecordingForm.paddingChoices, id: \.self) { Text(livePaddingChoice($0)).tag($0) } }
                 if let message = recordings.message { Text(message).foregroundStyle(Palette.warning) }
                 Button("Save") { Task { await recordings.edit(rule, options: options); if recordings.message == nil { dismiss() } } }
                 Button("Cancel") { dismiss() }
             }
-        }.onAppear { options = .init(series: rule.kind == "series", newOnly: rule.newOnly, anyChannel: rule.anyChannel, keep: rule.keep, padBefore: rule.padBefore, padAfter: rule.padAfter, useServerPadding: false) }
+        }.onAppear { options = LiveRecordingForm.rule(rule).options }
     }
 }
 
@@ -245,11 +249,11 @@ private struct TVLiveRecordingDelete: View {
     var body: some View {
         Form {
             Section("Delete “\(recording.title)”?") {
-                Text("This permanently deletes the file WatchMyMedia recorded. Your watch history and the series rule stay.")
-                Toggle("Don’t record it again", isOn: $doNotRecordAgain)
+                Text(liveDeleteRecordingNote)
+                Toggle(liveDontRecordAgain, isOn: $doNotRecordAgain)
                 if let message = recordings.message { Text(message).foregroundStyle(Palette.warning) }
                 Button("Cancel") { dismiss() }
-                Button("Delete recording", role: .destructive) {
+                Button(liveDeleteRecording, role: .destructive) {
                     Task { if await recordings.deleteFile(recording, recordAgain: !doNotRecordAgain) { dismiss() } }
                 }.disabled(recordings.changing.contains(recording.id))
             }
