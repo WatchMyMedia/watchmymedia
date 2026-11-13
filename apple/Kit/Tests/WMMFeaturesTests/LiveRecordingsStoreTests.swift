@@ -191,7 +191,7 @@ import WMMModel
         let repository = RecordingsRepository()
         let store = LiveRecordingsStore(repository: repository)
         var guide = Task { await store.showGuide(from: start, to: start.addingTimeInterval(3600)) }
-        try? await Task.sleep(for: .milliseconds(20))
+        #expect(await eventually(timeout: .seconds(2)) { store.showsGuideSpan })
         #expect(repository.guideRequests == 0, "Nothing changed since the guide loaded it")
         let following = Task { await store.follow() }
         defer { following.cancel() }
@@ -203,14 +203,16 @@ import WMMModel
         guide = Task { await store.showGuide(from: later, to: later.addingTimeInterval(3600)) }
         #expect(await eventually(timeout: .seconds(2)) { repository.guideRequests == 2 }, "Its listings may be from before the event")
         guide.cancel()
+        await guide.value
         guide = Task { await store.showGuide(from: later, to: later.addingTimeInterval(3600)) }
-        try? await Task.sleep(for: .milliseconds(20))
+        #expect(await eventually(timeout: .seconds(2)) { store.showsGuideSpan })
         #expect(repository.guideRequests == 2)
         guide.cancel()
         await guide.value
         // The guide has gone: an event asks nothing for it.
+        let followed = store.eventsFollowed
         repository.listener?.yield()
-        try? await Task.sleep(for: .milliseconds(50))
+        #expect(await eventually(timeout: .seconds(2)) { store.eventsFollowed == followed + 1 })
         #expect(repository.guideRequests == 2)
     }
 
@@ -227,10 +229,11 @@ import WMMModel
         await store.load(.upcoming)
         _ = await store.record(programme("p-1"), options: .init())
         #expect(repository.requests.count == 2, "the change asks for what is on screen itself")
+        let followed = store.eventsFollowed
         repository.typed?.yield(.recordings)
         repository.typed?.yield(.favourites)
         repository.typed?.yield(.reminders)
-        try? await Task.sleep(for: .milliseconds(50))
+        #expect(await eventually(timeout: .seconds(2)) { store.eventsFollowed == followed + 3 })
         #expect(repository.requests.count == 2, "its echo, and other parts' events, ask nothing")
         repository.typed?.yield(.recordings)
         #expect(await eventually(timeout: .seconds(2)) { repository.requests.count == 3 }, "another device's change does")

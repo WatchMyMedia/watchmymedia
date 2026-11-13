@@ -192,14 +192,19 @@ import WMMModel
         try await servers.select(FakeServers.remoteHome)
         // Approved only after the screen has gone, however late that is on a busy machine.
         let (approval, approve) = AsyncStream.makeStream(of: Void.self)
-        let auth = FakeAuthRepository(signedIn: false, servers: servers, pairingDelay: { for await _ in approval { break } })
+        // Says when the fake's wait for approval has ended; whatever it does next runs in the same turn.
+        let (settled, settle) = AsyncStream.makeStream(of: Void.self)
+        let auth = FakeAuthRepository(signedIn: false, servers: servers, pairingDelay: {
+            for await _ in approval { break }
+            settle.yield()
+        })
         let model = SignInModel(servers: servers, auth: auth)
         let task = Task { await model.pair() }
         #expect(await eventually { model.waitingCode != nil })
         task.cancel()
         await task.value
         approve.yield()
-        try await Task.sleep(for: .milliseconds(300))
+        for await _ in settled { break }
         #expect(auth.user == nil, "a cancelled pairing never signs in")
     }
 

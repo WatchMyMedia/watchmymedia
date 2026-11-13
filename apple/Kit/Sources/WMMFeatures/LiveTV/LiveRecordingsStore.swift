@@ -192,6 +192,7 @@ public final class LiveRecordingsStore {
     public func follow() async {
         for await change in repository.liveChanges() {
             guard !Task.isCancelled else { return }
+            defer { eventsFollowed += 1 }
             guard change == .all || (change == .recordings && !echoes.consume(.recordings, at: now())) else { continue }
             syncContext()
             events += 1; revision += 1
@@ -199,6 +200,11 @@ public final class LiveRecordingsStore {
             await refreshShown()
         }
     }
+
+    /// Events ``follow()`` has finished with, so a test can tell one asked for nothing.
+    @ObservationIgnored private(set) var eventsFollowed = 0
+    /// A guide span is on screen (``showGuide(from:to:)`` has begun), for tests.
+    var showsGuideSpan: Bool { visible != nil }
 
     /// The sections on screen again; those that have left it are forgotten.
     /// A section loaded by a screen that never said it shows them (an older

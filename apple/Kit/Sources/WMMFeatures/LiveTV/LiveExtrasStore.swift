@@ -323,6 +323,7 @@ public final class LiveExtrasStore {
     /// §4.1.8). Runs while the app does.
     public func follow() async {
         for await change in repository.liveChanges() {
+            defer { eventsFollowed += 1 }
             guard available else { continue }
             syncContext()
             let date = now()
@@ -337,6 +338,9 @@ public final class LiveExtrasStore {
             }
         }
     }
+
+    /// Events ``follow()`` has finished with, so a test can tell one asked for nothing.
+    @ObservationIgnored private(set) var eventsFollowed = 0
 
     // MARK: Private
 

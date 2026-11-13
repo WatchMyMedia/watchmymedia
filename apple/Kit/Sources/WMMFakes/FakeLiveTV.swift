@@ -206,6 +206,9 @@ public final class FakeLiveTVRepository: LiveTVRepository {
         }
     }
 
+    /// Who listens for typed changes now, so a test can wait for a subscription before an event.
+    public var liveListenerCount: Int { typedListeners.count }
+
     /// As if another device changed a favourite or reminder (the server's
     /// private events): `part` says which event; `.all` is a reconnect's.
     public func changedElsewhere(_ part: LiveTVChange = .all, _ change: (FakeLiveTVRepository) -> Void = { _ in }) {
