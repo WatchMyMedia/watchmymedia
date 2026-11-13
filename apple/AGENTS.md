@@ -81,6 +81,12 @@ server, and on iPad in both a regular and a compact width.
   arranged rows are a `VStack` (`HomeScreen.arrangedRows`). In a `List` in edit
   mode (the rows sheet's `.onMove`) a row's plain `Button` takes no taps: give
   it `.buttonStyle(.borderless)` or a style of its own.
+  Inside the player's full-screen cover a `GeometryReader` that ignores the
+  safe area reports zero `safeAreaInsets` (iOS 27.2 simulator): `PlayerShell`
+  measures them between a reader that keeps the safe area and one that
+  doesn't. A view's `.onChange(of: scenePhase)` under the tab view was not
+  seen to report `.background` before the app was ended, so state that must
+  survive eviction is saved when it changes (`PlaceKeeping`).
 - **Home's screens** (PLAN-HOME.md §7; `HomeScreen.swift` on both apps): a
   vertical `ScrollView` with `.scrollTargetBehavior(.paging)`, each screen
   `.containerRelativeFrame(.vertical)`. A horizontal card row inside a screen
@@ -178,6 +184,10 @@ didn't start.
 - YouTube's player (the movie trailer screen) needs the network. No video is
   known to refuse embedding reliably, so reach the refused screen with
   `-trailerError 150` in a debug build.
+- `typeKey` drives a hardware keyboard on the iOS simulator (space, arrows,
+  ⌘F: `UITests/KeyboardTests.swift`, on an iPad), but its Escape reached
+  neither `onKeyPress`, a cancel action nor a `UIKeyCommand` on iPadOS 27.2:
+  check Escape with a real keyboard.
 - XCUITest's Siri Remote has no touch-surface swipe, and Right while paused
   skips 10 s, so AVKit's own scrubbing (and the thumbnails it draws from an
   I-frame playlist) can't be driven from a test; check it by hand.
