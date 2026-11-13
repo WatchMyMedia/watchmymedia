@@ -39,11 +39,13 @@ internal object StrictModeChecks {
 
 /**
  * Runs [block], a read the start-up makes on the main thread on purpose
- * (the saved server and sign-in, so the first frame is right), with disk
- * reads allowed, so StrictMode logs only the reads nobody chose.
+ * (the saved server and sign-in, the downloads, so the first frame is right),
+ * with disk access allowed, so StrictMode logs only what nobody chose. Writes
+ * are allowed too: a first run writes what those reads find missing (the
+ * device's ID, SharedPreferences' folder).
  */
 internal inline fun <T> allowingStartupReads(block: () -> T): T {
-    val before = StrictMode.allowThreadDiskReads()
+    val before = StrictMode.allowThreadDiskWrites()
     try {
         return block()
     } finally {

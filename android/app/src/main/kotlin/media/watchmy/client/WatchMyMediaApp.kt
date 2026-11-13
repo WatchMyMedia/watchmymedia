@@ -111,7 +111,10 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
             null
         } else {
             traced("WMM OfflineDownloads") {
-                OfflineDownloads(this, data.offlineGateway, { data.client }, { engine.profiles.current() }, "WatchMyMedia/${BuildConfig.VERSION_NAME} (android; Android ${android.os.Build.VERSION.RELEASE})")
+                // The downloads' list is read once, here, on purpose: memory is its truth from then on.
+                allowingStartupReads {
+                    OfflineDownloads(this, data.offlineGateway, { data.client }, { engine.profiles.current() }, "WatchMyMedia/${BuildConfig.VERSION_NAME} (android; Android ${android.os.Build.VERSION.RELEASE})")
+                }
             }.also { offlineDownloads = it }
         }
         val library = object : LibraryRepository by data.library {
