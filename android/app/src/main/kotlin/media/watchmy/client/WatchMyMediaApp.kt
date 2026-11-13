@@ -75,6 +75,9 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    /** The process's first ON_START, when what only someone using the app needs starts. */
+    private val firstForeground by lazy { FirstForeground(ProcessLifecycleOwner.get().lifecycle) }
+
     /** Downloads to watch offline, on phones and tablets with the real data layer; null on TVs and the fakes. */
     override var offlineDownloads: OfflineDownloads? = null
         private set
@@ -88,7 +91,9 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
      * The data layer and the player engine. The data layer reads a few
      * hundred bytes of saved state once, synchronously, so the saved server
      * and sign-in are right from the first frame; the player engine has to be
-     * built on the main thread. Casting starts after the first frame.
+     * built on the main thread. The Cast SDK starts after the first frame of
+     * the app's first time in the foreground ([FirstForeground]), not for a
+     * process started for a broadcast or a job.
      */
     private fun realServices(): AppServices {
         val data = traced("WMM DataServices") { DataServices.create(this, tv = isTv, version = BuildConfig.VERSION_NAME) }.also { data = it }
@@ -117,6 +122,7 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
         val castable = traced("WMM cast check") { BuildConfig.CAST_APP_ID.isNotEmpty() && RealCastService.isSupported(this) }
         val cast = if (castable && !isTv) {
             traced("WMM RealCastService") { RealCastService(this, data.castGateway, data.servers, data.auth, data.preferences, data.library, client = { data.client }) }
+                .also { sender -> firstForeground.then(sender::start) }
         } else {
             CastService.None
         }

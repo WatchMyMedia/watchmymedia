@@ -51,10 +51,12 @@ import com.google.android.gms.cast.framework.CastState as SdkCastState
  * says it issues cast tokens. Media notification and lock screen controls
  * while casting come from the Cast SDK ([options]).
  *
- * The SDK starts once the main thread is first idle, after the app's first
- * frame, and builds its CastContext on a background thread, which on the
- * main thread held up a cold start's first frame. Until it is up the Cast
- * button stays hidden, as it always does without the SDK.
+ * The SDK starts when the app calls [start], which it does when it first
+ * comes to the foreground, so a process started for a broadcast or a job
+ * never starts it. It waits for the main thread to be idle, after the
+ * first frame, and builds its CastContext on a background thread, which on
+ * the main thread held up a cold start's first frame. Until it is up the
+ * Cast button stays hidden, as it always does without the SDK.
  */
 @OptIn(UnstableApi::class)
 class RealCastService(
@@ -116,11 +118,9 @@ class RealCastService(
         publish()
     }
 
+    private var started = false
+
     init {
-        Looper.myQueue().addIdleHandler {
-            startSdk()
-            false
-        }
         // Whether the server in use issues cast tokens, checked whenever the server or the sign-in changes.
         scope.launch {
             combine(servers.current, auth.user) { server, user -> server?.server?.id?.takeIf { user != null } }
@@ -129,6 +129,16 @@ class RealCastService(
                     serverCasts = id != null && withContext(Dispatchers.IO) { gateway.serverCasts() }
                     publish()
                 }
+        }
+    }
+
+    /** Starts the Cast SDK once the main thread is next idle; once only. Call it on the main thread. */
+    fun start() {
+        if (started) return
+        started = true
+        Looper.myQueue().addIdleHandler {
+            startSdk()
+            false
         }
     }
 
