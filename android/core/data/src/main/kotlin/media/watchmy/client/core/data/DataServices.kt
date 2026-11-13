@@ -29,6 +29,8 @@ import media.watchmy.client.model.RequestRepository
 import media.watchmy.client.model.RowsRepository
 import media.watchmy.client.model.ServerRepository
 import media.watchmy.client.model.StreamQuality
+import java.io.File
+import okhttp3.Cache
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import java.util.UUID
@@ -50,6 +52,8 @@ class DataServices internal constructor(
     baseClient: ClientInfo,
     dataStore: DataStore<Preferences>,
     httpClient: OkHttpClient,
+    /** The API client's HTTP cache; null keeps none. */
+    httpCache: Cache? = null,
     discovery: ServerDiscovery,
     sealer: TokenSealer,
     private val scope: CoroutineScope,
@@ -64,6 +68,7 @@ class DataServices internal constructor(
         baseClient = client,
         dataStore = dataStore(context),
         httpClient = sharedHttpClient,
+        httpCache = Cache(File(context.cacheDir, "http"), HTTP_CACHE_BYTES),
         discovery = NsdDiscovery(context),
         sealer = KeystoreSealer(),
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
@@ -88,7 +93,7 @@ class DataServices internal constructor(
     /** How this device describes itself, with the name as it is now (it is editable in Settings). */
     val client: ClientInfo get() = base.copy(name = store.deviceName.value.ifBlank { base.name })
 
-    private val http = Http(httpClient, store, "WatchMyMedia/${base.version} (${base.platform}; Android ${Build.VERSION.RELEASE})")
+    private val http = Http(httpClient, store, "WatchMyMedia/${base.version} (${base.platform}; Android ${Build.VERSION.RELEASE})", httpCache)
     private val events = ServerEvents(store, http, scope, eventBackoffMs)
     private val serverRepository = RealServerRepository(store, http, discovery, scope, clock)
     private val authRepository = RealAuthRepository(store, http, serverRepository, { client }, clock)
@@ -157,10 +162,11 @@ class DataServices internal constructor(
      * bearer token on requests to the current server, and only there. Images
      * have a Dispatcher of their own, so a screenful of posters doesn't queue
      * the API calls behind it (OkHttp runs 5 calls per host at a time); they
-     * share the connection pool. Made with the first image, not at start.
+     * share the connection pool, not the API's HTTP cache. Made with the
+     * first image, not at start.
      */
     val imageHttpClient: OkHttpClient by lazy {
-        http.client.newBuilder()
+        http.signedClient.newBuilder()
             .dispatcher(Dispatcher().apply { maxRequestsPerHost = IMAGE_REQUESTS_PER_HOST })
             .build()
     }
@@ -203,6 +209,9 @@ class DataServices internal constructor(
     companion object {
         /** Posters and stills loading at once from one server. */
         internal const val IMAGE_REQUESTS_PER_HOST = 8
+
+        /** The API replies kept for revalidation: a few hundred pages of library data. */
+        private const val HTTP_CACHE_BYTES = 20L shl 20
 
         @Volatile private var dataStore: DataStore<Preferences>? = null
 

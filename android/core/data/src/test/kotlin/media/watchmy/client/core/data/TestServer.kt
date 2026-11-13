@@ -119,12 +119,15 @@ class TestServer : Closeable {
 class Harness internal constructor(
     private val sealer: TokenSealer = PlainSealer,
     private val httpClient: OkHttpClient = OkHttpClient(),
+    /** Gives the API client an HTTP cache, in the harness's folder. */
+    httpCache: Boolean = false,
 ) : Closeable {
     val server = TestServer()
     val dir: File = Files.createTempDirectory("wmm-data").toFile()
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val dataStore = PreferenceDataStoreFactory.create(scope = scope, produceFile = { File(dir, "watchmymedia.preferences_pb") })
     var now = 1_800_000_000_000L
+    private val cache = if (httpCache) okhttp3.Cache(File(dir, "http"), 1L shl 20) else null
     val client = ClientInfo("dev-1", "Living room TV", "WatchMyMedia for Android TV", "androidtv", "0.1.0", model = "Chromecast with Google TV")
 
     /** Made with the harness; [reopen] makes another on the same storage, as after a restart. */
@@ -135,6 +138,7 @@ class Harness internal constructor(
         baseClient = client,
         dataStore = dataStore,
         httpClient = httpClient,
+        httpCache = cache,
         discovery = ServerDiscovery.None,
         sealer = sealer,
         scope = scope,

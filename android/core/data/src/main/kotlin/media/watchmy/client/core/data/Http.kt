@@ -17,6 +17,7 @@ import media.watchmy.client.core.api.models.ErrorModel
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.SignedOutException
 import media.watchmy.client.model.isOnServer
+import okhttp3.Cache
 import okhttp3.Call
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
@@ -43,7 +44,7 @@ internal class Credential(val baseUrl: String, val token: String, val onRejected
  * for that server, and clears the sign-in when the server answers 401, plus
  * [signedIn] and [call], which turn every failure into [ApiException].
  */
-internal class Http(base: OkHttpClient, private val store: LocalStore, private val userAgent: String) {
+internal class Http(base: OkHttpClient, private val store: LocalStore, private val userAgent: String, cache: Cache? = null) {
     /**
      * Public probes and sign-in never inherit the current account's token.
      * No client follows a redirect between http and https: one to http would
@@ -51,8 +52,21 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
      * calls are never redirected that way (a probe handles an upgrade itself).
      */
     val publicClient: OkHttpClient = base.newBuilder().followSslRedirects(false).addInterceptor(ReplyLimit()).addInterceptor(::userAgent).build()
-    /** API calls and images: a request goes as its [Credential] tag ([calls]), or else as the current sign-in. */
-    val client: OkHttpClient = publicClient.newBuilder().addInterceptor(::authorize).build()
+    /**
+     * Signed requests without the HTTP cache: images (the image loader keeps
+     * its own) and the event stream. A request goes as its [Credential] tag
+     * ([calls]), or else as the current sign-in.
+     */
+    val signedClient: OkHttpClient = publicClient.newBuilder().addInterceptor(::authorize).build()
+
+    /**
+     * API calls, signed as [signedClient] is, with [cache] (PLAN-ANDROID-REVIEW.md
+     * §4.1.1): the server gives library reads a weak ETag and answers 304
+     * while it still matches, so a quiet reload costs a few hundred bytes.
+     * Only replies with an ETag are kept, and each is asked again before
+     * it is used ([revalidated]).
+     */
+    val client: OkHttpClient = signedClient.newBuilder().cache(cache).addNetworkInterceptor(::revalidated).build()
 
     /**
      * Signing in and pairing follow no redirects at all: a 307 or 308 would
@@ -75,7 +89,7 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
         .build()
 
     /** The event stream: the server pings every 15 s, so silence for longer means the connection is gone. */
-    val streamClient: OkHttpClient = client.newBuilder()
+    val streamClient: OkHttpClient = signedClient.newBuilder()
         .readTimeout(45, TimeUnit.SECONDS)
         .callTimeout(0, TimeUnit.SECONDS)
         .build()
@@ -139,6 +153,21 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
                 return store.value.servers.firstOrNull { it.id == server.id }?.apiLevel ?: server.apiLevel
             }
         }
+    }
+
+    /**
+     * What the cache may keep, whatever a reply says: a 200 GET with an ETag,
+     * to be checked every time (no-cache), and nothing else (no-store). The
+     * server's ETag hashes the body, which depends on who asks, so a reply
+     * kept for one account comes back for another only when the server
+     * answers 304 to them: when their body is the same. A reply that called
+     * itself fresh for an hour would otherwise be used for anyone, unasked.
+     */
+    private fun revalidated(chain: Interceptor.Chain): Response {
+        val response = chain.proceed(chain.request())
+        if (chain.request().method != "GET") return response
+        val keep = response.code == 304 || response.code == 200 && response.header("ETag") != null
+        return response.newBuilder().header("Cache-Control", if (keep) "no-cache" else "no-store").removeHeader("Expires").build()
     }
 
     private fun reportRedirect(chain: Interceptor.Chain): Response {
