@@ -143,6 +143,8 @@ public struct ServerAPI: Sendable {
             return translate(client.underlyingError)
         case let url as URLError:
             return url.code == .cancelled ? CancellationError() : network(url)
+        case is TimedOut:
+            return network(URLError(.timedOut))
         case is DecodingError:
             return APIError(status: nil, message: "The server sent a reply this app doesn't understand. Update the app or the server.")
         default:

@@ -97,7 +97,7 @@ public final class DataServices {
         liveTV = RealLiveTVRepository(store: store, events: events)
         preferences = preferencesRepository
         offline = RealOfflineGateway(store: store, auth: authRepository)
-        casting = RealCastGateway(store: store)
+        casting = RealCastGateway(store: store, reader: serverInfo)
         rows = RealRowsRepository(store: store, events: events)
         images = CachedImageLoader(
             session: imageSession ?? session,

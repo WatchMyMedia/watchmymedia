@@ -1,12 +1,19 @@
 import Foundation
+import WMMAPI
 import WMMModel
 
 /// Cast grants are issued using one captured session and its original endpoint.
 /// Alternate URLs come only from that server and receive only its scoped cast token.
+/// The server's description comes from ``ServerInfoReader``, so Cast's check
+/// and the level's refresh at launch and on return share one GET /api/server.
 @MainActor
 final class RealCastGateway: CastGateway {
     private let store: LocalStore
-    init(store: LocalStore) { self.store = store }
+    private let reader: ServerInfoReader
+    init(store: LocalStore, reader: ServerInfoReader) {
+        self.store = store
+        self.reader = reader
+    }
 
     var identity: CastIdentity? {
         guard let server = store.current?.server, let user = store.user else { return nil }
@@ -18,9 +25,10 @@ final class RealCastGateway: CastGateway {
     }
 
     func capability() async throws -> CastCapability? {
-        guard let identity, let server = store.current?.server, server.features.castTokens else { return nil }
-        let api = try store.signedIn().api
-        let info = try await api.call { try await $0.getServer().ok.body.json }
+        guard let identity, store.features.castTokens else { return nil }
+        // The description is public; the identity's own address, as captured.
+        let info: Components.Schemas.ServerInfo
+        do { info = try await reader.info(at: identity.origin) } catch { throw ServerAPI.translate(error) }
         guard self.identity == identity else { throw SignedOutError() }
         guard info.id == identity.serverID, ServerFeatures(apiLevel: Int(info.apiLevel)).castTokens, info.casting == true,
               let appID = info.castAppId, appID == watchMyMediaCastAppID else { return nil }
