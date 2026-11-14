@@ -350,6 +350,15 @@ fun SettingsScreen(
                                 modifier = Modifier.clickable { openWeb(PRIVACY_POLICY_URL) },
                                 trailing = { RowValue("watchmy.media", icon = PhoneIcons.External, size = 13) },
                             )
+                            // The app's last exits and why, for a bug report (PLAN-ANDROID-REVIEW §6.4, the Diagnostics board).
+                            ListRow(
+                                "Copy diagnostics",
+                                subtitle = "The app’s last exits and why, for a bug report",
+                                minHeight = 44.dp,
+                                titleSize = 15,
+                                modifier = Modifier.clickable { dialog = DIALOG_DIAGNOSTICS },
+                                trailing = { RowValue("") },
+                            )
                             ListRow("Open-source licences", minHeight = 44.dp, titleSize = 15, modifier = Modifier.clickable { dialog = DIALOG_LICENCES }, trailing = { RowValue("") })
                             // TMDB's terms ask apps that use its API to say so (PLAN-ROWS.md §3).
                             Text(TMDB_NOTICE, style = Footnote, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp))
@@ -375,6 +384,7 @@ fun SettingsScreen(
             dialog = null
         }
         DIALOG_LICENCES -> LicencesDialog { dialog = null }
+        DIALOG_DIAGNOSTICS -> DiagnosticsDialog { dialog = null }
         DIALOG_DOWNLOAD_QUALITY -> DownloadQualityDialog(downloads.settings.quality, phone, onDismiss = { dialog = null }) {
             downloadsVm.setQuality(it)
             dialog = null
@@ -596,6 +606,7 @@ private const val DIALOG_NAME = "name"
 private const val DIALOG_QUALITY = "quality"
 private const val DIALOG_MOBILE = "mobile"
 private const val DIALOG_LICENCES = "licences"
+private const val DIALOG_DIAGNOSTICS = "diagnostics"
 private const val DIALOG_DOWNLOAD_QUALITY = "download-quality"
 private const val DIALOG_REMOVE_ALL = "remove-all"
 
