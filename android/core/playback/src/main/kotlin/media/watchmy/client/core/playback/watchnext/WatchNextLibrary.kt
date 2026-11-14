@@ -79,5 +79,6 @@ internal fun ContinueItem.toEntry(engagedAtMs: Long): WatchNextEntry {
         itemId = if (movie) movieId else episodeId,
         showId = showId,
         season = season,
+        artPath = stillPath ?: backdropPath,
     )
 }

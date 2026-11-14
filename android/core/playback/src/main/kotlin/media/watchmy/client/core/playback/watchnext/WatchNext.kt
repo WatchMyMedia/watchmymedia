@@ -24,6 +24,8 @@ data class WatchNextEntry(
     val itemId: Long? = null,
     val showId: Long? = null,
     val season: Int? = null,
+    /** The card's picture: the server's image path for an episode's still or a movie's backdrop; null for the app's banner. */
+    val artPath: String? = null,
 )
 
 /** The launcher's Watch Next row (Android TV and Google TV); [None] elsewhere. Calls return at once and do their work in the background. */

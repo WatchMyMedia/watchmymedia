@@ -1361,6 +1361,7 @@ class RealPlaybackController(
                     itemId = n.episodeId,
                     showId = n.showId,
                     season = n.season,
+                    artPath = n.stillPath,
                 ),
             )
         }
@@ -1379,6 +1380,7 @@ class RealPlaybackController(
                 positionMs = pos,
                 durationMs = duration(d),
                 engagedAtMs = clock.wallMs(),
+                artPath = v.request.backdropPath,
             ),
         )
     }
