@@ -26,7 +26,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import media.watchmy.client.presentation.player.PlayerEpisodesViewModel
 import media.watchmy.client.model.EpisodeDetail
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import media.watchmy.client.presentation.player.PlayerViewModel
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -63,9 +65,14 @@ import media.watchmy.client.ui.playerKey
  * The TV player. Mockups: design/mockups/android-tv/PlayerControls.dc.html
  * (controls with Skip Intro), PlayerNext.dc.html (Next Episode card) and
  * PlayerPicker.dc.html (audio, subtitles and quality). It renders a
- * [PlaybackController] from the app's services, made when the screen opens
- * and released when it leaves; the controller does the rest of
- * PLAN-CLIENTS.md §2.3.
+ * [PlaybackController]; the controller does the rest of PLAN-CLIENTS.md
+ * §2.3.
+ *
+ * Opened from the app, the play is held on the player's nav entry by a
+ * [PlayerViewModel] (PLAN-ANDROID-REVIEW §3.1.5): a recreated activity finds
+ * it still playing, and after process death it comes back at the same file
+ * (a later episode, if the play had moved on), place and tracks. Leaving the
+ * entry releases it, which reports the play stopped.
  */
 @Composable
 fun PlayerScreen(
@@ -74,33 +81,65 @@ fun PlayerScreen(
     /** A player made elsewhere (a play cast to this TV); the screen still stops and releases it when it goes. */
     controller: PlaybackController? = null,
 ) {
+    if (controller != null) {
+        CastPlayer(request, controller, onExit)
+        return
+    }
     val services = LocalAppServices.current
-    val viewing = remember(services, controller) { Viewing(controller ?: services.playback.create()) }
+    val model = viewModel { PlayerViewModel(services.playback, createSavedStateHandle(), request) }
+    val local = remember(model) { model.controller() }
+    val selection by model.selection.collectAsStateWithLifecycle()
+    LaunchedEffect(local, selection) { model.start(local) }
+    // The list follows later plays itself (playing()); it loads once, for the play the entry started with or came back to.
+    val first = remember(model) { selection.request }
+    PlayerFrame(local, first, onPlay = model::select, onLeave = { reportStop ->
+        if (reportStop) local.stop()
+        onExit()
+    })
+}
+
+/**
+ * A play cast to this TV (Cast Connect), with the player the cast receiver
+ * made: the receiver keeps the play, so the screen has no nav entry to hold
+ * it on. One viewing; it stops and releases the player when it goes.
+ */
+@Composable
+private fun CastPlayer(request: PlayRequest, controller: PlaybackController, onExit: () -> Unit) {
+    val viewing = remember(controller) { Viewing(controller) }
+    LaunchedEffect(viewing, request) { controller.start(request) }
+    DisposableEffect(viewing) { onDispose { viewing.close() } }
+    PlayerFrame(controller, request, onPlay = { controller.start(it) }, onLeave = { reportStop ->
+        viewing.finish(reportStop)
+        onExit()
+    })
+}
+
+/** The player on [controller], with the episode list for [request]'s show. */
+@Composable
+private fun PlayerFrame(controller: PlaybackController, request: PlayRequest, onPlay: (PlayRequest) -> Unit, onLeave: (reportStop: Boolean) -> Unit) {
+    val services = LocalAppServices.current
     // The episode list beside the video (TvPlayerEpisodes); a recording, or a film, has none.
     val episodes = viewModel(key = "tv-player-episodes") { PlayerEpisodesViewModel(services.library) }
     LaunchedEffect(episodes, request) { if (request.recordingId == null) episodes.load(request) }
-    val exit by rememberUpdatedState(onExit)
-    LaunchedEffect(viewing, request) { viewing.controller.start(request) }
-    DisposableEffect(viewing) { onDispose { viewing.close() } }
+    val leave by rememberUpdatedState(onLeave)
     // Leaving the app (Home, another app) pauses; the controller reports it.
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewing.controller.pause() }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { controller.pause() }
     MockupScale {
         PlayerContent(
-            controller = viewing.controller,
+            controller = controller,
             imageUrl = { path, size -> services.library.imageUrl(path, size) },
             episodes = episodes,
-            onLeave = { reportStop ->
-                viewing.finish(reportStop)
-                exit()
-            },
+            onPlay = onPlay,
+            onLeave = { leave(it) },
         )
     }
 }
 
 /**
- * One viewing. The viewer leaving reports "stopped" once ([finish] with
- * reportStop); when the controller ended the play itself ([PlayerEvent.Exit],
- * an admin's stop) it has reported already. [close] runs when the screen goes.
+ * One viewing of a cast play. The viewer leaving reports "stopped" once
+ * ([finish] with reportStop); when the controller ended the play itself
+ * ([PlayerEvent.Exit], an admin's stop) it has reported already. [close]
+ * runs when the screen goes.
  */
 private class Viewing(val controller: PlaybackController) {
     private var finished = false
@@ -135,6 +174,8 @@ private fun PlayerContent(
     imageUrl: (String?, ImageSize) -> String?,
     onLeave: (reportStop: Boolean) -> Unit,
     episodes: PlayerEpisodesViewModel? = null,
+    /** Plays an episode chosen from the list. */
+    onPlay: (PlayRequest) -> Unit = controller::start,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
     // Back, focus, hiding the controls and keeping the screen on: the frame Live TV's player shares.
@@ -212,7 +253,7 @@ private fun PlayerContent(
         val request = list.playRequest(episode) ?: return
         episodesOpen = false
         picker = null
-        controller.start(request)
+        onPlay(request)
         list.playing(request.fileId)
         controlsVisible = true
         shell.wanted = focus.playPause
