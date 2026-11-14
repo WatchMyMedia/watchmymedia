@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import media.watchmy.client.mobile.navigation.OnTabReselected
+import media.watchmy.client.mobile.components.MobileTab
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
@@ -114,6 +116,8 @@ fun LibraryScreen(
     LaunchedEffect(state.libraryId) { rowsVm.show(state.libraryId) }
     // One scroll for every layout, made above the phone/tablet branch, so turning the screen keeps the place.
     val grid = rememberLibraryGrid()
+    // Its tab tapped again takes the grid back to the top, as on the other tabs.
+    OnTabReselected(if (type == LibraryType.Tv) MobileTab.TvShows else MobileTab.Movies) { grid.animateScrollToItem(0) }
     val layout = media.watchmy.client.ui.rememberTabletLayout()
     if (layout.isTablet) {
         TabletLibraryScreen(type, state, vm, grid, user?.name, layout.twoPane, onOpenShow, onOpenMovie, onNavigate, onPlay, notMatched, rows, rowsVm)
