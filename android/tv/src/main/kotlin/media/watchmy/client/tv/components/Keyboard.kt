@@ -52,6 +52,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.runtime.LaunchedEffect
 import media.watchmy.client.ui.onBack
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
 
 private val Digits = "1234567890".map { it.toString() }
 private val Letters = listOf("qwertyuiop", "asdfghjkl'", "zxcvbnm,.-").map { row -> row.map { it.toString() } }
@@ -165,10 +167,17 @@ fun OnScreenKeyboard(
     masked: Boolean = false,
     note: String? = null,
     tvKey: FocusRequester = remember { FocusRequester() },
+    opener: TvKeyboardOpener? = null,
 ) {
     val editor = remember { FocusRequester() }
     val ime = LocalSoftwareKeyboardController.current
     var onTvKeyboard by remember { mutableStateOf(false) }
+    val openTvKeyboard: () -> Unit = {
+        onTvKeyboard = true
+        editor.requestFocus()
+        ime?.show()
+    }
+    SideEffect { opener?.action = openTvKeyboard }
     val gap = 8.dp
     // Back with the TV's keyboard already hidden: back to the key, not out of the screen.
     Column(
@@ -189,11 +198,7 @@ fun OnScreenKeyboard(
         )
         Key(
             "Use the TV’s keyboard",
-            {
-                onTvKeyboard = true
-                editor.requestFocus()
-                ime?.show()
-            },
+            openTvKeyboard,
             Modifier.width((keySize + gap) * 10 - gap).height(keySize).focusRequester(tvKey),
             fontSize = 20.sp,
         )
@@ -223,6 +228,14 @@ fun OnScreenKeyboard(
             tvKey.requestFocus()
         }
     }
+}
+
+/** Opens the TV's keyboard for a [OnScreenKeyboard]'s field from elsewhere on the screen (Search's box). */
+@Stable
+class TvKeyboardOpener {
+    internal var action: () -> Unit = {}
+
+    fun open() = action()
 }
 
 @Composable
@@ -263,6 +276,7 @@ fun KeyboardField(
     masked: Boolean = false,
     active: Boolean = false,
     height: Dp = 72.dp,
+    dim: Boolean = false,
 ) {
     val shape = RoundedCornerShape(14.dp)
     Row(
@@ -278,7 +292,8 @@ fun KeyboardField(
         if (shown.isEmpty() && !active) {
             Text(placeholder, style = inter(24.sp), color = WmmColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
         } else {
-            Text(shown, style = inter(24.sp), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.StartEllipsis, modifier = Modifier.weight(1f, fill = false))
+            // [dim]: words still being heard (voice typing), a shade softer.
+            Text(shown, style = inter(24.sp), color = if (dim) WmmColors.TextSoft else WmmColors.Text, maxLines = 1, overflow = TextOverflow.StartEllipsis, modifier = Modifier.weight(1f, fill = false))
             if (active) Box(Modifier.padding(start = 2.dp).width(3.dp).height(30.dp).background(WmmColors.Accent))
             if (shown.isEmpty()) Text(placeholder, style = inter(24.sp), color = WmmColors.TextFaint, maxLines = 1, modifier = Modifier.padding(start = 10.dp))
         }

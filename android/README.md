@@ -369,7 +369,14 @@ apps targeting API 37). `LocalNetworkGate` in `app` asks once at launch; after
 devices. A system dialog dismissed without an answer asks again at the next
 launch, and a Cast Connect play that opens the app while the question is
 up waits for the answer (two minutes at most) before it looks for the
-caster's server.
+caster's server. The server picker offers it again when nothing is found.
+
+TV Search's microphone listens in the app (`VoiceTyping`, with the TV's
+`SpeechRecognizer`), so the app declares `RECORD_AUDIO` in `tv`'s manifest,
+with `android.hardware.microphone` not required (the one APK runs on phones
+and TVs without one). The permission is asked for at the microphone's first
+press, on a TV only; the phone has no microphone key and never asks. A TV
+that offers no speech recognition to apps has no microphone key.
 
 ## Live TV on phones and tablets
 
