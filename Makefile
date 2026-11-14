@@ -96,22 +96,31 @@ apple-tv-test-sim: apple-gen ## Build the Apple TV app and run every test on the
 # GitHub's three-core runner: there two clones made every test two to three
 # times slower, and the UI tests took no less time (runs of 2026-11-12 and
 # 2026-11-14), so CI keeps one.
+#
+# CI splits the UI tests between two jobs instead: TV_UI_SHARD=1/2 runs the
+# first share of the test classes (apple/scripts/tv-ui-shard.py shares them out
+# by test count), and TV_KIT_TESTS=no leaves the Kit's tests to the other job.
 TV_UI_WORKERS ?= 1
-apple-tv-test-sim-ci: apple-gen ## Build once, then the Kit tests and the UI tests apart on the $(TV_SIM) simulator (TV_UI_WORKERS=2 for clones)
+TV_UI_SHARD ?=
+TV_KIT_TESTS ?= yes
+comma := ,
+apple-tv-test-sim-ci: apple-gen ## Build once, then the Kit tests and the UI tests apart on the $(TV_SIM) simulator (TV_UI_SHARD=1/2 for half the UI tests)
+	ui_tests="$$($(if $(TV_UI_SHARD),python3 -I apple/scripts/tv-ui-shard.py $(subst /, ,$(TV_UI_SHARD)),echo -only-testing:WatchMyMediaTVUITests))" && \
+	[ -n "$$ui_tests" ] && \
 	id=$$(apple/scripts/simulator.sh "$(TV_SIM)" appletv) && \
 	{ xcrun simctl boot "$$id" 2>/dev/null || true; } && \
 	rm -rf apple/build/TVTests.xcresult apple/build/TVUITests.xcresult && \
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
 	  -derivedDataPath $(APPLE_DERIVED) $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) build-for-testing && \
 	{ kit=0; ui=0; \
-	  xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
+	  $(if $(filter yes,$(TV_KIT_TESTS)),xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator$(comma)id=$$id" \
 	    -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVTests.xcresult $(APPLE_TEST_FLAGS) \
 	    $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) \
-	    -skip-testing:WatchMyMediaTVUITests test-without-building || kit=$$?; \
+	    -skip-testing:WatchMyMediaTVUITests test-without-building || kit=$$?;) \
 	  xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
 	    -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVUITests.xcresult $(APPLE_TEST_FLAGS) \
 	    $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) \
-	    -only-testing:WatchMyMediaTVUITests \
+	    $$ui_tests \
 	    $(if $(filter-out 1,$(TV_UI_WORKERS)),-parallel-testing-enabled YES -parallel-testing-worker-count $(TV_UI_WORKERS)) \
 	    test-without-building || ui=$$?; \
 	  echo "Kit tests: exit $$kit; UI tests: exit $$ui"; \

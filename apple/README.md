@@ -19,7 +19,7 @@ make apple-api        # after `make gen-api`: regenerate Kit/Sources/WMMAPI/Gene
 make apple-e2e        # the app end to end against a server (default: the fixture server at localhost:27588)
 make apple-tv-build   # build the Apple TV app for the simulator
 make apple-tv-test-sim # build it and run every test on the Apple TV 4K simulator (TV_SIM=… for another)
-make apple-tv-test-sim-ci # what CI runs: one build, then the Kit's tests and the UI tests apart (TV_UI_WORKERS=2 for clones)
+make apple-tv-test-sim-ci # what CI runs: one build, then the Kit's tests and the UI tests apart; CI's two jobs pass TV_UI_SHARD=1/2 and 2/2 (TV_KIT_TESTS=no) to share the UI test classes
 make apple-build-release    # the iPhone app in Release for devices, unsigned, then check-release-binary.sh (CI runs it)
 make apple-tv-build-release # the same for the Apple TV app
 make apple-perf       # launch and scrolling measures on SIM and TV_SIM, five runs each (not in CI)

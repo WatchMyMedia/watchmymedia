@@ -4,6 +4,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -476,9 +477,16 @@ esac
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         tv = re.search(r'(?ms)^  apple-tv:\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
         step = re.search(r'(?ms)- name: Build and test on an Apple TV simulator\n(.*?)(?=      -)', tv).group(1)
-        self.assertIn('timeout-minutes: 40', step)
-        self.assertIn("make apple-tv-test-sim-ci APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH=\"$PATH\"", step)
+        self.assertIn('timeout-minutes: 30', step)
+        self.assertIn("make apple-tv-test-sim-ci TV_UI_SHARD=${{ matrix.share }}/2 TV_KIT_TESTS=${{ matrix.share == 1 && 'yes' || 'no' }} "
+                      "APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH=\"$PATH\"", step)
         self.assertNotIn('continue-on-error', tv)
+        # Two shares, both run whatever the other does; the Release build once.
+        self.assertIn('fail-fast: false', tv)
+        self.assertIn('share: [1, 2]', tv)
+        release = re.search(r'(?ms)- name: Build for release\n(.*?)(?=      -)', tv).group(1)
+        self.assertIn('if: matrix.share == 2', release)
+        self.assertIn('name: apple-tv-test-results-${{ matrix.share }}', tv)
         self.assertIn('apple/build/TVTests.xcresult', tv)
         self.assertIn('apple/build/TVUITests.xcresult', tv)
 
@@ -579,6 +587,31 @@ esac
             failed = subprocess.run(command, cwd=tmp, env=dict(env, FAIL_ON='build-for-testing'), capture_output=True)
             self.assertNotEqual(0, failed.returncode)
             self.assertEqual(1, len(capture.read_text().splitlines()), 'no tests without a build')
+
+            # The two CI shares: the real share script over two stand-in classes.
+            shutil.copy(ROOT / 'apple/scripts/tv-ui-shard.py', path / 'apple/scripts/tv-ui-shard.py')
+            (path / 'apple/TVUITests').mkdir(parents=True)
+            (path / 'apple/TVUITests/A.swift').write_text(
+                'final class ATests: XCTestCase {\n    func testOne() {}\n    func testTwo() {}\n}\n')
+            (path / 'apple/TVUITests/B.swift').write_text('final class BTests: XCTestCase {\n    func testThree() {}\n}\n')
+            capture.unlink()
+            subprocess.run(command + ['TV_UI_SHARD=1/2'], cwd=tmp, env=env, check=True, capture_output=True)
+            build, kit, ui = capture.read_text().splitlines()
+            self.assertIn('-skip-testing:WatchMyMediaTVUITests', kit)
+            self.assertIn('-only-testing:WatchMyMediaTVUITests/ATests', ui)
+            self.assertNotIn('BTests', ui)
+            capture.unlink()
+            subprocess.run(command + ['TV_UI_SHARD=2/2', 'TV_KIT_TESTS=no'], cwd=tmp, env=env, check=True,
+                           capture_output=True)
+            build, ui = capture.read_text().splitlines()
+            self.assertTrue(build.endswith('build-for-testing'), build)
+            self.assertIn('-only-testing:WatchMyMediaTVUITests/BTests', ui)
+            self.assertNotIn('ATests', ui)
+            self.assertNotIn('-skip-testing', ui)
+            capture.unlink()
+            failed = subprocess.run(command + ['TV_UI_SHARD=3/2'], cwd=tmp, env=env, capture_output=True)
+            self.assertNotEqual(0, failed.returncode, 'a share that does not exist fails')
+            self.assertFalse(capture.exists(), 'and builds nothing')
 
     def test_apple_jobs_build_release_unsigned_after_their_tests(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
