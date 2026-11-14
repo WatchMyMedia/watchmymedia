@@ -1,5 +1,12 @@
 package media.watchmy.client.mobile.navigation
 
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
@@ -223,6 +230,12 @@ fun MobileNavHost(
         entry?.destination?.hasRoute<MobileRoutes.Trailer>() != true
     val downloads by services.downloads.enabled.collectAsStateWithLifecycle()
     val tabs = MobileTab.shown(downloads, rail = showRail, liveTV = live.available)
+    // The players and the trailer draw under the cutout and the bars on purpose and place their own controls.
+    val inPlayer = entry?.destination?.hasRoute<MobileRoutes.Player>() == true || entry?.destination?.hasRoute<MobileRoutes.LivePlayer>() == true ||
+        entry?.destination?.hasRoute<MobileRoutes.Trailer>() == true
+    // Every other page clears the camera cutout and a side navigation bar (a phone held sideways) here, once,
+    // rather than each page: titles sat under the cutout and lists under the bar.
+    val sides = if (inPlayer) Modifier else Modifier.windowInsetsPadding(WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal))
     Box(Modifier.fillMaxSize()) {
         NavigationSuiteScaffold(
             layoutType = if (showRail) NavigationSuiteType.NavigationRail else NavigationSuiteType.None,
@@ -245,7 +258,7 @@ fun MobileNavHost(
                 }
             },
         ) {
-            Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().then(sides)) {
                 NavHost(nav, startDestination = MobileRoutes.Home, modifier = Modifier.weight(1f)) {
                     composable<MobileRoutes.Home> {
                         HomeScreen(onPlay = nav::play, onOpenShow = openShow, onOpenMovie = openMovie, onNavigate = go, onOpenSeason = openSeason, onOpenEpisode = openEpisode, liveChannels = live.channels.takeIf { live.available }.orEmpty(), onWatchLive = watchLive, liveListings = live.listings)
@@ -370,8 +383,6 @@ fun MobileNavHost(
                 }
                 // While casting, the TV's play on every screen but the player itself: a channel's
                 // (Live TV included), or a file's (as before, not on Live TV).
-                val inPlayer = entry?.destination?.hasRoute<MobileRoutes.Player>() == true || entry?.destination?.hasRoute<MobileRoutes.LivePlayer>() == true ||
-                    entry?.destination?.hasRoute<MobileRoutes.Trailer>() == true
                 if (!inPlayer && castMiniLine(liveCast, liveCast.deviceName.orEmpty()) != null) LiveCastMini(live.channels, onOpen = openLiveRemote)
                 else if (!inPlayer && tab != MobileTab.LiveTV) CastMiniController(onOpen = nav::play)
                 if (tab != null && !showRail) MobileBottomBar(tab, onSelect = nav::openTab, settingsCount = badge.inbox ?: 0, tabs = tabs)
