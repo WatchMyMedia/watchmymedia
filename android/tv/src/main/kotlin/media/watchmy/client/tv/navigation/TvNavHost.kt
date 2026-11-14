@@ -63,6 +63,7 @@ import media.watchmy.client.tv.requests.RequestsScreen
 import media.watchmy.client.tv.search.SearchScreen
 import media.watchmy.client.tv.settings.SettingsScreen
 import media.watchmy.client.tv.rows.ListPageTv
+import media.watchmy.client.ui.onBack
 import media.watchmy.client.ui.rememberRequestBadge
 
 /** Opens the player for [request]. */
@@ -159,7 +160,6 @@ fun TvNavHost(
                     live.channels.firstOrNull { it.id == b.channelId }?.takeIf { it.available }?.let(watchLive)
                 }
             },
-            onDismiss = { dismiss() },
         )
     }
     LaunchedEffect(deepLink) {
@@ -177,10 +177,12 @@ fun TvNavHost(
     }
     val badge by rememberRequestBadge(services.requests)
     CompositionLocalProvider(LocalRequestBadge provides badge, LocalLiveTVAvailable provides live.available) {
-        Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
-            // The banner never takes focus: Hold OK watches and Back dismisses, before the screen sees them.
-            banner != null && bannerKeys.handle(event.nativeKeyEvent.keyCode, event.type == KeyEventType.KeyDown, event.nativeKeyEvent.repeatCount)
-        }) {
+        // The banner never takes focus: Hold OK watches and Back dismisses, before the screen sees them.
+        Box(
+            Modifier.fillMaxSize().onBack(enabled = banner != null) { dismiss() }.onPreviewKeyEvent { event ->
+                banner != null && bannerKeys.handle(event.nativeKeyEvent.keyCode, event.type == KeyEventType.KeyDown, event.nativeKeyEvent.repeatCount)
+            },
+        ) {
             NavHost(
                 nav,
                 startDestination = TvRoutes.Home,

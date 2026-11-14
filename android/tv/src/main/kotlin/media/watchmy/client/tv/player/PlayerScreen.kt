@@ -1,6 +1,5 @@
 package media.watchmy.client.tv.player
 
-import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -57,10 +56,10 @@ import media.watchmy.client.model.PlayerStatus
 import media.watchmy.client.model.PlayerUiState
 import media.watchmy.client.model.tracks
 import media.watchmy.client.ui.LocalAppServices
-import media.watchmy.client.ui.PlayerKey
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.CaptionLook
 import media.watchmy.client.ui.components.SubtitleCues
+import media.watchmy.client.ui.onBack
 import media.watchmy.client.ui.playerKey
 
 /**
@@ -155,7 +154,6 @@ private fun PlayerContent(
     // A focus move asked for by an action, honoured once its target is composed.
     var wanted by remember { mutableStateOf<FocusRequester?>(null) }
     val consumedKeys = remember { mutableSetOf<Int>() }
-    var backDown by remember { mutableStateOf(false) }
     val onLeaveNow by rememberUpdatedState(onLeave)
     // Set once the viewer leaves. The screen stays composed while it fades out, and the
     // screen underneath takes focus meanwhile: the player must not take it back, or focus
@@ -246,16 +244,6 @@ private fun PlayerContent(
         if (leaving) return false
         val native = event.nativeKeyEvent
         val key = playerKey(native.keyCode)
-        // Compose turns an unhandled Back into a focus exit, so the player takes it
-        // here, on key-up as the platform does, rather than leaving it to BackHandler.
-        if (key == PlayerKey.Back) {
-            if (event.type == KeyEventType.KeyDown && native.repeatCount == 0) backDown = true
-            if (event.type == KeyEventType.KeyUp && backDown) {
-                backDown = false
-                onBack()
-            }
-            return true
-        }
         if (event.type == KeyEventType.KeyUp) {
             if (!consumedKeys.remove(native.keyCode)) return false
             if (seek.holding) seek.release()?.let { controller.seekTo(it) }
@@ -271,9 +259,6 @@ private fun PlayerContent(
         perform(action, native.eventTime, repeat)
         return true
     }
-
-    // Back that is not a key (a gesture, or nothing in the player has focus).
-    BackHandler(enabled = !leaving) { onBack() }
 
     LaunchedEffect(controller) {
         controller.events.collect { event ->
@@ -365,6 +350,8 @@ private fun PlayerContent(
         Modifier
             .fillMaxSize()
             .background(Color.Black)
+            // Back as the remote's key or as a back callback (Android 16 and later send TVs only the callback).
+            .onBack(enabled = !leaving) { onBack() }
             .onPreviewKeyEvent { onKey(it) }
             .onFocusChanged {
                 treeHasFocus = it.hasFocus

@@ -1,7 +1,6 @@
 package media.watchmy.client.tv.live
 
 import android.view.KeyEvent as AndroidKey
-import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -63,6 +62,7 @@ import media.watchmy.client.presentation.live.editLiveNumber
 import media.watchmy.client.presentation.live.nextLiveChannel
 import media.watchmy.client.tv.components.rememberFocusMemory
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.onBack
 import media.watchmy.client.ui.components.rememberLiveClockFormat
 import media.watchmy.client.ui.components.rememberLiveNow
 
@@ -141,7 +141,6 @@ private fun LivePlayerContent(
     var treeHasFocus by remember { mutableStateOf(false) }
     var rootFocused by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }
-    var backDown by remember { mutableStateOf(false) }
     val consumed = remember { mutableSetOf<Int>() }
     val terminal = state.status in listOf(PlayerStatus.Error, PlayerStatus.Ended)
     // The takeover warning never takes focus, like the reminder banner: Hold OK is Don't record it, Back dismisses it.
@@ -151,7 +150,6 @@ private fun LivePlayerContent(
     val takeoverKeys = remember(takeover?.takeoverKey(), takeover?.takeoverCanCancel) {
         BannerKeys(
             onWatch = { takeover?.takeoverRecordingId?.let(recorder::cancel) },
-            onDismiss = { dismissedTakeover = takeover?.takeoverKey() },
             holdsOk = takeover?.takeoverCanCancel == true,
         )
     }
@@ -219,7 +217,6 @@ private fun LivePlayerContent(
         }
     }
 
-    BackHandler(enabled = !leaving, onBack = ::back)
     LaunchedEffect(current.id) {
         select(current)
         channelMemory.focused(current.id)
@@ -266,16 +263,14 @@ private fun LivePlayerContent(
     }
 
     Box(
-        modifier.fillMaxSize().background(Color.Black).onPreviewKeyEvent { event ->
+        // Back dismisses the takeover warning first, as the reminder banner's does.
+        modifier.fillMaxSize().background(Color.Black).onBack(enabled = !leaving) {
+            if (takeover != null) dismissedTakeover = takeover.takeoverKey() else back()
+        }.onPreviewKeyEvent { event ->
             if (leaving) return@onPreviewKeyEvent false
             val native = event.nativeKeyEvent
             val code = native.keyCode
             if (takeover != null && takeoverKeys.handle(code, event.type == KeyEventType.KeyDown, native.repeatCount)) return@onPreviewKeyEvent true
-            if (code == AndroidKey.KEYCODE_BACK) {
-                if (event.type == KeyEventType.KeyDown && native.repeatCount == 0) backDown = true
-                if (event.type == KeyEventType.KeyUp && backDown) { backDown = false; back() }
-                return@onPreviewKeyEvent true
-            }
             if (event.type == KeyEventType.KeyUp) return@onPreviewKeyEvent consumed.remove(code)
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             val prompt = controller.state.value.askStillWatching

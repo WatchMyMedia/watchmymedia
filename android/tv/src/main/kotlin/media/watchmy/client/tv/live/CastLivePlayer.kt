@@ -1,6 +1,5 @@
 package media.watchmy.client.tv.live
 
-import android.view.KeyEvent as AndroidKey
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
@@ -28,9 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -52,6 +48,7 @@ import media.watchmy.client.tv.components.TvButtonStyle
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
+import media.watchmy.client.ui.onBack
 import media.watchmy.client.ui.components.WmmIcons
 
 /**
@@ -163,10 +160,7 @@ internal fun CastStoppedScreen(sender: String, channel: String, onClose: () -> U
         body = "$channel stopped on this TV, and its tuner is free again.",
         small = "This TV goes back to what it showed before in ${STOPPED_SHOWN_MS / 1000} s.",
         focus = focus,
-        modifier = modifier.onPreviewKeyEvent { event ->
-            if (event.nativeKeyEvent.keyCode == AndroidKey.KEYCODE_BACK && event.type == KeyEventType.KeyUp) close()
-            event.nativeKeyEvent.keyCode == AndroidKey.KEYCODE_BACK
-        },
+        modifier = modifier.onBack { close() },
     ) {
         TvButton("Close", { close() }, Modifier.focusRequester(focus), style = TvButtonStyle.Primary)
     }

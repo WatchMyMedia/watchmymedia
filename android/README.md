@@ -861,9 +861,19 @@ minutes of playing a file, before and after a change.
   `Artwork(url, seed = title, …)`, which draws the mockups' gradient when the
   URL is null or loading. The app's image loader adds the sign-in.
 - **TV focus**: the focused card gets a 4 dp gold ring and a slight scale;
-  rows remember their focused item; Back closes overlays first. Compose
-  turns the remote's Back into a focus move while something has focus, so a
-  `BackHandler` never sees it: handle Back in `onPreviewKeyEvent`.
+  rows remember their focused item; a screen's remembered item survives
+  navigation (`rememberFocusMemory`, and `rememberSaveable` for anything
+  else focus depends on); a button busy with its work stays focusable and
+  ignores OK (`FocusableBox`'s `enabled`). Back closes overlays first:
+  handle it with `Modifier.onBack` (`core:ui`) on the screen or overlay it
+  belongs to. A remote's Back arrives as a key, which Compose turns into a
+  focus move before a `BackHandler` sees it; on Android 16 and later, where
+  the app targets SDK 36 or higher, it arrives only as a back callback,
+  with no key (seen on the `android-37.0` image: `adb shell input keyevent
+  KEYCODE_BACK` reaches the app through `WindowOnBackDispatcher`). `onBack`
+  takes both, once a press, and the overlay enabled last takes it first;
+  `onPreviewKeyEvent` or `BackHandler` alone misses one. A `TvDialog` gets
+  Back from its own window.
 - **TV sizes**: a 1080p Google TV is 960×540 dp, so `TvTheme` sets the
   density to make the window 1920 dp wide. Inside it, a mockup px is a dp
   on every TV and on the tablet emulator. `Dialog`, `Popup` and

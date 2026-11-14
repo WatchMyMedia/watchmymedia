@@ -37,7 +37,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
-import androidx.activity.compose.BackHandler
 import androidx.compose.ui.focus.onFocusChanged
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -132,6 +131,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.ui.onBack
 
 /**
  * Home. Arranged (servers that send `rows`): screens, one row each, paged
@@ -550,7 +550,6 @@ private fun ArrangedHomeContent(
 
     // Back from a row page goes to the first page before leaving Home, also while the pager is still on its way down.
     val awayFromTop by remember { derivedStateOf { pager.currentPage > 0 || goal.let { it != null && it.key != currentPages.first().key } } }
-    BackHandler(enabled = awayFromTop) { pageTo(0, interrupting = true) }
 
     val now = rememberLiveNow()
     val format = rememberLiveClockFormat()
@@ -574,7 +573,7 @@ private fun ArrangedHomeContent(
 
     VerticalPager(
         state = pager,
-        modifier = Modifier.fillMaxSize().testTag(TestTags.HOME),
+        modifier = Modifier.fillMaxSize().testTag(TestTags.HOME).onBack(enabled = awayFromTop) { pageTo(0, interrupting = true) },
         beyondViewportPageCount = 1,
         userScrollEnabled = false,
         key = { pages[it].key },
