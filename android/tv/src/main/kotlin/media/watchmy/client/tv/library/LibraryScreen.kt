@@ -86,6 +86,8 @@ import media.watchmy.client.tv.rows.TvRowActions
 import media.watchmy.client.tv.rows.bleed
 import media.watchmy.client.tv.rows.cardKey
 import media.watchmy.client.ui.ReportShown
+import androidx.compose.runtime.derivedStateOf
+import media.watchmy.client.model.ItemSort
 
 private enum class Picker { Sort, Decade }
 
@@ -113,6 +115,11 @@ fun LibraryScreen(
     val gridState = rememberLazyGridState()
     // Whether focus is somewhere on this screen's content already, which first focus leaves alone.
     var contentFocused by remember { mutableStateOf(false) }
+    // The A–Z strip, when sorted by title, and two rows at a time with Page Up/Down or CH+/CH− (§6.2).
+    val jumps = rememberGridJumps(vm, memory, gridState)
+    val byTitle = state.choices.sort == ItemSort.Title && !state.letters.isNullOrEmpty()
+    var onStrip by remember { mutableStateOf(false) }
+    LaunchedEffect(state.jump?.revision) { jumps.jumped(state) }
     val title = if (type == LibraryType.Tv) "TV Shows" else "Movies"
     // The library's rows above the grid, from servers that arrange them (PLAN-ROWS.md Decision 11).
     val rowsVm = viewModel(key = "tv-library-rows-$type") { LibraryRowsViewModel(services.library, services.rows) }
@@ -124,7 +131,7 @@ fun LibraryScreen(
         if (rowsVm.arranges && state.libraryId != null) {
             val actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, { show, season, episode -> onNavigate(TvRoutes.Episode(show, season, episode)) }, notMatched, { vm.setWatched(it, !it.watched) }) { id -> onNavigate(TvRoutes.MediaList(id)) }
             ArrangedLibrary(
-                type, title, state, rows, actions, memory, gridState,
+                type, title, state, rows, actions, memory, gridState, jumps, byTitle,
                 chips = { m -> ChipRow(vm, state, memory, { picker = Picker.Decade }, m, top = 0.dp) },
                 onSort = { picker = Picker.Sort },
                 onEditRows = { rows.screen?.let { onNavigate(TvRoutes.RowSettings(it)) } },
@@ -167,7 +174,7 @@ fun LibraryScreen(
                             LazyVerticalGrid(
                                 columns = GridCells.Fixed(8),
                                 state = gridState,
-                                modifier = Modifier.fillMaxSize().padding(start = ContentStart - 16.dp, end = ContentEnd - 16.dp).focusRestorer(),
+                                modifier = Modifier.fillMaxSize().padding(start = ContentStart - 16.dp, end = ContentEnd - 16.dp + if (byTitle) StripRoom else 0.dp).focusRestorer().pageKeys(jumps),
                                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 22.dp, bottom = 60.dp),
                                 horizontalArrangement = Arrangement.spacedBy(24.dp),
                                 verticalArrangement = Arrangement.spacedBy(28.dp),
@@ -178,9 +185,15 @@ fun LibraryScreen(
                                         imageUrl = services.library.imageUrl(item.posterPath, ImageSize.W342),
                                         onClick = { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) },
                                         onLongClick = if (item.kind == ItemKind.Movie) ({ vm.setWatched(item, !item.watched) }) else null,
+                                        narrow = byTitle,
                                         modifier = Modifier
                                             .focusMemory(memory, "item:${item.id}")
-                                            .onFocusChanged { if (it.isFocused) vm.onVisible(i) },
+                                            .onFocusChanged {
+                                                if (it.isFocused) {
+                                                    jumps.focusedIndex = i
+                                                    vm.onVisible(i)
+                                                }
+                                            },
                                     )
                                 }
                                 if (state.loadingMore || state.moreError != null) {
@@ -198,6 +211,10 @@ fun LibraryScreen(
                         LaunchedEffect(gridState) {
                             snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }.collect(vm::onVisible)
                         }
+                        if (byTitle) {
+                            Strip(state, type, jumps, Modifier.align(Alignment.TopEnd).padding(top = 22.dp, end = ContentEnd - 16.dp)) { onStrip = it }
+                        }
+                        JumpHints(onStrip, jumps.currentLetter(state), byTitle, Modifier.align(Alignment.BottomStart).padding(start = ContentStart, bottom = 20.dp))
                         // Once, when the grid first shows (or comes back after Back): a filter
                         // chosen on the chips leaves focus on its chip (§3.2.2).
                         LaunchedEffect(Unit) {
@@ -254,6 +271,8 @@ private fun ArrangedLibrary(
     actions: TvRowActions,
     memory: media.watchmy.client.tv.components.FocusMemory,
     gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
+    jumps: GridJumps,
+    byTitle: Boolean,
     chips: @Composable (Modifier) -> Unit,
     onSort: () -> Unit,
     onEditRows: () -> Unit,
@@ -266,12 +285,16 @@ private fun ArrangedLibrary(
     val density = LocalDensity.current
     val spec = remember(density) { with(density) { KeepInViewSpec(leading = 40.dp.toPx(), trailing = 60.dp.toPx()) } }
     val full: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
-    CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
+    // Sorted by title, the grid makes room for the A–Z strip; the rows still reach the screen's edge.
+    val end = ContentEnd + if (byTitle) StripRoom else 0.dp
+    jumps.header = drawn.size + 4
+    var onStrip by remember { mutableStateOf(false) }
+    CompositionLocalProvider(LocalBringIntoViewSpec provides spec) { Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(8),
             state = gridState,
-            modifier = Modifier.fillMaxSize().focusRestorer(),
-            contentPadding = PaddingValues(start = ContentStart, end = ContentEnd, top = 56.dp, bottom = 60.dp),
+            modifier = Modifier.fillMaxSize().focusRestorer().pageKeys(jumps),
+            contentPadding = PaddingValues(start = ContentStart, end = end, top = 56.dp, bottom = 60.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalArrangement = Arrangement.spacedBy(28.dp),
         ) {
@@ -283,7 +306,7 @@ private fun ArrangedLibrary(
                 }
             }
             drawn.forEach { row ->
-                item("row-${row.id}", span = full) { TvArrangedRow(row, services.library, memory, actions, Modifier.bleed(ContentStart, ContentEnd)) }
+                item("row-${row.id}", span = full) { TvArrangedRow(row, services.library, memory, actions, Modifier.bleed(ContentStart, end)) }
             }
             item("edit", span = full) {
                 Row { TvButton("Edit rows", onEditRows, Modifier.focusMemory(memory, "edit"), icon = WmmIcons.Sliders) }
@@ -300,7 +323,7 @@ private fun ArrangedLibrary(
                     }
                 }
             }
-            item("chips", span = full) { chips(Modifier.bleed(ContentStart, ContentEnd)) }
+            item("chips", span = full) { chips(Modifier.bleed(ContentStart, end)) }
             when {
                 state.loading && state.items.isEmpty() -> item("loading", span = full) { Box(Modifier.fillMaxWidth().height(300.dp)) { LoadingState() } }
                 state.error != null -> item("error", span = full) { Text(state.error.orEmpty(), style = inter(22.sp), color = WmmColors.Error) }
@@ -315,7 +338,13 @@ private fun ArrangedLibrary(
                             imageUrl = services.library.imageUrl(item.posterPath, ImageSize.W342),
                             onClick = { onOpen(item) },
                             onLongClick = if (item.kind == ItemKind.Movie) ({ actions.onToggleWatched(item) }) else null,
-                            modifier = Modifier.focusMemory(memory, "item:${item.id}").onFocusChanged { if (it.isFocused) onVisible(i) },
+                            narrow = byTitle,
+                            modifier = Modifier.focusMemory(memory, "item:${item.id}").onFocusChanged {
+                                if (it.isFocused) {
+                                    jumps.focusedIndex = i
+                                    onVisible(i)
+                                }
+                            },
                         )
                     }
                     if (state.loadingMore || state.moreError != null) {
@@ -326,7 +355,13 @@ private fun ArrangedLibrary(
                 }
             }
         }
-    }
+        // The strip shows once the grid is on screen, below the rows.
+        val gridInView by remember { derivedStateOf { gridState.firstVisibleItemIndex >= jumps.header - 2 } }
+        if (byTitle && gridInView) {
+            Strip(state, type, jumps, Modifier.align(Alignment.TopEnd).padding(top = 56.dp, end = ContentEnd)) { onStrip = it }
+        }
+        if (gridInView) JumpHints(onStrip, jumps.currentLetter(state), byTitle, Modifier.align(Alignment.BottomStart).padding(start = ContentStart, bottom = 20.dp))
+    } }
     LaunchedEffect(gridState) {
         snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }.collect { onVisible((it - drawn.size - 4).coerceAtLeast(0)) }
     }
@@ -381,13 +416,14 @@ private fun ChipRow(vm: LibraryViewModel, state: LibraryViewModel.State, memory:
 
 /** A 190×285 poster (`.card`): the New badge, the watched check and progress (no quality badge, PLAN-HOME.md §5). */
 @Composable
-private fun GridCard(item: BrowseItem, imageUrl: String?, onClick: () -> Unit, onLongClick: (() -> Unit)?, modifier: Modifier = Modifier) {
+private fun GridCard(item: BrowseItem, imageUrl: String?, onClick: () -> Unit, onLongClick: (() -> Unit)?, modifier: Modifier = Modifier, narrow: Boolean = false) {
     MediaCard(
         title = item.title,
         subtitle = item.gridSubtitle(),
         imageUrl = imageUrl,
-        artWidth = 190.dp,
-        artHeight = 285.dp,
+        // Narrower beside the A–Z strip, so eight still fit.
+        artWidth = if (narrow) 178.dp else 190.dp,
+        artHeight = if (narrow) 267.dp else 285.dp,
         onClick = onClick,
         onLongClick = onLongClick,
         focusedScale = 1.08f,
@@ -400,8 +436,29 @@ private fun GridCard(item: BrowseItem, imageUrl: String?, onClick: () -> Unit, o
 }
 
 /** The TV grid's columns, and a page of six rows of them. */
-private const val COLUMNS = 8
+internal const val COLUMNS = 8
 private const val PAGE_SIZE = COLUMNS * 6
 
 private fun noLibrary(type: LibraryType) =
     if (type == LibraryType.Tv) "This server has no TV library yet. Add one in the web app." else "This server has no movie library yet. Add one in the web app."
+
+/** The room the A–Z strip takes at the grid's right edge. */
+private val StripRoom = 96.dp
+
+/** The strip for this grid's letters, telling [onStrip] whether focus is on it. */
+@Composable
+private fun Strip(state: LibraryViewModel.State, type: LibraryType, jumps: GridJumps, modifier: Modifier, onStrip: (Boolean) -> Unit) {
+    LetterStrip(
+        letters = state.letters.orEmpty(),
+        total = state.total,
+        noun = if (type == LibraryType.Tv) "show" else "movie",
+        current = jumps.currentLetter(state),
+        onPreview = jumps::preview,
+        onPick = jumps::pick,
+        onBack = jumps::back,
+        modifier = modifier.onFocusChanged {
+            if (it.hasFocus) jumps.enteredStrip()
+            onStrip(it.hasFocus)
+        },
+    )
+}
