@@ -88,6 +88,10 @@ class SignInViewModel(
             ).distinctUntilChanged().collect { (s, signedIn) ->
                 if (signedIn) {
                     pairing?.cancel()
+                    // Signed in while a code was up: it was the code (the account can come in just before
+                    // the pairing says so), so the screen says the code was accepted.
+                    val user = auth.user.value
+                    _state.update { if (it.codeSignIn && it.pairing is PairingState.Waiting && user != null) it.copy(pairing = PairingState.Approved(user)) else it }
                     return@collect
                 }
                 _state.value = State(setupRequired = s?.third == true, revision = _state.value.revision + 1)
