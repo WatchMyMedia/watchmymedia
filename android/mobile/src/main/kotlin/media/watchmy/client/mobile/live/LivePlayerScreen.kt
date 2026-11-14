@@ -97,6 +97,7 @@ import media.watchmy.client.ui.components.ChannelLogo
 import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.components.rememberLiveClockFormat
 import media.watchmy.client.ui.components.rememberLiveNow
+import media.watchmy.client.ui.ShowsLiveChannels
 
 private enum class LivePanel { Channels, Quality }
 
@@ -128,6 +129,8 @@ fun LivePlayerScreen(
     onRecordings: () -> Unit = onGuide,
     onPlayRecording: (media.watchmy.client.model.PlayRequest) -> Unit = {},
 ) {
+    // Now and next on the player (banner, On now, picture in picture) follow the polled channel list.
+    ShowsLiveChannels()
     val services = LocalAppServices.current
     var where by rememberSaveable { mutableStateOf(if (onTv && castable) LiveWhere.Tv else LiveWhere.Phone) }
     var here by remember { mutableStateOf(target) }
