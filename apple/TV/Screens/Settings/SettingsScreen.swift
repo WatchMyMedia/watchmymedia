@@ -379,6 +379,15 @@ private struct SettingsView: View {
     // MARK: About
 
     private var about: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            aboutGroup
+            // Diagnostics, then the credits (TvDiagnostics.dc.html).
+            DiagnosticsGroup()
+            credits
+        }
+    }
+
+    private var aboutGroup: some View {
         SettingsGroup("About") {
             if let server = model.server {
                 FactRow(label: "Server", value: server.aboutLine)
@@ -392,11 +401,14 @@ private struct SettingsView: View {
                 SettingsRow(title: "Privacy policy and licences", compact: true) { Image(systemName: "chevron.right").font(.system(size: 17, weight: .bold)) }
             }
             .buttonStyle(SettingsRowStyle())
-            Text("Subtitles by OpenSubtitles.com · Metadata and artwork from TMDB")
-                .font(.system(size: 14))
-                .foregroundStyle(Palette.faint)
-                .padding(.horizontal, 18)
         }
+    }
+
+    private var credits: some View {
+        Text("Subtitles by OpenSubtitles.com · Metadata and artwork from TMDB")
+            .font(.system(size: 14))
+            .foregroundStyle(Palette.faint)
+            .padding(.horizontal, 18)
     }
 }
 

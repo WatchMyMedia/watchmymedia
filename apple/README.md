@@ -756,6 +756,18 @@ be in it:
 - No disk space or system uptime: their required reasons don't allow them in
   a report without a reason the manifests don't declare.
 
+On Apple TV, which has no clipboard to paste from, Settings › About's Help
+group has a Diagnostics row (TvDiagnostics.dc.html): it shows the redacted
+text as a QR code made on the Apple TV, beside a summary of what it holds,
+and Show as text pages through all of it (Down and Up turn the pages).
+`DiagnosticsCode` (WMMFeatures) decides what the code holds: at most
+`DiagnosticsCode.maxBytes` (997 bytes, a version 25 code at error correction
+M, 117 modules a side, which a phone reads from a sofa), leaving out the
+oldest log lines first and saying how many. `Kit/Tests/WMMUITests/DiagnosticsCodeSizeTests.swift`
+pins that size with CoreImage. `-diagnostics` with `-tab settings` opens the
+code at launch in a debug build, and `-diagnosticsLog` adds sixty made-up log
+lines, enough to fill the code and turn pages (`TVUITests/DiagnosticsTests.swift`).
+
 ## Layout
 
 | Path | What |

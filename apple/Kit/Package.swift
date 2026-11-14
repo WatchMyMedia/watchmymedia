@@ -71,7 +71,7 @@ let package = Package(
         .testTarget(name: "WMMPlaybackTests", dependencies: ["WMMPlayback", "WMMModel", "WMMFakes"]),
         .testTarget(name: "WMMDownloadsTests", dependencies: ["WMMDownloads", "WMMModel"]),
         .testTarget(name: "WMMFakesTests", dependencies: ["WMMFakes", "WMMModel"]),
-        .testTarget(name: "WMMUITests", dependencies: ["WMMUI", "WMMModel"]),
+        .testTarget(name: "WMMUITests", dependencies: ["WMMUI", "WMMModel", "WMMFeatures"]),
         .testTarget(name: "WMMFeaturesTests", dependencies: ["WMMFeatures", "WMMFakes", "WMMModel"]),
         .testTarget(name: "WMMCastTests", dependencies: ["WMMCast", "WMMModel", "WMMFakes"]),
     ]
