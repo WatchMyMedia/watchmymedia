@@ -1,4 +1,4 @@
-package media.watchmy.client.mobile.player
+package media.watchmy.client.presentation.player
 
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.PlayerStatus
@@ -15,7 +15,7 @@ import media.watchmy.client.model.PlayerUiState
  * tracks. [fileId] is the file playing now, which is a later episode when
  * the play moved on by itself.
  */
-internal fun handOver(request: PlayRequest, fileId: Long, state: PlayerUiState, positionMs: Long): PlayRequest {
+fun handOver(request: PlayRequest, fileId: Long, state: PlayerUiState, positionMs: Long): PlayRequest {
     val same = fileId == request.fileId
     return request.copy(
         fileId = fileId,
