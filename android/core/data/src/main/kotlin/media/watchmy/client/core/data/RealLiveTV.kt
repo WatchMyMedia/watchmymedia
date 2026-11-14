@@ -308,6 +308,7 @@ internal fun LiveTVCapabilities.toModel(features: ServerFeatures) = LiveCapabili
     recording = recording == true && features.liveRecordings,
     canRecord = canRecord == true && features.liveRecordings,
     automatic = automatic == true && features.liveAutomatic,
+    statusWaits = features.liveStatusWaits,
 )
 
 /**
@@ -413,9 +414,13 @@ internal class RealLivePlaybackGateway(
         // with this same bound gateway. Throwing here would leak that ID.
     }
 
-    override suspend fun status(sessionId: String): LiveSession {
-        if (access == null) return bind().status(sessionId)
-        val (base, reply) = access.call { base, client -> base to LiveTvApi(base, client).getLiveTVSession(sessionId) }
+    override suspend fun status(sessionId: String): LiveSession = awaitStatus(sessionId, 0)
+
+    /** Sent to a server that waits; 10 s at most, inside the API client's 30 s read timeout. */
+    override suspend fun awaitStatus(sessionId: String, waitMs: Long): LiveSession {
+        if (access == null) return bind().awaitStatus(sessionId, waitMs)
+        val wait = waitMs.coerceAtMost(MAX_STATUS_WAIT_MS).takeIf { it > 0 && access.features().liveStatusWaits }
+        val (base, reply) = access.call { base, client -> base to LiveTvApi(base, client).getLiveTVSession(sessionId, wait) }
         return reply.toModel(base)
     }
 
@@ -464,6 +469,11 @@ internal class RealLivePlaybackGateway(
 
     private fun requireCurrent() {
         if (!isCurrent) throw CancellationException("The signed-in account changed.")
+    }
+
+    private companion object {
+        /** The longest wait the server keeps a status read (livetv.MaxStatusWait). */
+        const val MAX_STATUS_WAIT_MS = 10_000L
     }
 }
 

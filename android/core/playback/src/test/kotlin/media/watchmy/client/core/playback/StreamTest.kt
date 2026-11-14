@@ -220,6 +220,55 @@ class StreamTest {
     }
 
     @Test
+    fun theDecisionsTokenPlaysWithoutAskingForOne() {
+        h.gateway.tokenWithDecision = true
+        h.start(PlayRequest(1, 0, "Lighthouse"), decision())
+        assertTrue("The first decision asks for a token", h.gateway.decisions.single().withMediaToken)
+        assertEquals("None asked for apart from the decision", 0, h.gateway.tokenCalls)
+        assertEquals("http://srv/api/playback/s1/master.m3u8?access_token=dec1", h.player.loads.single().url)
+        assertEquals(listOf("dec1"), h.player.liveTokens.map { it.token })
+
+        // A track change while the token is fresh needn't ask, and takes the new one that comes anyway.
+        h.gateway.decide = { decision(selectedAudio = it.audioIndex, sessionId = "s2") }
+        h.controller.selectAudio(2)
+        h.run()
+        assertFalse(h.gateway.decisions.last().withMediaToken)
+        assertEquals("dec2", h.player.liveTokens.last().token)
+        assertEquals(0, h.gateway.tokenCalls)
+    }
+
+    @Test
+    fun aPlayOnTheDecisionsTokenRenewsItInPlace() {
+        h.gateway.tokenWithDecision = true
+        h.gateway.tokenLifetimeMs = 40 * MIN
+        h.start(PlayRequest(1, 0, "Lighthouse"), decision())
+        h.advance(39 * MIN)
+        assertEquals(1, h.gateway.tokenCalls)
+        assertEquals("tok1", h.player.liveTokens.last().token)
+        assertEquals(1, h.gateway.decisions.size)
+        assertEquals(1, h.player.loads.size)
+    }
+
+    @Test
+    fun aDecisionWithoutATokenStillGetsOne() {
+        // An older server's, whose token failed beside it, or a download playing from the device.
+        h.start(PlayRequest(1, 0, "Lighthouse"), decision())
+        assertTrue(h.gateway.decisions.single().withMediaToken)
+        assertEquals(1, h.gateway.tokenCalls)
+        assertEquals("tok1", h.player.liveTokens.single().token)
+    }
+
+    @Test
+    fun aNewPlayAsksForANewTokenWithItsDecision() {
+        h.gateway.tokenWithDecision = true
+        h.start(PlayRequest(1, 0, "Lighthouse"), decision())
+        h.start(PlayRequest(2, 0, "Harbor Lights"), decision(playId = "b1", sessionId = "s2"))
+        assertTrue(h.gateway.decisions.last().withMediaToken)
+        assertEquals("dec2", h.player.liveTokens.last().token)
+        assertEquals(0, h.gateway.tokenCalls)
+    }
+
+    @Test
     fun aRefusedStreamGetsANewTokenOnce() {
         h.start(PlayRequest(1, 0, "Lighthouse"), decision())
         h.advance(20_000)

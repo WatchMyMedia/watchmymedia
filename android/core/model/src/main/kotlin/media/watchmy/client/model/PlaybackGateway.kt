@@ -84,6 +84,13 @@ data class DecisionRequest(
     val autoRecovery: Boolean = false,
     /** The negotiated quality directive this replacement accepts. */
     val switchGeneration: Long? = null,
+    /**
+     * The player holds no fresh media token: bring one with the decision
+     * ([PlaybackDecision.mediaToken]). A server at [DECISION_TOKEN_API_LEVEL]
+     * sends one in its reply; for an older one the gateway asks for it at the
+     * same time as the decision. Never sent to the server.
+     */
+    val withMediaToken: Boolean = false,
 )
 
 enum class StreamProtocol { File, Hls }
@@ -139,6 +146,13 @@ data class PlaybackDecision(
     val isOffline: Boolean = false,
     val subtitlePreferencesSupported: Boolean = false,
     val growing: GrowingRecording? = null,
+    /**
+     * A media token that came with the decision: the server's, from
+     * [DECISION_TOKEN_API_LEVEL] on (not for a cast token's requests), or the
+     * one the gateway asked for beside it ([DecisionRequest.withMediaToken]).
+     * Null when none came; the player then asks for one.
+     */
+    val mediaToken: MediaToken? = null,
 )
 
 /**

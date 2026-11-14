@@ -84,10 +84,16 @@ class FakeGateway(private val clock: Clock) : PlaybackGateway {
     /** Set, decisions wait for it: a request still out. */
     var hold: CompletableDeferred<Unit>? = null
 
+    /** Set, decisions come with a media token, as from a level-28 server: "dec1", "dec2"… */
+    var tokenWithDecision = false
+    var decisionTokens = 0
+
     override suspend fun decide(request: DecisionRequest): PlaybackDecision {
         decisions += request
         hold?.await()
-        return decide.invoke(request)
+        val decision = decide.invoke(request)
+        if (!tokenWithDecision || decision.mediaToken != null) return decision
+        return decision.copy(mediaToken = MediaToken("dec${++decisionTokens}", clock.wallMs() + tokenLifetimeMs, serverUrl = "http://srv"))
     }
 
     override suspend fun reportProgress(report: ProgressReport): ProgressReply {

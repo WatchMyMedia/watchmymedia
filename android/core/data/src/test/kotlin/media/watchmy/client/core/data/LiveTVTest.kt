@@ -158,6 +158,26 @@ class LiveTVTest {
         assertEquals("", received.directive?.url)
     }
 
+    @Test fun `a level 28 server is asked to wait on a tuning session's status, older ones are not`() = runBlocking {
+        signInAt(28)
+        server.always("GET /api/live-tv/capabilities", json("""{"enabled":true,"allowed":true,"playback":true,"guide":false}"""))
+        server.always("GET /api/live-tv/sessions/session-a", json(session(state = "starting")))
+        val gateway = h.services.livePlaybackGateway.bind()
+        assertTrue(gateway.liveCapabilities().statusWaits)
+        gateway.awaitStatus("session-a", 10_000)
+        assertEquals("10000", server.last("GET /api/live-tv/sessions/session-a").requestUrl!!.queryParameter("waitMs"))
+        gateway.awaitStatus("session-a", 60_000)
+        assertEquals("never past the server's most", "10000", server.last("GET /api/live-tv/sessions/session-a").requestUrl!!.queryParameter("waitMs"))
+        gateway.status("session-a")
+        assertNull(server.last("GET /api/live-tv/sessions/session-a").requestUrl!!.queryParameter("waitMs"))
+
+        signInAt(27)
+        val older = h.services.livePlaybackGateway.bind()
+        assertFalse(older.liveCapabilities().statusWaits)
+        older.awaitStatus("session-a", 10_000)
+        assertNull(server.last("GET /api/live-tv/sessions/session-a").requestUrl!!.queryParameter("waitMs"))
+    }
+
     @Test fun `heartbeat reports actual interaction and stop tolerates an already expired session`() = runBlocking {
         signInAt(11)
         server.always("PUT /api/live-tv/sessions/session-a", json(session(state = "stopped", reason = "pause_expired")))
