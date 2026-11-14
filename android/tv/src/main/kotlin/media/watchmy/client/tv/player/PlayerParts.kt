@@ -28,6 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
@@ -148,9 +150,10 @@ internal fun ControlButton(
             .focusRing(focused, height / 2)
             .clip(shape)
             .background(bg, shape)
-            .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .height(height)
-            .then(if (text == null) Modifier.width(height) else Modifier.padding(horizontal = 22.dp)),
+            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onClick)
+            // At least the mockup's height; taller when the TV's text size is larger.
+            .heightIn(min = height)
+            .then(if (text == null) Modifier.width(height) else Modifier.padding(horizontal = 22.dp, vertical = 6.dp)),
         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {

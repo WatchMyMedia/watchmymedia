@@ -15,7 +15,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
-import media.watchmy.client.fake.FakeAppServices
 import media.watchmy.client.fake.fakeLatencyMs
 import media.watchmy.client.tv.TvApp
 import media.watchmy.client.ui.LocalAppServices
@@ -29,6 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLooper
 import java.util.concurrent.TimeUnit
+import media.watchmy.client.tv.quietTvFakes
 
 /** Back from a search result puts focus back on it, not on the keyboard (PLAN-ANDROID-REVIEW.md §3.2.3). */
 @OptIn(ExperimentalTestApi::class)
@@ -40,8 +40,10 @@ class SearchFocusTest {
     @Before
     fun start() {
         fakeLatencyMs = 0
+        // Without tonight's reminders, whose banner would take Back first (QuietFakes.kt).
+        val services = quietTvFakes()
         compose.setContent {
-            CompositionLocalProvider(LocalAppServices provides FakeAppServices(tv = true)) { TvApp() }
+            CompositionLocalProvider(LocalAppServices provides services) { TvApp() }
         }
         compose.waitForIdle()
         press(Key.DirectionLeft)

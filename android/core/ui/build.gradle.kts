@@ -16,6 +16,8 @@ android {
 dependencies {
     api(project(":core:model"))
     api(platform(libs.androidx.compose.bom))
+    // Modifier.onBack registers with the window's OnBackPressedDispatcher.
+    implementation(libs.androidx.activity.compose)
     api(libs.androidx.compose.adaptive)
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.ui.graphics)

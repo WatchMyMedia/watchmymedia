@@ -1,6 +1,5 @@
 package media.watchmy.client.tv.player
 
-import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -9,7 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,13 +18,17 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import media.watchmy.client.presentation.player.PlayerEpisodesViewModel
+import media.watchmy.client.model.EpisodeDetail
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import media.watchmy.client.presentation.player.PlayerViewModel
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -35,10 +37,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -46,7 +46,6 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.ContentFrame
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import media.watchmy.client.model.ImageSize
@@ -57,7 +56,6 @@ import media.watchmy.client.model.PlayerStatus
 import media.watchmy.client.model.PlayerUiState
 import media.watchmy.client.model.tracks
 import media.watchmy.client.ui.LocalAppServices
-import media.watchmy.client.ui.PlayerKey
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.CaptionLook
 import media.watchmy.client.ui.components.SubtitleCues
@@ -67,9 +65,14 @@ import media.watchmy.client.ui.playerKey
  * The TV player. Mockups: design/mockups/android-tv/PlayerControls.dc.html
  * (controls with Skip Intro), PlayerNext.dc.html (Next Episode card) and
  * PlayerPicker.dc.html (audio, subtitles and quality). It renders a
- * [PlaybackController] from the app's services, made when the screen opens
- * and released when it leaves; the controller does the rest of
- * PLAN-CLIENTS.md §2.3.
+ * [PlaybackController]; the controller does the rest of PLAN-CLIENTS.md
+ * §2.3.
+ *
+ * Opened from the app, the play is held on the player's nav entry by a
+ * [PlayerViewModel] (PLAN-ANDROID-REVIEW §3.1.5): a recreated activity finds
+ * it still playing, and after process death it comes back at the same file
+ * (a later episode, if the play had moved on), place and tracks. Leaving the
+ * entry releases it, which reports the play stopped.
  */
 @Composable
 fun PlayerScreen(
@@ -78,29 +81,65 @@ fun PlayerScreen(
     /** A player made elsewhere (a play cast to this TV); the screen still stops and releases it when it goes. */
     controller: PlaybackController? = null,
 ) {
+    if (controller != null) {
+        CastPlayer(request, controller, onExit)
+        return
+    }
     val services = LocalAppServices.current
-    val viewing = remember(services, controller) { Viewing(controller ?: services.playback.create()) }
-    val exit by rememberUpdatedState(onExit)
-    LaunchedEffect(viewing, request) { viewing.controller.start(request) }
+    val model = viewModel { PlayerViewModel(services.playback, createSavedStateHandle(), request) }
+    val local = remember(model) { model.controller() }
+    val selection by model.selection.collectAsStateWithLifecycle()
+    LaunchedEffect(local, selection) { model.start(local) }
+    // The list follows later plays itself (playing()); it loads once, for the play the entry started with or came back to.
+    val first = remember(model) { selection.request }
+    PlayerFrame(local, first, onPlay = model::select, onLeave = { reportStop ->
+        if (reportStop) local.stop()
+        onExit()
+    })
+}
+
+/**
+ * A play cast to this TV (Cast Connect), with the player the cast receiver
+ * made: the receiver keeps the play, so the screen has no nav entry to hold
+ * it on. One viewing; it stops and releases the player when it goes.
+ */
+@Composable
+private fun CastPlayer(request: PlayRequest, controller: PlaybackController, onExit: () -> Unit) {
+    val viewing = remember(controller) { Viewing(controller) }
+    LaunchedEffect(viewing, request) { controller.start(request) }
     DisposableEffect(viewing) { onDispose { viewing.close() } }
+    PlayerFrame(controller, request, onPlay = { controller.start(it) }, onLeave = { reportStop ->
+        viewing.finish(reportStop)
+        onExit()
+    })
+}
+
+/** The player on [controller], with the episode list for [request]'s show. */
+@Composable
+private fun PlayerFrame(controller: PlaybackController, request: PlayRequest, onPlay: (PlayRequest) -> Unit, onLeave: (reportStop: Boolean) -> Unit) {
+    val services = LocalAppServices.current
+    // The episode list beside the video (TvPlayerEpisodes); a recording, or a film, has none.
+    val episodes = viewModel(key = "tv-player-episodes") { PlayerEpisodesViewModel(services.library) }
+    LaunchedEffect(episodes, request) { if (request.recordingId == null) episodes.load(request) }
+    val leave by rememberUpdatedState(onLeave)
     // Leaving the app (Home, another app) pauses; the controller reports it.
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewing.controller.pause() }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { controller.pause() }
     MockupScale {
         PlayerContent(
-            controller = viewing.controller,
+            controller = controller,
             imageUrl = { path, size -> services.library.imageUrl(path, size) },
-            onLeave = { reportStop ->
-                viewing.finish(reportStop)
-                exit()
-            },
+            episodes = episodes,
+            onPlay = onPlay,
+            onLeave = { leave(it) },
         )
     }
 }
 
 /**
- * One viewing. The viewer leaving reports "stopped" once ([finish] with
- * reportStop); when the controller ended the play itself ([PlayerEvent.Exit],
- * an admin's stop) it has reported already. [close] runs when the screen goes.
+ * One viewing of a cast play. The viewer leaving reports "stopped" once
+ * ([finish] with reportStop); when the controller ended the play itself
+ * ([PlayerEvent.Exit], an admin's stop) it has reported already. [close]
+ * runs when the screen goes.
  */
 private class Viewing(val controller: PlaybackController) {
     private var finished = false
@@ -117,8 +156,7 @@ private class Viewing(val controller: PlaybackController) {
     }
 }
 
-private class PlayerFocus {
-    val root = FocusRequester()
+private class PlayerFocus(val root: FocusRequester) {
     val back = FocusRequester()
     val skip = FocusRequester()
     val scrubber = FocusRequester()
@@ -126,20 +164,23 @@ private class PlayerFocus {
     val upNext = FocusRequester()
     val prompt = FocusRequester()
     val openers = PickerSection.entries.associateWith { FocusRequester() }
+    val episodes = FocusRequester()
     val picker = PickerSection.entries.associateWith { FocusRequester() }
 }
-
-/** Controls hide after this long without a key while playing. */
-private const val HIDE_AFTER_MS = 5_000L
 
 @Composable
 private fun PlayerContent(
     controller: PlaybackController,
     imageUrl: (String?, ImageSize) -> String?,
     onLeave: (reportStop: Boolean) -> Unit,
+    episodes: PlayerEpisodesViewModel? = null,
+    /** Plays an episode chosen from the list. */
+    onPlay: (PlayRequest) -> Unit = controller::start,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
-    val focus = remember { PlayerFocus() }
+    // Back, focus, hiding the controls and keeping the screen on: the frame Live TV's player shares.
+    val shell = rememberPlayerShellState()
+    val focus = remember { PlayerFocus(shell.root) }
     val seek = remember { SeekState() }
     // Read only by the scrubber and the clocks, through these lambdas, so its ticks recompose only them.
     val progress = controller.progress.collectAsStateWithLifecycle()
@@ -148,27 +189,21 @@ private fun PlayerContent(
     var controlsVisible by remember { mutableStateOf(true) }
     var picker by remember { mutableStateOf<PickerSection?>(null) }
     var pickerOpenedFromControls by remember { mutableStateOf(false) }
+    val episodeList = episodes?.state?.collectAsStateWithLifecycle()?.value
+    var episodesOpen by remember { mutableStateOf(false) }
+    var episodesOpenedFromControls by remember { mutableStateOf(false) }
+    val episodesFocus = remember { EpisodesFocus() }
+    // "N min in" for the playing episode, a minute at a time, so the list redraws once a minute while it plays.
+    val minutesIn by remember { derivedStateOf { progress.value.positionMs / 60_000 } }
     var area by remember { mutableStateOf(FocusArea.Root) }
-    var treeHasFocus by remember { mutableStateOf(false) }
-    var rootFocused by remember { mutableStateOf(false) }
-    var inputTick by remember { mutableIntStateOf(0) }
-    // A focus move asked for by an action, honoured once its target is composed.
-    var wanted by remember { mutableStateOf<FocusRequester?>(null) }
     val consumedKeys = remember { mutableSetOf<Int>() }
-    var backDown by remember { mutableStateOf(false) }
     val onLeaveNow by rememberUpdatedState(onLeave)
-    // Set once the viewer leaves. The screen stays composed while it fades out, and the
-    // screen underneath takes focus meanwhile: the player must not take it back, or focus
-    // goes down with it and lands on the rail.
-    var leaving by remember { mutableStateOf(false) }
 
     fun leave(reportStop: Boolean) {
-        if (leaving) return
-        leaving = true
-        onLeaveNow(reportStop)
+        if (shell.leave()) onLeaveNow(reportStop)
     }
 
-    val overlay = overlayOf(state, picker)
+    val overlay = overlayOf(state, picker, episodesOpen)
     // Skip makes way for a seek thumbnail while the remote seeks (PlayerScrub).
     val seeking by remember { derivedStateOf { seek.targetMs != null } }
     val skipShown = state.skip != null && overlay == Overlay.None && !(seeking && state.trickplay != null)
@@ -184,14 +219,45 @@ private fun PlayerContent(
         val start = section.takeIf { it in present } ?: present.firstOrNull() ?: return
         pickerOpenedFromControls = controlsVisible && area == FocusArea.Buttons
         picker = start
-        wanted = focus.picker.getValue(start)
+        shell.wanted = focus.picker.getValue(start)
     }
 
     fun closePicker() {
         val opened = picker ?: return
         picker = null
         controlsVisible = pickerOpenedFromControls
-        wanted = if (pickerOpenedFromControls) focus.openers.getValue(opened) else null
+        shell.wanted = if (pickerOpenedFromControls) focus.openers.getValue(opened) else null
+    }
+
+    fun openEpisodes() {
+        // The list as it is now: the controls' actions are made once, before it has loaded.
+        if (episodes?.state?.value?.available != true) return
+        episodesOpenedFromControls = controlsVisible && area == FocusArea.Buttons
+        episodesOpen = true
+        shell.wanted = episodesFocus.panel
+    }
+
+    fun closeEpisodes() {
+        if (!episodesOpen) return
+        episodesOpen = false
+        controlsVisible = episodesOpenedFromControls
+        shell.wanted = if (episodesOpenedFromControls) focus.episodes else null
+    }
+
+    /** Plays [episode] from the list; the one playing goes back to the video where it is. */
+    fun playEpisode(episode: EpisodeDetail) {
+        val list = episodes ?: return
+        if (episode.id == list.state.value.playing?.id) {
+            closeEpisodes()
+            return
+        }
+        val request = list.playRequest(episode) ?: return
+        episodesOpen = false
+        picker = null
+        onPlay(request)
+        list.playing(request.fileId)
+        controlsVisible = true
+        shell.wanted = focus.playPause
     }
 
     fun seekStep(forward: Boolean, nowMs: Long, repeat: Boolean) {
@@ -202,14 +268,14 @@ private fun PlayerContent(
     fun finishMessage() = leave(controller.state.value.stopMessage == null)
 
     fun perform(action: KeyAction, nowMs: Long, repeat: Boolean) {
-        val current = overlayOf(controller.state.value, picker)
+        val current = overlayOf(controller.state.value, picker, episodesOpen)
         when (action) {
             KeyAction.ShowControls -> controlsVisible = true
             is KeyAction.Seek -> {
                 seekStep(action.forward, nowMs, repeat)
                 // Under the Next Episode card the controls show once a seek back takes the card away.
                 controlsVisible = true
-                if (current == Overlay.None && area != FocusArea.Scrubber) wanted = focus.scrubber
+                if (current == Overlay.None && area != FocusArea.Scrubber) shell.wanted = focus.scrubber
             }
             KeyAction.TogglePlayPause -> {
                 controller.togglePlayPause()
@@ -229,33 +295,31 @@ private fun PlayerContent(
 
     fun onBack() {
         controller.noteUserInput()
-        inputTick++
-        val current = overlayOf(controller.state.value, picker)
+        shell.noteInput()
+        val current = overlayOf(controller.state.value, picker, episodesOpen)
         when (backAction(current, controlsVisible)) {
             BackAction.Leave -> if (current == Overlay.Message) finishMessage() else leave(true)
             BackAction.KeepWatching -> controller.answerStillWatching(true)
             BackAction.ClosePicker -> closePicker()
+            BackAction.CloseEpisodes -> closeEpisodes()
             BackAction.WatchCredits -> controller.watchCredits()
             BackAction.HideControls -> hideControls()
         }
     }
 
     fun onKey(event: KeyEvent): Boolean {
-        // Keys pressed while the player fades out belong to the screen underneath: a quick
-        // second Back leaves it too.
-        if (leaving) return false
         val native = event.nativeKeyEvent
-        val key = playerKey(native.keyCode)
-        // Compose turns an unhandled Back into a focus exit, so the player takes it
-        // here, on key-up as the platform does, rather than leaving it to BackHandler.
-        if (key == PlayerKey.Back) {
-            if (event.type == KeyEventType.KeyDown && native.repeatCount == 0) backDown = true
-            if (event.type == KeyEventType.KeyUp && backDown) {
-                backDown = false
-                onBack()
+        // The remote's Previous plays the episode before this one in its season (Next is routed below).
+        if (native.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS) {
+            val over = overlayOf(controller.state.value, picker, episodesOpen)
+            if (event.type == KeyEventType.KeyDown && native.repeatCount == 0 && (over == Overlay.None || over == Overlay.UpNext)) {
+                controller.noteUserInput()
+                shell.noteInput()
+                episodes?.previous()?.let(::playEpisode)
             }
-            return true
+            return event.type == KeyEventType.KeyDown || event.type == KeyEventType.KeyUp
         }
+        val key = playerKey(native.keyCode)
         if (event.type == KeyEventType.KeyUp) {
             if (!consumedKeys.remove(native.keyCode)) return false
             if (seek.holding) seek.release()?.let { controller.seekTo(it) }
@@ -264,16 +328,13 @@ private fun PlayerContent(
         if (event.type != KeyEventType.KeyDown) return false
         val repeat = native.repeatCount > 0
         if (!repeat) controller.noteUserInput()
-        inputTick++
-        val action = routeKey(key, overlayOf(controller.state.value, picker), controlsVisible, area)
+        shell.noteInput()
+        val action = routeKey(key, overlayOf(controller.state.value, picker, episodesOpen), controlsVisible, area, hasNext = controller.state.value.nextEpisode != null)
         if (action == KeyAction.PassThrough) return false
         consumedKeys += native.keyCode
         perform(action, native.eventTime, repeat)
         return true
     }
-
-    // Back that is not a key (a gesture, or nothing in the player has focus).
-    BackHandler(enabled = !leaving) { onBack() }
 
     LaunchedEffect(controller) {
         controller.events.collect { event ->
@@ -281,6 +342,8 @@ private fun PlayerContent(
                 // An admin's stop shows its message first; OK (or Back) leaves.
                 PlayerEvent.Exit -> if (controller.state.value.stopMessage == null) leave(false)
                 is PlayerEvent.StartedNext -> {
+                    episodes?.playing(event.fileId)
+                    episodesOpen = false
                     picker = null
                     controlsVisible = true
                 }
@@ -293,42 +356,17 @@ private fun PlayerContent(
         when (overlay) {
             Overlay.UpNext -> {
                 controlsVisible = false
-                wanted = focus.upNext
+                shell.wanted = focus.upNext
             }
-            Overlay.StillWatching, Overlay.Message -> wanted = focus.prompt
-            Overlay.Picker, Overlay.None -> Unit
+            Overlay.StillWatching, Overlay.Message -> shell.wanted = focus.prompt
+            Overlay.Picker, Overlay.Episodes, Overlay.None -> Unit
         }
     }
 
     // The Skip button takes focus when it appears, as in PlayerControls.
     val skipSegment = state.skip?.segment
     LaunchedEffect(skipSegment) {
-        if (skipSegment != null && overlayOf(controller.state.value, picker) == Overlay.None) wanted = focus.skip
-    }
-
-    // Focus always rests somewhere that takes the remote: what an action asked
-    // for, else the open overlay, the Skip button, the scrubber, or the screen.
-    LaunchedEffect(wanted, treeHasFocus, rootFocused, controlsVisible, overlay, skipShown, leaving) {
-        if (leaving) return@LaunchedEffect
-        val target = wanted ?: when {
-            overlay != Overlay.None -> if (treeHasFocus && !rootFocused) null else overlayFocus(overlay, picker, focus)
-            !treeHasFocus -> when {
-                skipShown -> focus.skip
-                controlsVisible -> focus.scrubber
-                else -> focus.root
-            }
-            rootFocused && controlsVisible -> focus.scrubber
-            else -> null
-        }
-        target?.focusSoon()
-        wanted = null
-    }
-
-    LaunchedEffect(controlsVisible, inputTick, state.status, overlay, seek.holding) {
-        if (controlsVisible && overlay == Overlay.None && state.status == PlayerStatus.Playing && !seek.holding) {
-            delay(HIDE_AFTER_MS)
-            hideControls()
-        }
+        if (skipSegment != null && overlayOf(controller.state.value, picker, episodesOpen) == Overlay.None) shell.wanted = focus.skip
     }
 
     // After a seek is sent, keep showing its target until the player gets there.
@@ -339,11 +377,9 @@ private fun PlayerContent(
         }
     }
 
-    KeepScreenOn(state.status == PlayerStatus.Playing || state.status == PlayerStatus.Buffering || state.status == PlayerStatus.Loading)
-
     // Kept across the state's updates (the countdowns, the Skip button's fill), so the buttons skip recomposing.
     val chromeFocus = remember(skipShown) {
-        ChromeFocus(back = focus.back, skip = if (skipShown) focus.skip else null, scrubber = focus.scrubber, playPause = focus.playPause, openers = focus.openers)
+        ChromeFocus(back = focus.back, skip = if (skipShown) focus.skip else null, scrubber = focus.scrubber, playPause = focus.playPause, openers = focus.openers, episodes = focus.episodes)
     }
     // The actions read the screen's state when they run, so one set does.
     val chromeActions = remember {
@@ -358,26 +394,38 @@ private fun PlayerContent(
             onPlayNext = { controller.playNext() },
             onFocusArea = { area = it },
             onSeekTo = { controller.seekTo(it) },
+            onOpenEpisodes = { openEpisodes() },
         )
     }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .onPreviewKeyEvent { onKey(it) }
-            .onFocusChanged {
-                treeHasFocus = it.hasFocus
-                rootFocused = it.isFocused
-                if (it.isFocused || !it.hasFocus) area = FocusArea.Root
+    PlayerShell(
+        shell,
+        keepScreenOn = state.status == PlayerStatus.Playing || state.status == PlayerStatus.Buffering || state.status == PlayerStatus.Loading,
+        autoHide = controlsVisible && overlay == Overlay.None && state.status == PlayerStatus.Playing && !seek.holding,
+        onHide = ::hideControls,
+        onBack = ::onBack,
+        onKey = ::onKey,
+        // Focus always rests somewhere that takes the remote: what an action asked
+        // for, else the open overlay, the Skip button, the scrubber, or the screen.
+        focusTarget = { wanted ->
+            wanted ?: when {
+                overlay != Overlay.None -> if (shell.treeHasFocus && !shell.rootFocused) null else overlayFocus(overlay, picker, focus, episodesFocus)
+                !shell.treeHasFocus -> when {
+                    skipShown -> focus.skip
+                    controlsVisible -> focus.scrubber
+                    else -> focus.root
+                }
+                shell.rootFocused && controlsVisible -> focus.scrubber
+                else -> null
             }
-            .focusRequester(focus.root)
-            .focusable(),
+        },
+        focusKeys = arrayOf<Any?>(controlsVisible, overlay, skipShown),
+        onFocusChanged = { if (it.isFocused || !it.hasFocus) area = FocusArea.Root },
     ) {
         VideoLayer(controller, state, imageUrl, raisedSubtitles = chromeVisible || overlay == Overlay.UpNext)
 
         AnimatedVisibility(chromeVisible, Modifier.fillMaxSize(), enter = fadeIn(tween(150)), exit = fadeOut(tween(250))) {
-            Box(Modifier.fillMaxSize()) { PlayerChrome(state, shownMs, readProgress, chromeFocus, chromeActions, seek) }
+            Box(Modifier.fillMaxSize()) { PlayerChrome(state, shownMs, readProgress, chromeFocus, chromeActions, seek, episodes = episodeList?.playingCode?.takeIf { episodeList.available }) }
         }
 
         val skip = state.skip
@@ -412,7 +460,7 @@ private fun PlayerContent(
 
         // Automatic's note: over the video, with or without the controls, and never focused.
         val note = state.note
-        if (note != null && overlay != Overlay.Picker && overlay != Overlay.Message) {
+        if (note != null && overlay != Overlay.Picker && overlay != Overlay.Episodes && overlay != Overlay.Message) {
             Entering(fadeIn(tween(200)), Modifier.align(Alignment.TopCenter).padding(top = 150.dp)) {
                 AutoNote(note)
             }
@@ -428,6 +476,20 @@ private fun PlayerContent(
             TitleBlock(state, Modifier.align(Alignment.TopStart).padding(start = 58.dp, top = 48.dp).graphicsLayer { alpha = 0.7f }, pausedNote = true)
             Entering(slideInHorizontally(tween(220)) { it }, Modifier.align(Alignment.CenterEnd)) {
                 PickerSheet(state.tracks, focus.picker, onChoose = { choose(controller, it) })
+            }
+        }
+
+        if (overlay == Overlay.Episodes && episodeList != null && episodes != null) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)))
+            TitleBlock(state, Modifier.align(Alignment.TopStart).padding(start = 58.dp, top = 48.dp).graphicsLayer { alpha = 0.7f }, pausedNote = true)
+            Entering(slideInHorizontally(tween(220)) { it }, Modifier.align(Alignment.CenterEnd)) {
+                EpisodesPanel(
+                    episodeList, episodesFocus, imageUrl,
+                    positionMinutes = { minutesIn },
+                    onSeason = episodes::selectSeason,
+                    onPlay = ::playEpisode,
+                    onRetry = episodes::retry,
+                )
             }
         }
 
@@ -458,7 +520,8 @@ private fun PlayerContent(
 
 private val UpNextShade = Color(0xE6070708)
 
-private fun overlayFocus(overlay: Overlay, picker: PickerSection?, focus: PlayerFocus): FocusRequester? = when (overlay) {
+private fun overlayFocus(overlay: Overlay, picker: PickerSection?, focus: PlayerFocus, episodes: EpisodesFocus): FocusRequester? = when (overlay) {
+    Overlay.Episodes -> episodes.panel
     Overlay.UpNext -> focus.upNext
     Overlay.StillWatching, Overlay.Message -> focus.prompt
     Overlay.Picker -> picker?.let { focus.picker.getValue(it) }
@@ -498,15 +561,5 @@ private fun VideoLayer(controller: PlaybackController, state: PlayerUiState, ima
     } else {
         Artwork(imageUrl(state.backdropPath, ImageSize.W1280), seed = state.title.ifEmpty { "player" }, contentDescription = null, modifier = Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
-    }
-}
-
-/** Keeps the TV from dimming or starting its screensaver while video plays. */
-@Composable
-private fun KeepScreenOn(on: Boolean) {
-    val view = LocalView.current
-    DisposableEffect(view, on) {
-        view.keepScreenOn = on
-        onDispose { view.keepScreenOn = false }
     }
 }

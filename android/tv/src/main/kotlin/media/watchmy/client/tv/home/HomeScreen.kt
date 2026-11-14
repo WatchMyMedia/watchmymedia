@@ -6,41 +6,22 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.pager.VerticalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
-import androidx.activity.compose.BackHandler
-import androidx.compose.ui.focus.onFocusChanged
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.activity.compose.ReportDrawnWhen
@@ -49,7 +30,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,13 +44,8 @@ import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.tv.live.LiveChannelCard
 import media.watchmy.client.model.RowScreens
 import media.watchmy.client.model.RowStyle
-import media.watchmy.client.model.ScreenRow
 import media.watchmy.client.model.arranged
-import media.watchmy.client.model.cardPanelAt
-import media.watchmy.client.model.headingLine
-import media.watchmy.client.model.pictureUrl
 import media.watchmy.client.model.drawn
-import media.watchmy.client.model.episodeCards
 import media.watchmy.client.tv.navigation.TvRoutes
 import media.watchmy.client.tv.rows.OnFocusItem
 import media.watchmy.client.tv.rows.TvArrangedRow
@@ -82,7 +57,6 @@ import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.airedLine
 import media.watchmy.client.model.codeBadge
 import media.watchmy.client.model.formatDate
-import media.watchmy.client.model.heroBadges
 import media.watchmy.client.model.playRequest
 import media.watchmy.client.model.remainingLine
 import media.watchmy.client.model.totalsLine
@@ -93,30 +67,22 @@ import media.watchmy.client.tv.components.InitialFocus
 import media.watchmy.client.tv.components.ArtBadge
 import media.watchmy.client.tv.components.ArtProgress
 import media.watchmy.client.tv.components.ArtWatched
-import media.watchmy.client.tv.components.Backdrop
 import media.watchmy.client.tv.components.CardRow
 import media.watchmy.client.tv.components.ContentStart
 import media.watchmy.client.tv.components.EmptyState
 import media.watchmy.client.tv.components.ErrorState
 import media.watchmy.client.tv.components.FocusMemory
-import media.watchmy.client.tv.components.Kicker
 import media.watchmy.client.tv.components.MediaCard
 import media.watchmy.client.tv.components.Notice
 import media.watchmy.client.tv.components.PivotSpec
 import media.watchmy.client.tv.components.PlayMark
 import media.watchmy.client.tv.components.RailSection
 import media.watchmy.client.tv.components.SectionHeader
-import media.watchmy.client.tv.components.TextBright
 import media.watchmy.client.tv.components.TvButton
-import media.watchmy.client.tv.components.TvButtonStyle
 import media.watchmy.client.tv.components.TvScaffold
-import media.watchmy.client.tv.components.TvTag
-import media.watchmy.client.tv.components.bringWholeIntoView
 import media.watchmy.client.tv.components.focusMemory
 import media.watchmy.client.tv.components.inter
-import media.watchmy.client.tv.components.overflowHeight
 import media.watchmy.client.tv.components.rememberFocusMemory
-import media.watchmy.client.tv.components.stopBringIntoView
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.rememberNotMatchedNotice
@@ -129,7 +95,6 @@ import media.watchmy.client.tv.components.FocusableBox
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import media.watchmy.client.ui.components.BadgeStyle
-import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.ReportShown
 import media.watchmy.client.ui.ShowsLiveChannels
 
@@ -407,7 +372,7 @@ private fun HomeContent(
 
 /** Live TV's row: On now with listings, else Watch a channel. Home's row screens pass [counter] and [onFocusItem], as [TvArrangedRow] takes them. */
 @Composable
-private fun LiveRow(
+internal fun LiveRow(
     liveChannels: List<LiveChannel>,
     liveListings: Boolean,
     memory: FocusMemory,
@@ -449,201 +414,6 @@ private fun LiveRow(
     }
 }
 
-/**
- * Home in the person's order (PLAN-ROWS.md §8.2) as screens (PLAN-HOME.md
- * §7.3, HomeStart.dc.html and HomeRow.dc.html): page 0 is the hero and the
- * first row drawn, every later row fills a page with the focused card's
- * picture, kicker, title, facts and overview above it, and the last page is
- * Edit rows and the totals. ▼ at a row pages down and ▲ pages up (the D-pad
- * pages, never a fling); each row comes back to the card it had focus on;
- * Back from a row page goes to page 0 first. Live TV sits in its place.
- *
- * Focus moves first and the pager follows it: ▼ puts focus on the next
- * row's card at once and the screen slides after, so a key pressed during
- * the slide acts on the row arriving, and the page showing is always the
- * one that holds focus.
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ArrangedHomeContent(
-    home: HomeData,
-    library: LibraryRepository,
-    memory: FocusMemory,
-    actions: TvRowActions,
-    liveChannels: List<LiveChannel>,
-    onWatchLive: (LiveChannel) -> Unit,
-    liveListings: Boolean,
-    onLiveGuide: () -> Unit,
-    onEditRows: () -> Unit,
-) {
-    val live = liveChannels.any { it.available }
-    val rows = home.rows.orEmpty().drawn(live)
-    val pages = remember(home, rows) { homePages(home.hero != null, rows) }
-    val pager = rememberPagerState { pages.size }
-    val available = liveChannels.filter { it.available }
-    // The card each row last had focus on, by row id, so a page restores it (FocusMemory keeps only the last key overall).
-    val lastFocus = remember { mutableStateMapOf<String, String>() }
-    val heroKey = home.hero?.let { if (it.fileId != null) "hero:play" else "hero:open" }
-    // The page Home is on or heading to: the one that holds focus (each page reports it), or one asked for that could not take focus yet.
-    var goal by remember { mutableStateOf<PageGoal?>(null) }
-
-    fun firstKey(row: ScreenRow): String? = if (row.style == RowStyle.Live) available.firstOrNull()?.let { "live:${it.id}" } else row.cardKey()
-    fun focus(key: String?): Boolean = key != null && runCatching { memory.requester(key).requestFocus() }.getOrDefault(false)
-
-    /** Puts focus on [page]: the card its row last had, else the row's first, else the hero. False while the page is not composed. */
-    fun focusPage(page: HomePage): Boolean = when (page) {
-        is HomePage.Start -> page.row?.let { focus(lastFocus[it.id]) || focus(firstKey(it)) } == true || focus(heroKey)
-        is HomePage.Row -> focus(lastFocus[page.row.id]) || focus(firstKey(page.row))
-        HomePage.End -> focus("end:edit")
-    }
-
-    fun ask(page: HomePage) {
-        goal = PageGoal(page.key, focus = true, ask = (goal?.ask ?: 0) + 1)
-    }
-
-    /**
-     * Goes to [target]. Focus moves there at once (the screens either side of the one showing are composed) and the
-     * pager follows it; a page too far away to be composed is scrolled to first and takes focus on arrival. One page
-     * move at a time, unless [interrupting] (Back).
-     */
-    fun pageTo(target: Int, interrupting: Boolean = false) {
-        if (target !in pages.indices || (pager.isScrollInProgress && !interrupting)) return
-        if (!focusPage(pages[target])) ask(pages[target])
-    }
-
-    val currentPages by rememberUpdatedState(pages)
-    val focusOn by rememberUpdatedState<(HomePage) -> Boolean> { focusPage(it) }
-
-    // The pager follows the goal, whatever set it: ▲ ▼, a focus search, or focus coming back from the rail or a closed page.
-    LaunchedEffect(pager) {
-        snapshotFlow { goal?.let { g -> currentPages.indexOfFirst { it.key == g.key }.takeIf { it >= 0 }?.let { it to g } } }
-            .collectLatest { target ->
-                val (index, wanted) = target ?: return@collectLatest
-                // Nothing else scrolls the pager. Should a scroll be cut short all the same, go again rather than rest between pages.
-                var tries = 0
-                while ((pager.currentPage != index || pager.currentPageOffsetFraction != 0f) && tries++ < SCROLL_TRIES) {
-                    try {
-                        pager.animateScrollToPage(index)
-                    } catch (_: CancellationException) {
-                        currentCoroutineContext().ensureActive()
-                    }
-                }
-                if (wanted.focus) {
-                    // The page composes as it comes into view: its cards may be a frame or two behind.
-                    repeat(FOCUS_FRAMES) {
-                        if (currentPages.getOrNull(index)?.let(focusOn) == true) return@collectLatest
-                        withFrameNanos { }
-                    }
-                }
-            }
-    }
-
-    LaunchedEffect(Unit) {
-        // The first row's cards compose inside the pager's first page a frame after it: try again once if they weren't there yet.
-        val fallback = home.arrangedFirstFocusKey(liveChannels) ?: liveChannels.firstOrNull { it.available }?.let { "live:${it.id}" }
-        repeat(2) {
-            withFrameNanos { }
-            if (memory.restore(fallback)) return@LaunchedEffect
-        }
-        // Neither is there (the remembered card has gone, and the hero is not on the page showing): the page showing takes focus.
-        pages.getOrNull(pager.currentPage)?.let(::ask)
-    }
-
-    // Back from a row page goes to the first page before leaving Home, also while the pager is still on its way down.
-    val awayFromTop by remember { derivedStateOf { pager.currentPage > 0 || goal.let { it != null && it.key != currentPages.first().key } } }
-    BackHandler(enabled = awayFromTop) { pageTo(0, interrupting = true) }
-
-    val now = rememberLiveNow()
-    val format = rememberLiveClockFormat()
-    val liveRepository = LocalAppServices.current.live
-
-    @Composable
-    fun RowBlock(row: ScreenRow, modifier: Modifier = Modifier, onFocusIndex: (Int) -> Unit = {}) {
-        val counter = "Row ${rows.indexOf(row) + 1} of ${rows.size}"
-        val onFocusItem: OnFocusItem = { i, key ->
-            lastFocus[row.id] = key
-            onFocusIndex(i)
-        }
-        if (row.style == RowStyle.Live) LiveRow(liveChannels, liveListings, memory, onWatchLive, onLiveGuide, modifier, counter, onFocusItem)
-        else TvArrangedRow(row, library, memory, actions, modifier, counter, onFocusItem)
-    }
-
-    fun nextName(index: Int): String = when (val next = pages.getOrNull(index + 1)) {
-        is HomePage.Row -> next.row.headingLine(liveListings)
-        else -> "End of Home"
-    }
-
-    VerticalPager(
-        state = pager,
-        modifier = Modifier.fillMaxSize().testTag(TestTags.HOME),
-        beyondViewportPageCount = 1,
-        userScrollEnabled = false,
-        key = { pages[it].key },
-    ) { index ->
-        val page = pages[index]
-        // The page that holds focus is the goal, and a card focused inside it never moves the pager by itself. Not a
-        // focus group: the rail's way back restores the row or the hero button it left, which a group here would hide.
-        Box(Modifier.fillMaxSize().onFocusChanged { if (it.hasFocus) goal = PageGoal(page.key, focus = false) }.stopBringIntoView()) {
-            when (page) {
-                is HomePage.Start -> Box(Modifier.fillMaxSize()) {
-                    Column {
-                        home.hero?.let { hero ->
-                            val episode = hero.episodeId?.takeIf { hero.kind == Hero.Kind.Episode }?.let { id -> home.episodeCards.firstOrNull { it.episodeId == id } }
-                            val openEpisode = episode?.let { e -> { actions.onOpenEpisode(e.showId, e.season, e.episodeId) } }
-                            HeroSection(hero, home, library, memory, actions.onPlay, actions.onOpenShow, actions.onOpenMovie, openEpisode)
-                        }
-                        page.row?.let { row ->
-                            Spacer(Modifier.height(80.dp))
-                            // ▲ from the row reaches the hero's buttons by itself; ▼ goes to the first row screen.
-                            RowBlock(row, Modifier.pageKeys(up = null, down = { pageTo(index + 1) }))
-                        }
-                    }
-                    PeekLine(nextName(index), up = false, Modifier.align(Alignment.BottomStart))
-                }
-                is HomePage.Row -> {
-                    val row = page.row
-                    var focused by rememberSaveable(row.id) { mutableIntStateOf(0) }
-                    val panel = remember(row, focused, available, now) { row.cardPanelAt(focused, available, now, format) }
-                    Box(Modifier.fillMaxSize()) {
-                        RowBackdrop(panel?.pictureUrl(library, liveRepository, ImageSize.W1280), panel?.seed ?: row.title)
-                        if (panel != null) FocusPanel(panel, Modifier.padding(start = ContentStart, top = 96.dp).width(940.dp))
-                        PrefetchNeighbours(row, focused, available, library, liveRepository, now, format)
-                        Box(Modifier.padding(top = 556.dp)) {
-                            RowBlock(row, Modifier.pageKeys(up = { pageTo(index - 1) }, down = { pageTo(index + 1) })) { focused = it }
-                        }
-                        PeekLine(nextName(index), up = false, Modifier.align(Alignment.BottomStart))
-                    }
-                }
-                HomePage.End -> Box(Modifier.fillMaxSize()) {
-                    Column(Modifier.padding(start = ContentStart, top = 300.dp).width(1000.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-                        Text("That's everything on Home", style = inter(44.sp, FontWeight.Bold, tracking = -0.02f), color = WmmColors.Text)
-                        Text("Move, hide and add rows. Your order follows you to every device.", style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.TextSoft, modifier = Modifier.widthIn(max = 760.dp))
-                        Row(Modifier.padding(top = 6.dp).pageKeys(up = { pageTo(index - 1) }, down = null), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                            TvButton("Edit rows", onEditRows, Modifier.focusMemory(memory, "end:edit"), icon = WmmIcons.Sliders)
-                            TvButton("Back to the top", { pageTo(0) }, Modifier.focusMemory(memory, "end:top"))
-                        }
-                        Text(home.totalsLine(), style = inter(17.sp), color = WmmColors.TextFaint, modifier = Modifier.padding(top = 18.dp))
-                    }
-                    val before = pages.getOrNull(index - 1)?.row?.headingLine(liveListings) ?: "Home"
-                    PeekLine(before, up = true, Modifier.align(Alignment.BottomStart))
-                }
-            }
-        }
-    }
-}
-
-/**
- * The page Home's pager goes to. [focus]: put focus on it on arrival, for a page that was not composed when it was
- * asked for; [ask] tells one such request from the next.
- */
-private data class PageGoal(val key: String, val focus: Boolean, val ask: Int = 0)
-
-/** Scrolls tried before leaving the pager where it is; nothing else moves it, so one is the rule. */
-private const val SCROLL_TRIES = 3
-
-/** Frames a page asked for is given to compose its cards before focus gives up on it. */
-private const val FOCUS_FRAMES = 10
-
 private fun ContinueItem.open(onOpenShow: (Long) -> Unit, onOpenMovie: (Long) -> Unit) {
     when {
         showId != null -> onOpenShow(showId!!)
@@ -675,103 +445,3 @@ private fun PosterCard(
         ArtProgress(item.progress)
     }
 }
-
-/** "S03 E07 · The Long Dark · 52 min · [4K] [HDR] · TV-14". */
-@Composable
-private fun HeroFacts(hero: Hero, tags: List<String>) {
-    val style = inter(23.sp)
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        var before = false
-        if (hero.facts.isNotBlank()) {
-            Text(hero.facts, style = style, color = TextBright, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-            before = true
-        }
-        if (tags.isNotEmpty()) {
-            if (before) Text("·", style = style, color = WmmColors.TextFaint)
-            tags.forEach { TvTag(it) }
-            before = true
-        }
-        hero.contentRating?.let {
-            if (before) Text("·", style = style, color = WmmColors.TextFaint)
-            Text(it, style = style, color = TextBright, maxLines = 1)
-        }
-    }
-}
-
-@Composable
-private fun HeroSection(
-    hero: Hero,
-    home: HomeData,
-    library: LibraryRepository,
-    memory: FocusMemory,
-    onPlay: (PlayRequest) -> Unit,
-    onOpenShow: (Long) -> Unit,
-    onOpenMovie: (Long) -> Unit,
-    onOpenEpisode: (() -> Unit)? = null,
-) {
-    Box(Modifier.fillMaxWidth().height(476.dp).bringWholeIntoView()) {
-        // The backdrop runs on behind the first row (620 tall from the top, starting 560 in).
-        Backdrop(
-            url = library.imageUrl(hero.backdropPath, ImageSize.W1280),
-            seed = hero.title,
-            modifier = Modifier
-                .offset(x = 560.dp)
-                .width(1360.dp)
-                .overflowHeight(620.dp, reported = 476.dp),
-            leftFade = listOf(0f to 1f, 0.22f to 0.85f, 0.6f to 0f),
-            bottomFadeFrom = 0.55f,
-            glowX = 0.7f,
-            glowY = 0.3f,
-        )
-        Column(Modifier.padding(start = ContentStart, top = 112.dp).width(900.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Kicker(hero.kicker, fontSize = 19.sp)
-            Text(
-                hero.title,
-                style = inter(72.sp, FontWeight.ExtraBold, lineHeight = 76.sp, tracking = -0.025f),
-                color = WmmColors.Text,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            HeroFacts(hero, home.heroBadges)
-            Text(
-                hero.overview,
-                style = inter(22.sp, lineHeight = 33.sp),
-                color = WmmColors.TextSoft,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 760.dp),
-            )
-            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                val play = hero.playRequest(home.episodeCards)
-                if (play != null) {
-                    TvButton(
-                        "Play",
-                        { onPlay(play) },
-                        Modifier.focusMemory(memory, "hero:play"),
-                        style = TvButtonStyle.Primary,
-                        icon = WmmIcons.Play,
-                    )
-                }
-                val open: (() -> Unit)? = when {
-                    onOpenEpisode != null -> onOpenEpisode
-                    hero.showId != null -> { { onOpenShow(hero.showId!!) } }
-                    hero.movieId != null -> { { onOpenMovie(hero.movieId!!) } }
-                    else -> null
-                }
-                if (open != null) {
-                    TvButton(
-                        when {
-                            onOpenEpisode != null -> "Go to episode"
-                            hero.kind == Hero.Kind.Movie -> "More info"
-                            else -> "Go to show"
-                        },
-                        open,
-                        Modifier.focusMemory(memory, "hero:open"),
-                        style = if (play == null) TvButtonStyle.Primary else TvButtonStyle.Ghost,
-                    )
-                }
-            }
-        }
-    }
-}
-

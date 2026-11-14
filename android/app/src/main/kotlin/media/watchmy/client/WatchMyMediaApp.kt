@@ -48,11 +48,12 @@ import media.watchmy.client.model.SeekThumbnails
 import media.watchmy.client.model.ServerRepository
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.ui.CoilSeekThumbnails
+import media.watchmy.client.core.playback.watchnext.WatchNextArtSource
 import okhttp3.OkHttpClient
 import androidx.work.Configuration as WorkConfiguration
 import java.time.Instant
 
-class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDownloads.Host, WorkConfiguration.Provider {
+class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDownloads.Host, WorkConfiguration.Provider, WatchNextArtSource {
     /** True on Android TV and Google TV (the TV UI), false on phones and tablets. */
     val isTv: Boolean by lazy {
         val uiMode = getSystemService(UiModeManager::class.java)
@@ -66,6 +67,20 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
 
     /** The real data layer; null when running on the fakes (`-Pfakes=true`). */
     private var data: DataServices? = null
+
+    /**
+     * A Watch Next card's picture for the launcher ([WatchNextArtProvider]): the
+     * server's image, through the client that signs in to it, and only while
+     * [account] is the one signed in.
+     */
+    override suspend fun watchNextArt(account: String, path: String): ByteArray? {
+        val data = data ?: return null
+        if (media.watchmy.client.model.watchNextAccount(data.servers.current.value?.server, data.auth.user.value) != account) return null
+        val url = data.library.imageUrl(path, media.watchmy.client.model.ImageSize.W780) ?: return null
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            data.imageHttpClient.newCall(okhttp3.Request.Builder().url(url).build()).execute().use { if (it.isSuccessful) it.body.bytes() else null }
+        }
+    }
 
     /** Whether the local network question (Android 17) is still open; [LocalNetworkGate] answers it. */
     val localNetwork: LocalNetworkQuestion by lazy { allowingStartupReads { LocalNetworkQuestion.of(this) } }

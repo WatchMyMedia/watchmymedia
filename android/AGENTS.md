@@ -81,6 +81,13 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   which the JDK's AES-GCM fails to load ("Framework jar verification can
   not be initialized"). A test that seals with a JVM key runs with
   `@ConscryptMode(ConscryptMode.Mode.OFF)`, as `TokenSealerTest` does.
+- **Pipes under Robolectric.** `ParcelFileDescriptor.createPipe` is a
+  temporary file there, not a pipe: a read that comes before the writer
+  finishes finds nothing. Join the writer first, as `WatchNextArtTest` does.
+- **The fakes follow the wall clock.** Their Live TV schedule, and the two
+  reminders they seed for tonight, come from the time the test runs. While
+  a reminder is due, the TV's banner takes Back first, so a test that runs
+  the whole TV app and presses Back uses `quietTvFakes()` (tv tests).
 - **Build conventions.** The settings modules share (SDK levels, Java and
   Kotlin targets, test options, Compose) are set by the plugins in
   `build-logic/` (README, "Build conventions"); a module's build file holds

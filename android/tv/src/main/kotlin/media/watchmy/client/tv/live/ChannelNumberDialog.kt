@@ -45,6 +45,7 @@ import media.watchmy.client.tv.components.TvButtonStyle
 import media.watchmy.client.tv.components.TvDialog
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.WmmColors
+import media.watchmy.client.ui.onBack
 
 /** The TV boards' Go to channel keypad, also opened by a remote's first numeric key. */
 @Composable
@@ -76,14 +77,10 @@ internal fun ChannelNumberDialog(
     }
     TvDialog(onDismiss) {
         Box(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = .7f)).onPreviewKeyEvent { event ->
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = .7f)).onBack(onBack = onDismiss).onPreviewKeyEvent { event ->
                 val code = event.nativeKeyEvent.keyCode
                 val char = liveNumberKey(code)
                 when {
-                    code == AndroidKey.KEYCODE_BACK -> {
-                        if (event.type == KeyEventType.KeyUp) onDismiss()
-                        true
-                    }
                     code == AndroidKey.KEYCODE_MEDIA_STOP -> {
                         if (event.type == KeyEventType.KeyUp) onStop()
                         true

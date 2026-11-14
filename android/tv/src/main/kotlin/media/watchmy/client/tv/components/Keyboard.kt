@@ -40,7 +40,6 @@ import media.watchmy.client.ui.WmmColors
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.delete
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.draw.alpha
@@ -52,6 +51,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.runtime.LaunchedEffect
+import media.watchmy.client.ui.onBack
 
 private val Digits = "1234567890".map { it.toString() }
 private val Letters = listOf("qwertyuiop", "asdfghjkl'", "zxcvbnm,.-").map { row -> row.map { it.toString() } }
@@ -170,7 +170,14 @@ fun OnScreenKeyboard(
     val ime = LocalSoftwareKeyboardController.current
     var onTvKeyboard by remember { mutableStateOf(false) }
     val gap = 8.dp
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(gap)) {
+    // Back with the TV's keyboard already hidden: back to the key, not out of the screen.
+    Column(
+        modifier.onBack(enabled = onTvKeyboard) {
+            ime?.hide()
+            tvKey.requestFocus()
+        },
+        verticalArrangement = Arrangement.spacedBy(gap),
+    ) {
         OnScreenKeyboard(
             onText = { t -> field.edit { append(t) } },
             onBackspace = { field.edit { if (length > 0) delete(length - 1, length) } },
@@ -215,11 +222,6 @@ fun OnScreenKeyboard(
             imeShown = false
             tvKey.requestFocus()
         }
-    }
-    // Back with the TV's keyboard already hidden: back to the key, not out of the screen.
-    BackHandler(enabled = onTvKeyboard) {
-        ime?.hide()
-        tvKey.requestFocus()
     }
 }
 

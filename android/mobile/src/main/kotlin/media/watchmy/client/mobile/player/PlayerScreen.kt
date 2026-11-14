@@ -54,7 +54,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import media.watchmy.client.presentation.player.PlayerSelection
+import media.watchmy.client.presentation.player.PlayerViewModel
+import media.watchmy.client.presentation.player.handOver
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.PlayerSurface
@@ -99,47 +103,48 @@ fun PlayerScreen(request: PlayRequest, onExit: () -> Unit) {
     val services = LocalAppServices.current
     val castState by services.cast.state.collectAsStateWithLifecycle()
     val castDevice = (castState as? CastState.Connected)?.deviceName.takeIf { request.recordingId == null }
-    // Where the play is now, and what it is (a handover carries the position and tracks).
-    var selection by remember { mutableStateOf(PlayerSelection(request)) }
-    var remote by remember { mutableStateOf(castDevice != null) }
+    // The play, on this screen's nav entry: where it is now (here or on a TV) and what it is, through a
+    // recreated activity or process death (a handover carries the position and tracks).
+    val model = viewModel { PlayerViewModel(services.playback, createSavedStateHandle(), request, onTv = castDevice != null) }
+    val selection by model.selection.collectAsStateWithLifecycle()
+    val remote by model.remote.collectAsStateWithLifecycle()
     CompositionLocalProvider(LocalContentColor provides WmmColors.Text) {
+        // The model stays here; its players get its parts (compose-lints: no ViewModel forwarding).
         if (remote) {
-            RemotePlayer(selection, castState, onExit, onPlay = { selection = selection.select(it) }, onContinueHere = {
-                selection = selection.select(it)
-                remote = false
-            })
+            RemotePlayer(selection, model::start, castState, onExit, onPlay = model::select, onContinueHere = model::continueHere)
         } else {
-            LocalPlayer(selection, castDevice, onExit, onPlay = { selection = selection.select(it) }, onCast = {
-                selection = selection.select(it)
-                remote = true
-            })
+            // The model's, kept through recreation; casting releases it, which reports the play stopped here.
+            val controller = remember(model) { model.controller() }
+            LocalPlayer(controller, selection, model::start, playingFileId = { model.fileId.value }, castDevice, onExit, onPlay = model::select, onCast = model::castTo)
         }
     }
 }
 
 @Composable
-private fun LocalPlayer(selection: PlayerSelection, castDevice: String?, onExit: () -> Unit, onPlay: (PlayRequest) -> Unit, onCast: (PlayRequest) -> Unit) {
-    val request = selection.request
-    val services = LocalAppServices.current
-    val controller = remember(services) { services.playback.create() }
-    // Releasing reports the play stopped, so a handover to the TV ends it here.
-    DisposableEffect(controller) { onDispose { controller.release() } }
-    var fileId by remember(selection) { mutableLongStateOf(request.fileId) }
-    StartSelectedPlayback(controller, selection)
-    LaunchedEffect(controller, selection) { controller.events.collect { if (it is PlayerEvent.StartedNext) fileId = it.fileId } }
+private fun LocalPlayer(
+    controller: PlaybackController,
+    selection: PlayerSelection,
+    start: (PlaybackController) -> Unit,
+    playingFileId: () -> Long,
+    castDevice: String?,
+    onExit: () -> Unit,
+    onPlay: (PlayRequest) -> Unit,
+    onCast: (PlayRequest) -> Unit,
+) {
+    StartSelectedPlayback(selection, controller, start)
     // A Cast device connected while playing here: the TV carries on.
     LaunchedEffect(castDevice) {
-        if (castDevice != null) onCast(handOver(request, fileId, controller.state.value, controller.progress.value.positionMs))
+        if (castDevice != null) onCast(handOver(selection.request, playingFileId(), controller.state.value, controller.progress.value.positionMs))
     }
     PlayerContent(controller, selection, onExit, onPlay, remoteDevice = null)
 }
 
 @Composable
-private fun RemotePlayer(selection: PlayerSelection, castState: CastState, onExit: () -> Unit, onPlay: (PlayRequest) -> Unit, onContinueHere: (PlayRequest) -> Unit) {
+private fun RemotePlayer(selection: PlayerSelection, start: (PlaybackController) -> Unit, castState: CastState, onExit: () -> Unit, onPlay: (PlayRequest) -> Unit, onContinueHere: (PlayRequest) -> Unit) {
     val request = selection.request
     val cast = LocalAppServices.current.cast
     val controller = cast.remote
-    StartSelectedPlayback(controller, selection)
+    StartSelectedPlayback(selection, controller, start)
     // The device's name and what it plays outlive the session, for the offer to carry on here.
     val device = latest(castState.deviceName) ?: "TV"
     val playing = latest(cast.nowPlaying.collectAsStateWithLifecycle().value) ?: request

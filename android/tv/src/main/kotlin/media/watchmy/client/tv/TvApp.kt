@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import media.watchmy.client.tv.live.CastLivePlayer
+import media.watchmy.client.tv.navigation.SessionViewModels
 import media.watchmy.client.tv.navigation.TvNavHost
 import media.watchmy.client.tv.servers.ServerPickerScreen
 import media.watchmy.client.tv.signin.SignInScreen
@@ -65,13 +66,16 @@ fun TvApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
                     onBack = if (server != null) ({ picking = false }) else null,
                 )
                 user == null -> SignInScreen(onSwitchServer = { picking = true })
+                // Each sign-in's screens keep their ViewModels to themselves, cleared when it ends.
                 else -> key(server?.server?.id, user) {
-                    TvNavHost(
-                        onSwitchServer = { picking = true },
-                        onSignedOut = {},
-                        deepLink = pendingLink,
-                        onDeepLinkHandled = { pendingLink = null },
-                    )
+                    SessionViewModels {
+                        TvNavHost(
+                            onSwitchServer = { picking = true },
+                            onSignedOut = {},
+                            deepLink = pendingLink,
+                            onDeepLinkHandled = { pendingLink = null },
+                        )
+                    }
                 }
             }
         }

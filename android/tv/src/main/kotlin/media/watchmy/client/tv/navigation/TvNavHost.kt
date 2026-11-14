@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
@@ -59,6 +60,7 @@ import media.watchmy.client.tv.requests.RequestsScreen
 import media.watchmy.client.tv.search.SearchScreen
 import media.watchmy.client.tv.settings.SettingsScreen
 import media.watchmy.client.tv.rows.ListPageTv
+import media.watchmy.client.ui.onBack
 import media.watchmy.client.ui.rememberRequestBadge
 import media.watchmy.client.presentation.live.ReminderBannerViewModel
 import media.watchmy.client.ui.LocalLiveChannelsShown
@@ -137,7 +139,6 @@ fun TvNavHost(
     val bannerKeys = remember(banner?.comeKey()) {
         BannerKeys(
             onWatch = { bannerModel.watch()?.let { b -> live.channels.firstOrNull { it.id == b.channelId }?.takeIf { it.available }?.let(watchLive) } },
-            onDismiss = dismiss,
         )
     }
     LaunchedEffect(deepLink) {
@@ -155,10 +156,17 @@ fun TvNavHost(
     }
     val badge by rememberRequestBadge(services.requests)
     CompositionLocalProvider(LocalRequestBadge provides badge, LocalLiveTVAvailable provides live.available, LocalLiveChannelsShown provides showChannels) {
-        Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
-            // The banner never takes focus: Hold OK watches and Back dismisses, before the screen sees them.
-            banner != null && bannerKeys.handle(event.nativeKeyEvent.keyCode, event.type == KeyEventType.KeyDown, event.nativeKeyEvent.repeatCount)
-        }) {
+        // The banner never takes focus: Hold OK watches and Back dismisses, before the screen sees them.
+        Box(
+            Modifier.fillMaxSize().onBack(enabled = banner != null, overlay = true) { dismiss() }.onPreviewKeyEvent { event ->
+                banner != null && bannerKeys.handle(event.nativeKeyEvent.keyCode, event.type == KeyEventType.KeyDown, event.nativeKeyEvent.repeatCount)
+            }.onKeyEvent { event ->
+                // The remote's Guide opens Live TV from any screen that doesn't take it itself (the Live TV player does).
+                val guide = event.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_GUIDE && live.available
+                if (guide && event.type == KeyEventType.KeyUp) nav.navigateSection(TvRoutes.LiveTV)
+                guide
+            },
+        ) {
             NavHost(
                 nav,
                 startDestination = TvRoutes.Home,

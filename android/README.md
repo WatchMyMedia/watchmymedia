@@ -556,7 +556,13 @@ hides itself after 15 s.
 
 When player controls are hidden, Up/Down changes channel, Left opens Channels,
 and OK shows controls. Dedicated Channel Up/Down keys also work while controls
-or the Channels and Quality panels are visible. Menu opens Quality. Back closes a panel, then hides the
+or the Channels and Quality panels are visible. Menu opens Quality. The
+remote's Last goes back to the channel watched before, Record offers to
+record what is on (to people who may record; in the guide it opens the
+programme's menu), and Guide opens the full guide, as it opens Live TV from
+any other screen. In the file player, Next and Previous play the next and
+the previous episode, and Episodes, before Audio, lists the season's
+episodes (android-tv/TvPlayerEpisodes). Back closes a panel, then hides the
 controls, then leaves; Stop releases the tuner and leaves immediately. Pausing
 shows the controls. There is no file seek bar or next-episode action.
 
@@ -861,9 +867,21 @@ minutes of playing a file, before and after a change.
   `Artwork(url, seed = title, …)`, which draws the mockups' gradient when the
   URL is null or loading. The app's image loader adds the sign-in.
 - **TV focus**: the focused card gets a 4 dp gold ring and a slight scale;
-  rows remember their focused item; Back closes overlays first. Compose
-  turns the remote's Back into a focus move while something has focus, so a
-  `BackHandler` never sees it: handle Back in `onPreviewKeyEvent`.
+  rows remember their focused item; a screen's remembered item survives
+  navigation (`rememberFocusMemory`, and `rememberSaveable` for anything
+  else focus depends on); a button busy with its work stays focusable and
+  ignores OK (`FocusableBox`'s `enabled`). Back closes overlays first:
+  handle it with `Modifier.onBack` (`core:ui`) on the screen or overlay it
+  belongs to. A remote's Back arrives as a key, which Compose turns into a
+  focus move before a `BackHandler` sees it; on Android 16 and later, where
+  the app targets SDK 36 or higher, it arrives only as a back callback,
+  with no key (seen on the `android-37.0` image: `adb shell input keyevent
+  KEYCODE_BACK` reaches the app through `WindowOnBackDispatcher`). `onBack`
+  takes both, once a press, and the overlay enabled last takes it first;
+  `onPreviewKeyEvent` or `BackHandler` alone misses one. Something that
+  floats over every screen, like the reminder banner, passes
+  `overlay = true`, so it also comes before a page opened after it. A
+  `TvDialog` gets Back from its own window.
 - **TV sizes**: a 1080p Google TV is 960×540 dp, so `TvTheme` sets the
   density to make the window 1920 dp wide. Inside it, a mockup px is a dp
   on every TV and on the tablet emulator. `Dialog`, `Popup` and

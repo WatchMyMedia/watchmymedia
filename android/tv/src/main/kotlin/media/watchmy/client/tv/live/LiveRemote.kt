@@ -5,7 +5,7 @@ import media.watchmy.client.ui.PlayerKey
 import media.watchmy.client.ui.playerKey
 
 internal enum class LivePanel { Channels, Quality, Number }
-internal enum class LiveAction { Pass, Swallow, Controls, Channels, Quality, PreviousChannel, NextChannel, TogglePause, Play, Pause, Leave }
+internal enum class LiveAction { Pass, Swallow, Controls, Channels, Quality, PreviousChannel, NextChannel, LastChannel, Record, Guide, TogglePause, Play, Pause, Leave }
 internal enum class LiveBackAction { ClosePanel, KeepWatching, HideControls, Leave }
 
 /** Numeric remotes and the on-screen keypad share the same exact channel matcher. */
@@ -21,9 +21,14 @@ internal fun liveNumberKey(code: Int): Char? = when (code) {
 internal fun liveKeyAction(code: Int, panel: LivePanel?, controls: Boolean, terminal: Boolean, prompt: Boolean): LiveAction {
     val key = playerKey(code)
     if (key == PlayerKey.Stop) return LiveAction.Leave
+    // The remote's Guide opens the full guide from wherever the player is.
+    if (code == KeyEvent.KEYCODE_GUIDE) return LiveAction.Guide
     if (terminal || prompt) return if (key in listOf(PlayerKey.Left, PlayerKey.Right, PlayerKey.Up, PlayerKey.Down, PlayerKey.Centre, PlayerKey.Back, PlayerKey.Other)) LiveAction.Pass else LiveAction.Swallow
     if (code == KeyEvent.KEYCODE_CHANNEL_UP) return LiveAction.NextChannel
     if (code == KeyEvent.KEYCODE_CHANNEL_DOWN) return LiveAction.PreviousChannel
+    // Last goes back to the channel watched before this one; Record offers to record what is on.
+    if (code == KeyEvent.KEYCODE_LAST_CHANNEL) return LiveAction.LastChannel
+    if (code == KeyEvent.KEYCODE_MEDIA_RECORD) return LiveAction.Record
     if (panel != null) return when {
         key == PlayerKey.PlayPause -> LiveAction.TogglePause
         key == PlayerKey.Play -> LiveAction.Play

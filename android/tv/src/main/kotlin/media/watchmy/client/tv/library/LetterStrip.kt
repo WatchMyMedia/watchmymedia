@@ -1,6 +1,5 @@
 package media.watchmy.client.tv.library
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,6 +49,7 @@ import media.watchmy.client.tv.components.ContentStart
 import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.WmmColors
+import media.watchmy.client.ui.onBack
 
 /** The strip's letters, as the server indexes titles: digits and the rest under #, then A to Z. */
 internal val Alphabet: List<String> = listOf("#") + ('A'..'Z').map { it.toString() }
@@ -93,9 +93,8 @@ internal fun LetterStrip(
     val requesters = remember { Alphabet.associateWith { FocusRequester() } }
     var focused by remember { mutableStateOf<String?>(null) }
     val entry = current?.takeIf { (counts[it] ?: 0) > 0 } ?: letters.minByOrNull { it.offset }?.letter
-    // Back on the strip (the remote's key reaches back callbacks on newer TVs, the key itself on older ones).
-    BackHandler(enabled = focused != null, onBack = onBack)
-    Box(modifier) {
+    // Back on the strip: the remote's key on older TVs, the back callback on newer ones (Modifier.onBack takes both).
+    Box(modifier.onBack(enabled = focused != null, onBack = onBack)) {
         Column(
             Modifier
                 .align(Alignment.TopEnd)

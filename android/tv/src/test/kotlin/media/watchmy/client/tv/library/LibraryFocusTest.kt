@@ -11,7 +11,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
-import media.watchmy.client.fake.FakeAppServices
 import media.watchmy.client.fake.FakeData
 import media.watchmy.client.fake.fakeLatencyMs
 import media.watchmy.client.tv.TvApp
@@ -25,6 +24,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import media.watchmy.client.tv.quietTvFakes
 
 /**
  * Focus on the TV Shows page (PLAN-ANDROID-REVIEW.md §3.2.2): choosing a
@@ -45,8 +45,10 @@ class LibraryFocusTest {
     @Before
     fun start() {
         fakeLatencyMs = 0
+        // Without tonight's reminders, whose banner would take Back first (QuietFakes.kt).
+        val services = quietTvFakes()
         compose.setContent {
-            CompositionLocalProvider(LocalAppServices provides FakeAppServices(tv = true)) { TvApp() }
+            CompositionLocalProvider(LocalAppServices provides services) { TvApp() }
         }
         compose.waitForIdle()
         // Home, then the rail's TV Shows.

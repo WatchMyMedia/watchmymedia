@@ -20,5 +20,15 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+
+        <!-- The pictures on the launcher's Watch Next cards (PLAN-ANDROID-REVIEW.md §2.4).
+             Exported so the launcher can read them; read-only, and it answers only
+             addresses this app signed with a key that never leaves it (WatchNextArt),
+             for the account signed in now. -->
+        <provider
+            android:name="media.watchmy.client.core.playback.watchnext.WatchNextArtProvider"
+            android:authorities="${applicationId}.watchnext.art"
+            android:exported="true"
+            tools:ignore="ExportedContentProvider" />
     </application>
 </manifest>

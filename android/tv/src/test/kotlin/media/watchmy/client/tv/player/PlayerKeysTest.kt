@@ -49,6 +49,10 @@ class PlayerKeysTest {
         assertEquals(KeyAction.Swallow, routeKey(PlayerKey.PlayPause, Overlay.StillWatching, false, FocusArea.Root))
         assertEquals(KeyAction.Swallow, routeKey(PlayerKey.PlayPause, Overlay.Message, false, FocusArea.Root))
         assertEquals(KeyAction.PlayNext, routeKey(PlayerKey.Next, Overlay.UpNext, false, FocusArea.Root))
+        // The remote's Next plays the next episode with nothing over the video too, when there is one.
+        assertEquals(KeyAction.PlayNext, routeKey(PlayerKey.Next, Overlay.None, true, FocusArea.Scrubber, hasNext = true))
+        assertEquals(KeyAction.Swallow, routeKey(PlayerKey.Next, Overlay.None, true, FocusArea.Scrubber, hasNext = false))
+        assertEquals(KeyAction.Swallow, routeKey(PlayerKey.Next, Overlay.Episodes, false, FocusArea.Root, hasNext = true))
     }
 
     @Test

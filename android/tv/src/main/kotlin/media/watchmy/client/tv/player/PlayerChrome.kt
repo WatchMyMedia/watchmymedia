@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -66,6 +67,8 @@ internal class ChromeFocus(
     val scrubber: FocusRequester,
     val playPause: FocusRequester,
     val openers: Map<PickerSection, FocusRequester>,
+    /** The Episodes button's, for an episode. */
+    val episodes: FocusRequester? = null,
 )
 
 /** What the chrome's controls do. */
@@ -77,6 +80,7 @@ internal class ChromeActions(
     val onPlayNext: () -> Unit,
     val onFocusArea: (FocusArea) -> Unit,
     val onSeekTo: (Long) -> Unit = {},
+    val onOpenEpisodes: () -> Unit = {},
 )
 
 /** The dark washes behind the chrome, top and bottom, as in PlayerControls. */
@@ -103,6 +107,8 @@ internal fun BoxScope.PlayerChrome(
     focus: ChromeFocus,
     actions: ChromeActions,
     seek: SeekState? = null,
+    /** "S03 E07" for an episode with a list to open; null hides Episodes. */
+    episodes: String? = null,
 ) {
     ChromeShades()
     TitleBlock(
@@ -146,7 +152,7 @@ internal fun BoxScope.PlayerChrome(
         Modifier.align(Alignment.TopEnd).padding(top = 120.dp, end = 58.dp).onFocusChanged { if (it.isFocused) actions.onFocusArea(FocusArea.Buttons) },
         size = media.watchmy.client.tv.components.TvButtonSize.Medium,
     )
-    TransportRow(state, focus, actions, Modifier.align(Alignment.BottomCenter).padding(start = 58.dp, end = 58.dp, bottom = 56.dp))
+    TransportRow(state, focus, actions, episodes, Modifier.align(Alignment.BottomCenter).padding(start = 58.dp, end = 58.dp, bottom = 56.dp))
 }
 
 /** The title and episode line, with [back] before them; the picker shows it dimmed with "paused" added. */
@@ -186,7 +192,8 @@ private fun ScrubberRow(
         fraction = { fractionOf(shownMs(), state.durationMs) },
         gap = 22.dp,
         previewLift = 31.dp,
-        elapsed = { Text(if (known) formatClock(positionMs) else "", Modifier.width(88.dp), style = clock, maxLines = 1) },
+        // At least the mockup's width, and wider with larger text, which the track gives up.
+        elapsed = { Text(if (known) formatClock(positionMs) else "", Modifier.widthIn(min = 88.dp), style = clock, maxLines = 1) },
         track = {
             ScrubberTrack(
                 progress = fractionOf(positionMs, state.durationMs),
@@ -210,7 +217,7 @@ private fun ScrubberRow(
                     .focusable(),
             )
         },
-        remaining = { Text(if (known) "−" + formatClock(state.durationMs - positionMs) else "", Modifier.width(88.dp), style = clock, textAlign = TextAlign.End, maxLines = 1) },
+        remaining = { Text(if (known) "−" + formatClock(state.durationMs - positionMs) else "", Modifier.widthIn(min = 88.dp), style = clock, textAlign = TextAlign.End, maxLines = 1) },
         modifier = modifier.fillMaxWidth(),
         preview = if (trickplay != null && seek?.targetMs != null) {
             { SeekThumbnail(trickplay, shownMs, SeekThumbnailStyle.Tv, chip = { SeekStepChip(stepMs = { seek.stepMs }) }) }
@@ -221,7 +228,7 @@ private fun ScrubberRow(
 }
 
 @Composable
-private fun TransportRow(state: PlayerUiState, focus: ChromeFocus, actions: ChromeActions, modifier: Modifier) {
+private fun TransportRow(state: PlayerUiState, focus: ChromeFocus, actions: ChromeActions, episodes: String?, modifier: Modifier) {
     val playing = state.status == PlayerStatus.Playing || state.status == PlayerStatus.Buffering
     Row(
         modifier
@@ -241,6 +248,11 @@ private fun TransportRow(state: PlayerUiState, focus: ChromeFocus, actions: Chro
         )
         ControlButton({ actions.onSeekStep(true) }, icon = WmmIcons.Forward10, contentDescription = "Forward 10 seconds")
         Spacer(Modifier.width(18.dp))
+        // Episodes before Audio, Subtitles and Quality (TvPlayerEpisodes).
+        val episodesFocus = focus.episodes
+        if (episodes != null && episodesFocus != null) {
+            ControlButton(actions.onOpenEpisodes, Modifier.focusRequester(episodesFocus), icon = PlayerIcons.Episodes, text = "Episodes", detail = episodes)
+        }
         audioSummary(state.tracks)?.let {
             ControlButton(
                 { actions.onOpenPicker(PickerSection.Audio) },

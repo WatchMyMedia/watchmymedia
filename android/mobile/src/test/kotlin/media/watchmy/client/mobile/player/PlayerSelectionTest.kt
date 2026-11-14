@@ -2,13 +2,16 @@ package media.watchmy.client.mobile.player
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.SavedStateHandle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import media.watchmy.client.fake.FakePlaybackController
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.PlaybackController
+import media.watchmy.client.presentation.player.PlayerViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -23,19 +26,19 @@ class PlayerSelectionTest {
 
     @Test fun `selecting the original episode after autoplay starts it again while resizing does not`() {
         val original = PlayRequest(1L, title = "Episode one")
-        val selection = mutableStateOf(PlayerSelection(original))
-        val width = mutableStateOf(800.dp)
         val controller = RecordingController()
+        val model = PlayerViewModel({ controller }, SavedStateHandle(), original)
+        val width = mutableStateOf(800.dp)
         compose.setContent {
             Box(Modifier.size(width.value, 400.dp)) {
-                StartSelectedPlayback(controller, selection.value)
+                StartSelectedPlayback(model.selection.collectAsState().value, model.controller(), model::start)
             }
         }
         compose.runOnIdle {
             assertEquals(listOf(1L), controller.starts)
             // Autoplay changed the controller's file, but the last manual request is still one.
             controller.currentFile = 2L
-            selection.value = selection.value.select(original)
+            model.select(original)
         }
         compose.runOnIdle {
             assertEquals(listOf(1L, 1L), controller.starts)

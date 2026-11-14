@@ -26,9 +26,10 @@ import media.watchmy.client.model.WatchTarget
  * internal flags keep the movie or episode (1), the show (2) and the
  * season (3), so a mark can find them. One for the app.
  *
- * [poster] gives the card's image. The launcher fetches it without the
- * app's sign-in, so the default is the app's TV banner rather than the
- * server's artwork.
+ * [poster] gives the card's image. The launcher can't sign in to the
+ * server, so the default is the entry's picture through the app's own
+ * [WatchNextArtProvider], which fetches it with the app's sign-in, and the
+ * app's TV banner for an entry without one.
  */
 // WatchNextProgram's public builder and getters are inherited from
 // BasePreviewProgram, which tvprovider marks restricted; lint flags every
@@ -214,8 +215,8 @@ class TvWatchNext(
 
         private fun defaultPoster(app: Context): (WatchNextEntry) -> Uri? {
             val res = app.applicationInfo.banner.takeIf { it != 0 } ?: app.applicationInfo.icon
-            val uri = if (res == 0) null else "${ContentResolver.SCHEME_ANDROID_RESOURCE}://${app.packageName}/$res".toUri()
-            return { uri }
+            val banner = if (res == 0) null else "${ContentResolver.SCHEME_ANDROID_RESOURCE}://${app.packageName}/$res".toUri()
+            return { e -> e.account?.let { account -> e.artPath?.let { WatchNextArt.uri(app, account, it) } } ?: banner }
         }
     }
 }
