@@ -2,22 +2,29 @@ package media.watchmy.client
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import media.watchmy.client.mobile.MobileApp
+import media.watchmy.client.mobile.navigation.KeyboardShortcuts
+import media.watchmy.client.mobile.navigation.LocalKeyboardShortcuts
 import media.watchmy.client.tv.TvApp
 import media.watchmy.client.ui.ProvideAppServices
 
 class MainActivity : ComponentActivity() {
     /** A cast to this TV to Cast Connect (the TV UI then opens the player from AppServices.castReceiver); a link to the UI. */
     private val intents = IntentRouter { intent -> (application as WatchMyMediaApp).castConnect?.onNewIntent(intent) == true }
+
+    /** The phone's keyboard shortcuts, from the keys no screen took. */
+    private val shortcuts = KeyboardShortcuts()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Before super: the launch screen stays until the first frame, so it goes straight to the page or its skeleton.
@@ -31,12 +38,21 @@ class MainActivity : ComponentActivity() {
             Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
                 LocalNetworkGate(isTv = app.isTv, question = app.localNetwork) {
                     ProvideAppServices(app.services) {
-                        if (app.isTv) TvApp(intents.deepLink, deepLinkKey = intents.deepLinkCount) else MobileApp(intents.deepLink, deepLinkKey = intents.deepLinkCount)
+                        if (app.isTv) {
+                            TvApp(intents.deepLink, deepLinkKey = intents.deepLinkCount)
+                        } else {
+                            CompositionLocalProvider(LocalKeyboardShortcuts provides shortcuts) {
+                                MobileApp(intents.deepLink, deepLinkKey = intents.deepLinkCount)
+                            }
+                        }
                     }
                 }
             }
         }
     }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
+        shortcuts.onKeyUp(keyCode, event) || super.onKeyUp(keyCode, event)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

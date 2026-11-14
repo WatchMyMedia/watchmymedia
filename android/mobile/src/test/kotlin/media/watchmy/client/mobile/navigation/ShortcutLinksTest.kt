@@ -1,5 +1,6 @@
 package media.watchmy.client.mobile.navigation
 
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.hasSetTextAction
@@ -12,6 +13,7 @@ import media.watchmy.client.model.DeepLink
 import media.watchmy.client.ui.LocalAppServices
 import androidx.navigation.NavDestination.Companion.hasRoute
 import org.junit.After
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -20,7 +22,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The phone launcher's shortcuts' links open Search and Downloads (PLAN-ANDROID-REVIEW §6.3). */
+/**
+ * The phone launcher's shortcuts' links open Search and Downloads, and a
+ * keyboard's Ctrl+F, / or Search key opens Search (PLAN-ANDROID-REVIEW §6.3).
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xxhdpi")
 class ShortcutLinksTest {
@@ -36,10 +41,12 @@ class ShortcutLinksTest {
         fakeLatencyMs = latency
     }
 
-    private fun open(link: DeepLink): NavHostController {
+    private val shortcuts = KeyboardShortcuts()
+
+    private fun open(link: DeepLink?): NavHostController {
         lateinit var nav: NavHostController
         compose.setContent {
-            CompositionLocalProvider(LocalAppServices provides FakeAppServices()) {
+            CompositionLocalProvider(LocalAppServices provides FakeAppServices(), LocalKeyboardShortcuts provides shortcuts) {
                 nav = rememberNavController()
                 MobileNavHost(onSwitchServer = {}, onSignedOut = {}, nav = nav, deepLink = link)
             }
@@ -52,6 +59,23 @@ class ShortcutLinksTest {
         val nav = open(DeepLink.Search)
         assertTrue(nav.currentDestination!!.hasRoute<MobileRoutes.Search>())
         assertTrue(compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty())
+    }
+
+    @Test fun `Ctrl+F, slash and the Search key are Search, and F or Ctrl+slash aren't`() {
+        assertTrue(KeyboardShortcuts.isSearch(KeyEvent.KEYCODE_F, ctrl = true, otherModifier = false))
+        assertTrue(KeyboardShortcuts.isSearch(KeyEvent.KEYCODE_SLASH, ctrl = false, otherModifier = false))
+        assertTrue(KeyboardShortcuts.isSearch(KeyEvent.KEYCODE_SEARCH, ctrl = false, otherModifier = false))
+        assertFalse(KeyboardShortcuts.isSearch(KeyEvent.KEYCODE_F, ctrl = false, otherModifier = false))
+        assertFalse(KeyboardShortcuts.isSearch(KeyEvent.KEYCODE_SLASH, ctrl = true, otherModifier = false))
+        assertFalse(KeyboardShortcuts.isSearch(KeyEvent.KEYCODE_F, ctrl = true, otherModifier = true))
+    }
+
+    @Test fun `Ctrl+F no screen took opens Search`() {
+        val nav = open(null)
+        val ctrlF = KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_F, 0, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+        compose.runOnUiThread { assertTrue(shortcuts.onKeyUp(KeyEvent.KEYCODE_F, ctrlF)) }
+        compose.waitForIdle()
+        assertTrue(nav.currentDestination!!.hasRoute<MobileRoutes.Search>())
     }
 
     @Test fun `the Downloads shortcut opens Downloads`() {

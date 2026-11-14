@@ -26,6 +26,8 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -247,6 +249,15 @@ fun MobileNavHost(
     // Every other page clears the camera cutout and a side navigation bar (a phone held sideways) here, once,
     // rather than each page: titles sat under the cutout and lists under the bar.
     val sides = if (inPlayer) Modifier else Modifier.windowInsetsPadding(WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal))
+    // A keyboard's Ctrl+F, / or Search key opens Search, except in a player.
+    val shortcuts = LocalKeyboardShortcuts.current
+    val searchAllowed by rememberUpdatedState(!inPlayer)
+    DisposableEffect(shortcuts, nav) {
+        shortcuts?.onSearch = {
+            searchAllowed.also { if (it) nav.go(MobileRoutes.Search) }
+        }
+        onDispose { shortcuts?.onSearch = null }
+    }
     Box(Modifier.fillMaxSize()) {
         NavigationSuiteScaffold(
             layoutType = if (showRail) NavigationSuiteType.NavigationRail else NavigationSuiteType.None,
