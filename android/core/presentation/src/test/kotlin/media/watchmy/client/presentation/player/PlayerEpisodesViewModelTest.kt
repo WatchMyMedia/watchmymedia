@@ -108,6 +108,34 @@ class PlayerEpisodesViewModelTest {
         assertNull(vm.state.value.playingCode)
     }
 
+    // From the phone's own list, which the phone left for this one (its tests came with it).
+
+    @Test
+    fun `a file opened from a link finds its season from the library, not its display title`() = runTest(main.dispatcher) {
+        val vm = PlayerEpisodesViewModel(library)
+        vm.load(PlayRequest(9101, title = "Unrelated display title"))
+        advanceUntilIdle()
+        assertEquals("Harbor Lights", vm.state.value.showTitle)
+        assertEquals(3, (vm.state.value.season as Load.Ready).data.season.number)
+    }
+
+    @Test
+    fun `a newer playing file supersedes an older lookup`() = runTest(main.dispatcher) {
+        val slow = object : media.watchmy.client.model.LibraryRepository by fake {
+            override suspend fun playRequest(fileId: Long): PlayRequest {
+                if (fileId == 9101L) kotlinx.coroutines.delay(1_000)
+                return fake.playRequest(fileId)
+            }
+        }
+        val vm = PlayerEpisodesViewModel(slow)
+        vm.load(PlayRequest(9101, title = "First"))
+        vm.load(PlayRequest(MOVIE_FILE, title = "Second"))
+        advanceUntilIdle()
+        assertEquals(MOVIE_FILE, vm.state.value.playingFileId)
+        assertFalse(vm.state.value.available)
+        assertTrue(vm.state.value.season is Load.Loading)
+    }
+
     private companion object {
         const val HARBOR_LIGHTS = 100L
 

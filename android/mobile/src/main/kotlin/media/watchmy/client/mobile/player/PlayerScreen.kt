@@ -55,6 +55,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import media.watchmy.client.presentation.Load
+import media.watchmy.client.presentation.player.PlayerEpisodesViewModel
 import media.watchmy.client.presentation.player.PlayerSelection
 import media.watchmy.client.presentation.player.PlayerViewModel
 import media.watchmy.client.presentation.player.handOver
@@ -173,7 +175,10 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
     var playingFileId by remember(selection) { mutableLongStateOf(request.fileId) }
     var showEpisodes by remember { mutableStateOf(false) }
     LaunchedEffect(tablet, playingFileId) {
-        if (tablet && request.recordingId == null) episodesModel.load(if (playingFileId == request.fileId) request else PlayRequest(playingFileId, title = state.title))
+        // The shared episode list (core:presentation): the request first, then the file the play moved on to.
+        if (tablet && request.recordingId == null) {
+            if (playingFileId == request.fileId) episodesModel.load(request) else episodesModel.playing(playingFileId)
+        }
     }
     val activity = LocalActivity.current as? ComponentActivity
     val exit by rememberUpdatedState(onExit)
@@ -429,7 +434,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                                     rotationLocked = !rotationLocked
                                 },
                                 onPlayNext = { act { playNext() } },
-                                onEpisodes = if (tablet && (episodes.season != null || episodes.error != null)) { { input(); showEpisodes = true } } else null,
+                                onEpisodes = if (tablet && (episodes.season is Load.Ready || episodes.season is Load.Failed)) { { input(); showEpisodes = true } } else null,
                                 onToggleFill = { setFill(!fill) }.takeIf { fillOffered },
                             ),
                         )
@@ -503,6 +508,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                     state, episodes, ::openPicker,
                     onPlay = { input(); showEpisodes = false; onPlay(it) },
                     onRetry = episodesModel::retry,
+                    playRequest = episodesModel::playRequest,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
             }
@@ -529,6 +535,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                 episodes,
                 onPlay = { input(); showEpisodes = false; onPlay(it) },
                 onRetry = episodesModel::retry,
+                playRequest = episodesModel::playRequest,
                 onDismiss = { showEpisodes = false; controls = controls.shown(now()) },
             )
         }
