@@ -1,17 +1,10 @@
-import { PageHeader } from '../../components/SettingsPanel'
-import { BackupSection } from '../../components/SettingsSections'
+import { useSettingsPage } from '../../components/settings/hooks'
 import { ServerOnly } from './SettingsLayout'
+import { BackupsHub } from './backups/Hub'
+import { RestorePage } from './backups/Restore'
 
-/** Settings › Backups: nightly backups, the ones on disk, and how to restore one. */
+/** Settings › Server › Backups (PLAN-ADMIN-SETTINGS.md §5.8): the page and Restore from a backup. */
 export function BackupsSettings() {
-  return (
-    <>
-      <PageHeader title="Backups">
-        A backup holds the database (libraries, matches, accounts, watch history) and <code className="text-neutral-200">config.yaml</code>; artwork is fetched again. It keeps no one signed in: after a restore, everyone signs in again.
-      </PageHeader>
-      <ServerOnly>
-        <BackupSection />
-      </ServerOnly>
-    </>
-  )
+  const page = useSettingsPage()
+  return <ServerOnly tab="backups">{page?.task === 'restore' ? <RestorePage /> : <BackupsHub />}</ServerOnly>
 }
