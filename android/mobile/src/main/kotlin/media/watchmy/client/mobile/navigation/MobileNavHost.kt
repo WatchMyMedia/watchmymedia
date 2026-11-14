@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
@@ -117,6 +121,9 @@ private fun NavDestination.tab(): MobileTab? = when {
 }
 
 /** Switches tab the Material way: one copy of each tab, each keeping its own back stack and scroll. */
+/** How long a page fades in and out, as on the TV. */
+private const val PAGE_FADE_MS = 180
+
 private fun NavHostController.openTab(tab: MobileTab) = navigate(tab.route()) {
     popUpTo(graph.findStartDestination().id) { saveState = true }
     launchSingleTop = true
@@ -160,8 +167,9 @@ fun MobileNavHost(
     // With a TV connected that plays Live TV, and a server that lets this account cast, Watch casts (PLAN-LIVE-TV.md §4.1).
     val castState by services.cast.state.collectAsStateWithLifecycle()
     val liveCast by services.cast.live.state.collectAsStateWithLifecycle()
-    val castDevice = (castState as? CastState.Connected)?.deviceName?.takeIf { live.castable && liveCast.receiverLive == true }
-    val notLiveDevice = (castState as? CastState.Connected)?.deviceName?.takeIf { live.castable && liveCast.receiverLive == false }
+    // States, not values: the graph's builder captures them, and a changed capture rebuilds the graph (§4.3.5).
+    val castDevice by remember { derivedStateOf { (castState as? CastState.Connected)?.deviceName?.takeIf { live.castable && liveCast.receiverLive == true } } }
+    val notLiveDevice by remember { derivedStateOf { (castState as? CastState.Connected)?.deviceName?.takeIf { live.castable && liveCast.receiverLive == false } } }
     val watchLive = { channel: LiveChannel ->
         nav.navigate(MobileRoutes.LivePlayer(channel.id, channel.sourceId, channel.number, channel.name, onTv = castDevice != null))
     }
@@ -259,7 +267,16 @@ fun MobileNavHost(
             },
         ) {
             Column(Modifier.fillMaxSize().then(sides)) {
-                NavHost(nav, startDestination = MobileRoutes.Home, modifier = Modifier.weight(1f)) {
+                // The TV's short fades, not Navigation's 700 ms default (§4.3.5).
+                NavHost(
+                    nav,
+                    startDestination = MobileRoutes.Home,
+                    modifier = Modifier.weight(1f),
+                    enterTransition = { fadeIn(tween(PAGE_FADE_MS)) },
+                    exitTransition = { fadeOut(tween(PAGE_FADE_MS)) },
+                    popEnterTransition = { fadeIn(tween(PAGE_FADE_MS)) },
+                    popExitTransition = { fadeOut(tween(PAGE_FADE_MS)) },
+                ) {
                     composable<MobileRoutes.Home> {
                         HomeScreen(onPlay = nav::play, onOpenShow = openShow, onOpenMovie = openMovie, onNavigate = go, onOpenSeason = openSeason, onOpenEpisode = openEpisode, liveChannels = live.channels.takeIf { live.available }.orEmpty(), onWatchLive = watchLive, liveListings = live.listings)
                     }
