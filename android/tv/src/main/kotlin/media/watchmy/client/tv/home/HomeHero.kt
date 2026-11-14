@@ -105,7 +105,8 @@ internal fun HeroSection(
                 color = WmmColors.TextSoft,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 760.dp),
+                // Measured after the buttons: with larger text the overview gives up its lines, not the buttons their height.
+                modifier = Modifier.widthIn(max = 760.dp).weight(1f, fill = false),
             )
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 val play = hero.playRequest(home.episodeCards)

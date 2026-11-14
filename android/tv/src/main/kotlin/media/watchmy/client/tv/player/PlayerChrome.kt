@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -191,7 +192,8 @@ private fun ScrubberRow(
         fraction = { fractionOf(shownMs(), state.durationMs) },
         gap = 22.dp,
         previewLift = 31.dp,
-        elapsed = { Text(if (known) formatClock(positionMs) else "", Modifier.width(88.dp), style = clock, maxLines = 1) },
+        // At least the mockup's width, and wider with larger text, which the track gives up.
+        elapsed = { Text(if (known) formatClock(positionMs) else "", Modifier.widthIn(min = 88.dp), style = clock, maxLines = 1) },
         track = {
             ScrubberTrack(
                 progress = fractionOf(positionMs, state.durationMs),
@@ -215,7 +217,7 @@ private fun ScrubberRow(
                     .focusable(),
             )
         },
-        remaining = { Text(if (known) "−" + formatClock(state.durationMs - positionMs) else "", Modifier.width(88.dp), style = clock, textAlign = TextAlign.End, maxLines = 1) },
+        remaining = { Text(if (known) "−" + formatClock(state.durationMs - positionMs) else "", Modifier.widthIn(min = 88.dp), style = clock, textAlign = TextAlign.End, maxLines = 1) },
         modifier = modifier.fillMaxWidth(),
         preview = if (trickplay != null && seek?.targetMs != null) {
             { SeekThumbnail(trickplay, shownMs, SeekThumbnailStyle.Tv, chip = { SeekStepChip(stepMs = { seek.stepMs }) }) }
