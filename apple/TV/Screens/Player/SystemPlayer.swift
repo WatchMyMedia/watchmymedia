@@ -32,6 +32,7 @@ struct SystemPlayer<Overlay: View, Action: Equatable>: UIViewControllerRepresent
         controller.allowedSubtitleOptionLanguages = []
         controller.allowsPictureInPicturePlayback = behavior.pictureInPicture != nil
         controller.customInfoViewControllers = behavior.infoTabs()
+        context.coordinator.shownTabs = behavior.infoTabsKey
         context.coordinator.show(overlay, in: controller)
         context.coordinator.show(contextualActions, transportBarActions, in: controller)
         behavior.pictureInPicture?.possible(controller.allowsPictureInPicturePlayback && AVPictureInPictureController.isPictureInPictureSupported())
@@ -41,6 +42,10 @@ struct SystemPlayer<Overlay: View, Action: Equatable>: UIViewControllerRepresent
     func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
         if controller.player !== player { controller.player = player }
         context.coordinator.behavior = behavior
+        if behavior.infoTabsKey != context.coordinator.shownTabs {
+            context.coordinator.shownTabs = behavior.infoTabsKey
+            controller.customInfoViewControllers = behavior.infoTabs()
+        }
         context.coordinator.show(contextualActions, transportBarActions, in: controller)
     }
 
@@ -54,6 +59,8 @@ struct SystemPlayer<Overlay: View, Action: Equatable>: UIViewControllerRepresent
         private var shown: [Action] = []
         private var shownInBar: [Action] = []
         private var overlayHost: UIViewController?
+        /// The `infoTabsKey` the info panel's tabs were made for.
+        var shownTabs: AnyHashable?
 
         init(behavior: SystemPlayerBehavior<Action>) {
             self.behavior = behavior
@@ -137,6 +144,9 @@ struct SystemPlayerBehavior<Action> {
     var transportBarChanged: @MainActor (Bool) -> Void
     /// The viewer scrubbed or skipped from the first time to the second: where the player goes.
     var seek: @MainActor (_ from: CMTime, _ to: CMTime) -> CMTime
+    /// The info panel's tabs are made again when this changes (the film
+    /// player's Episodes tab comes with an episode and goes with a film).
+    var infoTabsKey: AnyHashable = 0
 }
 
 extension SystemPlayerBehavior where Action == TVPlayerAction {
@@ -147,9 +157,10 @@ extension SystemPlayerBehavior where Action == TVPlayerAction {
     /// when the app goes to the background, and nothing handles AVKit's
     /// picture-in-picture callbacks for it, so starting it would end the
     /// film (PLAN-APPLE-REVIEW.md §3.1.6). Live TV keeps its own.
-    @MainActor static func film(_ model: TVPlayerModel) -> Self {
+    /// `episodesTab`, for an episode, makes the Episodes tab, which comes before the others.
+    @MainActor static func film(_ model: TVPlayerModel, episodesTab: (@MainActor () -> UIViewController)? = nil) -> Self {
         Self(
-            infoTabs: { PickerTab.allCases.map { OptionsTabController(model: model, tab: $0) } },
+            infoTabs: { (episodesTab.map { [$0()] } ?? []) + PickerTab.allCases.map { OptionsTabController(model: model, tab: $0) } },
             uiAction: { action in
                 UIAction(
                     title: action.title,
@@ -164,7 +175,8 @@ extension SystemPlayerBehavior where Action == TVPlayerAction {
             seek: { _, target in
                 if target.isNumeric { model.userSeeked(toPlayerMs: Int((target.seconds * 1000).rounded())) }
                 return target
-            }
+            },
+            infoTabsKey: episodesTab != nil
         )
     }
 }

@@ -17,11 +17,12 @@ struct PlayerScreen: View {
     @Environment(Navigator.self) private var navigator
     @Environment(\.scenePhase) private var scenePhase
     @State private var model: TVPlayerModel?
+    @State private var episodes: TVPlayerEpisodesModel?
 
     var body: some View {
         ZStack {
             Color.black
-            if let model { PlayerContent(model: model) }
+            if let model, let episodes { PlayerContent(model: model, episodes: episodes) }
         }
         .ignoresSafeArea()
         .onAppear(perform: begin)
@@ -44,6 +45,7 @@ struct PlayerScreen: View {
         #endif
         let model = TVPlayerModel(controller: controller, request: request, onExit: { navigator.closePlayer() })
         self.model = model
+        episodes = TVPlayerEpisodesModel(library: services.library)
         model.start()
         #if DEBUG
         PlayerLaunchArguments.apply(to: model)
@@ -53,9 +55,17 @@ struct PlayerScreen: View {
 
 private struct PlayerContent: View {
     let model: TVPlayerModel
+    /// The info panel's Episodes tab, for an episode.
+    let episodes: TVPlayerEpisodesModel
     @Environment(AppServices.self) private var services
     /// The fakes have no video: the system's player runs empty over the backdrop.
     @State private var standIn = AVPlayer()
+    /// The Episodes tab over the video, on the fakes, whose empty player has no info panel (`-playerPanel episodes`).
+    #if DEBUG
+    @State private var episodesPreview = PlayerLaunchArguments.episodesPanel
+    #else
+    @State private var episodesPreview = false
+    #endif
 
     var body: some View {
         let state = model.state
@@ -66,7 +76,7 @@ private struct PlayerContent: View {
                     player: model.controller.player ?? standIn,
                     contextualActions: model.contextualActions,
                     transportBarActions: model.transportBarActions,
-                    behavior: .film(model),
+                    behavior: .film(model, episodesTab: episodes.hasTab ? episodesTab : nil),
                     overlay: VideoOverlay(
                         model: model,
                         standIn: model.controller.player == nil,
@@ -75,8 +85,15 @@ private struct PlayerContent: View {
                     .environment(\.imageLoader, services.images)
                 )
                 // Still watching asks first; the remote is its.
-                .disabled(!model.videoTakesInput)
+                .disabled(!model.videoTakesInput || episodesPreview)
                 .transition(.opacity)
+            }
+
+            if episodesPreview, episodes.hasTab, model.overlay == nil {
+                EpisodesTab(model: model, episodes: episodes, imageURL: { services.library.imageURL($0, size: .w780) })
+                    .environment(\.imageLoader, services.images)
+                    .padding(.top, 40)
+                    .frame(maxHeight: .infinity, alignment: .top)
             }
 
             switch model.overlay {
@@ -115,9 +132,17 @@ private struct PlayerContent: View {
             }
         }
         .animation(.easeOut(duration: 0.25), value: model.overlay)
+        .task(id: model.request) { await episodes.follow(model.request) }
         // What reaches the app once the system's controls have closed what is theirs.
-        .onExitCommand { model.back() }
+        .onExitCommand {
+            if episodesPreview { episodesPreview = false } else { model.back() }
+        }
         .onPlayPauseCommand { model.playPause() }
+    }
+
+    /// The Episodes tab as AVKit hosts it, made when the info panel's tabs are.
+    private func episodesTab() -> UIViewController {
+        EpisodesTabController(model: model, episodes: episodes, imageURL: { [library = services.library] in library.imageURL($0, size: .w780) }, images: services.images)
     }
 }
 

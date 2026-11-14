@@ -196,6 +196,12 @@ public final class TVPlayerModel {
         controller.playNext()
     }
 
+    /// An episode chosen in the info panel's Episodes tab plays in place of this one.
+    public func play(_ request: PlayRequest) {
+        controller.noteUserInput()
+        session.play(request)
+    }
+
     public func watchCredits() {
         controller.noteUserInput()
         controller.watchCredits()

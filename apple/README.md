@@ -164,7 +164,21 @@ Its player takes these too, on the fakes and in debug builds
 `-playerStopped` and `-playerError`, after `-open watchmymedia://play/9101`.
 The fakes have no video, so the system player runs empty over the backdrop:
 Skip, the card and the prompts show, but not the transport bar or its
-Audio, Subtitles and Quality tabs, which need a server.
+Episodes, Audio, Subtitles and Quality tabs, which need a server;
+`-playerPanel episodes` shows the Episodes tab over the video instead.
+
+The info panel's Episodes tab (TvPlayerEpisodes.dc.html, PLAN-APPLE-REVIEW.md
+§6.2) comes after Info for an episode, never a film or a recording: the
+show's seasons as buttons (focus on one chooses it) above the chosen
+season's episodes on disk, focus starting on the one playing, which is
+marked Now playing; the one after it is Next. Select or Play/Pause on
+another plays it in place, from where it was left. `TVPlayerEpisodesModel`
+decides it. It asks the server nothing to know whether the tab shows (the
+request carries the show and season, or the next episode is found in a
+season already loaded, or looked up once); opening the tab the first time
+asks for the show and the playing season side by side, each other season
+once when chosen, and the playing season again after another episode
+started.
 
 The Apple TV simulator takes the Mac's keyboard as the Siri Remote: the
 arrows move focus, Return selects, Escape is Menu, and a long press is

@@ -57,12 +57,14 @@ public final class PlayerSession {
         controller.start(request)
     }
 
-    /// Plays `request` on the same controller instead, and it becomes
-    /// ``request`` (the phone's episodes panel switches episodes this way,
-    /// keeping its Picture in Picture).
-    public func play(_ request: PlayRequest) {
-        self.request = request
-        controller.start(request)
+    /// Plays another episode on the same controller in place of this one, and
+    /// it becomes ``request``: the controller ends this play and starts that one
+    /// on the same player (the Apple TV player's Episodes tab, and the phone's
+    /// episodes panel, which keeps its Picture in Picture this way).
+    public func play(_ next: PlayRequest) {
+        guard started, !isDisposed else { return }
+        request = next
+        controller.start(next)
     }
 
     /// The screen went away: reports "stopped" and lets go of the player. Safe to call twice.
