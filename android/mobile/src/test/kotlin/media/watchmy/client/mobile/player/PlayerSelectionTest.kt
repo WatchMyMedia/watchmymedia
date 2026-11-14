@@ -2,6 +2,7 @@ package media.watchmy.client.mobile.player
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.SavedStateHandle
 import androidx.compose.ui.Modifier
@@ -30,7 +31,7 @@ class PlayerSelectionTest {
         val width = mutableStateOf(800.dp)
         compose.setContent {
             Box(Modifier.size(width.value, 400.dp)) {
-                StartSelectedPlayback(model, model.controller())
+                StartSelectedPlayback(model.selection.collectAsState().value, model.controller(), model::start)
             }
         }
         compose.runOnIdle {
