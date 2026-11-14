@@ -339,7 +339,7 @@ internal fun GuideDays(state: LiveGuideViewModel.State, onDay: (Int) -> Unit, on
                         activeContainerColor = WmmColors.Accent.copy(alpha = .18f), activeContentColor = WmmColors.Accent, activeBorderColor = WmmColors.TextFaint,
                         inactiveContainerColor = Color.Transparent, inactiveContentColor = WmmColors.TextSoft, inactiveBorderColor = WmmColors.TextFaint,
                     ),
-                ) { Text(day.label, fontSize = 13.sp, maxLines = 1, softWrap = false) }
+                ) { Text(day.label, fontSize = 13.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) }
             }
         }
         TonalButton("Now", onNow, compact = true)
@@ -382,7 +382,7 @@ internal fun GuideTimeHeader(state: LiveGuideViewModel.State, format: LiveClockF
             Row(Modifier.fillMaxSize()) {
                 state.slots.forEach { slot ->
                     Box(Modifier.weight(1f).fillMaxHeight().border(width = 0.5.dp, color = WmmColors.Line), contentAlignment = Alignment.CenterStart) {
-                        Text(format.time(slot), color = WmmColors.TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 10.dp))
+                        Text(format.time(slot), color = WmmColors.TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 10.dp))
                     }
                 }
             }
