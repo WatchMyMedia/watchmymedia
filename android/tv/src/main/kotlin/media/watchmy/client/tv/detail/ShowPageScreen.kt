@@ -43,6 +43,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -86,6 +87,7 @@ import media.watchmy.client.model.MissingEpisode
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.ProblemKind
 import media.watchmy.client.model.REPLACE_TITLE
+import media.watchmy.client.model.SeasonMissing
 import media.watchmy.client.model.SeasonSummary
 import media.watchmy.client.model.ShowDetail
 import media.watchmy.client.model.airedLabel
@@ -298,12 +300,16 @@ private fun PageContent(
             }
         }
     }
+    // The episode on top, read where focus searches rather than where the tabs and About compose: moving along
+    // the row changes it, and they don't draw it (PLAN-ANDROID-REVIEW.md §4.3.4).
+    val episodeNow by rememberUpdatedState(state.episodeId)
+    val episodeFocus: () -> FocusRequester = remember(memory) { { memory.requester("ep:$episodeNow") } }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
         Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(bottom = 64.dp)) {
             Top(show, ep, state, vm, library, memory, onPlay, onMore, onAsk)
-            SeasonTabs(state, vm, memory, onAsk, Modifier.onFocusChanged { if (it.hasFocus) toTop() })
+            state.seasonBar()?.let { bar -> SeasonTabs(bar, vm, memory, episodeFocus, onAsk, Modifier.onFocusChanged { if (it.hasFocus) toTop() }) }
             EpisodeRow(show, state, vm, library, memory, onOpen = backToPlay, Modifier.onFocusChanged { if (it.hasFocus) toTop() })
-            About(show, state, vm, library, memory, onAsk, onDetails)
+            About(show, state.aboutFlags(), vm, library, memory, episodeFocus, onAsk, onDetails)
         }
     }
 }
@@ -506,20 +512,42 @@ internal fun MoreButton(onClick: () -> Unit, modifier: Modifier = Modifier, size
  * heading. Then the season's summary and Mark season watched, and with Show
  * missing the season's Request, Search now and Monitor. ▲ goes to Play.
  */
+/** What the season tabs draw: the same while focus moves along the episode row. */
+@Immutable
+private data class SeasonBar(
+    val number: Int,
+    val seasons: List<SeasonSummary>,
+    val oneSeason: Boolean,
+    val showMissing: Boolean,
+    val summary: String?,
+    val canMark: Boolean,
+    val watched: Boolean,
+    val acting: Boolean,
+    val actions: SeasonMissing?,
+)
+
+private fun ShowPageViewModel.State.seasonBar(): SeasonBar? {
+    val number = seasonNumber ?: return null
+    val summary = seasonSummary?.let {
+        if (showMissing) seasonCountLine(it.episodeCount, it.availableCount) else seasonWatchLine(it.availableCount, it.watchedCount, season?.nextToAir())
+    }
+    return SeasonBar(number, seasons, oneSeason, showMissing, summary, canMarkSeason, seasonWatched, acting, seasonActions)
+}
+
 @Composable
-private fun SeasonTabs(state: ShowPageViewModel.State, vm: ShowPageActions, memory: FocusMemory, onAsk: (Int) -> Unit, modifier: Modifier = Modifier) {
-    val number = state.seasonNumber ?: return
-    val summary = state.seasonSummary
-    val up = memory.requester("play")
-    val nav = Modifier.focusProperties {
-        this.up = up
-        this.down = memory.requester("ep:${state.episodeId}")
+private fun SeasonTabs(bar: SeasonBar, vm: ShowPageActions, memory: FocusMemory, episodeFocus: () -> FocusRequester, onAsk: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val number = bar.number
+    val nav = remember(memory, episodeFocus) {
+        Modifier.focusProperties {
+            this.up = memory.requester("play")
+            this.down = episodeFocus()
+        }
     }
     Row(modifier.fillMaxWidth().padding(start = ContentStart - 6.dp, end = ContentEnd, top = 20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (state.oneSeason) {
+        if (bar.oneSeason) {
             Text(seasonName(number), style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.padding(start = 6.dp, end = 8.dp))
         } else {
-            val index = state.seasons.indexOfFirst { it.number == number }
+            val index = bar.seasons.indexOfFirst { it.number == number }
             val tabs = rememberLazyListState(initialFirstVisibleItemIndex = (index - 3).coerceAtLeast(0))
             LazyRow(
                 Modifier.weight(1f, fill = false).focusRestorer(memory.requester("tab:$number")),
@@ -527,27 +555,21 @@ private fun SeasonTabs(state: ShowPageViewModel.State, vm: ShowPageActions, memo
                 contentPadding = PaddingValues(6.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(state.seasons, key = { it.number }) { s ->
-                    SeasonTab(s, s.number == number, state.showMissing, nav.focusMemory(memory, "tab:${s.number}").onFocusChanged { if (it.isFocused) vm.selectSeason(s.number) }) { vm.selectSeason(s.number) }
+                items(bar.seasons, key = { it.number }) { s ->
+                    SeasonTab(s, s.number == number, bar.showMissing, nav.focusMemory(memory, "tab:${s.number}").onFocusChanged { if (it.isFocused) vm.selectSeason(s.number) }) { vm.selectSeason(s.number) }
                 }
             }
         }
-        if (summary != null) {
-            Text(
-                if (state.showMissing) seasonCountLine(summary.episodeCount, summary.availableCount) else seasonWatchLine(summary.availableCount, summary.watchedCount, state.season?.nextToAir()),
-                style = inter(18.sp),
-                color = WmmColors.TextMuted,
-                maxLines = 1,
-                modifier = Modifier.padding(horizontal = 12.dp),
-            )
+        if (bar.summary != null) {
+            Text(bar.summary, style = inter(18.sp), color = WmmColors.TextMuted, maxLines = 1, modifier = Modifier.padding(horizontal = 12.dp))
         }
-        if (state.canMarkSeason) {
-            TvButton(markSeasonButtonLabel(state.seasonWatched), { vm.setSeasonWatched(!state.seasonWatched) }, nav.focusMemory(memory, "mark-season"), size = TvButtonSize.Small, enabled = !state.acting)
+        if (bar.canMark) {
+            TvButton(markSeasonButtonLabel(bar.watched), { vm.setSeasonWatched(!bar.watched) }, nav.focusMemory(memory, "mark-season"), size = TvButtonSize.Small, enabled = !bar.acting)
         }
-        state.seasonActions?.takeIf { it.any }?.let { a ->
+        bar.actions?.takeIf { it.any }?.let { a ->
             if (a.request) TvButton(requestSeasonLabel(number), { onAsk(number) }, nav.focusMemory(memory, "season-request"), size = TvButtonSize.Small, icon = WmmIcons.Plus)
-            if (a.search) TvButton("Search now", vm::searchSeason, nav.focusMemory(memory, "season-search"), size = TvButtonSize.Small, enabled = !state.acting)
-            if (a.monitor) TvButton("Monitor", vm::monitorSeason, nav.focusMemory(memory, "season-monitor"), size = TvButtonSize.Small, enabled = !state.acting)
+            if (a.search) TvButton("Search now", vm::searchSeason, nav.focusMemory(memory, "season-search"), size = TvButtonSize.Small, enabled = !bar.acting)
+            if (a.monitor) TvButton("Monitor", vm::monitorSeason, nav.focusMemory(memory, "season-monitor"), size = TvButtonSize.Small, enabled = !bar.acting)
         }
     }
 }
@@ -672,9 +694,8 @@ private fun cardLine(ep: EpisodeDetail, missing: MissingEpisode?): String = when
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun About(show: ShowDetail, state: ShowPageViewModel.State, vm: ShowPageActions, library: LibraryRepository, memory: FocusMemory, onAsk: (Int) -> Unit, onDetails: () -> Unit) {
-    val up = memory.requester("ep:${state.episodeId}")
-    val nav = Modifier.focusProperties { this.up = up }
+private fun About(show: ShowDetail, flags: AboutFlags, vm: ShowPageActions, library: LibraryRepository, memory: FocusMemory, episodeFocus: () -> FocusRequester, onAsk: (Int) -> Unit, onDetails: () -> Unit) {
+    val nav = remember(episodeFocus) { Modifier.focusProperties { this.up = episodeFocus() } }
     Row(
         Modifier
             .fillMaxWidth()
@@ -696,14 +717,27 @@ private fun About(show: ShowDetail, state: ShowPageViewModel.State, vm: ShowPage
             }
             if (show.overview.isNotBlank()) Text(show.overview, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.TextSoft, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 1100.dp))
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                if (state.canMarkShow) TvButton(markShowLabel(state.showWatched), { vm.setShowWatched(!state.showWatched) }, nav.focusMemory(memory, "about:mark"), enabled = !state.acting)
-                if (state.canShowMissing) TvButton(missingEpisodesLabel(state.showMissing), { vm.setShowMissing(!state.showMissing) }, nav.focusMemory(memory, "about:missing"))
-                if (state.missingSeasons) TvButton("Request missing seasons", { onAsk(ALL_SEASONS) }, nav.focusMemory(memory, "about:request"))
+                if (flags.canMarkShow) TvButton(markShowLabel(flags.showWatched), { vm.setShowWatched(!flags.showWatched) }, nav.focusMemory(memory, "about:mark"), enabled = !flags.acting)
+                if (flags.canShowMissing) TvButton(missingEpisodesLabel(flags.showMissing), { vm.setShowMissing(!flags.showMissing) }, nav.focusMemory(memory, "about:missing"))
+                if (flags.missingSeasons) TvButton("Request missing seasons", { onAsk(ALL_SEASONS) }, nav.focusMemory(memory, "about:request"))
                 TvButton("Cast & details", onDetails, nav.focusMemory(memory, "about:details"), icon = WmmIcons.Info)
             }
         }
     }
 }
+
+/** What About the show's buttons depend on: the same while focus moves along the episode row. */
+@Immutable
+private data class AboutFlags(
+    val canMarkShow: Boolean,
+    val showWatched: Boolean,
+    val acting: Boolean,
+    val canShowMissing: Boolean,
+    val showMissing: Boolean,
+    val missingSeasons: Boolean,
+)
+
+private fun ShowPageViewModel.State.aboutFlags() = AboutFlags(canMarkShow, showWatched, acting, canShowMissing, showMissing, missingSeasons)
 
 /** "2022– · 3 seasons · 24 episodes · Drama · ★ 8.1". */
 private fun showFacts(show: ShowDetail): String {
