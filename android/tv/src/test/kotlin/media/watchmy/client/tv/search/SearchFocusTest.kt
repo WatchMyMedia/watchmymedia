@@ -18,6 +18,11 @@ import androidx.compose.ui.test.pressKey
 import media.watchmy.client.fake.fakeLatencyMs
 import media.watchmy.client.tv.TvApp
 import media.watchmy.client.ui.LocalAppServices
+import android.content.ComponentName
+import android.content.IntentFilter
+import android.speech.RecognitionService
+import org.robolectric.Shadows.shadowOf
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Before
@@ -81,6 +86,34 @@ class SearchFocusTest {
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
         assertEquals(result, focused())
+    }
+
+    @Test
+    fun `up from the keyboard's top row reaches the search box, and right from there the microphone`() {
+        installRecognizer()
+        assertEquals("q", focused())
+        press(Key.DirectionUp)
+        assertEquals("the top row", "1", focused())
+        press(Key.DirectionUp)
+        assertTrue("${focused()} is the search box", focused().startsWith("Titles of shows"))
+        press(Key.DirectionRight)
+        assertEquals("Voice typing", focused())
+    }
+
+    /** A speech recognizer on the TV, for the microphone key; the screen is shown again to see it. */
+    private fun installRecognizer() {
+        val pm = shadowOf(compose.activity.packageManager)
+        val service = ComponentName("com.example.speech", "com.example.speech.Recognizer")
+        pm.addServiceIfNotPresent(service)
+        pm.addIntentFilterForService(service, IntentFilter(RecognitionService.SERVICE_INTERFACE))
+        // Search reads it when it is shown: leave for Home and come back.
+        press(Key.DirectionLeft)
+        repeat(6) { if (focused() != "Home") press(Key.DirectionDown) }
+        press(Key.DirectionCenter)
+        press(Key.DirectionLeft)
+        repeat(6) { if (focused() != "Search") press(Key.DirectionUp) }
+        press(Key.DirectionCenter)
+        if (focused() == "Search") press(Key.DirectionRight)
     }
 
     private fun focused(): String {
