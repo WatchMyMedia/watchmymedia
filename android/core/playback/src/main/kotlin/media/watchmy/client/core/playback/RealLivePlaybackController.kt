@@ -101,6 +101,9 @@ class RealLivePlaybackController(
     /** Automatic's output switches; what a failed one goes back to is the URL before it. */
     private val switch = OutputSwitch<String>(keepFallbackUntilReported = false)
     private var pollJob: Job? = null
+    /** A status read the server holds until the channel plays ([LiveCapabilities.statusWaits]), and its session. */
+    private var statusJob: Job? = null
+    private var statusSession: String? = null
     /** The last stop's DELETE, which [stopAndRelease] waits for. */
     private var releaseJob: Job? = null
     private var lastPollAt = 0L
@@ -462,11 +465,15 @@ class RealLivePlaybackController(
     private fun poll(forceHeartbeat: Boolean = false) {
         val session = state.value.session ?: return
         val currentGeneration = generation
-        if (!playing(currentGeneration, session.id) || pollJob?.isActive == true) return
+        if (!playing(currentGeneration, session.id)) return
         val now = clock.elapsedMs()
+        val tuning = session.state == LiveSessionState.Starting && now - lastPollAt >= STATUS_MS
+        val waits = capabilities?.statusWaits == true
+        if (tuning && waits) awaitStatus(session, currentGeneration)
+        if (pollJob?.isActive == true) return
         val beat = forceHeartbeat || paused != lastReportedPause || interaction != sentInteraction ||
             switch.accepted != null || switch.failed != null || now - lastBeatAt >= HEARTBEAT_MS
-        val status = session.state == LiveSessionState.Starting && now - lastPollAt >= STATUS_MS
+        val status = tuning && !waits
         val renew = loadedSession != null && tokens.due
         if (!beat && !status && !renew) return
         pollJob = scope.launch {
@@ -501,15 +508,59 @@ class RealLivePlaybackController(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    if (!playing(currentGeneration, session.id)) return@withLock
-                    val recording = dueTakeover()
-                    if (recording != null) fail(liveTVError("recording"), "recording", recording) else fail(message(e), reasonOf(e))
-                    // Stop media immediately so requests cannot indefinitely renew
-                    // a tuner while the control connection is broken.
-                    runCatching { releaseOwned() }
+                    lostControl(e, session, currentGeneration)
                 }
             }
         }
+    }
+
+    /**
+     * Asks a server that waits ([LiveCapabilities.statusWaits]) for the
+     * tuning session's status, which it holds until the channel plays, fails
+     * or stops, or [STATUS_WAIT_MS] passes. Asked outside [lane], so
+     * heartbeats, controls and a stop never queue behind it; its answer is
+     * taken in the lane, as the poll's is. A still-starting answer is asked
+     * again at the next tick. Another session's read is dropped here, never
+     * from inside itself, where its own failure may still be releasing the
+     * tuner; its answer would be dropped anyway, by [playing].
+     */
+    private fun awaitStatus(session: LiveSession, currentGeneration: Long) {
+        if (statusJob?.isActive == true && statusSession == session.id) return
+        statusJob?.cancel()
+        statusSession = session.id
+        statusJob = scope.launch {
+            val updated = try {
+                withContext(io) { gateway.awaitStatus(session.id, STATUS_WAIT_MS) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                lastPollAt = clock.elapsedMs()
+                lane.withLock { lostControl(e, session, currentGeneration) }
+                return@launch
+            }
+            lastPollAt = clock.elapsedMs()
+            lane.withLock {
+                if (!playing(currentGeneration, session.id)) return@withLock
+                try {
+                    require(updated.id == session.id) { "The server returned a different Live TV session." }
+                    accept(updated, currentGeneration)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    lostControl(e, session, currentGeneration)
+                }
+            }
+        }
+    }
+
+    /** A control call failed: the session ends. Called only in [lane]. */
+    private suspend fun lostControl(e: Exception, session: LiveSession, currentGeneration: Long) {
+        if (!playing(currentGeneration, session.id)) return
+        val recording = dueTakeover()
+        if (recording != null) fail(liveTVError("recording"), "recording", recording) else fail(message(e), reasonOf(e))
+        // Stop media immediately so requests cannot indefinitely renew
+        // a tuner while the control connection is broken.
+        runCatching { releaseOwned() }
     }
 
     /** Automatic's measurement for a heartbeat, as [measure] takes it for files too. Main thread only, as the player is. */
@@ -624,8 +675,10 @@ class RealLivePlaybackController(
 
     private companion object {
         val REASON = Regex("^[a-z_]+$")
-        /** While the server tunes, its status is asked at every tick (one call at a time). */
+        /** While the server tunes, its status is asked at every tick (one call at a time), unless the server waits. */
         const val STATUS_MS = PlayerHost.TICK_MS
+        /** How long a server that waits holds a status read: its most, and inside the API client's 30 s read timeout. */
+        const val STATUS_WAIT_MS = 10_000L
         const val CAPABILITIES_FRESH_MS = 5 * 60_000L
         const val TUNE_TIMEOUT_MS = 35_000L
         const val HEARTBEAT_MS = 10_000L

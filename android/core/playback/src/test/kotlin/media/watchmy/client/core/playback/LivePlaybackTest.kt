@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
 import media.watchmy.client.core.playback.player.PlayerFailure
 import media.watchmy.client.core.playback.player.PlayerPhase
 import media.watchmy.client.model.ApiException
@@ -470,6 +471,106 @@ class LivePlaybackTest {
         h.close()
     }
 
+    @Test fun `a server that waits is asked once while the channel tunes, and plays the moment it does`() = runTest {
+        val h = harness()
+        h.gateway.statusWaits = true
+        h.gateway.initialState = LiveSessionState.Starting
+        h.controller.start(ONE)
+        runCurrent()
+        advanceTimeBy(3_000)
+        runCurrent()
+        assertEquals("No status every tick", 0, h.gateway.statusCalls)
+        assertEquals(listOf(10_000L), h.gateway.waits)
+        h.gateway.nextReply = h.gateway.view().copy(state = LiveSessionState.Playing)
+        h.gateway.played.complete(Unit)
+        runCurrent()
+        assertEquals(PlayerStatus.Playing, h.controller.state.value.status)
+        assertEquals(1, h.media.loads.size)
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertEquals("None once it plays", 1, h.gateway.waits.size)
+        h.close()
+    }
+
+    @Test fun `a waiting read that runs out is asked again at the next tick`() = runTest {
+        val h = harness()
+        h.gateway.statusWaits = true
+        h.gateway.initialState = LiveSessionState.Starting
+        h.controller.start(ONE)
+        runCurrent()
+        // Asked at the first tick (250 ms), out until 10.25 s, then again at the next tick.
+        advanceTimeBy(10_400)
+        runCurrent()
+        assertEquals(1, h.gateway.waits.size)
+        advanceTimeBy(200)
+        runCurrent()
+        assertEquals(2, h.gateway.waits.size)
+        assertEquals(0, h.gateway.statusCalls)
+        assertEquals(PlayerStatus.Loading, h.controller.state.value.status)
+        h.close()
+    }
+
+    @Test fun `heartbeats and a stop never wait behind a held status read`() = runTest {
+        val h = harness()
+        h.gateway.statusWaits = true
+        h.gateway.holdForever = true
+        h.gateway.initialState = LiveSessionState.Starting
+        h.controller.start(ONE)
+        runCurrent()
+        val first = h.gateway.beats.size
+        advanceTimeBy(10_500)
+        runCurrent()
+        assertTrue("The ten-second heartbeat went out", h.gateway.beats.size > first)
+        assertEquals("One read out at a time", 1, h.gateway.waits.size)
+        val tuning = h.gateway.view()
+        val stopping = async { h.controller.stopAndRelease() }
+        runCurrent()
+        assertTrue("The DELETE went out at once", stopping.isCompleted)
+        assertTrue(h.gateway.allocated.isEmpty())
+        // The held read answers late: the stopped session stays stopped.
+        h.gateway.nextReply = tuning.copy(state = LiveSessionState.Playing)
+        h.gateway.played.complete(Unit)
+        runCurrent()
+        assertEquals(PlayerStatus.Ended, h.controller.state.value.status)
+        assertTrue(h.media.loads.isEmpty())
+        h.close()
+    }
+
+    @Test fun `a channel change asks the new session's status without waiting for the old read`() = runTest {
+        val h = harness()
+        h.gateway.statusWaits = true
+        h.gateway.holdForever = true
+        h.gateway.initialState = LiveSessionState.Starting
+        h.controller.start(ONE)
+        runCurrent()
+        advanceTimeBy(300)
+        runCurrent()
+        assertEquals(1, h.gateway.waits.size)
+        h.controller.start(TWO)
+        runCurrent()
+        advanceTimeBy(300)
+        runCurrent()
+        assertEquals(2, h.gateway.waits.size)
+        assertEquals(PlayerStatus.Loading, h.controller.state.value.status)
+        h.close()
+    }
+
+    @Test fun `a waiting read that fails ends the session and gives the tuner back`() = runTest {
+        val h = harness()
+        h.gateway.statusWaits = true
+        h.gateway.initialState = LiveSessionState.Starting
+        h.controller.start(ONE)
+        runCurrent()
+        advanceTimeBy(300)
+        runCurrent()
+        h.gateway.awaitError = IOException("connection reset")
+        h.gateway.played.complete(Unit)
+        runCurrent()
+        assertEquals(PlayerStatus.Error, h.controller.state.value.status)
+        assertTrue("The tuner was given back", h.gateway.allocated.isEmpty())
+        h.close()
+    }
+
     @Test fun `initial frame cannot acknowledge a prepared output before its own frame`() = runTest {
         val h = harness()
         h.gateway.automatic = true
@@ -649,7 +750,20 @@ class LivePlaybackTest {
         val tokenReads get() = tokens
         override suspend fun liveCapabilities(): LiveCapabilities {
             capabilityReads++
-            return LiveCapabilities(automatic = automatic)
+            return LiveCapabilities(automatic = automatic, statusWaits = statusWaits)
+        }
+        /** A level-28 server: status reads wait while the session starts, until [played] or their time is up. */
+        var statusWaits = false
+        val waits = mutableListOf<Long>()
+        var played = CompletableDeferred<Unit>()
+        /** Set, a waiting read never times out: it answers only once [played]. */
+        var holdForever = false
+        var awaitError: Exception? = null
+        override suspend fun awaitStatus(sessionId: String, waitMs: Long): LiveSession {
+            waits += waitMs
+            if (holdForever) played.await() else withTimeoutOrNull(waitMs) { played.await() }
+            awaitError?.let { throw it }
+            return nextReply ?: allocated.getValue(sessionId)
         }
         override suspend fun startNegotiated(target: LiveTarget, quality: StreamQuality, requestId: String, client: ClientInfo, profile: PlaybackProfile): LiveSession {
             profiles += profile
