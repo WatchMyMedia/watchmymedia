@@ -39,6 +39,8 @@ private struct MovieView: View {
                 ErrorState(message: message, retry: model.retry)
             case .loaded(let movie):
                 page(movie, topInset: geo.safeAreaInsets.top, width: geo.size.width)
+                    // Both of iPad's side-by-side columns pull to refresh.
+                    .refreshable { await model.refresh() }
             }
         }
         .groundBackground()
@@ -54,7 +56,7 @@ private struct MovieView: View {
                         Button {
                             report = ReportProblemModel(requests: services.requests, target: .movie(movie))
                         } label: {
-                            Label("Report a problem", systemImage: "exclamationmark.bubble")
+                            Label(reportProblemTitle, systemImage: "exclamationmark.bubble")
                         }
                     } label: {
                         Image(systemName: "ellipsis")
@@ -72,7 +74,7 @@ private struct MovieView: View {
         }
         .task { await model.run() }
         // Offline, the page follows what is watched on the copy.
-        .onChange(of: services.downloads.downloads) { model.refreshOffline() }
+        .background { DownloadsChangeWatcher(downloads: services.downloads) { model.refreshOffline() } }
         .messageToast($model.message)
     }
 

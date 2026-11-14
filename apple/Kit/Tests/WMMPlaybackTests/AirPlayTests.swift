@@ -32,6 +32,16 @@ import WMMModel
         #expect(route.apply(to: url("https://home.example.net/wmmx/api")) == nil)
     }
 
+    @Test func aTokenScopedToTheServerInUseStillReachesTheLANAddress() async {
+        // PLAN-APPLE-REVIEW.md §3.4.8: the token goes on the server's own address, which the LAN one then replaces.
+        h.gateway.scope = Self.tailnet
+        await startPlaying()
+        #expect(loaded == url("https://studio.tail1234.ts.net/api/playback/s1/master.m3u8?access_token=tok1"))
+        h.player.airPlay(true)
+        await h.run()
+        #expect(loaded == url("http://192.168.1.20:27588/api/playback/s1/master.m3u8?access_token=tok1"))
+    }
+
     @Test func airPlayFromATailnetAddressRestartsOnTheLANAddressWhereItWas() async throws {
         await startPlaying()
         await h.advance(60_000)

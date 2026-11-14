@@ -65,13 +65,16 @@ extension View {
     }
 }
 
-/// Cards dim and shrink a little while pressed.
+/// Cards dim and shrink a little while pressed, and lift under an iPad's
+/// pointer as the system draws it (PLAN-APPLE-REVIEW.md §6.3); at rest, and
+/// without a pointer, nothing changes.
 struct CardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .opacity(configuration.isPressed ? 0.85 : 1)
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+            .hoverEffect(.lift)
     }
 }
 

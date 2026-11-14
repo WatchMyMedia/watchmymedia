@@ -30,6 +30,19 @@ final class LiveExtrasTests: XCTestCase {
 
     private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
+    /// Waits until `element` matches `predicate`.
+    @MainActor
+    private func becomes(_ element: XCUIElement, _ predicate: String, timeout: TimeInterval = 10) -> Bool {
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: predicate), object: element)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    /// Waits until `element` is gone.
+    @MainActor
+    private func gone(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
+        becomes(element, "exists == false", timeout: timeout)
+    }
+
     @MainActor
     func testAStarAndTheFavouritesChip() throws {
         let app = launch()
@@ -152,8 +165,17 @@ final class LiveExtrasTests: XCTestCase {
         XCTAssertTrue(app.buttons["Watch 20.1"].exists, "What is on has Watch")
         snap("guide-search")
 
-        app.tabBars.buttons["Search"].tap()
-        let tabField = app.searchFields.firstMatch
+        // The Search tab, from a launch straight onto it. Reaching it by the tab bar
+        // meant putting the guide's keyboard away first, and no key or button
+        // did that on every iPhone (an iPhone 18 Pro kept it up, 2026-11-13).
+        app.terminate()
+        app.launchArguments = ["-fakes", "-fakesLiveGuide", "-tab", "search"]
+        app.launch()
+        let searchTab = app.tabBars.buttons["Search"]
+        XCTAssertTrue(searchTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(becomes(searchTab, "isSelected == true"), "the Search tab is chosen")
+        // The Search tab's own field, by its prompt: the guide's may still be in the tree.
+        let tabField = app.searchFields.matching(NSPredicate(format: "placeholderValue == %@", "Shows, movies, episodes, Live TV")).firstMatch
         XCTAssertTrue(tabField.waitForExistence(timeout: 10))
         tabField.tap(); tabField.typeText("harbor")
         let station = app.buttons["live-search-7.1-Station 9"].firstMatch

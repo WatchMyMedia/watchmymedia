@@ -6,7 +6,7 @@ final class LiveRecordingTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-fakes", "-fakesLiveRecordings", "-open", "watchmymedia://live-tv/recordings"]
         app.launch(); defer { app.terminate() }
-        XCTAssertTrue(app.buttons["Watch from the start"].firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["Watch from the start"].firstMatch.waitUntilExists(timeout: 20))
         XCTAssertTrue(app.buttons["Watch from the start"].firstMatch.exists)
         XCTAssertFalse(app.buttons["New recording"].exists)
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())

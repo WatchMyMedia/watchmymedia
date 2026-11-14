@@ -89,13 +89,70 @@ struct LiveExtrasModelTests {
         #expect(repository.favouriteIDs.isEmpty)
     }
 
+    @Test func aStarFromTheChannelListFollowsTheList() async throws {
+        let (repository, store) = try await make(guide(favourites: false))
+        let channel = LiveChannel(id: "ch-7.2", number: "7.2", name: "Driftwood")
+        #expect(!store.isFavourite(channel))
+        repository.setFavouriteElsewhere(true, channelID: "ch-7.2")
+        #expect(store.isFavourite(channel), "the index is made again when the list changes")
+        #expect(!store.isFavourite(LiveChannel(id: "ch-9.1", number: "9.1", name: "Station")))
+        #expect(store.isFavourite(LiveChannel(id: "ch-unlisted", number: "99.1", name: "Gone", favourite: true)),
+                "a channel the list doesn't hold keeps its own flag")
+    }
+
     @Test func anotherDevicesStarArrivesWithTheEvent() async throws {
         let (repository, store) = try await make(guide(favourites: false))
         let following = Task { await store.follow() }
         defer { following.cancel() }
-        try await Task.sleep(for: .milliseconds(20))
+        try await waitFor { repository.liveListenerCount > 0 }
         repository.changedElsewhere { $0.setFavouriteElsewhere(true, channelID: "ch-7.2") }
         try await waitFor { store.isFavourite(LiveChannel(id: "ch-7.2", number: "7.2", name: "Driftwood")) }
+    }
+
+    @Test func eachEventAsksOnlyForItsOwnPartAndAnEchoAsksForNothing() async throws {
+        let (repository, store) = try await make()
+        let following = Task { await store.follow() }
+        defer { following.cancel() }
+        try await waitFor { repository.liveListenerCount > 0 }
+        let refreshes = repository.refreshCount, reminders = repository.remindersCount
+        repository.changedElsewhere(.reminders)
+        try await waitFor { store.eventsFollowed == 1 }
+        #expect(repository.remindersCount == reminders + 1)
+        repository.changedElsewhere(.favourites)
+        try await waitFor { store.eventsFollowed == 2 }
+        #expect(repository.refreshCount == refreshes + 1)
+        repository.changedElsewhere(.recordings)
+        try await waitFor { store.eventsFollowed == 3 }
+        #expect(repository.remindersCount == reminders + 1, "a favourites or recordings event isn't the reminders'")
+        #expect(repository.refreshCount == refreshes + 1, "nor are reminders or recordings the channels'")
+        // A star set here: its echo asks for nothing.
+        await store.setFavourite(true, channel: LiveChannel(id: "ch-7.2", number: "7.2", name: "Driftwood"))
+        repository.changedElsewhere(.favourites)
+        try await waitFor { store.eventsFollowed == 4 }
+        #expect(repository.refreshCount == refreshes + 1)
+        // The stream coming back may have missed anything: both.
+        repository.changedElsewhere(.all)
+        try await waitFor { repository.refreshCount == refreshes + 2 && repository.remindersCount == reminders + 2 }
+    }
+
+    @Test func refreshesAtOnceShareOneRequest() async throws {
+        let (repository, store) = try await make()
+        let before = repository.remindersCount
+        // Hold the first request open until the second refresh has been asked:
+        // with no latency it could finish before the second began (it did on a
+        // loaded machine, 2026-11-13), and the second would rightly ask again.
+        let (opened, open) = AsyncStream<Void>.makeStream()
+        repository.remindersHold = { for await _ in opened { break } }
+        let first = Task { await store.refresh() }
+        #expect(await eventually { repository.remindersCount == before + 1 })
+        let second = Task { await store.refresh() }
+        for _ in 0..<20 { await Task.yield() }
+        open.yield(); open.finish()
+        await first.value; await second.value
+        repository.remindersHold = nil
+        #expect(repository.remindersCount == before + 1)
+        await store.refresh()
+        #expect(repository.remindersCount == before + 2, "a later one asks again")
     }
 
     // MARK: Reminders
@@ -195,7 +252,7 @@ struct LiveExtrasModelTests {
         let (repository, store) = try await make()
         let following = Task { await store.follow() }
         defer { following.cancel() }
-        try await Task.sleep(for: .milliseconds(20))
+        try await waitFor { repository.liveListenerCount > 0 }
         let count = store.reminders.count
         repository.changedElsewhere { $0.reminderItems.removeFirst() }
         try await waitFor { store.reminders.count == count - 1 }

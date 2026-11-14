@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The Apple TV app's privacy manifest (PLAN-APPLE-REVIEW.md §3.4.1). No
+  tracking and no data collected: the app talks only to the person's own
+  server. The required-reason APIs it calls, with Apple's reasons:
+  - UserDefaults, CA92.1: the app's own settings (Kit/Sources/WMMData/Storage/DeviceStorage.swift).
+  - System boot time, 35F9.1: ProcessInfo.systemUptime times events inside the app
+    (the players' transfer age in WMMPlayback, PlayerChromeModel's controls timer).
+  No disk space: the Apple TV app has no downloads and doesn't link WMMDownloads.
+  Keep it in step with App/Resources/PrivacyInfo.xcprivacy (apple/README.md).
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>35F9.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

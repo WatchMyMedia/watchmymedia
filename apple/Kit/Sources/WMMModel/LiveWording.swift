@@ -430,3 +430,106 @@ public func liveDeviceNotifiesNote(device: String) -> String {
 
 /// Settings on Apple TV.
 public let liveTVLeadSettingsNote = "Apple TV shows a reminder as a banner while WatchMyMedia is open, and can’t remind you when the app is closed. Kept on the server, so your other devices remind you at the same time."
+
+// MARK: Recording: the programme menus, Recordings and the options form (PLAN-APPLE-REVIEW.md §5.4, §5.8)
+
+public let liveStopRecording = "Stop recording"
+public let liveDontRecord = "Don’t record"
+
+/// Stopping a programme set to record: "Stop recording" while it records,
+/// else "Don’t record". `short` is the iPhone details' "Stop", beside its mark.
+public func liveCancelRecordingTitle(_ state: LiveRecordingState, short: Bool = false) -> String {
+    state == .recording ? (short ? "Stop" : liveStopRecording) : liveDontRecord
+}
+
+/// "Record", or "Record the rest" while it is on; `choosing` adds the "…" of
+/// a menu item whose choice follows on a screen of its own (Apple TV).
+public func liveRecordTitle(rest: Bool, choosing: Bool = false) -> String {
+    (rest ? "Record the rest" : "Record") + (choosing ? "…" : "")
+}
+
+/// The choice's heading: "Record Station 9".
+public func liveRecordHeading(_ title: String) -> String { "Record \(title)" }
+public let liveRecordJustThisEpisode = "Just this episode"
+public let liveRecordEveryNewEpisode = "Every new episode"
+public let liveRecordOptionsChoice = "Options…"
+public let liveWatchFromTheStart = "Watch from the start"
+public let liveRecordThisInstead = "Record this instead"
+public let liveStopSeries = "Stop series"
+public let liveDeleteRecording = "Delete recording"
+public let liveDeleteRecordingNote = "This permanently deletes the file WatchMyMedia recorded. Your watch history and the series rule stay."
+public let liveDontRecordAgain = "Don’t record it again"
+public let liveRecordingChangeFailed = "Couldn’t change the recording. Try again."
+public let liveNoRecordings = "No recordings"
+public let liveRecordingUnavailable = "Recording isn’t available"
+public let liveLoadMore = "Load more"
+
+/// Under a rule or recording someone else set: "Set by Alex".
+public func liveSetBy(_ name: String) -> String { "Set by \(name)" }
+
+/// "Loading upcoming", while a section of Recordings loads.
+public func liveRecordingsLoading(_ section: LiveRecordingSection) -> String { "Loading \(section.title.lowercased())" }
+
+/// "Couldn’t load upcoming".
+public func liveRecordingsFailed(_ section: LiveRecordingSection) -> String { "Couldn’t load \(section.title.lowercased())" }
+
+/// A recording's when and where: "Mon 9:00 – 10:00 PM · 4.1".
+public func liveRecordingWhen(_ recording: LiveRecording, clock: LiveClock = .device) -> String {
+    "\(clock.weekdayName(recording.start)) \(clock.range(recording.start, recording.end)) · \(recording.number)"
+}
+
+// The options form.
+public let liveNewEpisodesOnly = "New episodes only"
+public let liveAnyChannel = "Any channel"
+public let liveKeepTitle = "Keep"
+public let liveUseServerPadding = "Use server padding defaults"
+public let liveStartEarly = "Start early"
+public let liveEndLate = "End late"
+public let liveKeepNote = "The oldest by air time are deleted, watched or not. Only recordings from this rule are removed."
+
+/// Keep's choices: "All recordings", "The latest 3".
+public func liveKeepChoice(_ count: Int) -> String { count <= 0 ? "All recordings" : "The latest \(count)" }
+
+/// Start early's and End late's choices: "5 min".
+public func livePaddingChoice(_ minutes: Int) -> String { "\(minutes) min" }
+
+// MARK: The guide and the channel list, as both apps word them (PLAN-APPLE-REVIEW.md §5.8)
+
+public let liveAllChannels = "All channels"
+public let liveGoToChannel = "Go to channel"
+public let liveLoadingListings = "Loading listings"
+public let liveListingsFailedTitle = "Couldn't load listings"
+public let liveNoChannelMatches = "Try another channel, or All channels."
+public let liveNoListings = "No listings"
+public let liveNoListingsStillPlays = "No listings for this channel. It still plays."
+public let livePictureFromTMDB = "Picture: TMDB"
+public let liveDescriptionFromTMDB = "Description from TMDB"
+public let liveNoReminders = "No reminders"
+public let liveShowsInGuideHint = "Shows it in the guide"
+public let liveShowsKeptReminderHint = "Shows the reminder as it was kept"
+public let liveChannelNumberOrName = "Channel number or name"
+public let liveNoChannelNumberMatches = "Try another channel number or name."
+public let liveLoadingChannels = "Loading channels"
+public let liveChannelsFailedTitle = "Couldn't load channels"
+public let liveUnavailableTitle = "Live TV isn't available"
+public let liveOnNowTitle = "On now"
+public let liveWatchesLiveHint = "Watches live"
+
+/// Why the listings failed, under the error: "The server is busy. Channels still play."
+public func liveListingsFailed(_ error: String) -> String { "\(error) Channels still play." }
+
+/// A guide cell's spoken name: the programme's (with its recording state),
+/// ", reminder set" when reminded, then the channel: "…, reminder set, 4.1 NFLD-HD".
+public func liveCellAccessibilityLabel(_ programme: LiveProgramme, reminded: Bool, channel: LiveChannel, clock: LiveClock = .device) -> String {
+    liveAccessibilityLabel(programme, clock: clock) + (reminded ? ", reminder set" : "") + ", \(channel.number) \(channel.name)"
+}
+
+/// A guide row without listings, spoken: "4.3 Coast Shop, No listings. It still plays."
+public func liveNoListingsAccessibilityLabel(_ channel: LiveChannel) -> String {
+    "\(channel.number) \(channel.name), No listings. It still plays."
+}
+
+/// The paused Live TV player's countdown to giving the tuner back: "Tuner releases in 4:05".
+public func liveTunerReleasesIn(seconds: Int) -> String {
+    "Tuner releases in \(seconds / 60):\(String(format: "%02d", seconds % 60))"
+}

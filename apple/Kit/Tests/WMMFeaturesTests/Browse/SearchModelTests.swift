@@ -109,6 +109,27 @@ import WMMModel
         #expect(model.recentQueries.isEmpty)
     }
 
+    @Test func recentQueriesAreKeptBetweenLaunchesForTheAccountOnTheServer() async {
+        let name = "SearchModelTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let first = SearchModel(library: library, navigator: navigator, debounce: .zero, recents: RecentSearches(server: "server-a", user: 1, defaults: defaults))
+        first.setQuery("harbor")
+        await first.pending?.value
+        first.setQuery("kite")
+        await first.pending?.value
+
+        let relaunched = SearchModel(library: library, navigator: navigator, debounce: .zero, recents: RecentSearches(server: "server-a", user: 1, defaults: defaults))
+        #expect(relaunched.recentQueries == ["kite", "harbor"])
+        let otherAccount = SearchModel(library: library, navigator: navigator, debounce: .zero, recents: RecentSearches(server: "server-a", user: 2, defaults: defaults))
+        #expect(otherAccount.recentQueries.isEmpty)
+        let otherServer = SearchModel(library: library, navigator: navigator, debounce: .zero, recents: RecentSearches(server: "server-b", user: 1, defaults: defaults))
+        #expect(otherServer.recentQueries.isEmpty)
+
+        relaunched.clearRecentQueries()
+        #expect(RecentSearches(server: "server-a", user: 1, defaults: defaults).load().isEmpty, "Clear forgets them on the device too")
+    }
+
     @Test func failedAndCancelledSearchesDoNotEnterHistory() async {
         library.failure = APIError(status: 500, message: "Unavailable")
         model.setQuery("harbor")

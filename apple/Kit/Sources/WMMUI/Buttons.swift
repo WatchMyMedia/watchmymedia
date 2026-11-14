@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// The burgundy primary button: full width by default, 50 pt tall.
+/// The burgundy primary button: full width by default, 50 pt tall. Its text
+/// and height follow the system's text size, so it looks exactly so at the
+/// default size and grows with the text (PLAN-APPLE-REVIEW.md §2.8).
 public struct PrimaryButtonStyle: ButtonStyle {
     var height: CGFloat
     var fullWidth: Bool
@@ -16,14 +18,25 @@ public struct PrimaryButtonStyle: ButtonStyle {
 
     private struct PrimaryLabel: View {
         let configuration: Configuration
-        let height: CGFloat
         let fullWidth: Bool
+        @ScaledMetric private var height: CGFloat
+        @ScaledMetric private var fontSize: CGFloat
         @Environment(\.isEnabled) private var isEnabled
+
+        init(configuration: Configuration, height: CGFloat, fullWidth: Bool) {
+            self.configuration = configuration
+            self.fullWidth = fullWidth
+            let large = height >= 50
+            _height = ScaledMetric(wrappedValue: height, relativeTo: large ? .body : .subheadline)
+            _fontSize = ScaledMetric(wrappedValue: large ? 17 : 15, relativeTo: large ? .body : .subheadline)
+        }
 
         var body: some View {
             configuration.label
-                .font(.system(size: height >= 50 ? 17 : 15, weight: .semibold))
+                .font(.system(size: fontSize, weight: .semibold))
+                .multilineTextAlignment(.center)
                 .foregroundStyle(.white)
+                .padding(.vertical, 4)
                 .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
                 .padding(.horizontal, fullWidth ? 0 : 18)
                 .background(Palette.burgundy, in: RoundedRectangle(cornerRadius: 12))
@@ -33,7 +46,8 @@ public struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
-/// The translucent secondary button ("Go to show", "Mark watched").
+/// The translucent secondary button ("Go to show", "Mark watched"). Its
+/// text and height follow the system's text size, as the primary's do.
 public struct GhostButtonStyle: ButtonStyle {
     var height: CGFloat
     var fullWidth: Bool
@@ -44,12 +58,31 @@ public struct GhostButtonStyle: ButtonStyle {
     }
 
     public func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(Palette.text)
-            .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
-            .padding(.horizontal, fullWidth ? 0 : 14)
-            .background(.white.opacity(configuration.isPressed ? 0.18 : 0.12), in: RoundedRectangle(cornerRadius: 10))
+        GhostLabel(configuration: configuration, height: height, fullWidth: fullWidth)
+    }
+
+    private struct GhostLabel: View {
+        let configuration: Configuration
+        let fullWidth: Bool
+        @ScaledMetric private var height: CGFloat
+        @ScaledMetric(relativeTo: .subheadline) private var fontSize: CGFloat = 15
+
+        init(configuration: Configuration, height: CGFloat, fullWidth: Bool) {
+            self.configuration = configuration
+            self.fullWidth = fullWidth
+            _height = ScaledMetric(wrappedValue: height, relativeTo: .subheadline)
+        }
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: fontSize, weight: .semibold))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(Palette.text)
+                .padding(.vertical, 4)
+                .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
+                .padding(.horizontal, fullWidth ? 0 : 14)
+                .background(.white.opacity(configuration.isPressed ? 0.18 : 0.12), in: RoundedRectangle(cornerRadius: 10))
+        }
     }
 }
 
@@ -70,13 +103,17 @@ public struct SmallGhostButtonStyle: ButtonStyle {
     }
 }
 
-/// A filter or season chip; gold when selected.
+/// A filter or season chip; gold when selected. Its text and height follow
+/// the system's text size (34 pt at the default size).
 public struct Chip: View {
     let title: String
     let detail: String?
     let systemImage: String?
     let selected: Bool
     let action: () -> Void
+    @ScaledMetric(relativeTo: .subheadline) private var fontSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .subheadline) private var iconSize: CGFloat = 12
+    @ScaledMetric(relativeTo: .subheadline) private var height: CGFloat = 34
 
     public init(_ title: String, detail: String? = nil, systemImage: String? = nil, selected: Bool, action: @escaping () -> Void) {
         self.title = title
@@ -89,13 +126,13 @@ public struct Chip: View {
     public var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                if let systemImage { Image(systemName: systemImage).font(.system(size: 12, weight: .semibold)).accessibilityHidden(true) }
+                if let systemImage { Image(systemName: systemImage).font(.system(size: iconSize, weight: .semibold)).accessibilityHidden(true) }
                 Text(title).fontWeight(.semibold)
                 if let detail { Text(detail).fontWeight(.medium).foregroundStyle(selected ? Palette.ground : Palette.faint) }
             }
-            .font(.system(size: 14))
+            .font(.system(size: fontSize))
             .padding(.horizontal, 13)
-            .frame(minHeight: 34)
+            .frame(minHeight: height)
             .foregroundStyle(selected ? Palette.ground : Palette.textSecondary)
             .background(selected ? Palette.gold : Palette.surfaceRaised, in: Capsule())
             .overlay(Capsule().strokeBorder(selected ? Palette.gold : Palette.outline))

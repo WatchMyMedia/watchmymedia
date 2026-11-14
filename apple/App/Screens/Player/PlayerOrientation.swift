@@ -5,16 +5,22 @@ extension View {
     /// Landscape while this shows, and back to portrait when it goes, on
     /// iPhone. An iPad keeps turning with the device, under the system's
     /// rotation lock (PLAN-IOS.md §11.1), so this does nothing there.
-    func landscapeWhileShown() -> some View { modifier(LandscapeLock()) }
+    func landscapeWhileShown() -> some View { orientationsWhileShown(.landscape) }
+
+    /// `mask` while this shows (the film player: landscape; Live TV: any way
+    /// up but upside down), and back to portrait when it goes, on iPhone.
+    func orientationsWhileShown(_ mask: UIInterfaceOrientationMask) -> some View { modifier(OrientationsWhileShown(mask: mask)) }
 }
 
-private struct LandscapeLock: ViewModifier {
+private struct OrientationsWhileShown: ViewModifier {
+    let mask: UIInterfaceOrientationMask
+
     func body(content: Content) -> some View {
         if UIDevice.current.userInterfaceIdiom == .pad {
             content
         } else {
             content
-                .onAppear { OrientationLock.allow(.landscape) }
+                .onAppear { OrientationLock.allow(mask) }
                 .onDisappear { OrientationLock.allow(.portrait) }
         }
     }

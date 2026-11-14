@@ -1,7 +1,22 @@
 import Foundation
 import Network
 import os
+import Synchronization
 import WMMModel
+
+/// Whether the person said no to Local Network for this app, as discovery
+/// last heard it (`NWBrowser`'s policy-denied state, or ready), so an API
+/// call to a server on this network can say why it failed. Discovery runs
+/// while a server picker is open; until then nothing is known and nothing
+/// changes.
+final class LocalNetworkAccess: Sendable {
+    private let value = Mutex(false)
+
+    var denied: Bool {
+        get { value.withLock { $0 } }
+        set { value.withLock { $0 = newValue } }
+    }
+}
 
 /// Servers announcing themselves on the local network.
 @MainActor

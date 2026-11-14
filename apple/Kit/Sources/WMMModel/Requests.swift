@@ -5,10 +5,6 @@ import Observation
 // asks Radarr and Sonarr (or Seerr) for what is missing; the apps ask the
 // server. Mirrors android/core/model's requests.
 
-/// The API level from which a server takes requests and problem reports and
-/// says why an episode is missing (PLAN-ARR.md §10).
-public let requestsAPILevel = 5
-
 public enum MediaType: String, Hashable, Sendable { case movie, tv }
 
 /// What the signed-in user may do (GET /api/requests/options), so every

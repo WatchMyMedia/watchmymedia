@@ -2,6 +2,7 @@ import SwiftUI
 import UserNotifications
 import WMMDownloads
 import WMMCast
+import WMMData
 import WMMFeatures
 import WMMModel
 import WMMUI
@@ -18,8 +19,12 @@ struct WatchMyMediaApp: App {
     @State private var recordings: LiveRecordingsStore
 
     init() {
+        // Launch to Home's first content, and MetricKit's reports for Copy diagnostics (PLAN-APPLE-REVIEW.md §4.3.1, §6.4).
+        PerformanceSignposts.shared.launchBegan()
+        Diagnostics.start()
         let services = ServicesFactory.make(arguments: ProcessInfo.processInfo.arguments)
         _services = State(initialValue: services)
+        BackgroundSync.register(services)
         _cast = State(initialValue: CastServicesFactory.make(services: services, arguments: ProcessInfo.processInfo.arguments))
         _extras = State(initialValue: LiveExtrasStore(repository: services.liveTV))
         _recordings = State(initialValue: LiveRecordingsStore(repository: services.liveTV))
@@ -37,23 +42,34 @@ struct WatchMyMediaApp: App {
                 .environment(\.imageLoader, services.images)
                 .preferredColorScheme(.dark)
                 .tint(Palette.gold)
-                .onOpenURL { url in
-                    guard let link = DeepLink(url: url) else { return }
-                    Task { await navigator.open(link, library: services.library, liveTV: services.liveTV) }
-                }
+                // A play or channel link acts only when the app published it for this server.
+                .onOpenURL { url in open(url) }
                 .task { await navigator.applyLaunchArguments(ProcessInfo.processInfo.arguments, library: services.library, liveTV: services.liveTV) }
                 // A reminder's notification opens its channel.
                 .task {
-                    LiveReminderNotifier.shared.open = { link in
-                        Task { await navigator.open(link, library: services.library, liveTV: services.liveTV) }
-                    }
+                    LiveReminderNotifier.shared.open = { url in open(url) }
+                }
+                // A quick action on the app's icon, or an App Shortcut.
+                .task {
+                    QuickActions.shared.open = { url in open(url) }
                 }
                 // The person's other devices change favourites and reminders too.
                 .task { await extras.follow() }
                 .task { await recordings.follow() }
-                .task { await cast.refresh() }
-                .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await cast.refresh() } } }
+                // Once at launch and on each return to the app.
+                .task(id: scenePhase) { if scenePhase == .active { await cast.refresh() } }
+                // Offline watching reaches the server in a background refresh too.
+                .onChange(of: scenePhase) { _, phase in if phase == .background { BackgroundSync.schedule() } }
         }
+    }
+}
+
+extension WatchMyMediaApp {
+    /// A `watchmymedia://` link from outside the app or one it published
+    /// (``DeepLink/opening(_:signedInServer:)``).
+    private func open(_ url: URL) {
+        guard let link = DeepLink.opening(url, signedInServer: services.servers.current?.server.id) else { return }
+        Task { await navigator.open(link, library: services.library, liveTV: services.liveTV) }
     }
 }
 
@@ -67,6 +83,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         MainActor.assumeIsolated { UNUserNotificationCenter.current().delegate = LiveReminderNotifier.shared }
         return true
+    }
+
+    /// The scene's delegate takes the Home Screen quick actions (``QuickActions``).
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = QuickActionSceneDelegate.self
+        return configuration
     }
 
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {

@@ -8,13 +8,15 @@ final class CachedImageLoader: ImageLoader {
     /// The sign-in in use, if any, read on the main actor for each image.
     typealias Current = @MainActor @Sendable () -> SignedInSession?
     /// A 401 with this sign-in's token: it was revoked.
-    typealias Rejected = @MainActor @Sendable (SignedInSession) -> Void
+    typealias Rejected = @Sendable (SignedInSession) async -> Void
 
     private let session: URLSession
     private let current: Current
     private let rejected: Rejected
 
-    init(session: URLSession, current: @escaping Current, rejected: @escaping Rejected) {
+    /// - Parameter rejected: what a revoked token does; by default what any
+    ///   other request's would (``ServerAPI/tokenRefused()``).
+    init(session: URLSession, current: @escaping Current, rejected: @escaping Rejected = { await $0.api.tokenRefused() }) {
         self.session = session
         self.current = current
         self.rejected = rejected
@@ -36,7 +38,7 @@ final class CachedImageLoader: ImageLoader {
         let request = signedIn?.api.authorizedRequest(url) ?? URLRequest(url: url)
         let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
-            if http.statusCode == 401, let signedIn, request.value(forHTTPHeaderField: "Authorization") != nil {
+            if let signedIn, ServerAPI.revokes(status: http.statusCode, signed: RequestSigner.signed(request)) {
                 await rejected(signedIn)
             }
             throw URLError(.badServerResponse)

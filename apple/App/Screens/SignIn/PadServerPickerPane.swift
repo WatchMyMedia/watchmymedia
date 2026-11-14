@@ -7,7 +7,7 @@ import WMMUI
 /// Its owner decides what selecting a server means for the surrounding flow.
 struct PadServerPickerPane: View {
     @Bindable var picker: ServerPickerModel
-    var title: String? = "Choose a server"
+    var title: String? = chooseServerTitle
     var excludingServerID: String?
     let choose: (ServerPickerModel.Row) async -> Void
     let connect: () async -> Void
@@ -25,20 +25,20 @@ struct PadServerPickerPane: View {
                         .tracking(-0.6)
                         .foregroundStyle(Palette.text)
                         .accessibilityAddTraits(.isHeader)
-                    Text("Servers on this network appear by themselves.")
+                    Text(serversAppearByThemselves)
                         .font(.subheadline)
                         .foregroundStyle(Palette.muted)
                 }
                 .padding(.bottom, 4)
             }
 
-            GroupHeading("On this network")
+            GroupHeading(onThisNetwork)
             if picker.localNetworkDenied {
                 localNetworkOff
             } else if found.isEmpty {
                 HStack(spacing: 12) {
                     ProgressView().tint(Palette.muted)
-                    Text("Looking for servers…").font(.subheadline).foregroundStyle(Palette.muted)
+                    Text(lookingForServers).font(.subheadline).foregroundStyle(Palette.muted)
                 }
                 .frame(minHeight: 48)
             } else {
@@ -62,9 +62,9 @@ struct PadServerPickerPane: View {
                 }
             }
 
-            GroupHeading("Or enter an address").padding(.top, 6)
+            GroupHeading(enterAnAddressHeading).padding(.top, 6)
             HStack(spacing: 10) {
-                TextField("Server address", text: $picker.address, prompt: Text(verbatim: "192.168.1.20 or https://home.example.net").foregroundStyle(Palette.faint))
+                TextField(serverAddressLabel, text: $picker.address, prompt: Text(serverAddressExample).foregroundStyle(Palette.faint))
                     .font(.body)
                     .foregroundStyle(Palette.text)
                     .textContentType(.URL)
@@ -92,7 +92,7 @@ struct PadServerPickerPane: View {
             } else if picker.showsHTTPSNudge {
                 Text(httpsNudge).font(.footnote).foregroundStyle(Palette.warning)
             }
-            GroupFootnote("An IP address or a .local name works over http on your own network. A hostname needs https; Tailscale Serve or a reverse proxy gives it one.")
+            GroupFootnote(serverAddressNote)
         }
         .onAppear { picker.startDiscovery(owner: discoveryOwner) }
         .onDisappear { picker.stopDiscovery(owner: discoveryOwner) }

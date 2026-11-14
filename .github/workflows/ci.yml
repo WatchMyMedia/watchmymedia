@@ -110,6 +110,7 @@ jobs:
             apple-tv:
               - 'apple/TV/**'
               - 'apple/TVUITests/**'
+              - 'apple/TopShelf/**'
               - 'apple/Kit/**'
               - 'apple/project.yml'
               - 'apple/Tools/**'
@@ -707,6 +708,11 @@ jobs:
         run: |
           xcodebuild -version
           make apple-test-sim APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
+      # The Release configuration for devices, unsigned: what an archive
+      # compiles, so a release-only break shows before a tag. The target also
+      # checks the privacy manifest is in the app and the fakes aren't.
+      - name: Build for release
+        run: make apple-build-release PATH="$PATH"
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: "!cancelled() && steps.packages.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
         with:
@@ -729,6 +735,14 @@ jobs:
     needs: changes
     if: needs.changes.outputs.apple-tv == 'true'
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
+    # Two jobs share the remote UI tests, whole classes each
+    # (apple/scripts/tv-ui-shard.py): one simulator ran them past 20 minutes
+    # (2026-11-14), and two clones in one job saved nothing. Share 1 also runs
+    # the Kit's tests; share 2 the Release build.
+    strategy:
+      fail-fast: false
+      matrix:
+        share: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install XcodeGen
@@ -748,13 +762,19 @@ jobs:
       - name: Build and test on an Apple TV simulator
         # Two Studio runners stalled after all tests passed. Avoid verbose
         # sysdiagnose collection, a possible cause; keep results and failures.
-        # One simulator: with two clones (-parallel-testing-worker-count 2)
-        # GitHub's three-core Mac ran the tests about a minute faster of ten
-        # and a timing-sensitive Kit test failed (run of 2026-11-12).
-        timeout-minutes: 20
-        run: make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
+        # Built once, then (share 1) the Kit's tests and this share's UI
+        # tests, apart, on one simulator. Two clones on this three-core runner
+        # made each test two to three times slower and saved nothing (runs of
+        # 2026-11-12 and 2026-11-14), and a Kit timing test failed beside them.
+        timeout-minutes: 30
+        run: make apple-tv-test-sim-ci TV_UI_SHARD=${{ matrix.share }}/2 TV_KIT_TESTS=${{ matrix.share == 1 && 'yes' || 'no' }} APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
+      # Release for devices, unsigned, as in the apple job: once, in share 2,
+      # which has no Kit tests to run.
+      - name: Build for release
+        if: matrix.share == 2
+        run: make apple-tv-build-release PATH="$PATH"
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: "!cancelled() && steps.packages.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        if: "!cancelled() && matrix.share == 1 && steps.packages.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
         with:
           path: apple/build/DerivedData/SourcePackages
           # The restore's key: the build adds the app's pins to the Kit's
@@ -763,8 +783,11 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
-          name: apple-tv-test-results
-          path: apple/build/TVTests.xcresult
+          name: apple-tv-test-results-${{ matrix.share }}
+          if-no-files-found: ignore
+          path: |
+            apple/build/TVTests.xcresult
+            apple/build/TVUITests.xcresult
 
   # The Go tests on Windows, with the ffmpeg build the Windows app will ship
   # (PLAN.md §7c). The Mac Studio cannot run Windows, so this and

@@ -17,6 +17,32 @@ import WMMModel
         #expect(page.genreCounts == ["Drama": 120, "Comedy": 0])
     }
 
+    /// The library's and playback's helpers trimmed different characters, so
+    /// a newline-only field was a value in one and nothing in the other.
+    @Test func blankIsBlankEverywhere() {
+        for blank in [nil, "", " ", "\t", "\n", " \r\n "] as [String?] {
+            #expect(Mapping.nonBlank(blank) == nil)
+            #expect(PlaybackMapping.nonBlank(blank) == nil)
+        }
+        #expect(Mapping.nonBlank(" Pilot ") == " Pilot ")
+    }
+
+    /// Sign-in and playback describe the device the same way.
+    @Test func oneClientMapping() {
+        let client = ClientInfo(deviceID: String(repeating: "d", count: 80), name: String(repeating: "n", count: 80), product: "WatchMyMedia for iOS",
+                                platform: "ios", version: "1.0", model: "\n")
+        #expect(PlaybackMapping.client(client) == client.api)
+        #expect(client.api.model == nil)
+        #expect(client.api.deviceId.count == 64 && client.api.name?.count == 64)
+    }
+
+    @Test func aSeasonIsTheSameFromTheShowAndFromItsPage() throws {
+        let season = Data(#"{"id":7,"showId":1,"number":2,"name":"Season 2","overview":"","airDate":" ","posterPath":"/p.jpg","episodeCount":10,"availableCount":8,"watchedCount":3,"monitored":true}"#.utf8)
+        let summary = try #require(try JSONDecoder().decode(Components.Schemas.Season.self, from: season).model)
+        #expect(summary == SeasonSummary(id: 7, number: 2, name: "Season 2", overview: "", airDate: nil, posterPath: "/p.jpg", episodeCount: 10,
+                                         availableCount: 8, watchedCount: 3, monitored: true, request: nil))
+    }
+
     @Test func emptyLibraryCountsArePresentRatherThanUnknown() throws {
         let data = Data(#"{"items":[],"facets":{"genres":[],"decades":[]},"limit":100,"offset":0,"total":0,"genreCounts":{}}"#.utf8)
         let page = try JSONDecoder().decode(Components.Schemas.ItemList.self, from: data).model

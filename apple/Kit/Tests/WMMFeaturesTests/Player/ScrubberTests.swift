@@ -122,8 +122,10 @@ import WMMModel
         h.model.seek(toMs: 600_000)
         // A real player reports the old position for a moment.
         h.spy.state.positionMs = 50_000
+        await h.time.settle()
         #expect(h.model.shownPositionMs == 600_000)
         h.spy.state.positionMs = 599_500
+        await h.time.settle()
         #expect(h.model.shownPositionMs == 599_500)
         h.spy.state.positionMs = 50_000
         await h.time.advance(byMs: PlayerChromeModel.holdMs)
@@ -132,11 +134,12 @@ import WMMModel
 }
 
 extension ScrubPreviewTests {
-    @Test func aGrowingScrubberShowsTheWholeTimelineButCannotSeekIntoTheFuture() {
+    @Test func aGrowingScrubberShowsTheWholeTimelineButCannotSeekIntoTheFuture() async {
         let h = PlayerHarness()
         let start = Date(timeIntervalSince1970: 1_800_000_000)
         h.spy.state.growing = .init(startedAt: start, endsAt: start.addingTimeInterval(100))
         h.spy.state.durationMs = 25_000
+        await h.time.settle()
         #expect(h.model.state.timelineDurationMs == 100_000)
         h.model.scrub(x: 50, width: 400)
         #expect(h.model.scrubMs == 12_500)

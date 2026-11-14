@@ -41,7 +41,7 @@ struct CastRemoteScreen: View {
     private var heading: some View {
         VStack(spacing: 16) {
             if cast.ownsMedia, let request = cast.request, let path = request.stillPath ?? request.backdropPath ?? request.posterPath {
-                Artwork(url: services.library.imageURL(path, size: .w780), seed: state.title)
+                Artwork(url: services.library.imageURL(path, size: .w780), seed: state.title, maxPixel: 1200)
                     .aspectRatio(16 / 9, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .accessibilityHidden(true)

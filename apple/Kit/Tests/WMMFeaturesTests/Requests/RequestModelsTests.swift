@@ -317,3 +317,110 @@ final class NoRequests: RequestsRepository {
     func replaceFile(fileID: Int) async throws -> ReplaceOutcome { Issue.record("replaced"); return ReplaceOutcome(connection: "", blocklisted: false) }
     func changes() -> AsyncStream<Void> { AsyncStream { _ in } }
 }
+
+/// Your requests and the Inbox keep the newest reply (PLAN-APPLE-REVIEW.md §5.5).
+@MainActor
+@Suite struct RequestListOrderTests {
+    private func request(_ id: Int) -> MediaRequest {
+        MediaRequest(id: id, status: .pending, requestedBy: "Sam", mine: true, createdAt: Date(timeIntervalSince1970: 1_800_000_000),
+                     mediaType: .movie, tmdbID: id, title: "Film \(id)")
+    }
+
+    @Test func anOlderListNeverOverwritesANewerOne() async {
+        let repository = HeldRequests()
+        let model = MyRequestsModel(requests: repository)
+        repository.hold = true
+        let older = Task { await model.retry() }
+        #expect(await eventually { repository.held != nil })
+        repository.hold = false
+        repository.reply = [request(2)]
+        await model.retry()
+        #expect(model.state.value?.map(\.id) == [2])
+        repository.release([request(1)])
+        await older.value
+        #expect(model.state.value?.map(\.id) == [2], "the older reply came last and was dropped")
+    }
+
+    @Test func pullToRefreshKeepsYourRequestsWhenItFails() async {
+        let repository = HeldRequests()
+        let model = MyRequestsModel(requests: repository)
+        repository.reply = [request(1)]
+        await model.retry()
+        repository.reply = [request(2), request(1)]
+        await model.refresh()
+        #expect(model.state.value?.map(\.id) == [2, 1])
+        repository.failure = APIError(status: nil, message: "Couldn't reach the server.")
+        await model.refresh()
+        #expect(model.state.value?.map(\.id) == [2, 1], "the list stays on screen")
+        #expect(model.message == "Couldn't reach the server.")
+    }
+
+    @Test func pullToRefreshKeepsTheInboxWhenItFails() async {
+        let repository = HeldRequests()
+        let model = InboxModel(requests: repository)
+        repository.reply = [request(1)]
+        await model.retry()
+        repository.reply = [request(2), request(1)]
+        await model.refresh()
+        #expect(model.requestList.map(\.id) == [2, 1])
+        repository.failure = APIError(status: nil, message: "Couldn't reach the server.")
+        await model.refresh()
+        #expect(model.requestList.map(\.id) == [2, 1], "the inbox stays on screen")
+        #expect(model.message == "Couldn't reach the server.")
+    }
+
+    @Test func anOlderInboxNeverOverwritesANewerOne() async {
+        let repository = HeldRequests()
+        let model = InboxModel(requests: repository)
+        repository.hold = true
+        let older = Task { await model.retry() }
+        #expect(await eventually { repository.heldInbox != nil })
+        repository.hold = false
+        repository.reply = [request(2)]
+        await model.retry()
+        #expect(model.requestList.map(\.id) == [2])
+        repository.releaseInbox(Inbox(requests: [request(1)]))
+        await older.value
+        #expect(model.requestList.map(\.id) == [2])
+    }
+}
+
+/// Requests whose replies the test holds back and lets go.
+@MainActor
+@Observable
+final class HeldRequests: RequestsRepository {
+    let options = RequestOptions(movies: true, shows: true, problems: true)
+    var hold = false
+    var reply: [MediaRequest] = []
+    var failure: APIError?
+    private(set) var held: CheckedContinuation<[MediaRequest], Never>?
+    private(set) var heldInbox: CheckedContinuation<Inbox, Never>?
+
+    func release(_ list: [MediaRequest]) { held?.resume(returning: list); held = nil }
+    func releaseInbox(_ inbox: Inbox) { heldInbox?.resume(returning: inbox); heldInbox = nil }
+
+    func refreshOptions() async {}
+    func search(_ text: String) async throws -> [Requestable] { [] }
+    func lookup(_ type: MediaType, tmdbID: Int) async throws -> Requestable { throw APIError(status: 404, message: "Not found.") }
+    func ask(_ type: MediaType, tmdbID: Int, seasons: [Int]) async throws -> CreatedRequest { throw APIError(status: 404, message: "Not found.") }
+    func mine() async throws -> [MediaRequest] {
+        if let failure { throw failure }
+        if hold { return await withCheckedContinuation { held = $0 } }
+        return reply
+    }
+    func cancel(requestID: Int) async throws {}
+    func inbox() async throws -> Inbox {
+        if let failure { throw failure }
+        if hold { return await withCheckedContinuation { heldInbox = $0 } }
+        return Inbox(requests: reply)
+    }
+    func decide(requestID: Int, approve: Bool, note: String) async throws {}
+    func report(_ item: WatchKind, id: Int, fileID: Int?, kind: ProblemKind, note: String) async throws -> Problem { throw APIError(status: 404, message: "Not found.") }
+    func resolve(problemID: Int) async throws {}
+    func searchMissing(showID: Int, season: Int, episodes: [Int]) async throws {}
+    func monitor(showID: Int, season: Int, episodes: [Int], monitored: Bool) async throws {}
+    func previewDelete(episodeID: Int) async throws -> DeletePreview { DeletePreview(managed: false) }
+    func deleteEpisode(id: Int) async throws -> DeleteOutcome { DeleteOutcome() }
+    func replaceFile(fileID: Int) async throws -> ReplaceOutcome { ReplaceOutcome(connection: "", blocklisted: false) }
+    func changes() -> AsyncStream<Void> { AsyncStream { _ in } }
+}

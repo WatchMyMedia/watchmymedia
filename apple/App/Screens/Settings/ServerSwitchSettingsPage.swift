@@ -34,7 +34,7 @@ struct ServerSwitchSettingsPage: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .groundBackground()
-        .navigationTitle(model.signIn == nil ? "Switch server" : "Sign in")
+        .navigationTitle(model.signIn == nil ? switchServerTitle : "Sign in")
         .navigationBarTitleDisplayMode(.large)
         .navigationBarBackButtonHidden()
         .toolbar {
@@ -44,7 +44,7 @@ struct ServerSwitchSettingsPage: View {
                         if model.signIn != nil { await model.backToPicker() } else { await model.cancel() }
                     }
                 } label: {
-                    Label(model.signIn == nil ? "Server" : "Switch server", systemImage: "chevron.left")
+                    Label(model.signIn == nil ? "Server" : switchServerTitle, systemImage: "chevron.left")
                 }
                 .disabled(model.busy)
             }

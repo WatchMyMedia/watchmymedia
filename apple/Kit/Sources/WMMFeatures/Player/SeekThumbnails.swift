@@ -67,6 +67,10 @@ public final class SeekThumbnails {
         }
     }
 
+    /// Whether the sheet at `url` was fetched (ahead, or for a tile) and has
+    /// not failed since: tests wait on it rather than on the clock.
+    func hasFetched(_ url: URL) -> Bool { fetched.contains(url) }
+
     /// A new scrub: sheets that failed may be asked for again.
     public func retryFailed() {
         failed.removeAll()

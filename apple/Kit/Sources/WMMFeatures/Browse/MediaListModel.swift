@@ -34,9 +34,12 @@ public final class MediaListModel {
     @ObservationIgnored private let library: any LibraryRepository
     @ObservationIgnored private let requests: (any RequestsRepository)?
     @ObservationIgnored private let navigator: Navigator
-    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private let changes: ScreenChanges
+    @ObservationIgnored private let loads = LoadController<Page>()
 
-    public init(listID: Int, rows: any RowsRepository, library: any LibraryRepository, requests: (any RequestsRepository)?, navigator: Navigator) {
+    public init(listID: Int, rows: any RowsRepository, library: any LibraryRepository, requests: (any RequestsRepository)?, navigator: Navigator,
+                now: @escaping @MainActor () -> Date = { Date() }) {
+        changes = ScreenChanges(now: now)
         self.listID = listID
         self.rows = rows
         self.library = library
@@ -78,29 +81,78 @@ public final class MediaListModel {
 
     // MARK: Loading
 
-    /// Loads the page, then again quietly when the library or the list changes, until cancelled.
+    /// Loads the page, then again quietly when the list or the library
+    /// changes or one of its titles is marked, until cancelled. A mark made
+    /// here is drawn at once from its own notice; coming back to the page
+    /// loads nothing unless something changed meanwhile (``ScreenChanges``).
     public func run() async {
-        await followChanges(of: library, also: rows.changes(), firstQuiet: state.value != nil) { quiet in await load(quiet: quiet) }
+        await changes.run(
+            subscribe: { merge(library.libraryChanges(), unknown: rows.changes()) },
+            hasContent: state.value != nil,
+            load: { quiet in await load(quiet: quiet) },
+            apply: { changes in await apply(changes) }
+        )
     }
 
-    public func retry() async { await load(quiet: false) }
+    public func retry() async {
+        await load(quiet: false)
+        changes.loaded()
+    }
 
     /// Pull to refresh: keeps the page, and says why if it fails.
-    public func reload() async { await load(quiet: true) }
+    public func reload() async {
+        await load(quiet: true)
+        changes.loaded()
+    }
 
+    /// Marks this device made, with their state, are drawn as they are; what
+    /// else touches a title on the list loads the page again.
+    private func apply(_ changes: [LibraryChange]) async {
+        guard var page = state.value else { return await load(quiet: true) }
+        let items = page.entries.compactMap(\.item)
+        var reload = false
+        for change in changes {
+            switch change {
+            case .watched(.movie, let ids, let watched?):
+                let marked = Set(ids)
+                page.entries = page.entries.map { entry in
+                    guard let item = entry.item, item.kind == .movie, marked.contains(item.id) else { return entry }
+                    var copy = entry
+                    copy.item?.watched = watched
+                    copy.item?.progress = nil
+                    return copy
+                }
+            case .watched(.movie, let ids, nil):
+                reload = reload || items.contains { $0.kind == .movie && ids.contains($0.id) }
+            case .watched(.episode, _, _):
+                reload = reload || items.contains { $0.kind == .show }
+            case .markedShow(let id, _, _):
+                reload = reload || items.contains { $0.kind == .show && $0.id == id }
+            case .scan:
+                break
+            case .library, .unknown:
+                reload = true
+            }
+        }
+        if reload { await load(quiet: true) } else if page != state.value { state = .loaded(page) }
+    }
+
+    /// A load still running when another starts is cancelled.
     func load(quiet: Bool) async {
-        generation += 1
-        let mine = generation
-        if !quiet || state.value == nil { state = .loading }
-        let result = await Loadable.run { () async throws -> Page in
+        await loads.run { [weak self] load in await self?.fetch(load, quiet: quiet) }
+    }
+
+    private func fetch(_ load: LoadController<Page>.Load, quiet: Bool) async {
+        loads.begin(&state, quiet: quiet)
+        let result = await loads.fetch(load) { () async throws -> Page in
             // The list and its entries at once.
             let list = Task { try await self.rows.list(id: self.listID) }
             defer { list.cancel() }
             let entries = try await self.rows.entries(listID: self.listID, offset: 0, limit: Self.pageSize)
             return Page(list: try await list.value, entries: entries.items, total: entries.total, inLibrary: entries.inLibrary)
         }
-        guard let result, mine == generation else { return }
-        if case .failed(let reason) = result, state.value != nil {
+        guard let result else { return }
+        if let reason = loads.quietFailure(result, quiet: quiet, over: state) {
             message = reason
         } else {
             state = result
@@ -135,12 +187,7 @@ public final class MediaListModel {
     }
 
     public func setWatched(_ target: WatchTarget, _ watched: Bool) async {
-        do {
-            try await library.mark(target, watched: watched)
-            message = markedMessage(watched: watched)
-        } catch {
-            message = error.displayMessage
-        }
+        message = await markWatched(target, watched, in: library)
     }
 
     /// Asks the server to fetch the list again; the page follows when it has.

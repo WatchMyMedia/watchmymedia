@@ -42,6 +42,7 @@ private struct MyRequestsView: View {
                     .padding(.horizontal, sizeClass.isWide ? PadLayout.margin : 16)
                     .padding(.vertical, 8)
                 }
+                .refreshable { await model.refresh() }
             }
         }
         .groundBackground()

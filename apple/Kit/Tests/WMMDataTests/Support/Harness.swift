@@ -131,6 +131,8 @@ final class FakeDiscovery: ServerDiscovery {
 
     func announce(_ servers: [DiscoveredServer]) { found?(servers) }
     func deny() { denied?(true) }
+    /// Browsing started: access was allowed (again).
+    func allow() { denied?(false) }
 }
 
 /// A DataServices on in-memory storage and a stub server, with short timings,
@@ -144,12 +146,20 @@ final class Harness {
     let probeSession: URLSession
     let client = ClientInfo(deviceID: "unused", name: "Sam’s iPhone", product: "WatchMyMedia for iOS", platform: "ios", version: "1.0 (12)", model: "iPhone")
     var tuning: DataTuning
+    /// The event stream's session; the main one when nil.
+    var eventSession: URLSession?
+    /// The device's network path, when a test drives it.
+    var network: FakeNetworkPath?
+    /// The API's HTTP cache, when a test looks in it.
+    var apiCache: URLCache?
     private(set) var services: DataServices!
 
     init(probeTimeout: Duration = .seconds(2)) {
         probeSession = Router.stubSession(hanging: true)
         let clock = clock
-        tuning = DataTuning(probeTimeout: probeTimeout, minimumPoll: .milliseconds(5), eventBackoff: { _ in .milliseconds(20) }, eventLinger: .zero, now: { clock.now })
+        // The longest wait (after a 404, a server without events) outlasts a test.
+        tuning = DataTuning(probeTimeout: probeTimeout, minimumPoll: .milliseconds(5), eventBackoff: { $0 >= 6 ? .seconds(60) : .milliseconds(20) },
+                            eventLinger: .zero, now: { clock.now })
         services = make()
     }
 
@@ -165,8 +175,17 @@ final class Harness {
     private func make() -> DataServices {
         DataServices(
             storage: storage, client: client, userAgent: "WatchMyMedia/1.0 (ios; iOS 18.0)", session: router.session,
-            probeSession: probeSession, discovery: discovery, tuning: tuning
+            probeSession: probeSession, eventSession: eventSession, discovery: discovery, apiCache: apiCache, network: network, tuning: tuning
         )
+    }
+
+    /// Moves the event stream onto one the test writes to as it goes, and
+    /// opens the services again on it; keep the stream for the test's length.
+    func liveEvents() -> LiveEventStream {
+        let stream = LiveEventStream(host: server.host)
+        eventSession = stream.session
+        reopen()
+        return stream
     }
 
     var testServer: Server { Server(id: "srv-test", name: "Test server", baseURL: router.baseURL, version: "1.0.0", apiLevel: 1) }
@@ -205,4 +224,20 @@ func eventually(_ timeout: Duration = .seconds(5), _ condition: () -> Bool) asyn
         try? await Task.sleep(for: .milliseconds(10))
     }
     return condition()
+}
+
+/// A network path the test turns off and on.
+final class FakeNetworkPath: NetworkPath, @unchecked Sendable {
+    private var continuation: AsyncStream<Bool>.Continuation?
+
+    /// Every change in order, so a test that turns the network off and on
+    /// again needn't wait between them for the first to be read.
+    func updates() -> AsyncStream<Bool> {
+        AsyncStream { continuation in
+            self.continuation = continuation
+            continuation.yield(true)
+        }
+    }
+
+    func set(_ satisfied: Bool) { continuation?.yield(satisfied) }
 }

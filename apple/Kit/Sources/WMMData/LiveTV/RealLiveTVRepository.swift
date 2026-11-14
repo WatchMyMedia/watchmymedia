@@ -11,6 +11,8 @@ final class RealLiveTVRepository: LiveTVRepository {
     private var loadedCapabilities: LiveTVCapabilities?
     private var loadedChannels: [LiveChannel] = []
 
+    private let flight = SingleFlight<Void>()
+
     init(store: LocalStore, events: ServerEvents? = nil) { self.store = store; self.events = events }
     var contextID: String? {
         guard let current = store.current, store.user != nil else { return nil }
@@ -19,9 +21,16 @@ final class RealLiveTVRepository: LiveTVRepository {
     var capabilities: LiveTVCapabilities? { loadedRevision == store.revision ? loadedCapabilities : nil }
     var channels: [LiveChannel] { loadedRevision == store.revision ? loadedChannels : [] }
 
+    /// The capabilities and channels, one request of each for every caller at
+    /// once (launch, sign-in, the foreground refresh, a link); a caller after
+    /// a Live TV event asks again (PLAN-APPLE-REVIEW.md §4.1.3).
     func refresh() async throws {
+        try await flight.run(stamp: "\(store.revision)#\(events?.received[.liveTV] ?? 0)") { [weak self] in try await self?.load() }
+    }
+
+    private func load() async throws {
         let revision = store.revision
-        guard let server = store.current?.server, server.apiLevel >= liveTVAPILevel, store.user != nil else {
+        guard let server = store.current?.server, server.features.liveTV, store.user != nil else {
             loadedRevision = revision; loadedCapabilities = .init(); loadedChannels = []
             return
         }
@@ -29,11 +38,11 @@ final class RealLiveTVRepository: LiveTVRepository {
         let capabilities = LiveTVCapabilities(enabled: c.enabled, allowed: c.allowed, playback: c.playback,
                                                bufferSeconds: c.bufferSeconds.map(Int.init) ?? 60,
                                                pauseSeconds: c.pauseSeconds.map(Int.init) ?? 300,
-                                               guide: c.guide && server.apiLevel >= liveGuideAPILevel,
-                                               extras: server.apiLevel >= liveExtrasAPILevel,
-                                               recording: server.apiLevel >= liveRecordingAPILevel && c.recording == true,
-                                               canRecord: server.apiLevel >= liveRecordingAPILevel && c.canRecord == true,
-                                               automatic: server.apiLevel >= liveAutomaticAPILevel && c.automatic == true)
+                                               guide: c.guide && server.features.liveGuide,
+                                               extras: server.features.livePersonal,
+                                               recording: server.features.liveRecordings && c.recording == true,
+                                               canRecord: server.features.liveRecordings && c.canRecord == true,
+                                               automatic: server.features.liveAutomatic && c.automatic == true)
         // Commit access revocation immediately; a failing channel refresh must not preserve an allowed tab.
         guard revision == store.revision else { throw CancellationError() }
         loadedRevision = revision; loadedCapabilities = capabilities
@@ -51,7 +60,7 @@ final class RealLiveTVRepository: LiveTVRepository {
 
     func guide(start: Date, hours: Int) async throws -> LiveGuide {
         let revision = store.revision
-        guard let server = store.current?.server, server.apiLevel >= liveGuideAPILevel, capabilities?.listings == true else {
+        guard let server = store.current?.server, server.features.liveGuide, capabilities?.listings == true else {
             throw LiveTVError(reason: "unavailable")
         }
         let reply = try await store.call {
@@ -66,7 +75,7 @@ final class RealLiveTVRepository: LiveTVRepository {
 
     /// The server in use when it keeps favourites and reminders, with the revision a reply must still match.
     private func extrasServer() throws -> (server: Server, revision: Int) {
-        guard let server = store.current?.server, server.apiLevel >= liveExtrasAPILevel, capabilities?.extrasAvailable == true else {
+        guard let server = store.current?.server, server.features.livePersonal, capabilities?.extrasAvailable == true else {
             throw LiveTVError(reason: "unavailable")
         }
         return (server, store.revision)
@@ -127,11 +136,15 @@ final class RealLiveTVRepository: LiveTVRepository {
         events?.changes(.liveTV) ?? AsyncStream { $0.finish() }
     }
 
+    func liveChanges() -> AsyncStream<LiveTVChange> {
+        events?.liveChanges() ?? AsyncStream { $0.finish() }
+    }
+
     func makeSessionGateway() throws -> any LiveSessionGateway {
-        guard (store.current?.server.apiLevel ?? 0) >= liveTVAPILevel else { throw LiveTVError(reason: "unavailable") }
+        guard store.features.liveTV else { throw LiveTVError(reason: "unavailable") }
         let session = try store.signedIn()
         return APILiveSessionGateway(api: session.api, clientName: store.client.name,
-                                     apiLevel: store.current?.server.apiLevel ?? 0, automaticAvailable: capabilities?.automatic == true)
+                                     apiLevel: store.features.apiLevel, automaticAvailable: capabilities?.automatic == true)
     }
 }
 
@@ -139,23 +152,23 @@ final class RealLiveTVRepository: LiveTVRepository {
 public struct APILiveSessionGateway: LiveSessionGateway {
     private let api: ServerAPI
     private let clientName: String
-    private let apiLevel: Int
+    private let features: ServerFeatures
     private let automaticAvailable: Bool
-    public init(api: ServerAPI, clientName: String, apiLevel: Int = liveTVAPILevel, automaticAvailable: Bool = false) {
-        self.api = api; self.clientName = clientName; self.apiLevel = apiLevel; self.automaticAvailable = automaticAvailable
+    public init(api: ServerAPI, clientName: String, apiLevel: Int = ServerFeatures.Level.liveTV, automaticAvailable: Bool = false) {
+        self.api = api; self.clientName = clientName; features = ServerFeatures(apiLevel: apiLevel); self.automaticAvailable = automaticAvailable
     }
 
     public func start(channelID: String, quality: LiveQuality, requestID: String) async throws -> LiveSession {
         try await start(channelID: channelID, quality: quality, requestID: requestID, profile: nil)
     }
     public func start(channelID: String, quality: LiveQuality, requestID: String, profile: PlaybackProfile?) async throws -> LiveSession {
-        let automatic = quality == .auto && apiLevel >= liveAutomaticAPILevel && automaticAvailable && profile != nil
+        let automatic = quality == .auto && features.liveAutomatic && automaticAvailable && profile != nil
         let selected: LiveQuality = quality == .auto && !automatic ? .p1080 : quality
         return try await liveCall {
             let response = try await api.call {
                 try await $0.startLiveTV(body: .json(.init(autoRecovery: automatic ? true : nil,
                                                           channelId: channelID, clientName: String(clientName.prefix(128)),
-                                                          profile: apiLevel >= liveProfileAPILevel ? profile?.liveProfile : nil,
+                                                          profile: features.liveProfile ? profile?.liveProfile : nil,
                                                           quality: .init(rawValue: selected.rawValue), requestId: requestID))).ok.body.json
             }
             do { return try LiveTVMapping.session(response, on: api) }
@@ -178,7 +191,7 @@ public struct APILiveSessionGateway: LiveSessionGateway {
     public func heartbeat(sessionID: String, paused: Bool, interacted: Bool, measurement: LiveMeasurement?) async throws -> LiveSession {
         try await liveCall {
             let response = try await api.call {
-                let m = apiLevel >= liveAutomaticAPILevel ? measurement : nil
+                let m = features.liveAutomatic ? measurement : nil
                 return try await $0.heartbeatLiveTV(path: .init(id: sessionID), body: .json(.init(
                     bufferedMs: m?.bufferedMs.map(Int64.init), interacted: interacted, paused: paused,
                     stalls: m?.stalls.map(Int64.init), state: m?.state.apiState,
@@ -194,8 +207,7 @@ public struct APILiveSessionGateway: LiveSessionGateway {
         catch let error as APIError where error.status == 404 { /* Already released. */ }
     }
     public func mediaToken() async throws -> MediaToken {
-        let token = try await api.call { try await $0.createMediaToken().ok.body.json }
-        return MediaToken(token: token.token, expiresAt: token.expiresAt, param: PlaybackMapping.nonBlank(token.param) ?? "access_token")
+        try await api.mediaToken()
     }
 
     private func liveCall<T>(_ operation: () async throws -> T) async throws -> T {
@@ -225,11 +237,27 @@ private extension LivePlaybackState {
     }
 }
 
+/// A channel as the channel list, the guide and a search hit all send it.
+protocol LiveChannelFields {
+    var id: String { get }
+    var number: String { get }
+    var name: String { get }
+    var available: Bool { get }
+    var reason: String? { get }
+    var logoUrl: String? { get }
+    var now: Components.Schemas.LiveTVProgramme? { get }
+    var next: Components.Schemas.LiveTVProgramme? { get }
+    var favourite: Bool? { get }
+}
+
+extension Components.Schemas.LiveTVChannel: LiveChannelFields {}
+extension Components.Schemas.LiveTVGuideChannel: LiveChannelFields {}
+
 enum LiveTVMapping {
     /// With `base`, the channel keeps its logo and now and next; without, it is a plain channel as before listings.
-    static func channel(_ channel: Components.Schemas.LiveTVChannel, base: URL? = nil) -> LiveChannel {
+    static func channel(_ channel: some LiveChannelFields, base: URL? = nil) -> LiveChannel {
         .init(id: channel.id, number: channel.number, name: channel.name, available: channel.available,
-              reason: PlaybackMapping.nonBlank(channel.reason),
+              reason: Mapping.nonBlank(channel.reason),
               logoURL: base.flatMap { picture(channel.logoUrl, base: $0) },
               now: base.flatMap { b in channel.now.map { programme($0, base: b) } },
               next: base.flatMap { b in channel.next.map { programme($0, base: b) } },
@@ -237,8 +265,8 @@ enum LiveTVMapping {
     }
 
     static func reminder(_ r: Components.Schemas.LiveTVReminder) -> LiveReminder {
-        .init(id: r.id, channelID: PlaybackMapping.nonBlank(r.channelId), number: r.number, channelName: PlaybackMapping.nonBlank(r.channelName),
-              programmeID: r.programmeId, start: r.start, end: r.end, title: r.title, episodeTitle: PlaybackMapping.nonBlank(r.episodeTitle),
+        .init(id: r.id, channelID: Mapping.nonBlank(r.channelId), number: r.number, channelName: Mapping.nonBlank(r.channelName),
+              programmeID: r.programmeId, start: r.start, end: r.end, title: r.title, episodeTitle: Mapping.nonBlank(r.episodeTitle),
               season: r.season.map(Int.init), episode: r.episode.map(Int.init), state: .init(r.state))
     }
 
@@ -246,32 +274,28 @@ enum LiveTVMapping {
         let state = LiveGuideState(enabled: guide.state.enabled, stale: guide.state.stale,
                                    updatedAt: guide.state.updatedAt, listedThrough: guide.state.listedThrough)
         return LiveGuide(start: guide.start, end: guide.end, state: state, channels: guide.channels.map { c in
-            let channel = LiveChannel(id: c.id, number: c.number, name: c.name, available: c.available,
-                                      reason: PlaybackMapping.nonBlank(c.reason), logoURL: picture(c.logoUrl, base: base),
-                                      now: c.now.map { programme($0, base: base) }, next: c.next.map { programme($0, base: base) },
-                                      favourite: c.favourite ?? false)
-            return LiveGuideChannel(channel: channel, listings: c.listings,
-                                    programmes: c.programmes.map { programme($0, base: base) }.filter { $0.end > $0.start })
+            LiveGuideChannel(channel: channel(c, base: base), listings: c.listings,
+                             programmes: c.programmes.map { programme($0, base: base) }.filter { $0.end > $0.start })
         })
     }
 
     static func programme(_ p: Components.Schemas.LiveTVProgramme, base: URL) -> LiveProgramme {
-        .init(id: p.id, start: p.start, end: p.end, title: p.title, episodeTitle: PlaybackMapping.nonBlank(p.episodeTitle),
-              season: p.season.map(Int.init), episode: p.episode.map(Int.init), episodeLabel: PlaybackMapping.nonBlank(p.episodeLabel),
-              airDate: PlaybackMapping.nonBlank(p.airDate), kind: p.kind.flatMap(LiveProgramme.Kind.init(rawValue:)),
+        .init(id: p.id, start: p.start, end: p.end, title: p.title, episodeTitle: Mapping.nonBlank(p.episodeTitle),
+              season: p.season.map(Int.init), episode: p.episode.map(Int.init), episodeLabel: Mapping.nonBlank(p.episodeLabel),
+              airDate: Mapping.nonBlank(p.airDate), kind: p.kind.flatMap(LiveProgramme.Kind.init(rawValue:)),
               isNew: p.new ?? false, live: p.live ?? false, isRepeat: p._repeat ?? false, hd: p.hd ?? false,
-              categories: (p.categories ?? []).compactMap { PlaybackMapping.nonBlank($0) }, rating: PlaybackMapping.nonBlank(p.rating),
-              description: PlaybackMapping.nonBlank(p.description), descriptionFromTMDB: p.descriptionSource == "tmdb",
+              categories: (p.categories ?? []).compactMap { Mapping.nonBlank($0) }, rating: Mapping.nonBlank(p.rating),
+              description: Mapping.nonBlank(p.description), descriptionFromTMDB: p.descriptionSource == "tmdb",
               pictureURL: picture(p.pictureUrl, base: base), pictureFromTMDB: p.pictureSource == "tmdb",
               stillURL: picture(p.stillUrl, base: base), posterURL: picture(p.posterUrl, base: base), reminder: p.reminder ?? false,
               recording: p.recording.map { .init(id: $0.id, state: .init(rawValue: $0.state) ?? .unknown, series: $0.series, canCancel: $0.canCancel ?? false,
-                                                 reason: PlaybackMapping.nonBlank($0.reason)) },
-              seriesKey: PlaybackMapping.nonBlank(p.seriesKey))
+                                                 reason: Mapping.nonBlank($0.reason)) },
+              seriesKey: Mapping.nonBlank(p.seriesKey))
     }
 
     /// A picture path on this server. Anything elsewhere is dropped, so viewers never contact the listings provider.
     static func picture(_ path: String?, base: URL) -> URL? {
-        guard let path = PlaybackMapping.nonBlank(path) else { return nil }
+        guard let path = Mapping.nonBlank(path) else { return nil }
         if path.hasPrefix("https://") || path.hasPrefix("http://") {
             guard let url = URL(string: path), ServerAPI.owns(base, url) else { return nil }
             return url
@@ -297,7 +321,7 @@ enum LiveTVMapping {
             return LiveOutputDirective(generation: Int(planned.generation),
                                        url: candidate.flatMap { ServerAPI.owns(api.baseURL, $0) ? $0 : nil }, reason: planned.reason)
         }
-        return .init(id: session.id, channel: channel(session.channel), state: state, reason: PlaybackMapping.nonBlank(session.reason),
+        return .init(id: session.id, channel: channel(session.channel), state: state, reason: Mapping.nonBlank(session.reason),
                      quality: LiveQuality(rawValue: session.quality) ?? .p1080, streamURL: url, paused: session.paused,
                      pauseRemainingSeconds: Int(session.pauseRemainingSeconds), bufferSeconds: Int(session.bufferSeconds),
                      takeover: session.takeoverAt.flatMap { at in
@@ -305,14 +329,14 @@ enum LiveTVMapping {
                          return .init(recordingID: id, title: title, at: at, canCancel: session.takeoverCanCancel ?? false)
                      }, automatic: session.automatic == true, actualQuality: session.actualQuality.flatMap(LiveQuality.init(rawValue:)), actualOutput: session.actualQuality,
                      outputGeneration: Int(session.outputGeneration ?? 0), directive: directive,
-                     switchStatus: PlaybackMapping.nonBlank(session.switchStatus),
-                     mode: PlaybackMapping.nonBlank(session.mode), modeReason: PlaybackMapping.nonBlank(session.modeReason))
+                     switchStatus: Mapping.nonBlank(session.switchStatus),
+                     mode: Mapping.nonBlank(session.mode), modeReason: Mapping.nonBlank(session.modeReason))
     }
 }
 
 extension RealLiveTVRepository {
     private func recordingServer() throws -> (server: Server, revision: Int) {
-        guard let server = store.current?.server, server.apiLevel >= liveRecordingAPILevel,
+        guard let server = store.current?.server, server.features.liveRecordings,
               capabilities?.recordingsAvailable == true else { throw LiveTVError(reason: "unavailable") }
         return (server, store.revision)
     }
@@ -323,7 +347,7 @@ extension RealLiveTVRepository {
         }
         guard revision == store.revision else { throw CancellationError() }
         return .init(items: reply.items.map { LiveTVMapping.recording($0, base: server.baseURL) },
-                     rules: (reply.rules ?? []).map(LiveTVMapping.recordingRule), nextCursor: PlaybackMapping.nonBlank(reply.nextCursor),
+                     rules: (reply.rules ?? []).map(LiveTVMapping.recordingRule), nextCursor: Mapping.nonBlank(reply.nextCursor),
                      tuners: reply.tuners.map(Int.init), freeBytes: reply.freeBytes)
     }
     func record(programmeID: String, options: LiveRecordingOptions) async throws -> LiveRecording {
@@ -400,11 +424,11 @@ extension RealLiveTVRepository {
 
 extension LiveTVMapping {
     static func recording(_ r: Components.Schemas.LiveTVRecording, base: URL) -> LiveRecording {
-        .init(id: r.id, ruleID: PlaybackMapping.nonBlank(r.ruleId), userID: r.userId.map(Int.init), userName: r.userName,
+        .init(id: r.id, ruleID: Mapping.nonBlank(r.ruleId), userID: r.userId.map(Int.init), userName: r.userName,
               channelID: r.channelId, sourceID: r.sourceId, number: r.number, channelName: r.channelName,
-              programmeID: PlaybackMapping.nonBlank(r.programmeId), title: r.title, episodeTitle: PlaybackMapping.nonBlank(r.episodeTitle),
+              programmeID: Mapping.nonBlank(r.programmeId), title: r.title, episodeTitle: Mapping.nonBlank(r.episodeTitle),
               season: r.season.map(Int.init), episode: r.episode.map(Int.init), start: r.start, end: r.end,
-              startedAt: r.startedAt, endedAt: r.endedAt, state: .init(rawValue: r.state) ?? .unknown, reason: PlaybackMapping.nonBlank(r.reason),
+              startedAt: r.startedAt, endedAt: r.endedAt, state: .init(rawValue: r.state) ?? .unknown, reason: Mapping.nonBlank(r.reason),
               series: r.series, padBefore: Int(r.padBefore), padAfter: Int(r.padAfter), bytes: r.bytes,
               gaps: r.gaps.map { .init(start: $0.start, end: $0.end, reason: $0.reason) }, mediaFileID: r.mediaFileId.map(Int.init),
               canCancel: r.canCancel, canDelete: r.canDelete ?? false, pictureURL: picture(r.pictureUrl, base: base),
@@ -414,9 +438,9 @@ extension LiveTVMapping {
               })
     }
     static func recordingRule(_ r: Components.Schemas.LiveTVRecordingRule) -> LiveRecordingRule {
-        .init(id: r.id, kind: r.kind, title: r.title, userName: r.userName, channelID: PlaybackMapping.nonBlank(r.channelId),
-              number: PlaybackMapping.nonBlank(r.number), seriesKey: PlaybackMapping.nonBlank(r.seriesKey), newOnly: r.newOnly,
+        .init(id: r.id, kind: r.kind, title: r.title, userName: r.userName, channelID: Mapping.nonBlank(r.channelId),
+              number: Mapping.nonBlank(r.number), seriesKey: Mapping.nonBlank(r.seriesKey), newOnly: r.newOnly,
               anyChannel: r.anyChannel, keep: Int(r.keep), padBefore: Int(r.padBefore), padAfter: Int(r.padAfter),
-              repeatKind: r._repeat, zone: PlaybackMapping.nonBlank(r.zone), canCancel: r.canCancel)
+              repeatKind: r._repeat, zone: Mapping.nonBlank(r.zone), canCancel: r.canCancel)
     }
 }

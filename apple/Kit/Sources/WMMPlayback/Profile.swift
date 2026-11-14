@@ -27,7 +27,9 @@ public struct DeviceDescription: Hashable, Sendable {
     public var hdr: Bool
     /// The HDR the display shows: "hdr10", "hlg", "dovi" (``displayHDRTypes(eligible:modes:)``).
     public var hdrTypes: Set<String>
-    /// The most audio channels the output takes: 2, or 8 on an Apple TV set to Dolby.
+    /// The most audio channels to ask for (``audioChannels(output:tv:handheldSurround:)``):
+    /// on an Apple TV what its output takes (2, or 6 or 8 to a receiver set to Dolby);
+    /// 2 on an iPhone or iPad until ``handheldSurroundChecked``.
     public var maxAudioChannels: Int
 
     public init(tv: Bool, decodes: Set<String>, decodes4K: Bool, hdr: Bool, hdrTypes: Set<String> = [], maxAudioChannels: Int = 2) {
@@ -92,6 +94,23 @@ public func displayHDRTypes(eligible: Bool, modes: Set<String>) -> Set<String> {
     return modes.isEmpty ? ["hdr10", "hlg"] : modes
 }
 
+/// Whether an iPhone or iPad says it takes surround (PLAN-APPLE-REVIEW.md §2.1):
+/// it would then ask for six channels or more and mix 5.1 down itself, so a
+/// 5.1 film keeps direct play. Off until a device check shows 5.1 AC-3 and
+/// E-AC-3 direct play working on the speaker and on headphones; turning it on
+/// is this one line.
+public let handheldSurroundChecked = false
+
+/// The audio channels a profile asks for. An Apple TV asks for what its
+/// output takes now (`AVAudioSession.maximumOutputNumberOfChannels`: 2 for a
+/// TV's speakers, 6 or 8 for a receiver), never fewer than 2. An iPhone or
+/// iPad asks for 2, or with `handheldSurround` for 6 or what its output takes
+/// if more (AirPlay to a receiver).
+public func audioChannels(output: Int, tv: Bool, handheldSurround: Bool = handheldSurroundChecked) -> Int {
+    if tv { return max(output, 2) }
+    return handheldSurround ? max(output, 6) : 2
+}
+
 /// The questions the profile asks the device, so tests can describe devices.
 public protocol DeviceProbe: Sendable {
     /// `AVURLAsset.isPlayableExtendedMIMEType`.
@@ -105,6 +124,16 @@ public protocol DeviceProbe: Sendable {
 
     /// HEVC decodes in hardware (`VTIsHardwareDecodeSupported`).
     var hardwareHEVC: Bool { get }
+
+    /// The most channels the audio output takes now
+    /// (`AVAudioSession.maximumOutputNumberOfChannels`); it changes with the
+    /// route (a receiver, AirPlay, headphones).
+    var outputChannels: Int { get }
+}
+
+extension DeviceProbe {
+    /// Two, for a probe that doesn't say.
+    public var outputChannels: Int { 2 }
 }
 
 /// The codec strings the probe asks about: High, Main and Main 10 at levels a
@@ -122,7 +151,7 @@ enum CodecProbe {
 }
 
 /// The device as `probe` sees it.
-public func describeDevice(_ probe: any DeviceProbe, tv: Bool = false) -> DeviceDescription {
+public func describeDevice(_ probe: any DeviceProbe, tv: Bool = false, handheldSurround: Bool = handheldSurroundChecked) -> DeviceDescription {
     var decodes = Set<String>()
     if probe.plays(CodecProbe.h264) { decodes.insert("h264") }
     if probe.plays(CodecProbe.hevc) { decodes.insert("hevc") }
@@ -133,7 +162,8 @@ public func describeDevice(_ probe: any DeviceProbe, tv: Bool = false) -> Device
     let hdr = probe.hdrEligible
     return DeviceDescription(
         tv: tv, decodes: decodes, decodes4K: probe.hardwareHEVC && probe.plays(CodecProbe.hevc4K),
-        hdr: hdr, hdrTypes: displayHDRTypes(eligible: hdr, modes: probe.hdrModes)
+        hdr: hdr, hdrTypes: displayHDRTypes(eligible: hdr, modes: probe.hdrModes),
+        maxAudioChannels: audioChannels(output: probe.outputChannels, tv: tv, handheldSurround: handheldSurround)
     )
 }
 
@@ -160,26 +190,40 @@ public struct AVFoundationProbe: DeviceProbe {
     }
 
     public var hardwareHEVC: Bool { VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC) }
+
+    public var outputChannels: Int {
+        #if os(iOS) || os(tvOS)
+        AVAudioSession.sharedInstance().maximumOutputNumberOfChannels
+        #else
+        2
+        #endif
+    }
 }
 
-/// The profile of this device: the codecs probed once, HDR and its kinds
-/// read at every call since they follow the display.
+/// The profile of this device: the codecs probed once; HDR and its kinds,
+/// and the audio output's channels, read at every call since they follow the
+/// display and the audio route. Live TV asks the same provider, so its
+/// profile has the same channels.
 @MainActor
 public final class DeviceProfileProvider: ProfileProvider {
     private let probe: any DeviceProbe
     private let tv: Bool
+    private let handheldSurround: Bool
     private var described: DeviceDescription?
 
-    public init(probe: any DeviceProbe = AVFoundationProbe(), tv: Bool = false) {
+    /// - Parameter handheldSurround: an iPhone or iPad asks for surround; ``handheldSurroundChecked`` decides it.
+    public init(probe: any DeviceProbe = AVFoundationProbe(), tv: Bool = false, handheldSurround: Bool = handheldSurroundChecked) {
         self.probe = probe
         self.tv = tv
+        self.handheldSurround = handheldSurround
     }
 
     public func current() -> PlaybackProfile {
-        var d = described ?? describeDevice(probe, tv: tv)
+        var d = described ?? describeDevice(probe, tv: tv, handheldSurround: handheldSurround)
         described = d
         d.hdr = probe.hdrEligible
         d.hdrTypes = displayHDRTypes(eligible: d.hdr, modes: probe.hdrModes)
+        d.maxAudioChannels = audioChannels(output: probe.outputChannels, tv: tv, handheldSurround: handheldSurround)
         return buildProfile(d)
     }
 }

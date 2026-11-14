@@ -67,7 +67,7 @@ public final class PlaybackEngine: PlaybackControllerFactory {
             preferences: preferences,
             client: client,
             profile: profile,
-            makePlayer: { AVMediaPlayer() },
+            makePlayer: { [gateway] in AVMediaPlayer(userAgent: gateway.userAgent) },
             stillWatching: stillWatching,
             system: system,
             lookups: lookups,

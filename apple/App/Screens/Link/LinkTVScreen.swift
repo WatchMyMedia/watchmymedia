@@ -1,5 +1,7 @@
 import SwiftUI
+#if DEBUG
 import WMMFakes
+#endif
 import WMMFeatures
 import WMMModel
 import WMMUI
@@ -152,6 +154,7 @@ private struct LinkTVContent: View {
     }
 }
 
+#if DEBUG
 #Preview {
     NavigationStack {
         LinkTVScreen(code: "K7M4PQ")
@@ -159,3 +162,4 @@ private struct LinkTVContent: View {
     .environment(AppServices.fake())
     .preferredColorScheme(.dark)
 }
+#endif

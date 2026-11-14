@@ -11,20 +11,39 @@ public final class LivePlaybackEngine: LivePlaybackControllerFactory {
     private let repository: any LiveTVRepository
     private let profile: any ProfileProvider
     private let network = LiveNetworkPath()
+    private let system: (any PlaybackSystem)?
+    private let userAgent: String?
     private var current: RealLivePlaybackController?
-    public init(repository: any LiveTVRepository, profile: any ProfileProvider = DeviceProfileProvider()) {
-        self.repository = repository; self.profile = profile
+    /// - Parameter system: Now Playing, the remote commands and the audio
+    ///   session's interruptions. By default the system's on iPhone and iPad;
+    ///   none on Apple TV, where AVKit's player shows Now Playing itself.
+    /// - Parameter userAgent: the app's, for the media requests
+    ///   (`APIPlaybackGateway.userAgent`); nil leaves AVFoundation's.
+    public init(repository: any LiveTVRepository, profile: any ProfileProvider = DeviceProfileProvider(), system: (any PlaybackSystem)? = LivePlaybackEngine.defaultSystem(),
+                userAgent: String? = nil) {
+        self.repository = repository; self.profile = profile; self.system = system; self.userAgent = userAgent
+    }
+
+    public static func defaultSystem() -> (any PlaybackSystem)? {
+        #if os(iOS)
+        AppleSystem()
+        #else
+        nil
+        #endif
     }
     public func make() -> any LivePlaybackController {
         let previous = current
         previous?.release()
-        let next = RealLivePlaybackController(repository: repository, media: AVLiveMediaPlayer(), clock: SystemPlaybackClock(),
+        let next = RealLivePlaybackController(repository: repository, media: AVLiveMediaPlayer(userAgent: userAgent), clock: SystemPlaybackClock(),
                                               cellular: { [network] in network.cellular }, profile: { [profile] in profile.current() },
-                                              beforeStart: { try await previous?.ensureStopped() })
+                                              beforeStart: { try await previous?.ensureStopped() }, system: system)
         current = next
         return next
     }
 }
+
+/// A Live TV heartbeat asked for: what it says is read when it goes out.
+private struct LiveBeat {}
 
 @MainActor
 private final class LiveNetworkPath {
@@ -63,11 +82,11 @@ public final class RealLivePlaybackController: LivePlaybackController {
     /// No player reads or control requests continue after failed cleanup. The
     /// shipped server's 60-second lease, plus a five-second grace, bounds ownership.
     @ObservationIgnored private var uncertainUntil: Int?
-    @ObservationIgnored private var token: MediaToken?
+    @ObservationIgnored private let tokens: TokenKeeper
     @ObservationIgnored private var worker: Task<Void, Never>?
-    @ObservationIgnored private var heartbeat: Task<Void, Never>?
-    @ObservationIgnored private var heartbeatPending = false
-    @ObservationIgnored private var timer: TimerHandle?
+    /// One heartbeat out at a time, and the newest one asked for meanwhile waiting.
+    @ObservationIgnored private var beats: HeartbeatPump<LiveBeat>!
+    @ObservationIgnored private let ticker: Ticker
     @ObservationIgnored private var released = false
     @ObservationIgnored private var loaded = false
     @ObservationIgnored private var wantsPlay = true
@@ -81,17 +100,31 @@ public final class RealLivePlaybackController: LivePlaybackController {
     @ObservationIgnored private var lastNativePlaying = false
     @ObservationIgnored private var loadedURL: URL?
     @ObservationIgnored private var startedProfile: PlaybackProfile?
-    @ObservationIgnored private var handledOutputGeneration = 0
     @ObservationIgnored private var pendingOutput: (generation: Int, previousURL: URL)?
-    @ObservationIgnored private var acceptedOutputGeneration: Int?
-    @ObservationIgnored private var failedOutputGeneration: Int?
+    /// Automatic's output switches: those handled, and those to report.
+    @ObservationIgnored private var switches = SwitchGenerations<Int>()
+    /// A new token is being fetched after the stream refused the last one.
+    @ObservationIgnored private var renewingToken = false
+    /// Tokens renewed for a refused stream, and when the last was: as many
+    /// as the file player's recoveries, counted afresh after a minute of playing.
+    @ObservationIgnored private var tokenRenewals = 0
+    @ObservationIgnored private var renewedAt = 0
+    /// Now Playing and the remote commands (iPhone and iPad), from the first start until release.
+    @ObservationIgnored private let system: (any PlaybackSystem)?
+    @ObservationIgnored private var systemSession: (any SystemSession)?
+    /// A call paused the channel, which it may resume when it ends.
+    @ObservationIgnored private var pausedByInterruption = false
 
     public init(repository: any LiveTVRepository, media: any LiveMediaPlayer, clock: any PlaybackClock, cellular: @escaping @MainActor () -> Bool = { false },
                 profile: @escaping @MainActor () -> PlaybackProfile = { PlaybackProfile(name: "Apple Live TV", containers: ["mpegts"], videoCodecs: ["h264"], audioCodecs: ["aac"], maxHeight: 1080) },
-                beforeStart: @escaping @MainActor () async throws -> Void = {}) {
-        self.repository = repository; self.contextID = repository.contextID
+                beforeStart: @escaping @MainActor () async throws -> Void = {}, system: (any PlaybackSystem)? = nil) {
+        self.repository = repository; self.contextID = repository.contextID; self.system = system
         self.gateway = Result { try repository.makeSessionGateway() }
         self.media = media; self.clock = clock; self.cellular = cellular; self.profile = profile; self.beforeStart = beforeStart
+        tokens = TokenKeeper(clock: clock)
+        ticker = Ticker(clock: clock, everyMs: 500)
+        beats = HeartbeatPump(owner: self, coalesce: { beat, waiting, _ in waiting = [beat] },
+                              deliver: { [weak self] _ in await self?.beat() })
     }
 
     public func start(_ request: LivePlayRequest) {
@@ -101,12 +134,15 @@ public final class RealLivePlaybackController: LivePlaybackController {
         request.quality = request.quality.cappedForCellular(cellular())
         generation += 1; desired = request; lastRequest = request
         loaded = false; wantsPlay = true; pausedAt = nil; pauseBudget = 300_000
-        loadedURL = nil; handledOutputGeneration = 0; pendingOutput = nil; acceptedOutputGeneration = nil; failedOutputGeneration = nil
+        loadedURL = nil; switches = SwitchGenerations(); pendingOutput = nil
+        renewingToken = false; tokenRenewals = 0
         noteUserInput()
         media.stop()
         state = LivePlayerState(); state.channel = request.channel; state.quality = request.quality
         state.status = .tuning
         updateNetworkState()
+        openSystemSession()
+        updateNowPlaying()
         scheduleTick()
         runSwitches()
     }
@@ -122,6 +158,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
         }
         pausedAt = nil; wantsPlay = true; media.play(); lastNativePlaying = true
         state.status = loaded ? .playing : .tuning
+        updateNowPlaying()
         sendHeartbeat(force: true)
     }
     public func pause() {
@@ -131,6 +168,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
         media.pause(); lastNativePlaying = false
         if pausedAt == nil { pausedAt = clock.elapsedMs; pauseBudget = 300_000 }
         state.status = .paused
+        updateNowPlaying()
         sendHeartbeat(force: true)
     }
     public func togglePlayPause() { wantsPlay ? pause() : play() }
@@ -158,14 +196,16 @@ public final class RealLivePlaybackController: LivePlaybackController {
     }
     public func stop() {
         generation += 1; desired = nil; loaded = false
-        loadedURL = nil; pendingOutput = nil; acceptedOutputGeneration = nil; failedOutputGeneration = nil
-        timer?.cancel(); timer = nil; media.stop()
+        loadedURL = nil; pendingOutput = nil; switches = SwitchGenerations(handled: switches.handled)
+        ticker.stop(); media.stop()
         state.status = .stopped; state.askStillWatching = false
+        updateNowPlaying()
         runSwitches()
     }
     public func release() {
         guard !released else { return }
         stop(); released = true
+        systemSession?.close(); systemSession = nil
     }
     public func waitUntilStopped() async { await worker?.value }
     func ensureStopped() async throws {
@@ -198,7 +238,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
                 do {
                     try await beforeStart?()
                     beforeStart = nil
-                    await heartbeat?.value
+                    await beats.drained()
                     retireExpiredOwnership()
                     let bound = try gateway.get()
                     if let uncertain = uncertainStart {
@@ -227,7 +267,9 @@ public final class RealLivePlaybackController: LivePlaybackController {
                     }
                     guard version == generation else { continue }
                     guard let request = desired, !released, identityMatches else { continue }
-                    let fresh = try await bound.mediaToken()
+                    // A channel change keeps a token with time left: they last six hours
+                    // (PLAN-APPLE-REVIEW.md §4.2.2). This controller is pinned to one sign-in.
+                    let fetched: MediaToken? = tokens.valid ? nil : try await bound.mediaToken()
                     guard version == generation, !released, identityMatches else { continue }
                     let selectedProfile = liveProfile()
                     let session = try await createSession(bound, request: request, requestID: UUID().uuidString, profile: selectedProfile)
@@ -238,7 +280,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
                         if version == generation { generation += 1; desired = nil }
                         continue
                     }
-                    token = fresh
+                    if let fetched { tokens.keep(fetched) }
                     startedProfile = selectedProfile
                     lastBeat = clock.elapsedMs; lastSuccessfulBeat = clock.elapsedMs
                     apply(session)
@@ -300,7 +342,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
             finish(reason: session.reason ?? "stopped"); return
         }
         guard session.state == .playing else { state.status = .tuning; return }
-        if !loaded, let url = session.streamURL, let token {
+        if !loaded, let url = session.streamURL, let token = tokens.token {
             media.load(url: token.apply(to: url), title: session.channel.title, play: wantsPlay)
             loaded = true; loadedURL = url; lastNativePlaying = wantsPlay
         }
@@ -314,10 +356,9 @@ public final class RealLivePlaybackController: LivePlaybackController {
 
     private func prepareOutput(_ session: LiveSession) {
         guard let directive = session.directive, pendingOutput == nil,
-              directive.generation > max(handledOutputGeneration, session.outputGeneration) else { return }
-        handledOutputGeneration = directive.generation
-        guard let next = directive.url, let previous = loadedURL ?? session.streamURL, let token else {
-            failedOutputGeneration = directive.generation
+              switches.take(directive.generation, playing: session.outputGeneration) else { return }
+        guard let next = directive.url, let previous = loadedURL ?? session.streamURL, let token = tokens.token else {
+            switches.fail(directive.generation)
             sendHeartbeat(force: true)
             return
         }
@@ -329,20 +370,19 @@ public final class RealLivePlaybackController: LivePlaybackController {
     private func rejectOutput() {
         guard let pending = pendingOutput else { return }
         pendingOutput = nil
-        failedOutputGeneration = pending.generation
+        switches.fail(pending.generation)
         loadedURL = pending.previousURL
         state.message = "Keeping the current Live TV quality after a switch failed."
-        guard let session = activeSession, let token else { finish(reason: "signal_lost", failure: true); return }
+        guard let session = activeSession, let token = tokens.token else { finish(reason: "signal_lost", failure: true); return }
         media.load(url: token.apply(to: pending.previousURL), title: session.channel.title, play: wantsPlay)
         sendHeartbeat(force: true)
     }
 
     private func scheduleTick() {
-        timer?.cancel()
-        timer = clock.after(ms: 500) { [weak self] in
-            guard let self, !self.released, self.desired != nil else { return }
+        ticker.restart { [weak self] _ in
+            // Nothing wanted any more (a failed start, an abandoned one): the beat ends.
+            guard let self, !self.released, self.desired != nil else { self?.ticker.stop(); return }
             self.tick()
-            if self.desired != nil { self.scheduleTick() }
         }
     }
     private func tick() {
@@ -356,7 +396,7 @@ public final class RealLivePlaybackController: LivePlaybackController {
             if media.failed { rejectOutput() }
             else if media.firstFrameRendered, let pending = pendingOutput {
                 pendingOutput = nil
-                acceptedOutputGeneration = pending.generation
+                switches.accept(pending.generation)
                 state.message = nil
                 sendHeartbeat(force: true)
             }
@@ -377,59 +417,132 @@ public final class RealLivePlaybackController: LivePlaybackController {
             state.pauseRemainingSeconds = max(0, (pauseBudget - (clock.elapsedMs - pausedAt) + 999) / 1000)
             if state.pauseRemainingSeconds == 0 { finish(reason: "pause_expired"); return }
         }
-        if media.failed { finish(reason: "signal_lost", failure: true); return }
+        if tokenRenewals > 0, media.playing, !media.buffering, clock.elapsedMs - renewedAt >= recoveryResetMs { tokenRenewals = 0 }
+        updateNowPlaying()
+        if media.failed && !renewingToken {
+            if media.failure?.refusedToken == true, tokenRenewals < maxRecoveries { renewToken() }
+            else { finish(reason: "signal_lost", failure: true); return }
+        }
         sendHeartbeat(force: false)
     }
+    /// The stream refused the media token (a 401 or 403 for a playlist or a
+    /// segment): a new token and the same stream again, as the file player
+    /// does, rather than "signal lost". The tuner's session is kept.
+    private func renewToken() {
+        guard let session = activeSession, let url = loadedURL ?? session.streamURL else {
+            finish(reason: "signal_lost", failure: true); return
+        }
+        renewingToken = true; tokenRenewals += 1; renewedAt = clock.elapsedMs
+        let version = generation
+        Task { [self] in
+            defer { if version == generation { renewingToken = false } }
+            do {
+                let fresh = try await gateway.get().mediaToken()
+                guard version == generation, activeSession?.id == session.id, !released else { return }
+                tokens.keep(fresh)
+                media.load(url: fresh.apply(to: url), title: session.channel.title, play: wantsPlay)
+                lastNativePlaying = wantsPlay
+                state.message = "Reconnected at live TV."
+            } catch {
+                guard version == generation, !released else { return }
+                finish(reason: "signal_lost", failure: true)
+            }
+        }
+    }
+
+    /// Now Playing, the lock screen's and Control Center's controls, and the
+    /// audio session's interruptions, as the file player has them
+    /// (PLAN-APPLE-REVIEW.md §6.3). Play and pause are the screen's own: a
+    /// pause keeps the tuner within its allowance and Play goes back to live
+    /// once it passed the buffer. There is nothing to skip or scrub.
+    private func openSystemSession() {
+        guard systemSession == nil, let system else { return }
+        systemSession = system.open(SystemCommands(
+            play: { [weak self] in self?.play() },
+            pause: { [weak self] in self?.pause() },
+            togglePlayPause: { [weak self] in self?.togglePlayPause() },
+            seekBy: { _ in },
+            seekTo: { _ in },
+            interruption: { [weak self] began, resume in self?.interrupted(began: began, shouldResume: resume) },
+            // Headphones unplugged: pause rather than play out loud.
+            routeLost: { [weak self] in self?.pause() },
+            foreground: {},
+            seeks: false
+        ))
+    }
+
+    /// A call pauses the channel, within the pause's allowance; when it ends
+    /// the system says whether to carry on, at live if the pause passed the buffer.
+    private func interrupted(began: Bool, shouldResume: Bool) {
+        if began {
+            pausedByInterruption = wantsPlay && activeSession != nil && state.status != .stopped && state.status != .error
+            if pausedByInterruption { pause() }
+        } else {
+            if shouldResume && pausedByInterruption && activeSession != nil && !wantsPlay { play() }
+            pausedByInterruption = false
+        }
+    }
+
+    private func updateNowPlaying() {
+        guard let systemSession, let channel = state.channel else { return }
+        systemSession.update(NowPlayingInfo(title: channel.title, subtitle: nil, durationMs: 0, positionMs: 0,
+                                            playing: state.status == .playing || state.status == .buffering, live: true))
+    }
+
     private func updateNetworkState() {
         state.cellular = cellular()
         state.qualities = (repository.capabilities?.automatic == true ? [.auto] : [])
             + LiveQuality.fixed.filter { !state.cellular || $0 != .p1080 }
     }
     private func sendHeartbeat(force: Bool) {
-        if force, heartbeat != nil { heartbeatPending = true; return }
-        guard heartbeat == nil, worker == nil, let session = activeSession, desired != nil, !released else { return }
+        // One already out: a forced one waits for it, taking the place of any waiting.
+        if force, beats.busy { beats.submit(LiveBeat()); return }
+        guard !beats.busy, worker == nil, let session = activeSession, desired != nil, !released else { return }
+        // While the channel tunes this asks every second. From API level 28 a
+        // status request with `waitMs` answers the moment it plays; that needs
+        // the regenerated client (`getLiveTVSession`), so it waits for it.
         let interval = session.state == .starting ? 1_000 : 10_000
         guard force || clock.elapsedMs - lastBeat >= interval else { return }
+        beats.submit(LiveBeat())
+    }
+
+    /// Sends a heartbeat with what the player measures now, and acts on the reply.
+    private func beat() async {
+        guard worker == nil, let session = activeSession, desired != nil, !released else { return }
         lastBeat = clock.elapsedMs
         let version = generation, input = inputVersion, paused = !wantsPlay
-        let accepted = acceptedOutputGeneration, failed = failedOutputGeneration
+        let accepted = switches.accepted, failed = switches.failed
         let transfer = session.automatic ? media.transfer : nil
         let measurement: LiveMeasurement? = session.automatic ? .init(
             state: paused ? .paused : media.ready && media.playing && !media.buffering ? .playing : .buffering,
             bufferedMs: media.bufferedMs, throughputBps: transfer?.bps, throughputAgeMs: transfer?.ageMs,
             stalls: media.stalls, switchGeneration: accepted, switchFailedGeneration: failed) : nil
-        heartbeat = Task { [self] in
-            defer {
-                heartbeat = nil
-                if heartbeatPending { heartbeatPending = false; sendHeartbeat(force: true) }
-            }
-            do {
-                let bound = try gateway.get()
-                let updated = try await bound.heartbeat(sessionID: session.id, paused: paused, interacted: input != acknowledgedInput, measurement: measurement)
+        do {
+            let bound = try gateway.get()
+            let updated = try await bound.heartbeat(sessionID: session.id, paused: paused, interacted: input != acknowledgedInput, measurement: measurement)
+            guard version == generation, activeSession?.id == session.id, !released else { return }
+            lastSuccessfulBeat = clock.elapsedMs; acknowledgedInput = input
+            switches.acknowledge(accepted: accepted)
+            switches.acknowledge(failed: failed)
+            apply(updated)
+            guard desired != nil else { return }
+            if !tokens.valid {
+                let fresh = try await bound.mediaToken()
                 guard version == generation, activeSession?.id == session.id, !released else { return }
-                lastSuccessfulBeat = clock.elapsedMs; acknowledgedInput = input
-                if acceptedOutputGeneration == accepted { acceptedOutputGeneration = nil }
-                if failedOutputGeneration == failed { failedOutputGeneration = nil }
-                apply(updated)
-                guard desired != nil else { return }
-                if token.map({ $0.expiresAt.timeIntervalSince(clock.now) < 60 }) ?? true {
-                    let fresh = try await bound.mediaToken()
-                    guard version == generation, activeSession?.id == session.id, !released else { return }
-                    token = fresh
-                    if let url = loadedURL ?? updated.streamURL {
-                        media.load(url: fresh.apply(to: url), title: updated.channel.title, play: wantsPlay)
-                        state.message = "Reconnected at live TV."
-                    }
+                tokens.keep(fresh)
+                if let url = loadedURL ?? updated.streamURL {
+                    media.load(url: fresh.apply(to: url), title: updated.channel.title, play: wantsPlay)
+                    state.message = "Reconnected at live TV."
                 }
-            } catch {
-                guard version == generation, !released else { return }
-                if error is SignedOutError || (error as? APIError)?.status == 403 || (error as? LiveTVError)?.reason == "access_revoked" {
-                    finish(reason: "access_revoked")
-                } else if (error as? APIError)?.status == 404 {
-                    finish(reason: "lease_expired")
-                } else if clock.elapsedMs - lastSuccessfulBeat >= 50_000 {
-                    finish(reason: "lease_expired", failure: true)
-                }
+            }
+        } catch {
+            guard version == generation, !released else { return }
+            if error is SignedOutError || (error as? APIError)?.status == 403 || (error as? LiveTVError)?.reason == "access_revoked" {
+                finish(reason: "access_revoked")
+            } else if (error as? APIError)?.status == 404 {
+                finish(reason: "lease_expired")
+            } else if clock.elapsedMs - lastSuccessfulBeat >= 50_000 {
+                finish(reason: "lease_expired", failure: true)
             }
         }
     }

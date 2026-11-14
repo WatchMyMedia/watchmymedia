@@ -1,9 +1,5 @@
 import Foundation
 
-/// The API level from which a playback decision carries the file's seek
-/// thumbnails (PLAN-TRICKPLAY.md, `Decision.trickplay`).
-public let trickplayAPILevel = 9
-
 /// A file's seek thumbnails (PLAN-TRICKPLAY.md §2): tiles of `width` ×
 /// `height` pixels, one every `intervalMs`, `columns` × `rows` to a JPEG
 /// sheet. Tile i covers [i × intervalMs, (i+1) × intervalMs); the last

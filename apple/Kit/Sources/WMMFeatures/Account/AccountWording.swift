@@ -289,3 +289,32 @@ public let openSourceNotices: [(name: String, licence: String)] = [
     ("Swift OpenAPI URLSession", "Apache License 2.0"),
     ("Swift HTTP Types", "Apache License 2.0"),
 ]
+
+// MARK: - Words both apps' sign-in and server screens share (PLAN-APPLE-REVIEW.md §5.8)
+
+public let chooseServerTitle = "Choose a server"
+public let lookingForServers = "Looking for servers…"
+public let serversAppearByThemselves = "Servers on this network appear by themselves."
+public let onThisNetwork = "On this network"
+public let enterAnAddressHeading = "Or enter an address"
+public let serverAddressLabel = "Server address"
+/// The address field's example, never a real server's.
+public let serverAddressExample = "192.168.1.20 or https://home.example.net"
+public let serverAddressNote = "An IP address or a .local name works over http on your own network. A hostname needs https; Tailscale Serve or a reverse proxy gives it one."
+/// The tick by the server in use, spoken.
+public let serverInUse = "In use"
+public let switchServerTitle = "Switch server"
+
+public let pairingGettingCode = "Getting a code…"
+public let pairingCodeAccepted = "Code accepted. Signing in…"
+public let pairingNewCode = "Get a new code"
+
+/// A pairing code's boxes, spoken: "Code K 7 M 4 P Q", or "No code yet".
+public func pairingCodeAccessibilityLabel(_ code: String) -> String {
+    code.isEmpty ? "No code yet" : "Code \(spokenCode(code))"
+}
+
+/// Sign out's question: "Sign out of Home?", or "Sign out?" with no server.
+public func signOutQuestion(serverName: String?) -> String {
+    serverName.map { "Sign out of \($0)?" } ?? "Sign out?"
+}

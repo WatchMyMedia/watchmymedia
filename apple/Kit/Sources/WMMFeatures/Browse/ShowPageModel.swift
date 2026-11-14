@@ -62,12 +62,17 @@ public final class ShowPageModel {
     @ObservationIgnored private let downloadSession: (@MainActor () -> String?)?
     @ObservationIgnored private let downloadSessionAtOpen: String?
     @ObservationIgnored private let navigator: Navigator
-    @ObservationIgnored private var showGeneration = 0
-    @ObservationIgnored private var seasonGeneration = 0
+    @ObservationIgnored private let changes: ScreenChanges
+    /// The show's loads; one still running when another starts is cancelled.
+    @ObservationIgnored private let showLoads = LoadController<ShowDetail>()
+    /// The row's season: a newer one (another tab) wins, and an older reply is dropped.
+    @ObservationIgnored private let seasonLoads = LoadController<SeasonDetail>(cancelsOlder: false)
     /// The episode on top was chosen by the rule or the person at least once.
     @ObservationIgnored private var placed = false
 
-    public init(library: any LibraryRepository, navigator: Navigator, showID: Int, arrival: ShowArrival = .show, requests: (any RequestsRepository)? = nil, preferences: (any PreferencesRepository)? = nil, downloads: (any DownloadRepository)? = nil, downloadSession: (@MainActor () -> String?)? = nil) {
+    public init(library: any LibraryRepository, navigator: Navigator, showID: Int, arrival: ShowArrival = .show, requests: (any RequestsRepository)? = nil, preferences: (any PreferencesRepository)? = nil, downloads: (any DownloadRepository)? = nil, downloadSession: (@MainActor () -> String?)? = nil,
+                now: @escaping @MainActor () -> Date = { Date() }) {
+        changes = ScreenChanges(now: now)
         self.library = library
         self.navigator = navigator
         self.requests = requests
@@ -151,18 +156,46 @@ public final class ShowPageModel {
 
     // MARK: Loading
 
-    /// Loads the show and its season, then reloads quietly whenever the
-    /// library or requests change, until cancelled.
+    /// Loads the show and its season, then reloads quietly whenever one of
+    /// the season's episodes or the show is marked, its library changes or
+    /// requests change, until cancelled. Coming back to the page loads nothing
+    /// unless that happened meanwhile (``ScreenChanges``). Marks and changes
+    /// made here reload it through their own notice, once.
     public func run() async {
-        let requestChanges = Task { [weak self] in
-            guard let changes = self?.requests?.changes() else { return }
-            for await _ in changes { await self?.load(quiet: true) }
-        }
-        defer { requestChanges.cancel() }
-        await followChanges(of: library, firstQuiet: loadedShow.value != nil) { quiet in await load(quiet: quiet) }
+        await changes.run(
+            subscribe: { merge(library.libraryChanges(), unknown: requests?.changes()) },
+            hasContent: loadedShow.value != nil,
+            load: { quiet in await load(quiet: quiet) },
+            apply: { changes in
+                guard changes.contains(where: affects) else { return }
+                await load(quiet: true)
+            }
+        )
     }
 
-    public func retry() async { await load(quiet: false) }
+    /// Whether `change` can touch the page. Another season's episodes (whose
+    /// IDs the page doesn't hold) are left for the next return or change.
+    private func affects(_ change: LibraryChange) -> Bool {
+        switch change {
+        case .watched(.episode, let ids, _):
+            let shown = Set((loadedSeason?.value?.episodes ?? []).map(\.id) + (topSeason?.episodes ?? []).map(\.id))
+            return ids.contains(where: shown.contains)
+        case .markedShow(let id, _, _): return id == showID
+        case .watched(.movie, _, _), .scan: return false
+        case .library, .unknown: return change.touches(library: loadedShow.value?.libraryID)
+        }
+    }
+
+    public func retry() async {
+        await load(quiet: false)
+        changes.loaded()
+    }
+
+    /// Pull to refresh: keeps the page as it is, and says why if it fails.
+    public func refresh() async {
+        await load(quiet: true)
+        changes.loaded()
+    }
 
     public func retrySeason() async {
         guard let selectedSeason else { return }
@@ -196,18 +229,21 @@ public final class ShowPageModel {
         }
     }
 
-    /// Loads the show, then the chosen season. `quiet` keeps the page as it is meanwhile.
+    /// Loads the show, then the chosen season. `quiet` keeps the page as it is
+    /// meanwhile. A load still running when another starts is cancelled.
     func load(quiet: Bool) async {
-        showGeneration += 1
-        let mine = showGeneration
-        if !quiet || loadedShow.value == nil { loadedShow = .loading }
-        guard let result = await Loadable.run({ try await self.library.show(id: self.showID) }), mine == showGeneration else { return }
-        switch result {
-        case .failed where loadOffline():
-            return
-        case .failed(let text) where quiet && loadedShow.value != nil:
+        await showLoads.run { [weak self] load in await self?.fetch(load, quiet: quiet) }
+    }
+
+    private func fetch(_ load: LoadController<ShowDetail>.Load, quiet: Bool) async {
+        showLoads.begin(&loadedShow, quiet: quiet)
+        guard let result = await showLoads.fetch(load, { try await self.library.show(id: self.showID) }) else { return }
+        if case .failed = result, loadOffline() { return }
+        if let text = showLoads.quietFailure(result, quiet: quiet, over: loadedShow) {
             message = text
             return
+        }
+        switch result {
         case .failed, .loading:
             loadedShow = result
             return
@@ -223,7 +259,7 @@ public final class ShowPageModel {
                     selectedSeason = number
                     await loadSeason(number, quiet: false, place: .arrival)
                 } else {
-                    await findSeason(full, generation: mine)
+                    await findSeason(full, load: load)
                 }
             } else if let first = ShowPageRule.firstSeason(visible) {
                 // The chosen season went (deleted, or only Show missing listed it).
@@ -239,14 +275,16 @@ public final class ShowPageModel {
     /// top, chosen by `place` (the arrival's rule or the season's first
     /// unfinished), kept when still there, else the season's first unfinished.
     private func loadSeason(_ number: Int, quiet: Bool, place: Placing?) async {
-        seasonGeneration += 1
-        let mine = seasonGeneration
-        if !quiet || loadedSeason?.value == nil { loadedSeason = .loading }
-        guard let result = await Loadable.run({ try await self.library.season(showID: self.showID, number: number) }),
-              mine == seasonGeneration, selectedSeason == number else { return }
+        await seasonLoads.run { [weak self] load in await self?.fetchSeason(load, number: number, quiet: quiet, place: place) }
+    }
+
+    private func fetchSeason(_ load: LoadController<SeasonDetail>.Load, number: Int, quiet: Bool, place: Placing?) async {
+        seasonLoads.begin(&loadedSeason, quiet: quiet)
+        guard let result = await seasonLoads.fetch(load, { try await self.library.season(showID: self.showID, number: number) }),
+              selectedSeason == number else { return }
         if case .failed = result, !placed, loadOffline() { return }
         guard case .loaded(let season) = result else {
-            if case .failed(let text) = result, quiet, loadedSeason?.value != nil {
+            if let text = seasonLoads.quietFailure(result, quiet: quiet, over: loadedSeason ?? .loading) {
                 message = text
             } else {
                 loadedSeason = result
@@ -284,11 +322,11 @@ public final class ShowPageModel {
     /// The season holding the episode, opened without one (Home's hero): the
     /// next episode's, else the first from the newest that has it, which is
     /// where a new episode is.
-    private func findSeason(_ show: ShowDetail, generation mine: Int) async {
+    private func findSeason(_ show: ShowDetail, load: LoadController<ShowDetail>.Load) async {
         guard case .episode(let id, _) = arrival else { return }
         loadedSeason = .loading
         for number in show.seasons.map(\.number).sorted(by: >) {
-            guard let season = try? await library.season(showID: showID, number: number), mine == showGeneration else { continue }
+            guard let season = try? await library.season(showID: showID, number: number), showLoads.isCurrent(load) else { continue }
             if season.episodes.contains(where: { $0.id == id }) {
                 selectedSeason = number
                 loadedSeason = .loaded(season)
@@ -296,7 +334,7 @@ public final class ShowPageModel {
                 return
             }
         }
-        guard mine == showGeneration else { return }
+        guard showLoads.isCurrent(load) else { return }
         // Not in any season: the show's own first season, saying so.
         guard let first = ShowPageRule.firstSeason(show) else { return }
         selectedSeason = first
@@ -368,6 +406,14 @@ public final class ShowPageModel {
         navigator.play(request)
     }
 
+    /// What Play/Pause does on an episode of the row on Apple TV
+    /// (``CardPlayPause``): plays it, resuming, when it is on disk; else the
+    /// card's Select, which puts it on top.
+    public func cardPlayPause(_ episode: EpisodeDetail) -> CardPlayPause {
+        guard episode.playable, let request = playRequest(episode) else { return .select }
+        return .play(request)
+    }
+
     private func playRequest(_ episode: EpisodeDetail, fromStart: Bool = false) -> PlayRequest? {
         let show = loadedShow.value
         return episode.playRequest(showTitle: showTitle, backdropPath: show?.backdropPath, posterPath: show?.posterPath, fromStart: fromStart, showID: offline ? nil : showID)
@@ -416,24 +462,16 @@ public final class ShowPageModel {
     private func mark(_ target: WatchTarget, _ watched: Bool) async {
         guard !busy else { return }
         busy = true
-        do {
-            try await library.mark(target, watched: watched)
-            busy = false
-            message = markedMessage(watched: watched)
-            await load(quiet: true)
-        } catch let error as APIError where error.status == nil && held != nil {
-            if case .episode = target, let held {
-                downloads?.mark(fileID: held.fileID, watched: watched)
-                message = markedMessage(watched: watched)
-                loadOffline()
-            } else {
-                message = error.displayMessage
-            }
-            busy = false
-        } catch {
-            busy = false
-            message = error.displayMessage
-        }
+        // The mark's own notice reloads the page (``run()``).
+        let note = await markWatched(target, watched, in: library, offline: {
+            // No server: an episode's mark waits with its download.
+            guard case .episode = target, let held else { return false }
+            downloads?.mark(fileID: held.fileID, watched: watched)
+            loadOffline()
+            return true
+        })
+        busy = false
+        message = note
     }
 
     // MARK: The episode's ⋯

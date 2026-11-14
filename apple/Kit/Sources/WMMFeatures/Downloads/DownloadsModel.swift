@@ -132,7 +132,9 @@ public final class DownloadsModel {
         return PlayRequest(
             fileID: d.fileID, title: item.kind == .episode ? (item.showTitle ?? item.title) : item.title, subtitle: subtitle,
             backdropPath: item.kind == .movie ? item.artPath : nil, stillPath: item.kind == .episode ? item.artPath : nil,
-            posterPath: item.posterPath, showID: item.showID, seasonNumber: item.season
+            posterPath: item.posterPath, showID: item.showID, seasonNumber: item.season,
+            // A movie's year is all of the Info panel's details the download keeps.
+            year: item.kind == .movie ? item.year : nil
         )
     }
 

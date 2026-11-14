@@ -131,7 +131,7 @@ private struct MovieView: View {
                         .disabled(model.busy)
                     // From API level 5 (PLAN-ARR.md §9).
                     if services.requests.options.problems {
-                        Button("Report a problem") { report = ReportProblemModel(requests: services.requests, target: .movie(movie)) }
+                        Button(reportProblemTitle) { report = ReportProblemModel(requests: services.requests, target: .movie(movie)) }
                             .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
                     }
                     // 160 pt beside Trailer (TvMovieTrailer.dc.html), and the first to give way

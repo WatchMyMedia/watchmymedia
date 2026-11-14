@@ -34,4 +34,50 @@ import WMMModel
         #expect(try await h.services.casting.capability() == nil)
         #expect(h.router.requests("POST /api/auth/cast-token").isEmpty)
     }
+
+    // Cast's check reads GET /api/server through ServerInfoReader (PLAN-APPLE-REVIEW.md §5.6).
+
+    private nonisolated static let castingServer = #"{"id":"srv-test","name":"Test server","version":"1","apiLevel":18,"setupRequired":false,"turnstile":false,"casting":true,"castAppId":"0A4D0B6A"}"#
+
+    private func signedInAtLevel18() async throws -> Harness {
+        let h = Harness()
+        var server = h.testServer; server.apiLevel = 18
+        try await h.services.servers.select(server)
+        h.router.on("POST /api/auth/login", .json(Fixtures.signIn))
+        _ = try await h.services.auth.signIn(name: "viewer", password: "fixture-viewer-1")
+        return h
+    }
+
+    @Test func theCheckAndTheLevelsRefreshShareOneRequest() async throws {
+        let h = try await signedInAtLevel18()
+        h.router.always("GET /api/server", .json(Self.castingServer))
+        await h.services.serverRepository.refreshCurrent()
+        let asked = h.router.requests("GET /api/server").count
+        #expect(try await h.services.casting.capability() != nil)
+        #expect(h.router.requests("GET /api/server").count == asked)
+        #expect(h.router.requests("GET /api/server").allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == nil }, "the description is public")
+    }
+
+    @Test func anotherServerAnsweringAtTheAddressIssuesNoGrant() async throws {
+        let h = try await signedInAtLevel18()
+        h.router.always("GET /api/server", .json(Self.castingServer.replacingOccurrences(of: "srv-test", with: "different-server")))
+        #expect(try await h.services.casting.capability() == nil)
+        await #expect(throws: APIError.self) { try await h.services.casting.grant() }
+        #expect(h.router.requests("POST /api/auth/cast-token").isEmpty)
+    }
+
+    @Test func anAccountChangeWhileCheckingIsASignOut() async throws {
+        let h = try await signedInAtLevel18()
+        let gate = ReplyGate()
+        h.server.respondAsync { request in
+            guard request.url?.path == "/api/server" else { return (404, Data()) }
+            await gate.wait()
+            return (200, Data(Self.castingServer.utf8))
+        }
+        let checking = Task { try await h.services.casting.capability() }
+        #expect(await eventually { h.server.seen.contains { $0.url?.path == "/api/server" } })
+        h.services.store.setCredential(nil, serverID: h.testServer.id)
+        await gate.release()
+        await #expect(throws: SignedOutError()) { try await checking.value }
+    }
 }

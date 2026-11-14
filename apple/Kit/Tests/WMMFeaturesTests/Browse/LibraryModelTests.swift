@@ -174,6 +174,106 @@ import WMMModel
         #expect(model.state.value?.items.count == 10)
     }
 
+    @Test func aGridAboveTheServersLimitKeepsEveryTitleThroughAQuietReload() async throws {
+        // 1,200 films; the repository asks for at most 1,000 at once, as the real one does.
+        let films = (0..<1_200).map { BrowseItem(kind: .movie, id: 20_000 + $0, libraryID: FakeData.movieLibrary, title: "Film \($0)") }
+        library.itemsHandler = { query in
+            let limit = min(query.limit, 1_000)
+            return ItemPage(items: Array(films.dropFirst(query.offset).prefix(limit)), total: films.count, offset: query.offset, genres: [], decades: [])
+        }
+        let model = LibraryModel(library: library, navigator: navigator, type: .movie, pageSize: 400)
+        let running = Task { await model.run() }
+        defer { running.cancel() }
+        #expect(await eventually { model.state.value?.items.count == 400 })
+        await model.loadMore()
+        await model.loadMore()
+        #expect(model.state.value?.items.count == 1_200)
+        let before = library.queries.count
+        library.announceChange(.library(id: FakeData.movieLibrary))
+        #expect(await eventually { library.queries.count == before + 3 })
+        #expect(library.queries.suffix(3).map(\.limit) == [500, 500, 200])
+        #expect(library.queries.suffix(3).map(\.offset) == [0, 500, 1_000])
+        #expect(model.state.value?.items.count == 1_200)
+        #expect(model.state.value?.items.last?.title == "Film 1199")
+    }
+
+    @Test func anotherLibrarysChangesAndScansLoadNothing() async throws {
+        let model = model(.movie)
+        let running = Task { await model.run() }
+        defer { running.cancel() }
+        #expect(await eventually { model.state.value != nil })
+        library.announceChange(.library(id: FakeData.tvLibrary))
+        library.announceChange(.scan(libraryID: FakeData.movieLibrary))
+        library.announceChange(.watched(.episode, ids: [100037], watched: nil))
+        library.announceChange(.markedShow(id: 100, season: nil, watched: true))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(library.queries.count == 1)
+        #expect(library.movieCalls == 0)
+        library.announceChange(.library(id: FakeData.movieLibrary))
+        #expect(await eventually { library.queries.count == 2 })
+    }
+
+    @Test func marksArePatchedFromTheEventNotRefetched() async throws {
+        let model = model(.movie)
+        let running = Task { await model.run() }
+        defer { running.cancel() }
+        #expect(await eventually { model.state.value != nil })
+        let item = try #require(model.state.value?.items.first { $0.progress != nil })
+        // A mark made here says watched or not: drawn with no request at all.
+        library.announceChange(.watched(.movie, ids: [item.id], watched: true))
+        #expect(await eventually { model.state.value?.items.first { $0.id == item.id }?.watched == true })
+        #expect(model.state.value?.items.first { $0.id == item.id }?.progress == nil)
+        // The server's event says only which: that one title is asked for, not the grid.
+        library.announceChange(.watched(.movie, ids: [item.id, 99_999], watched: nil))
+        #expect(await eventually { library.movieCalls == 1 })
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(library.queries.count == 1)
+        #expect(library.movieCalls == 1, "a title the grid doesn't hold isn't asked for")
+    }
+
+    @Test func aMarkFromAPosterLoadsNothingMore() async throws {
+        let model = model(.movie)
+        let running = Task { await model.run() }
+        defer { running.cancel() }
+        #expect(await eventually { model.state.value != nil })
+        let item = try #require(model.state.value?.items.first)
+        await model.setWatched(item, true)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(library.queries.count == 1)
+        #expect(library.movieCalls == 0)
+        #expect(model.state.value?.items.first { $0.id == item.id }?.watched == true)
+    }
+
+    @Test func comingBackLoadsNothingUnlessSomethingChangedOrItIsOld() async throws {
+        var now = Date(timeIntervalSince1970: 1_800_000_000)
+        let model = LibraryModel(library: library, navigator: navigator, type: .tv, now: { now })
+        var running = Task { await model.run() }
+        #expect(await eventually { model.state.value != nil })
+        running.cancel()
+        await running.value
+        // Back from a title, a minute later: nothing changed.
+        now += 60
+        running = Task { await model.run() }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(library.queries.count == 1, "\(library.queries)")
+        running.cancel()
+        await running.value
+        // This library changed while the grid was away: one load on return.
+        library.announceChange(.library(id: FakeData.tvLibrary))
+        library.announceChange(.library(id: FakeData.tvLibrary))
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(library.queries.count == 1, "nothing loads while the grid is away")
+        running = Task { await model.run() }
+        #expect(await eventually { library.queries.count == 2 })
+        running.cancel()
+        await running.value
+        // Older than five minutes: loaded again.
+        now += ScreenChanges.maxAge
+        running = Task { await model.run() }
+        #expect(await eventually { library.queries.count == 3 })
+        running.cancel()
+    }
+
     @Test func aFailedPageOffersTryAgainWithoutLosingTheGrid() async {
         let model = model(pageSize: 5)
         await model.retry()

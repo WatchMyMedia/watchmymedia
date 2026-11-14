@@ -14,6 +14,10 @@ final class RealServerRepository: ServerRepository {
 
     var saved: [SavedServer] { store.saved }
     var current: SavedServer? { store.current }
+    var reachable: Bool? { reachability?.serverID == current?.server.id ? reachability?.answered : nil }
+
+    /// What the last check of the server in use found.
+    private var reachability: (serverID: String, answered: Bool)?
 
     @ObservationIgnored private let store: LocalStore
     @ObservationIgnored private let discovery: any ServerDiscovery
@@ -21,6 +25,7 @@ final class RealServerRepository: ServerRepository {
     @ObservationIgnored private let probeTimeout: Duration
     @ObservationIgnored private let localAddressTimeout: Duration
     @ObservationIgnored private let now: @Sendable () -> Date
+    @ObservationIgnored private let reader: ServerInfoReader
     /// The screens browsing now; discovery runs while there is one.
     @ObservationIgnored private var browsing = 0
 
@@ -28,7 +33,9 @@ final class RealServerRepository: ServerRepository {
     ///   - probeSession: for looking up a typed address; gives up connecting quickly.
     ///   - probeTimeout: how long one address may take altogether.
     ///   - localAddressTimeout: how long ``localAddress()`` looks.
-    init(store: LocalStore, discovery: any ServerDiscovery, probeSession: URLSession, probeTimeout: Duration, localAddressTimeout: Duration = .seconds(10), now: @escaping @Sendable () -> Date) {
+    init(store: LocalStore, discovery: any ServerDiscovery, probeSession: URLSession, probeTimeout: Duration, localAddressTimeout: Duration = .seconds(10),
+         now: @escaping @Sendable () -> Date, reader: ServerInfoReader? = nil) {
+        self.reader = reader ?? ServerInfoReader(store: store, session: probeSession, timeout: probeTimeout, now: now)
         self.store = store
         self.discovery = discovery
         self.probeSession = probeSession
@@ -46,7 +53,10 @@ final class RealServerRepository: ServerRepository {
         discovered = []
         discovery.start(
             found: { [weak self] in self?.discovered = $0 },
-            denied: { [weak self] in self?.localNetworkDenied = $0 }
+            denied: { [weak self] in
+                self?.localNetworkDenied = $0
+                self?.store.localNetwork.denied = $0
+            }
         )
     }
 
@@ -58,8 +68,13 @@ final class RealServerRepository: ServerRepository {
 
     /// Tries each URL the address could mean, in order, and returns the first
     /// that answers as a WatchMyMedia server; refuses one that is too old.
+    /// A failure says what was found (PLAN-APPLE-REVIEW.md §3.4.4): a reply
+    /// this app can't read (update), a server error (restarting), something
+    /// else answering, or nothing.
     func probe(_ address: String) async throws -> Server {
         var reached = false
+        var outdated = false
+        var serverError: Int?
         var explained: APIError?
         for base in try ServerAddress.candidates(address) {
             try Task.checkCancellation()
@@ -75,12 +90,19 @@ final class RealServerRepository: ServerRepository {
                 case .unreachable: break
                 case .explained(let message): explained = message
                 case .reached: reached = true
+                case .serverError(let status): serverError = serverError ?? status
+                case .outdated: outdated = true
                 }
             }
         }
         let shown = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        if outdated { throw APIError(status: nil, message: Self.outdatedMessage(shown)) }
+        if let serverError { throw APIError(status: serverError, message: Self.serverErrorMessage(shown, status: serverError)) }
         if reached { throw APIError(status: nil, message: "\(shown) doesn't look like a WatchMyMedia server.") }
         if let explained { throw explained }
+        if localNetworkDenied, let host = try? ServerAddress.candidates(address).first?.host(), isLANHost(host) {
+            throw APIError(status: nil, message: localNetworkOffMessage)
+        }
         throw APIError(status: nil, message: "Couldn't reach \(shown). Check the address and that the server is running.")
     }
 
@@ -102,19 +124,42 @@ final class RealServerRepository: ServerRepository {
         return server.baseURL
     }
 
-    private enum Failure {
+    /// A server answered GET /api/server in a shape this app can't read: a
+    /// newer or older server than it knows. Worded as the Android app words a
+    /// reply it doesn't understand.
+    static func outdatedMessage(_ shown: String) -> String {
+        "\(shown) sent a reply this app doesn't understand. Update the app or the server."
+    }
+
+    /// A server error (5xx): usually a server, or the proxy in front of it,
+    /// that is starting up or restarting.
+    static func serverErrorMessage(_ shown: String, status: Int) -> String {
+        "The server at \(shown) didn't answer (error \(status)). If it's starting up, try again in a moment."
+    }
+
+    private enum Failure: Equatable {
         /// Nothing answered.
         case unreachable
         /// Something stopped the connection that the person can fix (https, a certificate).
         case explained(APIError)
         /// Something answered, but not as a WatchMyMedia server.
         case reached
+        /// A server error: not answering yet.
+        case serverError(Int)
+        /// JSON in a shape this app doesn't know: a WatchMyMedia server of another version.
+        case outdated
     }
 
     private static func failure(_ error: Error) -> Failure {
         var underlying = error
         while let wrapped = underlying as? ClientError { underlying = wrapped.underlyingError }
         if underlying is TimedOut { return .unreachable }
+        if let api = underlying as? APIError, let status = api.status, status >= 500 { return .serverError(status) }
+        if let decoding = underlying as? DecodingError {
+            // Not JSON at all (a web page): something else answered.
+            if case .dataCorrupted = decoding { return .reached }
+            return .outdated
+        }
         guard let url = underlying as? URLError else { return .reached }
         switch url.code {
         case .appTransportSecurityRequiresSecureConnection, .serverCertificateUntrusted, .serverCertificateHasBadDate,
@@ -142,12 +187,33 @@ final class RealServerRepository: ServerRepository {
     }
 
     /// Keeps the address, the sign-in and when it was last used; a server
-    /// that now answers as another, or is too old, is left as it was.
+    /// that now answers as another, or is too old, is left as it was. An
+    /// answer from the last few seconds (Cast's check) stands in for asking.
     func refreshCurrent() async {
-        guard let saved = current?.server, let fresh = try? await lookUp(saved.baseURL, within: probeTimeout),
-              fresh.id == saved.id, !fresh.tooOld, fresh != saved
-        else { return }
-        store.update { $0.updateServer(saved.id) { $0.server = fresh } }
+        await refreshCurrent(fresh: false)
+    }
+
+    /// `fresh` asks whatever was heard lately: the event stream came back,
+    /// perhaps from a server upgraded meanwhile. True when the API level changed.
+    @discardableResult
+    func refreshCurrent(fresh: Bool) async -> Bool {
+        guard let saved = current?.server else { return false }
+        let info: Components.Schemas.ServerInfo
+        do {
+            info = try await reader.info(at: saved.baseURL, maxAge: fresh ? nil : ServerInfoReader.maxAge)
+        } catch {
+            if !(error is CancellationError), current?.server.id == saved.id { reachability = (saved.id, false) }
+            return false
+        }
+        guard current?.server.id == saved.id else { return false }
+        reachability = (saved.id, true)
+        let found = Server(
+            id: info.id, name: info.name, baseURL: saved.baseURL, version: info.version, apiLevel: Int(info.apiLevel),
+            setupRequired: info.setupRequired, turnstile: info.turnstile
+        )
+        guard found.id == saved.id, !found.tooOld, found != saved else { return false }
+        store.update { $0.updateServer(saved.id) { $0.server = found } }
+        return found.apiLevel != saved.apiLevel
     }
 
     /// Forgets the server and its sign-in, and ends the session on the server

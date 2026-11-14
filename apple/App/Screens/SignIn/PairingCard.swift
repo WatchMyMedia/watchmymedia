@@ -40,24 +40,24 @@ struct PairingCard: View {
                     .foregroundStyle(Palette.muted)
                     .frame(maxWidth: .infinity)
                 }
-                Button("Get a new code") { model.newCode() }
+                Button(pairingNewCode) { model.newCode() }
                     .buttonStyle(GoldTextButtonStyle())
                     .frame(maxWidth: .infinity)
             case .approved:
-                Label("Code accepted. Signing in…", systemImage: "checkmark.circle.fill")
+                Label(pairingCodeAccepted, systemImage: "checkmark.circle.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Palette.gold)
                     .frame(maxWidth: .infinity, minHeight: 52)
             case .expired, .failed:
                 CodeBoxes(code: "", dim: true)
                 if let problem = model.pairingProblem { ErrorLine(message: problem) }
-                Button("Get a new code") { model.newCode() }
+                Button(pairingNewCode) { model.newCode() }
                     .buttonStyle(PrimaryButtonStyle())
             case .starting, nil:
                 CodeBoxes(code: "", dim: true)
                 HStack(spacing: 8) {
                     ProgressView().tint(Palette.muted)
-                    Text("Getting a code…")
+                    Text(pairingGettingCode)
                 }
                 .font(.footnote)
                 .foregroundStyle(Palette.muted)

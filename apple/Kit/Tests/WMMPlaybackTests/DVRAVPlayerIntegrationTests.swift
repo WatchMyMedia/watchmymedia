@@ -53,7 +53,8 @@ import Testing
             for _ in 0..<120 where player.currentTime().seconds < 2 && player.currentItem?.status != .failed { try await Task.sleep(for: .milliseconds(250)) }
             try #require(player.currentItem?.status == .readyToPlay && player.currentTime().seconds > 2, "AVPlayer must decode and advance through the growing recording.")
             let position = player.currentTime().seconds
-            try await Task.sleep(for: .seconds(3))
+            // Waited for, not timed: a busy Mac can leave the player behind.
+            for _ in 0..<60 where player.currentTime().seconds <= position + 1 { try await Task.sleep(for: .milliseconds(250)) }
             #expect(player.currentTime().seconds > position + 1, "The player keeps reading while the recording grows.")
             let after: DVRActivity = try await http.request("GET", "/api/live-tv/activity")
             #expect(after.items.count == before.items.count, "Watching the recording never opens a second tuner session.")

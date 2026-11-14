@@ -16,14 +16,17 @@ public struct NowPlayingInfo: Hashable, Sendable {
     public var playing: Bool
     /// The picture beside the title; nil until it has loaded, or when there is none.
     public var artwork: NowPlayingArtwork?
+    /// A live stream (Live TV): no length or position, and the system shows it as live.
+    public var live: Bool
 
-    public init(title: String, subtitle: String?, durationMs: Int, positionMs: Int, playing: Bool, artwork: NowPlayingArtwork? = nil) {
+    public init(title: String, subtitle: String?, durationMs: Int, positionMs: Int, playing: Bool, artwork: NowPlayingArtwork? = nil, live: Bool = false) {
         self.title = title
         self.subtitle = subtitle
         self.durationMs = durationMs
         self.positionMs = positionMs
         self.playing = playing
         self.artwork = artwork
+        self.live = live
     }
 }
 
@@ -57,6 +60,9 @@ public struct SystemCommands: Sendable {
     public var routeLost: @MainActor @Sendable () -> Void
     /// The app came back to the foreground.
     public var foreground: @MainActor @Sendable () -> Void
+    /// The play can move by seeks: the skip and scrub commands are offered.
+    /// Live TV's can't; it pauses within its buffer and goes back to live.
+    public var seeks: Bool
 
     public init(
         play: @escaping @MainActor @Sendable () -> Void,
@@ -66,7 +72,8 @@ public struct SystemCommands: Sendable {
         seekTo: @escaping @MainActor @Sendable (Int) -> Void,
         interruption: @escaping @MainActor @Sendable (Bool, Bool) -> Void,
         routeLost: @escaping @MainActor @Sendable () -> Void,
-        foreground: @escaping @MainActor @Sendable () -> Void
+        foreground: @escaping @MainActor @Sendable () -> Void,
+        seeks: Bool = true
     ) {
         self.play = play
         self.pause = pause
@@ -76,6 +83,7 @@ public struct SystemCommands: Sendable {
         self.interruption = interruption
         self.routeLost = routeLost
         self.foreground = foreground
+        self.seeks = seeks
     }
 }
 
@@ -105,14 +113,16 @@ public protocol SystemSession: AnyObject {
 /// interruptions and lost routes pause) and the app's foreground return.
 @MainActor
 public final class AppleSystem: PlaybackSystem {
-    private weak var current: AppleSystemSession?
+    /// One for the process: the file and Live TV players each have an
+    /// AppleSystem, and a session one opens closes the other's.
+    private static weak var current: AppleSystemSession?
 
     public init() {}
 
     public func open(_ commands: SystemCommands) -> any SystemSession {
-        current?.close()
+        Self.current?.close()
         let session = AppleSystemSession(commands: commands)
-        current = session
+        Self.current = session
         return session
     }
 
@@ -160,12 +170,16 @@ final class AppleSystemSession: SystemSession {
         #if canImport(MediaPlayer)
         var values: [String: Any] = [
             MPMediaItemPropertyTitle: info.title,
-            MPMediaItemPropertyPlaybackDuration: Double(info.durationMs) / 1000,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: Double(info.positionMs) / 1000,
             MPNowPlayingInfoPropertyPlaybackRate: info.playing ? 1.0 : 0.0,
             MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.video.rawValue,
         ]
+        if info.live {
+            values[MPNowPlayingInfoPropertyIsLiveStream] = true
+        } else {
+            values[MPMediaItemPropertyPlaybackDuration] = Double(info.durationMs) / 1000
+            values[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(info.positionMs) / 1000
+        }
         if let subtitle = info.subtitle { values[MPMediaItemPropertyArtist] = subtitle }
         #if canImport(UIKit)
         if let item = artworkItem(info.artwork) { values[MPMediaItemPropertyArtwork] = item }
@@ -196,7 +210,8 @@ final class AppleSystemSession: SystemSession {
     /// The system runs the clock from the rate, so only a change, or a position off by more than a second and a half, is news.
     private func needsUpdate(_ info: NowPlayingInfo) -> Bool {
         guard let last else { return true }
-        if (last.title, last.subtitle, last.durationMs, last.playing, last.artwork?.id) != (info.title, info.subtitle, info.durationMs, info.playing, info.artwork?.id) { return true }
+        if (last.title, last.subtitle, last.durationMs, last.playing, last.artwork?.id, last.live) != (info.title, info.subtitle, info.durationMs, info.playing, info.artwork?.id, info.live) { return true }
+        if info.live { return false }
         let expected = last.positionMs + (last.playing ? Int((ContinuousClock.now - lastAt) / .milliseconds(1)) : 0)
         return abs(info.positionMs - expected) > 1_500
     }
@@ -211,16 +226,13 @@ final class AppleSystemSession: SystemSession {
         targets = []
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         #endif
-        #if os(iOS) || os(tvOS)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        #endif
+        PlaybackAudioSession.deactivate()
     }
 
     private func activateAudio() {
         #if os(iOS) || os(tvOS)
+        PlaybackAudioSession.activate()
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .moviePlayback)
-        try? session.setActive(true)
         let commands = commands
         observers.append(NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: session, queue: .main) { note in
             let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init)
@@ -257,6 +269,13 @@ final class AppleSystemSession: SystemSession {
         on(center.playCommand) { _ in commands.play(); return .success }
         on(center.pauseCommand) { _ in commands.pause(); return .success }
         on(center.togglePlayPauseCommand) { _ in commands.togglePlayPause(); return .success }
+        guard commands.seeks else {
+            // A file play before this one may have left them on.
+            for command in [center.skipBackwardCommand, center.skipForwardCommand, center.changePlaybackPositionCommand] as [MPRemoteCommand] {
+                command.isEnabled = false
+            }
+            return
+        }
         center.skipBackwardCommand.preferredIntervals = [10]
         center.skipForwardCommand.preferredIntervals = [10]
         on(center.skipBackwardCommand) { _ in commands.seekBy(-10_000); return .success }

@@ -27,7 +27,7 @@ public final class FakeRowsRepository: RowsRepository {
 
     public var available: Bool {
         guard let servers else { return true }
-        return (servers.current?.server.apiLevel ?? 0) >= rowsAPILevel && servers.currentUser != nil
+        return ServerFeatures(apiLevel: servers.current?.server.apiLevel).rows && servers.currentUser != nil
     }
 
     // MARK: The lists

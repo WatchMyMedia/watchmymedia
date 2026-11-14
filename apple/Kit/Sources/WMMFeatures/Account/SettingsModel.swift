@@ -158,9 +158,9 @@ public final class SettingsModel {
     /// their first audio language: the page says so until the next change.
     public private(set) var foreignAudioNotice = false
 
-    public var supportsSubtitlePreferences: Bool { (server?.apiLevel ?? 0) >= subtitlePreferencesAPILevel }
+    public var supportsSubtitlePreferences: Bool { ServerFeatures(apiLevel: server?.apiLevel).subtitlePreferences }
     /// Audio languages and the foreign-audio choice, from API level 21.
-    public var supportsAudioLanguages: Bool { (server?.apiLevel ?? 0) >= audioPreferencesAPILevel }
+    public var supportsAudioLanguages: Bool { ServerFeatures(apiLevel: server?.apiLevel).audioLanguages }
 
     public var audio: AudioPreferences { pendingLanguages?.audio ?? preferences.playback.audio }
     public var subtitles: SubtitlePreferences { pendingLanguages?.subtitles ?? preferences.playback.subtitles }

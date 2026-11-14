@@ -1,5 +1,7 @@
 import SwiftUI
+#if DEBUG
 import WMMFakes
+#endif
 import WMMFeatures
 import WMMModel
 import WMMUI
@@ -287,7 +289,7 @@ private struct SettingsRoot: View {
     }
 
     private var signOutTitle: String {
-        model.server.map { "Sign out of \($0.name)?" } ?? "Sign out?"
+        signOutQuestion(serverName: model.server?.name)
     }
 
     private var accountCard: some View {
@@ -383,14 +385,16 @@ private struct SettingsRow: View {
     }
 }
 
-/// A root row that lights up while pressed, as a List row does.
+/// A root row that lights up while pressed, as a List row does, and under an iPad's pointer.
 private struct RowPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(configuration.isPressed ? Color.white.opacity(0.08) : .clear)
+            .hoverEffect(.highlight)
     }
 }
 
+#if DEBUG
 #Preview {
     NavigationStack {
         SettingsScreen()
@@ -402,3 +406,4 @@ private struct RowPressStyle: ButtonStyle {
     .environment(Navigator())
     .preferredColorScheme(.dark)
 }
+#endif

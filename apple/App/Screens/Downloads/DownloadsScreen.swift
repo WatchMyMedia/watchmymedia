@@ -68,6 +68,11 @@ private struct DownloadsView: View {
         List { content() }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
+            // Pull to sync: what the server decided of the downloads, and progress made offline (PLAN-APPLE-REVIEW.md §6.3).
+            .refreshable {
+                await model.sync()
+                model.refreshStorage()
+            }
     }
 
     private var storage: some View {

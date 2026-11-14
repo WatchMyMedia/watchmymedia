@@ -18,7 +18,7 @@ final class RealRowsRepository: RowsRepository {
         self.events = events
     }
 
-    var available: Bool { (store.current?.server.apiLevel ?? 0) >= rowsAPILevel && store.currentCredential != nil }
+    var available: Bool { store.features.rows && store.currentCredential != nil }
 
     func libraryRows(libraryID: Int) async throws -> [ScreenRow] {
         guard available else { return [] }

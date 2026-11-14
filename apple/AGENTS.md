@@ -46,8 +46,14 @@ server, and on iPad in both a regular and a compact width.
   authorization under the root rules.
 - **Older servers.** The generated client rejects a reply missing a required
   field, which is why new server reply fields must be optional (root file).
-  Gate features on the server's `apiLevel`, refreshed at launch and on
-  foreground, without raising the app's minimum.
+  Gate features on what the server offers, refreshed at launch, on
+  foreground and when the event stream reconnects, without raising the
+  app's minimum: `server.features.rows` (or `ServerFeatures(apiLevel:)`
+  for a level held alone), never `apiLevel >= N`. A new level is one line
+  in `ServerFeatures.Level` and a property named as Android's
+  `ServerFeatures` names it, pinned in `ServerFeaturesTests` against the
+  comment above `APILevel` in `server/internal/api/system.go`. The fakes
+  still set a level by number (`ServerFeatures.Level.liveTV`).
 - **Models, not views, decide.** Put state and rules in a `WMMFeatures` model
   and test it in `Kit/Tests/WMMFeaturesTests` against the fakes with
   `FakeLatency.duration = .zero`. Formatting goes in a `WMMModel` helper with a
@@ -56,13 +62,24 @@ server, and on iPad in both a regular and a compact width.
   actor hundreds of milliseconds behind, so a fixed `Task.sleep` before an
   assertion fails now and then. Give the model or fake a `sleep` (and `now`)
   and move a `ManualTime` (`PlayerTestSupport.swift`), as `PlayerHarness` and
-  `FakePlaybackController(sleep:)` do, or wait for the state with
-  `eventually { … }`. `FakeLatency` covers the fake repositories, not the fake
-  player's own timing. `swift test --maximum-repetitions` repeats one test at a
+  `FakePlaybackController(sleep:)` do (in `WMMDataTests`, the event
+  stream's backoff and linger take `DataTuning.eventSleep`, which
+  `ManualSleeps` ends), or wait for the state with `eventually { … }`.
+  `FakeLatency` covers the fake repositories, not the fake player's own
+  timing. `swift test --maximum-repetitions` repeats one test at a
   time, which doesn't load the main actor; to check a fix, run several copies
   of the whole test bundle at once.
 - **iPhone and Apple TV share no files.** What both need goes in the Kit
   (README explains why `TV/` is separate from `App/`).
+- **The Top Shelf extension links only `WMMTopShelf`** and only reads the
+  App Group (README, Top Shelf). Nothing the app writes there may name a
+  server address, an image URL, a token or the person: add a field to the
+  snapshot only through `TopShelfRules`, with a case in
+  `TopShelfPublisherTests`' no-address test. `make apple-tv-build-release`
+  fails if the extension picks up another Kit module. A link the shelf
+  publishes goes through `DeepLink.url(publishedFor:source:)`. Code the
+  extension runs must not use a required-reason API (file dates,
+  UserDefaults) unless `TopShelf/PrivacyInfo.xcprivacy` declares it.
 - **Layout traps.** On Apple TV a focused `.borderless` button lifts and
   enlarges any `Image` in its label, so put a small icon inside the `Text`
   (`Text("\(Image(systemName: …)) …")`). On iPad a `.presentationSizing(.fitted)`
@@ -73,6 +90,12 @@ server, and on iPad in both a regular and a compact width.
   arranged rows are a `VStack` (`HomeScreen.arrangedRows`). In a `List` in edit
   mode (the rows sheet's `.onMove`) a row's plain `Button` takes no taps: give
   it `.buttonStyle(.borderless)` or a style of its own.
+  Inside the player's full-screen cover a `GeometryReader` that ignores the
+  safe area reports zero `safeAreaInsets` (iOS 27.2 simulator): `PlayerShell`
+  measures them between a reader that keeps the safe area and one that
+  doesn't. A view's `.onChange(of: scenePhase)` under the tab view was not
+  seen to report `.background` before the app was ended, so state that must
+  survive eviction is saved when it changes (`PlaceKeeping`).
 - **Home's screens** (PLAN-HOME.md §7; `HomeScreen.swift` on both apps): a
   vertical `ScrollView` with `.scrollTargetBehavior(.paging)`, each screen
   `.containerRelativeFrame(.vertical)`. A horizontal card row inside a screen
@@ -87,7 +110,10 @@ server, and on iPad in both a regular and a compact width.
   `.focused($page, equals: n)` reports which screen holds focus and, set,
   moves focus into that screen (Back to the top, Menu). The Siri Remote in the
   simulator tool has no Menu key: `TVUITests/HomeScreensTests.swift` checks
-  Menu with `XCUIRemote`.
+  Menu with `XCUIRemote`. On Apple TV each screen is identified by what it
+  shows (`HomePage`), not its place, and a row's screen (`HomeRowScreen`)
+  holds its own focused card: a row appearing above keeps the others' cards,
+  and moving along a row redraws that screen alone.
 - **Dialogs and focus.**
   - iOS 27's Back is a bare chevron. Hiding it for a labelled Back of your
     own turns off the edge swipe, and on iPad a leading toolbar item goes into
@@ -107,7 +133,25 @@ server, and on iPad in both a regular and a compact width.
     chooses its season. Focus coming into the row or the tabs from above or
     below lands on whatever is nearest, so the page moves it to the card on
     top (or the chosen tab) before following it; otherwise coming up from the
-    row would choose the season over the card.
+    row would choose the season over the card. Measured with `_printChanges`
+    on tvOS 27: the view that owns a `@FocusState` is redrawn on every focus
+    move whatever its body reads, a container that takes a closure under it
+    (`TabPage`) then rebuilds its content, and an `.equatable()` view's `==`
+    isn't asked for its first several updates; so what changes with each
+    move (the episode on top) is read only in views of its own (`Separately`).
+    Building `TabPage`'s content once, in its `init`, saves nothing: the
+    owner's body runs on each move and would build it there instead
+    (measured 2026-11-13: one `TabPage` content build per owner redraw, none
+    besides), and the model reads in the content would then redraw the owner
+    rather than `TabPage` alone.
+  - On Apple TV a focused button that becomes disabled keeps focus, dimmed,
+    until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
+    up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable
+    itself while it works.
+  - On Apple TV Play/Pause goes to the focused view's `.onPlayPauseCommand`
+    and nowhere else: a card plays with `playPauseCard(_:select:)`, whose
+    rule is `CardPlayPause` in the Kit (a show's card opens, as Select does),
+    and a new card needs it too (`TVUITests/PlayPauseCardTests.swift`).
   - A note pill's timer is cancelled while a page settles in after Back, so
     clear the note only when the sleep finished (`MessagePill`).
   - On iPad the toolbar beside the tab bar holds little: a third trailing
@@ -130,12 +174,32 @@ didn't start.
 
 - A fresh install needs `xcrun simctl keychain <udid> reset` as well as
   `simctl uninstall`: the Keychain keeps the sign-in, on Apple TV too.
+- The Top Shelf shows on the tvOS simulator above the app's icon when it is
+  focused in the Home Screen's top row (a new simulator has only a few apps,
+  so the app is there). Run the app on the fakes, then press Home with the
+  remote (`XCUIRemote` in a UI test) and capture with `simctl io`. On tvOS 27.2
+  `XCUIRemote`'s Up from the icon did not move focus into the shelf, so a
+  focused card's title, the second section and Select or Play/Pause on a card
+  need a hand on the Simulator or a device. `xcrun simctl get_app_container
+  <udid> media.watchmy.client groups` finds the App Group's folder, with the
+  snapshot as snapshot.json in its TopShelf folder. The Home Screen's order
+  is the simulator's HeadBoard AppOrder.plist, under its data's Library.
 - Make your own (`xcrun simctl create "WMM <name>" <device type> <runtime>`),
   pass its name (not its UDID) to make as `SIM=` or `TV_SIM=`, and delete it
   afterwards. A UDID matches no name, so the tests quietly run on the default
   iPhone Pro or Apple TV 4K, which other sessions use.
   `scripts/simulator.sh` resolves names to a UDID and falls back to the newest
   iPhone Pro or Apple TV when the named one is missing (as on CI's runners).
+- `make apple-test-sim` runs the Kit's tests on the simulator: the
+  `WatchMyMedia` scheme has no UI test target, so `UITests/` runs only
+  through the `WatchMyMediaE2E` scheme, one class or test at a time with
+  `-only-testing:WatchMyMediaUITests/<Class>` (README's trailer recipe;
+  `-test-iterations 5 -run-tests-until-failure` repeats one).
+- On iPhone the keyboard covers the tab bar: a UI test that taps a tab while
+  a field has the keyboard up taps a key instead. Put the keyboard away
+  first, wait for the tab's `isSelected`, and find a page's search field by
+  its prompt, since another tab's may still be in the tree
+  (`UITests/LiveExtrasTests.swift`).
 - Builds for the simulator are signed ad hoc (`APPLE_SIM_SIGNING` in the
   Makefile). Without it the Keychain refuses the app and the sign-in does not
   survive a relaunch, so use the make targets or copy those flags.
@@ -154,6 +218,31 @@ didn't start.
 - YouTube's player (the movie trailer screen) needs the network. No video is
   known to refuse embedding reliably, so reach the refused screen with
   `-trailerError 150` in a debug build.
+- `typeKey` drives a hardware keyboard on the iOS simulator (space, arrows,
+  ⌘F: `UITests/KeyboardTests.swift`, on an iPad), but its Escape reached
+  neither `onKeyPress`, a cancel action nor a `UIKeyCommand` on iPadOS 27.2:
+  check Escape with a real keyboard.
+- XCTest's own waits look late in the Apple TV UI tests (tvOS 27.2
+  simulator): `waitForExistence`, `waitForNonExistence` and an
+  `XCTNSPredicateExpectation` waited on with `XCTWaiter` first look about a
+  second after they start, even when what they wait for is already there,
+  and the expectation then looks only every 6 s. A wait after each remote
+  press cost 1.3 s a press. The TV UI tests wait with
+  `TVUITests/Waiting.swift` (`waitUntilExists`, `waitUntilGone`,
+  `waitForFocus`, `wait(until:)`, `eventually`), which look at once and then
+  every quarter second; use those. XCTest's late look also let each new
+  screen settle before the next press, so `waitUntilExists` and
+  `waitUntilGone` give it half a second; where a press needs focus
+  somewhere, wait for that focus, and where an element stays in the tree
+  under a pushed page (the grid's Sort by), wait for the page to go. In a
+  loop that presses until focus reaches something, wait for focus to move
+  after each press (`press(_:thenWaitForFocusToMove:)`), not for the target:
+  a slow move is otherwise pressed twice, or each step on the way waits out
+  the timeout. `snapshot()` retries for 2 s on a missing element, so ask
+  `exists` first (`lookedAt`). A look at the screen once took 8 s on a busy
+  simulator, so read something shown briefly in the look that finds it
+  (`wait(until:)` reads one snapshot) and keep it up long enough for a whole
+  look (`-liveBannerSeconds 15` for the reminder banner).
 - XCUITest's Siri Remote has no touch-surface swipe, and Right while paused
   skips 10 s, so AVKit's own scrubbing (and the thumbnails it draws from an
   I-frame playlist) can't be driven from a test; check it by hand.

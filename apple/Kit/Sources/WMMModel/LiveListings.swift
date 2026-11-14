@@ -1,10 +1,5 @@
 import Foundation
 
-/// Programme listings (PLAN-LIVE-TV-GUIDE.md): servers from this level list
-/// what is on when `LiveTVCapabilities.guide` is true. Below it, or with the
-/// capability off, Live TV stays a channel list.
-public let liveGuideAPILevel = 13
-
 /// One programme on a channel, as the listings provider gives it.
 public struct LiveProgramme: Hashable, Sendable, Identifiable {
     public enum Kind: String, Hashable, Sendable { case episode, show, movie }

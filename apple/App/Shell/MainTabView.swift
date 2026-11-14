@@ -73,14 +73,15 @@ struct MainTabView: View {
             .presentationBackground(Palette.ground)
             .interactiveDismissDisabled(flow.serverSwitch != nil)
         }
+        .modifier(TabShellKeys())
         // A note left by a page that has gone ("Deleted").
         .messageToast(Binding(get: { navigator.toast }, set: { navigator.toast = $0 }))
         .fullScreenCover(isPresented: Binding(get: { cast.remotePresented }, set: { cast.remotePresented = $0 }), onDismiss: continueOnDevice) { CastRemoteScreen() }
-        // What the user may request, and the Inbox's count, follow the server's events.
+        // What the user may request, and the Inbox's count, follow the server's
+        // events; Live TV follows its own (PLAN-APPLE-REVIEW.md §4.1.8).
         .task {
             for await _ in services.requests.changes() {
                 await services.requests.refreshOptions()
-                try? await services.liveTV.refresh()
             }
         }
     }
@@ -118,6 +119,31 @@ struct MainTabView: View {
         case .liveSearch: LiveListingsSearchScreen()
         case .mediaList(let id): MediaListScreen(id: id)
         }
+    }
+}
+
+/// What the tabs do besides showing: ⌘F for Search on a hardware keyboard,
+/// and keeping where the person was for when the system evicts the app
+/// (PLAN-APPLE-REVIEW.md §6.3).
+private struct TabShellKeys: ViewModifier {
+    @Environment(Navigator.self) private var navigator
+    @Environment(AppFlow.self) private var flow
+    @Environment(AppServices.self) private var services
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                Button("Search") { navigator.findInSearch() }
+                    .keyboardShortcut("f", modifiers: .command)
+                    .disabled(flow.serverSwitch != nil)
+                    .opacity(0)
+                    .frame(width: 0, height: 0)
+                    .accessibilityHidden(true)
+            }
+            .onAppear { PlaceKeeping.restoreOnce(navigator, services: services) }
+            .onChange(of: navigator.place) { _, _ in
+                if flow.serverSwitch == nil { PlaceKeeping.save(navigator, services: services) }
+            }
     }
 }
 

@@ -1,5 +1,7 @@
 import SwiftUI
+#if DEBUG
 import WMMFakes
+#endif
 import WMMFeatures
 import WMMModel
 import WMMUI
@@ -15,7 +17,9 @@ struct PadSignInScreen: View {
         PadSignInContent(picker: ServerPickerModel(servers: services.servers))
             .onAppear {
                 // `-localNetworkDenied` (DEBUG, fakes): the state after someone said no to Local Network.
+                #if DEBUG
                 if ScreenshotLaunch.has("-localNetworkDenied") { (services.servers as? FakeServerRepository)?.localNetworkDenied = true }
+                #endif
             }
     }
 }
@@ -61,7 +65,7 @@ private struct PadSignInContent: View {
 
                 ScrollView {
                     // A new form for each server, as on iPhone, where choosing one opens sign-in afresh.
-                    SignInContent(model: SignInModel(servers: services.servers, auth: services.auth), pane: true)
+                    SignInContent(model: flow.signInModel(services), pane: true)
                         .id(services.servers.current?.server.id)
                         .frame(maxWidth: 532, alignment: .leading)
                         .padding(.top, 16)

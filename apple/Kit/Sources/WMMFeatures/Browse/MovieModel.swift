@@ -27,11 +27,14 @@ public final class MovieModel {
     @ObservationIgnored private let navigator: Navigator
     @ObservationIgnored private let device: String
     @ObservationIgnored private let downloads: (any DownloadRepository)?
-    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private let changes: ScreenChanges
+    @ObservationIgnored private let loads = LoadController<MovieDetail>()
 
     /// `device` names this device in how a version would play: "this phone", "this TV".
     /// With `downloads`, a downloaded movie's page opens with no server, and its marks wait for one (PLAN-DOWNLOADS.md §6).
-    public init(library: any LibraryRepository, playback: any PlaybackControllerFactory, navigator: Navigator, movieID: Int, device: String = "this phone", downloads: (any DownloadRepository)? = nil) {
+    public init(library: any LibraryRepository, playback: any PlaybackControllerFactory, navigator: Navigator, movieID: Int, device: String = "this phone",
+                downloads: (any DownloadRepository)? = nil, now: @escaping @MainActor () -> Date = { Date() }) {
+        changes = ScreenChanges(now: now)
         self.library = library
         self.playback = playback
         self.navigator = navigator
@@ -84,12 +87,40 @@ public final class MovieModel {
 
     // MARK: Loading
 
-    /// Loads the movie and its plans, then reloads quietly whenever the library changes, until cancelled.
+    /// Loads the movie and its plans, then reloads quietly whenever it is
+    /// marked or its library changes, until cancelled. Coming back to the page
+    /// loads nothing unless that happened meanwhile (``ScreenChanges``).
     public func run() async {
-        await followChanges(of: library, firstQuiet: state.value != nil) { quiet in await load(quiet: quiet) }
+        await changes.run(
+            subscribe: { library.libraryChanges() },
+            hasContent: state.value != nil,
+            load: { quiet in await load(quiet: quiet) },
+            apply: { changes in
+                guard changes.contains(where: affects) else { return }
+                await load(quiet: true)
+            }
+        )
     }
 
-    public func retry() async { await load(quiet: false) }
+    /// Whether `change` can touch this movie.
+    private func affects(_ change: LibraryChange) -> Bool {
+        switch change {
+        case .watched(.movie, let ids, _): ids.contains(movieID)
+        case .watched(.episode, _, _), .markedShow, .scan: false
+        case .library, .unknown: change.touches(library: movie?.libraryID)
+        }
+    }
+
+    public func retry() async {
+        await load(quiet: false)
+        changes.loaded()
+    }
+
+    /// Pull to refresh: keeps the page as it is, and says why if it fails.
+    public func refresh() async {
+        await load(quiet: true)
+        changes.loaded()
+    }
 
     // MARK: Taps
 
@@ -132,21 +163,16 @@ public final class MovieModel {
     public func setWatched(_ watched: Bool) async {
         guard !busy else { return }
         busy = true
-        do {
-            try await library.mark(.movie(id: movieID), watched: watched)
-            busy = false
-            message = markedMessage(watched: watched)
-            await load(quiet: true)
-        } catch let error as APIError where error.status == nil && held != nil {
+        // The mark's own notice reloads the page (``run()``).
+        let note = await markWatched(.movie(id: movieID), watched, in: library, offline: {
             // No server: the mark waits with the download, by when it was made.
-            busy = false
-            if let held { downloads?.mark(fileID: held.fileID, watched: watched) }
-            message = markedMessage(watched: watched)
+            guard let held else { return false }
+            downloads?.mark(fileID: held.fileID, watched: watched)
             if offline, let detail = self.held?.movieDetail() { state = .loaded(detail) }
-        } catch {
-            busy = false
-            message = error.displayMessage
-        }
+            return true
+        })
+        busy = false
+        message = note
     }
 
     /// The page from the download again, after a play or a mark made here with no server.
@@ -157,11 +183,14 @@ public final class MovieModel {
 
     // MARK: Internals
 
+    /// A load still running when another starts is cancelled.
     func load(quiet: Bool) async {
-        generation += 1
-        let mine = generation
-        if !quiet || state.value == nil { state = .loading }
-        guard var result = await Loadable.run({ try await self.library.movie(id: self.movieID) }), mine == generation else { return }
+        await loads.run { [weak self] load in await self?.fetch(load, quiet: quiet) }
+    }
+
+    private func fetch(_ load: LoadController<MovieDetail>.Load, quiet: Bool) async {
+        loads.begin(&state, quiet: quiet)
+        guard var result = await loads.fetch(load, { try await self.library.movie(id: self.movieID) }) else { return }
         if case .failed = result, let detail = held?.movieDetail() {
             // No server, but the movie is here: its page from the download.
             offline = true
@@ -169,7 +198,7 @@ public final class MovieModel {
             return
         }
         offline = false
-        if case .failed(let text) = result, quiet, state.value != nil {
+        if let text = loads.quietFailure(result, quiet: quiet, over: state) {
             message = text
             return
         }
@@ -183,6 +212,6 @@ public final class MovieModel {
         if let selectedVersionID, !movie.versions.contains(where: { $0.id == selectedVersionID }) { self.selectedVersionID = nil }
         // A version list without the play mode is still right, so this cannot fail the page.
         let found = await playback.plans(fileIDs: movie.versions.map(\.fileID))
-        if mine == generation { plans = found }
+        if loads.isCurrent(load) { plans = found }
     }
 }

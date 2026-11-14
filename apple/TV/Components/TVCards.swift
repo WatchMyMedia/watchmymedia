@@ -3,6 +3,16 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
+/// The pixels to decode a card's picture at (`Artwork`'s `maxPixel`, its
+/// longest side): the card's longest side on this screen, with room for the
+/// focus lift. From the display's scale, so an Apple TV HD (scale 1) decodes
+/// what it draws rather than twice that, and an Apple TV 4K (scale 2) keeps
+/// its sharpness: a wide card decodes as before (2.4 × its width), a poster
+/// at its drawn height rather than below it.
+func cardPixels(width: CGFloat, height: CGFloat, scale: CGFloat, lift: CGFloat = 1.2) -> CGFloat {
+    (max(width, height) * scale * lift).rounded()
+}
+
 /// A 2:3 poster (Home's rows, the grids, Search): the New badge, the watched
 /// check or how far it was watched, then the title and a line. No quality
 /// badge (PLAN-HOME.md §5): quality is a fact on the hero, the row screens'
@@ -15,11 +25,13 @@ struct PosterCard: View {
     /// The line under the title; the grid's by default.
     var line: String?
     @Environment(\.isFocused) private var focused
+    @Environment(\.displayScale) private var scale
 
     var body: some View {
+        let height = (width * 1.5).rounded()
         VStack(alignment: .leading, spacing: 0) {
-            Artwork(url: imageURL, seed: item.title, maxPixel: width * 2.4)
-                .frame(width: width, height: (width * 1.5).rounded())
+            Artwork(url: imageURL, seed: item.title, maxPixel: cardPixels(width: width, height: height, scale: scale))
+                .frame(width: width, height: height)
                 .overlay { badges }
                 .overlay { FocusSheen(focused: focused) }
                 .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -53,6 +65,7 @@ struct WideCard<Overlay: View>: View {
     var missing = false
     @ViewBuilder var overlay: () -> Overlay
     @Environment(\.isFocused) private var focused
+    @Environment(\.displayScale) private var scale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -62,7 +75,7 @@ struct WideCard<Overlay: View>: View {
                         .fill(Palette.surface)
                         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Palette.outlineStrong, style: StrokeStyle(lineWidth: 1, dash: [6, 4])))
                 } else {
-                    Artwork(url: imageURL, seed: seed, maxPixel: width * 2.4)
+                    Artwork(url: imageURL, seed: seed, maxPixel: cardPixels(width: width, height: width * 9 / 16, scale: scale))
                 }
             }
             .frame(width: width, height: (width * 9 / 16).rounded())
@@ -196,9 +209,11 @@ struct DetailPoster: View {
     let url: URL?
     let seed: String
     var width: CGFloat = 240
+    @Environment(\.displayScale) private var scale
 
     var body: some View {
-        Artwork(url: url, seed: seed, maxPixel: width * 2.4)
+        // Not focusable, so no room for a lift.
+        Artwork(url: url, seed: seed, maxPixel: cardPixels(width: width, height: width * 1.5, scale: scale, lift: 1))
             .frame(width: width, height: width * 1.5)
             .clipShape(RoundedRectangle(cornerRadius: 18))
             .shadow(color: .black.opacity(0.6), radius: 30, y: 24)

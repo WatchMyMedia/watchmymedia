@@ -50,6 +50,8 @@ private struct InboxView: View {
                 }
             }
         }
+        // Both of iPad's columns pull to refresh.
+        .refreshable { await model.refresh() }
         .scrollDismissesKeyboard(.interactively)
         .groundBackground()
         .navigationTitle("Inbox")

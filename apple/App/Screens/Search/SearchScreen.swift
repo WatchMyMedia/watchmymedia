@@ -17,7 +17,9 @@ struct SearchScreen: View {
     @Environment(LiveExtrasStore.self) private var extras
 
     var body: some View {
-        SearchView(model: SearchModel(library: services.library, navigator: navigator, requests: services.requests),
+        // Recent searches are kept between launches for this account on this server.
+        let recents = services.servers.current.flatMap { current in services.auth.user.map { RecentSearches(server: current.server.id, user: $0.id) } }
+        SearchView(model: SearchModel(library: services.library, navigator: navigator, requests: services.requests, recents: recents),
                    live: LiveSearchModel(repository: services.liveTV, extras: extras))
     }
 }
@@ -28,7 +30,9 @@ private struct SearchView: View {
     @Environment(AppServices.self) private var services
     @Environment(LiveExtrasStore.self) private var extras
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(Navigator.self) private var navigator
     @State private var width: CGFloat = 0
+    @FocusState private var fieldFocused: Bool
 
     private var wide: Bool { sizeClass.isWide }
 
@@ -50,8 +54,15 @@ private struct SearchView: View {
             placement: .navigationBarDrawer(displayMode: .always),
             prompt: live.available ? "Shows, movies, episodes, Live TV" : "Shows, movies, episodes"
         )
+        .searchFocused($fieldFocused)
         .autocorrectionDisabled()
         .textInputAutocapitalization(.never)
+        // ⌘F: the cursor in the field.
+        .onChange(of: navigator.searchFieldRequested, initial: true) { _, requested in
+            guard requested else { return }
+            fieldFocused = true
+            navigator.searchFieldRequested = false
+        }
         .task {
             // `-search harbor` (DEBUG) searches at launch, for screenshots.
             if let query = ScreenshotLaunch.value(after: "-search") { model.setQuery(query); live.setQuery(query) }
@@ -354,11 +365,12 @@ private struct ResultRow<Art: View>: View {
     }
 }
 
-/// A result row lights up while pressed.
+/// A result row lights up while pressed, and under an iPad's pointer.
 private struct ResultRowStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(configuration.isPressed ? Color.white.opacity(0.06) : .clear)
+            .hoverEffect(.highlight)
     }
 }
 

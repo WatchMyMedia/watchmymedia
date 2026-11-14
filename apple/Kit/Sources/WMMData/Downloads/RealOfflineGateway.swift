@@ -51,18 +51,12 @@ final class RealOfflineGateway: OfflineGateway {
     /// Runs a call as `owner`; a refused token signs that account out.
     private func call<T: Sendable>(_ owner: OfflineOwner, _ operation: @Sendable (Client) async throws -> T) async throws -> T {
         let (server, credential) = try access(owner)
-        let api = store.api(baseURL: server?.baseURL ?? owner.baseURL, token: credential.token)
-        do {
-            return try await api.call(operation)
-        } catch let error as APIError where error.status == 401 {
-            store.tokenRejected(serverID: owner.serverID, token: credential.token)
-            throw SignedOutError()
-        }
+        return try await store.api(serverID: owner.serverID, baseURL: server?.baseURL ?? owner.baseURL, token: credential.token).call(operation)
     }
 
     /// Older servers, and servers that turned requests off, offer no downloads.
     func allowed(_ owner: OfflineOwner) async throws -> Bool {
-        guard level(owner) >= offlineAPILevel else { return false }
+        guard ServerFeatures(apiLevel: level(owner)).offline else { return false }
         do {
             return try await call(owner) { try await $0.getRequestOptions().ok.body.json }.offline == true
         } catch let error as APIError where PlaybackMapping.unknownRoute(error) || error.status == 503 {
@@ -95,7 +89,7 @@ final class RealOfflineGateway: OfflineGateway {
         let body = Components.Schemas.CreateOfflineInputBody(
             audioIndex: choice.audioIndex.map(Int64.init),
             burnIn: choice.burnInSubtitleID.map { _ in true },
-            client: PlaybackMapping.client(client),
+            client: client.api,
             profile: PlaybackMapping.profile(profile.forAPILevel(level(owner))),
             quality: Components.Schemas.CreateOfflineInputBody.QualityPayload(rawValue: choice.quality.id) ?? .original,
             subtitleId: choice.burnInSubtitleID
@@ -112,20 +106,19 @@ final class RealOfflineGateway: OfflineGateway {
 
     func token(_ owner: OfflineOwner, downloadID: String) async throws -> MediaToken {
         let t = try await call(owner) { try await $0.createOfflineToken(path: .init(id: downloadID)).ok.body.json }
-        return MediaToken(token: t.token, expiresAt: t.expiresAt, param: PlaybackMapping.nonBlank(t.param) ?? "access_token")
+        return t.model(server: baseURL(owner))
     }
 
+    /// Nil for an address that isn't on the owner's server as it is kept now:
+    /// the sign-in goes only to the server that issued it (PLAN-APPLE-REVIEW.md §3.4.8).
     func authorizedRequest(_ owner: OfflineOwner, url: URL) -> URLRequest? {
         guard let (_, credential) = try? access(owner) else { return nil }
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(credential.token)", forHTTPHeaderField: "Authorization")
-        request.setValue(store.userAgent, forHTTPHeaderField: "User-Agent")
-        return request
+        return store.signer(baseURL: baseURL(owner), token: credential.token).signedRequest(url)
     }
 
     func sync(_ owner: OfflineOwner, client: ClientInfo, sentAt: Date, downloads: [SyncedDownload], progress: [OfflineProgress]) async throws -> SyncReply {
         let body = Components.Schemas.OfflineSyncInputBody(
-            client: PlaybackMapping.client(client),
+            client: client.api,
             downloads: downloads.isEmpty ? nil : downloads.map { d in
                 Components.Schemas.OfflineSyncDownload(
                     deviceState: .init(rawValue: d.state.rawValue) ?? .queued, id: d.id,
@@ -199,12 +192,12 @@ final class RealOfflineGateway: OfflineGateway {
             movieID: i.movieId.map(Int.init),
             showID: i.showId.map(Int.init),
             episodeID: i.episodeId.map(Int.init),
-            showTitle: PlaybackMapping.nonBlank(i.showTitle),
+            showTitle: Mapping.nonBlank(i.showTitle),
             season: i.seasonNumber.map(Int.init),
             episode: i.episodeNumber.map(Int.init),
             year: i.year.flatMap { $0 > 0 ? Int($0) : nil },
-            posterPath: PlaybackMapping.nonBlank(i.posterPath),
-            artPath: PlaybackMapping.nonBlank(i.artPath)
+            posterPath: Mapping.nonBlank(i.posterPath),
+            artPath: Mapping.nonBlank(i.artPath)
         )
     }
 }

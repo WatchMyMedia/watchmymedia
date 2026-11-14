@@ -1,4 +1,5 @@
 import SwiftUI
+import WMMData
 import WMMFeatures
 import WMMModel
 import WMMUI
@@ -15,10 +16,27 @@ struct WatchMyMediaTVApp: App {
     @State private var recordings: LiveRecordingsStore
 
     init() {
+        // Launch to Home's first content (PLAN-APPLE-REVIEW.md §4.3.1). tvOS has no MetricKit, so start() does nothing here.
+        PerformanceSignposts.shared.launchBegan()
+        Diagnostics.start()
         let services = ServicesFactory.make(arguments: ProcessInfo.processInfo.arguments)
         _services = State(initialValue: services)
         _extras = State(initialValue: LiveExtrasStore(repository: services.liveTV))
         _recordings = State(initialValue: LiveRecordingsStore(repository: services.liveTV))
+    }
+
+    /// How long a reminder's banner stays: ten seconds, or, in a debug build,
+    /// the seconds after `-liveBannerSeconds`, so a UI test on a busy
+    /// simulator isn't racing the banner's ten seconds to read it.
+    private static var bannerDuration: Duration {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let i = arguments.firstIndex(of: "-liveBannerSeconds"), arguments.indices.contains(i + 1),
+           let seconds = Int(arguments[i + 1]), seconds > 0 {
+            return .seconds(seconds)
+        }
+        #endif
+        return .seconds(10)
     }
 
     var body: some Scene {
@@ -31,16 +49,19 @@ struct WatchMyMediaTVApp: App {
                 .environment(\.imageLoader, services.images)
                 .preferredColorScheme(.dark)
                 .tint(Palette.gold)
+                // A play or channel link acts only when the app published it for this server.
                 .onOpenURL { url in
-                    guard let link = DeepLink(url: url), link.opensOnAppleTV else { return }
+                    guard let link = DeepLink.opening(url, signedInServer: services.servers.current?.server.id), link.opensOnAppleTV else { return }
                     Task { await navigator.open(link, library: services.library, liveTV: services.liveTV) }
                 }
                 .task { await navigator.applyLaunchArguments(ProcessInfo.processInfo.arguments, library: services.library, liveTV: services.liveTV) }
+                // The Top Shelf shows only the signed-in person's rows (Home publishes them).
+                .clearsTopShelfOnAccountChange(services)
                 // The person's other devices change favourites and reminders too.
                 .task { await extras.follow() }
                 .task { await recordings.follow() }
                 // tvOS notifications carry only badges: a reminder is a banner while the app is open.
-                .task(id: extras.alertsKey) { await extras.runBanners() }
+                .task(id: extras.alertsKey) { await extras.runBanners(duration: Self.bannerDuration) }
         }
     }
 }

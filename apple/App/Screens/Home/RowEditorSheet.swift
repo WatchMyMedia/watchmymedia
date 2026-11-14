@@ -29,6 +29,8 @@ private struct RowEditorView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var adding: [String]?
     @State private var confirmingReset = false
+    /// Counts rows dropped in a new place, for the tap felt as each lands.
+    @State private var moves = 0
 
     var body: some View {
         NavigationStack {
@@ -88,7 +90,10 @@ private struct RowEditorView: View {
                 ForEach(model.rows) { entry in
                     EditorRow(model: model, entry: entry, besideHero: sizeClass.isWide && model.screen == .home && model.isBesideHero(entry))
                 }
-                .onMove { model.move(fromOffsets: $0, toOffset: $1) }
+                .onMove {
+                    model.move(fromOffsets: $0, toOffset: $1)
+                    moves += 1
+                }
                 Button { adding = model.offered.map(\.id) } label: {
                     Label { Text("Add a row").foregroundStyle(Palette.gold) } icon: {
                         Image(systemName: "plus").fontWeight(.bold).foregroundStyle(Palette.gold)
@@ -129,6 +134,7 @@ private struct RowEditorView: View {
         }
         .scrollContentBackground(.hidden)
         .environment(\.editMode, .constant(.active))
+        .sensoryFeedback(.impact(weight: .light), trigger: moves)
     }
 }
 

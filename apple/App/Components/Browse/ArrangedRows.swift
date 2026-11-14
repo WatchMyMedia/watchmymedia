@@ -27,7 +27,6 @@ struct ArrangedRow: View {
     let actions: RowActions
     var counter: String?
     var leading: Binding<String?>?
-    @Environment(AppServices.self) private var services
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var wide: Bool { sizeClass.isWide }
@@ -50,72 +49,125 @@ struct ArrangedRow: View {
             }
         case .continue:
             CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 18 : 12, seeAll: actions.seeAll(row), counter: counter, leading: leading) {
-                ForEach(row.continueItems, id: \.cardKey) { item in continueCard(item, leading: isLeading(item.cardKey, first: row.continueItems.first?.cardKey)) }
+                ForEach(row.continueItems, id: \.cardKey) { item in
+                    ContinueCard(item: item, actions: actions, width: wideCardWidth, leading: isLeading(item.cardKey, first: row.continueItems.first?.cardKey))
+                }
             }
             .accessibilityIdentifier("row-\(row.id)")
         case .episode:
             CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 18 : 12, seeAll: actions.seeAll(row), counter: counter, leading: leading) {
-                ForEach(row.episodes, id: \.cardKey) { episode in episodeCard(episode, leading: isLeading(episode.cardKey, first: row.episodes.first?.cardKey)) }
+                ForEach(row.episodes, id: \.cardKey) { episode in
+                    EpisodeRowCard(episode: episode, actions: actions, width: wideCardWidth, leading: isLeading(episode.cardKey, first: row.episodes.first?.cardKey))
+                }
             }
             .accessibilityIdentifier("row-\(row.id)")
         case .wide:
             CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 18 : 12, seeAll: actions.seeAll(row), counter: counter, leading: leading) {
-                ForEach(row.items, id: \.cardID) { item in wideCard(item, leading: isLeading(item.cardID, first: row.items.first?.cardID)) }
+                ForEach(row.items, id: \.cardID) { item in
+                    WideItemCard(item: item, actions: actions, width: wideCardWidth, leading: isLeading(item.cardID, first: row.items.first?.cardID))
+                }
             }
             .accessibilityIdentifier("row-\(row.id)")
         case .poster:
             CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 16 : 10, seeAll: actions.seeAll(row), counter: counter, leading: leading) {
                 ForEach(row.items, id: \.cardID) { item in
-                    Button { actions.open(item) } label: {
-                        PosterCard(item: item, imageURL: url(item.posterPath, .w342), width: wide ? 150 : 110, leading: isLeading(item.cardID, first: row.items.first?.cardID))
-                    }
-                    .buttonStyle(CardButtonStyle())
-                    .contextMenu { watchMenu(item) }
+                    PosterItemCard(item: item, actions: actions, width: wide ? 150 : 110, leading: isLeading(item.cardID, first: row.items.first?.cardID))
                 }
             }
             .accessibilityIdentifier("row-\(row.id)")
         }
     }
+}
 
-    private func url(_ path: String?, _ size: ImageSize) -> URL? {
-        services.library.imageURL(path, size: size)
-    }
+// MARK: Home's cards, wherever a row draws them (PLAN-APPLE-REVIEW.md §5.7)
 
-    private func continueCard(_ item: ContinueItem, leading: Bool) -> some View {
+/// A Continue watching card: resumes on a tap; Mark watched and the page on a long press.
+struct ContinueCard: View {
+    let item: ContinueItem
+    let actions: RowActions
+    let width: CGFloat
+    var leading = false
+    @Environment(AppServices.self) private var services
+
+    var body: some View {
         Button { actions.resume(item) } label: {
-            WideCard(title: item.title, subtitle: item.remainingLine, imageURL: url(item.stillPath ?? item.backdropPath, .w780), seed: item.title, width: wideCardWidth, leading: leading) {
+            WideCard(title: item.title, subtitle: item.remainingLine, imageURL: services.library.imageURL(item.stillPath ?? item.backdropPath, size: .w780), seed: item.title, width: width, leading: leading) {
                 ProgressStrip(progress: item.progress).pinned(.bottom, padding: 0)
             }
         }
         .buttonStyle(CardButtonStyle())
-        .accessibilityHint("Resumes playing")
-        .contextMenu {
-            if let target = item.watchTarget {
-                WatchToggleButton(watched: false) { await actions.setWatched(target, $0) }
-            }
-            if item.pageRoute != nil {
-                Button { actions.openPage(item) } label: { Label(item.pageLabel, systemImage: "info.circle") }
-            }
+        .accessibilityHint(resumesPlayingHint)
+        .contextMenu { ContinueWatchingMenu(item: item, actions: actions) }
+    }
+}
+
+/// Continue watching's long press, the one menu for every card of it: Mark
+/// watched, and the title's page.
+struct ContinueWatchingMenu: View {
+    let item: ContinueItem
+    let actions: RowActions
+
+    var body: some View {
+        if let target = item.watchTarget {
+            WatchToggleButton(watched: false) { await actions.setWatched(target, $0) }
+        }
+        if item.pageRoute != nil {
+            Button { actions.openPage(item) } label: { Label(item.pageLabel, systemImage: "info.circle") }
         }
     }
+}
 
-    private func wideCard(_ item: BrowseItem, leading: Bool) -> some View {
+/// A 16:9 card of a title (Recently released): its release date and watched check.
+struct WideItemCard: View {
+    let item: BrowseItem
+    let actions: RowActions
+    let width: CGFloat
+    var leading = false
+    @Environment(AppServices.self) private var services
+
+    var body: some View {
         Button { actions.open(item) } label: {
-            WideCard(title: item.title, imageURL: url(item.backdropPath, .w780), seed: item.title, width: wideCardWidth, leading: leading) {
+            WideCard(title: item.title, imageURL: services.library.imageURL(item.backdropPath, size: .w780), seed: item.title, width: width, leading: leading) {
                 if let date = formatDate(item.releaseDate) { Badge(date).pinned(.bottomLeading) }
                 if item.watched { WatchedCheck().pinned(.bottomTrailing) }
             }
         }
         .buttonStyle(CardButtonStyle())
-        .contextMenu { watchMenu(item) }
+        .contextMenu { WatchMenu(item: item, actions: actions) }
     }
+}
 
-    private func episodeCard(_ episode: EpisodeCard, leading: Bool) -> some View {
+/// A poster card (Recently added): opens the title; Mark watched on a long press.
+struct PosterItemCard: View {
+    let item: BrowseItem
+    let actions: RowActions
+    let width: CGFloat
+    var leading = false
+    @Environment(AppServices.self) private var services
+
+    var body: some View {
+        Button { actions.open(item) } label: {
+            PosterCard(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w342), width: width, leading: leading)
+        }
+        .buttonStyle(CardButtonStyle())
+        .contextMenu { WatchMenu(item: item, actions: actions) }
+    }
+}
+
+/// An episode's card (Recently aired): opens the episode; Play and Mark watched on a long press.
+struct EpisodeRowCard: View {
+    let episode: EpisodeCard
+    let actions: RowActions
+    let width: CGFloat
+    var leading = false
+    @Environment(AppServices.self) private var services
+
+    var body: some View {
         Button { actions.openEpisode(episode) } label: {
-            WideCard(title: episode.showTitle, subtitle: episode.airedLine(), imageURL: url(episode.stillPath ?? episode.showBackdropPath, .w780), seed: episode.showTitle, width: wideCardWidth, leading: leading) {
+            WideCard(title: episode.showTitle, subtitle: episode.airedLine(), imageURL: services.library.imageURL(episode.stillPath ?? episode.showBackdropPath, size: .w780), seed: episode.showTitle, width: width, leading: leading) {
                 if episode.isNew { Badge("New", style: .gold).pinned(.topLeading) }
                 if !episode.hasFile {
-                    Badge("Not in library", style: .warning).pinned(.topTrailing)
+                    Badge(notInLibraryBadge, style: .warning).pinned(.topTrailing)
                 } else if episode.watched {
                     WatchedCheck().pinned(.topTrailing)
                 }
@@ -123,7 +175,7 @@ struct ArrangedRow: View {
             }
         }
         .buttonStyle(CardButtonStyle())
-        .accessibilityHint("Opens the episode")
+        .accessibilityHint(opensEpisodeHint)
         .contextMenu {
             if episode.playRequest != nil {
                 Button { actions.playEpisode(episode) } label: { Label("Play", systemImage: "play.fill") }
@@ -131,8 +183,14 @@ struct ArrangedRow: View {
             WatchToggleButton(watched: episode.watched) { await actions.setWatched(.episode(id: episode.episodeID), $0) }
         }
     }
+}
 
-    @ViewBuilder private func watchMenu(_ item: BrowseItem) -> some View {
+/// A title's long press: Mark watched or unwatched, when it can be marked.
+struct WatchMenu: View {
+    let item: BrowseItem
+    let actions: RowActions
+
+    var body: some View {
         if let target = item.watchTarget {
             WatchToggleButton(watched: item.watched) { await actions.setWatched(target, $0) }
         }

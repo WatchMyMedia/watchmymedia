@@ -61,7 +61,8 @@ extension EpisodeCard {
         fileID.map {
             PlayRequest(
                 fileID: $0, title: showTitle, subtitle: "\(episodeCode(season: season, episode: episode)) · \(title)",
-                backdropPath: showBackdropPath ?? stillPath, stillPath: stillPath, posterPath: showPosterPath, showID: showID, seasonNumber: season
+                backdropPath: showBackdropPath ?? stillPath, stillPath: stillPath, posterPath: showPosterPath, showID: showID, seasonNumber: season,
+                overview: overview.isEmpty ? nil : overview
             )
         }
     }
@@ -73,7 +74,8 @@ extension Hero {
         guard let fileID else { return nil }
         let episode = episodeID.flatMap { e in episodes.first { $0.episodeID == e } }
         let subtitle = episode.map { "\(episodeCode(season: $0.season, episode: $0.episode)) · \($0.title)" } ?? (kind == .episode ? facts : nil)
-        return PlayRequest(fileID: fileID, title: title, subtitle: subtitle, backdropPath: backdropPath, posterPath: posterPath, showID: episode?.showID, seasonNumber: episode?.season)
+        return PlayRequest(fileID: fileID, title: title, subtitle: subtitle, backdropPath: backdropPath, posterPath: posterPath, showID: episode?.showID, seasonNumber: episode?.season,
+                           overview: (episode?.overview ?? overview).nonEmpty, contentRating: contentRating)
     }
 }
 
@@ -88,7 +90,8 @@ extension EpisodeDetail {
             subtitle: "\(episodeCode(season: season, episode: number)) · \(title)",
             backdropPath: backdropPath ?? stillPath,
             stillPath: stillPath,
-            posterPath: posterPath, showID: showID, seasonNumber: season
+            posterPath: posterPath, showID: showID, seasonNumber: season,
+            overview: overview.nonEmpty
         )
     }
 }
@@ -97,6 +100,11 @@ extension MovieDetail {
     /// Plays `version` (the first by default): resumes when partway through, unless `fromStart`.
     public func playRequest(version: MediaVersion? = nil, fromStart: Bool = false) -> PlayRequest? {
         guard let fileID = (version ?? versions.first)?.fileID else { return nil }
-        return PlayRequest(fileID: fileID, startMs: fromStart ? 0 : nil, title: title, subtitle: year.map(String.init), backdropPath: backdropPath, posterPath: posterPath)
+        return PlayRequest(fileID: fileID, startMs: fromStart ? 0 : nil, title: title, subtitle: year.map(String.init), backdropPath: backdropPath, posterPath: posterPath,
+                           overview: overview.nonEmpty, year: year, contentRating: contentRating, genres: genres)
     }
+}
+
+private extension String {
+    var nonEmpty: String? { isEmpty ? nil : self }
 }

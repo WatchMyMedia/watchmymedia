@@ -44,7 +44,7 @@ struct TVLivePlayerModelTests {
         #expect(model.cancellableTakeover?.recordingID == "r1")
         // The banner takes no focus: nothing joins the contextual actions or the transport bar.
         #expect(!model.contextualActions.contains { $0.title.contains("record") })
-        #expect(model.transportBarActions.map(\.kind) == [.stop])
+        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel, .goToChannel, .stop])
         controller.state.askStillWatching = true
         #expect(model.cancellableTakeover == nil, "Not under a prompt")
         model.dispose()
@@ -52,8 +52,8 @@ struct TVLivePlayerModelTests {
     @Test func channelActionsStaySeparateFromFileTransportAndWrapPlayableChannels() async throws {
         let (model, controller, repository) = try await fixture()
         repository.availableChannels[1].available = false
-        #expect(model.contextualActions.map(\.kind) == [.previousChannel, .nextChannel])
-        #expect(model.contextualActions.map(\.accessibilityLabel) == ["Previous channel", "Next channel"])
+        #expect(model.contextualActions.isEmpty, "the channel buttons are on the transport bar, not contextual actions")
+        #expect(model.transportBarActions.prefix(2).map(\.title) == ["Channel down", "Channel up"])
         model.pickQuality(.p480)
         model.perform(.nextChannel)
         #expect(model.state.channel?.id == repository.channels[2].id)
@@ -74,16 +74,16 @@ struct TVLivePlayerModelTests {
     }
     @Test func pauseOrBehindLiveAddsGoLiveAndItReturnsToTheEdge() async throws {
         let (model, controller, _) = try await fixture()
-        #expect(model.transportBarActions.map(\.kind) == [.stop])
+        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel, .goToChannel, .stop])
         controller.state.isAtLiveEdge = false
-        #expect(model.contextualActions.map(\.kind) == [.previousChannel, .nextChannel, .goLive])
-        #expect(model.transportBarActions.map(\.kind) == [.stop])
+        #expect(model.contextualActions.map(\.kind) == [.goLive])
+        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel, .goToChannel, .stop])
         model.perform(.goLive)
-        #expect(model.contextualActions.map(\.kind) == [.previousChannel, .nextChannel])
-        #expect(model.transportBarActions.map(\.kind) == [.stop])
+        #expect(model.contextualActions.isEmpty)
+        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel, .goToChannel, .stop])
         controller.state.status = .paused
-        #expect(model.contextualActions.map(\.kind) == [.previousChannel, .nextChannel, .goLive])
-        #expect(model.transportBarActions.map(\.kind) == [.stop])
+        #expect(model.contextualActions.map(\.kind) == [.goLive])
+        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel, .goToChannel, .stop])
         model.dispose()
     }
     @Test func firstBackAnswersStillWatchingAndSecondBackStopsAndExitsOnce() async throws {
@@ -101,6 +101,24 @@ struct TVLivePlayerModelTests {
         #expect(controller.calls.filter { $0 == "release" }.count == 1)
         #expect(model.state.status == .stopped)
     }
+    @Test func backWithAReminderBannerClosesItBeforeLeaving() async throws {
+        var exits = 0
+        let (model, controller, _) = try await fixture(onExit: { exits += 1 })
+        #expect(model.back(bannerShowing: true) == .closeBanner)
+        #expect(exits == 0)
+        #expect(model.state.status == .playing, "the channel plays on under the banner")
+        #expect(!controller.calls.contains("release"))
+        // Still watching comes first: its prompt hides the banner.
+        controller.state.askStillWatching = true
+        #expect(model.back(bannerShowing: true) == .handled)
+        #expect(controller.calls.last == "keep")
+        #expect(exits == 0)
+        // With the banner gone, Menu leaves.
+        #expect(model.back() == .handled)
+        #expect(exits == 1)
+        #expect(model.back(bannerShowing: true) == .handled, "a closed player has nothing to hide")
+    }
+
     @Test func playPauseAnswersPromptWithoutTogglingPlayback() async throws {
         let (model, controller, _) = try await fixture()
         controller.state.askStillWatching = true

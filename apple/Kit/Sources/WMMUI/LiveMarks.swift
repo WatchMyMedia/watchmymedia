@@ -29,9 +29,8 @@ public struct LiveLogo<Fallback: View>: View {
         }
         .task(id: url) {
             guard let url else { image = nil; return }
-            if let cached = ImageMemoryCache.shared.image(for: url) { image = cached; return }
-            guard let data = try? await loader.data(for: url), let decoded = Artwork.decode(data, maxPixel: 240) else { return }
-            ImageMemoryCache.shared.store(decoded, for: url)
+            if let cached = ImageMemoryCache.shared.image(for: url, maxPixel: 240) { image = cached; return }
+            guard let decoded = await ImagePipeline.shared.image(for: url, maxPixel: 240, loader: loader), !Task.isCancelled else { return }
             image = decoded
         }
         .accessibilityHidden(true)

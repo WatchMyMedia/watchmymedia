@@ -71,6 +71,29 @@ public enum FakeData {
         )
     }
 
+    /// About 1,200 movies for measuring a large grid (`-fakesLargeLibrary`,
+    /// PLAN-APPLE-REVIEW.md §4.3): the sample's, then made-up titles built
+    /// from invented words, so none is a real film's.
+    public static let largeMovies: [BrowseItem] = {
+        let starts = ["Al", "Bren", "Cor", "Dav", "Ev", "Fen", "Gar", "Hal", "Is", "Jor", "Kel", "Lun", "Mar", "Nor", "Ost",
+                      "Pel", "Quin", "Ros", "Sel", "Tor", "Ul", "Ver", "Wyn", "Yar", "Zel"]
+        let ends = ["ane", "ith", "ora", "ux", "enne", "ald", "ix", "ova", "ure", "eth", "omb", "isk"]
+        let places = ["Crossing", "Ledger", "Signal", "Quay", "Archive", "Reach", "Causeway", "Lantern", "Spire", "Weir"]
+        let genres = [["Drama"], ["Thriller"], ["Comedy"], ["Sci-Fi"], ["Documentary"], ["Crime", "Drama"], ["Animation"]]
+        let made = (0..<(1_200 - movies.count)).map { i -> BrowseItem in
+            let title = "\(starts[i % starts.count])\(ends[(i / starts.count) % ends.count]) \(places[(i / (starts.count * ends.count)) % places.count])"
+            let year = 1960 + (i * 7) % 66
+            return BrowseItem(
+                kind: .movie, id: 20_000 + i, libraryID: movieLibrary, title: title, year: year,
+                overview: "A made-up film for measuring the grid.", genres: genres[i % genres.count], rating: 5 + Double(i % 50) / 10,
+                backdropPath: FakeBackdrops.path(for: title), quality: ["1080p", "4K", "720p"][i % 3], hdr: i % 3 == 1,
+                watched: i % 9 == 0, progress: i % 13 == 0 ? 0.4 : nil, runtimeMin: 80 + i % 70,
+                releaseDate: String(format: "%04d-%02d-%02d", year, 1 + i % 12, 1 + i % 28)
+            )
+        }
+        return movies + made
+    }()
+
     /// What an OpenSubtitles search finds for the fake episode.
     public static let onlineSubtitles = OnlineSubtitles(
         results: [

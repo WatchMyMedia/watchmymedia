@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The Top Shelf extension's privacy manifest (PLAN-APPLE-REVIEW.md §3.4.1, §6.2).
+  No tracking and no data collected. It reads the snapshot and picture files the
+  app wrote into the App Group (Kit/Sources/WMMTopShelf) and nothing else: no
+  UserDefaults, no file dates, no disk space, no system uptime, so no
+  required-reason API. Keep it so, or declare the API here and in
+  TV/Resources/PrivacyInfo.xcprivacy (apple/README.md).
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array/>
+</dict>
+</plist>

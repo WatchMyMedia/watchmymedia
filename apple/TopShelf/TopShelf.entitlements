@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The Top Shelf extension (media.watchmy.client.topshelf): the App Group it
+     shares with the Apple TV app, where the app writes the shelf's snapshot and
+     pictures (Kit/Sources/WMMTopShelf). Nothing else: no Keychain group, so the
+     extension can't reach the app's sign-in. -->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.media.watchmy.client</string>
+	</array>
+</dict>
+</plist>

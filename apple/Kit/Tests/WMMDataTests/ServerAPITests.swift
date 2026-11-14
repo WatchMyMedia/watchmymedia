@@ -120,6 +120,61 @@ import WMMModel
     }
 }
 
+/// The one way a sign-in goes on a request (PLAN-APPLE-REVIEW.md §5.6): the
+/// token only on the issuing server's addresses, however the request is made.
+@Suite struct RequestSignerTests {
+    let signer = RequestSigner(baseURL: URL(string: "http://192.168.1.20:27587/wmm")!, token: "tok", userAgent: "WatchMyMedia/1.0 (ios; iOS 27.0)")
+
+    static let elsewhere = [
+        "https://elsewhere.example.net/wmm/api/images/a.jpg", // another host
+        "http://192.168.1.21:27587/wmm/api/images/a.jpg", // another address
+        "http://192.168.1.20:8080/wmm/api/images/a.jpg", // another port
+        "https://192.168.1.20:27587/wmm/api/images/a.jpg", // another scheme
+        "http://192.168.1.20:27587/wmm2/api/images/a.jpg", // a sibling path
+        "http://192.168.1.20:27587/api/images/a.jpg", // outside the server's path
+        "http://user@192.168.1.20.evil.example:27587/wmm/a.jpg", // a look-alike host
+    ]
+
+    @Test func theServersOwnAddressGetsTheTokenAndTheUserAgent() throws {
+        let request = signer.request(URL(string: "http://192.168.1.20:27587/wmm/api/images/w342/a.jpg")!)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer tok")
+        #expect(request.value(forHTTPHeaderField: "User-Agent") == "WatchMyMedia/1.0 (ios; iOS 27.0)")
+        #expect(signer.signedRequest(URL(string: "http://192.168.1.20:27587/wmm/api/offline/d1/playlist.m3u8")!) != nil)
+    }
+
+    @Test(arguments: elsewhere)
+    func anotherAddressNeverGetsTheToken(_ address: String) throws {
+        let url = try #require(URL(string: address))
+        let request = signer.request(url)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(request.value(forHTTPHeaderField: "User-Agent") != nil)
+        #expect(signer.signedRequest(url) == nil)
+        let server = try #require(URL(string: address.components(separatedBy: "/wmm").first ?? address))
+        #expect(signer.authorization(path: url.path, server: server, operationID: "getHome") == nil, "a generated call to another server")
+    }
+
+    @Test func theGeneratedClientsCallsAreSignedExceptThePasswordSignIn() throws {
+        let server = URL(string: "http://192.168.1.20:27587/wmm")!
+        #expect(signer.authorization(path: "/api/home", server: server, operationID: "getHome") == "Bearer tok")
+        #expect(signer.authorization(path: "/api/auth/login", server: server, operationID: "login") == nil)
+    }
+
+    @Test func withoutATokenNothingIsSigned() {
+        let anonymous = RequestSigner(baseURL: URL(string: "http://192.168.1.20:27587")!, token: { nil }, userAgent: nil)
+        #expect(anonymous.request(URL(string: "http://192.168.1.20:27587/api/images/a.jpg")!).value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(anonymous.signedRequest(URL(string: "http://192.168.1.20:27587/api/images/a.jpg")!) == nil)
+    }
+
+    @Test func onlyARefusedTokenSignsOut() {
+        #expect(ServerAPI.revokes(status: 401, signed: true))
+        #expect(ServerAPI.revokes(status: 401, signed: true, operationID: "getHome"))
+        #expect(!ServerAPI.revokes(status: 401, signed: false), "nothing was sent to refuse")
+        #expect(!ServerAPI.revokes(status: 401, signed: true, operationID: "login"), "a wrong password")
+        #expect(!ServerAPI.revokes(status: 401, signed: true, operationID: "getAuthStatus"), "a code not yet approved")
+        #expect(!ServerAPI.revokes(status: 403, signed: true))
+    }
+}
+
 /// No bytes are ready when polled, but a blocking read produces the next chunk.
 /// A real streamed upload can be in this state while its async producer runs.
 private final class AvailabilityGapInputStream: InputStream {

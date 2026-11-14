@@ -59,9 +59,9 @@ public final class CastService {
 
     public var deviceName: String { transport.deviceName }
     public var ownsMedia: Bool { owner != nil && owner == gateway.identity }
-    public var supportsLive: Bool { connected && (capability?.apiLevel ?? 0) >= liveCastAPILevel && receiver?.features?.contains("live") == true }
+    public var supportsLive: Bool { connected && ServerFeatures(apiLevel: capability?.apiLevel).liveCast && receiver?.features?.contains("live") == true }
     public var supportsLiveAutomatic: Bool {
-        supportsLive && (capability?.apiLevel ?? 0) >= liveAutomaticAPILevel
+        supportsLive && ServerFeatures(apiLevel: capability?.apiLevel).liveAutomatic
             && receiver?.features?.contains(CastProtocol.liveAutomaticFeature) == true
     }
     public var active: Bool { connected && (loading || receiver.map { $0.phase != "idle" } == true) }

@@ -94,6 +94,7 @@ private final class LiveMediaSpy: LiveMediaPlayer {
     var playing = false
     var ready = true
     var failed = false
+    var failure: PlayerFailure?
     var position: Double = 58
     var seekable: ClosedRange<Double>? = 0...60
     var loads: [URL] = []
@@ -102,7 +103,7 @@ private final class LiveMediaSpy: LiveMediaPlayer {
     var transfer: MediaTransfer? = .init(bps: 4_000_000, ageMs: 300)
     var stalls = 1
     var goLives = 0
-    func load(url: URL, title: String, play: Bool) { loads.append(url); playing = play; firstFrameRendered = false; failed = false }
+    func load(url: URL, title: String, play: Bool) { loads.append(url); playing = play; firstFrameRendered = false; failed = false; failure = nil }
     func play() { playing = true }
     func pause() { playing = false }
     func goLive() { goLives += 1; position = (seekable?.upperBound ?? 60) - 2 }
@@ -142,9 +143,10 @@ private final class LiveRig {
     let clock = LiveClock()
     let repository: LiveRepositorySpy
     let controller: RealLivePlaybackController
-    init(cellular: @escaping @MainActor () -> Bool = { false }, profile: @escaping @MainActor () -> PlaybackProfile = { PlaybackProfile(name: "Apple Live TV", containers: ["mpegts"], videoCodecs: ["h264"], audioCodecs: ["aac"], maxHeight: 1080) }) {
+    init(cellular: @escaping @MainActor () -> Bool = { false }, profile: @escaping @MainActor () -> PlaybackProfile = { PlaybackProfile(name: "Apple Live TV", containers: ["mpegts"], videoCodecs: ["h264"], audioCodecs: ["aac"], maxHeight: 1080) },
+         system: (any PlaybackSystem)? = nil) {
         repository = LiveRepositorySpy(gateway: gateway)
-        controller = RealLivePlaybackController(repository: repository, media: media, clock: clock, cellular: cellular, profile: profile)
+        controller = RealLivePlaybackController(repository: repository, media: media, clock: clock, cellular: cellular, profile: profile, system: system)
     }
     func start(_ index: Int = 0) async { controller.start(.init(channel: repository.channels[index])); await settle() }
     func settle() async { for _ in 0..<25 { await Task.yield() } }
@@ -544,9 +546,133 @@ struct LivePlaybackTests {
         #expect(rig.gateway.sessions.isEmpty)
         await rig.finish()
     }
+    @Test func channelChangesKeepAValidToken() async {
+        // PLAN-APPLE-REVIEW.md §4.2.2: tokens last six hours; a change of channel needs no new one.
+        let rig = LiveRig(); await rig.start()
+        rig.controller.start(.init(channel: rig.repository.channels[1])); await rig.settle()
+        rig.controller.start(.init(channel: rig.repository.channels[2])); await rig.settle()
+        #expect(rig.gateway.starts.count == 3)
+        #expect(rig.gateway.tokens == 1)
+        #expect(rig.media.loads.last?.query()?.contains("access_token=token-1") == true)
+        await rig.finish()
+
+        // One within the heartbeat's minute of running out is renewed. A token
+        // that says it has 30 s left is trusted for the floor first, as the
+        // file player trusts it: the clocks may disagree (Rules.swift).
+        let late = LiveRig(); late.gateway.tokenExpiry = TestClock.wallStart.addingTimeInterval(30)
+        await late.start()
+        late.controller.start(.init(channel: late.repository.channels[1])); await late.settle()
+        #expect(late.gateway.tokens == 1)
+        // The clock moves to the floor's minute, no tick between: the change itself renews it.
+        late.clock.elapsedMs += tokenMinLifetimeMs - tokenMarginMs
+        late.controller.start(.init(channel: late.repository.channels[2])); await late.settle()
+        #expect(late.gateway.tokens == 2)
+        #expect(late.media.loads.last?.query()?.contains("access_token=token-2") == true)
+        await late.finish()
+    }
+
+    @Test func stallsAreCountedAsTheyHappenOncePerWait() {
+        // PLAN-APPLE-REVIEW.md §3.1.7: the stall notification and the player starting to wait both say so.
+        var c = LiveStallCounter()
+        c.waiting()
+        #expect(c.count == 0, "waiting before it ever played is the start, not a stall")
+        c.playing()
+        c.waiting()
+        c.waiting()
+        #expect(c.count == 1, "the notification and the wait are one stall")
+        c.playing()
+        c.waiting()
+        #expect(c.count == 2)
+        c.playing()
+        c.excuse()
+        c.waiting()
+        #expect(c.count == 2, "the wait after a pause or a seek is the viewer's")
+        c.playing()
+        c.waiting()
+        #expect(c.count == 3)
+    }
+
+    @Test func aRefusedTokenIsRenewedOnTheSameTunerNotReportedAsSignalLost() async {
+        // PLAN-APPLE-REVIEW.md §5.1: the file player's new token on a 401 or 403, for Live TV.
+        let rig = LiveRig(); await rig.start()
+        rig.media.failed = true
+        rig.media.failure = PlayerFailure(kind: .http, detail: "HTTP 403", httpStatus: 403)
+        await rig.advance(500)
+        #expect(rig.gateway.tokens == 2)
+        #expect(rig.media.loads.count == 2)
+        #expect(rig.media.loads.last?.path == rig.media.loads.first?.path)
+        #expect(rig.media.loads.last?.query()?.contains("access_token=token-2") == true)
+        #expect(rig.gateway.starts.count == 1)
+        #expect(rig.controller.state.status != .error)
+        #expect(rig.controller.state.message == "Reconnected at live TV.")
+
+        // Refused again at once, past the recoveries: the signal is lost, as before.
+        for _ in 0..<maxRecoveries {
+            rig.media.failed = true
+            rig.media.failure = PlayerFailure(kind: .http, detail: "HTTP 401", httpStatus: 401)
+            await rig.advance(500)
+        }
+        #expect(rig.gateway.tokens == 1 + maxRecoveries)
+        #expect(rig.controller.state.status == .error)
+        #expect(rig.controller.state.stopReason == "signal_lost")
+        await rig.finish()
+    }
+
+    @Test func nowPlayingAndTheLockScreenFollowTheChannel() async throws {
+        // PLAN-APPLE-REVIEW.md §6.3: Live TV on the lock screen and in Control Center, as films are.
+        let system = FakeSystem()
+        let rig = LiveRig(system: system)
+        await rig.start()
+        rig.media.playing = true
+        await rig.advance(500)
+        #expect(system.opened == 1)
+        let commands = try #require(system.commands)
+        #expect(!commands.seeks, "nothing to skip or scrub on a live channel")
+        let title = rig.repository.channels[0].title
+        #expect(system.nowPlaying.last == NowPlayingInfo(title: title, subtitle: nil, durationMs: 0, positionMs: 0, playing: true, live: true))
+
+        commands.pause()
+        #expect(rig.controller.state.status == .paused)
+        #expect(system.nowPlaying.last?.playing == false)
+        commands.play()
+        #expect(rig.controller.state.status == .playing)
+
+        // A call pauses the channel; when it ends, the system says whether to carry on.
+        commands.interruption(true, false)
+        #expect(rig.controller.state.status == .paused)
+        commands.interruption(false, true)
+        #expect(rig.controller.state.status == .playing)
+        // Headphones unplugged: paused, and a call ending doesn't start it.
+        commands.routeLost()
+        commands.interruption(false, true)
+        #expect(rig.controller.state.status == .paused)
+        #expect(rig.gateway.starts.count == 1, "the tuner is the same throughout")
+
+        // Another channel keeps the one session; leaving the player closes it.
+        rig.controller.start(.init(channel: rig.repository.channels[1])); await rig.settle()
+        #expect(system.opened == 1)
+        await rig.finish()
+        #expect(system.closed == 1)
+        #expect(system.nowPlaying.last?.playing == false)
+    }
+
+    @Test func aFailureThatIsntTheTokensStillLosesTheSignal() async {
+        let rig = LiveRig(); await rig.start()
+        rig.media.failed = true
+        rig.media.failure = PlayerFailure(kind: .http, detail: "HTTP 404", httpStatus: 404)
+        await rig.advance(500)
+        #expect(rig.gateway.tokens == 1)
+        #expect(rig.controller.state.status == .error)
+        #expect(rig.controller.state.stopReason == "signal_lost")
+        await rig.finish()
+    }
+
     @Test func mediaTokenRenewsWithoutNewTuner() async {
         let rig = LiveRig(); rig.gateway.tokenExpiry = TestClock.wallStart.addingTimeInterval(65)
         await rig.start(); await rig.advance(10_000)
+        // The token's 65 s are under the floor: the clocks may disagree, so it is trusted for the floor.
+        #expect(rig.gateway.tokens == 1)
+        await rig.advance(tokenMinLifetimeMs - tokenMarginMs - 10_000)
         #expect(rig.gateway.tokens == 2)
         #expect(rig.media.loads.count == 2)
         #expect(rig.gateway.starts.count == 1)

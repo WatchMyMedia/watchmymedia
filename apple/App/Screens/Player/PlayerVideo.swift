@@ -12,13 +12,16 @@ struct PlayerVideo: View {
     let backdrop: URL?
     let seed: String
     let pictureInPicture: PictureInPicture
+    /// Fit or fill (`PlayerFitFill.swift`).
+    var layout = VideoLayout()
     @State private var ready = false
 
     var body: some View {
         ZStack {
             Color.black
             if let player {
-                VideoSurface(player: player, pictureInPicture: pictureInPicture) { ready = $0 }
+                VideoSurface(player: player, pictureInPicture: pictureInPicture, gravity: layout.gravity) { ready = $0 }
+                    .padding(layout.insets)
             }
             if player == nil || !ready || pictureInPicture.isActive {
                 Artwork(url: backdrop, seed: seed, maxPixel: 1600)
@@ -32,15 +35,18 @@ struct PlayerVideo: View {
             }
         }
         .animation(.easeOut(duration: 0.25), value: ready)
+        .animation(.easeInOut(duration: 0.25), value: layout)
         .accessibilityHidden(!pictureInPicture.isActive)
     }
 }
 
-/// An `AVPlayerLayer` bound to the controller's player, aspect fit. Reports
-/// when the first frame is ready, and hands the layer to Picture in Picture.
+/// An `AVPlayerLayer` bound to the controller's player, aspect fit or fill.
+/// Reports when the first frame is ready, and hands the layer to Picture in
+/// Picture.
 private struct VideoSurface: UIViewRepresentable {
     let player: AVPlayer
     let pictureInPicture: PictureInPicture
+    let gravity: AVLayerVideoGravity
     let onReady: (Bool) -> Void
 
     func makeUIView(context: Context) -> PlayerLayerView {
@@ -53,6 +59,7 @@ private struct VideoSurface: UIViewRepresentable {
     func updateUIView(_ view: PlayerLayerView, context: Context) {
         view.onReady = onReady
         if view.playerLayer.player !== player { view.playerLayer.player = player }
+        if view.playerLayer.videoGravity != gravity { view.playerLayer.videoGravity = gravity }
         pictureInPicture.attach(view.playerLayer)
     }
 }

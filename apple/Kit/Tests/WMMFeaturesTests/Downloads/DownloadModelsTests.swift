@@ -130,6 +130,16 @@ import WMMModel
         #expect(navigator.playing?.fileID == 9003)
         #expect(navigator.playing?.title == "Saltmarsh")
         #expect(navigator.playing?.subtitle == "S01 E09 · Undertow")
+        #expect(navigator.playing?.year == nil, "an episode's year isn't the download's to say")
+    }
+
+    @Test func aMoviesCopyCarriesItsYearForTheInfoPanel() throws {
+        let model = DownloadsModel(downloads: FakeDownloadRepository(), navigator: Navigator())
+        let movie = try #require(model.movies.first)
+        let request = model.playRequest(movie)
+        #expect(request.year == movie.item.year)
+        #expect(request.year != nil, "the fakes' download has a year")
+        #expect(request.overview == nil && request.contentRating == nil && request.genres.isEmpty, "the download keeps nothing else")
     }
 
     @Test func removeAllAndTheSettings() {

@@ -139,6 +139,18 @@ import Testing
         #expect(t.apply(to: URL(string: "http://h/a.m3u8?x=1")!).absoluteString == "http://h/a.m3u8?x=1&access_token=abc")
     }
 
+    @Test func aScopedMediaTokenGoesOnlyToItsServer() {
+        // PLAN-APPLE-REVIEW.md §3.4.8.
+        let t = MediaToken(token: "abc", expiresAt: .now, server: URL(string: "https://home.example.net/wmm")!)
+        #expect(t.apply(to: URL(string: "https://home.example.net/wmm/api/files/1/stream")!).absoluteString == "https://home.example.net/wmm/api/files/1/stream?access_token=abc")
+        #expect(t.apply(to: URL(string: "https://HOME.example.net/wmm")!).absoluteString == "https://HOME.example.net/wmm?access_token=abc")
+        for elsewhere in ["https://cdn.example.net/wmm/api/files/1/stream", "http://home.example.net/wmm/api", "https://home.example.net:8443/wmm/api", "https://home.example.net/wmmx/api", "https://home.example.net/api"] {
+            #expect(t.apply(to: URL(string: elsewhere)!).absoluteString == elsewhere)
+        }
+        #expect(t.apply(to: URL(fileURLWithPath: "/tmp/a.mp4")).isFileURL)
+        #expect(t.apply(to: URL(fileURLWithPath: "/tmp/a.mp4")).query() == nil)
+    }
+
     @Test func unmatchedFilmsPlayTheirFile() {
         let film = BrowseItem(kind: .unmatched, id: 7, libraryID: 1, title: "Glass Tide (2023).mkv", fileName: "Glass Tide (2023)/Glass Tide (2023).mkv", fileCount: 1)
         #expect(film.unmatchedPlayRequest == PlayRequest(fileID: 7, title: "Glass Tide (2023).mkv"))
@@ -165,6 +177,22 @@ import Testing
         let e = EpisodeDetail(id: 1, season: 3, number: 7, title: "The Long Dark", stillPath: "/s.jpg", hasFile: true, aired: true, versions: [MediaVersion(fileID: 5, label: "a", sizeBytes: 1)])
         let request = e.playRequest(showTitle: "Harbor Lights", backdropPath: "/b.jpg", posterPath: "/p.jpg")
         #expect((request?.stillPath, request?.posterPath, request?.backdropPath) == ("/s.jpg", "/p.jpg", "/b.jpg"))
+    }
+
+    @Test func playRequestsCarryWhatTheAppleTVInfoPanelShows() {
+        // PLAN-APPLE-REVIEW.md §6.2: the page's own description, year, certification and genres.
+        var movie = MovieDetail(
+            id: 21, libraryID: 1, title: "Paper Moons", year: 2021, tagline: nil, overview: "Two letters a year.", releaseDate: nil, runtimeMin: nil, genres: ["Drama"],
+            rating: nil, posterPath: nil, backdropPath: nil, quality: nil, hdr: false, versions: [MediaVersion(fileID: 5, label: "a", sizeBytes: 1)], cast: [], watch: nil
+        )
+        movie.contentRating = "PG"
+        let m = movie.playRequest()
+        #expect((m?.overview, m?.year, m?.contentRating, m?.genres) == ("Two letters a year.", 2021, "PG", ["Drama"]))
+        let e = EpisodeDetail(id: 1, season: 3, number: 7, title: "The Long Dark", overview: "The harbour freezes.", hasFile: true, aired: true, versions: [MediaVersion(fileID: 5, label: "a", sizeBytes: 1)])
+        #expect(e.playRequest(showTitle: "Harbor Lights", backdropPath: nil)?.overview == "The harbour freezes.")
+        // An empty description is none.
+        let quiet = EpisodeDetail(id: 1, season: 3, number: 7, title: "The Long Dark", hasFile: true, aired: true, versions: [MediaVersion(fileID: 5, label: "a", sizeBytes: 1)])
+        #expect(quiet.playRequest(showTitle: "Harbor Lights", backdropPath: nil)?.overview == nil)
     }
 }
 

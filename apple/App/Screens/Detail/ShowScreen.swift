@@ -54,6 +54,7 @@ private struct ShowPageView: View {
                 ErrorState(message: message, retry: model.retry)
             case .loaded(let show):
                 page(show, topInset: geo.safeAreaInsets.top, width: geo.size.width)
+                    .refreshable { await model.refresh() }
             }
         }
         .groundBackground()
@@ -90,7 +91,7 @@ private struct ShowPageView: View {
             }
         }
         .task { await model.run() }
-        .onChange(of: services.downloads.downloads) { model.refreshOffline() }
+        .background { DownloadsChangeWatcher(downloads: services.downloads) { model.refreshOffline() } }
         .messageToast($model.message)
     }
 
@@ -663,7 +664,7 @@ private struct ShowPageView: View {
     private var moreMenu: some View {
         Menu {
             if model.canReport {
-                Button { model.reportProblem() } label: { Label("Report a problem", systemImage: "exclamationmark.bubble") }
+                Button { model.reportProblem() } label: { Label(reportProblemTitle, systemImage: "exclamationmark.bubble") }
             }
             if model.canReplace {
                 Button { model.askReplace() } label: { Label("Replace file", systemImage: "arrow.triangle.2.circlepath") }

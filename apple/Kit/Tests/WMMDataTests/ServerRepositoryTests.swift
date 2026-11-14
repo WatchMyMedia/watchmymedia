@@ -60,6 +60,19 @@ struct ServerRepositoryTests {
         #expect(missing?.message.contains("doesn't look like a WatchMyMedia server") == true)
     }
 
+    @Test func probeSaysARestartingServerDidntAnswerAndAnUnknownReplyNeedsAnUpdate() async throws {
+        // A 502 from the proxy in front of a restarting server.
+        h.router.on("GET /api/server", .problem(502, "bad gateway"))
+        let restarting = await #expect(throws: APIError.self) { try await servers.probe(host) }
+        #expect(restarting?.message == "The server at \(host) didn't answer (error 502). If it's starting up, try again in a moment.")
+        #expect(restarting?.message.contains("doesn't look like") == false)
+
+        // JSON from a server this app doesn't know the shape of.
+        h.router.on("GET /api/server", .json(#"{"id":"x","name":"Living room server"}"#))
+        let outdated = await #expect(throws: APIError.self) { try await servers.probe(host) }
+        #expect(outdated?.message == "\(host) sent a reply this app doesn't understand. Update the app or the server.")
+    }
+
     @Test func probeTriesTheNextAddressWhenTheFirstCannotConnect() async throws {
         // A domain is tried over https first, then on the server's port.
         let domain = "probe-\(UUID().uuidString.lowercased()).example"
@@ -82,6 +95,32 @@ struct ServerRepositoryTests {
         let found = try await servers.probe("http://\(host)")
         #expect(found.baseURL.absoluteString == "http://\(host)")
         #expect(ContinuousClock.now - start >= Self.probeTimeout)
+    }
+
+    /// PLAN-APPLE-REVIEW.md §3.4.3: once discovery has heard that Local
+    /// Network access is off, a server on this network that can't be reached
+    /// says why; one elsewhere, or with access allowed again, doesn't.
+    @Test func aServerOnThisNetworkSaysWhenLocalNetworkIsOff() async throws {
+        servers.startDiscovery()
+        h.discovery.deny()
+        servers.stopDiscovery()
+        let nowhere = "nowhere-\(UUID().uuidString.lowercased()).local"
+        let probed = await #expect(throws: APIError.self) { try await servers.probe(nowhere) }
+        #expect(probed?.message == localNetworkOffMessage)
+        let lan = h.services.store.api(baseURL: URL(string: "http://\(nowhere):27587")!, token: "tok")
+        await #expect(throws: APIError(status: nil, message: localNetworkOffMessage)) { try await lan.call { try await $0.getHome().ok.body.json } }
+
+        let elsewhere = h.services.store.api(baseURL: URL(string: "https://nowhere-\(UUID().uuidString.lowercased()).example.net")!, token: "tok")
+        await #expect(throws: APIError(status: nil, message: "Couldn't reach the server. Check the connection and try again.")) {
+            try await elsewhere.call { try await $0.getHome().ok.body.json }
+        }
+
+        servers.startDiscovery()
+        h.discovery.allow()
+        servers.stopDiscovery()
+        let allowed = await #expect(throws: APIError.self) { try await servers.probe(nowhere) }
+        #expect(allowed?.message == "Couldn't reach \(nowhere). Check the address and that the server is running.")
+        await #expect(throws: APIError(status: nil, message: "Couldn't reach the server. Check the connection and try again.")) { try await lan.call { try await $0.getHome().ok.body.json } }
     }
 
     @Test func probeTimesOutWhenNothingAnswersInTime() async throws {

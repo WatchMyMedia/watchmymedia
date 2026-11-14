@@ -15,6 +15,7 @@ import WMMModel
         var hdrEligible: Bool
         var hardwareHEVC: Bool
         var hdrModes: Set<String> = []
+        var outputChannels = 2
 
         func plays(_ mimeType: String) -> Bool { plays.contains(mimeType) }
     }
@@ -123,6 +124,49 @@ import WMMModel
         var d = describeDevice(Device(plays: everything, hdrEligible: true, hardwareHEVC: true), tv: true)
         d.maxAudioChannels = 8
         #expect(buildProfile(d).maxAudioChannels == 8)
+    }
+
+    @Test func anAppleTVAsksForWhatItsOutputTakes() {
+        // PLAN-APPLE-REVIEW.md §3.1.1: a receiver set to 5.1 or 7.1 gets surround; a TV's speakers stereo.
+        for (output, asked) in [(2, 2), (6, 6), (8, 8), (0, 2)] {
+            let p = buildProfile(describeDevice(Device(plays: everything, hdrEligible: true, hardwareHEVC: true, outputChannels: output), tv: true))
+            #expect(p.maxAudioChannels == asked, "output \(output)")
+        }
+    }
+
+    @Test func anIPhoneOrIPadAsksForStereoUntilSurroundIsChecked() {
+        // §2.1: six or more only once a device check shows 5.1 direct play works.
+        #expect(!handheldSurroundChecked)
+        let surroundOut = Device(plays: everything, hdrEligible: true, hardwareHEVC: true, outputChannels: 6)
+        #expect(buildProfile(describeDevice(surroundOut)).maxAudioChannels == 2)
+        #expect(DeviceProfileProvider(probe: surroundOut).current().maxAudioChannels == 2)
+        // With the switch on: at least six, so the device mixes 5.1 down itself, or more over AirPlay to a receiver.
+        let stereoOut = Device(plays: everything, hdrEligible: true, hardwareHEVC: true)
+        #expect(buildProfile(describeDevice(stereoOut, handheldSurround: true)).maxAudioChannels == 6)
+        #expect(DeviceProfileProvider(probe: stereoOut, handheldSurround: true).current().maxAudioChannels == 6)
+        #expect(audioChannels(output: 8, tv: false, handheldSurround: true) == 8)
+        #expect(audioChannels(output: 8, tv: false, handheldSurround: false) == 2)
+    }
+
+    @Test func theProviderReadsTheAudioOutputAtEveryCall() {
+        final class Route: DeviceProbe, @unchecked Sendable {
+            var channels = 2
+            func plays(_ mimeType: String) -> Bool { true }
+            var hdrEligible: Bool { false }
+            var hdrModes: Set<String> { [] }
+            var hardwareHEVC: Bool { true }
+            var outputChannels: Int { channels }
+        }
+        let route = Route()
+        let tv = DeviceProfileProvider(probe: route, tv: true)
+        #expect(tv.current().maxAudioChannels == 2)
+        // The receiver comes on, set to 7.1.
+        route.channels = 8
+        #expect(tv.current().maxAudioChannels == 8)
+        // Live TV asks the same provider (LivePlaybackEngine), so a channel gets the same.
+        #expect(tv.current().audioCodecs.contains("eac3"))
+        let phone = DeviceProfileProvider(probe: route)
+        #expect(phone.current().maxAudioChannels == 2)
     }
 
     @Test func theProviderProbesCodecsOnceAndHDREveryTime() {
