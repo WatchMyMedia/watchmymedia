@@ -85,6 +85,7 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.ui.ReportShown
 
 /**
  * A movie (Movie.dc.html): backdrop, poster and facts, Resume or Play, Mark
@@ -104,6 +105,7 @@ fun MovieScreen(
     val layout = rememberTabletLayout()
     val services = LocalAppServices.current
     val vm = viewModel { MovieViewModel(services.library, movieId, services.requests, services.downloads, plans = services.playback::plans) }
+    ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val movie = state.movie.value
     var reporting by rememberSaveable { mutableStateOf(false) }

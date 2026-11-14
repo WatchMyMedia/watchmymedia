@@ -87,6 +87,7 @@ import media.watchmy.client.tv.components.rememberFocusMemory
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.ui.ReportShown
 
 /**
  * A movie (mockup: design/mockups/android-tv/Movie.dc.html): the header
@@ -103,6 +104,7 @@ fun MovieScreen(movieId: Long, onPlay: (PlayRequest) -> Unit, onBack: () -> Unit
     val context = LocalContext.current
     val youTube = remember(context) { context.canOpenYouTube() }
     val vm = viewModel(key = "movie-$movieId") { MovieViewModel(services.library, movieId, services.requests, youTube = youTube, plans = services.playback::plans) }
+    ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val memory = rememberFocusMemory()
     var more by remember { mutableStateOf(false) }

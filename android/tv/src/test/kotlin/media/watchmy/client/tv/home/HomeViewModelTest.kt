@@ -24,8 +24,8 @@ class HomeViewModelTest {
     /** The fake library, failing [failures] times first and reporting [changes]. */
     private class Library(var failures: Int = 0) : LibraryRepository by FakeLibraryRepository() {
         var calls = 0
-        val changesFlow = MutableSharedFlow<Unit>()
-        override val changes = changesFlow
+        val changesFlow = MutableSharedFlow<media.watchmy.client.model.LibraryChange>()
+        override val libraryChanges = changesFlow
 
         override suspend fun home(): HomeData {
             calls++
@@ -87,7 +87,7 @@ class HomeViewModelTest {
         val vm = HomeViewModel(library)
         advanceUntilIdle()
         library.failures = 1
-        library.changesFlow.emit(Unit)
+        library.changesFlow.emit(media.watchmy.client.model.LibraryChange.Everything)
         advanceUntilIdle()
         assertEquals(2, library.calls)
         assertTrue(vm.state.value.home != null)

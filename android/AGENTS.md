@@ -50,6 +50,13 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   ViewModel in `core:presentation`, tested there against the fakes; the TV
   and phone screens only draw it. Where the two UIs used to differ, the
   Apple apps' `WMMFeatures` models decide.
+- **Server changes.** A page's ViewModel reloads for `libraryChanges`
+  (core:model's `LibraryChange`, with the items and libraries an event
+  names) through `Freshness` in core:presentation, which ignores changes
+  that aren't the page's and holds them while the page is hidden. Its
+  screen calls `ReportShown(vm::setShown)` (core:ui) once, so a page under
+  another one, or with the app in the background, reloads when next shown
+  rather than with every event. Tests drive `libraryChanges`, not `changes`.
 - **Stored settings in tests.** `LocalStore` writes behind: a change is in
   memory at once and on disk a moment later. In `core:data` tests, write
   storage with `Harness.editStorage`, not `dataStore.edit`, and reopen with
