@@ -186,7 +186,8 @@ beyond the titles held, so the grid keeps its start and its rows. Page Up and
 Page Down (`onPageKeys`, on remotes that have them) move two rows in any sort
 (`GridPaging`). `-librarySort title` starts the grids sorted by title in a
 debug build; `-fakesLargeLibrary -tab movies -librarySort title` gives the
-index most letters (`TVUITests/LetterIndexTests.swift`).
+index most letters (`TVUITests/LetterIndexTests.swift`). A list's page takes
+Page Up and Page Down the same way (`TVUITests/ListPageKeysTests.swift`).
 
 ### Downloads
 

@@ -10,6 +10,8 @@ import WMMUI
 /// page; selecting a missing one opens the request dialog (where the person
 /// may request it); an imported title TMDB couldn't find says Not found. A
 /// list whose last fetch failed says so, with Try again for whoever may.
+/// Page Up and Page Down move two rows, as on the library grids
+/// (TvLibraryAZ.dc.html, `GridPaging`).
 struct TVMediaListScreen: View {
     let id: Int
     @Environment(AppServices.self) private var services
@@ -23,10 +25,33 @@ struct TVMediaListScreen: View {
 private struct TVMediaListView: View {
     @State var model: MediaListModel
     @Environment(AppServices.self) private var services
+    /// The focused title's rank, for Page Up and Page Down.
+    @FocusState private var focusedRank: Int?
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 24, alignment: .top), count: 7)
+    private static let columnCount = 7
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 24, alignment: .top), count: TVMediaListView.columnCount)
 
     var body: some View {
+        ScrollViewReader { proxy in
+            page
+                .onPageKeys(enabled: focusedRank != nil) { page(by: $0, proxy) }
+        }
+    }
+
+    /// Two rows back or on from the focused title, in the same column.
+    private func page(by pages: Int, _ proxy: ScrollViewProxy) {
+        guard let rank = focusedRank, let entries = model.state.value?.entries,
+              let place = entries.firstIndex(where: { $0.rank == rank }),
+              let target = GridPaging.target(from: place, pages: pages, columns: Self.columnCount, count: entries.count) else { return }
+        let id = entries[target].rank
+        withAnimation { proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.32)) }
+        Task {
+            await Task.yield()
+            focusedRank = id
+        }
+    }
+
+    private var page: some View {
         TabPage {
             TVLoadable(model.state, retry: model.retry) { page in
                 VStack(alignment: .leading, spacing: 28) {
@@ -36,7 +61,7 @@ private struct TVMediaListView: View {
                     }
                     .focusSection()
                     LazyVGrid(columns: columns, alignment: .leading, spacing: 36) {
-                        ForEach(page.entries) { entry in card(entry) }
+                        ForEach(page.entries) { entry in card(entry).focused($focusedRank, equals: entry.rank) }
                     }
                     .focusSection()
                 }
