@@ -18,6 +18,7 @@ import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.model.LiveCapabilities
 import media.watchmy.client.model.LiveMeasurement
 import media.watchmy.client.model.LiveOutputDirective
+import media.watchmy.client.model.LivePlaybackState
 import media.watchmy.client.model.LivePlaybackGateway
 import media.watchmy.client.model.PlaybackProfile
 import media.watchmy.client.model.LiveSession
@@ -362,14 +363,28 @@ class LivePlaybackTest {
 
     @Test fun `token renewal changes future media requests without loading a new source or starting a session`() = runTest {
         val h = harness()
-        h.gateway.tokenLifetime = 20_000
+        h.gateway.tokenLifetime = 40 * 60_000L
         h.controller.start(ONE)
         runCurrent()
-        advanceTimeBy(17_000)
+        advanceTimeBy(38 * 60_000L)
+        runCurrent()
+        assertEquals("Not before its last minute", 1, h.media.liveTokens.size)
+        advanceTimeBy(60_500)
         runCurrent()
         assertEquals(2, h.media.liveTokens.size)
         assertEquals(1, h.gateway.requests.size)
         assertEquals(1, h.media.loads.size)
+        h.close()
+    }
+
+    @Test fun `a token that seems to have expired by this device's clock is still trusted for half an hour`() = runTest {
+        val h = harness()
+        h.gateway.tokenLifetime = -60 * 60_000L
+        h.controller.start(ONE)
+        runCurrent()
+        advanceTimeBy(5 * 60_000L)
+        runCurrent()
+        assertEquals("No renewal loop", 1, h.media.liveTokens.size)
         h.close()
     }
 
@@ -402,15 +417,56 @@ class LivePlaybackTest {
         h.gateway.automatic = true
         h.controller.selectQuality(StreamQuality.Auto)
         runCurrent()
-        // The already loaded session cannot offer a choice until a fresh
-        // capabilities read; retuning then exposes Automatic.
+        // The loaded session cannot offer a choice until a fresh capabilities read.
         assertEquals(1, h.gateway.requests.size)
         h.controller.start(TWO)
         runCurrent()
+        assertEquals("A channel change goes by the capabilities held", 1, h.gateway.capabilityReads)
+        assertFalse(h.controller.state.value.automaticAvailable)
+        assertEquals(StreamQuality.FullHd, h.gateway.requests.last().quality)
+        // Once they are old, a start reads them again in the background, and the picker offers Automatic.
+        advanceTimeBy(5 * 60_000L)
+        h.controller.start(ONE)
+        runCurrent()
+        assertEquals(2, h.gateway.capabilityReads)
         assertTrue(h.controller.state.value.automaticAvailable)
+        h.controller.start(TWO)
+        runCurrent()
         assertEquals(StreamQuality.Auto, h.gateway.requests.last().quality)
         assertEquals(1, h.gateway.maximumTuners)
         assertEquals("Android Live TV", h.gateway.profiles.last().name)
+        h.close()
+    }
+
+    @Test fun `a channel change keeps the media token while it is fresh`() = runTest {
+        val h = harness()
+        h.controller.start(ONE)
+        runCurrent()
+        h.controller.start(TWO)
+        runCurrent()
+        h.controller.start(THREE)
+        runCurrent()
+        assertEquals(3, h.gateway.requests.size)
+        assertEquals(1, h.gateway.tokenReads)
+        assertEquals(listOf("token-1"), h.media.liveTokens.map { it.token }.distinct())
+        h.close()
+    }
+
+    @Test fun `a tuning channel's status is asked at every tick, one call at a time`() = runTest {
+        val h = harness()
+        h.gateway.initialState = LiveSessionState.Starting
+        h.controller.start(ONE)
+        runCurrent()
+        advanceTimeBy(1_010)
+        runCurrent()
+        // The first tick carries the start's input as a heartbeat; the rest ask for the status.
+        assertEquals(4, h.gateway.statusCalls + h.gateway.beats.size)
+        assertEquals(3, h.gateway.statusCalls)
+        h.gateway.nextReply = h.gateway.view().copy(state = LiveSessionState.Playing)
+        advanceTimeBy(250)
+        runCurrent()
+        assertEquals(PlayerStatus.Playing, h.controller.state.value.status)
+        assertEquals(1, h.media.loads.size)
         h.close()
     }
 
@@ -436,6 +492,30 @@ class LivePlaybackTest {
         assertEquals(8_000L, h.gateway.measurements.last().bufferedMs)
         assertEquals(StreamQuality.Hd, h.controller.state.value.session?.actualQuality)
         assertEquals(1, h.gateway.requests.size)
+        h.close()
+    }
+
+    @Test fun `Automatic's heartbeat measures the player on its own thread and keeps the channel`() = runTest {
+        val h = harness()
+        h.gateway.automatic = true
+        h.preferences.quality.value = StreamQuality.Auto
+        h.controller.start(ONE)
+        runCurrent()
+        assertTrue(h.controller.state.value.session!!.automatic)
+        val before = h.gateway.measurements.size
+        h.media.transfer = media.watchmy.client.core.playback.player.TransferSample(6_000_000, 400)
+        h.media.bufferAheadMs = 12_000
+        advanceTimeBy(10_500)
+        runCurrent()
+        assertTrue("The measured heartbeat went out", h.gateway.measurements.size > before)
+        runCurrent()
+        val m = h.gateway.measurements.last()
+        assertEquals(6_000_000L, m.throughputBps)
+        assertEquals(12_000L, m.bufferedMs)
+        assertEquals(LivePlaybackState.Playing, m.state)
+        assertEquals("The channel plays on", PlayerStatus.Playing, h.controller.state.value.status)
+        assertNull(h.controller.state.value.error)
+        assertEquals(1, h.gateway.allocated.size)
         h.close()
     }
 
@@ -501,7 +581,7 @@ class LivePlaybackTest {
         var ids = 0
         return Harness(
             RealLivePlaybackController(gateway, prefs, CLIENT, { media }, visibility = visibility,
-                network = MeteredNetwork { metered }, clock = clock, dispatcher = dispatcher, io = dispatcher,
+                network = MeteredNetwork { metered }, clock = clock, dispatcher = dispatcher, io = OffMainDispatcher(StandardTestDispatcher(testScheduler)),
                 requestId = { "request-${++ids}" }), gateway, media, prefs, visibility,
         )
     }
@@ -564,7 +644,13 @@ class LivePlaybackTest {
         val profiles = mutableListOf<PlaybackProfile>()
         val measurements = mutableListOf<LiveMeasurement>()
         var startDirective: LiveOutputDirective? = null
-        override suspend fun liveCapabilities() = LiveCapabilities(automatic = automatic)
+        var capabilityReads = 0
+        var statusCalls = 0
+        val tokenReads get() = tokens
+        override suspend fun liveCapabilities(): LiveCapabilities {
+            capabilityReads++
+            return LiveCapabilities(automatic = automatic)
+        }
         override suspend fun startNegotiated(target: LiveTarget, quality: StreamQuality, requestId: String, client: ClientInfo, profile: PlaybackProfile): LiveSession {
             profiles += profile
             return start(target, quality, requestId, client)
@@ -595,7 +681,10 @@ class LivePlaybackTest {
             return session
         }
         fun view() = allocated.values.last()
-        override suspend fun status(sessionId: String): LiveSession = nextReply ?: allocated.getValue(sessionId)
+        override suspend fun status(sessionId: String): LiveSession {
+            statusCalls++
+            return nextReply ?: allocated.getValue(sessionId)
+        }
         override suspend fun heartbeat(sessionId: String, paused: Boolean, interacted: Boolean): LiveSession {
             beats += Beat(sessionId, paused, interacted)
             beforeHeartbeat()

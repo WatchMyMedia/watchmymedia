@@ -19,11 +19,11 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import media.watchmy.client.model.MediaToken
-import media.watchmy.client.model.isOnServer
+import media.watchmy.client.model.signing
 import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -34,19 +34,23 @@ import androidx.media3.exoplayer.source.LoadEventInfo
 import androidx.media3.exoplayer.source.MediaLoadData
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DataSource
+import okhttp3.Call
 
 /**
  * [MediaPlayer] on ExoPlayer with the HLS module. Create it on the main
  * thread; ExoPlayer runs its callbacks there. It measures for Automatic
  * quality as it plays: the bandwidth meter's estimate ([ThroughputMeter])
- * and rebuffers ([StallCounter]). [options] are the device's settings when
- * the player screen opened; [sources] wraps its HTTP data source: the
- * phone app reads downloaded items from the download cache through it.
+ * and rebuffers ([StallCounter]). It fetches over [http] ([mediaHttpClient]),
+ * which carries the timeouts and the redirect rule. [options] are the
+ * device's settings when the player screen opened; [sources] wraps its HTTP
+ * data source: the phone app reads downloaded items from the download cache
+ * through it.
  */
 @OptIn(UnstableApi::class)
 class ExoMediaPlayer(
     context: Context,
     userAgent: String,
+    http: Call.Factory,
     options: PlayerOptions = PlayerOptions(),
     sources: (DataSource.Factory) -> DataSource.Factory = { it },
 ) : MediaPlayer {
@@ -63,22 +67,16 @@ class ExoMediaPlayer(
     private var firstFramePending = false
     private var mediaPathPrefix: String? = null
     private var videoFrameRate: Float? = null
-    @Volatile private var liveToken: MediaToken? = null
+    /** The media token the stream's further requests carry, in place of the one they were made with. */
+    @Volatile private var mediaToken: MediaToken? = null
 
     /** The source loaded is an event or live playlist, which may grow. */
     private var live = false
 
     init {
-        // A VOD segment can wait several seconds while the server starts
-        // ffmpeg at a new place, so reads get longer than the default 8 s.
-        val http = DefaultHttpDataSource.Factory()
-            .setUserAgent(userAgent)
-            // An https stream that redirects to http would carry the media token in the clear.
-            .setAllowCrossProtocolRedirects(false)
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(45_000)
-        val renewable = ResolvingDataSource.Factory(sources(http)) { spec ->
-            liveToken?.let { spec.withUri(renewableMediaUri(spec.uri, it)) } ?: spec
+        val network = OkHttpDataSource.Factory(http).setUserAgent(userAgent)
+        val renewable = ResolvingDataSource.Factory(sources(network)) { spec ->
+            mediaToken?.let { spec.withUri(renewableMediaUri(spec.uri, it)) } ?: spec
         }
         exo = ExoPlayer.Builder(context)
             .setRenderersFactory((if (options.passthrough) DefaultRenderersFactory(context) else PcmOnlyRenderersFactory(context)).setEnableDecoderFallback(true))
@@ -182,7 +180,7 @@ class ExoMediaPlayer(
     override val endedEventDurationMs: Long?
         get() = exo.duration.takeIf { live && !exo.currentTimeline.isEmpty && !exo.isCurrentMediaItemDynamic && it != C.TIME_UNSET && it >= 0 }
 
-    override fun updateMediaToken(token: MediaToken) { liveToken = token }
+    override fun updateMediaToken(token: MediaToken) { mediaToken = token }
 
     override fun seekToLiveEdge() {
         exo.seekToDefaultPosition()
@@ -374,7 +372,7 @@ internal fun frameRateOf(tracks: Tracks): Float? {
     return null
 }
 
-/** What went wrong, for the controller: HTTP statuses, and the audio format a renderer couldn't take. */
+/** What went wrong, for the controller: HTTP statuses, and the audio or video format a renderer couldn't take. */
 @OptIn(UnstableApi::class)
 internal fun failureOf(error: PlaybackException): PlayerFailure {
     val detail = "${error.errorCodeName}: ${error.message}"
@@ -391,10 +389,10 @@ internal fun failureOf(error: PlaybackException): PlayerFailure {
         in 5000..5999 -> PlayerFailure.Kind.Audio
         else -> PlayerFailure.Kind.Other
     }
-    val audio = (error as? ExoPlaybackException)
-        ?.takeIf { it.type == ExoPlaybackException.TYPE_RENDERER }
-        ?.rendererFormat?.sampleMimeType?.takeIf(MimeTypes::isAudio)
-    return PlayerFailure(kind, detail, audioMimeType = audio)
+    val format = (error as? ExoPlaybackException)?.takeIf { it.type == ExoPlaybackException.TYPE_RENDERER }?.rendererFormat
+    val audio = format?.sampleMimeType?.takeIf(MimeTypes::isAudio)
+    val video = format?.sampleMimeType?.takeIf(MimeTypes::isVideo)?.let { FailedVideo(it, format.width, format.height) }
+    return PlayerFailure(kind, detail, audioMimeType = audio, video = video)
 }
 
 /** A load's subtitle tracks: the side-loaded files' IDs, and the file's own tracks in its order. */
@@ -463,13 +461,9 @@ private val RENDITION_GROUP = Regex("""^(\d+:)?subtitle:""")
 
 private fun isSideloaded(formatId: String?, id: String) = formatId == id || formatId?.endsWith(":$id") == true
 
-/** Replaces an old playlist token on each read, confined to the signed-in server. */
+/** Replaces an old token on each read (a playlist's, a segment's, a file's), confined to the signed-in server. */
 internal fun renewableMediaUri(uri: Uri, token: MediaToken): Uri {
-    val server = token.serverUrl ?: return uri
-    if (!isOnServer(server, uri.toString())) return uri
-    val builder = uri.buildUpon().clearQuery()
-    uri.queryParameterNames.filter { it != token.param }.forEach { name ->
-        uri.getQueryParameters(name).forEach { builder.appendQueryParameter(name, it) }
-    }
-    return builder.appendQueryParameter(token.param, token.token).build()
+    val url = uri.toString()
+    val signed = token.signing(url)
+    return if (signed === url) uri else Uri.parse(signed)
 }

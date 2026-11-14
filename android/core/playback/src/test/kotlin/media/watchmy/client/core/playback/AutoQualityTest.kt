@@ -6,6 +6,7 @@ import media.watchmy.client.core.playback.player.Stalls
 import media.watchmy.client.core.playback.player.TransferSample
 import media.watchmy.client.core.playback.player.PlayerFailure
 import media.watchmy.client.core.playback.profile.ProfileProvider
+import media.watchmy.client.model.loweredNote
 import media.watchmy.client.model.DecisionRequest
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.PlayRequest
@@ -41,7 +42,7 @@ class AutoQualityTest {
 
     private fun startPlaying() = h.start(PlayRequest(1, 0, "Harbor Lights"), ::answer)
 
-    private fun lower(to: StreamQuality, message: String? = "Lowered to ${stepName(to)} for your connection.") {
+    private fun lower(to: StreamQuality, message: String? = loweredNote(to)) {
         step = to
         h.gateway.reply = { ProgressReply(completed = false, stopMessage = null, newPlayId = null, qualityChange = QualityChange(to, message)) }
     }

@@ -186,19 +186,37 @@ class StreamTest {
     }
 
     @Test
-    fun aPlayThatOutlivesItsTokenRestartsWithANewOne() {
+    fun aPlayThatOutlivesItsTokenRenewsItInPlace() {
         h.gateway.tokenLifetimeMs = 40 * MIN
         h.start(PlayRequest(1, 0, "Lighthouse"), decision())
+        assertEquals("The stream's requests carry the play's token", listOf("tok1"), h.player.liveTokens.map { it.token })
         h.advance(39 * MIN - 250)
-        assertEquals(1, h.gateway.decisions.size)
+        assertEquals(1, h.gateway.tokens)
         h.advance(250)
         assertEquals(2, h.gateway.tokens)
-        val again = h.gateway.decisions.last()
-        assertEquals("a1", again.playId)
-        assertEquals(39 * MIN, again.startMs)
-        assertEquals("http://srv/api/playback/s1/master.m3u8?access_token=tok2", h.player.loads.last().url)
-        assertEquals(39 * MIN, h.player.loads.last().startPositionMs)
+        assertEquals("The new token goes on the stream's further requests", "tok2", h.player.liveTokens.last().token)
+        assertEquals("No new decision or session", 1, h.gateway.decisions.size)
+        assertEquals("No reload", 1, h.player.loads.size)
+        assertTrue(h.gateway.stoppedSessions.isEmpty())
         assertEquals(PlayerStatus.Playing, h.state.status)
+        h.advance(30 * MIN)
+        assertEquals("Not again until the new one's last minute", 2, h.gateway.tokens)
+    }
+
+    @Test
+    fun aRenewalThatFailsTriesAgainLaterWithoutStoppingThePlay() {
+        h.gateway.tokenLifetimeMs = 40 * MIN
+        h.start(PlayRequest(1, 0, "Lighthouse"), decision())
+        h.gateway.tokenError = ApiException(null, "offline")
+        h.advance(39 * MIN)
+        val tries = h.gateway.tokenCalls
+        h.advance(10_000)
+        assertEquals("No retry every tick", tries, h.gateway.tokenCalls)
+        h.gateway.tokenError = null
+        h.advance(25_000)
+        assertEquals("tok2", h.player.liveTokens.last().token)
+        assertEquals(PlayerStatus.Playing, h.state.status)
+        assertEquals(1, h.player.loads.size)
     }
 
     @Test

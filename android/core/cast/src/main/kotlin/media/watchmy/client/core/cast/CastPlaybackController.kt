@@ -1,7 +1,6 @@
 package media.watchmy.client.core.cast
 
 import androidx.media3.common.Player
-import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -16,21 +15,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.AudioOption
 import media.watchmy.client.model.CastGateway
 import media.watchmy.client.model.ClientInfo
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.PlaybackController
-import media.watchmy.client.model.PlaybackMode
 import media.watchmy.client.model.PlaybackProgress
 import media.watchmy.client.model.PlayerEvent
 import media.watchmy.client.model.PlayerStatus
 import media.watchmy.client.model.PlayerUiState
 import media.watchmy.client.model.PreferencesRepository
 import media.watchmy.client.model.Segment
-import media.watchmy.client.model.SegmentKind
 import media.watchmy.client.model.SkipPrompt
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleOption
@@ -38,6 +34,11 @@ import media.watchmy.client.model.UpNext
 import media.watchmy.client.model.UpNextPrompt
 import media.watchmy.client.model.audioTrackLabel
 import media.watchmy.client.model.subtitleTrackLabel
+import media.watchmy.client.model.STOPPED_BY_ADMIN
+import media.watchmy.client.model.automaticStepNote
+import media.watchmy.client.model.playbackModeOf
+import media.watchmy.client.model.segmentKindOf
+import media.watchmy.client.model.skipLabel
 
 /**
  * The TV's play as a remote (PLAN-CAST.md §5.2): the receiver runs the play
@@ -55,8 +56,6 @@ class CastPlaybackController(
     private val preferences: PreferencesRepository,
     /** This phone, named in LOAD as who cast. */
     private val client: () -> ClientInfo,
-    /** The current server's address for an artwork path (LibraryRepository.imageUrl at w1280). */
-    private val imageUrl: (String?) -> String?,
     private val elapsedMs: () -> Long = { System.nanoTime() / 1_000_000 },
     dispatcher: CoroutineDispatcher = Dispatchers.Main,
     private val io: CoroutineDispatcher = Dispatchers.IO,
@@ -79,14 +78,13 @@ class CastPlaybackController(
     /** What the TV is playing, as a request that reopens it; null when nothing is. */
     val nowPlaying: StateFlow<PlayRequest?> = _nowPlaying.asStateFlow()
 
-    private var link: ReceiverLink? = null
+    private var link: SharedLink? = null
     private var request: PlayRequest? = null
     private var remote: StateMessage? = null
     private var status: ReceiverStatus? = null
     private var loading = false
     private var error: String? = null
     private var loadJob: Job? = null
-    private var lastInputAt = Long.MIN_VALUE / 2
 
     /** A seek not yet reflected in MEDIA_STATUS: the scrubber shows it meanwhile. */
     private var pendingSeek: Long? = null
@@ -95,22 +93,33 @@ class CastPlaybackController(
     private var note: String? = null
     private var noteJob: Job? = null
 
-    private val listener = object : ReceiverLink.Listener {
+    private val listener = object : SharedLink.Listener {
         override fun onStatus(status: ReceiverStatus) = onReceiverStatus(status)
 
-        override fun onMessage(message: String) {
-            CastProtocol.decodeState(message)?.let(::onReceiverState)
-        }
+        override fun onState(state: StateMessage) = onReceiverState(state)
     }
 
-    /** A Cast session started or resumed. */
-    fun attach(link: ReceiverLink) {
+    /** A Cast session started or resumed, as this remote's alone. */
+    fun attach(link: ReceiverLink) = attach(SharedLink(link, elapsedMs))
+
+    /**
+     * A Cast session started or resumed, shared with the live remote. What
+     * the last session's receiver said goes, as the live remote's does: the
+     * TV now may be another, playing something else.
+     */
+    internal fun attach(link: SharedLink) {
         if (this.link === link) return
-        this.link?.setListener(null)
+        this.link?.stopListening(listener)
         this.link = link
-        link.setListener(listener)
-        link.status?.let(::onReceiverStatus)
-        link.send(CastCommand.GetState.encode())
+        loadJob?.cancel()
+        loading = false
+        error = null
+        pendingSeek = null
+        clearNote()
+        remote = null
+        status = link.status
+        link.state?.let(::onReceiverState)
+        link.listen(listener)
         render()
     }
 
@@ -118,7 +127,7 @@ class CastPlaybackController(
     fun detach() {
         loadJob?.cancel()
         loading = false
-        link?.setListener(null)
+        link?.stopListening(listener)
         link = null
         _nowPlaying.value = null
         render()
@@ -152,25 +161,17 @@ class CastPlaybackController(
         loadJob?.cancel()
         loadJob = scope.launch {
             try {
-                val server = withContext(io) { gateway.castServer() } ?: throw ApiException(null, "No server is in use.")
-                val token = withContext(io) { gateway.castToken() }
+                val base = l.loadData(gateway, io, client().name)
                 if (link !== l) return@launch
-                val data = LoadData(
-                    server = LoadServer(server.id, (token.urls + server.baseUrl).distinct()),
-                    token = token.token,
-                    tokenExpiresAt = Instant.ofEpochMilli(token.expiresAtMs).toString(),
+                val data = base.copy(
                     fileId = request.fileId,
                     startMs = request.startMs,
                     audioIndex = request.audioIndex,
                     subtitleId = request.subtitleId,
                     subtitleMode = request.subtitleMode.id,
                     quality = preferences.quality.value.id,
-                    device = LoadDevice(l.deviceId, l.deviceName),
-                    sender = LoadSender(client().name),
                 )
-                // LOAD metadata is echoed in status by older receivers. Omit private artwork.
-                val image: String? = null
-                l.load(LoadRequest(request.fileId, request.title, request.subtitle, image, data))
+                l.load(LoadRequest(request.fileId, request.title, request.subtitle, data))
                 loading = false
                 render()
             } catch (e: CancellationException) {
@@ -227,12 +228,9 @@ class CastPlaybackController(
         scope.launch { runCatching { preferences.setQuality(quality) } }
     }
 
-    /** Throttled: the player screen calls this on every touch. */
+    /** Throttled ([SharedLink.noteInput]): the player screen calls this on every touch. */
     override fun noteUserInput() {
-        val now = elapsedMs()
-        if (now - lastInputAt < INPUT_EVERY_MS) return
-        lastInputAt = now
-        link?.send(CastCommand.Input.encode())
+        link?.noteInput()
     }
 
     /** Stops the TV's play; leaving the remote screen does not call this. */
@@ -244,8 +242,7 @@ class CastPlaybackController(
     override fun release() {}
 
     private fun send(command: CastCommand) {
-        lastInputAt = elapsedMs()
-        link?.send(command.encode())
+        link?.command(command)
     }
 
     // --- the receiver's side ---
@@ -298,17 +295,18 @@ class CastPlaybackController(
         val was = StreamQuality.byId(before.autoStep) ?: return
         val now = StreamQuality.byId(m.autoStep) ?: return
         if (now == was) return
-        note = when {
-            now.ordinal > was.ordinal -> "Lowered to ${now.label.substringBefore(" · ")} for your connection."
-            now == StreamQuality.Original -> "Connection recovered; playing the original file."
-            else -> "Raised to ${now.label.substringBefore(" · ")} for your connection."
-        }
+        note = automaticStepNote(was, now)
         noteJob?.cancel()
         noteJob = scope.launch {
             delay(NOTE_MS)
             note = null
             render()
         }
+    }
+
+    private fun clearNote() {
+        noteJob?.cancel()
+        note = null
     }
 
     private fun merged(r: PlayRequest): PlayRequest {
@@ -370,10 +368,10 @@ class CastPlaybackController(
             quality = quality,
             qualities = StreamQuality.offered(preferences.autoQuality.value),
             autoStep = StreamQuality.byId(r?.autoStep)?.takeIf { quality == StreamQuality.Auto && it != StreamQuality.Auto },
-            mode = r?.mode?.let(::playbackMode),
+            mode = playbackModeOf(r?.mode),
             note = note,
             stopMessage = r?.stopMessage?.takeIf { r.phase == StateMessage.STOPPED }
-                ?: if (r?.phase == StateMessage.STOPPED) "Playback was stopped by the server's admin." else null,
+                ?: if (r?.phase == StateMessage.STOPPED) STOPPED_BY_ADMIN else null,
             error = shownError ?: if (status == PlayerStatus.Error) "The TV couldn't play this." else null,
         )
     }
@@ -385,39 +383,10 @@ class CastPlaybackController(
         /** How long Automatic's switch note shows. */
         const val NOTE_MS = 5_000L
 
-        internal fun withToken(url: String, token: String) = url + (if ('?' in url) "&" else "?") + "access_token=" + token
-
-        internal fun segmentKind(kind: String): SegmentKind? = when (kind) {
-            "intro" -> SegmentKind.Intro
-            "recap" -> SegmentKind.Recap
-            "credits" -> SegmentKind.Credits
-            "preview" -> SegmentKind.Preview
-            "commercial" -> SegmentKind.Commercial
-            else -> null
-        }
-
-        internal fun SegmentKind.wireName(): String = name.lowercase()
-
-        private fun skipLabel(kind: SegmentKind): String = when (kind) {
-            SegmentKind.Intro -> "Skip Intro"
-            SegmentKind.Recap -> "Skip Recap"
-            SegmentKind.Credits -> "Skip Credits"
-            SegmentKind.Preview -> "Skip Preview"
-            SegmentKind.Commercial -> "Skip Ad"
-        }
-
-        private fun playbackMode(mode: String): PlaybackMode? = when (mode) {
-            "direct" -> PlaybackMode.Direct
-            "remux" -> PlaybackMode.Remux
-            "audio" -> PlaybackMode.AudioTranscode
-            "transcode" -> PlaybackMode.Transcode
-            else -> null
-        }
-
-        private fun SegmentInfo.toModel() = segmentKind(kind)?.let { Segment(it, startMs, endMs, final == true) }
+        private fun SegmentInfo.toModel() = segmentKindOf(kind)?.let { Segment(it, startMs, endMs, final == true) }
 
         private fun skipPrompt(skip: SkipInfo, segments: List<Segment>): SkipPrompt? {
-            val kind = segmentKind(skip.kind) ?: return null
+            val kind = segmentKindOf(skip.kind) ?: return null
             val segment = segments.firstOrNull { it.kind == kind && it.endMs == skip.endMs } ?: Segment(kind, 0, skip.endMs)
             return SkipPrompt(segment, skipLabel(kind), autoProgress = null)
         }

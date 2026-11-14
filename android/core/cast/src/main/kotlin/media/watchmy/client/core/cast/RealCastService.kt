@@ -34,8 +34,6 @@ import media.watchmy.client.model.CastGateway
 import media.watchmy.client.model.CastService
 import media.watchmy.client.model.CastState
 import media.watchmy.client.model.ClientInfo
-import media.watchmy.client.model.ImageSize
-import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.LiveCastRemote
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.PlaybackController
@@ -63,7 +61,6 @@ class RealCastService(
     servers: ServerRepository,
     auth: AuthRepository,
     preferences: PreferencesRepository,
-    library: LibraryRepository,
     client: () -> ClientInfo,
 ) : CastService {
     private val app = context.applicationContext
@@ -72,7 +69,7 @@ class RealCastService(
     private val _state = MutableStateFlow<CastState>(CastState.Unavailable)
     override val state: StateFlow<CastState> = _state.asStateFlow()
 
-    private val controller = CastPlaybackController(gateway, preferences, client, { library.imageUrl(it, ImageSize.W1280) })
+    private val controller = CastPlaybackController(gateway, preferences, client)
     override val remote: PlaybackController = controller
     override val nowPlaying: StateFlow<PlayRequest?> = controller.nowPlaying
 
@@ -158,10 +155,10 @@ class RealCastService(
     private fun connected(s: CastSession) {
         session = s
         connecting = null
-        // The file remote and the live remote share the session's messages.
+        // The file remote and the live remote share the session: its messages, one getState, LOAD and the input throttle.
         val shared = SharedLink(SdkReceiverLink(s))
-        controller.attach(shared.view())
-        liveController.attach(shared.view())
+        controller.attach(shared)
+        liveController.attach(shared)
         publish()
     }
 

@@ -19,7 +19,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
-import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.NoOpCacheEvictor
@@ -29,6 +29,7 @@ import androidx.media3.exoplayer.offline.DefaultDownloaderFactory
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadManager
 import androidx.media3.exoplayer.offline.DownloadNotificationHelper
+import androidx.media3.exoplayer.scheduler.Requirements
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -37,6 +38,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.io.File
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,6 +49,9 @@ import media.watchmy.client.model.OfflineGateway
 import media.watchmy.client.model.PlaybackGateway
 import media.watchmy.client.model.PlaybackProfile
 import media.watchmy.client.model.downloadTitle
+import okhttp3.Call
+import okhttp3.Dispatcher
+import okhttp3.OkHttpClient
 
 /**
  * Offline downloads for the phone app (PLAN-DOWNLOADS.md §10): made once by
@@ -64,6 +69,11 @@ class OfflineDownloads(
     client: () -> ClientInfo,
     profile: suspend () -> PlaybackProfile,
     userAgent: String,
+    /**
+     * The app's HTTP client without the API's sign-in, whose connection pool
+     * the downloader shares; asked for with the first download.
+     */
+    httpClient: () -> OkHttpClient = ::OkHttpClient,
 ) {
     /** Implemented by the Application, so [WmmDownloadService] and [OfflineSyncWorker] find the downloads. */
     interface Host {
@@ -88,12 +98,9 @@ class OfflineDownloads(
     private val tokens = OfflineTokens(gateway::token, owner = { id -> store.record(id)?.owner })
 
     internal val manager: DownloadManager = run {
-        // The player's read timeout: a VOD segment can wait while the server starts ffmpeg.
-        val http = DefaultHttpDataSource.Factory()
-            .setUserAgent(userAgent)
-            .setAllowCrossProtocolRedirects(false)
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(45_000)
+        // Built with the first fetch, on the downloader's thread, not at the app's start.
+        val client by lazy { downloaderHttpClient(httpClient()) }
+        val http = OkHttpDataSource.Factory(Call.Factory { client.newCall(it) }).setUserAgent(userAgent)
         val events = object : FetchEvents {
             override fun preparing(id: String) { ready?.preparing(id) }
             override fun fetching(id: String) { ready?.fetching(id) }
@@ -113,13 +120,15 @@ class OfflineDownloads(
 
     private val notifications = DownloadNotificationHelper(app, CHANNEL)
 
+    private val engine = Media3Engine(app, manager, cache)
+
     val repository: DownloadRepository
 
     init {
         ready = RealDownloadRepository(
             store = store,
             gateway = gateway,
-            engine = Media3Engine(app, manager, cache),
+            engine = engine,
             client = client,
             profile = profile,
             space = {
@@ -138,6 +147,13 @@ class OfflineDownloads(
             }
         })
     }
+
+    /**
+     * Unfinished downloads go on after the process starts again: the manager
+     * resumes now, once the repository has set its requirements (Wi-Fi only).
+     */
+    private val restarts = DownloadRestarts(manager, engine::startService, WorkManagerJobs(app))
+        .also { ProcessLifecycleOwner.get().lifecycle.addObserver(it) }
 
     /** The player's calls, with downloaded items played from the device. */
     fun playbackGateway(online: PlaybackGateway): PlaybackGateway = OfflinePlaybackGateway(online, repo)
@@ -161,6 +177,19 @@ class OfflineDownloads(
         val running = downloads.firstOrNull { it.state == Download.STATE_DOWNLOADING }
         val title = running?.let { repo.downloads.value.firstOrNull { d -> d.id == it.request.id } }?.item?.let { downloadTitle(it) }
         return notifications.buildProgressNotification(app, R.drawable.ic_stat_download, launchIntent(app), title, downloads.filterNot { isPart(it.request.id) }, notMetRequirements)
+    }
+
+    /**
+     * The job that runs unfinished downloads while the app is away, on
+     * Android 12 and later ([DownloadRestarts]): it returns once the manager
+     * can do no more, and asks to run again while any is left.
+     */
+    class DownloadJobWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+        override suspend fun doWork(): Result {
+            val downloads = (applicationContext as? Host)?.offlineDownloads ?: return Result.success()
+            val done = kotlinx.coroutines.withContext(Dispatchers.Main.immediate) { downloads.restarts.runUntilIdle() }
+            return if (done) Result.success() else Result.retry()
+        }
     }
 
     /** A job that syncs once a network is back. */
@@ -192,10 +221,64 @@ class OfflineDownloads(
             }
         }
 
+        /**
+         * The downloader's client, made from the app's [shared] one as the
+         * players' is: the same connection pool, its own dispatcher, no
+         * response cache, reads that wait out a server starting ffmpeg, and
+         * no redirect between http and https (the token is in the URL).
+         */
+        internal fun downloaderHttpClient(shared: OkHttpClient): OkHttpClient = shared.newBuilder()
+            .dispatcher(Dispatcher())
+            .cache(null)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(45, TimeUnit.SECONDS)
+            .followSslRedirects(false)
+            .build()
+
+        /** WorkManager's constraints for Media3's [requirements]: the network (unmetered for Wi-Fi only) and storage that isn't low. */
+        internal fun constraintsFor(requirements: Requirements): Constraints = Constraints.Builder()
+            .setRequiredNetworkType(
+                when {
+                    requirements.isUnmeteredNetworkRequired -> NetworkType.UNMETERED
+                    requirements.isNetworkRequired -> NetworkType.CONNECTED
+                    else -> NetworkType.NOT_REQUIRED
+                },
+            )
+            .setRequiresStorageNotLow(requirements.isStorageNotLowRequired)
+            .build()
+
         internal fun launchIntent(context: Context): PendingIntent? {
             val intent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return null
             return PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         }
+    }
+}
+
+/** [DownloadJobs] on WorkManager: one unique job, kept while one is waiting, with the downloads' requirements. */
+@OptIn(UnstableApi::class)
+private class WorkManagerJobs(private val context: Context) : DownloadJobs {
+    override fun schedule(requirements: Requirements) {
+        try {
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                DOWNLOAD_WORK,
+                ExistingWorkPolicy.KEEP,
+                OneTimeWorkRequestBuilder<OfflineDownloads.DownloadJobWorker>().setConstraints(OfflineDownloads.constraintsFor(requirements)).build(),
+            )
+        } catch (e: IllegalStateException) {
+            Log.w("WmmDownloads", "could not schedule the downloads' job", e)
+        }
+    }
+
+    override fun cancel() {
+        try {
+            WorkManager.getInstance(context).cancelUniqueWork(DOWNLOAD_WORK)
+        } catch (e: IllegalStateException) {
+            Log.w("WmmDownloads", "could not cancel the downloads' job", e)
+        }
+    }
+
+    private companion object {
+        const val DOWNLOAD_WORK = "offline-downloads-run"
     }
 }
 

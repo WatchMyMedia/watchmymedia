@@ -148,6 +148,28 @@ class DownloadRepositoryTest {
     }
 
     @Test
+    fun `a download that finished as the process ended is done at the next start, with its notice, and the old copy goes`() = runTest {
+        val r = repo()
+        r.download(DownloadChoice(42, DownloadQuality.Original))
+        engine.set(RECORD_ID, EngineDownload.State.Completed, 100f, 10)
+        gateway.state = OfflineRecordState.Replaced
+        gateway.replacedBy = 77
+        r.sync()
+        gateway.state = OfflineRecordState.Ready
+        r.download(DownloadChoice(77, DownloadQuality.Original))
+        notices.clear()
+        // The last bytes landed, but the process ended before the engine said so.
+        engine.loaded("bbbbbbbbbbbbbbbb", EngineDownload.State.Completed)
+        assertNull(r.downloads.value.first { it.fileId == 77L }.completedAtMs)
+        // The next start: the engine reads its index and reports everything at once.
+        engine.initialized()
+        assertEquals(listOf(77L), r.downloads.value.map { it.fileId })
+        assertEquals(now, r.downloads.value.single().completedAtMs)
+        assertEquals(listOf("downloaded Dead Reckoning Bay"), notices)
+        assertTrue(RECORD_ID in engine.removed)
+    }
+
+    @Test
     fun `a failure is said, but a refusal is the sync's to explain`() = runTest {
         val r = repo()
         r.download(DownloadChoice(42, DownloadQuality.Original))
@@ -400,6 +422,14 @@ class DownloadRepositoryTest {
             all[id] = d
             listener?.invoke(d, failure)
         }
+
+        /** What the engine's index holds, without telling anyone: the process ended first. */
+        fun loaded(id: String, state: EngineDownload.State) {
+            all[id] = EngineDownload(id, state, if (state == EngineDownload.State.Completed) 100f else 0f, 10)
+        }
+
+        /** The engine has read its index (Media3's onInitialized). */
+        fun initialized() = listener?.invoke(null, null)
 
         override fun downloads() = all.toMap()
         override fun notMet() = 0

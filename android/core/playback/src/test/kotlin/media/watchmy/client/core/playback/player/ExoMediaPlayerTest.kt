@@ -48,11 +48,13 @@ class ExoMediaPlayerTest {
     }
 
     @Test
-    fun `a video decoder's failure names no audio`() {
-        val hevc = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H265).build()
+    fun `a video decoder's failure names the video and no audio`() {
+        val hevc = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H265).setWidth(3840).setHeight(2160).build()
         val failure = failureOf(renderer(hevc, PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED))
         assertEquals(PlayerFailure.Kind.Decoder, failure.kind)
         assertNull(failure.audioMimeType)
+        assertEquals("What the controller asks around", FailedVideo("video/hevc", 3840, 2160), failure.video)
+        assertNull("An audio failure names no video", failureOf(renderer(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3).build(), PlaybackException.ERROR_CODE_DECODING_FAILED)).video)
         assertNull("No format at all", failureOf(renderer(null, PlaybackException.ERROR_CODE_DECODER_INIT_FAILED)).audioMimeType)
     }
 

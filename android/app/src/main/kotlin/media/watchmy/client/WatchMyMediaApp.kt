@@ -122,7 +122,7 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
         data.onSessionChange { playback.setWatchNextAccount(account()) }
         val castable = traced("WMM cast check") { BuildConfig.CAST_APP_ID.isNotEmpty() && RealCastService.isSupported(this) }
         val cast = if (castable && !isTv) {
-            traced("WMM RealCastService") { RealCastService(this, data.castGateway, data.servers, data.auth, data.preferences, data.library, client = { data.client }) }
+            traced("WMM RealCastService") { RealCastService(this, data.castGateway, data.servers, data.auth, data.preferences, client = { data.client }) }
         } else {
             CastService.None
         }

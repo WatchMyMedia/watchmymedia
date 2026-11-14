@@ -1,14 +1,13 @@
 package media.watchmy.client.core.cast
 
-import media.watchmy.client.core.cast.CastPlaybackController.Companion.wireName
 import java.time.Instant
 import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.model.LivePlayerState
 import media.watchmy.client.model.LiveProgramme
-import media.watchmy.client.model.PlaybackMode
 import media.watchmy.client.model.PlayerStatus
 import media.watchmy.client.model.PlayerUiState
 import media.watchmy.client.model.UpNext
+import media.watchmy.client.model.wireName
 
 /**
  * The `state` message the TV app's player sends senders (Cast Connect):
@@ -32,13 +31,13 @@ internal fun castConnectState(fileId: Long, state: PlayerUiState, imageUrl: (Str
         fileId = fileId,
         title = s.title,
         subtitle = s.subtitle,
-        mode = s.mode?.let(::modeName),
+        mode = s.mode?.wireName,
         quality = s.quality.id,
         autoStep = s.autoStep?.id,
         durationMs = s.durationMs,
         offsetMs = 0,
-        segments = s.segments.map { SegmentInfo(it.kind.wireName(), it.startMs, it.endMs, it.final) },
-        skip = s.skip?.let { SkipInfo(it.segment.kind.wireName(), it.segment.endMs ?: s.durationMs, auto = it.autoProgress != null) },
+        segments = s.segments.map { SegmentInfo(it.kind.wireName, it.startMs, it.endMs, it.final) },
+        skip = s.skip?.let { SkipInfo(it.segment.kind.wireName, it.segment.endMs ?: s.durationMs, auto = it.autoProgress != null) },
         upNext = s.upNext?.let { p -> p.next.toInfo().copy(secondsLeft = p.countdownMs?.let { ((it + 999) / 1000).toInt() }) },
         nextEpisode = s.nextEpisode?.toInfo(),
         stillWatching = s.askStillWatching,
@@ -50,13 +49,6 @@ internal fun castConnectState(fileId: Long, state: PlayerUiState, imageUrl: (Str
         error = s.error,
         deviceName = deviceName,
     )
-}
-
-private fun modeName(mode: PlaybackMode) = when (mode) {
-    PlaybackMode.Direct -> "direct"
-    PlaybackMode.Remux -> "remux"
-    PlaybackMode.AudioTranscode -> "audio"
-    PlaybackMode.Transcode -> "transcode"
 }
 
 /** What this TV app plays beyond files, in every `state` it sends (PLAN-LIVE-TV.md §4.1). */
