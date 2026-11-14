@@ -78,8 +78,8 @@ class ShortcutLinksTest {
 
     @Test fun `Ctrl+F no screen took opens Search`() {
         val nav = open(null)
-        val ctrlF = KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_F, 0, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
-        compose.runOnUiThread { assertTrue(shortcuts.onKeyUp(KeyEvent.KEYCODE_F, ctrlF)) }
+        val ctrlF = KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_F, 0, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+        compose.runOnUiThread { assertTrue(shortcuts.onKeyDown(KeyEvent.KEYCODE_F, ctrlF)) }
         compose.waitForIdle()
         assertTrue(nav.currentDestination!!.hasRoute<MobileRoutes.Search>())
     }

@@ -141,7 +141,8 @@ fun PressableCard(
                     .onKeyEvent { event ->
                         val menuKey = event.key == Key.Menu || (event.key == Key.F10 && event.isShiftPressed)
                         if (!hasMenu || !menuKey) return@onKeyEvent false
-                        if (event.type == KeyEventType.KeyUp) {
+                        // On the press: Shift may be let go before F10.
+                        if (event.type == KeyEventType.KeyDown) {
                             menuAt = null
                             menu = true
                         }

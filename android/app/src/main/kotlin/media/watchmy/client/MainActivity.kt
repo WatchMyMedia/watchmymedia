@@ -51,8 +51,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
-        shortcuts.onKeyUp(keyCode, event) || super.onKeyUp(keyCode, event)
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
+        shortcuts.onKeyDown(keyCode, event) || super.onKeyDown(keyCode, event)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
