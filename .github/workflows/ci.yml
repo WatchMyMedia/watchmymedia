@@ -754,13 +754,15 @@ jobs:
       - name: Build and test on an Apple TV simulator
         # Two Studio runners stalled after all tests passed. Avoid verbose
         # sysdiagnose collection, a possible cause; keep results and failures.
-        # One simulator: with two clones (-parallel-testing-worker-count 2)
-        # GitHub's three-core Mac ran the tests about a minute faster of ten
-        # and a timing-sensitive Kit test failed (run of 2026-11-12).
-        # 35 minutes: the Apple review's UI tests (A-Z, Episodes, channel keys,
-        # diagnostics, Top Shelf) took the suite past 20 (run of 2026-11-14).
-        timeout-minutes: 35
-        run: make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
+        # Built once; the Kit's tests on one simulator, then the remote UI
+        # tests on two clones of it. The whole scheme on two clones made a
+        # timing-sensitive Kit test fail beside the UI tests (run of
+        # 2026-11-12), so the Kit's tests run on their own first.
+        # The Apple review's UI tests (A-Z, Episodes, channel keys,
+        # diagnostics, Top Shelf) took one simulator past 20 minutes (run of
+        # 2026-11-14).
+        timeout-minutes: 30
+        run: make apple-tv-test-sim-ci APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
       # Release for devices, unsigned, as in the apple job.
       - name: Build for release
         run: make apple-tv-build-release PATH="$PATH"
@@ -775,7 +777,9 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: apple-tv-test-results
-          path: apple/build/TVTests.xcresult
+          path: |
+            apple/build/TVTests.xcresult
+            apple/build/TVUITests.xcresult
 
   # The Go tests on Windows, with the ffmpeg build the Windows app will ship
   # (PLAN.md §7c). The Mac Studio cannot run Windows, so this and

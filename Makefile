@@ -8,7 +8,7 @@ VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev
 OPENSUBTITLES_API_KEY ?=
 LDFLAGS  = -s -w -X main.version=$(VERSION) -X main.openSubtitlesKey=$(OPENSUBTITLES_API_KEY)
 
-.PHONY: help dev web-dev gen gen-sqlc gen-api web build build-universal release ffmpeg-macos ffmpeg-windows windows-app windows-installer windows-test macos-app macos-dmg test bench lint docker docker-up clean fixture fixture-serve apple-api apple-gen apple-test apple-build apple-test-sim apple-archive apple-upload apple-tv-archive apple-tv-upload apple-e2e apple-tv-build apple-tv-test-sim apple-build-release apple-tv-build-release apple-perf agents-check server-deps android-verify-metadata
+.PHONY: help dev web-dev gen gen-sqlc gen-api web build build-universal release ffmpeg-macos ffmpeg-windows windows-app windows-installer windows-test macos-app macos-dmg test bench lint docker docker-up clean fixture fixture-serve apple-api apple-gen apple-test apple-build apple-test-sim apple-archive apple-upload apple-tv-archive apple-tv-upload apple-e2e apple-tv-build apple-tv-test-sim apple-tv-test-sim-ci apple-build-release apple-tv-build-release apple-perf agents-check server-deps android-verify-metadata
 .PHONY: streaming-check release-tag
 
 PLATFORMS := darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64
@@ -87,6 +87,32 @@ apple-tv-test-sim: apple-gen ## Build the Apple TV app and run every test on the
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
 	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVTests.xcresult $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) \
 	  $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) test
+
+# CI's way to run the same tests (PLAN-CI-SPEED.md C5): build once, run the
+# Kit's tests on the one simulator, then the remote UI tests on $(TV_UI_WORKERS)
+# clones of it. Run apart, the Kit's timing-sensitive tests don't share the
+# machine with the UI tests' simulators, as they did when the whole scheme ran
+# on two clones (run of 2026-11-12). Both runs go ahead, and either failing
+# fails the target. Results: TVTests.xcresult (Kit), TVUITests.xcresult (UI).
+TV_UI_WORKERS ?= 2
+apple-tv-test-sim-ci: apple-gen ## Build once, then the Kit tests and the UI tests on $(TV_UI_WORKERS) Apple TV simulator clones
+	id=$$(apple/scripts/simulator.sh "$(TV_SIM)" appletv) && \
+	{ xcrun simctl boot "$$id" 2>/dev/null || true; } && \
+	rm -rf apple/build/TVTests.xcresult apple/build/TVUITests.xcresult && \
+	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
+	  -derivedDataPath $(APPLE_DERIVED) $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) build-for-testing && \
+	{ kit=0; ui=0; \
+	  xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
+	    -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVTests.xcresult $(APPLE_TEST_FLAGS) \
+	    $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) \
+	    -skip-testing:WatchMyMediaTVUITests test-without-building || kit=$$?; \
+	  xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
+	    -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVUITests.xcresult $(APPLE_TEST_FLAGS) \
+	    $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) \
+	    -only-testing:WatchMyMediaTVUITests -parallel-testing-enabled YES -parallel-testing-worker-count $(TV_UI_WORKERS) \
+	    test-without-building || ui=$$?; \
+	  echo "Kit tests: exit $$kit; UI tests: exit $$ui"; \
+	  [ $$kit -eq 0 ] && [ $$ui -eq 0 ]; }
 
 # The Release configuration for devices, unsigned: what an archive compiles
 # (optimised, no DEBUG, so no fakes), without signing. CI runs both, so a

@@ -476,10 +476,11 @@ esac
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         tv = re.search(r'(?ms)^  apple-tv:\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
         step = re.search(r'(?ms)- name: Build and test on an Apple TV simulator\n(.*?)(?=      -)', tv).group(1)
-        self.assertIn('timeout-minutes: 35', step)
-        self.assertIn("make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH=\"$PATH\"", step)
+        self.assertIn('timeout-minutes: 30', step)
+        self.assertIn("make apple-tv-test-sim-ci APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH=\"$PATH\"", step)
         self.assertNotIn('continue-on-error', tv)
-        self.assertIn('path: apple/build/TVTests.xcresult', tv)
+        self.assertIn('apple/build/TVTests.xcresult', tv)
+        self.assertIn('apple/build/TVUITests.xcresult', tv)
 
         # Run the real make target against command stand-ins: check the argv
         # and a failing xcodebuild exit without touching a simulator or Xcode.
@@ -524,6 +525,56 @@ esac
             self.assertNotEqual(0, failed.returncode)
             self.assertIn(b'Error 65', failed.stderr)
 
+    def test_tv_ci_target_builds_once_and_runs_kit_and_ui_tests_apart(self):
+        # CI's target: one build-for-testing, the Kit's tests on the one
+        # simulator, then only the UI tests on parallel clones; a failure in
+        # either run fails the target, and the other still runs.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp)
+            (path / 'apple/scripts').mkdir(parents=True)
+            commands = {
+                'apple/scripts/simulator.sh': 'echo 00000000-0000-0000-0000-000000000001',
+                'xcodegen': 'exit 0',
+                'xcrun': 'exit 1',
+                # One line of arguments per call; FAIL_ON names the action that fails.
+                'xcodebuild': 'echo "$*" >> "$CAPTURE_PATH"\n'
+                              'for last; do :; done\n'
+                              'case " $* " in *" $FAIL_ON "*) [ -n "$FAIL_ON" ] && exit 65;; esac\n'
+                              'exit 0',
+            }
+            for name, script in commands.items():
+                command = path / name
+                command.write_text('#!/bin/sh\n' + script + '\n')
+                command.chmod(0o755)
+            capture = path / 'arguments'
+            env = dict(os.environ, CAPTURE_PATH=str(capture), FAIL_ON='')
+            command = ['make', '-f', str(ROOT / 'Makefile'), 'apple-tv-test-sim-ci',
+                       'APPLE_TV_TEST_DIAGNOSTICS=never', 'APPLE_TEST_FLAGS=-enableCodeCoverage NO',
+                       'PATH=' + tmp + os.pathsep + os.environ['PATH']]
+            subprocess.run(command, cwd=tmp, env=env, check=True, capture_output=True)
+            build, kit, ui = capture.read_text().splitlines()
+            self.assertTrue(build.endswith('build-for-testing'), build)
+            self.assertIn('-enableCodeCoverage NO', build)
+            self.assertTrue(kit.endswith('test-without-building'), kit)
+            self.assertIn('-skip-testing:WatchMyMediaTVUITests', kit)
+            self.assertIn('-resultBundlePath apple/build/TVTests.xcresult', kit)
+            self.assertNotIn('-parallel-testing-enabled', kit)
+            self.assertIn('-collect-test-diagnostics never', kit)
+            self.assertTrue(ui.endswith('test-without-building'), ui)
+            self.assertIn('-only-testing:WatchMyMediaTVUITests', ui)
+            self.assertIn('-resultBundlePath apple/build/TVUITests.xcresult', ui)
+            self.assertIn('-parallel-testing-enabled YES -parallel-testing-worker-count 2', ui)
+            for failing in ('-skip-testing:WatchMyMediaTVUITests', '-only-testing:WatchMyMediaTVUITests'):
+                with self.subTest(failing=failing):
+                    capture.unlink()
+                    failed = subprocess.run(command, cwd=tmp, env=dict(env, FAIL_ON=failing), capture_output=True)
+                    self.assertNotEqual(0, failed.returncode)
+                    self.assertEqual(3, len(capture.read_text().splitlines()), 'both test runs still go ahead')
+            capture.unlink()
+            failed = subprocess.run(command, cwd=tmp, env=dict(env, FAIL_ON='build-for-testing'), capture_output=True)
+            self.assertNotEqual(0, failed.returncode)
+            self.assertEqual(1, len(capture.read_text().splitlines()), 'no tests without a build')
+
     def test_apple_jobs_build_release_unsigned_after_their_tests(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         makefile = (ROOT / 'Makefile').read_text()
@@ -532,7 +583,9 @@ esac
                 body = re.search(r'(?ms)^  ' + re.escape(job) + r':\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
                 step = re.search(r'(?ms)- name: Build for release\n(.*?)(?=      -)', body).group(1)
                 self.assertIn(f'run: make {target} PATH="$PATH"', step)
-                self.assertLess(body.index('-test-sim '), body.index('- name: Build for release'))
+                tests = re.search(r'-test-sim(?:-ci)? ', body)
+                self.assertIsNotNone(tests)
+                self.assertLess(tests.start(), body.index('- name: Build for release'))
                 recipe = re.search(r'(?ms)^' + re.escape(target) + r':.*?\n((?:\t.*\n)+)', makefile).group(1)
                 self.assertIn('-configuration Release', recipe)
                 self.assertIn(f"-destination 'generic/platform={platform}'", recipe)
