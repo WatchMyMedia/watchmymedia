@@ -240,8 +240,9 @@ didn't start.
   a slow move is otherwise pressed twice, or each step on the way waits out
   the timeout. `snapshot()` retries for 2 s on a missing element, so ask
   `exists` first (`lookedAt`). A look at the screen once took 8 s on a busy
-  simulator, so a test that reads something shown briefly makes it stay
-  longer (`-liveBannerSeconds 30` for the reminder banner).
+  simulator, so read something shown briefly in the look that finds it
+  (`wait(until:)` reads one snapshot) and keep it up long enough for a whole
+  look (`-liveBannerSeconds 15` for the reminder banner).
 - XCUITest's Siri Remote has no touch-surface swipe, and Right while paused
   skips 10 s, so AVKit's own scrubbing (and the thumbnails it draws from an
   I-frame playlist) can't be driven from a test; check it by hand.

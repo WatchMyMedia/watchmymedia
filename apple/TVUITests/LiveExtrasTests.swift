@@ -139,17 +139,20 @@ final class LiveExtrasTests: XCTestCase {
     @MainActor
     func testTheBannerComesOverHomeWithoutTakingFocus() {
         // The reminder comes 8 s after launch, once Home is up, rather than the
-        // fakes' default 20 s. The banner stays 30 s rather than 10: on a busy
-        // simulator one look at the screen took 8 s, and the banner had gone
-        // between finding it and reading its label.
-        let app = launch(["-fakesLiveReminderSoon", "8", "-liveBannerSeconds", "30"])
+        // fakes' default 20 s. On a busy simulator one look at the screen took
+        // 8 s, and a 10 s banner had gone between finding it and reading its
+        // label. So the look that finds the banner also reads its label and
+        // focus, from one snapshot, and the banner stays 15 s: long enough for
+        // a look to start and finish while it is up, and a 15 s wait for it to
+        // go rather than 30.
+        let app = launch(["-fakesLiveReminderSoon", "8", "-liveBannerSeconds", "15"])
         let banner = app.descendants(matching: .any)["live-reminder-banner"]
-        XCTAssertTrue(banner.waitUntilExists(timeout: 45), "The reminder's banner comes at its time")
-        XCTAssertTrue(banner.label.contains("Pro Hockey starts in 5 minutes on 9.1 PNVL-HD. Watch it from Live TV."), banner.label)
-        XCTAssertFalse(banner.hasFocus)
+        let says = "Pro Hockey starts in 5 minutes on 9.1 PNVL-HD. Watch it from Live TV."
+        XCTAssertTrue(banner.wait(until: NSPredicate(format: "label CONTAINS %@ AND hasFocus == false", says), timeout: 45),
+                      "The reminder's banner comes at its time, says what is on and where, and takes no focus: \(banner.lookedAt?.label ?? "no banner")")
         snap("tv-banner-home")
-        // waitUntilGone looks every quarter second; an
-        // XCTNSPredicateExpectation looked only every 6 s here.
+        // Looks every quarter second; an XCTNSPredicateExpectation looked only
+        // every 6 s here.
         XCTAssertTrue(banner.waitUntilGone(timeout: 45), "It goes by itself")
         app.terminate()
     }

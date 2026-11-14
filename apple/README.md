@@ -560,8 +560,8 @@ favourites and reminders; `-fakesLiveReminder set|moved|gone` and
 keeps the server at level 13, and `-fakesLiveReminderSoon` (optionally
 followed by a number of seconds, 20 by default) replaces the canned
 reminders with one whose notification or banner comes that long after launch.
-On Apple TV, `-liveBannerSeconds 30` (debug builds) keeps a reminder's banner
-up that long rather than ten seconds, so a UI test can read it.
+On Apple TV, `-liveBannerSeconds N` (debug builds) keeps a reminder's banner
+up N seconds rather than ten, so a UI test on a busy simulator can read it.
 Debug fake states add `-liveStillWatching`, `-livePauseExpired`, `-liveBusy`,
 `-liveTakeover` (a recording needs the tuner in 2 minutes) or `-liveTakenOver`
 (stopped for a recording).
