@@ -110,6 +110,7 @@ jobs:
             apple-tv:
               - 'apple/TV/**'
               - 'apple/TVUITests/**'
+              - 'apple/TopShelf/**'
               - 'apple/Kit/**'
               - 'apple/project.yml'
               - 'apple/Tools/**'

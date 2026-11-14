@@ -686,6 +686,54 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
   `BGTaskSchedulerPermittedIdentifiers: [media.watchmy.client.sync]` and
   `UIBackgroundModes: [fetch]`.
 
+## Top Shelf
+
+With the app in the top row of the Apple TV's Home Screen, the Top Shelf
+shows Continue watching (16:9 cards with the system's progress bar) and
+Recently added (posters, movies and shows in turn) as two sections the
+system draws (PLAN-APPLE-REVIEW.md §2.2, §6.2; `TvTopShelfSections`). Select
+opens the page; Play/Pause plays, as on the card in the app: a Continue
+watching item resumes, a movie plays its first version, and a show, which has
+no single episode to play, opens. Signed out, or with nothing to show, the
+system shows the static Top Shelf image from `TV/Resources`.
+
+- **The extension only reads.** `TopShelf/` is the target "WatchMyMedia
+  TopShelf" (`media.watchmy.client.topshelf`), embedded in the Apple TV app.
+  It links only `WMMTopShelf` (Foundation and TVServices) and reads the
+  snapshot the app wrote into their App Group, `group.media.watchmy.client`
+  (`TV/WatchMyMediaTV.entitlements`, `TopShelf/TopShelf.entitlements`). It
+  has no sign-in and makes no request.
+- **The app writes it.** Home publishes whenever its rows change
+  (`.publishesTopShelf` in `TV/Screens/Home/HomeScreen.swift`, then
+  `TopShelfPublisher` in WMMFeatures): the rows the person shows on Home (a
+  row hidden from Home isn't on the shelf), ten Continue watching and twelve
+  Recently added, each picture fetched with the app's sign-in and saved as a
+  file in the group, then `TVTopShelfContentProvider.topShelfContentDidChange()`.
+  Signing out, or another person or server signing in, clears it
+  (`.clearsTopShelfOnAccountChange` in `TV/Shell/WatchMyMediaTVApp.swift`);
+  so does a launch that finds someone else's snapshot.
+- **What it may hold** (`Kit/Sources/WMMTopShelf`, `TopShelfRules`): titles,
+  the app's own `watchmymedia:` links published for the server signed in
+  (`source=top-shelf&server=`, PLAN-APPLE-REVIEW.md §2.5) and bare picture file
+  names. Never a server address, an image's web address, a token or the
+  person's ID (the owner is a hash). Links with other query items and
+  pictures that aren't bare names are dropped on both sides.
+  `Kit/Tests/WMMFeaturesTests/Browse/TopShelfPublisherTests.swift` checks
+  that nothing written names the address, port or token.
+- **Staleness**: the extension shows nothing from a snapshot older than two
+  weeks (`TopShelfRules.maxAge`) or of another format; a shelf left on
+  screen is written again after a day.
+- **Links**: `watchmymedia://movies/{id}?play=1` plays a movie, and only
+  when the app published it for the server signed in; from anywhere else it
+  opens the movie's page.
+
+On a simulator, run the app once on the fakes (`-fakes`) so it writes a
+snapshot, then go to the Home Screen with the app's icon focused in the top
+row to see the shelf (apple/AGENTS.md, Simulators). The
+fakes have backdrops but no posters, so Recently added draws blank cards there.
+Signing for a device needs the App Group and the extension's App ID in the
+developer account; simulator builds are signed ad hoc and need neither.
+
 ## Release builds, privacy and measuring
 
 **Release builds.** `make apple-build-release` and `make apple-tv-build-release`
@@ -694,7 +742,9 @@ compiles), and CI's `apple` and `apple-tv` jobs run them after their tests, so a
 break that only shows in Release (an `#if DEBUG`, optimisation, a missing
 import) shows before a tag. `scripts/check-release-binary.sh` then fails if the
 app has no privacy manifest, holds any `WMMFakes` symbol or still reads
-`-fakesSignedOut`.
+`-fakesSignedOut`, or if an extension in its `PlugIns` (the Top Shelf) has no
+privacy manifest of its own or holds code from `WMMModel`, `WMMData`,
+`WMMAPI`, `WMMPlayback`, `WMMFeatures` or `WMMFakes`.
 
 **The fakes are debug-only** (PLAN-APPLE-REVIEW.md §2.9): every
 `import WMMFakes` in `App/` and `TV/`, the fakes' branch of each
@@ -705,8 +755,10 @@ object file: Xcode links a package product's whole object file, so without
 that a Release binary carried all of the fakes. The UI tests, `make apple-perf`
 and the App Store screenshot recipe all run Debug builds.
 
-**Privacy manifests**: `App/Resources/PrivacyInfo.xcprivacy` and
-`TV/Resources/PrivacyInfo.xcprivacy`. No tracking and no collected data; the
+**Privacy manifests**: `App/Resources/PrivacyInfo.xcprivacy`,
+`TV/Resources/PrivacyInfo.xcprivacy` and the Top Shelf's
+`TopShelf/PrivacyInfo.xcprivacy`, which declares no API: it reads files and
+no file dates, and the snapshot's age is a date inside it. No tracking and no collected data; the
 required-reason APIs with Apple's reasons: UserDefaults `CA92.1`
 (`DeviceStorage`), system boot time `35F9.1` (`ProcessInfo.systemUptime` in the
 players and `PlayerChromeModel`), and on iPhone and iPad disk space `85F4.1` and
@@ -782,9 +834,11 @@ lines, enough to fill the code and turn pages (`TVUITests/DiagnosticsTests.swift
 | `Kit/Sources/WMMCast` | SDK-independent Cast protocol, session state, transfers and fakes; the Google SDK adapter lives only in `App/Cast/` |
 | `Kit/Sources/WMMFakes` | In-memory fakes of every protocol, with the mockups' library and a pretend player (`AppServices.fake()`) |
 | `Kit/Sources/WMMUI` | Brand tokens (`Palette`), `Artwork`, `Badge`, `Tag`, `ProgressStrip`, `WatchedCheck`, `BrandMark`, button styles, `Chip`, `LoadableView` and the empty and error states |
+| `Kit/Sources/WMMTopShelf` | The Apple TV Top Shelf's snapshot in the App Group: its format, what it may hold (`TopShelfRules`), the store, and the sections the system draws. Foundation and TVServices only, so the extension links nothing else |
 | `Kit/Sources/WMMFeatures` | Screen models and navigation, shared with the Apple TV app: `Navigation/` (`Navigator`, `Route`, `AppTab`, `DeepLink`), `Browse/` (Home, Library, Show, Movie, Search), `Account/` (server picker, sign-in and pairing, Settings, Link a TV), `Player/` (the controls' timing, double-tap seek, the scrubber, the picker's wording, and `TVPlayerModel` for the Apple TV's system player) |
 | `App/` | The iPhone and iPad app: `Shell/` (app, root flow, tabs, `ServicesFactory`), `Screens/<feature>/` (SwiftUI views; a screen lays itself out for a regular width with `PadLayout` from `Components/Layout.swift`), `Components/Browse` and `Components/Account` (views those screens share) |
 | `TV/` | The Apple TV app, target "WatchMyMedia TV" (tvOS 18+, the same bundle ID for the universal purchase): `Shell/` (app, root flow, the tab bar, `TabPage`, its own `ServicesFactory` with the TV profile), `Screens/<feature>/`, `Components/` (focus, buttons, chips, cards, rows), `Resources/` (the layered icon and Top Shelf images from `brand/`) |
+| `TopShelf/` | The Apple TV app's Top Shelf extension, target "WatchMyMedia TopShelf": `ContentProvider` reads the snapshot (see Top Shelf), its privacy manifest and entitlements |
 | `UITests/` | The end-to-end test against a real server (`make apple-e2e`), the iPhone and iPad UI tests on the fakes, and the performance tests (`make apple-perf`) |
 | `TVUITests/` | The Apple TV app on the fakes, driven with the Siri Remote, and its launch measure (`make apple-perf`) |
 | `Tools/` | The OpenAPI generator, kept out of the app's dependencies |

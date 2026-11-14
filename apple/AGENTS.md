@@ -71,6 +71,15 @@ server, and on iPad in both a regular and a compact width.
   of the whole test bundle at once.
 - **iPhone and Apple TV share no files.** What both need goes in the Kit
   (README explains why `TV/` is separate from `App/`).
+- **The Top Shelf extension links only `WMMTopShelf`** and only reads the
+  App Group (README, Top Shelf). Nothing the app writes there may name a
+  server address, an image URL, a token or the person: add a field to the
+  snapshot only through `TopShelfRules`, with a case in
+  `TopShelfPublisherTests`' no-address test. `make apple-tv-build-release`
+  fails if the extension picks up another Kit module. A link the shelf
+  publishes goes through `DeepLink.url(publishedFor:source:)`. Code the
+  extension runs must not use a required-reason API (file dates,
+  UserDefaults) unless `TopShelf/PrivacyInfo.xcprivacy` declares it.
 - **Layout traps.** On Apple TV a focused `.borderless` button lifts and
   enlarges any `Image` in its label, so put a small icon inside the `Text`
   (`Text("\(Image(systemName: …)) …")`). On iPad a `.presentationSizing(.fitted)`
@@ -165,6 +174,16 @@ didn't start.
 
 - A fresh install needs `xcrun simctl keychain <udid> reset` as well as
   `simctl uninstall`: the Keychain keeps the sign-in, on Apple TV too.
+- The Top Shelf shows on the tvOS simulator above the app's icon when it is
+  focused in the Home Screen's top row (a new simulator has only a few apps,
+  so the app is there). Run the app on the fakes, then press Home with the
+  remote (`XCUIRemote` in a UI test) and capture with `simctl io`. On tvOS 27.2
+  `XCUIRemote`'s Up from the icon did not move focus into the shelf, so a
+  focused card's title, the second section and Select or Play/Pause on a card
+  need a hand on the Simulator or a device. `xcrun simctl get_app_container
+  <udid> media.watchmy.client groups` finds the App Group's folder, with the
+  snapshot as snapshot.json in its TopShelf folder. The Home Screen's order
+  is the simulator's HeadBoard AppOrder.plist, under its data's Library.
 - Make your own (`xcrun simctl create "WMM <name>" <device type> <runtime>`),
   pass its name (not its UDID) to make as `SIM=` or `TV_SIM=`, and delete it
   afterwards. A UDID matches no name, so the tests quietly run on the default

@@ -55,6 +55,8 @@ struct WatchMyMediaTVApp: App {
                     Task { await navigator.open(link, library: services.library, liveTV: services.liveTV) }
                 }
                 .task { await navigator.applyLaunchArguments(ProcessInfo.processInfo.arguments, library: services.library, liveTV: services.liveTV) }
+                // The Top Shelf shows only the signed-in person's rows (Home publishes them).
+                .clearsTopShelfOnAccountChange(services)
                 // The person's other devices change favourites and reminders too.
                 .task { await extras.follow() }
                 .task { await recordings.follow() }

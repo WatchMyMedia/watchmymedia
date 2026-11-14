@@ -56,6 +56,7 @@ private struct HomeView: View {
             }
         }
         .task { await model.run() }
+        .publishesTopShelf(model.state.value)
         .messagePill($model.message)
         .noticeAlert($model.notice)
         .fullScreenCover(isPresented: $editingRows) { TVRowEditor(screen: .home, screenName: "Home") }
