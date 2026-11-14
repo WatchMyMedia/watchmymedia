@@ -536,4 +536,35 @@ class LibraryViewModelTest {
         assertEquals(ItemSort.Title, q.sort)
         assertEquals("harbor", q.text)
     }
+
+    @Test fun `a page that repeats an item already shown adds it once, and paging goes on`() = runTest(main.dispatcher) {
+        val fake = FakeLibraryRepository()
+        var shifted = false
+        // A show added at the top during a scan pushes every later one down a place.
+        val scanning = GridLibrary(object : LibraryRepository by fake {
+            override suspend fun items(query: ItemQuery): ItemPage {
+                val all = fake.items(query.copy(offset = 0, limit = 1000))
+                if (!shifted) return fake.items(query)
+                val items = listOf(all.items.first().copy(id = 9999, title = "Added in the scan")) + all.items
+                return all.copy(items = items.drop(query.offset).take(query.limit), total = items.size, offset = query.offset)
+            }
+        })
+        val vm = vm(pageSize = 5, from = scanning)
+        val first = vm.state.value.items
+        shifted = true
+        vm.loadMore()
+        val ids = vm.state.value.items.map { it.id }
+        assertEquals("no repeated keys", ids.distinct(), ids)
+        assertEquals(first, vm.state.value.items.take(5))
+        assertEquals(9, vm.state.value.items.size)
+        assertEquals("the window moved by the whole page", 10, vm.state.value.end)
+        while (vm.state.value.hasMore) vm.loadMore()
+        assertEquals(17, vm.state.value.end)
+        assertEquals(vm.state.value.items.map { it.id }.distinct(), vm.state.value.items.map { it.id })
+    }
+
+    @Test fun `newTo keeps a page's items the grid doesn't hold yet, once each`() {
+        val shows = FakeData.shows.take(4)
+        assertEquals(shows.drop(2), (shows.drop(1) + shows.last()).newTo(shows.take(2)))
+    }
 }

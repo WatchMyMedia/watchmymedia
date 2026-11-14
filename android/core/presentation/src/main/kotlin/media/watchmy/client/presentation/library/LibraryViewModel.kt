@@ -191,7 +191,7 @@ class LibraryViewModel(
                 .onSuccess { page ->
                     _state.update {
                         it.copy(
-                            items = it.items + page.items,
+                            items = it.items + page.items.newTo(it.items),
                             end = page.offset + page.items.size,
                             total = page.total,
                             loadingMore = false,
@@ -214,7 +214,7 @@ class LibraryViewModel(
         job = viewModelScope.launch {
             attempt { library.items(s.query(id, offset = start).copy(limit = s.offset - start)) }
                 .onSuccess { page ->
-                    _state.update { it.copy(items = page.items + it.items, offset = page.offset, total = page.total, loadingEarlier = false) }
+                    _state.update { it.copy(items = page.items.newTo(it.items) + it.items, offset = page.offset, total = page.total, loadingEarlier = false) }
                 }
                 .onFailure { e -> _state.update { it.copy(loadingEarlier = false, moreError = errorMessage(e)) } }
         }
@@ -354,7 +354,7 @@ class LibraryViewModel(
                 }
                 _state.update {
                     it.copy(
-                        libraryId = id, items = page.items, total = page.total, offset = page.offset,
+                        libraryId = id, items = page.items.distinctBy { item -> item.id }, total = page.total, offset = page.offset,
                         end = page.offset + page.items.size, letters = page.letters, genres = page.genres, decades = page.decades, summary = page.summary,
                         anchorLetter = anchor?.takeIf { letter -> page.letters?.any { entry -> entry.letter == letter } == true },
                         genreCounts = page.genreCounts.orEmpty(), genreCountsFromServer = page.genreCounts != null,
@@ -423,6 +423,18 @@ class LibraryViewModel(
         private const val DECADE = "decade"
         private const val TEXT = "text"
     }
+}
+
+/**
+ * A page's items that [held] doesn't have yet. An item added or removed
+ * during a scan shifts the offsets, so a page can repeat one already shown,
+ * and a lazy grid keyed by id throws on a repeated key
+ * (PLAN-ANDROID-REVIEW.md §3.3.2). The window's end still moves by the
+ * whole page, so paging goes on past the repeat.
+ */
+internal fun List<BrowseItem>.newTo(held: List<BrowseItem>): List<BrowseItem> {
+    val ids = held.mapTo(HashSet()) { it.id }
+    return filter { ids.add(it.id) }
 }
 
 /** "142 shows · 3,418 episodes · 12 continuing". */
