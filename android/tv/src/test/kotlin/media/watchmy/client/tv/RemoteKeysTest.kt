@@ -4,6 +4,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -47,5 +49,25 @@ class RemoteKeysTest {
         compose.onRoot().performKeyInput { pressKey(Key.Guide) }
         compose.waitForIdle()
         compose.onNodeWithText("Go to channel").assertExists()
+    }
+
+    @Test fun `Back in the live player hides its controls first, then leaves for the guide`() {
+        compose.onRoot().performKeyInput { pressKey(Key.Guide) }
+        compose.waitForIdle()
+        compose.onNodeWithText("Favourites").assertExists()
+        // OK on the guide's programme watches its channel.
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.waitForIdle()
+        compose.onNode(hasText("Pause") and hasClickAction()).assertExists()
+        compose.onNodeWithText("Favourites").assertDoesNotExist()
+
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+        compose.onNode(hasText("Pause") and hasClickAction()).assertDoesNotExist()
+        compose.onNodeWithText("Favourites").assertDoesNotExist()
+
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+        compose.onNodeWithText("Favourites").assertExists()
     }
 }
