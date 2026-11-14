@@ -1,5 +1,6 @@
 package media.watchmy.client.core.data
 
+import media.watchmy.client.model.ServerFeatures
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
@@ -13,9 +14,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import media.watchmy.client.model.AUTO_API_LEVEL
 import media.watchmy.client.model.AuthRepository
 import media.watchmy.client.model.CastGateway
 import media.watchmy.client.model.ClientInfo
@@ -29,6 +30,8 @@ import media.watchmy.client.model.RequestRepository
 import media.watchmy.client.model.RowsRepository
 import media.watchmy.client.model.ServerRepository
 import media.watchmy.client.model.StreamQuality
+import java.io.File
+import okhttp3.Cache
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import java.util.UUID
@@ -49,25 +52,38 @@ import java.util.concurrent.TimeUnit
 class DataServices internal constructor(
     baseClient: ClientInfo,
     dataStore: DataStore<Preferences>,
-    httpClient: OkHttpClient,
+    /** The shared client, asked for only when a call is first made, off the main thread. */
+    httpClient: () -> OkHttpClient,
+    /** The API client's HTTP cache; null keeps none. */
+    httpCache: Cache? = null,
+    network: NetworkMonitor = NetworkMonitor.Always,
     discovery: ServerDiscovery,
     sealer: TokenSealer,
     private val scope: CoroutineScope,
     clock: () -> Long,
     eventBackoffMs: (attempt: Int) -> Long = ServerEvents.BACKOFF,
+    /**
+     * Whether the app is in front until [setInFront] says otherwise. The app
+     * starts not in front and reports its process lifecycle; tests start in
+     * front.
+     */
+    inFront: Boolean = true,
     /** What storage holds, when the caller has just read it; null reads it here. */
     stored: Stored? = null,
 ) {
     constructor(context: Context, client: ClientInfo) : this(context, client, stored = null)
 
-    private constructor(context: Context, client: ClientInfo, stored: Stored?) : this(
+    private constructor(context: Context, client: ClientInfo, stored: Stored?, scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)) : this(
         baseClient = client,
         dataStore = dataStore(context),
-        httpClient = sharedHttpClient,
+        httpClient = { sharedHttpClient },
+        httpCache = Cache(File(context.cacheDir, "http"), HTTP_CACHE_BYTES),
+        network = SystemNetworkMonitor(context, scope),
         discovery = NsdDiscovery(context),
         sealer = KeystoreSealer(),
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+        scope = scope,
         clock = System::currentTimeMillis,
+        inFront = false,
         stored = stored,
     )
 
@@ -88,25 +104,50 @@ class DataServices internal constructor(
     /** How this device describes itself, with the name as it is now (it is editable in Settings). */
     val client: ClientInfo get() = base.copy(name = store.deviceName.value.ifBlank { base.name })
 
-    private val http = Http(httpClient, store, "WatchMyMedia/${base.version} (${base.platform}; Android ${Build.VERSION.RELEASE})")
-    private val events = ServerEvents(store, http, scope, eventBackoffMs)
+    private val http = Http(httpClient, store, "WatchMyMedia/${base.version} (${base.platform}; Android ${Build.VERSION.RELEASE})", httpCache, network)
+
+    init {
+        // The clients' TLS set-up, off the main thread, before the first call needs it.
+        scope.launch { http.warm() }
+    }
+
+    private val events = ServerEvents(store, http, scope, eventBackoffMs, network, inFront, onReconnect = ::reconnected)
     private val serverRepository = RealServerRepository(store, http, discovery, scope, clock)
+
+    /**
+     * Whether the app is in front, which the app reports from its process
+     * lifecycle (PLAN-ANDROID-REVIEW.md §4.1.5): the event stream connects
+     * only in front, and the return to the front reconnects it at once. The
+     * start-up checks of a saved sign-in also wait for it, so a start in the
+     * background (a boot, a download's sync) asks the server nothing.
+     */
+    fun setInFront(inFront: Boolean) = events.setInFront(inFront)
+
+    /**
+     * The event stream reconnected after a gap: the server may have been
+     * upgraded meanwhile, and a TV app can stay open for weeks, so its level
+     * is read again (§4.1.6).
+     */
+    private fun reconnected() {
+        scope.launch { runCatching { serverRepository.refreshCurrent() } }
+    }
     private val authRepository = RealAuthRepository(store, http, serverRepository, { client }, clock)
     private val preferencesRepository = RealPreferencesRepository(store, http)
 
     val servers: ServerRepository = serverRepository
     val auth: AuthRepository = authRepository
-    val library: LibraryRepository = RealLibraryRepository(store, http, events)
-    val live: LiveRepository = RealLiveRepository(http, store, scope, clock, events)
-    val livePlaybackGateway: LivePlaybackGateway = RealLivePlaybackGateway(store, http)
-    val requests: RequestRepository = RealRequestRepository(store, http, events)
+    val library: LibraryRepository = RealLibraryRepository(store, http, events, scope, clock)
+    private val liveRepository = RealLiveRepository(http, store, scope, clock, events)
+    val live: LiveRepository = liveRepository
+    val livePlaybackGateway: LivePlaybackGateway = RealLivePlaybackGateway(store, http, capabilities = liveRepository::capabilities)
+    val requests: RequestRepository = RealRequestRepository(store, http, events, scope, clock)
     val rows: RowsRepository = RealRowsRepository(http, events)
     val preferences: PreferencesRepository = preferencesRepository
     val playbackGateway: PlaybackGateway =
         RealPlaybackGateway(SignedInAccess(http), { store.deviceName.value }, { deviceId }, { RealPlaybackGateway.signedInMediaToken(http) })
 
     /** A sender's calls for casting to a TV. */
-    val castGateway: CastGateway = RealCastGateway(store, http)
+    val castGateway: CastGateway = RealCastGateway(store, http, liveRepository::capabilities)
 
     /** The offline routes, for downloads on phones and tablets (PLAN-DOWNLOADS.md). */
     val offlineGateway: OfflineGateway = RealOfflineGateway(store, http, authRepository)
@@ -125,7 +166,7 @@ class DataServices internal constructor(
     fun castPlayback(server: ReachedServer, token: String, expiresAtMs: Long, quality: StreamQuality?): CastPlayback {
         val access = CastTokenAccess(server.baseUrl.trimEnd('/'), http, token, expiresAtMs, server.apiLevel)
         val gateway = RealPlaybackGateway(access, { store.deviceName.value }, { deviceId }, access::renew, onlineSubtitles = false)
-        val auto = server.apiLevel >= AUTO_API_LEVEL
+        val auto = ServerFeatures(server.apiLevel).automaticQuality
         return CastPlayback(gateway, CastPreferences(access, preferencesRepository, quality, auto)) { path -> castImageUrl(access.baseUrl, access.token, path) }
     }
 
@@ -157,13 +198,26 @@ class DataServices internal constructor(
      * bearer token on requests to the current server, and only there. Images
      * have a Dispatcher of their own, so a screenful of posters doesn't queue
      * the API calls behind it (OkHttp runs 5 calls per host at a time); they
-     * share the connection pool. Made with the first image, not at start.
+     * share the connection pool, not the API's HTTP cache. Made with the
+     * first image, not at start.
      */
     val imageHttpClient: OkHttpClient by lazy {
-        http.client.newBuilder()
+        http.signedClient.newBuilder()
             .dispatcher(Dispatcher().apply { maxRequestsPerHost = IMAGE_REQUESTS_PER_HOST })
             .build()
     }
+
+    /**
+     * For the player and the downloader (Media3's OkHttpDataSource,
+     * PLAN-ANDROID-REVIEW.md §4.2.1): derived from the API's client, so it
+     * shares the connection pool and dispatcher and the first playlist
+     * request reuses the API's connection. No token interceptor (media URLs
+     * carry their own `access_token`), no reply limit, no HTTP cache;
+     * 15 s to connect and 45 s between reads, as the player had, and no
+     * timeout on the whole call. Built off the main thread at start; a caller
+     * on the main thread can wrap it as `Call.Factory { mediaHttpClient.newCall(it) }`.
+     */
+    val mediaHttpClient: OkHttpClient get() = http.mediaClient
 
     /** The latest sign-in's [loadSession]; the next sign-in or sign-out cancels it, so an older one can't answer last. */
     private var sessionLoad: Job? = null
@@ -177,7 +231,14 @@ class DataServices internal constructor(
             preferencesRepository.reset()
             restartSessionLoad(signedIn)
         }
-        if (store.session()?.account != null) restartSessionLoad(true)
+        if (store.session()?.account != null) {
+            // The saved sign-in's checks, once the app is in front; a sign-in meanwhile has made its own.
+            val revision = store.revision
+            scope.launch {
+                events.awaitInFront()
+                if (store.revision == revision) restartSessionLoad(true)
+            }
+        }
     }
 
     private fun restartSessionLoad(signedIn: Boolean) = synchronized(sessionLoadLock) {
@@ -188,21 +249,35 @@ class DataServices internal constructor(
     /** Returns once the settings written behind have landed, for tests that write storage themselves. */
     internal suspend fun awaitWrites() = store.awaitWrites()
 
+    /**
+     * Returns once the latest sign-in's checks have finished and what they
+     * wrote has landed: for tests that open another DataServices on the same
+     * storage, which a check finishing late would write over.
+     */
+    internal suspend fun awaitIdle() {
+        synchronized(sessionLoadLock) { sessionLoad }?.join()
+        store.awaitWrites()
+    }
+
     /** The current sign-in's token as it is stored (sealed), for tests. */
     internal fun storedToken(): String? = store.session()?.account?.token
 
     /** Lets OS integrations clear account-specific state synchronously on sign-out or switching. */
     fun onSessionChange(listener: () -> Unit) { store.onSessionChange { listener() } }
 
-    private suspend fun loadSession() {
-        authRepository.refreshUser()
-        runCatching { preferencesRepository.refresh() }
-        runCatching { serverRepository.refreshCurrent() }
+    /** The three are independent, so they go together rather than one after another (PLAN-ANDROID-REVIEW.md §4.1.6). */
+    private suspend fun loadSession() = coroutineScope {
+        launch { authRepository.refreshUser() }
+        launch { runCatching { preferencesRepository.refresh() } }
+        launch { runCatching { serverRepository.refreshCurrent() } }
     }
 
     companion object {
         /** Posters and stills loading at once from one server. */
         internal const val IMAGE_REQUESTS_PER_HOST = 8
+
+        /** The API replies kept for revalidation: a few hundred pages of library data. */
+        private const val HTTP_CACHE_BYTES = 20L shl 20
 
         @Volatile private var dataStore: DataStore<Preferences>? = null
 

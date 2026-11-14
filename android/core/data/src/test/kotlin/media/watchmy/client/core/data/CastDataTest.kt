@@ -176,6 +176,27 @@ class CastDataTest {
     }
 
     @Test
+    fun `an earlier address that doesn't answer doesn't hold up one that has`() = runBlocking {
+        TestServer().use { slow ->
+            // The sender's first address hangs (the home network's, away from home); its second answers at once.
+            slow.always("GET /api/server", json(info(2, true)).setHeadersDelay(5, java.util.concurrent.TimeUnit.SECONDS))
+            server.always("GET /api/server", json(info(2, true)))
+            val started = System.nanoTime()
+            assertEquals(ReachedServer(server.baseUrl, 2), h.services.reachCastServer("srv-test", listOf(slow.baseUrl, server.baseUrl)))
+            assertTrue("didn't wait for the first", (System.nanoTime() - started) / 1_000_000 < 2_000)
+        }
+    }
+
+    @Test
+    fun `the better address still wins when it answers moments later`() = runBlocking {
+        TestServer().use { better ->
+            better.always("GET /api/server", json(info(2, true)).setHeadersDelay(100, java.util.concurrent.TimeUnit.MILLISECONDS))
+            server.always("GET /api/server", json(info(2, true)))
+            assertEquals(ReachedServer(better.baseUrl, 2), h.services.reachCastServer("srv-test", listOf(better.baseUrl, server.baseUrl)))
+        }
+    }
+
+    @Test
     fun `a sender's addresses are tried once each, http and https only, eight at most`() {
         assertEquals(
             listOf("http://192.168.1.20:27587", "https://media.example.com", "http://[fd7a:115c::1]:27587"),

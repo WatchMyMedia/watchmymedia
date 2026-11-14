@@ -113,7 +113,7 @@ internal class RealServerRepository(
             s.copy(servers = s.servers.filter { it.id != serverId }, currentId = s.currentId.takeIf { it != serverId })
         }
         // Ends the session on the server too, when it can be reached; forgetting works offline either way.
-        val token = gone.account?.let(store::token) ?: return
+        val token = gone.account?.let(store::tokenOrNull) ?: return
         signOutLater(gone.baseUrl, token)
     }
 
@@ -130,7 +130,7 @@ internal class RealServerRepository(
     /** POST /api/auth/logout with [token], ignoring every failure. */
     suspend fun signOutQuietly(baseUrl: String, token: String) {
         withTimeoutOrNull(5_000) {
-            runCatching { AuthApi(baseUrl, http.withToken(token)).logout() }
+            runCatching { AuthApi(baseUrl, http.calls(Credential(baseUrl, token))).logout() }
         }
     }
 }

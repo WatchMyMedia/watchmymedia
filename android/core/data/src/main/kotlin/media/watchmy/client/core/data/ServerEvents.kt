@@ -2,24 +2,38 @@ package media.watchmy.client.core.data
 
 import java.io.EOFException
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.longOrNull
 import okhttp3.Request
 import okio.BufferedSource
+import media.watchmy.client.model.LibraryChange
 import media.watchmy.client.model.RowsChange
 
 /**
@@ -35,6 +49,58 @@ internal fun eventField(data: String, name: String): String? {
 
 /** One server-sent event. */
 internal data class ServerEvent(val event: String, val data: String, val id: String? = null)
+
+/**
+ * What [e] says changed in the library (PLAN-ANDROID-REVIEW.md §4.1.2), or
+ * null for an event about something else. watch.changed names its item type
+ * and ids; the scan events and library.changed their libraryId. One the app
+ * can't read counts as [LibraryChange.Everything].
+ */
+internal fun libraryChange(e: ServerEvent): LibraryChange? = when (e.event) {
+    ServerEvents.RECONNECTED -> LibraryChange.Everything
+    ServerEvents.WATCH_CHANGED -> {
+        val data = runCatching { Json.parseToJsonElement(e.data) }.getOrNull() as? JsonObject
+        val ids = (data?.get("itemIds") as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.longOrNull }?.toSet()
+        val type = (data?.get("itemType") as? JsonPrimitive)?.contentOrNull
+        when {
+            ids != null && type == "movie" -> LibraryChange(movies = ids)
+            ids != null && type == "episode" -> LibraryChange(episodes = ids)
+            else -> LibraryChange.Everything
+        }
+    }
+    in ServerEvents.LIBRARY_EVENTS -> eventField(e.data, "libraryId")?.toLongOrNull()?.let { LibraryChange(libraries = setOf(it)) } ?: LibraryChange.Everything
+    else -> null
+}
+
+/**
+ * The values that arrive within [windowMs] of the first of a burst, as one
+ * ([merge]d), [windowMs] after it: a scan's scan.finished and library.changed,
+ * or a season marked watched, reload a page once rather than twice.
+ */
+internal fun <T> Flow<T>.coalesce(windowMs: Long, merge: (T, T) -> T): Flow<T> = channelFlow {
+    val pending = Channel<T>(Channel.UNLIMITED)
+    launch {
+        try {
+            collect { pending.send(it) }
+        } finally {
+            pending.close()
+        }
+    }
+    while (true) {
+        val first = pending.receiveCatching()
+        if (first.isClosed) break
+        @Suppress("UNCHECKED_CAST")
+        var batch = first.getOrNull() as T
+        delay(windowMs)
+        while (true) {
+            val next = pending.tryReceive()
+            if (!next.isSuccess) break
+            @Suppress("UNCHECKED_CAST")
+            batch = merge(batch, next.getOrNull() as T)
+        }
+        send(batch)
+    }
+}
 
 /**
  * Reads the text/event-stream format a line at a time (https://html.spec.whatwg.org/#event-stream-interpretation).
@@ -101,29 +167,74 @@ internal class EventTooLargeException(message: String) : IOException(message)
 internal class EventStreamException(val status: Int) : IOException("event stream answered $status")
 
 /**
- * GET /api/events on the current server, signed in: [changes] emits for
- * watch.changed and library.changed, [requestChanges] for requests.changed
+ * GET /api/events on the current server, signed in: [libraryChanges] and
+ * [changes] emit for watch.changed, library.changed and the scan events,
+ * [requestChanges] for requests.changed
  * and problems.changed, [liveChanges] for the Live TV ones, [rowChanges] for
  * rows.changed and lists.changed. Connected only while collected (shared by every
  * collector, and kept 5 s after the last one leaves so moving between screens
- * does not reconnect). A dropped stream reconnects with backoff, and both emit
- * once after reconnecting, since events may have been missed.
+ * does not reconnect), and only while the app is in front ([setInFront]) and
+ * the device has a default network ([network]): PLAN-ANDROID-REVIEW.md
+ * §4.1.5. A dropped stream reconnects with backoff; the return to the front,
+ * or to a network, reconnects at once. Each reconnection emits once on every
+ * flow, since events may have been missed, and calls [onReconnect].
  */
 internal class ServerEvents(
     private val store: LocalStore,
     private val http: Http,
     scope: CoroutineScope,
     private val backoffMs: (attempt: Int) -> Long = BACKOFF,
+    private val network: NetworkMonitor = NetworkMonitor.Always,
+    inFront: Boolean = true,
+    /** Called on each reconnection of a sign-in's stream, on the stream's thread: what was missed may need asking again. */
+    private val onReconnect: () -> Unit = {},
 ) {
+    private val front = MutableStateFlow(inFront)
+
+    /** The app came to the front (true) or left it; the stream connects only in front. */
+    fun setInFront(inFront: Boolean) {
+        front.value = inFront
+    }
+
+    /** True once the app has been in front, at once if it is now. */
+    suspend fun awaitInFront() {
+        front.first { it }
+    }
+
+    /** When to connect: a sign-in ([revision]), in front, on a network ([network], a new one reconnects). */
+    private data class Gate(val revision: Long, val open: Boolean, val network: Long?)
+
+    /**
+     * The sign-in whose stream has connected since this flow started: its
+     * next connection follows a gap, so it emits [RECONNECTED]. A new
+     * sign-in's first doesn't (its screens load afresh anyway), nor does the
+     * first after nothing collected for a while.
+     */
+    @Volatile private var connected: Long? = null
+
+    private val listeners = java.util.concurrent.CopyOnWriteArrayList<(event: String) -> Unit>()
+
+    /**
+     * Calls [listener] with each event's name as it arrives while the stream
+     * is connected, and with [RECONNECTED] after a gap: for what the data
+     * layer keeps ([SessionMemo]), without keeping the stream open itself.
+     */
+    fun onEvent(listener: (event: String) -> Unit) {
+        listeners += listener
+    }
 
     /** The events screens refetch for, and [RECONNECTED]. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val events: Flow<ServerEvent> = store.sessionChanges
-        .transformLatest {
+    private val events: Flow<ServerEvent> = combine(store.sessionChanges, front, network.network) { revision, inFront, net ->
+        Gate(revision, inFront && net != null, net)
+    }
+        .distinctUntilChanged()
+        .onStart { connected = null }
+        .transformLatest { gate ->
+            if (!gate.open) return@transformLatest
             val target = store.requestSnapshot().first ?: return@transformLatest
             if (target.account == null) return@transformLatest
             var attempt = 0
-            var connectedBefore = false
             while (true) {
                 var pinged = false
                 try {
@@ -134,12 +245,19 @@ internal class ServerEvents(
                                 // Only a connection's first ping can follow missed events;
                                 // servers up to 0.4.1 also ping every 15 s to keep it open.
                                 if (!pinged) {
-                                    if (connectedBefore) emit(ServerEvent(RECONNECTED, ""))
-                                    connectedBefore = true
                                     pinged = true
+                                    if (connected == gate.revision) {
+                                        onReconnect()
+                                        listeners.forEach { it(RECONNECTED) }
+                                        emit(ServerEvent(RECONNECTED, ""))
+                                    }
+                                    connected = gate.revision
                                 }
                             }
-                            in LIBRARY_EVENTS, in REQUEST_EVENTS, in LIVE_EVENTS, in ROW_EVENTS -> emit(e)
+                            WATCH_CHANGED, in LIBRARY_EVENTS, in REQUEST_EVENTS, in LIVE_EVENTS, in ROW_EVENTS -> {
+                                listeners.forEach { it(e.event) }
+                                emit(e)
+                            }
                         }
                     }
                 } catch (e: EventStreamException) {
@@ -155,7 +273,15 @@ internal class ServerEvents(
 
     private val names: Flow<String> = events.map { it.event }
 
-    val changes: Flow<Unit> = names.filter { it == RECONNECTED || it in LIBRARY_EVENTS }.map { }
+    /**
+     * watch.changed, the scan events and library.changed, with what they
+     * name, and [LibraryChange.Everything] after a reconnect; a burst within
+     * [COALESCE_MS] comes as one.
+     */
+    val libraryChanges: Flow<LibraryChange> = events.mapNotNull(::libraryChange).coalesce(COALESCE_MS, LibraryChange::plus)
+
+    /** [libraryChanges] without what changed, for the pages that reload whatever it was. */
+    val changes: Flow<Unit> = libraryChanges.map { }
 
     val requestChanges: Flow<Unit> = names.filter { it == RECONNECTED || it in REQUEST_EVENTS }.map { }
 
@@ -187,15 +313,14 @@ internal class ServerEvents(
     private fun stream(session: Session): Flow<ServerEvent> = callbackFlow {
         val account = session.account ?: run { close(); return@callbackFlow }
         val token = store.tokenForRequest(session.server.id, account) ?: run { close(); return@callbackFlow }
-        val client = http.withToken(token).newBuilder().readTimeout(45, TimeUnit.SECONDS).callTimeout(0, TimeUnit.SECONDS).build()
         val baseUrl = session.server.baseUrl
-        val call = client.newCall(
+        // The stream client's interceptor sends the token and clears the sign-in on a 401, as for any call.
+        val call = http.calls(http.accountCredential(session.server, token), http.streamClient).newCall(
             Request.Builder().url("$baseUrl/api/events").header("Accept", "text/event-stream").build(),
         )
         launch(Dispatchers.IO) {
             try {
                 call.execute().use { response ->
-                    if (response.code == 401) store.tokenRejected(session.server.id, token)
                     if (!response.isSuccessful) throw EventStreamException(response.code)
                     val parser = SseParser { trySendBlocking(it) }
                     readEventLines(response.body.source(), each = parser::line)
@@ -209,10 +334,14 @@ internal class ServerEvents(
     }
 
     companion object {
-        private const val RECONNECTED = "reconnected"
+        const val RECONNECTED = "reconnected"
+        const val WATCH_CHANGED = "watch.changed"
         // Refresh on transitions, never for every scan.progress event.
-        private val LIBRARY_EVENTS = setOf("watch.changed", "library.changed", "scan.started", "scan.finished", "scan.failed")
-        private val REQUEST_EVENTS = setOf("requests.changed", "problems.changed")
+        val LIBRARY_EVENTS = setOf("library.changed", "scan.started", "scan.finished", "scan.failed")
+
+        /** How long a burst of library events gathers before pages hear of it. */
+        const val COALESCE_MS = 250L
+        val REQUEST_EVENTS = setOf("requests.changed", "problems.changed")
         const val LIVE_FAVOURITES = "live.favourites.changed"
         const val LIVE_REMINDERS = "live.reminders.changed"
         const val LIVE_RECORDINGS = "live.recordings.changed"

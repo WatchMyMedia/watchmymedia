@@ -96,6 +96,8 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
      */
     private fun realServices(): AppServices {
         val data = traced("WMM DataServices") { DataServices.create(this, tv = isTv, version = BuildConfig.VERSION_NAME) }.also { data = it }
+        // The event stream and the start-up checks wait for the app to be in front (PLAN-ANDROID-REVIEW.md §4.1.5).
+        appScope.launch { ProcessLifecycleOwner.get().lifecycle.currentStateFlow.collect { data.setInFront(it.isAtLeast(Lifecycle.State.STARTED)) } }
         fun account() = media.watchmy.client.model.watchNextAccount(data.servers.current.value?.server, data.auth.user.value)
         // Downloads (PLAN-DOWNLOADS.md) are for phones and tablets: the TV app never shows them.
         lateinit var engine: PlaybackEngine

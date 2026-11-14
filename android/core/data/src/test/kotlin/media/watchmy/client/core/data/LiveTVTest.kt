@@ -63,7 +63,10 @@ class LiveTVTest {
         assertFalse(denied.available)
         assertEquals(60, denied.bufferSeconds)
         assertEquals(300, denied.pauseSeconds)
+        // Each asked again once the memo is old (SessionMemo).
+        h.now += SessionMemo.TTL_MS
         assertFalse(h.services.live.capabilities().available)
+        h.now += SessionMemo.TTL_MS
         assertTrue(h.services.live.capabilities().available)
     }
 

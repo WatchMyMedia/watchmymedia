@@ -1,5 +1,6 @@
 package media.watchmy.client.core.data
 
+import media.watchmy.client.model.ServerFeatures
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -39,14 +40,10 @@ import media.watchmy.client.core.api.models.LiveTVSessionView
 import media.watchmy.client.core.api.models.LiveTVStartInputBody
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.ClientInfo
-import media.watchmy.client.model.LIVE_CAST_API_LEVEL
-import media.watchmy.client.model.LIVE_GUIDE_API_LEVEL
 import media.watchmy.client.model.LIVE_GUIDE_WINDOW_HOURS
-import media.watchmy.client.model.LIVE_PERSONAL_API_LEVEL
 import media.watchmy.client.model.LIVE_REMINDER_DEFAULT_LEAD
 import media.watchmy.client.model.LIVE_REMINDER_LEADS
 import media.watchmy.client.model.LIVE_SEARCH_MIN_CHARS
-import media.watchmy.client.model.LIVE_TV_API_LEVEL
 import media.watchmy.client.model.LiveCapabilities
 import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.model.LiveGuide
@@ -90,10 +87,16 @@ internal class RealLiveRepository(
     private val windows = mutableMapOf<Long, Window>()
     private val lock = Any()
     private val recordingChanges = MutableSharedFlow<LivePersonalChange>(extraBufferCapacity = 1)
+
+    /** Live TV's capabilities, which change only with the admin's settings: asked again after a reconnect or a while ([SessionMemo]). */
+    private val capabilitiesMemo = SessionMemo(store, scope, clock) {
+        http.signedIn { base, client -> LiveTvApi(base, client).getLiveTVCapabilities() }.toModel(http.features())
+    }
     private val _reminders = MutableStateFlow<LiveReminders?>(null)
     override val reminders: StateFlow<LiveReminders?> = _reminders.asStateFlow()
 
     init {
+        events?.onEvent { if (it == ServerEvents.RECONNECTED) capabilitiesMemo.clear() }
         // Another server or account: its reminders and listings aren't this one's.
         scope.launch {
             store.sessionChanges.drop(1).collect {
@@ -103,7 +106,7 @@ internal class RealLiveRepository(
         }
     }
 
-    private fun personal() = http.apiLevel() >= LIVE_PERSONAL_API_LEVEL
+    private fun personal() = http.features().livePersonal
 
     override suspend fun setFavourite(channel: LiveChannel, favourite: Boolean) {
         if (!personal()) return
@@ -116,11 +119,9 @@ internal class RealLiveRepository(
     override suspend fun search(query: String): List<LiveSearchHit> {
         val q = query.trim()
         if (!personal() || q.length < LIVE_SEARCH_MIN_CHARS) return emptyList()
-        return http.signedIn { base, client ->
-            LiveTvApi(base, client).searchLiveTVGuide(q, SEARCH_LIMIT).items.mapNotNull { hit ->
-                if (!hit.channel.enabled) return@mapNotNull null
-                hit.programme.toModel()?.let { LiveSearchHit(hit.channel.toModel(listings = true), it) }
-            }
+        return http.signedIn { base, client -> LiveTvApi(base, client).searchLiveTVGuide(q, SEARCH_LIMIT) }.items.mapNotNull { hit ->
+            if (!hit.channel.enabled) return@mapNotNull null
+            hit.programme.toModel()?.let { LiveSearchHit(hit.channel.toModel(listings = true), it) }
         }
     }
 
@@ -148,12 +149,8 @@ internal class RealLiveRepository(
     override suspend fun forget(reminderId: String) {
         if (!personal()) return
         val revision = store.revision
-        try {
-            http.signedIn { base, client -> LiveTvApi(base, client).deleteLiveTVReminder(reminderId) }
-        } catch (e: ApiException) {
-            // Already gone (another device, or it ended): the list no longer has it either way.
-            if (e.status != 404) throw e
-        }
+        // Already gone (another device, or it ended): the list no longer has it either way.
+        ignoring404 { http.signedIn { base, client -> LiveTvApi(base, client).deleteLiveTVReminder(reminderId) } }
         if (store.revision == revision) _reminders.value = _reminders.value?.let { it.copy(items = it.items.filter { r -> r.id != reminderId }) }
     }
 
@@ -177,7 +174,7 @@ internal class RealLiveRepository(
         }
     } ?: emptyFlow())
 
-    private fun recordingLevel() = http.apiLevel() >= LIVE_RECORDING_API_LEVEL
+    private fun recordingLevel() = http.features().liveRecordings
     private fun recordingsChanged() {
         synchronized(lock) { windows.clear() }
         recordingChanges.tryEmit(LivePersonalChange.Recordings)
@@ -185,18 +182,20 @@ internal class RealLiveRepository(
 
     override suspend fun recordings(section: RecordingSection, cursor: String?): RecordingPage {
         if (!recordingLevel()) return RecordingPage()
-        return http.signedIn { base, client -> LiveTvApi(base, client).listLiveTVRecordings(section = LiveTvApi.SectionListLiveTVRecordings.entries.first { it.value == section.id }, cursor = cursor).toModel() }
+        val wanted = LiveTvApi.SectionListLiveTVRecordings.entries.first { it.value == section.id }
+        return http.signedIn { base, client -> LiveTvApi(base, client).listLiveTVRecordings(section = wanted, cursor = cursor) }.toModel()
     }
 
     override suspend fun record(programme: LiveProgramme, options: RecordingOptions): LiveRecording? {
         if (!recordingLevel()) return null
         require(options.valid)
-        val result = http.signedIn { base, client -> LiveTvApi(base, client).createLiveTVRecording(LiveTVRecordingCreate(
+        val body = LiveTVRecordingCreate(
             programmeId = programme.id,
             scope = if (options.series) LiveTVRecordingCreate.Scope.series else LiveTVRecordingCreate.Scope.once,
             newOnly = options.newOnly, anyChannel = options.anyChannel, keep = options.keep.toLong(),
             padBefore = options.padBefore.toLong().takeIf { options.customPadding }, padAfter = options.padAfter.toLong().takeIf { options.customPadding },
-        )).toModel() }
+        )
+        val result = http.signedIn { base, client -> LiveTvApi(base, client).createLiveTVRecording(body) }.toModel()
         recordingsChanged()
         return result
     }
@@ -204,11 +203,12 @@ internal class RealLiveRepository(
     override suspend fun recordManual(request: ManualRecording): LiveRecording? {
         if (!recordingLevel()) return null
         request.validation(clock())?.let { throw ApiException(422, it) }
-        val result = http.signedIn { base, client -> LiveTvApi(base, client).createManualLiveTVRecording(LiveTVRecordingManual(
+        val body = LiveTVRecordingManual(
             channelId = request.channelId, name = request.name,
             start = Instant.ofEpochMilli(request.startMs).toString(), end = Instant.ofEpochMilli(request.endMs).toString(),
             repeat = LiveTVRecordingManual.Repeat.entries.first { it.value == request.repeat }, zone = request.zone,
-        )).toModel() }
+        )
+        val result = http.signedIn { base, client -> LiveTvApi(base, client).createManualLiveTVRecording(body) }.toModel()
         recordingsChanged()
         return result
     }
@@ -221,8 +221,7 @@ internal class RealLiveRepository(
 
     override suspend fun cancelRecording(id: String) {
         if (!recordingLevel()) return
-        try { http.signedIn { base, client -> LiveTvApi(base, client).cancelLiveTVRecording(id) } }
-        catch (e: ApiException) { if (e.status != 404) throw e }
+        ignoring404 { http.signedIn { base, client -> LiveTvApi(base, client).cancelLiveTVRecording(id) } }
         recordingsChanged()
     }
 
@@ -244,24 +243,19 @@ internal class RealLiveRepository(
 
     override suspend fun deleteRecordingRule(id: String) {
         if (!recordingLevel()) return
-        try { http.signedIn { base, client -> LiveTvApi(base, client).deleteLiveTVRecordingRule(id) } }
-        catch (e: ApiException) { if (e.status != 404) throw e }
+        ignoring404 { http.signedIn { base, client -> LiveTvApi(base, client).deleteLiveTVRecordingRule(id) } }
         recordingsChanged()
     }
 
     override suspend fun capabilities(): LiveCapabilities {
-        if (http.apiLevel() < LIVE_TV_API_LEVEL) return LiveCapabilities()
-        return http.signedIn { base, client ->
-            LiveTvApi(base, client).getLiveTVCapabilities().toModel(http.apiLevel())
-        }
+        if (!http.features().liveTv) return LiveCapabilities()
+        return capabilitiesMemo.get()
     }
 
     override suspend fun channels(): List<LiveChannel> {
-        if (http.apiLevel() < LIVE_TV_API_LEVEL) return emptyList()
-        val listings = http.apiLevel() >= LIVE_GUIDE_API_LEVEL
-        return http.signedIn { base, client ->
-            LiveTvApi(base, client).listLiveTVChannels().items.filter { it.enabled }.map { it.toModel(listings) }
-        }
+        if (!http.features().liveTv) return emptyList()
+        val listings = http.features().liveGuide
+        return http.signedIn { base, client -> LiveTvApi(base, client).listLiveTVChannels() }.items.filter { it.enabled }.map { it.toModel(listings) }
     }
 
     override fun artUrl(path: String?): String? {
@@ -274,7 +268,7 @@ internal class RealLiveRepository(
 
 
     override suspend fun guide(startMs: Long, endMs: Long): LiveGuide? {
-        if (http.apiLevel() < LIVE_GUIDE_API_LEVEL || endMs <= startMs) return null
+        if (!http.features().liveGuide || endMs <= startMs) return null
         val first = Math.floorDiv(startMs, WINDOW_MS) * WINDOW_MS
         val starts = generateSequence(first) { it + WINDOW_MS }.takeWhile { it < endMs }.toList()
         val replies = starts.map(::window)
@@ -288,10 +282,10 @@ internal class RealLiveRepository(
         val now = clock()
         windows.entries.removeAll { (key, kept) -> kept.revision != revision || key + WINDOW_MS < now - WINDOW_MS || kept.reply.isCompleted && kept.reply.getCompletionExceptionOrNull() != null }
         windows[start]?.takeIf { now - it.fetchedAtMs < WINDOW_TTL_MS }?.let { return it.reply }
+        val from = Instant.ofEpochMilli(start).toString()
         val reply = scope.async {
-            http.signedIn { base, client ->
-                LiveTvApi(base, client).getLiveTVGuide(start = Instant.ofEpochMilli(start).toString(), hours = LIVE_GUIDE_WINDOW_HOURS.toLong()).toModel(base)
-            }
+            val (base, guide) = http.signedIn { base, client -> base to LiveTvApi(base, client).getLiveTVGuide(start = from, hours = LIVE_GUIDE_WINDOW_HOURS.toLong()) }
+            guide.toModel(base)
         }
         windows[start] = Window(revision, now, reply)
         reply
@@ -306,14 +300,14 @@ internal class RealLiveRepository(
     }
 }
 
-/** The server's Live TV capabilities as this app uses them at [level]: listings from 13, casting a channel from 14. */
-internal fun LiveTVCapabilities.toModel(level: Int) = LiveCapabilities(
+/** The server's Live TV capabilities as this app uses them with what the server offers ([features]). */
+internal fun LiveTVCapabilities.toModel(features: ServerFeatures) = LiveCapabilities(
     enabled, allowed, playback, bufferSeconds.seconds(60), pauseSeconds.seconds(300),
-    guide = guide && level >= LIVE_GUIDE_API_LEVEL,
-    cast = cast == true && level >= LIVE_CAST_API_LEVEL,
-    recording = recording == true && level >= LIVE_RECORDING_API_LEVEL,
-    canRecord = canRecord == true && level >= LIVE_RECORDING_API_LEVEL,
-    automatic = automatic == true && level >= LIVE_AUTOMATIC_API_LEVEL,
+    guide = guide && features.liveGuide,
+    cast = cast == true && features.liveCast,
+    recording = recording == true && features.liveRecordings,
+    canRecord = canRecord == true && features.liveRecordings,
+    automatic = automatic == true && features.liveAutomatic,
 )
 
 /**
@@ -323,14 +317,14 @@ internal fun LiveTVCapabilities.toModel(level: Int) = LiveCapabilities(
  */
 internal class CastLiveRepository(private val access: CastTokenAccess) : LiveRepository {
     override suspend fun capabilities(): LiveCapabilities {
-        if (access.apiLevel() < LIVE_TV_API_LEVEL) return LiveCapabilities()
-        return access.call { base, client -> LiveTvApi(base, client).getLiveTVCapabilities().toModel(access.apiLevel()) }
+        if (!access.features().liveTv) return LiveCapabilities()
+        return access.call { base, client -> LiveTvApi(base, client).getLiveTVCapabilities() }.toModel(access.features())
     }
 
     override suspend fun channels(): List<LiveChannel> {
-        if (access.apiLevel() < LIVE_TV_API_LEVEL) return emptyList()
-        val listings = access.apiLevel() >= LIVE_GUIDE_API_LEVEL
-        return access.call { base, client -> LiveTvApi(base, client).listLiveTVChannels().items.filter { it.enabled }.map { it.toModel(listings) } }
+        if (!access.features().liveTv) return emptyList()
+        val listings = access.features().liveGuide
+        return access.call { base, client -> LiveTvApi(base, client).listLiveTVChannels() }.items.filter { it.enabled }.map { it.toModel(listings) }
     }
 
     override fun artUrl(path: String?): String? {
@@ -366,12 +360,14 @@ internal class RealLivePlaybackGateway(
     private val revision: Long? = null,
     /** Where media tokens come from instead of createMediaToken: a cast token's renewal (Cast Connect), which a cast token may call. */
     private val mediaTokens: (suspend () -> MediaToken)? = null,
+    /** The signed-in account's capabilities as Live TV's screens have them ([RealLiveRepository.capabilities]), so a channel change doesn't ask again. */
+    private val capabilities: (suspend () -> LiveCapabilities)? = null,
 ) : LivePlaybackGateway {
     private var automaticEnabled = false
     override fun bind(): LivePlaybackGateway {
         if (access != null) return this
         val (session, capturedRevision) = store.requestSnapshot()
-        return RealLivePlaybackGateway(store, http, http.bind(session), capturedRevision)
+        return RealLivePlaybackGateway(store, http, http.bind(session), capturedRevision, capabilities = capabilities)
     }
 
     override val isCurrent: Boolean get() = revision == null || store.revision == revision
@@ -381,8 +377,9 @@ internal class RealLivePlaybackGateway(
     override suspend fun liveCapabilities(): LiveCapabilities {
         if (access == null) return bind().liveCapabilities()
         requireCurrent()
-        if (access.apiLevel() < LIVE_TV_API_LEVEL) return LiveCapabilities()
-        val result = access.call { base, client -> LiveTvApi(base, client).getLiveTVCapabilities().toModel(access.apiLevel()) }
+        if (!access.features().liveTv) return LiveCapabilities()
+        val result = capabilities?.invoke()?.also { requireCurrent() }
+            ?: access.call { base, client -> LiveTvApi(base, client).getLiveTVCapabilities() }.toModel(access.features())
         automaticEnabled = result.automatic
         return result
     }
@@ -397,20 +394,20 @@ internal class RealLivePlaybackGateway(
         if (access == null) return if (profile == null) bind().start(target, quality, requestId, client)
             else bind().startNegotiated(target, quality, requestId, client, profile)
         requireCurrent()
-        if (access.apiLevel() < LIVE_TV_API_LEVEL) throw ApiException(404, "Live TV needs a newer server.")
+        if (!access.features().liveTv) throw ApiException(404, "Live TV needs a newer server.")
         if (!target.channel.available) throw ApiException(409, target.channel.reason ?: "This channel is unavailable.")
         require(requestId.isNotBlank() && requestId.length <= 64)
-        val selected = quality.forLiveTV(automaticEnabled && access.apiLevel() >= LIVE_AUTOMATIC_API_LEVEL)
-        return access.call { base, httpClient ->
-            LiveTvApi(base, httpClient).startLiveTV(LiveTVStartInputBody(
-                channelId = target.channel.id,
-                requestId = requestId,
-                quality = LiveTVStartInputBody.Quality.entries.first { it.value == selected.id },
-                clientName = liveClientName(client.name),
-                profile = profile?.takeIf { access.apiLevel() >= LIVE_PROFILE_API_LEVEL }?.toLiveApi(),
-                autoRecovery = true.takeIf { selected == StreamQuality.Auto },
-            )).toModel(base)
-        }
+        val selected = quality.forLiveTV(automaticEnabled && access.features().liveAutomatic)
+        val body = LiveTVStartInputBody(
+            channelId = target.channel.id,
+            requestId = requestId,
+            quality = LiveTVStartInputBody.Quality.entries.first { it.value == selected.id },
+            clientName = liveClientName(client.name),
+            profile = profile?.takeIf { access.features().liveProfile }?.toLiveApi(),
+            autoRecovery = true.takeIf { selected == StreamQuality.Auto },
+        )
+        val (base, reply) = access.call { base, httpClient -> base to LiveTvApi(base, httpClient).startLiveTV(body) }
+        return reply.toModel(base)
         // Return a late successful allocation even when the account changed.
         // The controller checks isCurrent before attaching, then stops its ID
         // with this same bound gateway. Throwing here would leak that ID.
@@ -418,56 +415,51 @@ internal class RealLivePlaybackGateway(
 
     override suspend fun status(sessionId: String): LiveSession {
         if (access == null) return bind().status(sessionId)
-        return access.call { base, client -> LiveTvApi(base, client).getLiveTVSession(sessionId).toModel(base) }
+        val (base, reply) = access.call { base, client -> base to LiveTvApi(base, client).getLiveTVSession(sessionId) }
+        return reply.toModel(base)
     }
 
     override suspend fun heartbeat(sessionId: String, paused: Boolean, interacted: Boolean): LiveSession {
         if (access == null) return bind().heartbeat(sessionId, paused, interacted)
         requireCurrent()
-        return access.call { base, client ->
-            LiveTvApi(base, client).heartbeatLiveTV(sessionId, LiveTVHeartbeatInputBody(paused = paused, interacted = interacted.takeIf { it })).toModel(base)
-        }
+        val body = LiveTVHeartbeatInputBody(paused = paused, interacted = interacted.takeIf { it })
+        val (base, reply) = access.call { base, client -> base to LiveTvApi(base, client).heartbeatLiveTV(sessionId, body) }
+        return reply.toModel(base)
     }
 
     override suspend fun heartbeatMeasured(sessionId: String, paused: Boolean, interacted: Boolean, measurement: LiveMeasurement): LiveSession {
         if (access == null) return bind().heartbeatMeasured(sessionId, paused, interacted, measurement)
         requireCurrent()
-        if (access.apiLevel() < LIVE_AUTOMATIC_API_LEVEL) return heartbeat(sessionId, paused, interacted)
-        return access.call { base, client ->
-            LiveTvApi(base, client).heartbeatLiveTV(sessionId, LiveTVHeartbeatInputBody(
-                paused = paused, interacted = interacted.takeIf { it },
-                state = when (measurement.state) {
-                    LivePlaybackState.Playing -> LiveTVHeartbeatInputBody.State.playing
-                    LivePlaybackState.Paused -> LiveTVHeartbeatInputBody.State.paused
-                    LivePlaybackState.Buffering -> LiveTVHeartbeatInputBody.State.buffering
-                },
-                bufferedMs = measurement.bufferedMs?.coerceAtLeast(0),
-                throughputBps = measurement.throughputBps?.takeIf { it > 0 },
-                throughputAgeMs = measurement.throughputAgeMs?.takeIf { it >= 0 },
-                stalls = measurement.stalls?.coerceAtLeast(0),
-                switchGeneration = measurement.switchGeneration?.takeIf { it > 0 },
-                switchFailedGeneration = measurement.switchFailedGeneration?.takeIf { it > 0 },
-            )).toModel(base)
-        }
+        if (!access.features().liveAutomatic) return heartbeat(sessionId, paused, interacted)
+        val body = LiveTVHeartbeatInputBody(
+            paused = paused, interacted = interacted.takeIf { it },
+            state = when (measurement.state) {
+                LivePlaybackState.Playing -> LiveTVHeartbeatInputBody.State.playing
+                LivePlaybackState.Paused -> LiveTVHeartbeatInputBody.State.paused
+                LivePlaybackState.Buffering -> LiveTVHeartbeatInputBody.State.buffering
+            },
+            bufferedMs = measurement.bufferedMs?.coerceAtLeast(0),
+            throughputBps = measurement.throughputBps?.takeIf { it > 0 },
+            throughputAgeMs = measurement.throughputAgeMs?.takeIf { it >= 0 },
+            stalls = measurement.stalls?.coerceAtLeast(0),
+            switchGeneration = measurement.switchGeneration?.takeIf { it > 0 },
+            switchFailedGeneration = measurement.switchFailedGeneration?.takeIf { it > 0 },
+        )
+        val (base, reply) = access.call { base, client -> base to LiveTvApi(base, client).heartbeatLiveTV(sessionId, body) }
+        return reply.toModel(base)
     }
 
     override suspend fun stop(sessionId: String) {
         if (access == null) return bind().stop(sessionId)
-        try {
-            access.call { base, client -> LiveTvApi(base, client).stopLiveTV(sessionId) }
-        } catch (e: ApiException) {
-            if (e.status != 404) throw e
-        }
+        ignoring404 { access.call { base, client -> LiveTvApi(base, client).stopLiveTV(sessionId) } }
     }
 
     override suspend fun mediaToken(): MediaToken {
         mediaTokens?.let { return it() }
         if (access == null) return bind().mediaToken()
         requireCurrent()
-        return access.call { base, client ->
-            val token = AuthApi(base, client).createMediaToken()
-            MediaToken(token.token, epochMs(token.expiresAt) ?: 0L, token.param.ifBlank { "access_token" }, base)
-        }
+        val (base, token) = access.call { base, client -> base to AuthApi(base, client).createMediaToken() }
+        return token.toModel(base)
     }
 
     private fun requireCurrent() {

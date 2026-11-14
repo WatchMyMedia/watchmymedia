@@ -25,7 +25,7 @@ internal class RealRowsRepository(
     private val http: Http,
     events: ServerEvents,
 ) : RowsRepository {
-    override val supported: Boolean get() = http.apiLevel() >= ROWS_API_LEVEL
+    override val supported: Boolean get() = http.features().rows
 
     private suspend fun <T> browse(block: suspend (BrowseApi) -> T): T {
         if (!supported) throw ApiException(404, "Update the server to arrange rows.")

@@ -9,7 +9,10 @@ import kotlinx.coroutines.withTimeout
 import media.watchmy.client.core.data.TestServer.Companion.problem
 import okhttp3.mockwebserver.MockResponse
 import org.junit.After
+import media.watchmy.client.model.LibraryChange
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -59,17 +62,58 @@ class ServerEventsTest {
                     "event: scan.progress\ndata: {\"libraryId\":1}\n\n" +
                     "event: watch.changed\ndata: {\"itemType\":\"movie\",\"itemIds\":[21]}\n\n",
             ),
-            stream("event: ping\ndata: {\"time\":\"t\"}\n\nevent: library.changed\ndata: {\"libraryId\":2}\n\n"),
+            // After the first burst has gone out.
+            stream("event: ping\ndata: {\"time\":\"t\"}\n\nevent: library.changed\ndata: {\"libraryId\":2}\n\n")
+                .setHeadersDelay(ServerEvents.COALESCE_MS * 3, java.util.concurrent.TimeUnit.MILLISECONDS),
         )
-        h.services.library.changes.test(timeout = 5.seconds) {
-            awaitItem() // watch.changed
-            awaitItem() // the second connection's ping: events may have been missed
-            awaitItem() // library.changed
+        h.services.library.libraryChanges.test(timeout = 5.seconds) {
+            assertEquals(LibraryChange(movies = setOf(21)), awaitItem()) // watch.changed; scan.progress says nothing
+            // The second connection's ping (events may have been missed) and its library.changed, as one.
+            assertEquals(LibraryChange.Everything, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
         val first = h.server.requests("GET /api/events").first()
         assertEquals("Bearer tok-viewer", first.getHeader("Authorization"))
         assertEquals("text/event-stream", first.getHeader("Accept"))
+    }
+
+    @Test
+    fun `a burst comes as one change, naming what it touched`() = runBlocking {
+        h.signIn()
+        h.server.on(
+            "GET /api/events",
+            stream(
+                "event: ping\ndata: {}\n\n" +
+                    "event: watch.changed\ndata: {\"itemType\":\"episode\",\"itemIds\":[401,402]}\n\n" +
+                    "event: scan.finished\ndata: {\"libraryId\":3,\"added\":1}\n\n" +
+                    "event: library.changed\ndata: {\"libraryId\":3}\n\n" +
+                    "event: requests.changed\ndata: {}\n\n",
+            ),
+            stream("event: ping\ndata: {}\n\nevent: watch.changed\ndata: {\"itemType\":\"season\"}\n\n")
+                .setHeadersDelay(ServerEvents.COALESCE_MS * 3, java.util.concurrent.TimeUnit.MILLISECONDS),
+        )
+        h.services.library.libraryChanges.test(timeout = 5.seconds) {
+            val change = awaitItem()
+            assertEquals(LibraryChange(episodes = setOf(401, 402), libraries = setOf(3)), change)
+            assertTrue(change.touchesEpisodes(listOf(400, 402)))
+            assertFalse(LibraryChange(episodes = change.episodes).touchesEpisodes(listOf(400)))
+            // What can't be read counts as everything.
+            assertEquals(LibraryChange.Everything, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `merging changes keeps every id, and everything wins`() {
+        val a = LibraryChange(movies = setOf(1), libraries = setOf(7))
+        val b = LibraryChange(episodes = setOf(2), libraries = setOf(8))
+        assertEquals(LibraryChange(movies = setOf(1), episodes = setOf(2), libraries = setOf(7, 8)), a + b)
+        assertEquals(LibraryChange.Everything, a + LibraryChange.Everything)
+        assertTrue(LibraryChange(movies = setOf(1)).touchesMovie(1))
+        assertFalse(LibraryChange(movies = setOf(1)).touchesMovie(2))
+        assertFalse(LibraryChange(movies = setOf(1)).libraryContents)
+        assertTrue(LibraryChange(movies = setOf(1)).touchesLibrary(5))
+        assertFalse(LibraryChange(libraries = setOf(4)).touchesLibrary(5))
     }
 
     @Test
