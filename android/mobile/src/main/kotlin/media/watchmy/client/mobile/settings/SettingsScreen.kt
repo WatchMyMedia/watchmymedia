@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import media.watchmy.client.mobile.navigation.OnTabReselected
+import media.watchmy.client.mobile.components.MobileTab
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
@@ -144,6 +146,7 @@ fun SettingsScreen(
     val twoPane = rememberTabletLayout().twoPane
     var page by rememberSaveable { mutableStateOf(SettingsPage.Playback) }
     val pageScroll = rememberScrollState()
+    OnTabReselected(MobileTab.Settings) { pageScroll.animateScrollTo(0) }
     LaunchedEffect(page, twoPane) { pageScroll.scrollTo(0) }
     val phone = if (LocalConfiguration.current.smallestScreenWidthDp >= 600) "tablet" else "phone"
     val rowsAvailable = (state.server?.server?.apiLevel ?: 0) >= ROWS_API_LEVEL

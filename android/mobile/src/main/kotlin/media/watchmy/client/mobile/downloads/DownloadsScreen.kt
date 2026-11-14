@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import media.watchmy.client.mobile.navigation.OnTabReselected
+import media.watchmy.client.mobile.components.MobileTab
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -244,7 +247,9 @@ private fun PhoneDownloads(
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { EmptyDownloads(tablet = false, onHome = onHome) }
             return
         }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        val list = rememberLazyListState()
+        OnTabReselected(MobileTab.Downloads) { list.animateScrollToItem(0) }
+        LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(bottom = 16.dp)) {
             if (state.movies.isNotEmpty()) {
                 item(key = "movies") { Section("Movies") }
                 items(state.movies, key = { it.id }) { d ->

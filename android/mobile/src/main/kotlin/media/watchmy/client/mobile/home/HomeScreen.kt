@@ -83,6 +83,8 @@ import media.watchmy.client.model.episodeCards
 import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.model.BrowseItem
 import media.watchmy.client.model.ContinueItem
+import media.watchmy.client.mobile.components.MobileTab
+import media.watchmy.client.mobile.navigation.OnTabReselected
 import media.watchmy.client.model.EpisodeCard
 import media.watchmy.client.model.Hero
 import media.watchmy.client.model.HomeData
@@ -150,6 +152,7 @@ fun HomeScreen(
     // Above the tablet branch and the loading states: a window that crosses into or out of the tablet
     // layouts (a split screen resized, a foldable opened) comes back to the place it was.
     val list = rememberLazyListState()
+    OnTabReselected(MobileTab.Home) { list.animateScrollToItem(0) }
     // Fully drawn once Home has its rows, or has settled on an error or the offline Home: a cold start's
     // time to full display (the startup benchmarks, :baselineprofile).
     ReportDrawnWhen { state.home != null || state.error != null || (state.offline && held.enabled) }
