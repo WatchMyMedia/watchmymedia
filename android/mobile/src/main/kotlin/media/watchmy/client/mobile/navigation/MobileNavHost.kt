@@ -219,6 +219,9 @@ fun MobileNavHost(
                 if (channel != null && channel.available) watchLive(channel) else nav.openTab(MobileTab.LiveTV)
             }
             DeepLink.LiveGuide -> nav.openTab(MobileTab.LiveTV)
+            // The launcher's shortcuts.
+            DeepLink.Search -> nav.go(MobileRoutes.Search)
+            DeepLink.Downloads -> nav.go(MobileRoutes.Downloads)
         }
         onDeepLinkHandled()
     }

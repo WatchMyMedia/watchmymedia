@@ -44,6 +44,8 @@ android {
         // names another, such as a development receiver. -PcastAppId= (empty) builds without
         // casting: no Cast button, and the TV app takes no casts.
         buildConfigField("String", "CAST_APP_ID", "\"${providers.gradleProperty("castAppId").getOrElse("0A4D0B6A").filter(Char::isLetterOrDigit)}\"")
+        // The package the launcher shortcuts (res/xml/shortcuts.xml) open: the application ID, with any suffix below.
+        resValue("string", "shortcut_package", "media.watchmy.client")
     }
 
     signingConfigs {
@@ -61,7 +63,10 @@ android {
 
     buildTypes.named("debug") {
         // -PappIdSuffix=.tvbrowse installs a build beside others on the same device.
-        providers.gradleProperty("appIdSuffix").orNull?.let { applicationIdSuffix = it }
+        providers.gradleProperty("appIdSuffix").orNull?.let {
+            applicationIdSuffix = it
+            resValue("string", "shortcut_package", "media.watchmy.client$it")
+        }
     }
 
     buildTypes {
@@ -75,8 +80,13 @@ android {
             signingConfig = signingConfigs.findByName("upload")
         }
     }
+    // ShortcutsTest reads res/xml/shortcuts.xml, as the other modules' tests read their resources.
+    testOptions { unitTests.isIncludeAndroidResources = true }
+
     buildFeatures {
         buildConfig = true
+        // shortcut_package, above.
+        resValues = true
     }
 }
 

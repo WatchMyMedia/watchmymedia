@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">WatchMyMedia</string>
+    <!-- The launcher's shortcuts (xml/shortcuts.xml). -->
+    <string name="shortcut_search">Search</string>
+    <string name="shortcut_live_tv">Live TV</string>
+    <string name="shortcut_downloads">Downloads</string>
 </resources>
