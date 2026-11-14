@@ -142,13 +142,16 @@ private struct LivePlayerContent: View {
         let insets = frame.insets(portrait: portrait)
         let metrics = frame.metrics
         return ZStack {
-            PlayerVideo(player: model.controller.player, backdrop: nil, seed: state.channel?.name ?? "Live TV", pictureInPicture: pip)
-            Color.clear.contentShape(Rectangle()).onTapGesture { model.tap() }.accessibilityHidden(true)
+            PlayerVideo(player: model.controller.player, backdrop: nil, seed: state.channel?.name ?? "Live TV", pictureInPicture: pip, layout: frame.videoLayout)
+            Color.clear.contentShape(Rectangle()).onTapGesture { model.tap() }
+                .pinchToFit(frame, area: frame.videoArea(portrait: portrait))
+                .accessibilityHidden(true)
             if stopped { stoppedPrompt }
             else if model.showsControls && !pip.isActive {
                 VStack(spacing: 12) {
                     HStack(spacing: 10) {
                         RoundIconButton(systemImage: "xmark", label: "Stop and close live TV", size: metrics.button, iconSize: metrics.buttonIcon) { model.close() }
+                        VideoFitButton(frame: frame, area: frame.videoArea(portrait: portrait), metrics: metrics) { model.input() }
                         if !portrait {
                             let programme = model.listedChannel?.programme(at: .now)
                             Text([state.channel?.title ?? "Live TV", programme?.title].compactMap(\.self).joined(separator: " · "))

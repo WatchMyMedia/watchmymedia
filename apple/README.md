@@ -501,6 +501,24 @@ touch while playing (`ControlsAutoHide`, tested in the Kit; up for VoiceOver,
 and for Channels and the Quality menu on Live TV). `-playerKeepControls` keeps
 either player's controls up for screenshots and UI tests.
 
+**Fit and fill** (PLAN-APPLE-REVIEW.md §6.3, `design/mockups/ios/PlayerFitFill.dc.html`)
+is the shell's too, for both players on iPhone and iPad: a button beside Close
+(arrows out while fitted; gold, with arrows in, while filled), and a pinch on
+the picture (out fills, in fits; taps and double-tap seeks keep working). Fit
+keeps the whole picture inside the safe area, clear of the Dynamic Island; Fill
+covers the screen, the island too, and crops, never stretches
+(`resizeAspectFill`). A note under the top bar says which and how much is
+cropped ("Fill · 18% of the picture is cropped at the edges", from the
+picture's own size against the screen or, on a tall iPad or the portrait Live
+TV player, the 16:9 box). The choice is kept on the device for every video
+after it and for both players. The rule is `VideoFitModel` (WMMFeatures,
+tested in `VideoFitTests`); the views are `App/Screens/Player/PlayerFitFill.swift`.
+`-player.videoFit fit|fill` sets the choice for a launch (UI tests,
+screenshots) and `-playerFitNoteMs 8000` keeps the note up longer;
+`UITests/PlayerFitFillTests.swift` taps, pinches and double taps on the fakes
+(run it with the WatchMyMediaE2E scheme and `-only-testing`, as TrailerTests). The fakes draw a backdrop and no video, so how the picture
+crops shows only against a server.
+
 Quality is fixed at 1080p, 720p, 480p or 360p. Mobile data caps Live TV at 720p,
 including when the connection changes during playback. AirPlay and Picture in
 Picture use the live player; backgrounding without either stops the live session.

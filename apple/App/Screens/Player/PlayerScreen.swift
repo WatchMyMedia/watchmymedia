@@ -125,16 +125,19 @@ private struct PlayerContent: View {
                     player: model.controller.player,
                     backdrop: services.library.imageURL(state.backdropPath ?? model.request.backdropPath, size: .w1280),
                     seed: state.title.isEmpty ? model.request.title : state.title,
-                    pictureInPicture: pictureInPicture
+                    pictureInPicture: pictureInPicture,
+                    layout: frame.videoLayout
                 )
 
                 if !pictureInPicture.isActive {
                     PlayerCues(clock: model.clock, bottomPadding: model.showsControls ? insets.bottom + (portrait ? 56 : metrics.skipLift) + 8 : insets.bottom + 8, sidePadding: insets.leading)
 
-                    // Taps on the video: show or hide the controls; double taps on a side seek.
+                    // Taps on the video: show or hide the controls; double taps on a side seek;
+                    // a pinch fills or fits.
                     Color.clear
                         .contentShape(Rectangle())
                         .onTapGesture(coordinateSpace: .local) { model.tap(x: $0.x, width: frame.fullWidth) }
+                        .pinchToFit(frame, area: frame.videoArea(portrait: portrait))
                         .accessibilityHidden(true)
 
                     if let ripple = model.ripple {
@@ -145,7 +148,8 @@ private struct PlayerContent: View {
                     }
 
                     if model.showsControls {
-                        PlayerControlsView(model: model, pictureInPicture: pictureInPicture, insets: insets, metrics: metrics, portrait: portrait, onEpisodes: episodes.season == nil && episodes.error == nil ? nil : { showsEpisodes = true })
+                        PlayerControlsView(model: model, pictureInPicture: pictureInPicture, insets: insets, metrics: metrics, portrait: portrait, onEpisodes: episodes.season == nil && episodes.error == nil ? nil : { showsEpisodes = true },
+                                           fitButton: VideoFitButton(frame: frame, area: frame.videoArea(portrait: portrait), metrics: metrics) { model.showControls() })
                             .transition(.opacity)
                     } else if model.isWaiting, model.overlay == nil {
                         SpinnerRing()

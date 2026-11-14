@@ -37,6 +37,8 @@ struct PlayerControlsView: View {
     var metrics: PlayerMetrics = .phone
     var portrait = false
     var onEpisodes: (() -> Void)?
+    /// Fit and fill, beside Close (PlayerFitFill.dc.html).
+    var fitButton: VideoFitButton?
 
     var body: some View {
         let state = model.state
@@ -106,6 +108,7 @@ struct PlayerControlsView: View {
             .frame(minHeight: metrics.button)
             HStack(spacing: metrics.streamChip ? 12 : 10) {
                 RoundIconButton(systemImage: "xmark", label: "Close", size: metrics.button, iconSize: metrics.buttonIcon) { model.close() }
+                if let fitButton { fitButton }
                 Spacer(minLength: 0)
                 if cast.available && !state.isOffline {
                     CastHandoverButton(model: model)

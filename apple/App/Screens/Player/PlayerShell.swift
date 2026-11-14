@@ -72,6 +72,10 @@ struct PlayerFrame {
     let safeArea: EdgeInsets
     let metrics: PlayerMetrics
     let pictureInPicture: PictureInPicture
+    /// Fit or fill, remembered between videos (``VideoFitButton``, `PlayerFitFill.swift`).
+    let fit: VideoFitModel
+    /// The picture's own size once it has one, for how much Fill crops.
+    let videoSize: @MainActor () -> CGSize?
 
     /// Taller than wide: the video sits at the top with the details under it.
     var tall: Bool { size.height > size.width }
@@ -102,6 +106,7 @@ struct PlayerShell<Content: View>: View {
     var orientations: UIInterfaceOrientationMask = .landscape
     @ViewBuilder let content: (PlayerFrame) -> Content
     @State private var pictureInPicture = PictureInPicture()
+    @State private var fit = VideoFitModel.forPlayer()
     /// The shell holds the keyboard's focus, so its keys reach the player without a tap first.
     @FocusState private var keyboardFocus: Bool
     @Environment(\.scenePhase) private var scenePhase
@@ -116,11 +121,22 @@ struct PlayerShell<Content: View>: View {
         // that keeps it and one that doesn't.
         GeometryReader { safe in
             GeometryReader { full in
-                content(PlayerFrame(size: full.size, safeArea: Self.insets(safe: safe.frame(in: .global), full: full.frame(in: .global)),
-                                    metrics: metrics, pictureInPicture: pictureInPicture))
+                let model = model
+                let frame = PlayerFrame(size: full.size, safeArea: Self.insets(safe: safe.frame(in: .global), full: full.frame(in: .global)),
+                                        metrics: metrics, pictureInPicture: pictureInPicture,
+                                        fit: fit, videoSize: { model.shellPlayer?.currentItem?.presentationSize })
+                ZStack(alignment: .top) {
+                    content(frame)
+                    // Fit and fill's note, under the top bar where the quality note sits.
+                    if !pictureInPicture.isActive {
+                        VideoFitNote(fit: fit)
+                            .padding(.top, frame.insets(portrait: frame.tall).top + metrics.button + (metrics.streamChip ? 52 : 16))
+                    }
+                }
             }
             .ignoresSafeArea()
         }
+        .onDisappear { fit.dispose() }
         .background(Color.black.ignoresSafeArea())
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
