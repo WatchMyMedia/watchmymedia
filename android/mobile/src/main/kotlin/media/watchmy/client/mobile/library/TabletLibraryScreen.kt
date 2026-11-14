@@ -53,6 +53,7 @@ import media.watchmy.client.mobile.components.GoldChip
 import media.watchmy.client.mobile.components.InlineError
 import media.watchmy.client.mobile.components.LoadingState
 import media.watchmy.client.mobile.components.MainTopBar
+import media.watchmy.client.mobile.components.LoadContent
 import media.watchmy.client.mobile.components.MessageHost
 import media.watchmy.client.mobile.components.PosterCard
 import media.watchmy.client.mobile.components.fieldColors
@@ -84,6 +85,7 @@ internal fun TabletLibraryScreen(
     type: LibraryType,
     state: LibraryViewModel.State,
     vm: LibraryViewModel,
+    grid: androidx.compose.foundation.lazy.grid.LazyGridState,
     userName: String?,
     twoPane: Boolean,
     onOpenShow: (Long) -> Unit,
@@ -99,18 +101,12 @@ internal fun TabletLibraryScreen(
     val arranged = rowsVm?.arranges == true && state.libraryId != null
     val drawn = if (arranged) rows.rows.drawn(live = false) else emptyList()
     val rowActions = rowsVm?.let { libraryRowActions(onPlay, onOpenShow, onOpenMovie, onNavigate, onNotMatched, it) }
-    val grid = rememberLazyGridState()
     ShowRowsWhenTheyArrive(grid, drawn.size)
     var filtersVisible by rememberSaveable { mutableStateOf(true) }
     var filtersSheet by remember { mutableStateOf(false) }
     val noun = if (type == LibraryType.Tv) "show" else "movie"
-    val query = "${state.choices}/${state.offset}"
-    var shownQuery by rememberSaveable { mutableStateOf(query) }
-    LaunchedEffect(query) { if (query != shownQuery) { shownQuery = query; grid.scrollToItem(0) } }
-    // A letter jumped to: its first title, under the rows when there are any.
-    LaunchedEffect(state.jump?.revision) { state.jump?.let { grid.scrollToItem((if (arranged) drawn.size + 2 else 0) + it.index) } }
-    val nearEnd by remember { derivedStateOf { (grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= grid.layoutInfo.totalItemsCount - 12 } }
-    LaunchedEffect(state.items.size, state.offset, state.loading, state.refreshing) { snapshotFlow { nearEnd }.collect { if (it) vm.loadMore() } }
+    // A new sort or filter goes back up to the grid; a letter jumped to, to its first title, under the rows when there are any.
+    grid.FollowLibrary(state, vm, top = 0, first = if (arranged) drawn.size + 2 else 0)
 
     Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
         MainTopBar(if (type == LibraryType.Tv) "TV Shows" else "Movies", userName, { onNavigate(MobileRoutes.Search) }, { onNavigate(MobileRoutes.Settings) })
@@ -133,13 +129,8 @@ internal fun TabletLibraryScreen(
                 FilterPanel(state, vm, type, Modifier.width(220.dp).fillMaxHeight()) { filtersVisible = false }
             }
             Box(Modifier.weight(1f).fillMaxHeight()) {
-                when {
-                    state.loading && state.items.isEmpty() -> LoadingState()
-                    state.error != null && state.items.isEmpty() -> ErrorState(state.error!!, vm::retry)
-                    state.noLibrary -> EmptyState("No ${noun} library", "Add a library in the web app.")
-                    state.items.isEmpty() && state.filtered -> EmptyState("Nothing matches", "No ${noun}s match these filters.", action = "Clear filters", onAction = vm::clearFilters)
-                    state.items.isEmpty() -> EmptyState("No ${noun}s yet", "Pull down to check again.", action = "Check again", onAction = vm::retry)
-                    else -> androidx.compose.material3.pulltorefresh.PullToRefreshBox(state.refreshing, vm::refresh, Modifier.fillMaxSize()) {
+                LoadContent(state.loadStatus(type, vm), vm::retry) {
+                    androidx.compose.material3.pulltorefresh.PullToRefreshBox(state.refreshing, vm::refresh, Modifier.fillMaxSize()) {
                         LazyVerticalGrid(GridCells.Adaptive(TabletLayout.posterMinimum), state = grid, modifier = Modifier.testTag(TestTags.LIBRARY), contentPadding = PaddingValues(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             if (arranged && rowActions != null) {
                                 libraryRows(drawn, library, rowActions, tablet = true, edge = 0.dp, onNavigate = onNavigate)

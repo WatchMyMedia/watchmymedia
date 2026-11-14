@@ -61,6 +61,7 @@ import media.watchmy.client.mobile.components.InlineError
 import media.watchmy.client.mobile.components.ChipRowSkeleton
 import media.watchmy.client.mobile.components.LibraryGridSkeleton
 import media.watchmy.client.mobile.components.MainTopBar
+import media.watchmy.client.mobile.components.LoadContent
 import media.watchmy.client.mobile.components.MessageHost
 import media.watchmy.client.mobile.components.PosterCard
 import media.watchmy.client.mobile.navigation.MobileRoutes
@@ -111,34 +112,23 @@ fun LibraryScreen(
     ReportShown(rowsVm::setShown)
     val rows by rowsVm.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.libraryId) { rowsVm.show(state.libraryId) }
+    // One scroll for every layout, made above the phone/tablet branch, so turning the screen keeps the place.
+    val grid = rememberLibraryGrid()
     val layout = media.watchmy.client.ui.rememberTabletLayout()
     if (layout.isTablet) {
-        TabletLibraryScreen(type, state, vm, user?.name, layout.twoPane, onOpenShow, onOpenMovie, onNavigate, onPlay, notMatched, rows, rowsVm)
+        TabletLibraryScreen(type, state, vm, grid, user?.name, layout.twoPane, onOpenShow, onOpenMovie, onNavigate, onPlay, notMatched, rows, rowsVm)
         return
     }
     if (rowsVm.arranges && state.libraryId != null) {
         ArrangedLibraryScreen(
-            type, state, vm, rows, rowsVm, user?.name, onOpenShow, onOpenMovie, onNavigate, onPlay, notMatched,
+            type, state, vm, grid, rows, rowsVm, user?.name, onOpenShow, onOpenMovie, onNavigate, onPlay, notMatched,
             sortMenu = { SortMenu(state, vm, type) },
             chips = { ChipRow(state, vm, type) },
         )
         return
     }
-    val grid = rememberLazyGridState()
-    val noun = if (type == LibraryType.Tv) "show" else "movie"
-
     // A new sort or filter starts at the top; coming back from a show keeps the place.
-    val queryKey = "${state.choices} ${state.offset}"
-    var shownKey by rememberSaveable { mutableStateOf(queryKey) }
-    LaunchedEffect(queryKey) {
-        if (queryKey != shownKey) {
-            shownKey = queryKey
-            grid.scrollToItem(0)
-        }
-    }
-    // Restarted after each page, so a short page that leaves the end in view asks for the next one.
-    val nearEnd by remember { derivedStateOf { (grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) >= grid.layoutInfo.totalItemsCount - 12 } }
-    LaunchedEffect(grid, state.items.size) { snapshotFlow { nearEnd }.collect { if (it) vm.loadMore() } }
+    grid.FollowLibrary(state, vm, top = 0, first = 0)
 
     val title = if (type == LibraryType.Tv) "TV Shows" else "Movies"
     // The first page on its way: the outline of the grid (HomeLoading.dc.html, library), with the sort as it is.
@@ -162,16 +152,7 @@ fun LibraryScreen(
         if (firstLoad) ChipRowSkeleton(sheen = sheen) else ChipRow(state, vm, type)
         Spacer(Modifier.height(16.dp))
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            when {
-                state.items.isEmpty() && state.loading -> LibraryGridSkeleton("Loading $title", sheen = sheen)
-                state.items.isEmpty() && state.error != null -> ErrorState(state.error!!, vm::retry)
-                state.noLibrary -> EmptyState(
-                    if (type == LibraryType.Tv) "No TV library" else "No movie library",
-                    "This server has no ${if (type == LibraryType.Tv) "TV Shows" else "Movies"} library yet. Add one in the web app.",
-                )
-                state.items.isEmpty() && state.filtered -> EmptyState("Nothing matches", "No ${noun}s match these filters.", action = "Clear filters", onAction = vm::clearFilters)
-                state.items.isEmpty() -> EmptyState("No ${noun}s yet", "When the server has scanned the library, its ${noun}s appear here.", action = "Check again", onAction = vm::retry)
-                else -> {
+            LoadContent(state.loadStatus(type, vm), vm::retry, loading = { LibraryGridSkeleton("Loading $title", sheen = sheen) }) {
                     val pull = rememberPullToRefreshState()
                     PullToRefreshBox(
                         isRefreshing = state.refreshing,
@@ -215,7 +196,6 @@ fun LibraryScreen(
                             }
                         }
                     }
-                }
             }
             MessageHost(state.message, vm::messageShown, Modifier.align(Alignment.BottomCenter))
         }
