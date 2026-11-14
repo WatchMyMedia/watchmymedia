@@ -12,6 +12,7 @@ import media.watchmy.client.core.playback.player.PlayerOptions
 import media.watchmy.client.core.playback.player.mediaHttpClient
 import media.watchmy.client.core.playback.profile.DeviceProfileProvider
 import media.watchmy.client.core.playback.session.AndroidMediaSessionHost
+import media.watchmy.client.core.playback.watchnext.TvPreviewChannel
 import media.watchmy.client.core.playback.watchnext.TvWatchNext
 import media.watchmy.client.core.playback.watchnext.WatchNext
 import media.watchmy.client.core.playback.watchnext.WatchNextLibrary
@@ -104,14 +105,20 @@ class PlaybackEngine(
         )
     }
 
-    fun setWatchNextAccount(account: String?) { (watchNext as? TvWatchNext)?.selectAccount(account) }
+    /** The launcher's preview channel (Recently added), on a TV. */
+    private val previewChannel: TvPreviewChannel? = if (isTv) TvPreviewChannel(app, watchNextAccount) else null
+
+    fun setWatchNextAccount(account: String?) {
+        (watchNext as? TvWatchNext)?.selectAccount(account)
+        previewChannel?.selectAccount(account)
+    }
 
     /**
      * [library] as the screens should use it: on a TV, Home's loads and the
      * marks keep the launcher's Watch Next row in step ([WatchNextLibrary]).
      */
     fun screensLibrary(library: LibraryRepository): LibraryRepository =
-        if (watchNext is TvWatchNext) WatchNextLibrary(library, watchNext) else library
+        if (watchNext is TvWatchNext) WatchNextLibrary(library, watchNext, channel = previewChannel) else library
 
     /**
      * A player that talks to the server through [gateway] with [preferences]

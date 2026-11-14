@@ -14,17 +14,23 @@ import media.watchmy.client.model.playRequest
  * every watch.changed, which Home reloads on) brings the row's partway
  * entries in line with the server's Continue watching, and a mark takes
  * the item's entries off at once. [now] dates entries the row didn't have,
- * newest first.
+ * newest first. Each Home load also fills the app's preview channel
+ * ([channel], Recently added) on the launcher.
  */
 class WatchNextLibrary(
     private val library: LibraryRepository,
     private val watchNext: WatchNext,
     private val now: () -> Long = System::currentTimeMillis,
+    private val channel: TvPreviewChannel? = null,
 ) : LibraryRepository by library {
     override suspend fun home(): HomeData {
         // Bound before the call: a reply for someone who has since signed out changes nothing.
         val row = watchNext.bind()
-        return library.home().also { home -> row.syncWith(home.continueWatching) }
+        val recent = channel?.bind()
+        return library.home().also { home ->
+            row.syncWith(home.continueWatching)
+            recent?.invoke(home)
+        }
     }
 
     /**
@@ -34,7 +40,9 @@ class WatchNextLibrary(
      */
     override suspend fun arrangedHome(): HomeData {
         val row = watchNext.bind()
+        val recent = channel?.bind()
         return library.arrangedHome().also { home ->
+            recent?.invoke(home)
             // A failure there leaves the row as it is; Home itself loaded.
             (home.continueRow ?: attempt { library.continueWatching() }.getOrNull())?.let { row.syncWith(it) }
         }
