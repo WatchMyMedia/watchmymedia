@@ -138,7 +138,18 @@ struct LiveExtrasModelTests {
     @Test func refreshesAtOnceShareOneRequest() async throws {
         let (repository, store) = try await make()
         let before = repository.remindersCount
-        await together({ await store.refresh() }, { await store.refresh() })
+        // Hold the first request open until the second refresh has been asked:
+        // with no latency it could finish before the second began (it did on a
+        // loaded machine, 2026-11-13), and the second would rightly ask again.
+        let (opened, open) = AsyncStream<Void>.makeStream()
+        repository.remindersHold = { for await _ in opened { break } }
+        let first = Task { await store.refresh() }
+        #expect(await eventually { repository.remindersCount == before + 1 })
+        let second = Task { await store.refresh() }
+        for _ in 0..<20 { await Task.yield() }
+        open.yield(); open.finish()
+        await first.value; await second.value
+        repository.remindersHold = nil
         #expect(repository.remindersCount == before + 1)
         await store.refresh()
         #expect(repository.remindersCount == before + 2, "a later one asks again")

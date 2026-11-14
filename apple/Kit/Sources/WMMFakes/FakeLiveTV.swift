@@ -42,6 +42,9 @@ public final class FakeLiveTVRepository: LiveTVRepository {
     /// Calls made, for tests that count requests.
     public private(set) var refreshCount = 0
     public private(set) var remindersCount = 0
+    /// Awaited inside each reminders call after it is counted, so a test can
+    /// hold one open while a second caller joins it.
+    public var remindersHold: (@MainActor () async -> Void)?
     public var contextID: String? {
         guard let servers else { return "fake-live" }
         guard servers.currentUser != nil, let current = servers.current else { return nil }
@@ -161,6 +164,7 @@ public final class FakeLiveTVRepository: LiveTVRepository {
 
     public func reminders() async throws -> LiveReminders {
         remindersCount += 1
+        if let remindersHold { await remindersHold() }
         _ = try await extras()
         let now = self.now()
         reminderItems.removeAll { $0.end <= now }
