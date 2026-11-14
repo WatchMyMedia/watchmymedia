@@ -12,17 +12,28 @@ object TabletLayout {
     val posterMinimum = 150.dp
     val detailColumn = 400.dp
     val singleColumnMax = 720.dp
-    fun isTablet(widthDp: Int) = widthDp >= 600
-    fun usesTwoPanes(widthDp: Int) = widthDp >= 1000
+    /** The height a tablet layout needs: a phone held sideways, about 410 dp tall, keeps the phone layouts. */
+    const val TABLET_MIN_HEIGHT_DP = 480
+
+    /**
+     * The tablet layouts: at least 600 dp wide and 480 dp tall
+     * (PLAN-ANDROID-REVIEW §2.7). Width alone gave a phone held sideways
+     * (915 × 412) the tablet Home, whose 440 dp panel didn't fit its height.
+     */
+    fun isTablet(widthDp: Int, heightDp: Int) = widthDp >= 600 && heightDp >= TABLET_MIN_HEIGHT_DP
+    fun usesTwoPanes(widthDp: Int, heightDp: Int) = isTablet(widthDp, heightDp) && widthDp >= 1000
     // A landscape phone is wider than 600 dp, but retains the phone player.
-    fun usesTabletPlayer(widthDp: Int, smallestWidthDp: Int) = isTablet(widthDp) && smallestWidthDp >= 600
+    fun usesTabletPlayer(widthDp: Int, smallestWidthDp: Int) = widthDp >= 600 && smallestWidthDp >= 600
 }
 
-data class TabletLayoutInfo(val widthDp: Int) {
-    val isTablet get() = TabletLayout.isTablet(widthDp)
-    val twoPane get() = TabletLayout.usesTwoPanes(widthDp)
+data class TabletLayoutInfo(val widthDp: Int, val heightDp: Int) {
+    val isTablet get() = TabletLayout.isTablet(widthDp, heightDp)
+    val twoPane get() = TabletLayout.usesTwoPanes(widthDp, heightDp)
 }
 
 /** Configuration follows this app window, including a split-screen window. */
 @Composable
-fun rememberTabletLayout() = TabletLayoutInfo(LocalConfiguration.current.screenWidthDp)
+fun rememberTabletLayout(): TabletLayoutInfo {
+    val configuration = LocalConfiguration.current
+    return TabletLayoutInfo(configuration.screenWidthDp, configuration.screenHeightDp)
+}

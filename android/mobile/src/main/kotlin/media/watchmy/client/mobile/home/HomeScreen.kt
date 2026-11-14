@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -146,6 +147,9 @@ fun HomeScreen(
     val uri = LocalUriHandler.current
     val downloads = viewModel { DownloadsViewModel(services.downloads) }
     val held by downloads.state.collectAsStateWithLifecycle()
+    // Above the tablet branch and the loading states: a window that crosses into or out of the tablet
+    // layouts (a split screen resized, a foldable opened) comes back to the place it was.
+    val list = rememberLazyListState()
     // Fully drawn once Home has its rows, or has settled on an error or the offline Home: a cold start's
     // time to full display (the startup benchmarks, :baselineprofile).
     ReportDrawnWhen { state.home != null || state.error != null || (state.offline && held.enabled) }
@@ -213,7 +217,7 @@ fun HomeScreen(
                                 liveListings = liveListings,
                                 modifier = Modifier.fillMaxSize(),
                             )
-                        } else LazyColumn(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        } else LazyColumn(Modifier.fillMaxSize(), state = list, horizontalAlignment = Alignment.CenterHorizontally, contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             if (liveFirst || (arranged && state.isEmpty)) liveRow()
                             if (state.isEmpty && liveChannels.isEmpty()) {
                                 item {
