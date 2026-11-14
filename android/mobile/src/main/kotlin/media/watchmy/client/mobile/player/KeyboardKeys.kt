@@ -1,5 +1,6 @@
 package media.watchmy.client.mobile.player
 
+import android.view.KeyEvent
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -10,11 +11,14 @@ import androidx.compose.ui.input.key.type
 import media.watchmy.client.ui.PlayerKey
 import media.watchmy.client.ui.playerKey
 
-/** What a key does in the phone player. */
+/** What a key does in the phone's players. */
 internal sealed interface KeyboardAction {
     data object TogglePlayPause : KeyboardAction
 
     data class SeekBy(val deltaMs: Long) : KeyboardAction
+
+    /** Live TV: the next channel up the list, or down it. */
+    data class ChannelBy(val delta: Int) : KeyboardAction
 }
 
 /**
@@ -31,15 +35,34 @@ internal fun keyboardAction(key: PlayerKey): KeyboardAction? = when (key) {
     else -> null
 }
 
+/** The file player's keys by key code: [keyboardAction]. */
+internal fun fileKeyboardAction(keyCode: Int): KeyboardAction? = keyboardAction(playerKey(keyCode))
+
 /**
- * Takes the player's keys ([keyboardAction]) from a keyboard or a remote
+ * Live TV's keys: Space and K play and pause, as in the file player; Page Up
+ * and Page Down, and a remote's channel keys, change channel. There is no
+ * seeking in live TV, so the arrows are left to move focus.
+ */
+internal fun liveKeyboardAction(keyCode: Int): KeyboardAction? = when (keyCode) {
+    KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP -> KeyboardAction.ChannelBy(1)
+    KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> KeyboardAction.ChannelBy(-1)
+    else -> KeyboardAction.TogglePlayPause.takeIf { playerKey(keyCode) == PlayerKey.PlayPause }
+}
+
+/**
+ * Takes a player's keys ([actionFor] a key code) from a keyboard or a remote
  * while [enabled], before the focused control does, so Space never clicks a
  * button as well. The player is focusable through [focus], which it requests
  * when it opens: with nothing focused, keys reach no one.
  */
-internal fun Modifier.playerKeyboard(focus: FocusRequester, enabled: Boolean, onAction: (KeyboardAction) -> Unit): Modifier =
+internal fun Modifier.playerKeyboard(
+    focus: FocusRequester,
+    enabled: Boolean,
+    actionFor: (Int) -> KeyboardAction? = ::fileKeyboardAction,
+    onAction: (KeyboardAction) -> Unit,
+): Modifier =
     onPreviewKeyEvent { event ->
-        val action = keyboardAction(playerKey(event.nativeKeyEvent.keyCode))
+        val action = actionFor(event.nativeKeyEvent.keyCode)
         if (!enabled || action == null) return@onPreviewKeyEvent false
         if (event.type == KeyEventType.KeyDown) onAction(action)
         // The key-up too, so a focused control never sees half a press.

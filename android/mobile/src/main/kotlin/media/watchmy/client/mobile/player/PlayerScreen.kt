@@ -1,6 +1,5 @@
 package media.watchmy.client.mobile.player
 
-import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -15,7 +14,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,10 +38,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toAndroidRect
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
@@ -245,6 +241,8 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                     PipAction.Replay -> act { seekBy(-DoubleTapSeek.STEP_MS) }
                     PipAction.PlayPause -> act { togglePlayPause() }
                     PipAction.Forward -> act { seekBy(DoubleTapSeek.STEP_MS) }
+                    // Live TV's; the file player's window doesn't show them.
+                    PipAction.ChannelDown, PipAction.ChannelUp -> Unit
                 }
             },
         )
@@ -275,13 +273,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
 
     // A remote keeps its controls up.
     val autoHide = local && ControlsState.autoHides(state.status, scrubbing, picker != null || showEpisodes)
-    var autoHideSince by remember(playingFileId, selection) { mutableLongStateOf(0L) }
-    LaunchedEffect(autoHide, playingFileId, selection) { if (autoHide) autoHideSince = now() }
-    LaunchedEffect(controls, autoHide, autoHideSince, playingFileId, selection) {
-        val at = controls.hideAtMs(autoHide, autoHideSince) ?: return@LaunchedEffect
-        delay((at - now()).coerceAtLeast(0))
-        controls = controls.hidden()
-    }
+    AutoHideControls(controls, autoHide, reset = playingFileId to selection) { controls = controls.hidden() }
     LaunchedEffect(ripple, playingFileId, selection) {
         if (ripple != null) {
             delay(DoubleTapSeek.WINDOW_MS + 300)
@@ -299,21 +291,17 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
         }
     }
 
-    val noteTouch by rememberUpdatedState(::input)
-    val keys = remember { FocusRequester() }
-    LaunchedEffect(keys) { keys.requestFocus() }
-    BoxWithConstraints(
-        Modifier.fillMaxSize().background(WmmColors.Ground).pointerInput(Unit) {
-            awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                noteTouch()
-            }
-        }.playerKeyboard(keys, enabled = !inPip && picker == null && !showEpisodes) { action ->
+    PlayerShell(
+        keys = ::fileKeyboardAction,
+        keysEnabled = !inPip && picker == null && !showEpisodes,
+        onKey = { action ->
             when (action) {
                 KeyboardAction.TogglePlayPause -> act { togglePlayPause() }
                 is KeyboardAction.SeekBy -> act { seekBy(action.deltaMs) }
+                is KeyboardAction.ChannelBy -> Unit
             }
         },
+        onTouch = ::input,
     ) {
         val portrait = tablet && maxHeight > maxWidth && !inPip
         val videoHeight = maxWidth * 9 / 16
@@ -597,4 +585,4 @@ private fun <T : Any> latest(value: T?): T? {
     return value ?: last.value
 }
 
-private fun now() = SystemClock.uptimeMillis()
+private fun now() = playerNow()

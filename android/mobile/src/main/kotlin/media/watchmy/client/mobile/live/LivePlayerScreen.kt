@@ -1,6 +1,23 @@
 package media.watchmy.client.mobile.live
 
 import android.content.pm.ActivityInfo
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.graphics.toAndroidRect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import media.watchmy.client.mobile.player.AutoHideControls
+import media.watchmy.client.mobile.player.ControlsState
+import media.watchmy.client.mobile.player.KeyboardAction
+import media.watchmy.client.mobile.player.PipAction
+import media.watchmy.client.mobile.player.PlayerShell
+import media.watchmy.client.mobile.player.liveKeyboardAction
+import media.watchmy.client.mobile.player.pipAspectRatio
+import media.watchmy.client.mobile.player.playerControlsInsets
+import media.watchmy.client.mobile.player.playerNow
+import media.watchmy.client.mobile.player.rememberPictureInPicture
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.annotation.OptIn
@@ -65,7 +82,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.PlayerSurface
 import androidx.media3.ui.compose.modifiers.resizeWithContentScale
 import androidx.media3.ui.compose.state.rememberPresentationState
-import kotlinx.coroutines.delay
 import media.watchmy.client.mobile.components.CastButton
 import media.watchmy.client.mobile.components.FilledButton
 import media.watchmy.client.mobile.components.PhoneIcons
@@ -158,6 +174,7 @@ fun LivePlayerScreen(
 /** Where the channel plays: here, on the TV, or nowhere yet because the TV can't play Live TV. */
 internal enum class LiveWhere { Phone, Tv, NotLive }
 
+@OptIn(UnstableApi::class)
 @Composable
 private fun LocalLivePlayer(
     target: LiveTarget,
@@ -206,34 +223,23 @@ private fun LocalLivePlayer(
     DisposableEffect(activity, originalOrientation) {
         onDispose { activity?.requestedOrientation = originalOrientation }
     }
-    val config = LocalConfiguration.current
-    val landscape = config.screenWidthDp > config.screenHeightDp
-    val tablet = config.smallestScreenWidthDp >= 600
-    if (landscape && activity != null) HideSystemBars(activity.window)
-    KeepScreenOn(state.status in listOf(PlayerStatus.Playing, PlayerStatus.Loading, PlayerStatus.Buffering))
 
     var panel by remember { mutableStateOf<LivePanel?>(null) }
     var unavailable by remember { mutableStateOf<LiveChannel?>(null) }
-    var controls by remember { mutableStateOf(true) }
+    var controls by remember { mutableStateOf(ControlsState(lastInputMs = playerNow())) }
     var dismissedTakeover by rememberSaveable { mutableStateOf<String?>(null) }
+    var videoBounds by remember { mutableStateOf<android.graphics.Rect?>(null) }
     val current = state.target?.channel ?: target.channel
     // The list's copy carries what is on; the target carries only the channel.
     val shown = channels.firstOrNull { it.id == current.id } ?: current
     val now = rememberLiveNow()
     val format = rememberLiveClockFormat()
-    LaunchedEffect(current.id, state.status) { controls = true }
-    LaunchedEffect(controls, state.status, panel, landscape) {
-        if (controls && landscape && panel == null && state.status == PlayerStatus.Playing) {
-            delay(5_000)
-            controls = false
-        }
-    }
     fun leave() {
         controller.stop()
         onExit()
     }
     fun act(action: LivePlaybackController.() -> Unit) {
-        controls = true
+        controls = controls.shown(playerNow())
         controller.noteUserInput()
         controller.action()
     }
@@ -249,101 +255,167 @@ private fun LocalLivePlayer(
     fun step(delta: Int) {
         nextLiveChannel(channels, controller.state.value.target?.channel?.id ?: current.id, delta)?.let(::watch)
     }
-    BackHandler {
+
+    // Picture in picture, as the file player has (the LivePiP board): the window changes channel and pauses.
+    val presentation = player?.let { rememberPresentationState(it) }
+    val playing = state.status == PlayerStatus.Playing || state.status == PlayerStatus.Buffering
+    val pip = (activity as? ComponentActivity)?.let {
+        rememberPictureInPicture(
+            it,
+            aspect = pipAspectRatio(presentation?.videoSizeDp?.width, presentation?.videoSizeDp?.height),
+            sourceRect = videoBounds,
+            playing = playing,
+            buttons = livePipButtons(nextLiveChannel(channels, current.id, -1)?.number, nextLiveChannel(channels, current.id, 1)?.number, playing),
+            onAction = { action ->
+                when (action) {
+                    PipAction.ChannelDown -> step(-1)
+                    PipAction.PlayPause -> act { togglePlayPause() }
+                    PipAction.ChannelUp -> step(1)
+                    else -> Unit
+                }
+            },
+        )
+    }
+    val inPip = pip?.active == true
+    LaunchedEffect(inPip) {
+        if (inPip) {
+            panel = null
+            controls = controls.hidden()
+        } else {
+            controls = controls.shown(playerNow())
+        }
+    }
+
+    val config = LocalConfiguration.current
+    // The window in picture in picture is as wide as the video: the landscape layout, with no controls.
+    val landscape = config.screenWidthDp > config.screenHeightDp || inPip
+    val tablet = config.smallestScreenWidthDp >= 600
+    if (landscape && activity != null) HideSystemBars(activity.window)
+    KeepScreenOn(state.status in listOf(PlayerStatus.Playing, PlayerStatus.Loading, PlayerStatus.Buffering))
+    LaunchedEffect(current.id, state.status) { controls = controls.shown(playerNow()) }
+    // The file player's auto-hide: 3 s after the last touch while it plays, sideways and with no panel open.
+    AutoHideControls(controls, autoHide = landscape && !inPip && panel == null && state.status == PlayerStatus.Playing, reset = current.id) { controls = controls.hidden() }
+
+    BackHandler(enabled = !inPip) {
         if (panel != null) panel = null else leave()
     }
-    Column(modifier.fillMaxSize().background(WmmColors.Ground).then(if (!landscape) Modifier.statusBarsPadding() else Modifier)) {
-        Row(Modifier.then(if (landscape) Modifier.weight(1f) else Modifier.fillMaxWidth()), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-            Box(Modifier.weight(1f).then(if (landscape) Modifier.fillMaxHeight() else Modifier.aspectRatio(16f / 9f)).background(Color.Black)) {
-                LiveVideo(player, Modifier.fillMaxSize().pointerInput(controller) {
-                    detectTapGestures { controller.noteUserInput(); controls = !controls }
-                })
-                if (controls || !landscape || state.status != PlayerStatus.Playing || panel != null) {
-                    Column(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .25f))) {
-                        Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .35f)).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            LiveIcon(WmmIcons.Back, "Back to channels", ::leave)
-                            Column(Modifier.weight(1f)) {
-                                Text("${current.number} · ${current.name}", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                if (landscape) Text(onNowLine(shown, now).takeIf { listings } ?: "No listings for this channel", color = WmmColors.TextSoft, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            if (castable) CastButton()
-                            if (!landscape && !tablet) LiveIcon(PhoneIcons.Fullscreen, "Full screen", {
-                                requestedFullscreen = true
-                                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                            })
-                            else if (requestedFullscreen) LiveIcon(PhoneIcons.Fullscreen, "Exit full screen", {
-                                requestedFullscreen = false
-                                activity?.requestedOrientation = originalOrientation
-                            })
-                            if (landscape) TextButton(onClick = ::leave) { Text("Stop", color = Color.White) }
-                        }
-                        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            when (state.status) {
-                                PlayerStatus.Loading, PlayerStatus.Buffering -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    CircularProgressIndicator(Modifier.size(24.dp), color = WmmColors.Accent, strokeWidth = 2.dp)
-                                    Text(if (state.status == PlayerStatus.Loading) "Tuning ${current.number}…" else "Buffering…", color = Color.White)
+    PlayerShell(
+        keys = ::liveKeyboardAction,
+        keysEnabled = !inPip && panel == null && unavailable == null && !state.askStillWatching,
+        onKey = { key ->
+            when (key) {
+                KeyboardAction.TogglePlayPause -> act { togglePlayPause() }
+                is KeyboardAction.ChannelBy -> step(key.delta)
+                is KeyboardAction.SeekBy -> Unit
+            }
+        },
+        onTouch = {
+            controller.noteUserInput()
+            controls = controls.touched(playerNow())
+        },
+        modifier = modifier,
+    ) {
+        Column(Modifier.fillMaxSize().then(if (!landscape) Modifier.statusBarsPadding() else Modifier)) {
+            Row(Modifier.then(if (landscape) Modifier.weight(1f) else Modifier.fillMaxWidth()), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+                Box(Modifier.weight(1f).then(if (landscape) Modifier.fillMaxHeight() else Modifier.aspectRatio(16f / 9f)).background(Color.Black)) {
+                    LiveVideo(
+                        player,
+                        presentation?.videoSizeDp,
+                        Modifier.fillMaxSize().onGloballyPositioned { if (!inPip) it.boundsInWindow().toAndroidRect().takeIf { r -> r != videoBounds }?.let { r -> videoBounds = r } }
+                            .pointerInput(controller) { detectTapGestures { controls = controls.toggled(playerNow()) } },
+                    )
+                    if (inPip) {
+                        LivePipOverlay(state, shown, now)
+                    } else if (controls.visible || !landscape || state.status != PlayerStatus.Playing || panel != null) {
+                        // Sideways the controls keep clear of the camera cutout and the bars; the video draws under them.
+                        Column(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .25f)).then(if (landscape) Modifier.windowInsetsPadding(playerControlsInsets) else Modifier)) {
+                            Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .35f)).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                LiveIcon(WmmIcons.Back, "Back to channels", ::leave)
+                                Column(Modifier.weight(1f)) {
+                                    Text("${current.number} · ${current.name}", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    if (landscape) Text(onNowLine(shown, now).takeIf { listings } ?: "No listings for this channel", color = WmmColors.TextSoft, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
-                                PlayerStatus.Playing, PlayerStatus.Paused -> Row(horizontalArrangement = Arrangement.spacedBy(32.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    LiveIcon(PhoneIcons.ChannelDown, "Previous channel", { step(-1) }, enabled = channels.count { it.available } > 1)
-                                    IconButton(onClick = { act { togglePlayPause() } }, modifier = Modifier.size(64.dp), colors = IconButtonDefaults.iconButtonColors(containerColor = Color.White, contentColor = WmmColors.Ground)) {
-                                        Icon(if (state.status == PlayerStatus.Paused) WmmIcons.Play else PhoneIcons.Pause, contentDescription = if (state.status == PlayerStatus.Paused) "Resume live TV" else "Pause live TV", modifier = Modifier.size(32.dp))
+                                if (castable) CastButton()
+                                if (!landscape && !tablet) LiveIcon(PhoneIcons.Fullscreen, "Full screen", {
+                                    requestedFullscreen = true
+                                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                })
+                                else if (requestedFullscreen) LiveIcon(PhoneIcons.Fullscreen, "Exit full screen", {
+                                    requestedFullscreen = false
+                                    activity?.requestedOrientation = originalOrientation
+                                })
+                                if (landscape) TextButton(onClick = ::leave) { Text("Stop", color = Color.White) }
+                            }
+                            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                when (state.status) {
+                                    PlayerStatus.Loading, PlayerStatus.Buffering -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        CircularProgressIndicator(Modifier.size(24.dp), color = WmmColors.Accent, strokeWidth = 2.dp)
+                                        Text(if (state.status == PlayerStatus.Loading) "Tuning ${current.number}…" else "Buffering…", color = Color.White)
                                     }
-                                    LiveIcon(PhoneIcons.ChannelUp, "Next channel", { step(1) }, enabled = channels.count { it.available } > 1)
+                                    PlayerStatus.Playing, PlayerStatus.Paused -> Row(horizontalArrangement = Arrangement.spacedBy(32.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        LiveIcon(PhoneIcons.ChannelDown, "Previous channel", { step(-1) }, enabled = channels.count { it.available } > 1)
+                                        IconButton(onClick = { act { togglePlayPause() } }, modifier = Modifier.size(64.dp), colors = IconButtonDefaults.iconButtonColors(containerColor = Color.White, contentColor = WmmColors.Ground)) {
+                                            Icon(if (state.status == PlayerStatus.Paused) WmmIcons.Play else PhoneIcons.Pause, contentDescription = if (state.status == PlayerStatus.Paused) "Resume live TV" else "Pause live TV", modifier = Modifier.size(32.dp))
+                                        }
+                                        LiveIcon(PhoneIcons.ChannelUp, "Next channel", { step(1) }, enabled = channels.count { it.available } > 1)
+                                    }
+                                    else -> if (!landscape) Text("Live TV stopped", color = Color.White)
                                 }
-                                else -> if (!landscape) Text("Live TV stopped", color = Color.White)
                             }
-                        }
-                        if (landscape && listings && state.status in listOf(PlayerStatus.Playing, PlayerStatus.Paused) && panel == null) {
-                            LandscapeBanner(shown, now, format, Modifier.padding(horizontal = 16.dp, vertical = 8.dp).widthIn(max = 560.dp))
-                        }
-                        if (landscape && state.status == PlayerStatus.Paused) {
-                            Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .65f)).padding(horizontal = 16.dp, vertical = 4.dp)) { LivePauseNote(state) }
-                        }
-                        if (landscape && (state.message ?: state.liveSwitchMessage()) != null) Text((state.message ?: state.liveSwitchMessage()).orEmpty(), color = WmmColors.Accent, fontSize = 13.sp, modifier = Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .65f)).padding(horizontal = 16.dp, vertical = 4.dp))
-                        Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .45f)).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (state.atLiveEdge && state.status == PlayerStatus.Playing) LiveBadge()
-                            else if (state.status == PlayerStatus.Playing || state.status == PlayerStatus.Paused) TextButton(onClick = { act { goLive() } }) { Text("Go live", color = WmmColors.Accent) }
-                            if (state.status == PlayerStatus.Paused) Text("Paused", color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                            else Box(Modifier.weight(1f))
-                            if (landscape) {
-                                TextButton(onClick = { controller.noteUserInput(); panel = LivePanel.Channels }) { Text(if (listings) "Guide" else "Channels", color = Color.White) }
-                                TextButton(onClick = { controller.noteUserInput(); panel = LivePanel.Quality }) { Text(state.liveQualityLabel(), color = Color.White) }
+                            if (landscape && listings && state.status in listOf(PlayerStatus.Playing, PlayerStatus.Paused) && panel == null) {
+                                LandscapeBanner(shown, now, format, Modifier.padding(horizontal = 16.dp, vertical = 8.dp).widthIn(max = 560.dp))
+                            }
+                            if (landscape && state.status == PlayerStatus.Paused) {
+                                Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .65f)).padding(horizontal = 16.dp, vertical = 4.dp)) { LivePauseNote(state) }
+                            }
+                            if (landscape && (state.message ?: state.liveSwitchMessage()) != null) Text((state.message ?: state.liveSwitchMessage()).orEmpty(), color = WmmColors.Accent, fontSize = 13.sp, modifier = Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .65f)).padding(horizontal = 16.dp, vertical = 4.dp))
+                            Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .45f)).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (state.atLiveEdge && state.status == PlayerStatus.Playing) LiveBadge()
+                                else if (state.status == PlayerStatus.Playing || state.status == PlayerStatus.Paused) TextButton(onClick = { act { goLive() } }) { Text("Go live", color = WmmColors.Accent) }
+                                if (state.status == PlayerStatus.Paused) Text("Paused", color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                                else Box(Modifier.weight(1f))
+                                if (landscape) {
+                                    TextButton(onClick = { controller.noteUserInput(); panel = LivePanel.Channels }) { Text(if (listings) "Guide" else "Channels", color = Color.White) }
+                                    TextButton(onClick = { controller.noteUserInput(); panel = LivePanel.Quality }) { Text(state.liveQualityLabel(), color = Color.White) }
+                                }
                             }
                         }
                     }
-                }
-                if (landscape && state.status in listOf(PlayerStatus.Error, PlayerStatus.Ended)) {
-                    LiveStopped(state, onRetry = { if (state.takeoverRecording != null) state.takeoverRecording?.let(onPlayRecording) else if (state.reason == "recording") onRecordings() else act { retry() } }, onExit = ::leave, modifier = Modifier.fillMaxSize())
-                }
-                // Over the controls, so its buttons stay reachable while they show.
-                state.session?.takeIf { it.takeoverAtMs != null && !it.state.terminal && it.takeoverKey() != dismissedTakeover }?.let { session ->
-                    RecordingTakeover(session, format, onDismiss = { dismissedTakeover = session.takeoverKey() }, Modifier.align(Alignment.TopCenter).padding(top = 64.dp))
-                }
-            }
-            if (landscape && panel != null) {
-                Surface(Modifier.width(320.dp).fillMaxHeight(), color = WmmColors.Surface) {
-                    if (listings && panel == LivePanel.Channels) OnNowPanel(channels, current, now, format, onClose = { panel = null }, onGuide = { controller.stop(); onGuide() }, onWatch = ::watch)
-                    else LivePlayerPanel(panel!!, channels, current, state, onClose = { panel = null }, onWatch = ::watch, onQuality = { quality -> panel = null; act { selectQuality(quality) } })
-                }
-            }
-        }
-        if (!landscape) {
-            if (state.status in listOf(PlayerStatus.Error, PlayerStatus.Ended)) {
-                LiveStopped(state, onRetry = { if (state.takeoverRecording != null) state.takeoverRecording?.let(onPlayRecording) else if (state.reason == "recording") onRecordings() else act { retry() } }, onExit = ::leave, modifier = Modifier.weight(1f))
-            } else {
-                if (listings) {
-                    LazyColumn(Modifier.weight(1f)) {
-                        item("banner") { LiveWatchBanner(shown, state, now, format, onGuide = { controller.stop(); onGuide() }, onQuality = { controller.noteUserInput(); panel = LivePanel.Quality }) }
-                        item("on-now") {
-                            Text("On now · ${format.time(now)}", color = WmmColors.Text, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
-                        }
-                        items(channels, key = { it.id }) { channel -> OnNowRow(channel, now, format, watching = channel.id == current.id, onClick = { watch(channel) }) }
+                    if (landscape && !inPip && state.status in listOf(PlayerStatus.Error, PlayerStatus.Ended)) {
+                        LiveStopped(state, onRetry = { if (state.takeoverRecording != null) state.takeoverRecording?.let(onPlayRecording) else if (state.reason == "recording") onRecordings() else act { retry() } }, onExit = ::leave, modifier = Modifier.fillMaxSize())
                     }
+                    // Over the controls, so its buttons stay reachable while they show.
+                    state.session?.takeIf { !inPip && it.takeoverAtMs != null && !it.state.terminal && it.takeoverKey() != dismissedTakeover }?.let { session ->
+                        RecordingTakeover(session, format, onDismiss = { dismissedTakeover = session.takeoverKey() }, Modifier.align(Alignment.TopCenter).padding(top = 64.dp))
+                    }
+                }
+                if (landscape && panel != null) {
+                    Surface(Modifier.width(320.dp).fillMaxHeight(), color = WmmColors.Surface) {
+                        Box(Modifier.windowInsetsPadding(playerControlsInsets.only(WindowInsetsSides.End + WindowInsetsSides.Vertical))) {
+                            if (listings && panel == LivePanel.Channels) OnNowPanel(channels, current, now, format, onClose = { panel = null }, onGuide = { controller.stop(); onGuide() }, onWatch = ::watch)
+                            else LivePlayerPanel(panel!!, channels, current, state, onClose = { panel = null }, onWatch = ::watch, onQuality = { quality -> panel = null; act { selectQuality(quality) } })
+                        }
+                    }
+                }
+            }
+            if (!landscape) {
+                if (state.status in listOf(PlayerStatus.Error, PlayerStatus.Ended)) {
+                    LiveStopped(state, onRetry = { if (state.takeoverRecording != null) state.takeoverRecording?.let(onPlayRecording) else if (state.reason == "recording") onRecordings() else act { retry() } }, onExit = ::leave, modifier = Modifier.weight(1f))
                 } else {
-                    LiveChannelInfo(current, state, onQuality = { controller.noteUserInput(); panel = LivePanel.Quality })
-                    LazyColumn(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        item { Text("Channels", color = WmmColors.Text, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 12.dp)) }
-                        items(channels, key = { it.id }) { channel -> LiveChannelRow(channel, channel.id == current.id, onClick = { watch(channel) }, selectedLabel = "Watching") }
+                    if (listings) {
+                        LazyColumn(Modifier.weight(1f)) {
+                            item("banner") { LiveWatchBanner(shown, state, now, format, onGuide = { controller.stop(); onGuide() }, onQuality = { controller.noteUserInput(); panel = LivePanel.Quality }) }
+                            item("on-now") {
+                                Text("On now · ${format.time(now)}", color = WmmColors.Text, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+                            }
+                            items(channels, key = { it.id }) { channel -> OnNowRow(channel, now, format, watching = channel.id == current.id, onClick = { watch(channel) }) }
+                        }
+                    } else {
+                        LiveChannelInfo(current, state, onQuality = { controller.noteUserInput(); panel = LivePanel.Quality })
+                        LazyColumn(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            item { Text("Channels", color = WmmColors.Text, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 12.dp)) }
+                            items(channels, key = { it.id }) { channel -> LiveChannelRow(channel, channel.id == current.id, onClick = { watch(channel) }, selectedLabel = "Watching") }
+                        }
                     }
                 }
             }
@@ -373,11 +445,10 @@ private fun LocalLivePlayer(
 
 @OptIn(UnstableApi::class)
 @Composable
-private fun LiveVideo(player: Player?, modifier: Modifier = Modifier) {
+private fun LiveVideo(player: Player?, videoSize: androidx.compose.ui.geometry.Size?, modifier: Modifier = Modifier) {
     Box(modifier, contentAlignment = Alignment.Center) {
         if (player != null) {
-            val presentation = rememberPresentationState(player)
-            PlayerSurface(player, Modifier.resizeWithContentScale(ContentScale.Fit, presentation.videoSizeDp))
+            PlayerSurface(player, Modifier.resizeWithContentScale(ContentScale.Fit, videoSize))
         } else {
             // Fake sessions have no video. Channel identity stays truthful and contains no invented programme.
             Icon(PhoneIcons.LiveTV, contentDescription = null, tint = WmmColors.TextFaint.copy(alpha = .25f), modifier = Modifier.size(80.dp))

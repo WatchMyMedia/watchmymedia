@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -90,8 +90,8 @@ internal fun PlayerControls(
             Modifier.align(Alignment.BottomStart).fillMaxWidth().height(180.dp)
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)))),
         )
-        // Clear of the system bars, which show while this is a remote (and take no room while hidden).
-        Box(Modifier.fillMaxSize().systemBarsPadding()) {
+        // Clear of the system bars, which show while this is a remote (and take no room while hidden), and of the camera cutout.
+        Box(Modifier.fillMaxSize().windowInsetsPadding(playerControlsInsets)) {
             // What each part shows, rather than the whole state, so the countdowns skip them.
             TopBar(state.title, state.subtitle, streamChip(state.tracks), rotationLocked, actions, remote, rotationLockWorks, state.canCast)
             if (!(scrubbing && state.trickplay != null)) Transport(state.status, actions, Modifier.align(Alignment.Center))
