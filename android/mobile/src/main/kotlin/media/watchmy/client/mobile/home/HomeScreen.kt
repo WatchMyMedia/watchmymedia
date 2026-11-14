@@ -54,8 +54,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import media.watchmy.client.mobile.components.CardAction
-import media.watchmy.client.mobile.components.EmptyState
-import media.watchmy.client.mobile.components.ErrorState
+import media.watchmy.client.mobile.components.LoadContent
+import media.watchmy.client.mobile.components.LoadStatus
 import media.watchmy.client.mobile.components.FilledButton
 import media.watchmy.client.mobile.components.HomeSkeleton
 import media.watchmy.client.mobile.components.MainTopBar
@@ -97,12 +97,15 @@ import media.watchmy.client.model.codeBadge
 import media.watchmy.client.model.formatDate
 import media.watchmy.client.model.HomeEmptyState
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
+import media.watchmy.client.model.SavedServer
 import media.watchmy.client.model.heroBadges
 import media.watchmy.client.model.playRequest
 import media.watchmy.client.model.remainingLine
 import media.watchmy.client.model.totalsLine
 import media.watchmy.client.model.watchTarget
 import media.watchmy.client.presentation.downloads.DownloadsViewModel
+import media.watchmy.client.presentation.home.HomeViewModel.State as HomeState
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.TabletLayout
 import media.watchmy.client.ui.rememberTabletLayout
@@ -179,9 +182,9 @@ fun HomeScreen(
                     onSeeAll = { onNavigate(MobileRoutes.Downloads) },
                     tablet = layout.isTablet,
                 )
-                home == null && state.error != null -> ErrorState(state.error!!, vm::retry)
-                home == null -> HomeSkeleton()
-                else -> {
+                // Loading, failed or empty: the shared states (PLAN-ANDROID-REVIEW §5.4), with Home's skeleton.
+                else -> LoadContent(homeStatus(state, home, liveChannels, user?.isAdmin == true, server, uri, vm::retry, vm::say), vm::retry, Modifier.fillMaxSize(), loading = { HomeSkeleton() }) {
+                    if (home == null) return@LoadContent
                     val pull = rememberPullToRefreshState()
                     PullToRefreshBox(
                         isRefreshing = state.refreshing,
@@ -224,22 +227,7 @@ fun HomeScreen(
                             )
                         } else LazyColumn(Modifier.fillMaxSize(), state = list, horizontalAlignment = Alignment.CenterHorizontally, contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             if (liveFirst || (arranged && state.isEmpty)) liveRow()
-                            if (state.isEmpty && liveChannels.isEmpty()) {
-                                item {
-                                    val empty = state.emptyState ?: HomeEmptyState(HomeEmptyState.Kind.Unavailable)
-                                    val setup = user?.isAdmin == true && empty.offersSetup && server != null
-                                    EmptyState(
-                                        empty.title,
-                                        empty.message(user?.isAdmin == true),
-                                        Modifier.fillParentMaxSize(),
-                                        action = if (setup) "Open the web page" else "Check again",
-                                        onAction = {
-                                            if (setup) runCatching { uri.openUri(server!!.server.baseUrl) }.onFailure { vm.say("Couldn't open a browser. Open ${server!!.server.baseUrl} on another device.") }
-                                            else vm.retry()
-                                        },
-                                    )
-                                }
-                            } else if (arranged) {
+                            if (arranged) {
                                 val actions = RowActions(onPlay, onOpenShow, onOpenMovie, onOpenEpisode, notMatched, vm::setWatched)
                                 arrangedRows(home, services.library, vm, actions, layout.isTablet, layout.twoPane, onNavigate, live = liveRow.takeIf { liveChannels.isNotEmpty() && !state.isEmpty })
                             } else {
@@ -252,6 +240,34 @@ fun HomeScreen(
             MessageHost(state.message, vm::messageShown, Modifier.align(Alignment.BottomCenter))
         }
     }
+}
+
+/**
+ * What Home shows instead of its rows: loading, why it failed, or why the
+ * library is empty (with nothing on Live TV either), where an admin can open
+ * the web app to set it up. Null once there are rows or channels to show.
+ */
+internal fun homeStatus(
+    state: HomeState,
+    home: HomeData?,
+    liveChannels: List<LiveChannel>,
+    admin: Boolean,
+    server: SavedServer?,
+    uri: UriHandler,
+    retry: () -> Unit,
+    say: (String) -> Unit,
+): LoadStatus? = when {
+    home == null && state.error != null -> LoadStatus.Failed(state.error!!)
+    home == null -> LoadStatus.Loading
+    state.isEmpty && liveChannels.isEmpty() -> {
+        val empty = state.emptyState ?: HomeEmptyState(HomeEmptyState.Kind.Unavailable)
+        val setup = admin && empty.offersSetup && server != null
+        LoadStatus.Empty(empty.title, empty.message(admin), action = if (setup) "Open the web page" else "Check again") {
+            if (setup) runCatching { uri.openUri(server!!.server.baseUrl) }.onFailure { say("Couldn't open a browser. Open ${server!!.server.baseUrl} on another device.") }
+            else retry()
+        }
+    }
+    else -> null
 }
 
 private fun LazyListScope.homeRows(
