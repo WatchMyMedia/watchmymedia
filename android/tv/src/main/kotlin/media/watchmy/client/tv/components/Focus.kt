@@ -36,6 +36,7 @@ import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.relocation.BringIntoViewModifierNode
 import androidx.compose.ui.relocation.bringIntoView
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.zIndex
@@ -86,6 +87,8 @@ fun FocusableBox(
     ringColor: Color = WmmColors.Accent,
     enabled: Boolean = true,
     contentAlignment: Alignment = Alignment.TopStart,
+    /** What TalkBack calls it: a button for the TV's controls; null leaves it to the modifier (a switch row, a chip). */
+    role: Role? = null,
     content: @Composable BoxScope.(focused: Boolean) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -97,6 +100,7 @@ fun FocusableBox(
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,
+                role = role,
                 onLongClick = onLongClick?.let { long -> { if (enabled) long() } },
                 onClick = { if (enabled) onClick() },
             )

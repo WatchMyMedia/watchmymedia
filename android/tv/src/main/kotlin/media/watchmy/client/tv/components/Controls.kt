@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,8 +68,10 @@ fun TvButton(
         cornerRadius = size.radius,
         focusedScale = 1.04f,
         enabled = enabled,
+        role = Role.Button,
     ) { focused ->
-        val base = Modifier.height(size.height)
+        // At least the mockup's height; taller when the TV's text size is larger.
+        val base = Modifier.heightIn(min = size.height)
         val styled = when (style) {
             TvButtonStyle.Primary -> base
                 .background(if (focused) WmmColors.BrandHover else WmmColors.Brand, shape)
@@ -81,7 +84,7 @@ fun TvButton(
                 .border(1.dp, DangerRim, shape)
         }
         Row(
-            styled.padding(horizontal = size.padding),
+            styled.padding(horizontal = size.padding, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -113,11 +116,8 @@ fun TvChip(
     leadingIcon: ImageVector? = null,
 ) {
     val shape = RoundedCornerShape(24.dp)
-    val described = modifier.semantics {
-        this.role = role
-        this.selected = selected
-    }
-    FocusableBox(onClick = onClick, modifier = described, cornerRadius = 24.dp, focusedScale = 1.04f) { focused ->
+    val described = modifier.semantics { this.selected = selected }
+    FocusableBox(onClick = onClick, modifier = described, cornerRadius = 24.dp, focusedScale = 1.04f, role = role) { focused ->
         val bg = when {
             selected -> WmmColors.Accent
             focused -> WmmColors.Surface3
@@ -125,7 +125,7 @@ fun TvChip(
         }
         Row(
             Modifier
-                .height(48.dp)
+                .heightIn(min = 48.dp)
                 .background(bg, shape)
                 .border(1.dp, if (selected) WmmColors.Accent else WmmColors.Line2, shape)
                 .padding(horizontal = 20.dp),
