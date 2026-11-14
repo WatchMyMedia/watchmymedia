@@ -638,6 +638,12 @@ jobs:
       # on the same sources. Release builds on a tag and locally keep it.
       - name: Test, lint and build
         run: ./gradlew testDebugUnitTest coverageReport lintDebug assembleDebug :app:assembleRelease -x lintVitalRelease --continue --console=plain
+      # The committed baseline and startup profiles go stale quietly as screens
+      # are renamed: this fails when many of their rules name app classes
+      # that are gone (android/README.md, "Baseline profile").
+      - name: Check the baseline profile is current
+        if: ${{ !cancelled() }}
+        run: python3 -I ../deploy/ci/baseline_profile.py .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-debug-apk

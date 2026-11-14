@@ -80,6 +80,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -153,6 +154,7 @@ import media.watchmy.client.presentation.detail.ShowPageActions
 import media.watchmy.client.presentation.detail.ShowPageViewModel
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.rememberTabletLayout
 import media.watchmy.client.ui.components.Artwork
@@ -495,7 +497,7 @@ private fun Actions(show: ShowDetail, ep: EpisodeDetail, state: ShowPageViewMode
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when {
-            play != null -> FilledButton(play, { vm.playRequest()?.let(page.onPlay) }, Modifier.fillMaxWidth(), large = true, icon = WmmIcons.Play)
+            play != null -> FilledButton(play, { vm.playRequest()?.let(page.onPlay) }, Modifier.fillMaxWidth().testTag(TestTags.PLAY), large = true, icon = WmmIcons.Play)
             missing != null && missing.actions -> {
                 if (missing.request) FilledButton(requestSeasonLabel(ep.season), { page.onAsk(ep.season) }, Modifier.fillMaxWidth(), large = true)
                 if (missing.requested && missing.cancel == null) OffPill("Requested", Modifier.fillMaxWidth(), large = true)

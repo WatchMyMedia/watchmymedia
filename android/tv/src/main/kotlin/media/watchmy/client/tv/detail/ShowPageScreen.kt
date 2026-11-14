@@ -53,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -142,6 +143,7 @@ import media.watchmy.client.tv.requests.TvDownloadBar
 import media.watchmy.client.tv.requests.tvIcon
 import media.watchmy.client.tv.requests.tvTone
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.BadgeStyle
@@ -477,7 +479,8 @@ private fun Buttons(
         }
         actions.forEachIndexed { i, a ->
             val key = if (i == 0) "play" else "action:${a.label}"
-            TvButton(a.label, a.onClick, nav.focusMemory(memory, key), style = a.style, size = TvButtonSize.Large, icon = a.icon, enabled = a.enabled)
+            val tag = if (i == 0 && play != null) Modifier.testTag(TestTags.PLAY) else Modifier
+            TvButton(a.label, a.onClick, nav.focusMemory(memory, key).then(tag), style = a.style, size = TvButtonSize.Large, icon = a.icon, enabled = a.enabled)
         }
         if (state.hasMore) MoreButton(onMore, nav.focusMemory(memory, if (actions.isEmpty()) "play" else "more"))
     }

@@ -8,10 +8,12 @@ import org.junit.runner.RunWith
 
 /**
  * Writes the app's baseline profile (the code compiled ahead of time at
- * install) from the journeys in Journeys.kt, on a fakes build, and its
- * startup profile (the code placed first in the dex files) from [startup]
- * alone. A phone build runs the phone's journeys, a -PforceTv build the TV's;
- * generate.sh runs both and merges them (README, "Baseline profile").
+ * install) from the journeys in Journeys.kt, and its startup profile (the
+ * code placed first in the dex files) from [startup] alone. A phone fakes
+ * build runs the phone's journeys, a -PforceTv fakes build the TV's, and a
+ * real build given a fixture server (the fixtureServer argument) signs in to
+ * it, loads its posters and plays a file. generate.sh runs all three and
+ * merges them (README, "Baseline profile").
  */
 @RunWith(AndroidJUnit4::class)
 class BaselineProfileGenerator {
@@ -26,21 +28,29 @@ class BaselineProfileGenerator {
         signIn(showsTv())
     }
 
-    /** Home's rows, the TV Shows grid, a show and the player. */
+    /** Home's rows, a library grid, a page and the player. */
     @Test
     fun journeys() = rule.collect(packageName = targetPackage, maxIterations = ITERATIONS) {
         pressHome()
         startActivityAndWait()
         val tv = showsTv()
         signIn(tv)
-        if (tv) {
-            tvHome()
-            tvLibraryAndShow()
-            tvPlay()
-        } else {
-            phoneHome()
-            phoneLibraryAndShow()
-            phonePlay()
+        when {
+            tv -> {
+                tvHome()
+                tvLibraryAndShow()
+                tvPlay()
+            }
+            fixtureServer != null -> {
+                phoneHome()
+                fixtureMovies()
+                phonePlay()
+            }
+            else -> {
+                phoneHome()
+                phoneLibraryAndShow()
+                phonePlay()
+            }
         }
     }
 

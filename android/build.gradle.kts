@@ -9,3 +9,12 @@ plugins {
     // coverageReport: every module's debug unit test coverage in one JaCoCo report.
     alias(libs.plugins.wmm.android.coverage)
 }
+
+// build-logic's own tests (versionCodeOf) run with the modules' unit tests:
+// `./gradlew testDebugUnitTest`, as CI and the checks before a hand-back run it,
+// runs this task too.
+tasks.register("testDebugUnitTest") {
+    group = "verification"
+    description = "Runs build-logic's tests; each module's task of the same name runs its own."
+    dependsOn(gradle.includedBuild("build-logic").task(":test"))
+}

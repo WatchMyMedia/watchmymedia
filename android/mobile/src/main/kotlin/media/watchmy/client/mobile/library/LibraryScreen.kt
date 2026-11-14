@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -74,6 +75,7 @@ import media.watchmy.client.model.plural
 import media.watchmy.client.model.sortOptions
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.ui.rememberNotMatchedNotice
 import media.watchmy.client.ui.open
@@ -180,7 +182,7 @@ fun LibraryScreen(
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(3),
                             state = grid,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize().testTag(TestTags.LIBRARY),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp),

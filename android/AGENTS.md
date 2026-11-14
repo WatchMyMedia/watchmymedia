@@ -110,6 +110,19 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   `DownloadService` calls `startForeground` unguarded once a download runs,
   which Android refuses from the background. `DownloadRestarts` runs the
   `DownloadManager` itself from its WorkManager job instead.
+- **Start-up work.** `WatchMyMediaApp.onCreate` runs for every process
+  start: a reminder's alarm, the download service and WorkManager jobs
+  start the process too. Work only someone using the app needs waits for
+  the first `ON_START` (`FirstForeground`), as the Cast SDK does;
+  WorkManager starts on first use (the manifest removes its initializer).
+  Debug builds log StrictMode findings to logcat. A main-thread disk read
+  the start-up makes on purpose runs in `allowingStartupReads`; anything
+  else it logs is a finding to fix, not to allow.
+- **Baseline profile.** CI's android job fails when the committed profiles
+  have many rules for classes that are gone
+  (`deploy/ci/baseline_profile.py`). Generate them again (README,
+  "Baseline profile") rather than loosening the check. The journeys find
+  screens by `TestTags`; keep a tag when you rework its screen.
 - **Focus tests and cleared semantics.** `HomeFocusTest` finds the focused
   element by its `Focused` semantics. A card that `clearAndSetSemantics` to
   read as one thing must set `focused` itself (as `TvOnNowCard` does), or the

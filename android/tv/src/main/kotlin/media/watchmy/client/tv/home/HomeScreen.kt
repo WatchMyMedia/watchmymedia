@@ -43,6 +43,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.activity.compose.ReportDrawnWhen
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
@@ -116,6 +118,7 @@ import media.watchmy.client.tv.components.overflowHeight
 import media.watchmy.client.tv.components.rememberFocusMemory
 import media.watchmy.client.tv.components.stopBringIntoView
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.rememberNotMatchedNotice
 import media.watchmy.client.ui.open
 import media.watchmy.client.ui.WmmColors
@@ -155,6 +158,9 @@ fun HomeScreen(
     val user by vm.user.collectAsStateWithLifecycle()
     val server by services.servers.current.collectAsStateWithLifecycle()
     val memory = rememberFocusMemory()
+    // Fully drawn once Home has its rows or has settled on an error: a cold start's time to full display
+    // (the startup benchmarks, :baselineprofile).
+    ReportDrawnWhen { state.home != null || state.error != null }
 
     TvScaffold(RailSection.Home, onNavigate) {
         when {
@@ -251,7 +257,7 @@ private fun HomeContent(
     val spec = remember(density) { PivotSpec(with(density) { 124.dp.toPx() }) }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
         LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxSize().testTag(TestTags.HOME),
             state = rememberLazyListState(),
             contentPadding = PaddingValues(bottom = 0.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -565,7 +571,7 @@ private fun ArrangedHomeContent(
 
     VerticalPager(
         state = pager,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().testTag(TestTags.HOME),
         beyondViewportPageCount = 1,
         userScrollEnabled = false,
         key = { pages[it].key },

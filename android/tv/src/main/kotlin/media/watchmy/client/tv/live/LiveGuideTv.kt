@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -83,6 +84,7 @@ import media.watchmy.client.tv.components.TvButtonSize
 import media.watchmy.client.tv.components.TvChip
 import media.watchmy.client.tv.components.focusMemory
 import media.watchmy.client.tv.components.inter
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.ChannelLogo
 import media.watchmy.client.ui.components.HeroFade
@@ -197,7 +199,7 @@ internal fun LiveTvGuide(
             style = inter(18.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(start = 8.dp, bottom = 12.dp),
         )
         TvTimeHeader(state, format)
-        LazyColumn(Modifier.weight(1f).padding(end = 58.dp), state = list, contentPadding = PaddingValues(bottom = 40.dp)) {
+        LazyColumn(Modifier.weight(1f).padding(end = 58.dp).testTag(TestTags.GUIDE), state = list, contentPadding = PaddingValues(bottom = 40.dp)) {
             itemsIndexed(rows, key = { _, row -> row.channel.id }) { index, row ->
                 TvGuideRow(
                     row, state, now, format, memory,
