@@ -41,6 +41,9 @@ final class HomeScreensTests: XCTestCase {
         let panel = app.descendants(matching: .any)["homeFocusPanel-recentlyAddedShows"]
         XCTAssertFalse(app.windows.firstMatch.frame.contains(panel.frame), "the first screen has the hero, not a panel")
 
+        // Something must have focus before Down can move it: on CI's slower
+        // runner a Down pressed as soon as Play existed was dropped (2026-11-14).
+        XCTAssertTrue(app.waitForFocusedButton(timeout: 15) { _ in true }, "the tab bar has focus")
         remote.press(.down)
         XCTAssertTrue(focused(play), "Down from the tab bar lands on Play")
         remote.press(.down)

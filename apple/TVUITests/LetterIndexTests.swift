@@ -43,6 +43,19 @@ final class LetterIndexTests: XCTestCase {
         app.press(button, thenWaitForFocusToMove: 2)
     }
 
+    /// Waits until the grid has stopped scrolling: the focused poster in the
+    /// same place on two looks a third of a second apart. A Page Up pressed
+    /// while the grid still scrolled from the last one was lost on a loaded
+    /// simulator (CI and locally, 2026-11-14).
+    @MainActor
+    private func gridStill(_ app: XCUIApplication, timeout: TimeInterval = 5) {
+        _ = eventually(timeout: timeout) {
+            let frame = focusedButton(app).frame
+            Thread.sleep(forTimeInterval: 0.33)
+            return frame == focusedButton(app).frame
+        }
+    }
+
     /// A poster's label holds its runtime ("A Lesser Moon, 2026 · 1 h 52 min").
     private static func isPoster(_ label: String) -> Bool { label.contains(" min") }
 
@@ -132,12 +145,19 @@ final class LetterIndexTests: XCTestCase {
         XCTAssertEqual(after.frame.midX, x, accuracy: 30, "the same column")
         shot("Page Down")
         let paged = after.label
-        remote.press(.down)
-        remote.press(.down)
+        // Each press waits for focus to land before the next: pressed back to
+        // back, CI's slower runner dropped one (2026-11-14).
+        move(app, .down)
+        move(app, .down)
         XCTAssertTrue(focus(app) { $0 != paged })
-        remote.press(.pageUp)
-        remote.press(.pageUp)
-        XCTAssertTrue(focus(app) { $0 == label }, "two Page Ups go back four rows, to the first row")
+        let down2 = focusedButton(app).label
+        gridStill(app)
+        move(app, .pageUp)
+        let up1 = focusedButton(app).label
+        gridStill(app)
+        move(app, .pageUp)
+        XCTAssertTrue(focus(app) { $0 == label },
+                      "two Page Ups go back four rows, to the first row: \(label) → \(paged) → \(down2) → \(up1) → \(focusedButton(app).label)")
     }
 
     @MainActor
