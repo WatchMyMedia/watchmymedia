@@ -128,7 +128,7 @@ fun LibraryScreen(
         return
     }
     // A new sort or filter starts at the top; coming back from a show keeps the place.
-    grid.FollowLibrary(state, vm, top = 0, first = 0)
+    grid.FollowLibrary(state, top = 0, first = 0, loadMore = vm::loadMore)
 
     val title = if (type == LibraryType.Tv) "TV Shows" else "Movies"
     // The first page on its way: the outline of the grid (HomeLoading.dc.html, library), with the sort as it is.

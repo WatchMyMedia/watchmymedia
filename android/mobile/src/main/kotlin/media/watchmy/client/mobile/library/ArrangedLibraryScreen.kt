@@ -101,7 +101,7 @@ internal fun ArrangedLibraryScreen(
     val drawn = rows.rows.drawn(live = false)
     // A new sort or filter from deep in the grid goes back up to its heading; with the heading or
     // the rows in view nothing moves, and coming back from a show keeps the place.
-    grid.FollowLibrary(state, vm, top = drawn.size + 1, first = drawn.size + 2)
+    grid.FollowLibrary(state, top = drawn.size + 1, first = drawn.size + 2, loadMore = vm::loadMore)
     ShowRowsWhenTheyArrive(grid, drawn.size)
     val actions = libraryRowActions(onPlay, onOpenShow, onOpenMovie, onNavigate, onNotMatched, rowsVm)
 

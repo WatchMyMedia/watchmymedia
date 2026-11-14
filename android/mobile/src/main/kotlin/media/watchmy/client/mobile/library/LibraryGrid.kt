@@ -8,6 +8,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -27,10 +28,10 @@ internal fun rememberLibraryGrid(): LazyGridState = rememberLazyGridState()
  * What the three layouts do with the grid's scroll: a new sort, filter or
  * window goes back up to [top] (the grid's heading) when it is below it, a
  * letter jumped to scrolls to its first title ([first] is the first
- * poster's index), and nearing the end asks for the next page.
+ * poster's index), and nearing the end asks for the next page ([loadMore]).
  */
 @Composable
-internal fun LazyGridState.FollowLibrary(state: LibraryViewModel.State, vm: LibraryViewModel, top: Int, first: Int) {
+internal fun LazyGridState.FollowLibrary(state: LibraryViewModel.State, top: Int, first: Int, loadMore: () -> Unit) {
     val grid = this
     val query = "${state.choices}/${state.offset}"
     var shown by rememberSaveable { mutableStateOf(query) }
@@ -43,7 +44,8 @@ internal fun LazyGridState.FollowLibrary(state: LibraryViewModel.State, vm: Libr
     LaunchedEffect(state.jump?.revision) { state.jump?.let { grid.scrollToItem(first + it.index) } }
     // Restarted after each page, so a short page that leaves the end in view asks for the next one.
     val nearEnd by remember(grid) { derivedStateOf { (grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= grid.layoutInfo.totalItemsCount - 12 } }
-    LaunchedEffect(grid, state.items.size, state.offset) { snapshotFlow { nearEnd }.collect { if (it) vm.loadMore() } }
+    val more by rememberUpdatedState(loadMore)
+    LaunchedEffect(grid, state.items.size, state.offset) { snapshotFlow { nearEnd }.collect { if (it) more() } }
 }
 
 /** The grid's loading, error and empty states, the same in each layout; null once it has posters. */

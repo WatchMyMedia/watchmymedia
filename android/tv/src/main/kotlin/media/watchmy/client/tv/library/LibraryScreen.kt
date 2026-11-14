@@ -212,7 +212,7 @@ fun LibraryScreen(
                             snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }.collect(vm::onVisible)
                         }
                         if (byTitle) {
-                            Strip(state, type, jumps, Modifier.align(Alignment.TopEnd).padding(top = 22.dp, end = ContentEnd - 16.dp)) { onStrip = it }
+                            Strip(state, type, jumps, { onStrip = it }, Modifier.align(Alignment.TopEnd).padding(top = 22.dp, end = ContentEnd - 16.dp))
                         }
                         JumpHints(onStrip, jumps.currentLetter(state), byTitle, Modifier.align(Alignment.BottomStart).padding(start = ContentStart, bottom = 20.dp))
                         // Once, when the grid first shows (or comes back after Back): a filter
@@ -358,7 +358,7 @@ private fun ArrangedLibrary(
         // The strip shows once the grid is on screen, below the rows.
         val gridInView by remember { derivedStateOf { gridState.firstVisibleItemIndex >= jumps.header - 2 } }
         if (byTitle && gridInView) {
-            Strip(state, type, jumps, Modifier.align(Alignment.TopEnd).padding(top = 56.dp, end = ContentEnd)) { onStrip = it }
+            Strip(state, type, jumps, { onStrip = it }, Modifier.align(Alignment.TopEnd).padding(top = 56.dp, end = ContentEnd))
         }
         if (gridInView) JumpHints(onStrip, jumps.currentLetter(state), byTitle, Modifier.align(Alignment.BottomStart).padding(start = ContentStart, bottom = 20.dp))
     } }
@@ -447,7 +447,7 @@ private val StripRoom = 96.dp
 
 /** The strip for this grid's letters, telling [onStrip] whether focus is on it. */
 @Composable
-private fun Strip(state: LibraryViewModel.State, type: LibraryType, jumps: GridJumps, modifier: Modifier, onStrip: (Boolean) -> Unit) {
+private fun Strip(state: LibraryViewModel.State, type: LibraryType, jumps: GridJumps, onStrip: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     LetterStrip(
         letters = state.letters.orEmpty(),
         total = state.total,

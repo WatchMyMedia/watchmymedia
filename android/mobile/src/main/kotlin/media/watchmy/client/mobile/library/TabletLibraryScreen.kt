@@ -106,7 +106,7 @@ internal fun TabletLibraryScreen(
     var filtersSheet by remember { mutableStateOf(false) }
     val noun = if (type == LibraryType.Tv) "show" else "movie"
     // A new sort or filter goes back up to the grid; a letter jumped to, to its first title, under the rows when there are any.
-    grid.FollowLibrary(state, vm, top = 0, first = if (arranged) drawn.size + 2 else 0)
+    grid.FollowLibrary(state, top = 0, first = if (arranged) drawn.size + 2 else 0, loadMore = vm::loadMore)
 
     Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
         MainTopBar(if (type == LibraryType.Tv) "TV Shows" else "Movies", userName, { onNavigate(MobileRoutes.Search) }, { onNavigate(MobileRoutes.Settings) })
