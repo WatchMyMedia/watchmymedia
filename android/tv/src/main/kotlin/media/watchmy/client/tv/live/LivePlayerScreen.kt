@@ -49,6 +49,7 @@ import media.watchmy.client.model.LivePlaybackController
 import media.watchmy.client.model.LiveTarget
 import media.watchmy.client.model.PlayerStatus
 import media.watchmy.client.model.liveTVError
+import media.watchmy.client.model.onAt
 import media.watchmy.client.model.liveSwitchMessage
 import media.watchmy.client.presentation.live.editLiveNumber
 import media.watchmy.client.presentation.live.nextLiveChannel
@@ -130,6 +131,10 @@ private fun LivePlayerContent(
     var panel by remember { mutableStateOf<LivePanel?>(null) }
     var numeric by remember { mutableStateOf("") }
     var channelProblem by remember { mutableStateOf<LiveChannel?>(null) }
+    // The channel watched before this one, for the remote's Last key.
+    var lastChannel by remember { mutableStateOf<LiveChannel?>(null) }
+    // A programme the remote's Record asked to record: its choices are open.
+    var recording by remember { mutableStateOf<media.watchmy.client.model.LiveProgramme?>(null) }
     val consumed = remember { mutableSetOf<Int>() }
     val terminal = state.status in listOf(PlayerStatus.Error, PlayerStatus.Ended)
     // The takeover warning never takes focus, like the reminder banner: Hold OK is Don't record it, Back dismisses it.
@@ -175,6 +180,8 @@ private fun LivePlayerContent(
         if (!channel.available) { channelProblem = channel; return }
         interact()
         panel = null
+        val from = controller.state.value.target?.channel ?: current
+        if (from.id != channel.id) lastChannel = from
         controller.start(LiveTarget(channel))
         banner = true
         shell.wanted = if (controls) focus.playPause else focus.root
@@ -201,6 +208,13 @@ private fun LivePlayerContent(
             LiveAction.Play -> controller.play()
             LiveAction.Pause -> controller.pause()
             LiveAction.Leave -> leave()
+            LiveAction.LastChannel -> lastChannel?.let(::watch)
+            // A cast channel's guide is on the phone that cast it.
+            LiveAction.Guide -> if (cast == null) leave(toGuide = true)
+            LiveAction.Record -> {
+                val on = shown.onAt(now)
+                if (cast == null && on != null && recorder.state.value.canRecord) recording = on
+            }
             LiveAction.Pass, LiveAction.Swallow -> Unit
         }
     }
@@ -281,7 +295,7 @@ private fun LivePlayerContent(
         },
         focusKeys = arrayOf<Any?>(controls, panel, terminal, state.askStillWatching),
         // Go to channel and an unavailable channel's message are dialogs that hold focus themselves.
-        arbitrate = panel != LivePanel.Number && channelProblem == null,
+        arbitrate = panel != LivePanel.Number && channelProblem == null && recording == null,
         modifier = modifier,
     ) {
         player?.let { LiveVideo(it) }
@@ -333,6 +347,7 @@ private fun LivePlayerContent(
             onLeave = { leave(toGuide = true) }, focus = focus.prompt, leaveLabel = if (state.askStillWatching) "Stop" else "Back to channels",
         )
         takeover?.let { session -> TvRecordingTakeover(session, recorder, format, Modifier.align(Alignment.TopCenter).padding(top = 100.dp)) }
+        recording?.let { programme -> TvRecordingChoice(programme, recorder, onDismiss = { recording = null }) }
         if (panel == LivePanel.Number) ChannelNumberDialog(channels, numeric, ::watch, ::closePanel, onStop = { leave() }, onInteraction = ::interact)
         channelProblem?.let { channel -> LiveMessageDialog("${channel.number} · ${channel.name}", liveTVError(channel.reason), onDismiss = { channelProblem = null; shell.wanted = focus.panel }, onStop = { leave() }) }
     }

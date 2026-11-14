@@ -56,7 +56,7 @@ internal sealed interface KeyAction {
  * picker. Back is not routed here: the screen takes it on key-up and asks
  * [backAction].
  */
-internal fun routeKey(key: PlayerKey, overlay: Overlay, controlsVisible: Boolean, focus: FocusArea): KeyAction {
+internal fun routeKey(key: PlayerKey, overlay: Overlay, controlsVisible: Boolean, focus: FocusArea, hasNext: Boolean = false): KeyAction {
     if (key == PlayerKey.Back || key == PlayerKey.Other) return KeyAction.PassThrough
     if (overlay == Overlay.Message) return if (key == PlayerKey.Stop) KeyAction.Leave else if (isDpad(key)) KeyAction.PassThrough else KeyAction.Swallow
     val prompt = overlay == Overlay.StillWatching
@@ -78,7 +78,8 @@ internal fun routeKey(key: PlayerKey, overlay: Overlay, controlsVisible: Boolean
         PlayerKey.Rewind, PlayerKey.FastForward ->
             if (overlay == Overlay.None || overlay == Overlay.UpNext) KeyAction.Seek(forward = key == PlayerKey.FastForward) else KeyAction.Swallow
         PlayerKey.Stop -> KeyAction.Leave
-        PlayerKey.Next -> if (overlay == Overlay.UpNext) KeyAction.PlayNext else KeyAction.Swallow
+        // The remote's Next plays the next episode, from the card or with nothing over the video.
+        PlayerKey.Next -> if (overlay == Overlay.UpNext || (overlay == Overlay.None && hasNext)) KeyAction.PlayNext else KeyAction.Swallow
         PlayerKey.Captions -> if (overlay == Overlay.None) KeyAction.OpenPicker(PickerSection.Subtitles) else KeyAction.Swallow
         PlayerKey.AudioTrack -> if (overlay == Overlay.None) KeyAction.OpenPicker(PickerSection.Audio) else KeyAction.Swallow
         PlayerKey.Menu -> if (overlay == Overlay.None) KeyAction.OpenPicker(PickerSection.Audio) else KeyAction.Swallow

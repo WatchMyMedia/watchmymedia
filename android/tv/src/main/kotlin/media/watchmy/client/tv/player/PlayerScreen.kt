@@ -267,6 +267,16 @@ private fun PlayerContent(
 
     fun onKey(event: KeyEvent): Boolean {
         val native = event.nativeKeyEvent
+        // The remote's Previous plays the episode before this one in its season (Next is routed below).
+        if (native.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS) {
+            val over = overlayOf(controller.state.value, picker, episodesOpen)
+            if (event.type == KeyEventType.KeyDown && native.repeatCount == 0 && (over == Overlay.None || over == Overlay.UpNext)) {
+                controller.noteUserInput()
+                shell.noteInput()
+                episodes?.previous()?.let(::playEpisode)
+            }
+            return event.type == KeyEventType.KeyDown || event.type == KeyEventType.KeyUp
+        }
         val key = playerKey(native.keyCode)
         if (event.type == KeyEventType.KeyUp) {
             if (!consumedKeys.remove(native.keyCode)) return false
@@ -277,7 +287,7 @@ private fun PlayerContent(
         val repeat = native.repeatCount > 0
         if (!repeat) controller.noteUserInput()
         shell.noteInput()
-        val action = routeKey(key, overlayOf(controller.state.value, picker, episodesOpen), controlsVisible, area)
+        val action = routeKey(key, overlayOf(controller.state.value, picker, episodesOpen), controlsVisible, area, hasNext = controller.state.value.nextEpisode != null)
         if (action == KeyAction.PassThrough) return false
         consumedKeys += native.keyCode
         perform(action, native.eventTime, repeat)

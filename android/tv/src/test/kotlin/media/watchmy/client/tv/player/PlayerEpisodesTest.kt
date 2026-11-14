@@ -36,7 +36,8 @@ import org.robolectric.annotation.Config
 /**
  * The TV player's episode list (android-tv/TvPlayerEpisodes), on the fakes:
  * Episodes, before Audio, opens it on the playing episode; OK on another
- * plays it; Back closes it and puts focus back on Episodes.
+ * plays it; the remote's Previous plays the one before; Back closes it and
+ * puts focus back on Episodes.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -77,10 +78,15 @@ class PlayerEpisodesTest {
         compose.onNodeWithText("PLAYING").assertDoesNotExist()
         compose.onNodeWithText("${episodeCode(3, next.number)} · ${next.title}").assertExists()
 
+        // The remote's Previous plays the episode before.
+        compose.onRoot().performKeyInput { pressKey(Key.MediaPrevious) }
+        compose.waitForIdle()
+        compose.onNodeWithText("${episodeCode(3, playing.number)} · ${playing.title}").assertExists()
+
         // Open it again: the list follows what plays now, and Back puts focus on Episodes.
         compose.onNode(hasText("Episodes") and hasClickAction()).performClick()
         compose.waitForIdle()
-        assertTrue(focused().startsWith("Episode ${next.number}, "))
+        assertTrue(focused().startsWith("Episode ${playing.number}, "))
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
         compose.onNodeWithText("PLAYING").assertDoesNotExist()

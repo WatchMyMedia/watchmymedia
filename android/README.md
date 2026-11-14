@@ -556,7 +556,13 @@ hides itself after 15 s.
 
 When player controls are hidden, Up/Down changes channel, Left opens Channels,
 and OK shows controls. Dedicated Channel Up/Down keys also work while controls
-or the Channels and Quality panels are visible. Menu opens Quality. Back closes a panel, then hides the
+or the Channels and Quality panels are visible. Menu opens Quality. The
+remote's Last goes back to the channel watched before, Record offers to
+record what is on (to people who may record; in the guide it opens the
+programme's menu), and Guide opens the full guide, as it opens Live TV from
+any other screen. In the file player, Next and Previous play the next and
+the previous episode, and Episodes, before Audio, lists the season's
+episodes (android-tv/TvPlayerEpisodes). Back closes a panel, then hides the
 controls, then leaves; Stop releases the tuner and leaves immediately. Pausing
 shows the controls. There is no file seek bar or next-episode action.
 

@@ -46,6 +46,18 @@ class LiveRemoteTest {
         assertEquals(LiveBackAction.KeepWatching, liveBackAction(null, true, false, true))
     }
 
+    @Test fun `Guide, Last and Record are the remote's own keys`() {
+        for (panel in listOf(null, LivePanel.Channels)) {
+            assertEquals(LiveAction.LastChannel, liveKeyAction(KeyEvent.KEYCODE_LAST_CHANNEL, panel, true, false, false))
+            assertEquals(LiveAction.Record, liveKeyAction(KeyEvent.KEYCODE_MEDIA_RECORD, panel, false, false, false))
+        }
+        // Guide leaves for the guide even from a stopped channel or the still-watching prompt.
+        for ((terminal, prompt) in listOf(false to false, true to false, false to true)) {
+            assertEquals(LiveAction.Guide, liveKeyAction(KeyEvent.KEYCODE_GUIDE, null, true, terminal, prompt))
+        }
+        assertEquals("A stopped channel's prompt keeps the remote for its buttons", LiveAction.Pass, liveKeyAction(KeyEvent.KEYCODE_LAST_CHANNEL, null, true, true, false))
+    }
+
     @Test fun `numeric remotes support digits subchannels and delete without treating Back as delete`() {
         for (n in 0..9) {
             assertEquals('0' + n, liveNumberKey(KeyEvent.KEYCODE_0 + n))

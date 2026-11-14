@@ -142,6 +142,27 @@ class LiveTVScreenTest {
         assertEquals(1, exits)
     }
 
+    @Test fun `the remote's Last goes back to the channel before, and Guide leaves for the guide`() {
+        val controller = RecordingController()
+        var guide = 0
+        compose.setContent {
+            CompositionLocalProvider(LocalAppServices provides FakeAppServices(tv = true)) {
+                TvTheme { LivePlayerScreen(LiveTarget(channels.first()), channels, onExit = {}, onChannels = { guide++ }, controller = controller) }
+            }
+        }
+        compose.waitForIdle()
+        native(AndroidKey.KEYCODE_CHANNEL_UP)
+        native(AndroidKey.KEYCODE_CHANNEL_UP)
+        assertEquals(channels[2], controller.state.value.target?.channel)
+        native(AndroidKey.KEYCODE_LAST_CHANNEL)
+        assertEquals("Last goes back one channel", channels[1], controller.state.value.target?.channel)
+        native(AndroidKey.KEYCODE_LAST_CHANNEL)
+        assertEquals("and again, back to where it was", channels[2], controller.state.value.target?.channel)
+        native(AndroidKey.KEYCODE_GUIDE)
+        assertEquals(1, guide)
+        assertEquals("Leaving for the guide releases the tuner", 1, controller.stops)
+    }
+
     @Test fun `live quality contains four fixed choices and no file playback controls`() {
         val controller = RecordingController()
         showPlayer(controller)

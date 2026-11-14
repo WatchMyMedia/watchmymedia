@@ -569,6 +569,11 @@ private fun TvGuideRow(
                             .onFocusChanged { if (it.isFocused) actions.focusProgramme(currentRow.channel, programme) }
                             .onPreviewKeyEvent { event ->
                                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                                // The remote's Record opens the programme's menu, with Record on it for people who may record.
+                                if (event.nativeKeyEvent.keyCode == AndroidKey.KEYCODE_MEDIA_RECORD && menus) {
+                                    actions.programmeMenu(currentRow.channel, programme)
+                                    return@onPreviewKeyEvent true
+                                }
                                 val w = currentWindow
                                 val step = verticalStep(event.nativeKeyEvent.keyCode)
                                 if (step != 0) return@onPreviewKeyEvent actions.vertical(currentIndex, maxOf(programme.startMs, w.startMs), step)

@@ -11,6 +11,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
@@ -181,6 +182,11 @@ fun TvNavHost(
         Box(
             Modifier.fillMaxSize().onBack(enabled = banner != null) { dismiss() }.onPreviewKeyEvent { event ->
                 banner != null && bannerKeys.handle(event.nativeKeyEvent.keyCode, event.type == KeyEventType.KeyDown, event.nativeKeyEvent.repeatCount)
+            }.onKeyEvent { event ->
+                // The remote's Guide opens Live TV from any screen that doesn't take it itself (the Live TV player does).
+                val guide = event.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_GUIDE && live.available
+                if (guide && event.type == KeyEventType.KeyUp) nav.navigateSection(TvRoutes.LiveTV)
+                guide
             },
         ) {
             NavHost(
