@@ -5,6 +5,55 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 1.4.4
+
+The Android app's second review: a quicker app that asks the server for less, fixes for
+downloads, Live TV and the TV remote, and new features on Google TV and on phones. The server
+learns three things that save the apps requests, and stops showing a film's deleted versions.
+
+- The server's database is the same as 1.4.2's and 1.4.3's, so updating needs no backup to go
+  back.
+- The Mac app and the Windows app were never offered 1.4.3, so their 1.4.2 offers 1.4.4
+  directly, with 1.4.3's fixes in it.
+- A film no longer lists a version whose file was deleted from its folder. That version showed
+  in the apps and wouldn't play.
+- The server now hands an app its media token with the answer to Play, so a play needs one
+  request where it needed two. While a Live TV channel tunes, an app can wait for it in one
+  request instead of asking once a second, and the channel list can be checked for changes
+  without being sent again. Older apps are unaffected.
+- In the Android app, downloads that stopped when Android closed the app now carry on, after
+  a restart too. Live TV at Automatic quality no longer stops a channel with "The connection
+  to the server was lost". A video the device can't decode is asked for again in a form it can,
+  and the app asks for 4K when the device's decoder can play it, even on a smaller screen.
+- On Google TV, Back closes the Live TV reminder banner; on Android 16 and later it closed the
+  app. Buttons keep their highlight while they work, and Search, Settings, the library and
+  Home put the highlight back where it was when you return.
+- New on Google TV: an A–Z strip in the library when it is sorted by title, with Page Up/Down
+  and Ch+/Ch− for a screenful; Search that listens for a title (the app asks for the microphone
+  the first time you press its key) or hands over to the TV's own keyboard, for accents and
+  other alphabets; the remote's Guide, Last, Record, Next and Previous keys; and the season's
+  episodes in the player.
+- The home screen's Watch Next cards show the film's or episode's picture, not the app's
+  banner. On home screens that show apps' channels, a Recently added row holds the newest films
+  and shows.
+- On phones and tablets, a phone held sideways keeps the phone's layout, and large text no
+  longer clips. The player can fill the screen for wide films, and Live TV plays in picture in
+  picture with channel buttons. A keyboard and mouse open a card's menu with a right-click or
+  the Menu key, and Ctrl+F searches. The launcher icon has shortcuts to Search, Live TV and
+  Downloads, and tapping the current tab again goes back to its top.
+- Settings › Copy diagnostics copies the app's version and its recent exits, to paste into a
+  report. Nothing is sent anywhere.
+- Home asks the server for nothing while it sits idle; before, Live TV was asked every 30
+  seconds on every screen. Pages reload only for changes to what they show, and the app starts
+  and plays sooner.
+- The iPhone, iPad and Apple TV apps' own review is in this version too, as 1.8.4 in the App
+  Store. Apple TV plays surround to a receiver, a video the device can't decode is asked for
+  again, screens reload less and scroll more smoothly, and Apple TV keeps its focus better.
+- The server, the Docker image, the Mac app, the Windows app and the Android app are 1.4.4.
+  The iPhone, iPad and Apple TV apps are 1.8.4 once the App Store approves them.
+- All of this has been tried in tests, on Android emulators and on iPhone and Apple TV
+  simulators, not yet on real TVs and remotes, a Chromecast or a real tuner.
+
 ## 1.4.3
 
 A fix for Home on Android TV, where the next row could come in with nothing on it highlighted,
