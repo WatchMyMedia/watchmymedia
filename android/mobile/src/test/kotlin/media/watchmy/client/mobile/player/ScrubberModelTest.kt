@@ -24,4 +24,13 @@ class ScrubberModelTest {
         assertEquals("−51:22", remainingLabel(48_000, 52 * 60_000L + 10_000))
         assertEquals("−0:00", remainingLabel(70_000, 60_000))
     }
+
+    @Test fun `the scrubber ticks as a drag passes the edge of an intro or credits band`() {
+        val intro = listOf(media.watchmy.client.model.Segment(media.watchmy.client.model.SegmentKind.entries.first(), 60_000, 90_000))
+        org.junit.Assert.assertTrue(crossesSegmentEdge(intro, 50_000, 61_000))
+        org.junit.Assert.assertTrue(crossesSegmentEdge(intro, 95_000, 90_000))
+        org.junit.Assert.assertFalse(crossesSegmentEdge(intro, 61_000, 89_000))
+        org.junit.Assert.assertFalse("an edge it sits on isn't crossed again", crossesSegmentEdge(intro, 60_000, 70_000))
+        org.junit.Assert.assertFalse(crossesSegmentEdge(intro, 70_000, 70_000))
+    }
 }
