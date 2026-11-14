@@ -1,4 +1,4 @@
-package media.watchmy.client.mobile.player
+package media.watchmy.client.presentation.player
 
 import media.watchmy.client.model.EpisodeContext
 import media.watchmy.client.model.PlayRequest
