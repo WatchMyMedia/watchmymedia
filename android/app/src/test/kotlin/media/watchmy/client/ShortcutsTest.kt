@@ -1,7 +1,9 @@
 package media.watchmy.client
 
 import android.app.Application
+import android.content.Intent
 import android.content.res.XmlResourceParser
+import android.net.Uri
 import media.watchmy.client.model.DeepLink
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -12,8 +14,8 @@ import org.robolectric.annotation.Config
 
 /**
  * The launcher's shortcuts (res/xml/shortcuts.xml, PLAN-ANDROID-REVIEW
- * §6.3): Search, Live TV and Downloads, each a link the app opens, aimed at
- * this build's package and MainActivity, and named in the manifest.
+ * §6.3): Search, Live TV and Downloads, each a link the app opens and that
+ * reaches MainActivity through its watchmymedia:// filter.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
@@ -35,8 +37,9 @@ class ShortcutsTest {
                     label = context.getString(parser.getAttributeResourceValue(ANDROID, "shortcutShortLabel", 0))
                 }
                 "intent" -> {
-                    val pkg = parser.getAttributeResourceValue(ANDROID, "targetPackage", 0).let { if (it != 0) context.getString(it) else parser.getAttributeValue(ANDROID, "targetPackage") }
-                    found += Shortcut(id, label, parser.getAttributeValue(ANDROID, "data"), "$pkg/${parser.getAttributeValue(ANDROID, "targetClass")}")
+                    // As Android stores it: a targetPackage is kept as written, so none is given (see shortcuts.xml).
+                    val target = listOfNotNull(parser.getAttributeValue(ANDROID, "targetPackage"), parser.getAttributeValue(ANDROID, "targetClass")).joinToString("/")
+                    found += Shortcut(id, label, parser.getAttributeValue(ANDROID, "data"), target)
                 }
             }
         }
@@ -47,7 +50,12 @@ class ShortcutsTest {
         val all = shortcuts()
         assertEquals(listOf("Search", "Live TV", "Downloads"), all.map { it.label })
         assertEquals(listOf(DeepLink.Search, DeepLink.LiveGuide, DeepLink.Downloads), all.map { DeepLink.open(it.data, null) })
-        all.forEach { assertEquals(it.id, "${context.packageName}/${MainActivity::class.java.name}", it.target) }
+        all.forEach { shortcut ->
+            // No named package: Android keeps a targetPackage as written, so it can't follow -PappIdSuffix.
+            assertEquals(shortcut.id, "", shortcut.target)
+            val opens = context.packageManager.resolveActivity(Intent(Intent.ACTION_VIEW, Uri.parse(shortcut.data)).setPackage(context.packageName), 0)
+            assertEquals(shortcut.id, MainActivity::class.java.name, opens?.activityInfo?.name)
+        }
     }
 
     private companion object {

@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The launcher's shortcuts on a phone or tablet (PLAN-ANDROID-REVIEW §6.3): long-press the
      icon for Search, Live TV and Downloads. Each opens a watchmymedia:// link, which waits
-     through the server picker and sign-in as any link does. TV launchers don't show them. -->
+     through the server picker and sign-in as any link does. TV launchers don't show them.
+     The intents name no package or activity: Android reads a shortcut's targetPackage as
+     written, so a resource can't follow -PappIdSuffix, and the link reaches MainActivity
+     through its watchmymedia:// filter in this build or a suffixed one. -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
         android:shortcutId="search"
@@ -10,9 +13,7 @@
         android:shortcutShortLabel="@string/shortcut_search">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="watchmymedia://search"
-            android:targetClass="media.watchmy.client.MainActivity"
-            android:targetPackage="@string/shortcut_package" />
+            android:data="watchmymedia://search" />
     </shortcut>
     <shortcut
         android:shortcutId="live_tv"
@@ -21,9 +22,7 @@
         android:shortcutShortLabel="@string/shortcut_live_tv">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="watchmymedia://live"
-            android:targetClass="media.watchmy.client.MainActivity"
-            android:targetPackage="@string/shortcut_package" />
+            android:data="watchmymedia://live" />
     </shortcut>
     <shortcut
         android:shortcutId="downloads"
@@ -32,8 +31,6 @@
         android:shortcutShortLabel="@string/shortcut_downloads">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="watchmymedia://downloads"
-            android:targetClass="media.watchmy.client.MainActivity"
-            android:targetPackage="@string/shortcut_package" />
+            android:data="watchmymedia://downloads" />
     </shortcut>
 </shortcuts>
