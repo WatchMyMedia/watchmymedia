@@ -97,7 +97,7 @@ private struct TVLivePlayerContent: View {
                     behavior: .live(model, extras: extras, recordings: recordings),
                     overlay: LiveVideoOverlay(model: model, standIn: model.controller.player == nil)
                 )
-                    .disabled(!model.videoTakesInput || previewPanel != nil)
+                    .disabled(!model.videoTakesInput || previewPanel != nil || model.goTo != nil)
             }
             if let previewPanel, model.overlay == nil {
                 // The fake player has no AVPlayerItem, so AVKit cannot open its
@@ -163,6 +163,8 @@ private struct TVLivePlayerContent: View {
                     .padding(.top, 60)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
+            // Page Up and Down's note and Go to channel (TvLiveChannelKeys.dc.html).
+            if model.overlay == nil { LiveChannelKeysLayer(model: model) }
         }
         .animation(.easeOut(duration: 0.3), value: banner)
     }
@@ -254,8 +256,10 @@ private struct LiveVideoOverlay: View {
 }
 
 /// Live TV on the shared ``SystemPlayer``: AVKit keeps its familiar
-/// transport, but seeking and file skips are off; Ch−, Ch+, Go live and Stop
-/// are its buttons, Channels and Quality its tabs, and picture in picture stays on.
+/// transport, but seeking and file skips are off; Last channel, Ch−, Ch+, Go
+/// to channel and Stop are its transport bar's buttons and Go live its
+/// contextual action, Page Up, Page Down and the 123 key change channel,
+/// Channels and Quality are its tabs, and picture in picture stays on.
 private extension SystemPlayerBehavior where Action == TVLivePlayerAction {
     @MainActor static func live(_ model: TVLivePlayerModel, extras: LiveExtrasStore, recordings: LiveRecordingsStore) -> Self {
         Self(
@@ -270,6 +274,7 @@ private extension SystemPlayerBehavior where Action == TVLivePlayerAction {
                 let result = UIAction(title: item.title, image: UIImage(systemName: item.systemImage), identifier: .init("media.watchmy.live.\(item.kind.rawValue)")) { [weak model] _ in
                     model?.perform(item.kind)
                 }
+                result.subtitle = item.subtitle
                 result.accessibilityLabel = item.accessibilityLabel
                 return result
             },
@@ -278,8 +283,21 @@ private extension SystemPlayerBehavior where Action == TVLivePlayerAction {
             seek: { old, _ in
                 model.controller.noteUserInput()
                 return old
-            }
+            },
+            presses: livePresses(model)
         )
+    }
+
+    /// Page Up and Page Down change channel; the 123 key (tvOS 18.1) opens Go to channel.
+    @MainActor private static func livePresses(_ model: TVLivePlayerModel) -> [UIPress.PressType: @MainActor () -> Void] {
+        var presses: [UIPress.PressType: @MainActor () -> Void] = [
+            .pageUp: { [weak model] in model?.pageUp() },
+            .pageDown: { [weak model] in model?.pageDown() },
+        ]
+        if #available(tvOS 18.1, *) {
+            presses[.tvRemoteOneTwoThree] = { [weak model] in model?.openGoToChannel() }
+        }
+        return presses
     }
 }
 

@@ -33,6 +33,7 @@ struct SystemPlayer<Overlay: View, Action: Equatable>: UIViewControllerRepresent
         controller.allowsPictureInPicturePlayback = behavior.pictureInPicture != nil
         controller.customInfoViewControllers = behavior.infoTabs()
         context.coordinator.shownTabs = behavior.infoTabsKey
+        context.coordinator.listen(for: behavior.presses.keys, on: controller)
         context.coordinator.show(overlay, in: controller)
         context.coordinator.show(contextualActions, transportBarActions, in: controller)
         behavior.pictureInPicture?.possible(controller.allowsPictureInPicturePlayback && AVPictureInPictureController.isPictureInPictureSupported())
@@ -64,6 +65,22 @@ struct SystemPlayer<Overlay: View, Action: Equatable>: UIViewControllerRepresent
 
         init(behavior: SystemPlayerBehavior<Action>) {
             self.behavior = behavior
+        }
+
+        /// A recogniser on the player's view for each press the behaviour
+        /// takes: the system's controls leave Page Up, Page Down and the 123
+        /// key alone, so they reach it while the video or its bar has focus.
+        func listen(for presses: some Sequence<UIPress.PressType>, on controller: AVPlayerViewController) {
+            for type in presses {
+                let recognizer = UITapGestureRecognizer(target: self, action: #selector(pressed(_:)))
+                recognizer.allowedPressTypes = [NSNumber(value: type.rawValue)]
+                controller.view.addGestureRecognizer(recognizer)
+            }
+        }
+
+        @objc private func pressed(_ recognizer: UITapGestureRecognizer) {
+            guard let raw = recognizer.allowedPressTypes.first?.intValue, let type = UIPress.PressType(rawValue: raw) else { return }
+            behavior.presses[type]?()
         }
 
         /// Hosts `overlay` in the player's `contentOverlayView`, which takes no presses.
@@ -147,6 +164,9 @@ struct SystemPlayerBehavior<Action> {
     /// The info panel's tabs are made again when this changes (the film
     /// player's Episodes tab comes with an episode and goes with a film).
     var infoTabsKey: AnyHashable = 0
+    /// Remote keys the system's controls leave alone, and what each does
+    /// (Live TV's Page Up, Page Down and 123). Read when the controller is made.
+    var presses: [UIPress.PressType: @MainActor () -> Void] = [:]
 }
 
 extension SystemPlayerBehavior where Action == TVPlayerAction {

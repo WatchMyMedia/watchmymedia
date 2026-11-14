@@ -508,9 +508,20 @@ The AirPlay receiver must be able to reach the selected server address; live
 playback does not perform the file player's LAN-address handoff. Simulator playback
 does not certify physical AirPlay, PiP, cellular networks or Apple TV remotes.
 
-Apple TV uses AVKit's native Play/Pause and a linear live transport. Ch−, Ch+
-and Go live are contextual actions; Stop is in the transport bar. Swipe down
-opens Channels and Quality while video continues. Back closes an open native
+Apple TV uses AVKit's native Play/Pause and a linear live transport
+(TvLiveChannelKeys.dc.html). Last channel (once there is one), Channel down,
+Channel up and Go to channel are transport bar buttons, before Stop and the
+system's own, each naming where it goes; as contextual actions they took
+Select from the bar (PLAN-APPLE-REVIEW.md §3.2.2). Go live stays a
+contextual action. The first time the bar comes up a note says Select
+pauses and the buttons are a swipe up. Page Up and Page Down change channel
+with a note naming it; the 123 key (tvOS 18.1) or the button opens Go to
+channel, a keypad that lists the channels whose number starts with what was
+typed and tunes the first two seconds after the last key, or the one chosen;
+digit keys type into it and Back closes it. `LiveChannelStep` (the list's
+order, skipping channels that can't be watched, wrapping) and
+`GoToChannelModel` are the rules, shared with the iPhone's channel keys.
+Swipe down opens Channels and Quality while video continues. Back closes an open native
 panel first, then stops and returns to the channel browser. The still-watching
 prompt takes focus; its first Back keeps watching, and the next Back leaves.
 

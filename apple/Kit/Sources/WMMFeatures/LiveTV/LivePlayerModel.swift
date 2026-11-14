@@ -165,11 +165,13 @@ public final class LivePlayerModel {
     }
     public func previousChannel() { step(-1) }
     public func nextChannel() { step(1) }
+    /// Where Ch+ (1) or Ch− (−1) goes from the channel playing (``LiveChannelStep``); nil when nowhere.
+    public func channel(steppedBy delta: Int) -> LiveChannel? {
+        LiveChannelStep.neighbour(of: state.channel?.id ?? request.channel.id, in: channels, by: delta)
+    }
     private func step(_ delta: Int) {
-        let playable = channels.filter(\.available)
-        guard !playable.isEmpty else { return }
-        let current = playable.firstIndex(where: { $0.id == state.channel?.id }) ?? 0
-        switchChannel(playable[(current + delta + playable.count) % playable.count])
+        guard let target = channel(steppedBy: delta) else { return }
+        switchChannel(target)
     }
     public func retry() { guard !disposed else { return }; controller.start(LivePlayRequest(channel: request.channel, quality: state.quality)) }
     public func close() { guard !disposed else { return }; dispose(); onExit?() }
