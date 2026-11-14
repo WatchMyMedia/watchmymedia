@@ -111,6 +111,8 @@ fun LibraryScreen(
     var picker by rememberSaveable { mutableStateOf<Picker?>(null) }
     val memory = rememberFocusMemory()
     val gridState = rememberLazyGridState()
+    // Whether focus is somewhere on this screen's content already, which first focus leaves alone.
+    var contentFocused by remember { mutableStateOf(false) }
     val title = if (type == LibraryType.Tv) "TV Shows" else "Movies"
     // The library's rows above the grid, from servers that arrange them (PLAN-ROWS.md Decision 11).
     val rowsVm = viewModel(key = "tv-library-rows-$type") { LibraryRowsViewModel(services.library, services.rows) }
@@ -123,13 +125,13 @@ fun LibraryScreen(
             val actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, { show, season, episode -> onNavigate(TvRoutes.Episode(show, season, episode)) }, notMatched, { vm.setWatched(it, !it.watched) }) { id -> onNavigate(TvRoutes.MediaList(id)) }
             ArrangedLibrary(
                 type, title, state, rows, actions, memory, gridState,
-                chips = { m -> ChipRow(vm, state, { picker = Picker.Decade }, m, top = 0.dp) },
+                chips = { m -> ChipRow(vm, state, memory, { picker = Picker.Decade }, m, top = 0.dp) },
                 onSort = { picker = Picker.Sort },
                 onEditRows = { rows.screen?.let { onNavigate(TvRoutes.RowSettings(it)) } },
                 onVisible = vm::onVisible,
                 onOpen = { item -> item.open(onOpenShow, onOpenMovie, onPlay, notMatched) },
             )
-        } else Column(Modifier.fillMaxSize()) {
+        } else Column(Modifier.fillMaxSize().onFocusChanged { contentFocused = it.hasFocus }) {
             Row(
                 Modifier.fillMaxWidth().padding(start = ContentStart, end = ContentEnd, top = 56.dp),
                 verticalAlignment = Alignment.Bottom,
@@ -144,7 +146,7 @@ fun LibraryScreen(
                     TvChip(state.choices.sort.label, selected = false, onClick = { picker = Picker.Sort }, trailingIcon = WmmIcons.ChevronDown)
                 }
             }
-            ChipRow(vm, state, onDecade = { picker = Picker.Decade })
+            ChipRow(vm, state, memory, onDecade = { picker = Picker.Decade })
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 when {
                     state.loading && state.items.isEmpty() -> LoadingState()
@@ -196,9 +198,11 @@ fun LibraryScreen(
                         LaunchedEffect(gridState) {
                             snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }.collect(vm::onVisible)
                         }
-                        LaunchedEffect(state.choices) {
+                        // Once, when the grid first shows (or comes back after Back): a filter
+                        // chosen on the chips leaves focus on its chip (§3.2.2).
+                        LaunchedEffect(Unit) {
                             withFrameNanos { }
-                            memory.restore(fallback = state.items.firstOrNull()?.let { "item:${it.id}" })
+                            if (!contentFocused) memory.restore(fallback = state.items.firstOrNull()?.let { "item:${it.id}" })
                         }
                     }
                 }
@@ -330,22 +334,31 @@ private fun ArrangedLibrary(
     // when returning from a page; a card that took focus while the page was still drawing doesn't count.
     val returning = remember { memory.key }
     val first = drawn.firstOrNull()?.cardKey() ?: state.items.firstOrNull()?.let { "item:${it.id}" } ?: "edit"
-    LaunchedEffect(state.choices, first, state.loading) {
-        if (state.loading) return@LaunchedEffect
-        val target = returning ?: first
+    // Where first focus went. Rows that arrive after the grid move it up to them, but only while
+    // it is still there: once the person has moved it (a chip, a filter), the page leaves it be,
+    // where it used to throw it back to the top after every filter (§3.2.2).
+    var placed by remember { mutableStateOf<String?>(null) }
+    val ready = !(state.loading && state.items.isEmpty())
+    LaunchedEffect(first, ready) {
+        if (!ready || placed != null && memory.key != placed) return@LaunchedEffect
+        val target = if (placed == null) returning ?: first else first
         // The grid's first page may have taken focus and scrolled the rows away: bring them back first.
-        if (returning == null) gridState.scrollToItem(0)
+        if (target == first) gridState.scrollToItem(0)
         repeat(10) {
             withFrameNanos { }
-            if (runCatching { memory.requester(target).requestFocus() }.getOrDefault(false)) return@LaunchedEffect
+            if (runCatching { memory.requester(target).requestFocus() }.getOrDefault(false)) {
+                placed = target
+                return@LaunchedEffect
+            }
         }
         memory.restore(fallback = first)
+        placed = memory.key
     }
 }
 
 /** Filters, a divider, then genres and Decade; scrolls sideways when the library has many genres. */
 @Composable
-private fun ChipRow(vm: LibraryViewModel, state: LibraryViewModel.State, onDecade: () -> Unit, modifier: Modifier = Modifier, top: androidx.compose.ui.unit.Dp = 22.dp) {
+private fun ChipRow(vm: LibraryViewModel, state: LibraryViewModel.State, memory: media.watchmy.client.tv.components.FocusMemory, onDecade: () -> Unit, modifier: Modifier = Modifier, top: androidx.compose.ui.unit.Dp = 22.dp) {
     val c = state.choices
     LazyRow(
         modifier.fillMaxWidth().padding(top = top, start = ContentStart - 12.dp).focusRestorer(),
@@ -353,14 +366,14 @@ private fun ChipRow(vm: LibraryViewModel, state: LibraryViewModel.State, onDecad
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        items(vm.filters, key = { "f-$it" }) { f -> TvChip(f.label, selected = c.filter == f, onClick = { vm.setFilter(f) }) }
+        items(vm.filters, key = { "f-$it" }) { f -> TvChip(f.label, selected = c.filter == f, onClick = { vm.setFilter(f) }, modifier = Modifier.focusMemory(memory, "chip:f-$f")) }
         if (state.genres.isNotEmpty() || state.decades.isNotEmpty()) {
             item("divider") { Box(Modifier.padding(horizontal = 8.dp).width(1.dp).height(32.dp).background(WmmColors.Line2)) }
         }
-        items(state.genres, key = { "g-$it" }) { g -> TvChip(g, selected = c.genre == g, onClick = { vm.setGenre(g) }) }
+        items(state.genres, key = { "g-$it" }) { g -> TvChip(g, selected = c.genre == g, onClick = { vm.setGenre(g) }, modifier = Modifier.focusMemory(memory, "chip:g-$g")) }
         if (state.decades.isNotEmpty()) {
             item("decade") {
-                TvChip(c.decade?.let { "${it}s" } ?: "Decade", selected = c.decade != null, onClick = onDecade, trailingIcon = WmmIcons.ChevronDown)
+                TvChip(c.decade?.let { "${it}s" } ?: "Decade", selected = c.decade != null, onClick = onDecade, trailingIcon = WmmIcons.ChevronDown, modifier = Modifier.focusMemory(memory, "chip:decade"))
             }
         }
     }
