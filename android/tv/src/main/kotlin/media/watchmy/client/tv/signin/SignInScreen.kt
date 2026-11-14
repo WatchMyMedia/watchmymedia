@@ -230,6 +230,7 @@ private fun PasswordSignIn(vm: SignInViewModel, state: SignInViewModel.State, se
     Box(Modifier.fillMaxSize().padding(end = 160.dp, top = 330.dp), contentAlignment = Alignment.TopEnd) {
         OnScreenKeyboard(
             field = if (target == Field.Name) nameField else passwordField,
+            masked = target == Field.Password,
             onDone = { if (target == Field.Name) target = Field.Password else submit() },
             doneLabel = if (target == Field.Name) "Next" else "Sign in",
             firstKey = firstKey,

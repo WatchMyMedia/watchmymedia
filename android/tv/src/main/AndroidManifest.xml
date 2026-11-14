@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Search's microphone hands voice typing to the TV's own speech recognizer, and shows only
+         when the TV has one (TvSearchKeyboard.dc.html): without this, Android 11 and later hide it
+         from resolveActivity. No microphone permission: the system listens, not the app. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
+</manifest>

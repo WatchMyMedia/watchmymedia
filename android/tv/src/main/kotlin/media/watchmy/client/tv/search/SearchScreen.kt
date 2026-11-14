@@ -84,8 +84,20 @@ import media.watchmy.client.tv.components.LocalLiveTVAvailable
 import media.watchmy.client.tv.live.TvLiveSearchRow
 import media.watchmy.client.presentation.search.SearchViewModel
 import media.watchmy.client.presentation.search.isEmpty
-import androidx.compose.runtime.withFrameNanos
 import media.watchmy.client.ui.rememberModelTextField
+import androidx.compose.runtime.withFrameNanos
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import media.watchmy.client.tv.components.FocusableBox
 
 /** Where the results start: right of the keyboard (154 + 712 + 60). */
 private val ResultsStart = 926.dp
@@ -127,12 +139,18 @@ fun SearchScreen(
     TvScaffold(RailSection.Search, onNavigate) {
         Column(Modifier.padding(start = ContentStart, top = 56.dp).width(712.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
             Text("Search", style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
-            KeyboardField(query.text.toString(), placeholder = if (withLive) "Titles of shows, movies, episodes or Live TV programmes" else "Titles of shows, movies or episodes", active = true)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                KeyboardField(query.text.toString(), Modifier.weight(1f), placeholder = if (withLive) "Titles of shows, movies, episodes or Live TV programmes" else "Titles of shows, movies or episodes", active = true)
+                // Voice typing, where the TV can listen (TvSearchKeyboard.dc.html): the TV's own recognizer
+                // listens and the words go into the field.
+                VoiceButton { query.setTextAndPlaceCursorAtEnd(it) }
+            }
             OnScreenKeyboard(
                 field = query,
                 onDone = vm::clear,
                 doneLabel = "Clear",
                 firstKey = firstKey,
+                note = "Accents and other alphabets come from the TV’s keyboard. Back or its Done returns here. Every field that uses this keyboard gets the same key, passwords included.",
             )
         }
         Box(Modifier.fillMaxSize().padding(start = ResultsStart - ContentStart)) {
@@ -313,6 +331,36 @@ private fun PosterSection(title: String, items: List<BrowseItem>, library: Libra
                     ArtProgress(item.progress)
                 }
             }
+        }
+    }
+}
+
+/** The microphone beside Search's field, shown only when the TV offers speech recognition; [onHeard] gets the words. */
+@Composable
+private fun VoiceButton(onHeard: (String) -> Unit) {
+    val context = LocalContext.current
+    val intent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, "Say a title")
+    }
+    val available = remember(context) { intent.resolveActivity(context.packageManager) != null }
+    if (!available) return
+    val heard by rememberUpdatedState(onHeard)
+    val listen = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.takeIf { it.isNotBlank() }?.let(heard)
+    }
+    FocusableBox(
+        onClick = { runCatching { listen.launch(intent) } },
+        cornerRadius = 36.dp,
+        focusedScale = 1.06f,
+        modifier = Modifier.size(72.dp).semantics { contentDescription = "Voice typing" },
+    ) { focused ->
+        Box(
+            Modifier.fillMaxSize().background(if (focused) WmmColors.Surface3 else WmmColors.Surface2, CircleShape).border(1.dp, WmmColors.Line2, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(WmmIcons.Microphone, contentDescription = null, tint = WmmColors.Text, modifier = Modifier.size(30.dp))
         }
     }
 }

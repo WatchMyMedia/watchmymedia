@@ -40,6 +40,14 @@ import media.watchmy.client.ui.WmmColors
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.delete
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 
 private val Digits = "1234567890".map { it.toString() }
 private val Letters = listOf("qwertyuiop", "asdfghjkl'", "zxcvbnm,.-").map { row -> row.map { it.toString() } }
@@ -135,6 +143,10 @@ fun OnScreenKeyboard(
 /**
  * The keyboard typing into [field]: a field's text is held in its
  * TextFieldState (PLAN-ANDROID-REVIEW.md §3.3.3), which the keys edit.
+ * Under it, "Use the TV's keyboard" hands the same field to the system's
+ * keyboard (TvSearchKeyboard.dc.html), with the TV's languages, accents and
+ * voice key; its Done, or Back, comes back to that key. [masked] fields
+ * (passwords) ask it for a password keyboard. [note] goes under the key.
  */
 @Composable
 fun OnScreenKeyboard(
@@ -145,17 +157,55 @@ fun OnScreenKeyboard(
     extraKeys: List<String> = emptyList(),
     keySize: Dp = 64.dp,
     firstKey: FocusRequester? = null,
+    masked: Boolean = false,
+    note: String? = null,
+    tvKey: FocusRequester = remember { FocusRequester() },
 ) {
-    OnScreenKeyboard(
-        onText = { t -> field.edit { append(t) } },
-        onBackspace = { field.edit { if (length > 0) delete(length - 1, length) } },
-        modifier = modifier,
-        onDone = onDone,
-        doneLabel = doneLabel,
-        extraKeys = extraKeys,
-        keySize = keySize,
-        firstKey = firstKey,
-    )
+    val editor = remember { FocusRequester() }
+    val ime = LocalSoftwareKeyboardController.current
+    var onTvKeyboard by remember { mutableStateOf(false) }
+    val gap = 8.dp
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(gap)) {
+        OnScreenKeyboard(
+            onText = { t -> field.edit { append(t) } },
+            onBackspace = { field.edit { if (length > 0) delete(length - 1, length) } },
+            onDone = onDone,
+            doneLabel = doneLabel,
+            extraKeys = extraKeys,
+            keySize = keySize,
+            firstKey = firstKey,
+        )
+        Key(
+            "Use the TV’s keyboard",
+            {
+                onTvKeyboard = true
+                editor.requestFocus()
+                ime?.show()
+            },
+            Modifier.width((keySize + gap) * 10 - gap).height(keySize).focusRequester(tvKey),
+            fontSize = 20.sp,
+        )
+        if (note != null) Text(note, style = inter(17.sp, lineHeight = 25.sp), color = WmmColors.TextFaint, modifier = Modifier.width((keySize + gap) * 10 - gap))
+        // The system's keyboard types into the same field through an editor of its own, out of sight.
+        BasicTextField(
+            state = field,
+            modifier = Modifier
+                .size(1.dp)
+                .alpha(0f)
+                .focusRequester(editor)
+                .onFocusChanged { if (!it.isFocused) onTvKeyboard = false },
+            keyboardOptions = KeyboardOptions(keyboardType = if (masked) KeyboardType.Password else KeyboardType.Text, imeAction = ImeAction.Done),
+            onKeyboardAction = {
+                ime?.hide()
+                tvKey.requestFocus()
+            },
+        )
+    }
+    // Back with the TV's keyboard put away: back to the key, not out of the screen.
+    BackHandler(enabled = onTvKeyboard) {
+        ime?.hide()
+        tvKey.requestFocus()
+    }
 }
 
 @Composable
@@ -257,6 +307,7 @@ fun KeyboardDialog(
                 }
                 OnScreenKeyboard(
                     field = field,
+                    masked = masked,
                     onDone = { onSubmit(field.text.toString()) },
                     doneLabel = submitLabel,
                     extraKeys = extraKeys,
