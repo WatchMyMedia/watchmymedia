@@ -155,8 +155,8 @@ import WMMModel
     @Test func exitLeavesThePlayer() async {
         let h = PlayerHarness()
         h.spy.send(.exit)
-        await h.time.settle()
-        #expect(h.exits.count == 1)
+        // Wait for the exit itself: a fixed number of yields was too few on a loaded CI runner.
+        #expect(await eventually { h.exits.count == 1 })
     }
 
     @Test func anAdminsStopWaitsForBack() async {
