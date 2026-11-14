@@ -5,13 +5,14 @@ import media.watchmy.client.model.PlayerUiState
 import media.watchmy.client.ui.PlayerKey
 
 /** What is over the video and takes the remote. */
-internal enum class Overlay { None, UpNext, Picker, StillWatching, Message }
+internal enum class Overlay { None, UpNext, Picker, Episodes, StillWatching, Message }
 
-/** The overlay up now, most important first: an admin's stop or a fatal error, Still watching, the picker, the Next Episode card. */
-internal fun overlayOf(state: PlayerUiState, picker: PickerSection?): Overlay = when {
+/** The overlay up now, most important first: an admin's stop or a fatal error, Still watching, the picker or the episode list, the Next Episode card. */
+internal fun overlayOf(state: PlayerUiState, picker: PickerSection?, episodes: Boolean = false): Overlay = when {
     state.stopMessage != null || state.status == PlayerStatus.Error -> Overlay.Message
     state.askStillWatching -> Overlay.StillWatching
     picker != null -> Overlay.Picker
+    episodes -> Overlay.Episodes
     state.upNext != null -> Overlay.UpNext
     else -> Overlay.None
 }
@@ -89,12 +90,13 @@ internal fun routeKey(key: PlayerKey, overlay: Overlay, controlsVisible: Boolean
 private fun isDpad(key: PlayerKey) = key == PlayerKey.Left || key == PlayerKey.Right || key == PlayerKey.Up || key == PlayerKey.Down || key == PlayerKey.Centre
 
 /** What Back does: close what is open first, then hide the controls, then leave. */
-internal enum class BackAction { Leave, KeepWatching, ClosePicker, WatchCredits, HideControls }
+internal enum class BackAction { Leave, KeepWatching, ClosePicker, CloseEpisodes, WatchCredits, HideControls }
 
 internal fun backAction(overlay: Overlay, controlsVisible: Boolean): BackAction = when (overlay) {
     Overlay.Message -> BackAction.Leave
     Overlay.StillWatching -> BackAction.KeepWatching
     Overlay.Picker -> BackAction.ClosePicker
+    Overlay.Episodes -> BackAction.CloseEpisodes
     Overlay.UpNext -> BackAction.WatchCredits
     Overlay.None -> if (controlsVisible) BackAction.HideControls else BackAction.Leave
 }
