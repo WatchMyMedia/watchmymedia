@@ -222,13 +222,26 @@ didn't start.
   ⌘F: `UITests/KeyboardTests.swift`, on an iPad), but its Escape reached
   neither `onKeyPress`, a cancel action nor a `UIKeyCommand` on iPadOS 27.2:
   check Escape with a real keyboard.
-- An `XCTNSPredicateExpectation` waited on with `XCTWaiter` checked its
-  predicate only every 6 s in the Apple TV UI tests (tvOS 27.2 simulator),
-  where `waitForExistence` and `waitForNonExistence` look about once a
-  second. Wait for something that comes or goes at a set time with those, or
-  give the waiter several polls' slack. A look at the screen once took 8 s
-  on a busy simulator, so a test that reads something shown briefly makes it
-  stay longer (`-liveBannerSeconds 30` for the reminder banner).
+- XCTest's own waits look late in the Apple TV UI tests (tvOS 27.2
+  simulator): `waitForExistence`, `waitForNonExistence` and an
+  `XCTNSPredicateExpectation` waited on with `XCTWaiter` first look about a
+  second after they start, even when what they wait for is already there,
+  and the expectation then looks only every 6 s. A wait after each remote
+  press cost 1.3 s a press. The TV UI tests wait with
+  `TVUITests/Waiting.swift` (`waitUntilExists`, `waitUntilGone`,
+  `waitForFocus`, `wait(until:)`, `eventually`), which look at once and then
+  every quarter second; use those. XCTest's late look also let each new
+  screen settle before the next press, so `waitUntilExists` and
+  `waitUntilGone` give it half a second; where a press needs focus
+  somewhere, wait for that focus, and where an element stays in the tree
+  under a pushed page (the grid's Sort by), wait for the page to go. In a
+  loop that presses until focus reaches something, wait for focus to move
+  after each press (`press(_:thenWaitForFocusToMove:)`), not for the target:
+  a slow move is otherwise pressed twice, or each step on the way waits out
+  the timeout. `snapshot()` retries for 2 s on a missing element, so ask
+  `exists` first (`lookedAt`). A look at the screen once took 8 s on a busy
+  simulator, so a test that reads something shown briefly makes it stay
+  longer (`-liveBannerSeconds 30` for the reminder banner).
 - XCUITest's Siri Remote has no touch-surface swipe, and Right while paused
   skips 10 s, so AVKit's own scrubbing (and the thumbnails it draws from an
   I-frame playlist) can't be driven from a test; check it by hand.

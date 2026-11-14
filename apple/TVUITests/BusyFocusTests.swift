@@ -15,15 +15,13 @@ final class BusyFocusTests: XCTestCase {
     /// Waits until `element` has focus.
     @MainActor
     private func focused(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
-        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hasFocus == true"), object: element)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+        element.waitForFocus(timeout: timeout)
     }
 
     /// Waits until `element`'s label ends with `text`.
     @MainActor
     private func label(_ element: XCUIElement, endsWith text: String, timeout: TimeInterval = 10) -> Bool {
-        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label ENDSWITH %@", text), object: element)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+        element.wait(until: NSPredicate(format: "label ENDSWITH %@", text), timeout: timeout)
     }
 
     /// Selects the focused field and types into it one character at a time:
@@ -42,20 +40,20 @@ final class BusyFocusTests: XCTestCase {
         app.launchArguments = ["-fakesSignedOut"]
         app.launch()
         let usePassword = app.buttons["Sign in with a password instead"]
-        XCTAssertTrue(usePassword.waitForExistence(timeout: 15), "sign-in opens on the pairing code")
+        XCTAssertTrue(usePassword.waitUntilExists(timeout: 15), "sign-in opens on the pairing code")
         for _ in 0..<3 where !usePassword.hasFocus { remote.press(.down) }
         XCTAssertTrue(focused(usePassword))
         remote.press(.select)
 
         let name = app.textFields["Username"]
-        XCTAssertTrue(name.waitForExistence(timeout: 10), "the password form is up")
+        XCTAssertTrue(name.waitUntilExists(timeout: 10), "the password form is up")
         XCTAssertTrue(focused(name), "on the name")
         type("sam")
         let password = app.secureTextFields["Password"]
         // A press just after the keyboard goes can be lost.
         for _ in 0..<3 where !password.hasFocus {
             remote.press(.down)
-            sleep(1)
+            _ = focused(password, timeout: 1)
         }
         XCTAssertTrue(focused(password))
         type("nope")
@@ -65,13 +63,13 @@ final class BusyFocusTests: XCTestCase {
         let row = [signIn, app.buttons["Use a pairing code instead"], app.buttons["Switch server"]]
         for _ in 0..<4 where !row.contains(where: \.hasFocus) {
             remote.press(.down)
-            sleep(1)
+            _ = eventually(timeout: 1) { row.contains(where: \.hasFocus) }
         }
         for _ in 0..<3 where !signIn.hasFocus { remote.press(.left) }
         XCTAssertTrue(focused(signIn), "Sign in is below the password")
 
         remote.press(.select)
-        XCTAssertTrue(app.staticTexts["Wrong name or password."].waitForExistence(timeout: 10), "the server refuses the password")
+        XCTAssertTrue(app.staticTexts["Wrong name or password."].waitUntilExists(timeout: 10), "the server refuses the password")
         XCTAssertTrue(signIn.hasFocus, "focus stays on Sign in while it works and after")
         remote.press(.right)
         XCTAssertTrue(focused(app.buttons["Use a pairing code instead"]), "and the remote moves on from there")
@@ -83,7 +81,7 @@ final class BusyFocusTests: XCTestCase {
         app.launchArguments = ["-fakes", "-open", "watchmymedia://shows/100?season=3&episode=100037"]
         app.launch()
         let play = app.buttons["Play · 52 min"]
-        XCTAssertTrue(play.waitForExistence(timeout: 15))
+        XCTAssertTrue(play.waitUntilExists(timeout: 15))
         XCTAssertTrue(focused(play))
         remote.press(.right)
         let mark = app.buttons["episodeWatchToggle"]
@@ -103,7 +101,7 @@ final class BusyFocusTests: XCTestCase {
         app.launchArguments = ["-fakes", "-fakesRows", "-tab", "settings", "-homeRowsSettings"]
         app.launch()
         let ups = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Move ' AND label ENDSWITH ' up'"))
-        XCTAssertTrue(ups.firstMatch.waitForExistence(timeout: 20), "Home rows is open")
+        XCTAssertTrue(ups.firstMatch.waitUntilExists(timeout: 20), "Home rows is open")
         // The first row's Move up is disabled, so focus starts on the second's.
         let second = ups.element(boundBy: 1)
         let title = second.label
@@ -111,8 +109,7 @@ final class BusyFocusTests: XCTestCase {
 
         remote.press(.select)
         let moved = app.buttons[title]
-        let first = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", title), object: ups.element(boundBy: 0))
-        XCTAssertEqual(XCTWaiter().wait(for: [first], timeout: 10), .completed, "the row is first now")
+        XCTAssertTrue(ups.element(boundBy: 0).wait(until: NSPredicate(format: "label == %@", title), timeout: 10), "the row is first now")
         XCTAssertFalse(moved.isEnabled, "its Move up can't move it further")
         XCTAssertTrue(moved.hasFocus, "and keeps focus at the top")
         remote.press(.right)

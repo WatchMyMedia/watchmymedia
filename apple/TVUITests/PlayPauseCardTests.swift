@@ -19,22 +19,20 @@ final class PlayPauseCardTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-fakes"] + arguments
         app.launch()
-        XCTAssertTrue(app.buttons["Play"].waitForExistence(timeout: 15), "Home shows the hero")
+        XCTAssertTrue(app.buttons["Play"].waitUntilExists(timeout: 15), "Home shows the hero")
         return app
     }
 
     /// Waits until `element` has focus.
     @MainActor
     private func focused(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
-        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hasFocus == true"), object: element)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+        element.waitForFocus(timeout: timeout)
     }
 
     /// The player on the fakes, whose stand-in says Playing or Paused.
     @MainActor
     private func playerIsUp(_ app: XCUIApplication, timeout: TimeInterval = 15) -> Bool {
-        let up = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in app.staticTexts["Playing"].exists || app.staticTexts["Paused"].exists }, object: nil)
-        return XCTWaiter().wait(for: [up], timeout: timeout) == .completed
+        eventually(timeout: timeout) { app.staticTexts["Playing"].exists || app.staticTexts["Paused"].exists }
     }
 
     /// Down from the tab bar until a card whose label contains one of
@@ -43,9 +41,9 @@ final class PlayPauseCardTests: XCTestCase {
     private func focusCard(_ app: XCUIApplication, labelled labels: [String], downs: Int = 8) -> XCUIElement? {
         for _ in 0...downs {
             let card = app.buttons.matching(NSPredicate(format: "hasFocus == true")).firstMatch
-            if card.exists, !card.label.contains(" left"), labels.contains(where: { card.label.contains($0) }) { return card }
-            remote.press(.down)
-            _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true"), object: app.buttons.matching(NSPredicate(format: "hasFocus == true")).firstMatch)], timeout: 3)
+            let label = card.exists ? card.label : ""
+            if !label.contains(" left"), labels.contains(where: { label.contains($0) }) { return card }
+            app.press(.down, thenWaitForFocusToMove: 3)
         }
         return nil
     }
@@ -61,7 +59,7 @@ final class PlayPauseCardTests: XCTestCase {
         remote.press(.playPause)
         XCTAssertTrue(playerIsUp(app), "Play/Pause resumes it")
         remote.press(.menu)
-        XCTAssertTrue(app.buttons["Play"].waitForExistence(timeout: 10), "Menu leaves the player for Home")
+        XCTAssertTrue(app.buttons["Play"].waitUntilExists(timeout: 10), "Menu leaves the player for Home")
     }
 
     @MainActor
@@ -81,7 +79,7 @@ final class PlayPauseCardTests: XCTestCase {
         guard focusCard(app, labelled: ["Harbor Lights"]) != nil else { return XCTFail("a show's card takes focus going down Home") }
         remote.press(.playPause)
         let episodeRow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "episode-card-")).firstMatch
-        XCTAssertTrue(episodeRow.waitForExistence(timeout: 15), "the show's page opens")
+        XCTAssertTrue(episodeRow.waitUntilExists(timeout: 15), "the show's page opens")
         XCTAssertFalse(app.staticTexts["Playing"].exists, "and nothing plays")
     }
 
@@ -89,14 +87,11 @@ final class PlayPauseCardTests: XCTestCase {
     func testPlayPauseOnAChannelCardTunesIt() {
         let app = launch(["-fakesLiveTV"])
         let channel = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-live-channel-")).firstMatch
-        XCTAssertTrue(channel.waitForExistence(timeout: 15), "Home has the Live TV row")
-        for _ in 0..<4 where !channel.hasFocus {
-            remote.press(.down)
-            _ = focused(channel, timeout: 3)
-        }
+        XCTAssertTrue(channel.waitUntilExists(timeout: 15), "Home has the Live TV row")
+        for _ in 0..<4 where !channel.hasFocus { app.press(.down, thenWaitForFocusToMove: 3) }
         XCTAssertTrue(focused(channel), "a channel's card takes focus")
         remote.press(.playPause)
-        XCTAssertTrue(app.descendants(matching: .any)["live-player-screen"].waitForExistence(timeout: 15), "Play/Pause tunes the channel")
+        XCTAssertTrue(app.descendants(matching: .any)["live-player-screen"].waitUntilExists(timeout: 15), "Play/Pause tunes the channel")
     }
 
     @MainActor
@@ -104,12 +99,9 @@ final class PlayPauseCardTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-fakes", "-open", "watchmymedia://shows/100?season=3&episode=100037"]
         app.launch()
-        XCTAssertTrue(app.buttons["Play · 52 min"].waitForExistence(timeout: 15), "the show's page opens on S03 E07")
+        XCTAssertTrue(app.buttons["Play · 52 min"].waitUntilExists(timeout: 15), "the show's page opens on S03 E07")
         let onTop = app.buttons["episode-card-100037"]
-        for _ in 0..<4 where !onTop.hasFocus {
-            remote.press(.down)
-            _ = focused(onTop, timeout: 3)
-        }
+        for _ in 0..<4 where !onTop.hasFocus { app.press(.down, thenWaitForFocusToMove: 3) }
         XCTAssertTrue(focused(onTop), "Down reaches the episode on top, in the row")
         remote.press(.right)
         XCTAssertTrue(focused(app.buttons["episode-card-100038"]), "Right moves to E08")
@@ -124,15 +116,12 @@ final class PlayPauseCardTests: XCTestCase {
         app.launchArguments = ["-fakes", "-fakesLiveGuide", "-tab", "liveTV"]
         app.launch()
         let onNow = app.buttons["live-cell-2.1-Quiz Parlor"]
-        XCTAssertTrue(onNow.waitForExistence(timeout: 20))
-        for _ in 0..<5 where !onNow.hasFocus {
-            remote.press(.down)
-            _ = focused(onNow, timeout: 3)
-        }
+        XCTAssertTrue(onNow.waitUntilExists(timeout: 20))
+        for _ in 0..<5 where !onNow.hasFocus { app.press(.down, thenWaitForFocusToMove: 3) }
         XCTAssertTrue(focused(onNow), "Down reaches the first channel's programme on now")
         remote.press(.playPause)
         let title = app.staticTexts["live-player-title"]
-        XCTAssertTrue(title.waitForExistence(timeout: 15), "Play/Pause tunes its channel")
+        XCTAssertTrue(title.waitUntilExists(timeout: 15), "Play/Pause tunes its channel")
         XCTAssertTrue(title.label.contains("Quiz Parlor"), title.label)
     }
 }

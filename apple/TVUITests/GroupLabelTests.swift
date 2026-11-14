@@ -12,7 +12,7 @@ final class GroupLabelTests: XCTestCase {
         app.launchArguments = ["-fakes", "-fakesLiveGuide", "-tab", "settings"]
         app.launch()
         let lead = app.buttons["live-lead-5"]
-        XCTAssertTrue(lead.waitForExistence(timeout: 20), "Settings › Live TV has Remind me")
+        XCTAssertTrue(lead.waitUntilExists(timeout: 20), "Settings › Live TV has Remind me")
         XCTAssertEqual(lead.label, "5 min", "a lead time reads its own label, not the group's")
         let leads = app.descendants(matching: .any)["live-lead-choices"]
         XCTAssertTrue(leads.exists)

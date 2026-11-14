@@ -17,30 +17,30 @@ final class LetterIndexTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-fakes", "-fakesLargeLibrary", "-tab", "movies"] + (sort.map { ["-librarySort", $0] } ?? [])
         app.launch()
-        XCTAssertTrue(app.staticTexts["Movies"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.staticTexts["Movies"].waitUntilExists(timeout: 20))
         return app
     }
 
     @MainActor
-    private func focusedButton(_ app: XCUIApplication) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "hasFocus == true")).firstMatch
-    }
+    private func focusedButton(_ app: XCUIApplication) -> XCUIElement { app.focusedButton }
 
     /// Waits until `element` has focus.
     @MainActor
     private func focused(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
-        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hasFocus == true"), object: element)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+        element.waitForFocus(timeout: timeout)
     }
 
     /// Waits until the focused button's label passes `test`.
     @MainActor
-    private func focus(_ app: XCUIApplication, timeout: TimeInterval = 10, where test: @escaping (String) -> Bool) -> Bool {
-        let done = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            let element = app.buttons.matching(NSPredicate(format: "hasFocus == true")).firstMatch
-            return element.exists && test(element.label)
-        }, object: nil)
-        return XCTWaiter().wait(for: [done], timeout: timeout) == .completed
+    private func focus(_ app: XCUIApplication, timeout: TimeInterval = 10, where test: (String) -> Bool) -> Bool {
+        app.waitForFocusedButton(timeout: timeout, where: test)
+    }
+
+    /// Presses `button` and waits for focus to move, so the next press
+    /// starts from where this one went.
+    @MainActor
+    private func move(_ app: XCUIApplication, _ button: XCUIRemote.Button) {
+        app.press(button, thenWaitForFocusToMove: 2)
     }
 
     /// A poster's label holds its runtime ("A Lesser Moon, 2026 · 1 h 52 min").
@@ -49,10 +49,7 @@ final class LetterIndexTests: XCTestCase {
     /// Down from the tab bar onto the grid's first row.
     @MainActor
     private func focusGrid(_ app: XCUIApplication) {
-        for _ in 0..<4 where !Self.isPoster(focusedButton(app).label) {
-            remote.press(.down)
-            _ = focus(app, timeout: 2) { _ in true }
-        }
+        for _ in 0..<4 where !Self.isPoster(focusedButton(app).label) { move(app, .down) }
         XCTAssertTrue(focus(app, where: Self.isPoster), "Down from the tab bar reaches the grid")
     }
 
@@ -67,27 +64,21 @@ final class LetterIndexTests: XCTestCase {
     @MainActor
     func testTheIndexJumpsToALetterAndMenuGoesBack() {
         let app = launch()
-        XCTAssertTrue(app.otherElements["letter-index"].waitForExistence(timeout: 10) || app.buttons["letter-A"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.otherElements["letter-index"].waitUntilExists(timeout: 10) || app.buttons["letter-A"].waitUntilExists(timeout: 10))
         XCTAssertFalse(app.buttons["letter-X"].isEnabled, "no title starts with X: dimmed and passed over")
         focusGrid(app)
         shot("Grid sorted by title, the index at the right")
         // Right along the first row; from its last column into the index.
-        for _ in 0..<8 where !focusedButton(app).identifier.hasPrefix("letter-") {
-            remote.press(.right)
-            _ = focus(app, timeout: 2) { _ in true }
-        }
+        for _ in 0..<8 where !focusedButton(app).identifier.hasPrefix("letter-") { move(app, .right) }
         let a = app.buttons["letter-A"]
         XCTAssertTrue(focused(a), "the index takes focus at the poster's letter")
         XCTAssertTrue(app.otherElements["letter-bubble"].exists || app.staticTexts["Select or swipe left to go there"].exists, "the bubble says what the letter holds")
 
         // Down to W, beyond the first page, passing X going on to Y.
         let target = "W"
-        for _ in 0..<30 where !app.buttons["letter-\(target)"].hasFocus {
-            remote.press(.down)
-            _ = focus(app, timeout: 2) { _ in true }
-        }
+        for _ in 0..<30 where !app.buttons["letter-\(target)"].hasFocus { move(app, .down) }
         XCTAssertTrue(focused(app.buttons["letter-\(target)"]))
-        XCTAssertTrue(app.staticTexts["Select or swipe left to go there"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Select or swipe left to go there"].waitUntilExists(timeout: 5))
         shot("Index focused on W")
         remote.press(.select)
         XCTAssertTrue(focus(app, timeout: 15) { $0.hasPrefix("Wyn") }, "Select lands on W's first title")
@@ -111,10 +102,7 @@ final class LetterIndexTests: XCTestCase {
     func testLeftFromTheIndexLandsOnTheLettersFirstTitle() {
         let app = launch()
         focusGrid(app)
-        for _ in 0..<8 where !focusedButton(app).identifier.hasPrefix("letter-") {
-            remote.press(.right)
-            _ = focus(app, timeout: 2) { _ in true }
-        }
+        for _ in 0..<8 where !focusedButton(app).identifier.hasPrefix("letter-") { move(app, .right) }
         XCTAssertTrue(focused(app.buttons["letter-A"]))
         remote.press(.down)
         XCTAssertTrue(focused(app.buttons["letter-B"]))

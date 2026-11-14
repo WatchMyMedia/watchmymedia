@@ -186,8 +186,10 @@ arrows move focus, Return selects, Escape is Menu, and a long press is
 Return held down. `apple/TVUITests` drives the remote in XCUITest on the
 fakes (where focus lands, the long-press menus, Menu going back, and the
 player's Next Episode card, Still watching and stop and can't-play states)
-and runs with the rest in `make apple-tv-test-sim`. XCUI does not see
-AVKit's contextual actions, so Skip is checked by hand.
+and runs with the rest in `make apple-tv-test-sim`. Its waits are in
+`TVUITests/Waiting.swift`: XCTest's own look a second late, and they add up
+over a test of many presses. XCUI does not see AVKit's contextual actions,
+so Skip is checked by hand.
 
 Sorted by title, the Apple TV grid has a letter index down its right edge
 (TvLibraryAZ.dc.html, PLAN-APPLE-REVIEW.md §6.2): right from the last column

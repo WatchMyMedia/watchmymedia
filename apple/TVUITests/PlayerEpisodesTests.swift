@@ -21,14 +21,12 @@ final class PlayerEpisodesTests: XCTestCase {
 
     @MainActor
     private func focused(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
-        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hasFocus == true"), object: element)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+        element.waitForFocus(timeout: timeout)
     }
 
     @MainActor
     private func says(_ element: XCUIElement, _ text: String, timeout: TimeInterval = 10) -> Bool {
-        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", text), object: element)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+        element.waitForLabel(containing: text, timeout: timeout)
     }
 
     @MainActor
@@ -43,7 +41,7 @@ final class PlayerEpisodesTests: XCTestCase {
     func testTheTabOpensOnTheEpisodePlayingAndRightIsTheNextOne() {
         let app = play()
         let playing = app.buttons["player-episode-7"]
-        XCTAssertTrue(playing.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(playing.waitUntilExists(timeout: 20), app.debugDescription)
         XCTAssertTrue(focused(playing), "focus starts on the one playing")
         XCTAssertTrue(playing.label.contains("now playing"), playing.label)
         let line = app.staticTexts["player-episodes-focus-line"]
@@ -63,12 +61,12 @@ final class PlayerEpisodesTests: XCTestCase {
     func testUpReachesTheSeasonsAndFocusChoosesOne() {
         let app = play()
         let playing = app.buttons["player-episode-7"]
-        XCTAssertTrue(playing.waitForExistence(timeout: 20))
+        XCTAssertTrue(playing.waitUntilExists(timeout: 20))
         XCTAssertTrue(focused(playing))
         remote.press(.up)
         let season3 = app.buttons["player-season-3"]
         let season2 = app.buttons["player-season-2"]
-        XCTAssertTrue(season2.waitForExistence(timeout: 10))
+        XCTAssertTrue(season2.waitUntilExists(timeout: 10))
         // Up lands on the season button nearest the card; move to Season 2 from there.
         for _ in 0..<3 where !season2.hasFocus { remote.press(.left) }
         XCTAssertTrue(focused(season2))
@@ -76,7 +74,7 @@ final class PlayerEpisodesTests: XCTestCase {
         XCTAssertTrue(says(line, "Season 2 ·"), line.label)
         // The fakes' season 2 has episodes 4 to 8 on disk.
         let first = app.buttons["player-episode-4"]
-        XCTAssertTrue(first.waitForExistence(timeout: 10))
+        XCTAssertTrue(first.waitUntilExists(timeout: 10))
         XCTAssertFalse(app.buttons["player-episode-3"].exists, "only the episodes on disk")
         XCTAssertFalse(first.label.contains("now playing"))
         snap("tv-player-episodes-season")
@@ -93,7 +91,7 @@ final class PlayerEpisodesTests: XCTestCase {
     func testSelectPlaysAnotherEpisodeInPlace() {
         let app = play()
         let playing = app.buttons["player-episode-7"]
-        XCTAssertTrue(playing.waitForExistence(timeout: 20))
+        XCTAssertTrue(playing.waitUntilExists(timeout: 20))
         XCTAssertTrue(focused(playing))
         remote.press(.select)
         XCTAssertTrue(playing.label.contains("now playing"), "the one playing keeps playing")
@@ -104,15 +102,15 @@ final class PlayerEpisodesTests: XCTestCase {
         XCTAssertTrue(says(next, "now playing"), next.label)
         XCTAssertFalse(playing.label.contains("now playing"))
         remote.press(.menu)
-        XCTAssertTrue(next.waitForNonExistence(timeout: 5), "Back closes the tab")
-        XCTAssertTrue(app.staticTexts["S03 E08 · Squall Line"].waitForExistence(timeout: 10), "and the chosen episode plays")
+        XCTAssertTrue(next.waitUntilGone(timeout: 5), "Back closes the tab")
+        XCTAssertTrue(app.staticTexts["S03 E08 · Squall Line"].waitUntilExists(timeout: 10), "and the chosen episode plays")
     }
 
     @MainActor
     func testPlayPausePlaysTheFocusedEpisode() {
         let app = play()
         let playing = app.buttons["player-episode-7"]
-        XCTAssertTrue(playing.waitForExistence(timeout: 20))
+        XCTAssertTrue(playing.waitUntilExists(timeout: 20))
         XCTAssertTrue(focused(playing))
         remote.press(.left)
         let earlier = app.buttons["player-episode-6"]
@@ -126,7 +124,7 @@ final class PlayerEpisodesTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-fakes", "-open", "watchmymedia://play/9900", "-playerPanel", "episodes"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["Playing"].waitForExistence(timeout: 20) || app.staticTexts["Paused"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Playing"].waitUntilExists(timeout: 20) || app.staticTexts["Paused"].waitUntilExists(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["player-episodes-tab"].exists)
     }
 }

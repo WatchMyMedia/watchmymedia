@@ -10,12 +10,8 @@ final class ListPageKeysTests: XCTestCase {
     override func setUp() async throws { continueAfterFailure = false }
 
     @MainActor
-    private func focus(_ app: XCUIApplication, timeout: TimeInterval = 10, where test: @escaping (String) -> Bool) -> Bool {
-        let done = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            let element = app.buttons.matching(NSPredicate(format: "hasFocus == true")).firstMatch
-            return element.exists && test(element.label)
-        }, object: nil)
-        return XCTWaiter().wait(for: [done], timeout: timeout) == .completed
+    private func focus(_ app: XCUIApplication, timeout: TimeInterval = 10, where test: (String) -> Bool) -> Bool {
+        app.waitForFocusedButton(timeout: timeout, where: test)
     }
 
     @MainActor
@@ -23,7 +19,7 @@ final class ListPageKeysTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-fakes", "-fakesRows", "-open", "watchmymedia://lists/9001"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["Top rated science fiction"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.staticTexts["Top rated science fiction"].waitUntilExists(timeout: 20))
         // Down into the grid, then left to the first column.
         let focused = app.buttons.matching(NSPredicate(format: "hasFocus == true")).firstMatch
         for _ in 0..<5 where !(focused.exists && focused.frame.minY > 200) {

@@ -21,8 +21,7 @@ final class DiagnosticsTests: XCTestCase {
 
     @MainActor
     private func focused(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
-        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hasFocus == true"), object: element)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+        element.waitForFocus(timeout: timeout)
     }
 
     @MainActor
@@ -37,7 +36,7 @@ final class DiagnosticsTests: XCTestCase {
     func testTheRowSaysNothingIsSent() {
         let app = launch()
         let row = app.buttons["settings-diagnostics"]
-        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        XCTAssertTrue(row.waitUntilExists(timeout: 20))
         XCTAssertTrue(row.label.contains("Diagnostics"))
         XCTAssertTrue(app.staticTexts["Nothing is sent from this Apple TV. No account, server address or titles are included."].exists)
         // Down the right-hand column, past the devices and About, to Diagnostics.
@@ -48,38 +47,38 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertTrue(focused(row), "Down the right-hand column reaches Diagnostics")
         shot("Diagnostics row focused")
         remote.press(.select)
-        XCTAssertTrue(app.buttons["diagnostics-done"].waitForExistence(timeout: 10), "Select opens the code")
+        XCTAssertTrue(app.buttons["diagnostics-done"].waitUntilExists(timeout: 10), "Select opens the code")
     }
 
     @MainActor
     func testALongLogIsCutToFitAndShownInPages() {
         let app = launch(["-diagnostics", "-diagnosticsLog"])
         let done = app.buttons["diagnostics-done"]
-        XCTAssertTrue(done.waitForExistence(timeout: 20))
+        XCTAssertTrue(done.waitUntilExists(timeout: 20))
         let summary = app.staticTexts["diagnostics-summary"]
         XCTAssertTrue(summary.label.contains("more log lines in the code"), summary.label)
         XCTAssertFalse(summary.label.contains("192.168.1.20"))
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH %@", "Plain text · ")).firstMatch.exists)
         shot("Diagnostics code, a long log")
+        XCTAssertTrue(focused(done), "Done holds the focus")
         remote.press(.right)
+        XCTAssertTrue(focused(app.buttons["diagnostics-show-text"]))
         remote.press(.select)
         let line = app.staticTexts["diagnostics-page"]
-        XCTAssertTrue(line.waitForExistence(timeout: 10))
+        XCTAssertTrue(line.waitUntilExists(timeout: 10))
         XCTAssertTrue(line.label.hasPrefix("Page 1 of "), line.label)
         let text = app.staticTexts["diagnostics-text"]
         XCTAssertTrue(text.label.contains("<address>"), "the made-up address is redacted")
         XCTAssertFalse(text.label.contains("192.168.1.20"))
         shot("Diagnostics as text, page 1")
         remote.press(.down)
-        let next = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label BEGINSWITH %@", "Page 2 of"), object: line)
-        XCTAssertEqual(XCTWaiter().wait(for: [next], timeout: 5), .completed, "Down turns the page")
+        XCTAssertTrue(line.wait(until: NSPredicate(format: "label BEGINSWITH %@", "Page 2 of"), timeout: 5), "Down turns the page")
         shot("Diagnostics as text, page 2")
         remote.press(.up)
-        let back = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label BEGINSWITH %@", "Page 1 of"), object: line)
-        XCTAssertEqual(XCTWaiter().wait(for: [back], timeout: 5), .completed, "Up turns it back")
+        XCTAssertTrue(line.wait(until: NSPredicate(format: "label BEGINSWITH %@", "Page 1 of"), timeout: 5), "Up turns it back")
         XCTAssertTrue(app.buttons["diagnostics-text-done"].hasFocus)
         remote.press(.select)
-        XCTAssertTrue(app.buttons["settings-diagnostics"].waitForExistence(timeout: 5), "Done closes it")
+        XCTAssertTrue(app.buttons["settings-diagnostics"].waitUntilExists(timeout: 5), "Done closes it")
         XCTAssertFalse(done.exists)
     }
 
@@ -87,7 +86,7 @@ final class DiagnosticsTests: XCTestCase {
     func testTheCodeShowsWhatItHoldsWithoutTheServerOrAccount() {
         let app = launch(["-diagnostics"])
         let done = app.buttons["diagnostics-done"]
-        XCTAssertTrue(done.waitForExistence(timeout: 20))
+        XCTAssertTrue(done.waitUntilExists(timeout: 20))
         XCTAssertTrue(focused(done), "Done holds the focus")
         XCTAssertTrue(app.otherElements["diagnostics-code"].exists || app.images["diagnostics-code"].exists || app.descendants(matching: .any)["diagnostics-code"].exists)
         let summary = app.staticTexts["diagnostics-summary"]
@@ -103,7 +102,7 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertTrue(focused(app.buttons["diagnostics-show-text"]))
         remote.press(.select)
         let text = app.staticTexts["diagnostics-text"]
-        XCTAssertTrue(text.waitForExistence(timeout: 10), "Show as text")
+        XCTAssertTrue(text.waitUntilExists(timeout: 10), "Show as text")
         XCTAssertTrue(text.label.hasPrefix("WatchMyMedia diagnostics"))
         XCTAssertFalse(text.label.contains("192.168.1.20"))
         XCTAssertTrue(focused(app.buttons["diagnostics-text-done"]))
@@ -112,16 +111,15 @@ final class DiagnosticsTests: XCTestCase {
         let line = app.staticTexts["diagnostics-page"]
         if line.exists, line.label.hasPrefix("Page 1 of") {
             remote.press(.down)
-            let next = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label BEGINSWITH %@", "Page 2 of"), object: line)
-            XCTAssertEqual(XCTWaiter().wait(for: [next], timeout: 5), .completed, "Down turns the page")
+            XCTAssertTrue(line.wait(until: NSPredicate(format: "label BEGINSWITH %@", "Page 2 of"), timeout: 5), "Down turns the page")
             remote.press(.up)
         }
         // Menu goes back to the code, Done closes it.
         remote.press(.menu)
-        XCTAssertTrue(done.waitForExistence(timeout: 5), "Menu goes back to the code")
+        XCTAssertTrue(done.waitUntilExists(timeout: 5), "Menu goes back to the code")
         XCTAssertTrue(focused(done))
         remote.press(.select)
-        XCTAssertTrue(done.waitForNonExistence(timeout: 5), "Done closes it")
-        XCTAssertTrue(app.buttons["settings-diagnostics"].waitForExistence(timeout: 5))
+        XCTAssertTrue(done.waitUntilGone(timeout: 5), "Done closes it")
+        XCTAssertTrue(app.buttons["settings-diagnostics"].waitUntilExists(timeout: 5))
     }
 }

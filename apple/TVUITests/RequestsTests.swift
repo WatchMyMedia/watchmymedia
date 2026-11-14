@@ -74,7 +74,7 @@ final class RequestsTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-fakes", "-fakesSeerr", "-open", "watchmymedia://inbox"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["Requests are approved in Seerr"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Requests are approved in Seerr"].waitUntilExists(timeout: 15))
         XCTAssertTrue(app.buttons["Approve"].firstMatch.exists)
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.lifetime = .keepAlways
