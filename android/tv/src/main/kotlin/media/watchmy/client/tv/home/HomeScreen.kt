@@ -31,7 +31,9 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -478,7 +480,8 @@ private fun ArrangedHomeContent(
     val pager = rememberPagerState { pages.size }
     val available = liveChannels.filter { it.available }
     // The card each row last had focus on, by row id, so a page restores it (FocusMemory keeps only the last key overall).
-    val lastFocus = remember { mutableStateMapOf<String, String>() }
+    // Saved with the screen: after Back from a page, ▲ into a row left scrolled sideways finds its card again.
+    val lastFocus = rememberSaveable(saver = RowFocusSaver) { mutableStateMapOf<String, String>() }
     val heroKey = home.hero?.let { if (it.fileId != null) "hero:play" else "hero:open" }
     // The page Home is on or heading to: the one that holds focus (each page reports it), or one asked for that could not take focus yet.
     var goal by remember { mutableStateOf<PageGoal?>(null) }
@@ -639,6 +642,12 @@ private const val SCROLL_TRIES = 3
 
 /** Frames a page asked for is given to compose its cards before focus gives up on it. */
 private const val FOCUS_FRAMES = 10
+
+/** Saves each row's last focused card (row id to card key) with the screen. */
+private val RowFocusSaver = listSaver<SnapshotStateMap<String, String>, String>(
+    save = { map -> map.flatMap { (row, card) -> listOf(row, card) } },
+    restore = { saved -> mutableStateMapOf<String, String>().apply { saved.chunked(2).forEach { (row, card) -> put(row, card) } } },
+)
 
 private fun ContinueItem.open(onOpenShow: (Long) -> Unit, onOpenMovie: (Long) -> Unit) {
     when {

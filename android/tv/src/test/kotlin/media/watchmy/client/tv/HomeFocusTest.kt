@@ -137,6 +137,25 @@ class HomeFocusTest {
     }
 
     @Test
+    fun `A row keeps its card while a page opened from the next row comes and goes`() {
+        press(Key.DirectionDown)
+        press(Key.DirectionDown) // Live TV.
+        press(Key.DirectionRight)
+        val channel = focused()
+        press(Key.DirectionDown) // Recently added shows.
+        val show = focused()
+        press(Key.DirectionCenter)
+        assertNotEquals("The show page took focus", show, focused())
+
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+        assertEquals(show, focused())
+        press(Key.DirectionUp)
+        assertEquals("The Live row comes back to the channel it had before the show page opened", channel, focused())
+        assertFocusShowing("Row 2 of ")
+    }
+
+    @Test
     fun `Left or right pressed while the next row slides in moves along that row`() {
         press(Key.DirectionDown)
         press(Key.DirectionDown) // Live TV.
