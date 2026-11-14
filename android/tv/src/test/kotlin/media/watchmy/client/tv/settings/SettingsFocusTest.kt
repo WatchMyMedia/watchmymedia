@@ -12,9 +12,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
-import media.watchmy.client.fake.FakeAppServices
 import media.watchmy.client.fake.fakeLatencyMs
 import media.watchmy.client.tv.TvApp
+import media.watchmy.client.tv.quietTvFakes
 import media.watchmy.client.ui.LocalAppServices
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -38,8 +38,9 @@ class SettingsFocusTest {
     @Before
     fun start() {
         fakeLatencyMs = 0
+        val services = quietTvFakes()
         compose.setContent {
-            CompositionLocalProvider(LocalAppServices provides FakeAppServices(tv = true)) { TvApp() }
+            CompositionLocalProvider(LocalAppServices provides services) { TvApp() }
         }
         compose.waitForIdle()
         openSettings()
