@@ -33,6 +33,18 @@ import org.robolectric.annotation.Config
 class KeyboardKeysTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun `the keys Live TV takes`() {
+        assertEquals(KeyboardAction.TogglePlayPause, liveKeyboardAction(android.view.KeyEvent.KEYCODE_SPACE))
+        assertEquals(KeyboardAction.TogglePlayPause, liveKeyboardAction(android.view.KeyEvent.KEYCODE_K))
+        assertEquals(KeyboardAction.ChannelBy(1), liveKeyboardAction(android.view.KeyEvent.KEYCODE_PAGE_UP))
+        assertEquals(KeyboardAction.ChannelBy(1), liveKeyboardAction(android.view.KeyEvent.KEYCODE_CHANNEL_UP))
+        assertEquals(KeyboardAction.ChannelBy(-1), liveKeyboardAction(android.view.KeyEvent.KEYCODE_PAGE_DOWN))
+        assertEquals(KeyboardAction.ChannelBy(-1), liveKeyboardAction(android.view.KeyEvent.KEYCODE_CHANNEL_DOWN))
+        // No seeking in live TV: the arrows move focus.
+        assertNull(liveKeyboardAction(android.view.KeyEvent.KEYCODE_DPAD_LEFT))
+        assertNull(liveKeyboardAction(android.view.KeyEvent.KEYCODE_J))
+    }
+
     @Test fun `the keys the player takes`() {
         assertEquals(KeyboardAction.TogglePlayPause, keyboardAction(PlayerKey.PlayPause))
         assertEquals(KeyboardAction.SeekBy(-10_000), keyboardAction(PlayerKey.Left))

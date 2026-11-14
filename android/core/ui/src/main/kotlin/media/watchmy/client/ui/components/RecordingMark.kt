@@ -5,7 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -46,11 +46,12 @@ fun RecordingMarkBadge(mark: RecordingMark, modifier: Modifier = Modifier, size:
     val described = modifier.semantics { contentDescription = mark.label }
     when (glyph) {
         RecordingGlyph.Rec -> Row(
-            described.background(RecTag, RoundedCornerShape(4.dp)).height(size + 6.dp).padding(horizontal = 5.dp),
+            // At least its size, and taller with the font: REC was cut in half at font size 2.0.
+            described.background(RecTag, RoundedCornerShape(4.dp)).heightIn(min = size + 6.dp).padding(horizontal = 5.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(size / 2).background(Color.White, CircleShape))
-            Text("REC", color = Color.White, fontWeight = FontWeight.Bold, fontSize = textSize, letterSpacing = .06.em)
+            Text("REC", color = Color.White, fontWeight = FontWeight.Bold, fontSize = textSize, lineHeight = 1.15.em, letterSpacing = .06.em)
         }
         else -> Canvas(described.size(size)) {
             val radius = this.size.minDimension / 2

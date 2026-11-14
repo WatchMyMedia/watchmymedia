@@ -23,6 +23,10 @@ class DeepLinkTest {
         assertEquals(DeepLink.LinkTv(null), DeepLink.parse("watchmymedia://link?code="))
         // Keys are decoded too (the phone used to decode only values).
         assertEquals(DeepLink.Show(100, 2), DeepLink.parse("watchmymedia://shows/100?%73eason=2"))
+        // The phone launcher's shortcuts.
+        assertEquals(DeepLink.Search, DeepLink.open("watchmymedia://search", null))
+        assertEquals(DeepLink.Downloads, DeepLink.open("watchmymedia://downloads", null))
+        assertEquals(DeepLink.LiveGuide, DeepLink.open("watchmymedia://live", null))
     }
 
     @Test fun `ignores anything else`() {

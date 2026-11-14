@@ -56,6 +56,10 @@ fun MobileApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
         DeepLink.open(deepLink, watchNextAccount(services.servers.current.value?.server, services.auth.user.value))?.let { pending = it }
     }
     val layout = rememberTabletLayout()
+    val accounts = rememberAccountStores()
+    val signedIn = server != null && user != null
+    // Signed out: the last account's ViewModels go now, not when the next one signs in.
+    LaunchedEffect(signedIn) { if (!signedIn) accounts.leave() }
     LightSystemBarIcons()
 
     WatchMyMediaPhoneTheme {
@@ -88,14 +92,16 @@ fun MobileApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
                     onLinkTv = { if (pending !is DeepLink.LinkTv) pending = DeepLink.LinkTv(null) },
                 )
                 else -> {
-                    // A different server or account starts the signed-in screens afresh, releasing its player.
+                    // A different server or account starts the signed-in screens afresh, with ViewModels of its own, releasing its player.
                     key(current.server.id, user) {
-                        MobileNavHost(
-                            onSwitchServer = { picking = true },
-                            onSignedOut = { pending = null },
-                            deepLink = pending,
-                            onDeepLinkHandled = { pending = null },
-                        )
+                        AccountViewModels(accounts, current.server.id to user) {
+                            MobileNavHost(
+                                onSwitchServer = { picking = true },
+                                onSignedOut = { pending = null },
+                                deepLink = pending,
+                                onDeepLinkHandled = { pending = null },
+                            )
+                        }
                     }
                     if (picking) {
                         Surface(Modifier.fillMaxSize(), color = WmmColors.Ground) {

@@ -14,6 +14,13 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
+import media.watchmy.client.mobile.player.PipAction
+import media.watchmy.client.mobile.player.PipButton
 import androidx.lifecycle.Lifecycle
 import androidx.media3.common.Player
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -157,6 +164,58 @@ class LivePlayerScreenTest {
         }
         compose.onNodeWithText("a recording needs this tuner", substring = true).assertExists()
         compose.onNodeWithText("Don’t record it").assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a keyboard changes channel with Page Up and Page Down and pauses with Space, as the file player's shell does`() {
+        open()
+        compose.onRoot().performKeyInput { pressKey(Key.PageUp) }
+        compose.runOnIdle { assertEquals(FakeLiveChannels[1], controller.state.value.target?.channel) }
+        compose.onRoot().performKeyInput { pressKey(Key.PageDown) }
+        compose.runOnIdle { assertEquals(FakeLiveChannels[0], controller.state.value.target?.channel) }
+        compose.onRoot().performKeyInput { pressKey(Key.Spacebar) }
+        compose.runOnIdle { assertEquals(PlayerStatus.Paused, controller.state.value.status) }
+    }
+
+    @Test
+    fun `sideways the controls hide 3 s after they show, and stay up in portrait`() {
+        open()
+        compose.mainClock.advanceTimeBy(3_500)
+        compose.onNodeWithContentDescription("Pause live TV").assertExists()
+
+        compose.runOnIdle { configuration.value = Configuration(configuration.value).apply { screenWidthDp = 891; screenHeightDp = 411 } }
+        compose.onNodeWithContentDescription("Pause live TV").assertExists()
+        compose.mainClock.advanceTimeBy(3_500)
+        compose.onNodeWithContentDescription("Pause live TV").assertDoesNotExist()
+    }
+
+    @Test
+    fun `in picture in picture the window shows the channel's tag and none of the controls`() {
+        open()
+        compose.runOnUiThread { compose.activity.onPictureInPictureModeChanged(true, Configuration(compose.activity.resources.configuration)) }
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Pause live TV").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Back to channels").assertDoesNotExist()
+        compose.onNodeWithText(FakeLiveChannels[0].number).assertExists()
+
+        compose.runOnUiThread { compose.activity.onPictureInPictureModeChanged(false, Configuration(compose.activity.resources.configuration)) }
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Pause live TV").assertExists()
+    }
+
+    @Test
+    fun `the picture-in-picture window's buttons change channel and pause, named for where they go`() {
+        assertEquals(
+            listOf(
+                PipButton(PipAction.ChannelDown, "Previous channel, 2.1"),
+                PipButton(PipAction.PlayPause, "Pause"),
+                PipButton(PipAction.ChannelUp, "Next channel, 7.1"),
+            ),
+            livePipButtons("2.1", "7.1", playing = true),
+        )
+        assertEquals("Play", livePipButtons(null, null, playing = false)[1].title)
+        assertEquals("Next channel", livePipButtons(null, null, playing = false)[2].title)
     }
 
     private class RecordingController : LivePlaybackController {

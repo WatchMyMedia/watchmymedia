@@ -75,6 +75,9 @@ android {
             signingConfig = signingConfigs.findByName("upload")
         }
     }
+    // ShortcutsTest reads res/xml/shortcuts.xml, as the other modules' tests read their resources.
+    testOptions { unitTests.isIncludeAndroidResources = true }
+
     buildFeatures {
         buildConfig = true
     }

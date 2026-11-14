@@ -192,7 +192,8 @@ fun MobileBottomBar(selected: MobileTab?, onSelect: (MobileTab) -> Unit, setting
                         }
                     },
                     modifier = if (tab == MobileTab.Settings && settingsCount > 0) Modifier.semantics { contentDescription = "Settings, $settingsCount in the Inbox" } else Modifier,
-                    label = { Text(tab.label, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.sp), maxLines = 1) },
+                    // At a large font size five labels can't fit: they end in an ellipsis rather than being cut off.
+                    label = { Text(tab.label, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.sp), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = WmmColors.Accent,
                         selectedTextColor = WmmColors.Text,

@@ -31,6 +31,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
@@ -133,7 +135,10 @@ private fun Scrubber(
     val bands = remember(segments, durationMs) { scrubberBands(segments, durationMs) }
     val currentDrag by rememberUpdatedState(onDrag)
     val currentSeek by rememberUpdatedState(onSeek)
+    val currentSegments by rememberUpdatedState(segments)
     var lastDragMs by remember { mutableLongStateOf(0L) }
+    // A tick as the drag takes hold, and a lighter one at each edge of an intro or credits band (§6.3).
+    val haptics = LocalHapticFeedback.current
     Canvas(
         modifier
             .semantics {
@@ -151,12 +156,15 @@ private fun Scrubber(
             .pointerInput(durationMs) {
                 detectHorizontalDragGestures(
                     onDragStart = {
+                        haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
                         lastDragMs = positionAt(it.x, size.width.toFloat(), durationMs)
                         currentDrag(lastDragMs)
                     },
                     onHorizontalDrag = { change, _ ->
                         change.consume()
-                        lastDragMs = positionAt(change.position.x, size.width.toFloat(), durationMs)
+                        val next = positionAt(change.position.x, size.width.toFloat(), durationMs)
+                        if (crossesSegmentEdge(currentSegments, lastDragMs, next)) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                        lastDragMs = next
                         currentDrag(lastDragMs)
                     },
                     onDragEnd = {
@@ -208,4 +216,12 @@ internal fun MiniProgress(progress: () -> PlaybackProgress, modifier: Modifier =
         }
         Text(formatClock(durationMs), style = PlayerType.MiniTime)
     }
+}
+
+/** Whether a drag from [fromMs] to [toMs] passes the start or end of one of [segments]: where the scrubber ticks. */
+internal fun crossesSegmentEdge(segments: List<Segment>, fromMs: Long, toMs: Long): Boolean {
+    if (fromMs == toMs) return false
+    // Past [fromMs] and up to [toMs], either way: an edge the drag sits on isn't crossed again.
+    val passed = if (toMs > fromMs) (fromMs + 1)..toMs else toMs until fromMs
+    return segments.any { s -> listOfNotNull(s.startMs, s.endMs).any { it in passed } }
 }

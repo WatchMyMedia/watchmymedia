@@ -60,7 +60,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-            <!-- watchmymedia://play/{fileId}, watchmymedia://shows/{id}, watchmymedia://movies/{id}, watchmymedia://link?code= -->
+            <!-- Search, Live TV and Downloads on a long press of the phone launcher's icon. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+            <!-- watchmymedia://play/{fileId}, watchmymedia://shows/{id}, watchmymedia://movies/{id}, watchmymedia://link?code=,
+                 and the shortcuts' watchmymedia://search, watchmymedia://live and watchmymedia://downloads -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
