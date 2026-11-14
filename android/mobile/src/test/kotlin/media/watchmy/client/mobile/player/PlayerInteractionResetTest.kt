@@ -74,13 +74,14 @@ class PlayerInteractionResetTest {
                 }
             }
         }
-        compose.onNodeWithTag("video").performTouchInput { click(center) }
+        // At the side, where a tap waits to see whether it is a double tap (the middle doesn't wait).
+        compose.onNodeWithTag("video").performTouchInput { click(centerLeft) }
         compose.runOnIdle { assertEquals(emptyList<Long>(), taps); file.longValue = 2L }
         compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()
         settleTap()
         compose.runOnIdle { assertEquals(emptyList<Long>(), taps) }
-        compose.onNodeWithTag("video").performTouchInput { click(center) }
+        compose.onNodeWithTag("video").performTouchInput { click(centerLeft) }
         settleTap()
         compose.runOnIdle { assertEquals(listOf(2L), taps) }
     }

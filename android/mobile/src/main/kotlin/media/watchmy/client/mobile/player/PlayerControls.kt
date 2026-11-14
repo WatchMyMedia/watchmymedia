@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -63,6 +65,8 @@ internal class ControlsActions(
     val onToggleRotationLock: () -> Unit,
     val onPlayNext: () -> Unit,
     val onEpisodes: (() -> Unit)? = null,
+    /** Fit or fill (PlayerFitFill), offered when the picture isn't the screen's shape. */
+    val onToggleFill: (() -> Unit)? = null,
 )
 
 /**
@@ -82,6 +86,7 @@ internal fun PlayerControls(
     remote: Boolean = false,
     portrait: Boolean = false,
     rotationLockWorks: Boolean = true,
+    filled: Boolean = false,
 ) {
     var scrubbing by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
@@ -93,7 +98,7 @@ internal fun PlayerControls(
         // Clear of the system bars, which show while this is a remote (and take no room while hidden), and of the camera cutout.
         Box(Modifier.fillMaxSize().windowInsetsPadding(playerControlsInsets)) {
             // What each part shows, rather than the whole state, so the countdowns skip them.
-            TopBar(state.title, state.subtitle, streamChip(state.tracks), rotationLocked, actions, remote, rotationLockWorks, state.canCast)
+            TopBar(state.title, state.subtitle, streamChip(state.tracks), rotationLocked, actions, remote, rotationLockWorks, state.canCast, filled)
             if (!(scrubbing && state.trickplay != null)) Transport(state.status, actions, Modifier.align(Alignment.Center))
             ScrubberRow(
                 progress = progress,
@@ -123,7 +128,7 @@ private fun GrowingRecording(progress: () -> PlaybackProgress, onSeekTo: (Long) 
 }
 
 @Composable
-private fun BoxScope.TopBar(title: String, subtitle: String?, chip: String?, rotationLocked: Boolean, actions: ControlsActions, remote: Boolean, rotationLockWorks: Boolean, canCast: Boolean) {
+private fun BoxScope.TopBar(title: String, subtitle: String?, chip: String?, rotationLocked: Boolean, actions: ControlsActions, remote: Boolean, rotationLockWorks: Boolean, canCast: Boolean, filled: Boolean) {
     Row(
         Modifier.align(Alignment.TopStart).fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -135,6 +140,7 @@ private fun BoxScope.TopBar(title: String, subtitle: String?, chip: String?, rot
             subtitle?.let { Text(it, style = PlayerType.Subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
         chip?.let { StreamChip(it, Modifier.padding(end = 6.dp)) }
+        actions.onToggleFill?.let { FillButton(filled, it) }
         actions.onPictureInPicture?.let { RoundButton(PlayerIcons.PictureInPicture, "Picture in picture", it, iconSize = 22.dp) }
         if (canCast) CastButton(overArt = true)
         // A remote follows the phone's own rotation; a large screen on Android 16 turns as the system says.
@@ -159,6 +165,26 @@ private fun StreamChip(text: String, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = PlayerType.Chip, maxLines = 1)
+    }
+}
+
+/** Fill, on while the picture fills the screen: a switch on a 48 dp target around the 28 dp chip. */
+@Composable
+private fun FillButton(filled: Boolean, onToggle: () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
+    Box(
+        Modifier.minimumInteractiveComponentSize().toggleable(value = filled, role = Role.Switch, onValueChange = { onToggle() }),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier.heightIn(min = 28.dp)
+                .background(if (filled) PlayerColors.Light else Color.Black.copy(alpha = 0.45f), shape)
+                .border(1.dp, Color.White.copy(alpha = if (filled) 0f else 0.14f), shape)
+                .padding(horizontal = 10.dp, vertical = 2.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("Fill", style = PlayerType.Chip.copy(color = if (filled) WmmColors.Ground else PlayerType.Chip.color, fontWeight = FontWeight.SemiBold), maxLines = 1)
+        }
     }
 }
 

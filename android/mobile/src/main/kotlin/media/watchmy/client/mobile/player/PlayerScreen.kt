@@ -34,13 +34,16 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toAndroidRect
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -173,6 +176,15 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
     var rotationLocked by remember { mutableStateOf(false) }
     var exitAfterMessage by remember(playingFileId, selection) { mutableStateOf(false) }
     var videoBounds by remember { mutableStateOf<android.graphics.Rect?>(null) }
+    // Fit or fill (PlayerFitFill): kept for the rest of the play, and said for a moment on each switch.
+    var fill by rememberSaveable { mutableStateOf(false) }
+    var fillNote by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(fillNote) {
+        if (fillNote != null) {
+            delay(FILL_NOTE_MS)
+            fillNote = null
+        }
+    }
     val seek = rememberSeekForFile(playingFileId, selection.generation)
     var ripple by remember(playingFileId, selection) { mutableStateOf<SeekBurst?>(null) }
     var rippleShown by remember(playingFileId, selection) { mutableStateOf(false) }
@@ -305,6 +317,16 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
     ) {
         val portrait = tablet && maxHeight > maxWidth && !inPip
         val videoHeight = maxWidth * 9 / 16
+        val crop = fillCrop(presentation?.videoSizeDp?.width, presentation?.videoSizeDp?.height, maxWidth.value, maxHeight.value)
+        val fillOffered = local && !portrait && !inPip && offersFill(crop)
+        val filling = fill && fillOffered
+        val setFill = { on: Boolean ->
+            if (fillOffered && on != fill) {
+                input()
+                fill = on
+                fillNote = fitFillNote(on, crop ?: 0f)
+            }
+        }
         Column(Modifier.fillMaxSize()) {
             Box(
                 Modifier
@@ -317,6 +339,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                     VideoLayer(
                         player = player,
                         coverSurface = presentation?.coverSurface ?: true,
+                        fill = filling,
                         videoSize = presentation?.videoSizeDp,
                         backdropUrl = library.imageUrl(state.backdropPath, ImageSize.W1280),
                         seed = state.title.ifEmpty { request.title },
@@ -351,6 +374,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                         ripple = seek.burst
                         rippleShown = true
                     },
+                    onPinch = setFill.takeIf { fillOffered },
                 )
                 val shownRipple = ripple
                 androidx.compose.animation.AnimatedVisibility(
@@ -371,6 +395,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                             portrait = portrait,
                             rotationLocked = rotationLocked,
                             rotationLockWorks = rotationLockWorks,
+                            filled = filling,
                             actions = ControlsActions(
                                 onBack = { leave(stop = true) },
                                 onTogglePlay = { act { togglePlayPause() } },
@@ -395,6 +420,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                                 },
                                 onPlayNext = { act { playNext() } },
                                 onEpisodes = if (tablet && (episodes.season != null || episodes.error != null)) { { input(); showEpisodes = true } } else null,
+                                onToggleFill = { setFill(!fill) }.takeIf { fillOffered },
                             ),
                         )
                     }
@@ -412,6 +438,15 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                     exit = fadeOut(),
                 ) {
                     note?.let { AutoNote(it) }
+                }
+                val shownFillNote = latest(fillNote)
+                androidx.compose.animation.AnimatedVisibility(
+                    fillNote != null && picker == null && !showEpisodes,
+                    Modifier.align(Alignment.TopCenter).padding(top = if (state.note != null) 124.dp else 76.dp, start = 16.dp, end = 16.dp),
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    shownFillNote?.let { PlayerNote(it) }
                 }
 
                 val upNext = latest(state.upNext)
@@ -501,6 +536,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
 private fun VideoLayer(
     player: Player?,
     coverSurface: Boolean,
+    fill: Boolean,
     videoSize: androidx.compose.ui.geometry.Size?,
     backdropUrl: String?,
     seed: String,
@@ -515,7 +551,7 @@ private fun VideoLayer(
             PlayerSurface(
                 player,
                 Modifier
-                    .resizeWithContentScale(ContentScale.Fit, videoSize)
+                    .resizeWithContentScale(if (fill) ContentScale.Crop else ContentScale.Fit, videoSize)
                     .onGloballyPositioned { onBounds(it.boundsInWindow().toAndroidRect()) },
             )
         }
@@ -544,21 +580,48 @@ private fun PlayingOn(device: String, modifier: Modifier = Modifier) {
 /**
  * Taps on the video: a tap shows or hides the controls; a double tap on the
  * left or right seeks (see [DoubleTapSeek]), and further taps on that side
- * keep seeking without waiting for a double tap.
+ * keep seeking without waiting for a double tap. A tap in the middle, where
+ * a double tap doesn't seek, shows or hides the controls at once rather
+ * than after the double-tap wait (PLAN-ANDROID-REVIEW §6.3); a quick second
+ * tap there is taken as part of it. Pinching out fills the screen with the
+ * picture and pinching in fits it ([onPinch]: true to fill).
  */
 @Composable
-internal fun TouchLayer(seek: DoubleTapSeek, onTap: () -> Unit, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
+internal fun TouchLayer(seek: DoubleTapSeek, onTap: () -> Unit, onSeek: (Long) -> Unit, modifier: Modifier = Modifier, onPinch: ((Boolean) -> Unit)? = null) {
     val tap by rememberUpdatedState(onTap)
     val seekBy by rememberUpdatedState(onSeek)
+    val pinch by rememberUpdatedState(onPinch)
     key(seek) {
         Box(
-            modifier.fillMaxSize().pointerInput(seek) {
+            modifier.fillMaxSize().pointerInput(Unit) {
+                // Two fingers only, so a tap or a one-finger drag is left to the taps below.
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    var zoom = 1f
+                    do {
+                        val event = awaitPointerEvent()
+                        if (event.changes.count { it.pressed } >= 2) {
+                            zoom *= event.calculateZoom()
+                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                        }
+                    } while (event.changes.any { it.pressed })
+                    when {
+                        zoom > PINCH_FILL -> pinch?.invoke(true)
+                        zoom < 1 / PINCH_FILL -> pinch?.invoke(false)
+                    }
+                }
+            }.pointerInput(seek) {
                 awaitEachGesture {
                     awaitFirstDown()
                     val up = waitForUpOrCancellation() ?: return@awaitEachGesture
                     val width = size.width.toFloat()
                     seek.onTap(up.position.x, width, up.uptimeMillis)?.let {
                         seekBy(it)
+                        return@awaitEachGesture
+                    }
+                    if (seekZone(up.position.x, width) == SeekZone.None) {
+                        tap()
+                        withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) { awaitFirstDown() }?.let { waitForUpOrCancellation() }
                         return@awaitEachGesture
                     }
                     val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) { awaitFirstDown() }
@@ -574,6 +637,12 @@ internal fun TouchLayer(seek: DoubleTapSeek, onTap: () -> Unit, onSeek: (Long) -
         )
     }
 }
+
+/** How long the note after switching between fit and fill shows. */
+private const val FILL_NOTE_MS = 2_500L
+
+/** How far two fingers pinch, out or in, before the picture fills the screen or fits it. */
+private const val PINCH_FILL = 1.15f
 
 private class Last<T>(var value: T?)
 

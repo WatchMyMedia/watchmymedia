@@ -100,6 +100,23 @@ internal fun AutoNote(text: String, modifier: Modifier = Modifier) {
     }
 }
 
+/** A short note over the video, as Automatic's, with no icon: "Fit · the whole picture". */
+@Composable
+internal fun PlayerNote(text: String, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(18.dp)
+    Box(
+        modifier
+            .heightIn(min = 36.dp)
+            .shadow(12.dp, shape)
+            .background(WmmColors.Ground.copy(alpha = 0.86f), shape)
+            .border(1.dp, Color.White.copy(alpha = 0.14f), shape)
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = PlayerType.Note, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
 /**
  * The Next Episode card (PlayerNext.dc.html): the still, the episode, and
  * a button that fills as the countdown runs ("Next episode in 7"), or
