@@ -32,6 +32,7 @@ import media.watchmy.client.mobile.signin.SignInScreen
 import media.watchmy.client.model.DeepLink
 import media.watchmy.client.model.watchNextAccount
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.SessionViewModels
 import media.watchmy.client.ui.WatchMyMediaPhoneTheme
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.rememberTabletLayout
@@ -56,10 +57,6 @@ fun MobileApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
         DeepLink.open(deepLink, watchNextAccount(services.servers.current.value?.server, services.auth.user.value))?.let { pending = it }
     }
     val layout = rememberTabletLayout()
-    val accounts = rememberAccountStores()
-    val signedIn = server != null && user != null
-    // Signed out: the last account's ViewModels go now, not when the next one signs in.
-    LaunchedEffect(signedIn) { if (!signedIn) accounts.leave() }
     LightSystemBarIcons()
 
     WatchMyMediaPhoneTheme {
@@ -94,7 +91,7 @@ fun MobileApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
                 else -> {
                     // A different server or account starts the signed-in screens afresh, with ViewModels of its own, releasing its player.
                     key(current.server.id, user) {
-                        AccountViewModels(accounts, current.server.id to user) {
+                        SessionViewModels {
                             MobileNavHost(
                                 onSwitchServer = { picking = true },
                                 onSignedOut = { pending = null },

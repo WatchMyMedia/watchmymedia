@@ -15,11 +15,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import media.watchmy.client.tv.live.CastLivePlayer
-import media.watchmy.client.tv.navigation.SessionViewModels
 import media.watchmy.client.tv.navigation.TvNavHost
 import media.watchmy.client.tv.servers.ServerPickerScreen
 import media.watchmy.client.tv.signin.SignInScreen
 import media.watchmy.client.tv.player.PlayerScreen
+import media.watchmy.client.ui.SessionViewModels
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
