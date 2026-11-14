@@ -131,6 +131,7 @@ import androidx.compose.foundation.background
 import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.ReportShown
+import media.watchmy.client.ui.ShowsLiveChannels
 
 /**
  * Home. Arranged (servers that send `rows`): screens, one row each, paged
@@ -416,6 +417,7 @@ private fun LiveRow(
     counter: String? = null,
     onFocusItem: OnFocusItem? = null,
 ) {
+    ShowsLiveChannels()
     val available = liveChannels.filter { it.available }
     if (liveListings) {
         val now = rememberLiveNow()

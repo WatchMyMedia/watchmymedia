@@ -64,6 +64,7 @@ import media.watchmy.client.tv.search.SearchScreen
 import media.watchmy.client.tv.settings.SettingsScreen
 import media.watchmy.client.tv.rows.ListPageTv
 import media.watchmy.client.ui.rememberRequestBadge
+import media.watchmy.client.ui.LocalLiveChannelsShown
 
 /** Opens the player for [request]. */
 fun NavHostController.play(request: PlayRequest) =
@@ -112,15 +113,9 @@ fun TvNavHost(
     val services = media.watchmy.client.ui.LocalAppServices.current
     val liveModel = viewModel { LiveChannelsViewModel(services.live, services.servers, services.auth) }
     val live by liveModel.state.collectAsStateWithLifecycle()
+    // The channel list is polled only while a screen showing channels is on screen (§4.1.3).
+    val showChannels = remember(liveModel) { liveModel::showing }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(liveModel, lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                liveModel.refresh()
-                delay(30_000)
-            }
-        }
-    }
     val watchLive = { channel: LiveChannel ->
         liveModel.select(channel)
         nav.navigate(TvRoutes.LivePlayer(channel.id, channel.sourceId, channel.number, channel.name))
@@ -138,8 +133,8 @@ fun TvNavHost(
             services.live.personalChanges.collect { if (it == LivePersonalChange.Reminders) attempt { services.live.refreshReminders() } }
         }
     }
-    val reminders by services.live.reminders.collectAsStateWithLifecycle()
     val format = rememberLiveClockFormat()
+    val reminders by services.live.reminders.collectAsStateWithLifecycle()
     // Every 15 s while there are reminders to come: when the next one is due.
     val clock by produceState(System.currentTimeMillis(), reminders) {
         while (reminders?.items?.isNotEmpty() == true) {
@@ -176,7 +171,7 @@ fun TvNavHost(
         handled()
     }
     val badge by rememberRequestBadge(services.requests)
-    CompositionLocalProvider(LocalRequestBadge provides badge, LocalLiveTVAvailable provides live.available) {
+    CompositionLocalProvider(LocalRequestBadge provides badge, LocalLiveTVAvailable provides live.available, LocalLiveChannelsShown provides showChannels) {
         Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
             // The banner never takes focus: Hold OK watches and Back dismisses, before the screen sees them.
             banner != null && bannerKeys.handle(event.nativeKeyEvent.keyCode, event.type == KeyEventType.KeyDown, event.nativeKeyEvent.repeatCount)

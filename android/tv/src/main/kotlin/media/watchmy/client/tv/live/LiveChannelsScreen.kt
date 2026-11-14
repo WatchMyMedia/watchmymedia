@@ -54,6 +54,7 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.rememberLiveClockFormat
 import media.watchmy.client.ui.components.rememberLiveNow
+import media.watchmy.client.ui.ShowsLiveChannels
 
 /**
  * LiveGuide: with listings (API level 13 and `capabilities.guide`) the guide
@@ -73,6 +74,7 @@ fun LiveChannelsScreen(
     target: LiveGuideViewModel.Target? = null,
     onTargetShown: () -> Unit = {},
 ) {
+    ShowsLiveChannels()
     val memory = rememberFocusMemory()
     val grid = rememberLazyGridState()
     val reload = remember { FocusRequester() }

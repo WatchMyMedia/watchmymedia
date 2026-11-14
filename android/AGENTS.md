@@ -57,6 +57,9 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   screen calls `ReportShown(vm::setShown)` (core:ui) once, so a page under
   another one, or with the app in the background, reloads when next shown
   rather than with every event. Tests drive `libraryChanges`, not `changes`.
+- **Live TV polling.** The channel list is polled only while a screen that
+  shows channels is on screen: such a screen or row calls
+  `ShowsLiveChannels()` (core:ui) once. Nothing else polls it.
 - **Stored settings in tests.** `LocalStore` writes behind: a change is in
   memory at once and on disk a moment later. In `core:data` tests, write
   storage with `Harness.editStorage`, not `dataStore.edit`, and reopen with
