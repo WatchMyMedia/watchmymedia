@@ -9,7 +9,7 @@ import { HardwareSettings } from '../components/HardwareSettings'
 import { Panel, secondaryButton } from '../components/SettingsPanel'
 import { liveTVSetupPlan, type LiveSetupStep } from '../lib/liveTVSettingsRules'
 import { addFailedHint, draftBody, libraryLabel, libraryTypes, readDrafts, setupStep, sourcesNext, writeDrafts, type FolderDraft, type FolderDrafts, type LibraryType } from '../lib/setupRules'
-import { LiveTunerSetup } from './settings/LiveTV'
+import { SetupTuner } from './settings/liveTV/AddTuner'
 
 /**
  * First run accepts libraries, a tuner, or both. File-only setup steps stay with libraries.
@@ -119,8 +119,8 @@ export function Setup({ step: requested }: { step?: LiveSetupStep }) {
                 : liveSettings.isError ? <div role="alert" className="space-y-2 text-sm text-warn"><p>{liveSettings.error.message}</p><button type="button" onClick={() => void liveSettings.refetch()} className={secondaryButton}>Retry tuner settings</button></div>
                   : sources.length > 0 ? <>
                     {sources.map((source) => <p key={source.id} className="break-words text-sm text-emerald-400">✓ {source.name} — {source.device.model}{source.enabled ? '' : ' (disabled)'}</p>)}
-                    <p className="text-sm text-neutral-400">Tuner saved. Choose which channels to show and who can watch in Settings › Live TV.</p>
-                  </> : <LiveTunerSetup />}
+                    <p className="text-sm text-neutral-400">Tuner saved. Admins can watch for now. Choose who can watch, which channels show and guide listings in Settings › Live TV.</p>
+                  </> : <SetupTuner />}
             </div>
           </Panel>
           <div className="flex flex-wrap items-center gap-3">

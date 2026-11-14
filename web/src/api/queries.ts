@@ -332,6 +332,12 @@ export const liveTVGuideQuery = (start: number, hours: number) =>
     queryFn: async () => unwrap(await api.GET('/api/live-tv/guide', { params: { query: { start: new Date(start).toISOString(), hours } } })),
     staleTime: 5 * 60_000,
   })
+/** What removing a tuner would affect, for its dialog (admin). */
+export const liveTVSourceRemovalQuery = (id: string) => queryOptions({
+  queryKey: ['live-tv', 'source-removal', id],
+  queryFn: async () => unwrap(await api.GET('/api/settings/live-tv/sources/{id}/removal', { params: { path: { id } } })),
+  staleTime: 0,
+})
 export const liveTVGuideSettingsQuery = queryOptions({
   queryKey: ['live-tv', 'guide-settings'],
   queryFn: async () => unwrap(await api.GET('/api/settings/live-tv/guide')),
