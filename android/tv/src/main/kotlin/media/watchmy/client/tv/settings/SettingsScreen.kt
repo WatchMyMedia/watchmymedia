@@ -26,6 +26,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,7 +85,10 @@ import media.watchmy.client.presentation.settings.SettingsViewModel
 import media.watchmy.client.tv.components.BackClosesNote
 import media.watchmy.client.tv.components.ContentStart
 import media.watchmy.client.tv.components.FocusableBox
+import media.watchmy.client.tv.components.FocusMemory
 import media.watchmy.client.tv.components.InitialFocus
+import media.watchmy.client.tv.components.focusMemory
+import media.watchmy.client.tv.components.rememberFocusMemory
 import media.watchmy.client.tv.components.KeepInViewSpec
 import media.watchmy.client.tv.components.KeyboardDialog
 import media.watchmy.client.tv.components.LocalRequestBadge
@@ -163,6 +168,8 @@ fun SettingsScreen(
     var overlay by rememberSaveable { mutableStateOf<Overlay?>(null) }
     val first = remember { FocusRequester() }
     val rowsFocus = remember { FocusRequester() }
+    // The row focused last, kept with the screen: back from Your requests, or from another section, focus is where it was.
+    val memory = rememberFocusMemory()
     val density = LocalDensity.current
     val spec = remember(density) { with(density) { KeepInViewSpec(leading = 40.dp.toPx(), trailing = 40.dp.toPx()) } }
     val server = state.server?.server
@@ -170,7 +177,7 @@ fun SettingsScreen(
     val reminders = viewModel(key = "tv-reminder-settings") { LiveRemindersViewModel(services.live, services.servers) }
     val reminderState by reminders.state.collectAsStateWithLifecycle()
 
-    TvScaffold(RailSection.Settings, onNavigate) {
+    TvScaffold(RailSection.Settings, onNavigate) { CompositionLocalProvider(LocalSettingsFocus provides memory) {
         Column(Modifier.padding(start = ContentStart, top = 56.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Settings", style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
             Text(
@@ -235,9 +242,10 @@ fun SettingsScreen(
                                 "${index + 1}. ${subtitleLanguageLabel(tag, displayLocale)}",
                                 onClick = { languageList = LanguageList.Audio; editingLanguage = tag; overlay = Overlay.LanguageActions },
                                 modifier = if (index == 0) Modifier.focusRequester(audioFirst) else Modifier,
+                                focusKey = "audio:$tag",
                             ) { Value("Options", chevron = true) }
                         }
-                        SettingRow("Add language", onClick = { languageList = LanguageList.Audio; overlay = Overlay.AddLanguage }, modifier = Modifier.focusRequester(audioAdd)) { Value("", chevron = true) }
+                        SettingRow("Add language", onClick = { languageList = LanguageList.Audio; overlay = Overlay.AddLanguage }, modifier = Modifier.focusRequester(audioAdd), focusKey = "audio:add") { Value("", chevron = true) }
                         Note("Commentary and audio description are never chosen for you. You can pick them in the player.", color = WmmColors.TextFaint)
                     }
                     SettingRow("Start subtitles", onClick = { overlay = Overlay.SubtitleChoice }, description = "When a video starts", modifier = Modifier.padding(top = if (state.audioLanguagesAvailable) 16.dp else 0.dp)) {
@@ -258,9 +266,10 @@ fun SettingsScreen(
                             "${index + 1}. ${subtitleLanguageLabel(tag, displayLocale)}",
                             onClick = { languageList = LanguageList.Subtitles; editingLanguage = tag; overlay = Overlay.LanguageActions },
                             modifier = if (index == 0) Modifier.focusRequester(subtitleFirst) else Modifier,
+                            focusKey = "subtitles:$tag",
                         ) { Value("Options", chevron = true) }
                     }
-                    SettingRow("Add language", onClick = { languageList = LanguageList.Subtitles; overlay = Overlay.AddLanguage }, modifier = Modifier.focusRequester(subtitleAdd)) { Value("", chevron = true) }
+                    SettingRow("Add language", onClick = { languageList = LanguageList.Subtitles; overlay = Overlay.AddLanguage }, modifier = Modifier.focusRequester(subtitleAdd), focusKey = "subtitles:add") { Value("", chevron = true) }
                     val automatic = subtitles.automaticAvailable
                     val on = automatic && subtitles.automaticDownload
                     SettingRow(
@@ -338,11 +347,12 @@ fun SettingsScreen(
                     TvButton(
                         if (state.signingOut) "Signing out…" else "Sign out of this TV",
                         vm::signOut,
+                        Modifier.focusMemory(memory, "sign-out"),
                         style = TvButtonStyle.Primary,
                         size = TvButtonSize.Settings,
                         enabled = !state.signingOut,
                     )
-                    TvButton("Switch server", onSwitchServer, size = TvButtonSize.Settings)
+                    TvButton("Switch server", onSwitchServer, Modifier.focusMemory(memory, "switch-server"), size = TvButtonSize.Settings)
                 }
                 Section("About") {
                     AboutRow("Server", server?.let { "${it.name} · ${versionLabel(it.version)} · ${displayAddress(it.baseUrl)}" } ?: "Not chosen")
@@ -360,8 +370,12 @@ fun SettingsScreen(
             }
         }
         Notice(state.message, vm::messageShown)
+    } }
+    val opensOnRows = rowsScreen != null && (server?.apiLevel ?: 0) >= ROWS_API_LEVEL
+    LaunchedEffect(opensOnRows) {
+        withFrameNanos { }
+        if (!memory.restore(fallback = null)) (if (opensOnRows) rowsFocus else first).requestFocus()
     }
-    InitialFocus(if (rowsScreen != null && (server?.apiLevel ?: 0) >= ROWS_API_LEVEL) rowsFocus else first)
 
     when (overlay) {
         Overlay.Quality -> OptionsDialog(
@@ -516,9 +530,13 @@ internal fun SettingRow(
     minHeight: Dp = if (stacked) 88.dp else 68.dp,
     labelSize: Int = 21,
     labelColor: Color = WmmColors.Text,
+    /** Who the row is to Settings' focus memory; give rows that share a label keys of their own. */
+    focusKey: String = label,
     trailing: @Composable () -> Unit,
 ) {
-    FocusableBox(onClick = onClick, modifier = modifier.fillMaxWidth(), cornerRadius = 12.dp, focusedScale = 1f, ringOffset = (-4).dp) { focused ->
+    val memory = LocalSettingsFocus.current
+    val remembered = if (memory != null) Modifier.focusMemory(memory, focusKey) else Modifier
+    FocusableBox(onClick = onClick, modifier = modifier.then(remembered).fillMaxWidth(), cornerRadius = 12.dp, focusedScale = 1f, ringOffset = (-4).dp) { focused ->
         Row(
             Modifier
                 .fillMaxWidth()
@@ -542,6 +560,9 @@ internal fun SettingRow(
         }
     }
 }
+
+/** Settings' [FocusMemory], which every [SettingRow] registers with. */
+internal val LocalSettingsFocus = staticCompositionLocalOf<FocusMemory?> { null }
 
 /** A row that TalkBack reads as a switch, on or off, and dimmed when it can't change. */
 private fun Modifier.switch(on: Boolean, enabled: Boolean = true): Modifier = semantics {
