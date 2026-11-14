@@ -19,6 +19,10 @@ make apple-api        # after `make gen-api`: regenerate Kit/Sources/WMMAPI/Gene
 make apple-e2e        # the app end to end against a server (default: the fixture server at localhost:27588)
 make apple-tv-build   # build the Apple TV app for the simulator
 make apple-tv-test-sim # build it and run every test on the Apple TV 4K simulator (TV_SIM=… for another)
+make apple-tv-test-sim-ci # what CI runs: one build, then the Kit's tests and the UI tests apart; CI's two jobs pass TV_UI_SHARD=1/2 and 2/2 (TV_KIT_TESTS=no) to share the UI test classes
+make apple-build-release    # the iPhone app in Release for devices, unsigned, then check-release-binary.sh (CI runs it)
+make apple-tv-build-release # the same for the Apple TV app
+make apple-perf       # launch and scrolling measures on SIM and TV_SIM, five runs each (not in CI)
 ```
 
 The Apple TV app needs the tvOS simulator runtime too
@@ -66,7 +70,12 @@ reach any screen for a screenshot: `-tab tvShows` (or `home`, `movies`,
 `shows/100?season=3` with that season's first unfinished one and
 `shows/100?season=3&episode=100037` with that episode,
 `movies/500`, `play/9101`, `link?code=K7M4PQ`, and `requests` and `inbox`
-for Settings' Your requests and Inbox):
+for Settings' Your requests and Inbox). Launch arguments are the app's own,
+so `play/` and `live-tv/<channel>` act as they read; the same links from
+outside the app (Safari, a QR code, another app) open the title's page or
+the guide instead, and only a link the app published for the server signed
+in (a reminder's notification) starts playback or takes a tuner
+(`DeepLink.opening`, PLAN-APPLE-REVIEW.md §2.5):
 
 ```bash
 xcrun simctl launch <udid> media.watchmy.client -fakes -tab movies
@@ -75,11 +84,14 @@ xcrun simctl io <udid> screenshot /tmp/movies.png
 
 The launch argument `-fakes` runs the app on the fakes in `WMMFakes` (the
 mockups' fictional library, no server): any name signs in with the password
-`password`. The fakes' posters are seeded gradients, but every show, movie,
+`password`. The fakes are in Debug builds only: a Release build ignores every
+`-fakes…` argument and doesn't link `WMMFakes` (see Release builds below). The fakes' posters are seeded gradients, but every show, movie,
 episode and Continue watching item carries one of six fictional backdrops
 drawn in code (`FakeBackdrops`), so Home's row screens on iPad and Apple TV
 (PLAN-HOME.md §7) can be judged on a simulator. `-fakesSignedOut` starts at sign-in, `-fakesNoServer` at the
 server picker. The scheme's Run action lists `-fakes`, off by default.
+`-fakesLargeLibrary` gives the fakes' Movies library about 1,200 titles (the
+sample's, then made-up ones), for measuring the grid.
 `-search harbor` searches at launch. The fake player has seek thumbnails drawn in
 code, so `-open watchmymedia://play/9101 -playerKeepControls -playerScrub 0.44`
 holds the scrubber at 44 % with its tile up (PLAN-TRICKPLAY.md T4).
@@ -153,15 +165,46 @@ Its player takes these too, on the fakes and in debug builds
 `-playerStopped` and `-playerError`, after `-open watchmymedia://play/9101`.
 The fakes have no video, so the system player runs empty over the backdrop:
 Skip, the card and the prompts show, but not the transport bar or its
-Audio, Subtitles and Quality tabs, which need a server.
+Episodes, Audio, Subtitles and Quality tabs, which need a server;
+`-playerPanel episodes` shows the Episodes tab over the video instead.
+
+The info panel's Episodes tab (TvPlayerEpisodes.dc.html, PLAN-APPLE-REVIEW.md
+§6.2) comes after Info for an episode, never a film or a recording: the
+show's seasons as buttons (focus on one chooses it) above the chosen
+season's episodes on disk, focus starting on the one playing, which is
+marked Now playing; the one after it is Next. Select or Play/Pause on
+another plays it in place, from where it was left. `TVPlayerEpisodesModel`
+decides it. It asks the server nothing to know whether the tab shows (the
+request carries the show and season, or the next episode is found in a
+season already loaded, or looked up once); opening the tab the first time
+asks for the show and the playing season side by side, each other season
+once when chosen, and the playing season again after another episode
+started.
 
 The Apple TV simulator takes the Mac's keyboard as the Siri Remote: the
 arrows move focus, Return selects, Escape is Menu, and a long press is
 Return held down. `apple/TVUITests` drives the remote in XCUITest on the
 fakes (where focus lands, the long-press menus, Menu going back, and the
 player's Next Episode card, Still watching and stop and can't-play states)
-and runs with the rest in `make apple-tv-test-sim`. XCUI does not see
-AVKit's contextual actions, so Skip is checked by hand.
+and runs with the rest in `make apple-tv-test-sim`. Its waits are in
+`TVUITests/Waiting.swift`: XCTest's own look a second late, and they add up
+over a test of many presses. XCUI does not see AVKit's contextual actions,
+so Skip is checked by hand.
+
+Sorted by title, the Apple TV grid has a letter index down its right edge
+(TvLibraryAZ.dc.html, PLAN-APPLE-REVIEW.md §6.2): right from the last column
+enters it at the poster's letter, the grid follows the letters up and down,
+Select or left lands on the letter's first title, and Menu goes back to the
+poster. It is built from the `letters` the server already sends with a
+title-sorted page (each letter's first offset in the whole filtered list);
+`LetterIndex` (WMMFeatures) turns them into the 27 places with their counts,
+and `LibraryModel(letterJump: .extend)` loads everything up to a letter
+beyond the titles held, so the grid keeps its start and its rows. Page Up and
+Page Down (`onPageKeys`, on remotes that have them) move two rows in any sort
+(`GridPaging`). `-librarySort title` starts the grids sorted by title in a
+debug build; `-fakesLargeLibrary -tab movies -librarySort title` gives the
+index most letters (`TVUITests/LetterIndexTests.swift`). A list's page takes
+Page Up and Page Down the same way (`TVUITests/ListPageKeysTests.swift`).
 
 ### Downloads
 
@@ -177,7 +220,12 @@ download takes a few seconds. `-open watchmymedia://downloads` opens Settings �
 Downloads. The Apple TV app has none (`UnavailableDownloads`).
 
 A download keeps going in the background through the system's sessions, so
-`AppDelegate` hands their events to `DownloadServices.handleEvents`. Its files
+`AppDelegate` hands their events to `DownloadServices.handleEvents`. When one
+finishes while the app is away, the session's completion handler waits (at
+most 20 seconds, under a background task) until the next download has been
+handed to the system, since an HLS download is made ready by the app first
+(`HandoverHold`). Wi-Fi only also waits on a personal hotspot and in Low Data
+Mode, which the system marks expensive and constrained. Its files
 are in `Library/Application Support/Downloads` (`state.json`, `engine.json` and
 a folder per original file) and, for HLS, the package the system made under
 `Library/com.apple.UserManagedAssets…`; read them from the simulator's app
@@ -400,8 +448,12 @@ panels show what is on with pictures. Pictures load through the server's
 a programme without one shows the channel's logo. `LiveGuideStore` fetches
 6-hour windows, prefetches the next and forgets them when the server or
 sign-in changes; now and next move on at a programme's end, and the channel
-list is asked again only then. Without listings every screen stays as L8 and
-L9 built it.
+list is asked again only then. `LiveGuideModel` keeps its rows, chips and
+selection until something they read changes (observation says when), and each
+guide cell is a view of its own compared by what it shows, so a focus move on
+Apple TV redraws the cells it moves between; on iPad the Live TV tab holds the
+guide's model, so Guide → Channels → Guide keeps the time, the selection and
+the listings. Without listings every screen stays as L8 and L9 built it.
 
 On servers at API level 15 with listings (§6.5, G9), each channel in the guide
 has a star (its own 44 pt button on iPhone and iPad; on Apple TV the channel
@@ -437,6 +489,38 @@ rolling buffer. Go live advances to the live edge. An expired position resumes
 at live with a notice. After five minutes
 paused, the tuner is released and Watch live starts a new session. Four hours
 without input asks whether you are still watching and gives one minute to answer.
+On iPhone and iPad the channel shows on the lock screen and in Control Center
+as a live stream, with Play and Pause (no skipping); a call pauses it and,
+when the call ends, it carries on (at live once the pause passed the buffer),
+and unplugged headphones pause it. A stream that refuses the media token gets
+a new one on the same tuner, as films do, before it reports a lost signal.
+
+On iPhone and iPad the film and Live TV players share one shell
+(`App/Screens/Player/PlayerShell.swift`, PLAN-APPLE-REVIEW.md §5.3): the status
+bar and home indicator hidden, the scene phase and Picture in Picture (2 s for
+it to start by itself in the background, `PlayerChromeModel.pictureInPictureGraceMs`),
+the safe area for the camera housing, and controls that hide 3 s after the last
+touch while playing (`ControlsAutoHide`, tested in the Kit; up for VoiceOver,
+and for Channels and the Quality menu on Live TV). `-playerKeepControls` keeps
+either player's controls up for screenshots and UI tests.
+
+**Fit and fill** (PLAN-APPLE-REVIEW.md §6.3, `design/mockups/ios/PlayerFitFill.dc.html`)
+is the shell's too, for both players on iPhone and iPad: a button beside Close
+(arrows out while fitted; gold, with arrows in, while filled), and a pinch on
+the picture (out fills, in fits; taps and double-tap seeks keep working). Fit
+keeps the whole picture inside the safe area, clear of the Dynamic Island; Fill
+covers the screen, the island too, and crops, never stretches
+(`resizeAspectFill`). A note under the top bar says which and how much is
+cropped ("Fill · 18% of the picture is cropped at the edges", from the
+picture's own size against the screen or, on a tall iPad or the portrait Live
+TV player, the 16:9 box). The choice is kept on the device for every video
+after it and for both players. The rule is `VideoFitModel` (WMMFeatures,
+tested in `VideoFitTests`); the views are `App/Screens/Player/PlayerFitFill.swift`.
+`-player.videoFit fit|fill` sets the choice for a launch (UI tests,
+screenshots) and `-playerFitNoteMs 8000` keeps the note up longer;
+`UITests/PlayerFitFillTests.swift` taps, pinches and double taps on the fakes
+(run it with the WatchMyMediaE2E scheme and `-only-testing`, as TrailerTests). The fakes draw a backdrop and no video, so how the picture
+crops shows only against a server.
 
 Quality is fixed at 1080p, 720p, 480p or 360p. Mobile data caps Live TV at 720p,
 including when the connection changes during playback. AirPlay and Picture in
@@ -445,9 +529,20 @@ The AirPlay receiver must be able to reach the selected server address; live
 playback does not perform the file player's LAN-address handoff. Simulator playback
 does not certify physical AirPlay, PiP, cellular networks or Apple TV remotes.
 
-Apple TV uses AVKit's native Play/Pause and a linear live transport. Ch−, Ch+
-and Go live are contextual actions; Stop is in the transport bar. Swipe down
-opens Channels and Quality while video continues. Back closes an open native
+Apple TV uses AVKit's native Play/Pause and a linear live transport
+(TvLiveChannelKeys.dc.html). Last channel (once there is one), Channel down,
+Channel up and Go to channel are transport bar buttons, before Stop and the
+system's own, each naming where it goes; as contextual actions they took
+Select from the bar (PLAN-APPLE-REVIEW.md §3.2.2). Go live stays a
+contextual action. The first time the bar comes up a note says Select
+pauses and the buttons are a swipe up. Page Up and Page Down change channel
+with a note naming it; the 123 key (tvOS 18.1) or the button opens Go to
+channel, a keypad that lists the channels whose number starts with what was
+typed and tunes the first two seconds after the last key, or the one chosen;
+digit keys type into it and Back closes it. `LiveChannelStep` (the list's
+order, skipping channels that can't be watched, wrapping) and
+`GoToChannelModel` are the rules, shared with the iPhone's channel keys.
+Swipe down opens Channels and Quality while video continues. Back closes an open native
 panel first, then stops and returns to the channel browser. The still-watching
 prompt takes focus; its first Back keeps watching, and the next Back leaves.
 
@@ -465,6 +560,8 @@ favourites and reminders; `-fakesLiveReminder set|moved|gone` and
 keeps the server at level 13, and `-fakesLiveReminderSoon` (optionally
 followed by a number of seconds, 20 by default) replaces the canned
 reminders with one whose notification or banner comes that long after launch.
+On Apple TV, `-liveBannerSeconds N` (debug builds) keeps a reminder's banner
+up N seconds rather than ten, so a UI test on a busy simulator can read it.
 Debug fake states add `-liveStillWatching`, `-livePauseExpired`, `-liveBusy`,
 `-liveTakeover` (a recording needs the tuner in 2 minutes) or `-liveTakenOver`
 (stopped for a recording).
@@ -539,8 +636,12 @@ Admins set folders and recording access in the server’s web app.
 
 Recordings shows Recording now, Won’t record, Upcoming, Series and Recorded,
 hiding empty sections; on iPhone and iPad a swipe left skips, stops or doesn't
-record one. Each section loads 20 at a time with Load more; server
-events refresh loaded sections, with no recording-status polling. Only the
+record one. Each section loads 20 at a time with Load more; a
+`live.recordings.changed` event refreshes the sections on screen (a screen
+says which with `LiveRecordingsStore.show(_:)`; one that has left is
+forgotten and loads again on return) and the guide's span while
+`showGuide(from:to:)` holds it, with no recording-status polling. The echo of
+a change made on this device asks for nothing more. Only the
 setter or an admin can cancel upcoming recordings, stop active ones or edit a
 series. Recording-now progress comes from the clock. Watch from the start reuses
 the ordinary player with a Recording pill, an extending duration and Go to now
@@ -583,24 +684,227 @@ installed SDK. Keep the server computer awake for future recordings. Simulator
 and fictional broadcasts do not certify a physical tuner, remote, AirPlay,
 Picture in Picture or real-broadcast ad detection.
 
+## Keyboard, pointer, quick actions and coming back
+
+What the iPhone and iPad apps take from the platform without a screen of
+their own (PLAN-APPLE-REVIEW.md §6.3):
+
+- **A hardware keyboard.** In either player, space plays or pauses (or
+  answers Still watching) and Escape closes the picker or Channels, then
+  leaves; in the film player left and right seek 10 s, in Live TV up and
+  down change channel. The rules are `PlayerChromeModel.handle(_:)` and
+  `LivePlayerModel.handle(_:)`; the apps have no volume or mute of their
+  own, so there is no M. Escape is a key command on the player's view
+  controller (`PlayerShell.swift`). ⌘F opens Search with the cursor in its
+  field (`Navigator.findInSearch()`). `UITests/KeyboardTests.swift` presses
+  space, the arrows and ⌘F on an iPad simulator; XCUITest's Escape never
+  reached the app there, so Escape needs a real keyboard.
+- **A pointer on iPad.** Cards (`CardButtonStyle`) lift and Search's and
+  Settings' rows highlight under the pointer, as the system draws it.
+- **Quick actions and App Shortcuts** (`App/Shell/QuickActions.swift`):
+  Continue watching (Home at its top), Search, Live TV when the server offers
+  it and Downloads when they are on. Each opens a link published for the
+  server signed in (`watchmymedia://home`, `search`, `live-tv`, `downloads`
+  with `source=` and `server=`), so another server's opens nothing; signed
+  out there are none and a shortcut opens the app as it is.
+- **Coming back to where you were** (`App/Shell/PlaceKeeping.swift`,
+  `SavedPlace` in the Kit): the tab and each tab's pages are saved per
+  account and server whenever they change and restored once a launch; never the player or Settings, and a page a later version added
+  ends its tab's pages there. A launch with `-open` or `-tab` goes where it
+  says; on the fakes nothing is kept unless `-fakesRestorePlace` is given.
+- **Recent searches** are kept between launches per account and server
+  (`RecentSearches`); they show on iPad, as before.
+- **A Live TV reminder's notification** offers Watch and Remind again,
+  which notifies once more five minutes later.
+- **Text size.** `PrimaryButtonStyle`, `GhostButtonStyle` and `Chip` scale
+  their text and height with Dynamic Type and look as before at the default
+  size (§2.8); `UITests/TextSizeTests.swift` runs a movie's page and the
+  Movies filters at the largest accessibility size. The guide and the
+  player keep fixed sizes (Later).
+- **Tapping the selected tab** goes back to its first page
+  (`UITests/TabReselectTests.swift`).
+- **Haptics** on taking the scrubber's thumb and on double-tap seeks.
+- **Reduce Motion** turns the player's slides into fades and stills its
+  spinner.
+- **Pull to refresh** on Downloads syncs them.
+- **A background refresh** (`App/Shell/BackgroundSync.swift`) sends what was
+  watched offline. It stays off until `project.yml` gives the app
+  `BGTaskSchedulerPermittedIdentifiers: [media.watchmy.client.sync]` and
+  `UIBackgroundModes: [fetch]`.
+
+## Top Shelf
+
+With the app in the top row of the Apple TV's Home Screen, the Top Shelf
+shows Continue watching (16:9 cards with the system's progress bar) and
+Recently added (posters, movies and shows in turn) as two sections the
+system draws (PLAN-APPLE-REVIEW.md §2.2, §6.2; `TvTopShelfSections`). Select
+opens the page; Play/Pause plays, as on the card in the app: a Continue
+watching item resumes, a movie plays its first version, and a show, which has
+no single episode to play, opens. Signed out, or with nothing to show, the
+system shows the static Top Shelf image from `TV/Resources`.
+
+- **The extension only reads.** `TopShelf/` is the target "WatchMyMedia
+  TopShelf" (`media.watchmy.client.topshelf`), embedded in the Apple TV app.
+  It links only `WMMTopShelf` (Foundation and TVServices) and reads the
+  snapshot the app wrote into their App Group, `group.media.watchmy.client`
+  (`TV/WatchMyMediaTV.entitlements`, `TopShelf/TopShelf.entitlements`). It
+  has no sign-in and makes no request.
+- **The app writes it.** Home publishes whenever its rows change
+  (`.publishesTopShelf` in `TV/Screens/Home/HomeScreen.swift`, then
+  `TopShelfPublisher` in WMMFeatures): the rows the person shows on Home (a
+  row hidden from Home isn't on the shelf), ten Continue watching and twelve
+  Recently added, each picture fetched with the app's sign-in and saved as a
+  file in the group, then `TVTopShelfContentProvider.topShelfContentDidChange()`.
+  Signing out, or another person or server signing in, clears it
+  (`.clearsTopShelfOnAccountChange` in `TV/Shell/WatchMyMediaTVApp.swift`);
+  so does a launch that finds someone else's snapshot.
+- **What it may hold** (`Kit/Sources/WMMTopShelf`, `TopShelfRules`): titles,
+  the app's own `watchmymedia:` links published for the server signed in
+  (`source=top-shelf&server=`, PLAN-APPLE-REVIEW.md §2.5) and bare picture file
+  names. Never a server address, an image's web address, a token or the
+  person's ID (the owner is a hash). Links with other query items and
+  pictures that aren't bare names are dropped on both sides.
+  `Kit/Tests/WMMFeaturesTests/Browse/TopShelfPublisherTests.swift` checks
+  that nothing written names the address, port or token.
+- **Staleness**: the extension shows nothing from a snapshot older than two
+  weeks (`TopShelfRules.maxAge`) or of another format; a shelf left on
+  screen is written again after a day.
+- **Links**: `watchmymedia://movies/{id}?play=1` plays a movie, and only
+  when the app published it for the server signed in; from anywhere else it
+  opens the movie's page.
+
+On a simulator, run the app once on the fakes (`-fakes`) so it writes a
+snapshot, then go to the Home Screen with the app's icon focused in the top
+row to see the shelf (apple/AGENTS.md, Simulators). The
+fakes have backdrops but no posters, so Recently added draws blank cards there.
+Signing for a device needs the App Group and the extension's App ID in the
+developer account; simulator builds are signed ad hoc and need neither.
+
+## Release builds, privacy and measuring
+
+**Release builds.** `make apple-build-release` and `make apple-tv-build-release`
+build the Release configuration for devices without signing (what an archive
+compiles), and CI's `apple` and `apple-tv` jobs run them after their tests, so a
+break that only shows in Release (an `#if DEBUG`, optimisation, a missing
+import) shows before a tag. `scripts/check-release-binary.sh` then fails if the
+app has no privacy manifest, holds any `WMMFakes` symbol or still reads
+`-fakesSignedOut`, or if an extension in its `PlugIns` (the Top Shelf) has no
+privacy manifest of its own or holds code from `WMMModel`, `WMMData`,
+`WMMAPI`, `WMMPlayback`, `WMMFeatures` or `WMMFakes`.
+
+**The fakes are debug-only** (PLAN-APPLE-REVIEW.md §2.9): every
+`import WMMFakes` in `App/` and `TV/`, the fakes' branch of each
+`ServicesFactory` and the `#Preview`s that use them sit under `#if DEBUG`.
+`project.yml` keeps `WMMFakes` as a dependency (so it builds and the import
+resolves) with `link: false`, and only Debug's `OTHER_LDFLAGS` links its
+object file: Xcode links a package product's whole object file, so without
+that a Release binary carried all of the fakes. The UI tests, `make apple-perf`
+and the App Store screenshot recipe all run Debug builds.
+
+**Privacy manifests**: `App/Resources/PrivacyInfo.xcprivacy`,
+`TV/Resources/PrivacyInfo.xcprivacy` and the Top Shelf's
+`TopShelf/PrivacyInfo.xcprivacy`, which declares no API: it reads files and
+no file dates, and the snapshot's age is a date inside it. No tracking and no collected data; the
+required-reason APIs with Apple's reasons: UserDefaults `CA92.1`
+(`DeviceStorage`), system boot time `35F9.1` (`ProcessInfo.systemUptime` in the
+players and `PlayerChromeModel`), and on iPhone and iPad disk space `85F4.1` and
+`E174.1` (Downloads shows the free space and refuses a download that won't
+fit). The Apple TV app has no downloads, so it doesn't declare disk space. When
+code starts calling another API on [Apple's list](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api),
+add it to the manifest of each app that links that code.
+
+**Signposts** (PLAN-APPLE-REVIEW.md §4.3.1): `PerformanceSignposts.shared`
+(WMMModel) marks the intervals Instruments and `XCTOSSignpostMetric` measure,
+under subsystem `media.watchmy.client` and category `Performance`: Launch to
+Home, Play to first frame, and its two halves Play to decision and Decision to
+first frame. Its calls are safe in any order: an end without its begin does
+nothing, and a new Play ends an open one as cancelled.
+
+**Measuring**. `make apple-perf` runs
+`UITests/PerformanceTests.swift` (a signed-in launch, flinging Home and the
+Movies grid of `-fakesLargeLibrary`'s 1,200 titles) on `SIM` and `TVUITests/PerformanceTests.swift` (a launch) on
+`TV_SIM`, five runs each, into `build/Perf.xcresult` and `build/TVPerf.xcresult`.
+They skip unless `WMM_PERF=1`, which the target sets, so the normal test runs
+and CI leave them out. They run on the fakes, so in Debug builds: compare runs
+with each other on one quiet Mac, not with a release on a device. On a
+simulator the scrolling measure reports only the fling's duration (hitches
+need a device), and on the tvOS simulator the launch metric reports nothing,
+so the Apple TV test also times `launch()` with a clock.
+
+**Diagnostics** (PLAN-APPLE-REVIEW.md §6.4, `design/mockups/ios/Diagnostics.dc.html`).
+`Diagnostics.start()` (WMMData) subscribes to MetricKit on iPhone
+and iPad and keeps the last launch, hang and crash summaries, and the last
+day's count of exits in the background other than normal ones ("1 for
+memory"), in Application Support/Diagnostics, excluded from backups; MetricKit
+isn't on tvOS, so on Apple TV it does nothing. `Diagnostics.text(server:servers:names:)`
+builds what a Copy diagnostics row copies: the app version and build, the
+hardware model and OS, the server's version and API level, the summaries and
+this run's log lines from the app's own subsystem (a process can read only its
+own log). Nothing leaves the device and no SDK is added. The rule for what may
+be in it:
+
+- Never a token, password, server address, or a person's, server's, device's or
+  title's name. The server appears only as its version and API level; the
+  summaries keep a crash's type, signal and top frames as binary and offset,
+  never an exception's message.
+- Every line passes `DiagnosticsRedactor`: known names (the remembered
+  servers' names, hosts and accounts, plus any the caller passes) become
+  `<name>` as whole words, taking a host's port with them; quoted text `"<text>"`; URLs, e-mail, IP addresses and host names
+  `<address>`; file paths `<path>`; the value after `token`, `password`,
+  `authorization` and the like, UUIDs and long opaque strings `<redacted>`.
+  `Kit/Tests/WMMModelTests/DiagnosticsTests.swift` holds the cases.
+- No disk space or system uptime: their required reasons don't allow them in
+  a report without a reason the manifests don't declare.
+
+On iPhone and iPad, Settings › About has a Diagnostics row under Help, with how
+many reports are kept, and its page (`App/Screens/Settings/DiagnosticsSettingsPage.swift`)
+shows what Copy puts on the clipboard, in groups: the app, this device and the
+server; iOS's last reports; and the last 200 log lines. Every value on the page
+went through the same redactor as the copy (`DiagnosticsPage` in WMMModel, made
+once as the page opens), which also knows this device's name, the account's,
+the servers found on the network and the titles downloaded here. Copy turns
+into Copied and a short Copied note shows (`DiagnosticsModel`); there is no
+Share. `DiagnosticsPageTests` and `DiagnosticsModelTests` hold the page's
+rules, including that nothing on it or in the copy names the server, the
+account or a title. `-diagnosticsReports` keeps a fictional hang, launch and
+exits report (the simulator gets none from MetricKit), `-diagnosticsNoReports`
+forgets them, and `-diagnosticsLog` logs a line naming the fake server, which
+the page must show redacted (`UITests/DiagnosticsTests.swift`, run with the
+WatchMyMediaE2E scheme and `-only-testing`). Log lines carry the device's own
+time, as the reports do.
+
+On Apple TV, which has no clipboard to paste from, Settings › About's Help
+group has a Diagnostics row (TvDiagnostics.dc.html): it shows the redacted
+text as a QR code made on the Apple TV, beside a summary of what it holds,
+and Show as text pages through all of it (Down and Up turn the pages).
+`DiagnosticsCode` (WMMFeatures) decides what the code holds: at most
+`DiagnosticsCode.maxBytes` (997 bytes, a version 25 code at error correction
+M, 117 modules a side, which a phone reads from a sofa), leaving out the
+oldest log lines first and saying how many. `Kit/Tests/WMMUITests/DiagnosticsCodeSizeTests.swift`
+pins that size with CoreImage. `-diagnostics` with `-tab settings` opens the
+code at launch in a debug build, and `-diagnosticsLog` adds sixty made-up log
+lines, enough to fill the code and turn pages (`TVUITests/DiagnosticsTests.swift`).
+
 ## Layout
 
 | Path | What |
 |---|---|
 | `Kit/` | Swift package `WatchMyMediaKit`; builds for iOS, tvOS and macOS, so `swift test` runs on the Mac |
-| `Kit/Sources/WMMModel` | Domain types and the protocols every screen builds against (`ServerRepository`, `AuthRepository`, `LibraryRepository`, `RowsRepository`, `PreferencesRepository`, `PlaybackController`, `PlaybackGateway`, `AppServices`), errors, and the shared wording (`Formats.swift`, `TrackLabels.swift`, `Watching.swift`). Mirrors `android/core/model` |
+| `Kit/Sources/WMMModel` | Domain types and the protocols every screen builds against (`ServerRepository`, `AuthRepository`, `LibraryRepository`, `RowsRepository`, `PreferencesRepository`, `PlaybackController`, `PlaybackGateway`, `AppServices`), errors, what a server offers at its API level (`ServerFeatures.swift`, the one table of levels), and the shared wording (`Formats.swift`, `TrackLabels.swift`, `Watching.swift`). Mirrors `android/core/model` |
 | `Kit/Sources/WMMAPI` | The client generated from `../api/openapi.json` (only the operations an app makes, see the config); committed. Generation opens response enums while keeping request-only enums strict |
-| `Kit/Sources/WMMData` | The real repositories. `Network/ServerAPI.swift` wraps the generated client: bearer token, user agent, and every failure as `APIError` or `SignedOutError` |
-| `Kit/Sources/WMMPlayback` | The `PlaybackController` on `AVPlayer` (PLAN-CLIENTS.md §2.3), the device profile, WebVTT cues, Now Playing |
+| `Kit/Sources/WMMData` | The real repositories. `Network/ServerAPI.swift` wraps the generated client: bearer token, user agent, and every failure as `APIError` or `SignedOutError`. Every request that carries a sign-in is built by its `RequestSigner` (the token only on the issuing server's addresses), and every 401 is read by `ServerAPI.revokes`, which signs out through the `ServerAPI` that `LocalStore.api(serverID:…)` made |
+| `Kit/Sources/WMMPlayback` | The `PlaybackController` on `AVPlayer` (PLAN-CLIENTS.md §2.3; `RealPlaybackController` split by part into `RealPlaybackController+*.swift`) and the Live TV controller (`LivePlaybackEngine`), with what both share: `PlayerCore` (an item, its first frame, the access log, the metadata, the audio session, the failure classifier), `TokenKeeper`, `SwitchGenerations`, `HeartbeatPump`, `Ticker` (PLAN-APPLE-REVIEW.md §5.1); the device profile, WebVTT cues, Now Playing |
 | `Kit/Sources/WMMDownloads` | Offline downloads on iPhone and iPad (PLAN-DOWNLOADS.md D3): the system's background sessions (`SystemDownloadEngine`), the offline store, sync, and `OfflinePlaybackGateway`, which plays a download from the device. Mirrors `android/core/downloads`; the Apple TV app doesn't link it |
 | `Kit/Sources/WMMCast` | SDK-independent Cast protocol, session state, transfers and fakes; the Google SDK adapter lives only in `App/Cast/` |
 | `Kit/Sources/WMMFakes` | In-memory fakes of every protocol, with the mockups' library and a pretend player (`AppServices.fake()`) |
 | `Kit/Sources/WMMUI` | Brand tokens (`Palette`), `Artwork`, `Badge`, `Tag`, `ProgressStrip`, `WatchedCheck`, `BrandMark`, button styles, `Chip`, `LoadableView` and the empty and error states |
+| `Kit/Sources/WMMTopShelf` | The Apple TV Top Shelf's snapshot in the App Group: its format, what it may hold (`TopShelfRules`), the store, and the sections the system draws. Foundation and TVServices only, so the extension links nothing else |
 | `Kit/Sources/WMMFeatures` | Screen models and navigation, shared with the Apple TV app: `Navigation/` (`Navigator`, `Route`, `AppTab`, `DeepLink`), `Browse/` (Home, Library, Show, Movie, Search), `Account/` (server picker, sign-in and pairing, Settings, Link a TV), `Player/` (the controls' timing, double-tap seek, the scrubber, the picker's wording, and `TVPlayerModel` for the Apple TV's system player) |
 | `App/` | The iPhone and iPad app: `Shell/` (app, root flow, tabs, `ServicesFactory`), `Screens/<feature>/` (SwiftUI views; a screen lays itself out for a regular width with `PadLayout` from `Components/Layout.swift`), `Components/Browse` and `Components/Account` (views those screens share) |
 | `TV/` | The Apple TV app, target "WatchMyMedia TV" (tvOS 18+, the same bundle ID for the universal purchase): `Shell/` (app, root flow, the tab bar, `TabPage`, its own `ServicesFactory` with the TV profile), `Screens/<feature>/`, `Components/` (focus, buttons, chips, cards, rows), `Resources/` (the layered icon and Top Shelf images from `brand/`) |
-| `UITests/` | The end-to-end test against a real server (`make apple-e2e`) |
-| `TVUITests/` | The Apple TV app on the fakes, driven with the Siri Remote |
+| `TopShelf/` | The Apple TV app's Top Shelf extension, target "WatchMyMedia TopShelf": `ContentProvider` reads the snapshot (see Top Shelf), its privacy manifest and entitlements |
+| `UITests/` | The end-to-end test against a real server (`make apple-e2e`), the iPhone and iPad UI tests on the fakes, and the performance tests (`make apple-perf`) |
+| `TVUITests/` | The Apple TV app on the fakes, driven with the Siri Remote, and its launch measure (`make apple-perf`) |
 | `Tools/` | The OpenAPI generator, kept out of the app's dependencies |
 
 Why `TV/` is a folder of its own beside `App/` rather than one `App/` with
@@ -636,10 +940,26 @@ brand views and the QR code in `WMMUI`. The two targets share no files.
 - **Images**: `Artwork(url: services.library.imageURL(path, size: .w342), seed: title)`;
   the loader in the environment adds the sign-in, and the gradient shows
   until the image arrives. Posters `w342`, backdrops `w1280`, stills `w300`.
+  `maxPixel` is the longer side in pixels as drawn (points times the screen's
+  scale); `ImagePipeline` fetches and decodes off the main actor, shares a
+  load under way, and keeps decodes by address and size step in a byte budget
+  (128 MB, 192 MB on Apple TV), so a small decode never stands in for a large one.
 - **Look**: dark only. `Palette` for colours (gold for progress, selection
   and badges; burgundy for primary fills; orange for warnings), the system
   font with Dynamic Type, 44 pt touch targets, real `Button`s with
   accessibility labels on icon-only ones.
+- **Changes come from the server's events** (PLAN-APPLE-REVIEW.md §4.1.1):
+  `LibraryRepository.libraryChanges()` says what changed (`LibraryChange`:
+  which movies or episodes were marked, which library changed, a scan). A
+  screen model follows them through `ScreenChanges`, which keeps listening
+  while the screen is away, so coming back loads nothing unless something
+  changed meanwhile or the screen is five minutes old. A mark made here
+  reloads every screen through its own notice: mark through `markWatched`
+  (`WMMFeatures/Browse/MarkWatched.swift`), which may draw the mark at once
+  or keep it with a download, and never reloads after it. The server's echo
+  of it is dropped. A screen's own loads go through `LoadController`: the
+  first shows a spinner, a later quiet one keeps the screen and says why it
+  failed as a message, and the newest wins.
 - **Concurrency**: Swift 6 language mode. Repositories, models and the
   controller are `@MainActor`; network work suspends off it.
 - **Apple TV**: every page is a `TabPage` (a scroll view from the screen's

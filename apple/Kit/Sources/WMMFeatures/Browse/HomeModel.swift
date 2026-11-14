@@ -22,14 +22,17 @@ public final class HomeModel {
     @ObservationIgnored private let auth: any AuthRepository
     @ObservationIgnored private let navigator: Navigator
     @ObservationIgnored private let rows: (any RowsRepository)?
-    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private let changes: ScreenChanges
+    @ObservationIgnored private let loads = LoadController<HomeData>()
 
     /// `rows` brings the person's other devices' changes to the layout and lists (rows.changed, lists.changed).
-    public init(library: any LibraryRepository, auth: any AuthRepository, navigator: Navigator, rows: (any RowsRepository)? = nil) {
+    public init(library: any LibraryRepository, auth: any AuthRepository, navigator: Navigator, rows: (any RowsRepository)? = nil,
+                now: @escaping @MainActor () -> Date = { Date() }) {
         self.library = library
         self.auth = auth
         self.navigator = navigator
         self.rows = rows
+        changes = ScreenChanges(now: now)
     }
 
     /// The signed-in user's name, for the avatar's label.
@@ -42,19 +45,51 @@ public final class HomeModel {
 
     public var offersSetup: Bool { isAdmin && emptyState?.offersSetup == true }
 
-    /// Loads Home, then reloads quietly whenever the library, or the person's
-    /// rows and lists, change, until cancelled.
+    /// The offline Home (HomeOffline.dc.html) with `downloads` to watch: Home's
+    /// request failed, or, while it is still out, the server check
+    /// (``ServerRepository/reachable``) found no server. That check gives up
+    /// in seconds where Home's request takes 30 (PLAN-APPLE-REVIEW.md §4.1.5);
+    /// the request carries on, and Home shows if it answers.
+    public func showsOffline(reachable: Bool?, downloads: Bool) -> Bool {
+        guard downloads else { return false }
+        switch state {
+        case .failed: return true
+        case .loading: return reachable == false
+        case .loaded: return false
+        }
+    }
+
+    /// Loads Home, then reloads quietly whenever the library, the person's
+    /// watch state, or their rows and lists change, until cancelled. Coming
+    /// back to Home loads nothing unless something changed meanwhile
+    /// (``ScreenChanges``). Scans matter only to an empty Home, which says
+    /// what the scan is doing; `library.changed` brings what a scan found.
     public func run() async {
-        await followChanges(of: library, also: rows?.changes(), firstQuiet: state.value != nil) { quiet in await load(quiet: quiet) }
+        await changes.run(
+            subscribe: { merge(library.libraryChanges(), unknown: rows?.changes()) },
+            hasContent: state.value != nil,
+            load: { quiet in await load(quiet: quiet) },
+            apply: { changes in
+                let scansOnly = changes.allSatisfy { if case .scan = $0 { true } else { false } }
+                if scansOnly && emptyState == nil { return }
+                await load(quiet: true)
+            }
+        )
     }
 
     /// Home is arranged (``rowsAPILevel``): Edit Home is offered.
     public var canEditRows: Bool { state.value?.isArranged == true }
 
-    public func retry() async { await load(quiet: false) }
+    public func retry() async {
+        await load(quiet: false)
+        changes.loaded()
+    }
 
     /// Pull to refresh: keeps Home on screen, and says why if it fails.
-    public func refresh() async { await load(quiet: true) }
+    public func refresh() async {
+        await load(quiet: true)
+        changes.loaded()
+    }
 
     // MARK: Taps
 
@@ -105,22 +140,20 @@ public final class HomeModel {
         navigator.play(request)
     }
 
+    /// The mark's own notice reloads Home, as it does every screen showing it.
     public func setWatched(_ target: WatchTarget, _ watched: Bool) async {
-        do {
-            try await library.mark(target, watched: watched)
-            message = markedMessage(watched: watched)
-            await load(quiet: true)
-        } catch {
-            message = error.displayMessage
-        }
+        message = await markWatched(target, watched, in: library)
     }
 
-    /// `quiet` keeps what is on screen: a failure then is a message, not an error page.
+    /// `quiet` keeps what is on screen: a failure then is a message, not an
+    /// error page. A load still running when another starts is cancelled.
     func load(quiet: Bool) async {
-        generation += 1
-        let mine = generation
-        if !quiet || state.value == nil { state = .loading }
-        guard let result = await Loadable.run({ try await self.library.home() }), mine == generation else { return }
+        await loads.run { [weak self] load in await self?.fetch(load, quiet: quiet) }
+    }
+
+    private func fetch(_ load: LoadController<HomeData>.Load, quiet: Bool) async {
+        loads.begin(&state, quiet: quiet)
+        guard let result = await loads.fetch(load, { try await self.library.home() }) else { return }
         var empty: HomeEmptyState?
         if result.value?.isEmpty == true {
             do {
@@ -130,13 +163,14 @@ public final class HomeModel {
             } catch {
                 empty = .unavailable
             }
-            guard mine == generation else { return }
+            guard loads.isCurrent(load) else { return }
         }
-        if case .failed(let reason) = result, state.value != nil {
+        if let reason = loads.quietFailure(result, quiet: quiet, over: state) {
             message = reason
         } else {
             state = result
             emptyState = empty
+            if result.value != nil { PerformanceSignposts.shared.homeShowedContent() }
         }
     }
 }

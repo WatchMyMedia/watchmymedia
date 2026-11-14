@@ -24,9 +24,12 @@ public final class SearchModel {
     }
 
     public private(set) var query = ""
-    /// Session-only successful queries, newest first. Rebuilding the account's
-    /// search model discards them; nothing is persisted or shared across models.
-    public private(set) var recentQueries: [String] = []
+    /// Successful queries, newest first, kept between launches for this
+    /// account on this server when the model has a ``RecentSearches``
+    /// (PLAN-APPLE-REVIEW.md §6.3); without one, for this model only.
+    public private(set) var recentQueries: [String] = [] {
+        didSet { if recentQueries != oldValue { recents?.save(recentQueries) } }
+    }
     /// Nil before the first search, and while the query is empty.
     public private(set) var results: SearchResults?
     /// The query `results` are for.
@@ -46,16 +49,19 @@ public final class SearchModel {
     @ObservationIgnored private let requests: (any RequestsRepository)?
     @ObservationIgnored private let navigator: Navigator
     @ObservationIgnored private let debounce: Duration
+    @ObservationIgnored private let recents: RecentSearches?
     /// The search waiting out the debounce or running; tests await it.
     @ObservationIgnored private(set) var pending: Task<Void, Never>?
     /// The search for what can be requested, beside ``pending``.
     @ObservationIgnored private(set) var pendingRequestables: Task<Void, Never>?
 
-    public init(library: any LibraryRepository, navigator: Navigator, debounce: Duration = .milliseconds(300), requests: (any RequestsRepository)? = nil) {
+    public init(library: any LibraryRepository, navigator: Navigator, debounce: Duration = .milliseconds(300), requests: (any RequestsRepository)? = nil, recents: RecentSearches? = nil) {
         self.library = library
         self.requests = requests
         self.navigator = navigator
         self.debounce = debounce
+        self.recents = recents
+        recentQueries = recents?.load() ?? []
     }
 
     /// Not in your library: what TMDB has that the library does not, for the
@@ -206,7 +212,7 @@ public final class SearchModel {
             guard !Task.isCancelled else { return }
             results = found
             resultsFor = text
-            recentQueries = Array(([text] + recentQueries.filter { $0.caseInsensitiveCompare(text) != .orderedSame }).prefix(8))
+            recentQueries = Array(([text] + recentQueries.filter { $0.caseInsensitiveCompare(text) != .orderedSame }).prefix(RecentSearches.limit))
             loading = false
         } catch {
             guard !Task.isCancelled, !(error is CancellationError) else { return }
@@ -216,15 +222,32 @@ public final class SearchModel {
     }
 
     private func mark(_ target: WatchTarget, _ watched: Bool, update: (inout SearchResults) -> Void) async {
-        do {
-            try await library.mark(target, watched: watched)
+        message = await markWatched(target, watched, in: library, drawn: {
             if var r = results {
                 update(&r)
                 results = r
             }
-            message = markedMessage(watched: watched)
-        } catch {
-            message = error.displayMessage
-        }
+        })
+    }
+}
+
+/// An account's recent searches on one server, kept in `defaults` between
+/// launches; another account, or the same one on another server, has its own.
+public struct RecentSearches: Sendable {
+    public static let limit = 8
+    private let key: String
+    private nonisolated(unsafe) let defaults: UserDefaults
+
+    public init(server: String, user: Int, defaults: UserDefaults = .standard) {
+        key = "recentSearches.\(server).\(user)"
+        self.defaults = defaults
+    }
+
+    public func load() -> [String] {
+        Array((defaults.stringArray(forKey: key) ?? []).prefix(Self.limit))
+    }
+
+    public func save(_ queries: [String]) {
+        if queries.isEmpty { defaults.removeObject(forKey: key) } else { defaults.set(Array(queries.prefix(Self.limit)), forKey: key) }
     }
 }

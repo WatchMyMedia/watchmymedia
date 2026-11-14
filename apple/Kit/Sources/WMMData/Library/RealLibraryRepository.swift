@@ -24,7 +24,7 @@ final class RealLibraryRepository: LibraryRepository {
     /// arranged Home. A reply with fixed rows and no `rows` keeps them, as
     /// older servers' do.
     func home() async throws -> HomeData {
-        let arranged = (store.current?.server.apiLevel ?? 0) >= rowsAPILevel
+        let arranged = store.features.rows
         var home = try await store.call { try await $0.getHome(query: .init(arranged: arranged ? true : nil)).ok.body.json }.model
         if !arranged {
             home.rows = nil
@@ -73,26 +73,42 @@ final class RealLibraryRepository: LibraryRepository {
         return SearchResults(movies: r.movies.map(\.browseItem), shows: r.shows.map(\.browseItem), episodes: r.episodes.map(\.card))
     }
 
+    /// Each mark tells every listener what changed, and the server's echo of
+    /// it is dropped (``ServerEvents/expect(_:)``), so every screen showing it
+    /// loads once.
     func setWatched(_ kind: WatchKind, id: Int, watched: Bool) async throws {
-        let id = Int64(id)
-        if watched {
-            let type: Operations.MarkWatched.Input.Path._TypePayload = kind == .movie ? .movie : .episode
-            _ = try await store.call { try await $0.markWatched(path: .init(_type: type, id: id)).noContent }
-        } else {
-            let type: Operations.MarkUnwatched.Input.Path._TypePayload = kind == .movie ? .movie : .episode
-            _ = try await store.call { try await $0.markUnwatched(path: .init(_type: type, id: id)).noContent }
+        let echo = events.expect(.watched(kind, ids: [id]))
+        let id64 = Int64(id)
+        do {
+            if watched {
+                let type: Operations.MarkWatched.Input.Path._TypePayload = kind == .movie ? .movie : .episode
+                _ = try await store.call { try await $0.markWatched(path: .init(_type: type, id: id64)).noContent }
+            } else {
+                let type: Operations.MarkUnwatched.Input.Path._TypePayload = kind == .movie ? .movie : .episode
+                _ = try await store.call { try await $0.markUnwatched(path: .init(_type: type, id: id64)).noContent }
+            }
+        } catch {
+            events.forget(echo)
+            throw error
         }
-        events.notify()
+        events.notify(.watched(kind, ids: [id], watched: watched))
     }
 
     func setSeasonWatched(showID: Int, season: Int, watched: Bool) async throws {
-        try await markSeason(showID: showID, season: season, watched: watched)
-        events.notify()
+        let echo = events.expect(.episodes)
+        do {
+            try await markSeason(showID: showID, season: season, watched: watched)
+        } catch {
+            events.forget(echo)
+            throw error
+        }
+        events.notify(.markedShow(id: showID, season: season, watched: watched))
     }
 
     /// One call for the whole show; a server without it gets one per season.
     func setShowWatched(showID: Int, watched: Bool) async throws {
         let id = Int64(showID)
+        let echo = events.expect(.episodes)
         do {
             if watched {
                 _ = try await store.call { try await $0.markShowWatched(path: .init(id: id)).noContent }
@@ -100,11 +116,20 @@ final class RealLibraryRepository: LibraryRepository {
                 _ = try await store.call { try await $0.markShowUnwatched(path: .init(id: id)).noContent }
             }
         } catch let error as APIError where error.status == 404 || error.status == 405 {
-            for season in try await show(id: showID).seasons {
-                try await markSeason(showID: showID, season: season.number, watched: watched)
+            do {
+                for season in try await show(id: showID).seasons {
+                    events.expect(.episodes)
+                    try await markSeason(showID: showID, season: season.number, watched: watched)
+                }
+            } catch {
+                events.forget(echo)
+                throw error
             }
+        } catch {
+            events.forget(echo)
+            throw error
         }
-        events.notify()
+        events.notify(.markedShow(id: showID, season: nil, watched: watched))
     }
 
     private func markSeason(showID: Int, season: Int, watched: Bool) async throws {
@@ -124,16 +149,13 @@ final class RealLibraryRepository: LibraryRepository {
         let file = try await fileInfo(fileID)
         if let movieID = file.movieId {
             let movie = try await movie(id: Int(movieID))
-            return PlayRequest(fileID: fileID, title: movie.title, subtitle: movie.year.map(String.init), backdropPath: movie.backdropPath, posterPath: movie.posterPath)
+            return PlayRequest(fileID: fileID, title: movie.title, subtitle: movie.year.map(String.init), backdropPath: movie.backdropPath, posterPath: movie.posterPath,
+                               overview: Mapping.nonBlank(movie.overview), year: movie.year, contentRating: movie.contentRating, genres: movie.genres)
         }
         if let showID = file.showId, let number = file.seasonNumber {
             let detail = try await season(showID: Int(showID), number: Int(number))
             if let episode = detail.episodes.first(where: { file.episodeId == Int64($0.id) }) {
-                return PlayRequest(
-                    fileID: fileID, title: detail.showTitle,
-                    subtitle: "\(episodeCode(season: episode.season, episode: episode.number)) · \(episode.title)",
-                    backdropPath: detail.showBackdropPath ?? episode.stillPath, stillPath: episode.stillPath, posterPath: detail.season.posterPath, showID: Int(showID), seasonNumber: Int(number)
-                )
+                return Self.episodeRequest(fileID: fileID, episode, showTitle: detail.showTitle, backdropPath: detail.showBackdropPath, posterPath: detail.season.posterPath, showID: Int(showID))
             }
         }
         let guess = file.parsed
@@ -161,13 +183,28 @@ final class RealLibraryRepository: LibraryRepository {
                 continue
             }
             guard let episode = detail.episodes.first(where: { $0.versions.contains { $0.fileID == fileID } }) else { continue }
-            return PlayRequest(
-                fileID: fileID, title: detail.showTitle,
-                subtitle: "\(episodeCode(season: episode.season, episode: episode.number)) · \(episode.title)",
-                backdropPath: show.backdropPath ?? episode.stillPath, stillPath: episode.stillPath, posterPath: show.posterPath, showID: show.id, seasonNumber: season
-            )
+            return Self.episodeRequest(fileID: fileID, episode, showTitle: detail.showTitle, backdropPath: show.backdropPath, posterPath: show.posterPath, showID: show.id)
         }
         return nil
+    }
+
+    /// Plays `fileID` as `episode` of its show, named and pictured as the
+    /// episode's page names it, with its description. `fileID` rather than the
+    /// episode's first file, since a play link names one version.
+    private static func episodeRequest(fileID: Int, _ episode: EpisodeDetail, showTitle: String, backdropPath: String?, posterPath: String?, showID: Int) -> PlayRequest {
+        PlayRequest(
+            fileID: fileID, title: showTitle,
+            subtitle: "\(episodeCode(season: episode.season, episode: episode.number)) · \(episode.title)",
+            backdropPath: backdropPath ?? episode.stillPath, stillPath: episode.stillPath, posterPath: posterPath, showID: showID, seasonNumber: episode.season,
+            overview: Mapping.nonBlank(episode.overview)
+        )
+    }
+
+    func filePage(fileID: Int) async throws -> FilePage? {
+        let file = try await fileInfo(fileID)
+        if let movieID = file.movieId { return .movie(id: Int(movieID)) }
+        guard let showID = file.showId else { return nil }
+        return .episode(showID: Int(showID), season: file.seasonNumber.map(Int.init), episode: file.episodeId.map(Int.init))
     }
 
     /// GET /api/files/{id}: what the server knows about a file.
@@ -184,6 +221,10 @@ final class RealLibraryRepository: LibraryRepository {
 
     func changes() -> AsyncStream<Void> {
         events.changes()
+    }
+
+    func libraryChanges() -> AsyncStream<LibraryChange> {
+        events.libraryChanges()
     }
 }
 

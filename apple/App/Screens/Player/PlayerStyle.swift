@@ -130,19 +130,23 @@ struct PlainBadge: View {
     }
 }
 
-/// A gold arc turning: loading and buffering.
+/// A gold arc turning: loading and buffering. With Reduce Motion it stays
+/// still and breathes instead (PLAN-APPLE-REVIEW.md §6.3).
 struct SpinnerRing: View {
     var size: CGFloat = 56
     var lineWidth: CGFloat = 3
     @State private var turning = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Circle()
             .trim(from: 0, to: 0.28)
             .stroke(Palette.gold, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
             .frame(width: size, height: size)
-            .rotationEffect(.degrees(turning ? 360 : 0))
-            .animation(.linear(duration: 0.9).repeatForever(autoreverses: false), value: turning)
+            .rotationEffect(.degrees(turning && !reduceMotion ? 360 : 0))
+            .opacity(reduceMotion && turning ? 0.45 : 1)
+            .animation(reduceMotion ? .easeInOut(duration: 1).repeatForever(autoreverses: true)
+                                    : .linear(duration: 0.9).repeatForever(autoreverses: false), value: turning)
             .onAppear { turning = true }
             .accessibilityElement()
             .accessibilityLabel("Loading")

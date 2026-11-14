@@ -14,22 +14,19 @@ final class HomeScreensTests: XCTestCase {
     /// Waits until `element` has focus.
     @MainActor
     private func focused(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
-        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hasFocus == true"), object: element)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+        element.waitForFocus(timeout: timeout)
     }
 
     /// Waits until `element` is on screen.
     @MainActor
     private func visible(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
-        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in element.exists && XCUIApplication().windows.firstMatch.frame.contains(element.frame) }, object: nil)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+        eventually(timeout: timeout) { element.exists && XCUIApplication().windows.firstMatch.frame.contains(element.frame) }
     }
 
     /// Waits until the panel above the row speaks of `title`.
     @MainActor
     private func panelSays(_ panel: XCUIElement, _ title: String, timeout: TimeInterval = 10) -> Bool {
-        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", title), object: panel)
-        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+        panel.waitForLabel(containing: title, timeout: timeout)
     }
 
     @MainActor
@@ -38,7 +35,7 @@ final class HomeScreensTests: XCTestCase {
         app.launchArguments = ["-fakes", "-fakesRows"]
         app.launch()
         let play = app.buttons["Play"]
-        XCTAssertTrue(play.waitForExistence(timeout: 15), "Home shows the hero")
+        XCTAssertTrue(play.waitUntilExists(timeout: 15), "Home shows the hero")
         XCTAssertTrue(visible(app.staticTexts["Row 1 of 7"]), "the first screen counts the drawn rows")
         // Every screen is laid out (the screens are a VStack), so the others' panels exist off screen.
         let panel = app.descendants(matching: .any)["homeFocusPanel-recentlyAddedShows"]

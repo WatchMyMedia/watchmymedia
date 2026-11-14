@@ -38,6 +38,13 @@ public final class FakeLiveTVRepository: LiveTVRepository {
     /// The clock search and reminders go by; tests set the boards' moment.
     public var now: @MainActor () -> Date = { Date() }
     private var listeners: [UUID: AsyncStream<Void>.Continuation] = [:]
+    private var typedListeners: [UUID: AsyncStream<LiveTVChange>.Continuation] = [:]
+    /// Calls made, for tests that count requests.
+    public private(set) var refreshCount = 0
+    public private(set) var remindersCount = 0
+    /// Awaited inside each reminders call after it is counted, so a test can
+    /// hold one open while a second caller joins it.
+    public var remindersHold: (@MainActor () async -> Void)?
     public var contextID: String? {
         guard let servers else { return "fake-live" }
         guard servers.currentUser != nil, let current = servers.current else { return nil }
@@ -46,12 +53,12 @@ public final class FakeLiveTVRepository: LiveTVRepository {
     public var capabilities: LiveTVCapabilities? { loaded && loadedContext == contextID ? offeredForServer : nil }
     public var channels: [LiveChannel] { capabilities?.available == true ? availableChannels.map(decorated) : [] }
     private var offeredForServer: LiveTVCapabilities {
-        if let servers, (servers.current?.server.apiLevel ?? 0) < liveTVAPILevel || servers.currentUser == nil { return .init() }
+        if let servers, !ServerFeatures(apiLevel: servers.current?.server.apiLevel).liveTV || servers.currentUser == nil { return .init() }
         var offered = offered
-        if let servers, (servers.current?.server.apiLevel ?? 0) < liveGuideAPILevel { offered.guide = false }
-        if let servers, (servers.current?.server.apiLevel ?? 0) < liveExtrasAPILevel { offered.extras = false }
-        if let servers, (servers.current?.server.apiLevel ?? 0) < liveRecordingAPILevel { offered.recording = false; offered.canRecord = false }
-        if let servers, (servers.current?.server.apiLevel ?? 0) < liveAutomaticAPILevel { offered.automatic = false }
+        if let servers, !ServerFeatures(apiLevel: servers.current?.server.apiLevel).liveGuide { offered.guide = false }
+        if let servers, !ServerFeatures(apiLevel: servers.current?.server.apiLevel).livePersonal { offered.extras = false }
+        if let servers, !ServerFeatures(apiLevel: servers.current?.server.apiLevel).liveRecordings { offered.recording = false; offered.canRecord = false }
+        if let servers, !ServerFeatures(apiLevel: servers.current?.server.apiLevel).liveAutomatic { offered.automatic = false }
         return offered
     }
     public init(servers: FakeServerRepository? = nil, guide: FakeLiveGuide? = nil) {
@@ -93,6 +100,7 @@ public final class FakeLiveTVRepository: LiveTVRepository {
         return guide
     }
     public func refresh() async throws {
+        refreshCount += 1
         let context = contextID
         await FakeLatency.wait()
         try Task.checkCancellation()
@@ -155,6 +163,8 @@ public final class FakeLiveTVRepository: LiveTVRepository {
     }
 
     public func reminders() async throws -> LiveReminders {
+        remindersCount += 1
+        if let remindersHold { await remindersHold() }
         _ = try await extras()
         let now = self.now()
         reminderItems.removeAll { $0.end <= now }
@@ -192,10 +202,23 @@ public final class FakeLiveTVRepository: LiveTVRepository {
         }
     }
 
-    /// As if another device changed a favourite or reminder (the server's private events).
-    public func changedElsewhere(_ change: (FakeLiveTVRepository) -> Void) {
+    public func liveChanges() -> AsyncStream<LiveTVChange> {
+        AsyncStream { continuation in
+            let id = UUID()
+            typedListeners[id] = continuation
+            continuation.onTermination = { [weak self] _ in Task { @MainActor in self?.typedListeners[id] = nil } }
+        }
+    }
+
+    /// Who listens for typed changes now, so a test can wait for a subscription before an event.
+    public var liveListenerCount: Int { typedListeners.count }
+
+    /// As if another device changed a favourite or reminder (the server's
+    /// private events): `part` says which event; `.all` is a reconnect's.
+    public func changedElsewhere(_ part: LiveTVChange = .all, _ change: (FakeLiveTVRepository) -> Void = { _ in }) {
         change(self)
         for listener in listeners.values { listener.yield() }
+        for listener in typedListeners.values { listener.yield(part) }
     }
 
     /// Stars or unstars a channel as another device would, without an event.

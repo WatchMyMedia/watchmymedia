@@ -10,11 +10,30 @@ import Testing
 @MainActor
 @Suite(.serialized) struct AVMediaPlayerTests {
     @Test func theItemsMetadataNamesWhatPlaysForTheTransportBar() {
-        let items = AVMediaPlayer.metadata(title: "Night Shift Diner", subtitle: "S02 E01 · Open Late")
+        let items = PlayerMetadata.items(title: "Night Shift Diner", subtitle: "S02 E01 · Open Late")
         #expect(items.map(\.identifier) == [.commonIdentifierTitle, .iTunesMetadataTrackSubTitle])
         #expect(items.map { $0.value as? String } == ["Night Shift Diner", "S02 E01 · Open Late"])
         // A bare play link has no title until the library names it.
-        #expect(AVMediaPlayer.metadata(title: "", subtitle: nil).isEmpty)
+        #expect(PlayerMetadata.items(title: "", subtitle: nil).isEmpty)
+    }
+
+    @Test func theInfoPanelHasTheDescriptionPictureRatingGenreAndYear() {
+        let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00])
+        let details = ItemDetails(overview: "A lighthouse keeper's last winter.", year: 2023, contentRating: "PG-13", genres: ["Drama", "Mystery"],
+                                  artwork: NowPlayingArtwork(id: "w1280/a.jpg", data: jpeg))
+        let items = PlayerMetadata.items(title: "Copper Valley", subtitle: "2023", details: details)
+        #expect(items.map(\.identifier) == [.commonIdentifierTitle, .iTunesMetadataTrackSubTitle, .commonIdentifierDescription, .commonIdentifierArtwork,
+                                             .iTunesMetadataContentRating, .quickTimeMetadataGenre, .quickTimeMetadataCreationDate])
+        #expect(items[2].value as? String == "A lighthouse keeper's last winter.")
+        #expect(items[3].value as? Data == jpeg)
+        #expect(items[3].dataType == kCMMetadataBaseDataType_JPEG as String)
+        #expect(items[4].value as? String == "PG-13")
+        #expect(items[5].value as? String == "Drama, Mystery")
+        #expect(items[6].value as? String == "2023")
+        // A picture AVKit can't read is left out rather than shown broken.
+        var gif = details
+        gif.artwork = NowPlayingArtwork(id: "x", data: Data("GIF89a".utf8))
+        #expect(!PlayerMetadata.items(title: "Copper Valley", subtitle: nil, details: gif).contains { $0.identifier == .commonIdentifierArtwork })
     }
 
     @Test func theLinkIsMeasuredOverTheTransfersSinceTheLastRead() {

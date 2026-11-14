@@ -184,4 +184,59 @@ struct LiveGuideModelTests {
         let end = try #require(channel.now?.end)
         #expect(channel.programme(at: end)?.title == "Conference Football")
     }
+
+    // MARK: Kept, not recomputed (PLAN-APPLE-REVIEW.md §4.3.4)
+
+    @Test func theRowsAreBuiltOnceUntilWhatTheyShowChanges() async throws {
+        let (_, model) = try await make()
+        let rows = model.rows
+        for row in model.rows { for cell in row.cells { _ = model.isSelected(row, cell) } }
+        _ = model.filters
+        #expect(model.rows == rows)
+        #expect(model.rowBuilds == 1, "reading the grid again, and asking each cell, builds nothing")
+        model.query = "4."
+        #expect(model.rows.map(\.channel.number).allSatisfy { $0.hasPrefix("4.") })
+        #expect(model.rowBuilds == 2)
+        model.query = ""
+        model.filter = try #require(model.filters.first)
+        _ = model.rows
+        #expect(model.rowBuilds == 3)
+        model.showAll()
+        model.later()
+        #expect(model.rows.first?.cells.first?.start == model.start)
+        #expect(model.rowBuilds == 4)
+    }
+
+    @Test func theSelectionIsWorkedOutOnceAndFollowsAChoice() async throws {
+        let (_, model) = try await make()
+        let rows = model.rows
+        let first = try #require(rows.first { $0.channel.number == "2.1" })
+        #expect(model.isSelected(first, try #require(first.cells.first)))
+        let other = try #require(rows.first { $0.channel.number == "4.1" })
+        model.select(other, try #require(other.cells.first))
+        #expect(!model.isSelected(first, try #require(first.cells.first)))
+        #expect(model.isSelected(other, try #require(other.cells.first)))
+        #expect(model.rowBuilds == 1, "choosing a cell doesn't rebuild the rows")
+    }
+
+    @Test func theProgrammeOnNowStaysSelectedOnlyWhileItIsOn() async throws {
+        FakeLatency.duration = .zero
+        let repository = FakeLiveTVRepository(guide: FakeLiveGuide(now: now, calendar: clock.calendar))
+        try await repository.refresh()
+        let time = MovingNow(now)
+        let model = LiveGuideModel(repository: repository, spanMinutes: 120, clock: clock, now: { time.date })
+        await model.load()
+        let row = try #require(model.rows.first { $0.channel.number == "2.1" })
+        let quiz = try #require(row.cells.first { $0.programme?.title == "Quiz Parlor" })
+        #expect(model.isSelected(row, quiz))
+        time.date = try #require(quiz.programme?.end).addingTimeInterval(1)
+        #expect(!model.isSelected(row, quiz), "once it ends, the selection moves on with now")
+    }
+}
+
+/// A clock a test moves.
+@MainActor
+private final class MovingNow {
+    var date: Date
+    init(_ date: Date) { self.date = date }
 }

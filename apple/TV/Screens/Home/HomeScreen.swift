@@ -27,17 +27,12 @@ private struct HomeView: View {
     @State var model: HomeModel
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
-    @Environment(\.imageLoader) private var imageLoader
 
-    /// The screen on view, by index: 0 the hero's, then one per row after the first, then the end screen.
-    @State private var page: Int?
+    /// The screen on view: the hero's, one per row after the first, then the end screen.
+    @State private var page: HomePage?
     /// The screen that holds focus; a container's focus state, so Back to the
     /// top and Menu can move focus to the first screen.
-    @FocusState private var focusedPage: Int?
-    /// Each row's focused card, by row id, for the panel above it.
-    @State private var focusedCards: [String: String] = [:]
-    /// The Live TV row's focused channel, or ``TVLiveHomeRow/guideKey``.
-    @State private var focusedChannel: String?
+    @FocusState private var focusedPage: HomePage?
     @State private var editingRows = false
 
     private var liveAvailable: Bool { services.liveTV.capabilities?.available == true }
@@ -61,6 +56,7 @@ private struct HomeView: View {
             }
         }
         .task { await model.run() }
+        .publishesTopShelf(model.state.value)
         .messagePill($model.message)
         .noticeAlert($model.notice)
         .fullScreenCover(isPresented: $editingRows) { TVRowEditor(screen: .home, screenName: "Home") }
@@ -75,10 +71,9 @@ private struct HomeView: View {
     /// The paging screens: the hero and the first row, a screen per further row, the end screen.
     private func screens(_ home: HomeData) -> some View {
         let rows = home.drawnRows(liveTV: liveAvailable)
-        let endPage = max(rows.count, 1)
-        let atTop = (page ?? 0) == 0
+        let atTop = (page ?? .start) == .start
         return ScrollView(.vertical) {
-            screenStack(home, rows: rows, endPage: endPage)
+            screenStack(home, rows: rows)
         }
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: $page)
@@ -87,42 +82,44 @@ private struct HomeView: View {
         .ignoresSafeArea()
         // Focus moving into another screen pages to it.
         .onChange(of: focusedPage) { _, focused in
-            guard let focused, focused != page ?? 0 else { return }
+            guard let focused, focused != page ?? .start else { return }
             withAnimation(.easeInOut(duration: 0.3)) { page = focused }
         }
         // Menu on a row screen goes back to the first screen; from there it is the system's.
         .onExitCommand(perform: atTop ? nil : { backToTop() })
     }
 
-    private func screenStack(_ home: HomeData, rows: [ScreenRow], endPage: Int) -> some View {
+    /// The screens, each identified by what it shows (``HomePage``), not its
+    /// place: a row appearing above another (Live TV once its capabilities
+    /// arrive, Continue watching after a first play) leaves the others' focused
+    /// cards and the screen on view where they were.
+    private func screenStack(_ home: HomeData, rows: [ScreenRow]) -> some View {
         VStack(spacing: 0) {
             // Without a hero (nothing added lately), the first row has a screen of its own like the others.
             if home.hero == nil, let first = rows.first {
-                rowScreen(first, index: 0, rows: rows)
-                    .id(0)
+                rowScreen(first, index: 0, rows: rows, page: .start)
             } else {
                 startScreen(home, rows: rows)
-                    .id(0)
+                    .id(HomePage.start)
             }
             ForEach(Array(rows.enumerated().dropFirst()), id: \.element.id) { index, row in
-                rowScreen(row, index: index, rows: rows)
-                    .id(index)
+                rowScreen(row, index: index, rows: rows, page: .row(row.id))
             }
-            endScreen(home, rows: rows, index: endPage)
-                .id(endPage)
+            endScreen(home, rows: rows, index: max(rows.count, 1))
+                .id(HomePage.end)
         }
         .scrollTargetLayout()
     }
 
     private func backToTop() {
-        withAnimation(.easeInOut(duration: 0.3)) { page = 0 }
-        focusedPage = 0
+        withAnimation(.easeInOut(duration: 0.3)) { page = .start }
+        focusedPage = .start
     }
 
     /// Screen 1: the hero and the first row (TvHomeStart.dc.html).
     private func startScreen(_ home: HomeData, rows: [ScreenRow]) -> some View {
         ZStack(alignment: .topTrailing) {
-            if let hero = home.hero { backdrop(url(hero.backdropPath, .w1280), seed: hero.title) }
+            if let hero = home.hero { ScreenBackdrop(url: url(hero.backdropPath, .w1280), seed: hero.title) }
             VStack(alignment: .leading, spacing: 0) {
                 if let hero = home.hero {
                     HomeHero(
@@ -140,42 +137,28 @@ private struct HomeView: View {
                 }
                 Spacer(minLength: 0)
                 if let first = rows.first {
-                    arrangedRow(first, index: 0, rows: rows)
+                    // No panel on this screen, so the row keeps its focused card to itself.
+                    TVArrangedRow(row: first, actions: TVRowActions(model), counter: rowCounter(index: 0, of: rows.count))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                nextRowLine(rows.count > 1 ? rows[1].screenName : HomeEndScreen.name, index: 0)
+                NextRowLine(name: rows.count > 1 ? rows[1].screenName : HomeEndScreen.name, index: 0)
             }
             .overlay(alignment: .top) { TabBarAccessories() }
         }
         .screen()
-        .focused($focusedPage, equals: 0)
+        .focused($focusedPage, equals: .start)
     }
 
-    /// A row's screen: the focused card's picture and panel, then the row (TvHomeRow.dc.html).
-    private func rowScreen(_ row: ScreenRow, index: Int, rows: [ScreenRow]) -> some View {
-        let key = focusedCards[row.id]
-        let panel = panel(for: row, card: key)
-        return ZStack(alignment: .topTrailing) {
-            if let panel { backdrop(panel.pictureURL ?? url(panel.picturePath, .w1280), seed: panel.seed) }
-            VStack(alignment: .leading, spacing: 0) {
-                if let panel {
-                    FocusPanel(panel: panel, moreInRow: row.hasSeveralCards)
-                        .padding(.horizontal, TVLayout.gutter)
-                        .padding(.top, 150)
-                        .accessibilityIdentifier("homeFocusPanel-\(row.id)")
-                }
-                Spacer(minLength: 0)
-                arrangedRow(row, index: index, rows: rows)
-                nextRowLine(rows.indices.contains(index + 1) ? rows[index + 1].screenName : HomeEndScreen.name, index: index)
-            }
-        }
-        .screen()
-        .focused($focusedPage, equals: index)
-        // The cards either side are fetched ahead, so ◀ ▶ does not flash the placeholder.
-        .task(id: key) {
-            for neighbour in RowPanel.neighbours(for: row, card: key) {
-                await Artwork.prefetch(neighbour.pictureURL ?? url(neighbour.picturePath, .w1280), maxPixel: 1920, loader: imageLoader)
-            }
-        }
+    /// A row's screen (TvHomeRow.dc.html), a view of its own: moving along
+    /// its row redraws that screen alone, not the others.
+    private func rowScreen(_ row: ScreenRow, index: Int, rows: [ScreenRow], page: HomePage) -> some View {
+        HomeRowScreen(
+            row: row, index: index,
+            counter: rowCounter(index: index, of: rows.count),
+            nextName: rows.indices.contains(index + 1) ? rows[index + 1].screenName : HomeEndScreen.name,
+            model: model, page: page, focusedPage: $focusedPage
+        )
+        .id(page)
     }
 
     /// The last screen: Edit rows, Back to the top and the totals.
@@ -212,55 +195,9 @@ private struct HomeView: View {
         .padding(.top, 330)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .screen()
-        .focused($focusedPage, equals: index)
+        .focused($focusedPage, equals: .end)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("homeEnd")
-    }
-
-    private func arrangedRow(_ row: ScreenRow, index: Int, rows: [ScreenRow]) -> some View {
-        TVArrangedRow(
-            row: row, actions: rowActions, counter: rowCounter(index: index, of: rows.count),
-            focusedCard: Binding(get: { focusedCards[row.id] }, set: { focusedCards[row.id] = $0 }),
-            focusedChannel: $focusedChannel
-        )
-        // Its own height: a horizontal scroll view would take all the screen left over the panel.
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
-    /// The panel for a row's focused card; the Live TV row's is the focused channel's programme.
-    private func panel(for row: ScreenRow, card key: String?) -> RowPanel? {
-        guard row.style == .live else { return RowPanel.panel(for: row, card: key) }
-        if focusedChannel == TVLiveHomeRow.guideKey { return .fullGuide }
-        let channels = services.liveTV.channels.filter(\.available)
-        guard let channel = channels.first(where: { $0.id == focusedChannel }) ?? channels.first else { return nil }
-        return RowPanel(channel: channel, now: .now)
-    }
-
-    /// The next row's name along the bottom edge, with a chevron (TvHomeRow.dc.html's `.peek`).
-    private func nextRowLine(_ name: String, index: Int) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "chevron.down").font(.system(size: 17, weight: .semibold))
-            Text(name).lineLimit(1)
-        }
-        .font(.system(size: 19))
-        .foregroundStyle(Palette.muted)
-        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
-        .overlay(alignment: .top) { Rectangle().fill(Palette.separator).frame(height: 1) }
-        .padding(.horizontal, TVLayout.gutter)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Next row: \(name)")
-        .accessibilityIdentifier("homeNextRow-\(index)")
-    }
-
-    /// The picture across the top right of a screen, fading to the ground at the left and bottom.
-    private func backdrop(_ url: URL?, seed: String) -> some View {
-        CrossfadeArtwork(url: url, seed: seed, maxPixel: 1920)
-            .frame(width: 1400, height: 660)
-            .overlay(RadialGradient(colors: [Palette.gold.opacity(0.10), .clear], center: UnitPoint(x: 0.7, y: 0.3), startRadius: 0, endRadius: 700))
-            .overlay(LinearGradient(stops: [.init(color: Palette.ground, location: 0), .init(color: Palette.ground.opacity(0.85), location: 0.22), .init(color: Palette.ground.opacity(0), location: 0.6)], startPoint: .leading, endPoint: .trailing))
-            .overlay(LinearGradient(stops: [.init(color: Palette.ground.opacity(0), location: 0.5), .init(color: Palette.ground, location: 1)], startPoint: .top, endPoint: .bottom))
-            .clipped()
-            .accessibilityHidden(true)
     }
 
     // MARK: One scrolling page (older servers, and an empty Home)
@@ -300,65 +237,16 @@ private struct HomeView: View {
         }
     }
 
-    private var rowActions: TVRowActions {
-        TVRowActions(
-            open: { model.open($0) },
-            openEpisode: { model.open($0) },
-            playEpisode: { model.play($0) },
-            resume: { model.resume($0) },
-            openPage: { model.openPage(of: $0) },
-            setWatched: { await model.setWatched($0, $1) },
-            openList: { model.open(.list(id: $0)) }
-        )
-    }
-
-    /// Today's rows, from servers below API level 22.
+    /// Today's rows, from servers below API level 22, drawn as arranged rows
+    /// are: the Live TV row after Continue watching, and what to do first
+    /// under it on an empty Home.
     @ViewBuilder private func fixedRows(_ home: HomeData) -> some View {
-                if !home.continueWatching.isEmpty {
-                    ShelfRow(title: "Continue watching", items: home.continueWatching) { item in
-                        Button { model.resume(item) } label: {
-                            WideCard(title: item.title, line: item.remainingLine, imageURL: url(item.stillPath ?? item.backdropPath, .w780), seed: item.title) {
-                                ProgressStrip(progress: item.progress, height: 6).pinned(.bottom, padding: 0)
-                            }
-                        }
-                        .buttonStyle(.borderless)
-                        .accessibilityHint("Resumes playing")
-                        .contextMenu {
-                            Button { model.resume(item) } label: { Label("Resume", systemImage: "play.fill") }
-                            if let target = item.watchTarget {
-                                WatchToggleButton(watched: false) { await model.setWatched(target, $0) }
-                            }
-                            if item.pageRoute != nil {
-                                Button { model.openPage(of: item) } label: { Label(item.pageLabel, systemImage: "info.circle") }
-                            }
-                        }
-                    }
-                }
-                TVLiveHomeRow()
-                if home.isEmpty {
-                    firstRun
-                }
-                if !home.recentlyAddedShows.isEmpty {
-                    posterRow("Recently added", detail: "TV Shows", items: home.recentlyAddedShows)
-                }
-                if !home.recentlyAired.isEmpty {
-                    ShelfRow(title: "Recently aired", detail: "Episodes", items: home.recentlyAired) { episode in airedCard(episode) }
-                }
-                if !home.recentlyAddedMovies.isEmpty {
-                    posterRow("Recently added", detail: "Movies", items: home.recentlyAddedMovies)
-                }
-                if !home.recentlyReleased.isEmpty {
-                    ShelfRow(title: "Recently released", detail: "Movies", items: home.recentlyReleased) { item in
-                        Button { model.open(item) } label: {
-                            WideCard(title: item.title, imageURL: url(item.backdropPath, .w780), seed: item.title) {
-                                if let date = formatDate(item.releaseDate) { TVBadge(date).pinned(.bottomLeading, padding: 10) }
-                                if item.watched { WatchedCheck(size: 28).pinned(.bottomTrailing, padding: 10) }
-                            }
-                        }
-                        .buttonStyle(.borderless)
-                        .contextMenu { watchMenu(item) }
-                    }
-                }
+        ForEach(home.fixedRows) { row in
+            TVArrangedRow(row: row, actions: TVRowActions(model))
+            if row.style == .live && home.isEmpty {
+                firstRun
+            }
+        }
     }
 
     private var firstRun: some View {
@@ -372,7 +260,7 @@ private struct HomeView: View {
                 Text("Open this address on your phone or computer.")
                     .foregroundStyle(Palette.muted)
             }
-            Button("Check again") { Task { await model.refresh() } }
+            Button(checkAgainTitle) { Task { await model.refresh() } }
                 .accessibilityIdentifier("homeCheckAgain")
         }
         .frame(maxWidth: .infinity)
@@ -393,43 +281,125 @@ private struct HomeView: View {
             .padding(.top, -200)
             .accessibilityHidden(true)
     }
+}
 
-    private func posterRow(_ title: String, detail: String, items: [BrowseItem]) -> some View {
-        ShelfRow(title: title, detail: detail, items: items) { item in
-            Button { model.open(item) } label: {
-                PosterCard(item: item, imageURL: url(item.posterPath, .w500), width: 160)
-            }
-            .buttonStyle(.borderless)
-            .contextMenu { watchMenu(item) }
-        }
+/// One of Home's screens, by what it shows: the first (the hero's), a row's, or the end.
+private enum HomePage: Hashable {
+    case start
+    case row(String)
+    case end
+}
+
+private extension TVRowActions {
+    /// Home's card actions.
+    @MainActor init(_ model: HomeModel) {
+        self.init(
+            open: { model.open($0) },
+            openEpisode: { model.open($0) },
+            playEpisode: { model.play($0) },
+            resume: { model.resume($0) },
+            openPage: { model.openPage(of: $0) },
+            setWatched: { await model.setWatched($0, $1) },
+            openList: { model.open(.list(id: $0)) }
+        )
     }
+}
 
-    private func airedCard(_ episode: EpisodeCard) -> some View {
-        Button { model.open(episode) } label: {
-            WideCard(title: episode.showTitle, line: episode.airedLine(), imageURL: url(episode.stillPath ?? episode.showBackdropPath, .w780), seed: episode.showTitle) {
-                if episode.isNew { TVBadge("New", style: .gold).pinned(.topLeading, padding: 10) }
-                if !episode.hasFile {
-                    TVBadge("Not in library", style: .warning).pinned(.topTrailing, padding: 10)
-                } else if episode.watched {
-                    WatchedCheck(size: 28).pinned(.topTrailing, padding: 10)
+/// A row's screen: the focused card's picture and panel, then the row
+/// (TvHomeRow.dc.html). It holds its row's focused card itself, so moving
+/// along the row redraws this screen and not every screen on Home; the card
+/// actions are made here, from the model, for the same reason.
+private struct HomeRowScreen: View {
+    let row: ScreenRow
+    let index: Int
+    let counter: String
+    let nextName: String
+    let model: HomeModel
+    let page: HomePage
+    var focusedPage: FocusState<HomePage?>.Binding
+    /// The focused card's key (``BrowseItem/cardID``, ``EpisodeCard/cardKey``, ``ContinueItem/cardKey``).
+    @State private var focusedCard: String?
+    /// The Live TV row's focused channel, or ``TVLiveHomeRow/guideKey``.
+    @State private var focusedChannel: String?
+    @Environment(AppServices.self) private var services
+    @Environment(\.imageLoader) private var imageLoader
+
+    var body: some View {
+        let panel = panel()
+        ZStack(alignment: .topTrailing) {
+            if let panel { ScreenBackdrop(url: panel.pictureURL ?? url(panel.picturePath, .w1280), seed: panel.seed) }
+            VStack(alignment: .leading, spacing: 0) {
+                if let panel {
+                    FocusPanel(panel: panel, moreInRow: row.hasSeveralCards)
+                        .padding(.horizontal, TVLayout.gutter)
+                        .padding(.top, 150)
+                        .accessibilityIdentifier("homeFocusPanel-\(row.id)")
                 }
-                TVBadge(episode.codeBadge).pinned(.bottomLeading, padding: 10)
+                Spacer(minLength: 0)
+                TVArrangedRow(row: row, actions: TVRowActions(model), counter: counter, focusedCard: $focusedCard, focusedChannel: $focusedChannel)
+                    // Its own height: a horizontal scroll view would take all the screen left over the panel.
+                    .fixedSize(horizontal: false, vertical: true)
+                NextRowLine(name: nextName, index: index)
             }
         }
-        .buttonStyle(.borderless)
-        .accessibilityHint("Opens the episode on its show")
-        .contextMenu {
-            if episode.playRequest != nil {
-                Button { model.play(episode) } label: { Label("Play", systemImage: "play.fill") }
+        .screen()
+        .focused(focusedPage, equals: page)
+        // The cards either side are fetched ahead, so ◀ ▶ does not flash the placeholder.
+        .task(id: focusedCard) {
+            for neighbour in RowPanel.neighbours(for: row, card: focusedCard) {
+                await Artwork.prefetch(neighbour.pictureURL ?? url(neighbour.picturePath, .w1280), maxPixel: 1920, loader: imageLoader)
             }
-            WatchToggleButton(watched: episode.watched) { await model.setWatched(.episode(id: episode.episodeID), $0) }
         }
     }
 
-    @ViewBuilder private func watchMenu(_ item: BrowseItem) -> some View {
-        if let target = item.watchTarget {
-            WatchToggleButton(watched: item.watched) { await model.setWatched(target, $0) }
+    private func url(_ path: String?, _ size: ImageSize) -> URL? {
+        services.library.imageURL(path, size: size)
+    }
+
+    /// The panel for the focused card; the Live TV row's is the focused channel's programme.
+    private func panel() -> RowPanel? {
+        guard row.style == .live else { return RowPanel.panel(for: row, card: focusedCard) }
+        if focusedChannel == TVLiveHomeRow.guideKey { return .fullGuide }
+        let channels = services.liveTV.channels.filter(\.available)
+        guard let channel = channels.first(where: { $0.id == focusedChannel }) ?? channels.first else { return nil }
+        return RowPanel(channel: channel, now: .now)
+    }
+}
+
+/// The next row's name along the bottom edge, with a chevron (TvHomeRow.dc.html's `.peek`).
+private struct NextRowLine: View {
+    let name: String
+    let index: Int
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "chevron.down").font(.system(size: 17, weight: .semibold))
+            Text(name).lineLimit(1)
         }
+        .font(.system(size: 19))
+        .foregroundStyle(Palette.muted)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+        .overlay(alignment: .top) { Rectangle().fill(Palette.separator).frame(height: 1) }
+        .padding(.horizontal, TVLayout.gutter)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(nextRowLabel(name))
+        .accessibilityIdentifier("homeNextRow-\(index)")
+    }
+}
+
+/// The picture across the top right of a screen, fading to the ground at the left and bottom.
+private struct ScreenBackdrop: View {
+    let url: URL?
+    let seed: String
+
+    var body: some View {
+        CrossfadeArtwork(url: url, seed: seed, maxPixel: 1920)
+            .frame(width: 1400, height: 660)
+            .overlay(RadialGradient(colors: [Palette.gold.opacity(0.10), .clear], center: UnitPoint(x: 0.7, y: 0.3), startRadius: 0, endRadius: 700))
+            .overlay(LinearGradient(stops: [.init(color: Palette.ground, location: 0), .init(color: Palette.ground.opacity(0.85), location: 0.22), .init(color: Palette.ground.opacity(0), location: 0.6)], startPoint: .leading, endPoint: .trailing))
+            .overlay(LinearGradient(stops: [.init(color: Palette.ground.opacity(0), location: 0.5), .init(color: Palette.ground, location: 1)], startPoint: .top, endPoint: .bottom))
+            .clipped()
+            .accessibilityHidden(true)
     }
 }
 

@@ -1,0 +1,140 @@
+import Foundation
+import Observation
+import WMMModel
+
+/// One play on a ``PlaybackController`` from start to finish, as every player
+/// screen's model needs it (PLAN-APPLE-REVIEW.md §5.2): it starts the
+/// controller and listens to it, follows its state, swaps in the next episode
+/// when one starts in place, closes the play once when the app goes to the
+/// background, and leaves once. ``TVPlayerModel`` and the phone's
+/// ``PlayerChromeModel`` are built on it.
+///
+/// The screen's own model keeps what is only its own: which overlay shows,
+/// the controls, the remote's keys, how long picture in picture gets.
+@MainActor
+@Observable
+public final class PlayerSession {
+    public let controller: any PlaybackController
+    /// What plays now: the request the screen opened with, or the next episode once it started in place.
+    public private(set) var request: PlayRequest
+
+    /// ``dispose()`` ran: the player is let go of and nothing more is followed.
+    @ObservationIgnored public private(set) var isDisposed = false
+    /// The play was closed when the app went to the background and not opened again.
+    @ObservationIgnored public private(set) var isClosedInBackground = false
+
+    @ObservationIgnored private let onExit: @MainActor () -> Void
+    @ObservationIgnored private var stateChanged: @MainActor () -> Void = {}
+    @ObservationIgnored private var startedNext: @MainActor () -> Void = {}
+    @ObservationIgnored private var finished = false
+    @ObservationIgnored private var started = false
+    @ObservationIgnored private var eventsTask: Task<Void, Never>?
+
+    public init(controller: any PlaybackController, request: PlayRequest, onExit: @escaping @MainActor () -> Void) {
+        self.controller = controller
+        self.request = request
+        self.onExit = onExit
+    }
+
+    /// Starts playing and listening to the controller. `stateChanged` runs
+    /// now and after every change to the controller's state; `startedNext`
+    /// after the next episode started in place and became ``request``. Once.
+    public func start(stateChanged: @escaping @MainActor () -> Void = {}, startedNext: @escaping @MainActor () -> Void = {}) {
+        guard !started, !isDisposed else { return }
+        started = true
+        self.stateChanged = stateChanged
+        self.startedNext = startedNext
+        controller.start(request)
+        let events = controller.events
+        eventsTask = Task { [weak self] in
+            for await event in events { self?.handle(event) }
+        }
+        follow()
+    }
+
+    /// The same play again, from the start of it (Try again).
+    public func restart() {
+        controller.start(request)
+    }
+
+    /// Plays another episode on the same controller in place of this one, and
+    /// it becomes ``request``: the controller ends this play and starts that one
+    /// on the same player (the Apple TV player's Episodes tab, and the phone's
+    /// episodes panel, which keeps its Picture in Picture this way).
+    public func play(_ next: PlayRequest) {
+        guard started, !isDisposed else { return }
+        request = next
+        controller.start(next)
+    }
+
+    /// The screen went away: reports "stopped" and lets go of the player. Safe to call twice.
+    public func dispose() {
+        guard !isDisposed else { return }
+        isDisposed = true
+        eventsTask?.cancel()
+        controller.stop()
+        controller.release()
+    }
+
+    /// The viewer leaves, or the play ended: the screen's `onExit`, once.
+    public func finish() {
+        guard !finished else { return }
+        finished = true
+        onExit()
+    }
+
+    /// The app went to the background: the video pauses and the server hears
+    /// "closed", once until ``reopen()``. False when nothing was done.
+    @discardableResult
+    public func closeInBackground() -> Bool {
+        guard !isClosedInBackground, !isDisposed else { return false }
+        isClosedInBackground = true
+        controller.pause()
+        controller.close()
+        return true
+    }
+
+    /// The app is in front again; the video stays paused until the viewer
+    /// plays. True when the play had been closed in the background.
+    @discardableResult
+    public func reopen() -> Bool {
+        guard isClosedInBackground else { return false }
+        isClosedInBackground = false
+        return true
+    }
+
+    /// The request for the episode that started after `previous`, named from
+    /// the controller's state. The still and poster too, so a retry keeps the
+    /// episode's Now Playing picture; and what belongs to the show (the year,
+    /// certification and genres) from `previous`, the same show's. The next
+    /// episode's description isn't known here, so it has none.
+    public static func next(fileID: Int, state: PlayerState, after previous: PlayRequest? = nil) -> PlayRequest {
+        PlayRequest(
+            fileID: fileID, title: state.title, subtitle: state.subtitle,
+            backdropPath: state.backdropPath, stillPath: state.stillPath, posterPath: state.posterPath,
+            year: previous?.year, contentRating: previous?.contentRating, genres: previous?.genres ?? []
+        )
+    }
+
+    private func handle(_ event: PlayerEvent) {
+        switch event {
+        case .exit:
+            // An admin's stop shows its message first; Back leaves.
+            if controller.state.stopMessage == nil { finish() }
+        case .startedNext(let fileID):
+            request = Self.next(fileID: fileID, state: controller.state, after: request)
+            startedNext()
+        }
+    }
+
+    /// Calls `stateChanged` now and after each change to the controller's state, until disposed.
+    private func follow() {
+        guard !isDisposed else { return }
+        withObservationTracking {
+            _ = controller.state
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in self?.follow() }
+        }
+        stateChanged()
+    }
+}

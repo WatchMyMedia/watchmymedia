@@ -25,9 +25,6 @@ struct PlayerScreen: View {
             Color.black.ignoresSafeArea()
             if let model, let episodes { PlayerContent(model: model, episodes: episodes) }
         }
-        .statusBarHidden()
-        .persistentSystemOverlays(.hidden)
-        .landscapeWhileShown()
         .onAppear(perform: begin)
         .onDisappear { model?.dispose() }
     }
@@ -49,48 +46,24 @@ struct PlayerScreen: View {
     }
 }
 
+/// The screen around the video, inside the players' shell. It reads the
+/// model's steady state, which changes when something other than the
+/// position does; what ticks is read only by the small views that draw it
+/// (``PlayerClock``).
 private struct PlayerContent: View {
     let model: PlayerChromeModel
     let episodes: PlayerEpisodesModel
     @State private var showsEpisodes = false
-    @State private var pictureInPicture = PictureInPicture()
     @Environment(AppServices.self) private var services
-    @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontal
     @Environment(\.verticalSizeClass) private var vertical
 
     var body: some View {
-        let state = model.state
         let metrics = PlayerMetrics.for(horizontal: horizontal, vertical: vertical)
-        GeometryReader { geo in
-            let portrait = metrics.sidePanelPicker && geo.size.height > geo.size.width
-            let videoHeight = portrait ? geo.size.width * 9 / 16 : geo.size.height
-            let insets = PlayerInsets(portrait ? EdgeInsets(top: geo.safeAreaInsets.top, leading: 0, bottom: 0, trailing: 0) : geo.safeAreaInsets, metrics: metrics)
-            ZStack(alignment: .top) {
-                VStack(spacing: 0) {
-                    video(in: geo, insets: insets, metrics: metrics, portrait: portrait)
-                        .frame(height: videoHeight)
-                        .clipped()
-                    if portrait {
-                        PlayerPortraitDetails(model: model, episodes: episodes)
-                    }
-                }
-                if !pictureInPicture.isActive {
-                    overlay(state, insets: insets, metrics: metrics)
-                    if showsEpisodes, model.overlay == nil {
-                        PlayerEpisodesPanel(model: model, episodes: episodes) { showsEpisodes = false }
-                    }
-                }
-            }
-            .animation(.easeInOut(duration: 0.2), value: model.showsControls)
-            .animation(.easeInOut(duration: 0.2), value: model.showsUpNext)
-            .animation(.easeInOut(duration: 0.2), value: model.showsSkip)
-            .animation(.easeOut(duration: 0.25), value: model.overlay)
-            .animation(.easeOut(duration: 0.2), value: model.ripple)
-            .animation(.easeInOut(duration: 0.25), value: state.qualityNote)
+        PlayerShell(model: model, orientations: .landscape) { frame in
+            content(frame)
         }
-        .ignoresSafeArea()
         .task(id: "\(model.request.fileID)-\(metrics.sidePanelPicker)") {
             if metrics.sidePanelPicker { await episodes.load(for: model.request) }
         }
@@ -98,67 +71,92 @@ private struct PlayerContent: View {
             if !tablet { showsEpisodes = false }
         }
         .onChange(of: showsEpisodes) { _, open in
-            model.keepsControlsUp = open || voiceOver
+            model.hold("panel", open)
             model.showControls()
         }
         .onChange(of: model.overlay) { _, overlay in
             if overlay != nil { showsEpisodes = false }
         }
-        .onChange(of: scenePhase) { _, phase in
-            switch phase {
-            case .background:
-                model.enteredBackground(
-                    externalPlayback: model.controller.player?.isExternalPlaybackActive ?? false,
-                    pictureInPictureMayStart: pictureInPicture.mayStartAutomatically
-                )
-            case .active: model.becameActive()
-            default: break
-            }
-        }
-        .onChange(of: pictureInPicture.isActive) { _, active in
-            model.pictureInPictureChanged(active: active, appActive: scenePhase == .active)
-        }
-        .onChange(of: voiceOver, initial: true) { was, on in
-            if on || was != on { model.keepsControlsUp = on || showsEpisodes }
-        }
-        .accessibilityAction(.escape) { model.close() }
     }
 
-    private func video(in geo: GeometryProxy, insets: PlayerInsets, metrics: PlayerMetrics, portrait: Bool) -> some View {
+    private func content(_ frame: PlayerFrame) -> some View {
         let state = model.state
+        let metrics = frame.metrics
+        let pictureInPicture = frame.pictureInPicture
+        let portrait = metrics.sidePanelPicker && frame.tall
+        let insets = frame.insets(portrait: portrait)
+        return ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                video(in: frame, insets: insets, portrait: portrait)
+                    .frame(height: portrait ? frame.size.width * 9 / 16 : frame.size.height)
+                    .clipped()
+                if portrait {
+                    PlayerPortraitDetails(model: model, episodes: episodes)
+                }
+            }
+            if !pictureInPicture.isActive {
+                overlay(state, insets: insets, metrics: metrics)
+                if showsEpisodes, model.overlay == nil {
+                    PlayerEpisodesPanel(model: model, episodes: episodes) { showsEpisodes = false }
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: model.showsControls)
+        .animation(.easeInOut(duration: 0.2), value: model.showsUpNext)
+        .animation(.easeInOut(duration: 0.2), value: model.showsSkip)
+        .animation(.easeOut(duration: 0.25), value: model.overlay)
+        .animation(.easeOut(duration: 0.2), value: model.ripple)
+        .animation(.easeInOut(duration: 0.25), value: state.qualityNote)
+        // A tick for each double tap that seeks.
+        .sensoryFeedback(.impact(weight: .light), trigger: model.ripple) { _, burst in burst != nil }
+    }
+
+    /// Slides in from `edge`, or only fades with Reduce Motion.
+    private func slide(_ edge: Edge) -> AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .move(edge: edge))
+    }
+
+    private func video(in frame: PlayerFrame, insets: PlayerInsets, portrait: Bool) -> some View {
+        let state = model.state
+        let metrics = frame.metrics
+        let pictureInPicture = frame.pictureInPicture
         return ZStack {
                 PlayerVideo(
                     player: model.controller.player,
                     backdrop: services.library.imageURL(state.backdropPath ?? model.request.backdropPath, size: .w1280),
                     seed: state.title.isEmpty ? model.request.title : state.title,
-                    pictureInPicture: pictureInPicture
+                    pictureInPicture: pictureInPicture,
+                    layout: frame.videoLayout
                 )
 
                 if !pictureInPicture.isActive {
-                    SubtitleCuesView(cues: state.cues, bottomPadding: model.showsControls ? insets.bottom + (portrait ? 56 : metrics.skipLift) + 8 : insets.bottom + 8, sidePadding: insets.leading)
+                    PlayerCues(clock: model.clock, bottomPadding: model.showsControls ? insets.bottom + (portrait ? 56 : metrics.skipLift) + 8 : insets.bottom + 8, sidePadding: insets.leading)
 
-                    // Taps on the video: show or hide the controls; double taps on a side seek.
+                    // Taps on the video: show or hide the controls; double taps on a side seek;
+                    // a pinch fills or fits.
                     Color.clear
                         .contentShape(Rectangle())
-                        .onTapGesture(coordinateSpace: .local) { model.tap(x: $0.x, width: geo.size.width + geo.safeAreaInsets.leading + geo.safeAreaInsets.trailing) }
+                        .onTapGesture(coordinateSpace: .local) { model.tap(x: $0.x, width: frame.fullWidth) }
+                        .pinchToFit(frame, area: frame.videoArea(portrait: portrait))
                         .accessibilityHidden(true)
 
                     if let ripple = model.ripple {
                         SeekRipple(burst: ripple)
-                            .frame(width: geo.size.width * 0.4)
+                            .frame(width: frame.size.width * 0.4)
                             .frame(maxWidth: .infinity, alignment: ripple.zone == .back ? .leading : .trailing)
                             .transition(.opacity)
                     }
 
                     if model.showsControls {
-                        PlayerControlsView(model: model, pictureInPicture: pictureInPicture, insets: insets, metrics: metrics, portrait: portrait, onEpisodes: episodes.season == nil && episodes.error == nil ? nil : { showsEpisodes = true })
+                        PlayerControlsView(model: model, pictureInPicture: pictureInPicture, insets: insets, metrics: metrics, portrait: portrait, onEpisodes: episodes.season == nil && episodes.error == nil ? nil : { showsEpisodes = true },
+                                           fitButton: VideoFitButton(frame: frame, area: frame.videoArea(portrait: portrait), metrics: metrics) { model.showControls() })
                             .transition(.opacity)
                     } else if model.isWaiting, model.overlay == nil {
                         SpinnerRing()
                     }
 
                     if let skip = state.skip, model.showsSkip {
-                        SkipButton(prompt: skip, metrics: metrics) { model.skip() }
+                        SkipButton(prompt: skip, clock: model.clock, metrics: metrics) { model.skip() }
                             .padding(.trailing, insets.trailing)
                             .padding(.bottom, model.showsControls ? insets.bottom + (portrait ? 56 : metrics.skipLift) : insets.bottom)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
@@ -166,7 +164,7 @@ private struct PlayerContent: View {
                     }
 
                     if model.showsMiniProgress {
-                        MiniProgress(positionMs: state.positionMs, durationMs: state.durationMs)
+                        ClockMiniProgress(clock: model.clock)
                             .opacity(model.overlay == .stillWatching ? 0.7 : 1)
                             .padding(.leading, insets.leading)
                             .padding(.bottom, max(insets.bottom - 2, 16))
@@ -177,7 +175,8 @@ private struct PlayerContent: View {
                     if let upNext = state.upNext, model.showsUpNext {
                         NextEpisodeCard(
                             prompt: upNext,
-                            width: metrics.sidePanelPicker ? min(400, geo.size.width * 0.48) : 320,
+                            clock: model.clock,
+                            width: metrics.sidePanelPicker ? min(400, frame.size.width * 0.48) : 320,
                             still: services.library.imageURL(upNext.next.stillPath, size: .w342),
                             onPlay: { model.playNext() },
                             onWatchCredits: { model.watchCredits() }
@@ -185,7 +184,7 @@ private struct PlayerContent: View {
                         .padding(.trailing, insets.trailing)
                         .padding(.bottom, max(insets.bottom - 2, 16))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        .transition(slide(.trailing))
                     }
 
                     if let note = state.qualityNote, model.overlay == nil {
@@ -205,7 +204,7 @@ private struct PlayerContent: View {
         switch model.overlay {
         case .picker(let tab):
             PlayerPickerSheet(model: model, tab: tab, insets: insets, sidePanel: metrics.sidePanelPicker)
-                .transition(.opacity.combined(with: .move(edge: metrics.sidePanelPicker ? .trailing : .bottom)))
+                .transition(slide(metrics.sidePanelPicker ? .trailing : .bottom))
         case .stillWatching:
             StillWatchingDialog(state: state) { model.answerStillWatching(keepWatching: $0) }
                 .transition(.opacity)
@@ -231,5 +230,25 @@ private struct PlayerContent: View {
         case nil:
             EmptyView()
         }
+    }
+}
+
+/// The subtitle cues, the only part of the video's overlay that follows them.
+private struct PlayerCues: View {
+    let clock: PlayerClock
+    let bottomPadding: CGFloat
+    let sidePadding: CGFloat
+
+    var body: some View {
+        SubtitleCuesView(cues: clock.cues, bottomPadding: bottomPadding, sidePadding: sidePadding)
+    }
+}
+
+/// ``MiniProgress`` at the clock's position.
+private struct ClockMiniProgress: View {
+    let clock: PlayerClock
+
+    var body: some View {
+        MiniProgress(positionMs: clock.positionMs, durationMs: clock.durationMs)
     }
 }

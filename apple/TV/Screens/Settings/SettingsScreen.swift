@@ -122,7 +122,7 @@ private struct SettingsView: View {
         } message: { _ in
             Text("It will need to sign in again, with a password or a code.")
         }
-        .alert(model.server.map { "Sign out of \($0.name)?" } ?? "Sign out?", isPresented: $confirmingSignOut) {
+        .alert(signOutQuestion(serverName: model.server?.name), isPresented: $confirmingSignOut) {
             Button("Sign out", role: .destructive) { Task { await model.signOut() } }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -186,7 +186,7 @@ private struct SettingsView: View {
             }
             .buttonStyle(SettingsRowStyle())
             Button { Task { await model.setAutoplayNext(!model.autoplayNext) } } label: {
-                SettingsRow(title: "Autoplay next episode", detail: "Counts down 10 s from the credits") { SwitchPill(on: model.autoplayNext) }
+                SettingsRow(title: "Autoplay next episode", detail: "Counts down 10 s from the credits") { TVSwitch(on: model.autoplayNext) }
             }
             .buttonStyle(SettingsRowStyle())
             .accessibilityValue(model.autoplayNext ? "On" : "Off")
@@ -211,7 +211,10 @@ private struct SettingsView: View {
                 }
                 .padding(4)
                 .background(.white.opacity(0.08), in: Capsule())
+                // A container first, so each chip keeps its own label and the group is named once.
+                .accessibilityElement(children: .contain)
                 .accessibilityLabel(liveRemindMe)
+                .accessibilityIdentifier("live-lead-choices")
             }
             .padding(.horizontal, 18)
             .frame(minHeight: 62)
@@ -244,7 +247,10 @@ private struct SettingsView: View {
                     Text(kind.settingsLabel).font(.system(size: 20, weight: .semibold)).foregroundStyle(Palette.text)
                     Spacer(minLength: 12)
                     SkipControl(mode: model.skipMode(kind)) { mode in Task { await model.setSkip(kind, mode: mode) } }
+                        // A container first, so each option keeps its own label and the group is named once.
+                        .accessibilityElement(children: .contain)
                         .accessibilityLabel("Skip \(kind.settingsLabel)")
+                        .accessibilityIdentifier("skip-\(kind.rawValue)")
                 }
                 .padding(.horizontal, 18)
                 .frame(minHeight: 62)
@@ -317,7 +323,7 @@ private struct SettingsView: View {
         SettingsGroup("Signed-in devices") {
             if model.canSeeEveryone {
                 Button { Task { await model.setEveryone(!model.everyone) } } label: {
-                    SettingsRow(title: "Everyone’s devices", detail: "Admins can see and sign out every account", compact: true) { SwitchPill(on: model.everyone) }
+                    SettingsRow(title: "Everyone’s devices", detail: "Admins can see and sign out every account", compact: true) { TVSwitch(on: model.everyone) }
                 }
                 .buttonStyle(SettingsRowStyle())
                 .accessibilityValue(model.everyone ? "On" : "Off")
@@ -373,223 +379,36 @@ private struct SettingsView: View {
     // MARK: About
 
     private var about: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            aboutGroup
+            // Diagnostics, then the credits (TvDiagnostics.dc.html).
+            DiagnosticsGroup()
+            credits
+        }
+    }
+
+    private var aboutGroup: some View {
         SettingsGroup("About") {
             if let server = model.server {
                 FactRow(label: "Server", value: server.aboutLine)
                 FactRow(label: "Admin tools", value: server.adminToolsLine)
             }
             Button { flow.choosingServer = true } label: {
-                SettingsRow(title: "Switch server", gold: true, compact: true) { Image(systemName: "chevron.right").font(.system(size: 17, weight: .bold)) }
+                SettingsRow(title: switchServerTitle, gold: true, compact: true) { Image(systemName: "chevron.right").font(.system(size: 17, weight: .bold)) }
             }
             .buttonStyle(SettingsRowStyle())
             Button { showingPrivacy = true } label: {
                 SettingsRow(title: "Privacy policy and licences", compact: true) { Image(systemName: "chevron.right").font(.system(size: 17, weight: .bold)) }
             }
             .buttonStyle(SettingsRowStyle())
-            Text("Subtitles by OpenSubtitles.com · Metadata and artwork from TMDB")
-                .font(.system(size: 14))
-                .foregroundStyle(Palette.faint)
-                .padding(.horizontal, 18)
         }
     }
-}
 
-/// A group of settings under an uppercase heading.
-private struct SettingsGroup<Content: View>: View {
-    let title: String
-    let content: Content
-
-    init(_ title: String, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title.uppercased())
-                .font(.system(size: 16, weight: .bold))
-                .tracking(1.6)
-                .foregroundStyle(Palette.muted)
-                .accessibilityAddTraits(.isHeader)
-            content
-        }
-    }
-}
-
-/// A row: its title, a muted line, and a value or control at the end.
-private struct SettingsRow<Accessory: View>: View {
-    let title: String
-    var detail: String?
-    var gold = false
-    var compact = false
-    @ViewBuilder var accessory: () -> Accessory
-    @Environment(\.isFocused) private var focused
-
-    var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: compact ? 18 : 20, weight: .semibold))
-                    .foregroundStyle(focused ? Palette.ground : gold ? Palette.gold : Palette.text)
-                if let detail {
-                    Text(detail).font(.system(size: compact ? 14 : 16)).foregroundStyle(focused ? Color(hex: 0x525252) : Palette.muted)
-                }
-            }
-            .lineLimit(1)
-            Spacer(minLength: 12)
-            accessory()
-                .font(.system(size: 18))
-                .foregroundStyle(focused ? Palette.ground : Palette.textSecondary)
-        }
-        .padding(.horizontal, 18)
-        .frame(minHeight: compact ? 56 : 62)
-    }
-}
-
-/// Settings rows light up white with the gold rim when focused.
-private struct SettingsRowStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        Styled(configuration: configuration)
-    }
-
-    private struct Styled: View {
-        let configuration: Configuration
-        @Environment(\.isFocused) private var focused
-
-        var body: some View {
-            configuration.label
-                .background(focused ? Palette.text : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
-                .focusRim(focused, cornerRadius: 14, scale: 1.03)
-                .scaleEffect(configuration.isPressed ? 0.98 : 1)
-        }
-    }
-}
-
-/// The left column's section buttons (TvSettings.dc.html's `.nav`).
-private struct SettingsNavStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        Styled(configuration: configuration)
-    }
-
-    private struct Styled: View {
-        let configuration: Configuration
-        @Environment(\.isFocused) private var focused
-
-        var body: some View {
-            configuration.label
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(focused ? Palette.ground : Palette.textSecondary)
-                .padding(.horizontal, 24)
-                .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-                .background(focused ? Palette.text : .clear, in: RoundedRectangle(cornerRadius: 16))
-                .focusRim(focused, cornerRadius: 16, scale: 1.04)
-        }
-    }
-}
-
-/// Never / Ask / Auto / Auto after 3 s as one control (the artboard's `.seg`):
-/// focus moves along it, Select chooses.
-private struct SkipControl: View {
-    let mode: SkipMode
-    let choose: (SkipMode) -> Void
-
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(SkipMode.allCases, id: \.self) { option in
-                Button(option.label) { choose(option) }
-                    .buttonStyle(TVChipStyle(selected: option == mode, height: 40, fontSize: 16))
-            }
-        }
-        .padding(4)
-        .background(.white.opacity(0.08), in: Capsule())
-    }
-}
-
-/// The on/off switch in a row: gold with the knob right when on.
-private struct SwitchPill: View {
-    let on: Bool
-
-    var body: some View {
-        Capsule()
-            .fill(on ? Palette.gold : Palette.outlineStrong)
-            .frame(width: 64, height: 36)
-            .overlay(alignment: on ? .trailing : .leading) {
-                Circle().fill(on ? Palette.ground : Palette.text).frame(width: 28, height: 28).padding(4)
-            }
-            .animation(.easeOut(duration: 0.15), value: on)
-            .accessibilityHidden(true)
-    }
-}
-
-/// A label and its value, not focusable.
-private struct FactRow: View {
-    let label: String
-    let value: String
-
-    var body: some View {
-        HStack(spacing: 14) {
-            Text(label).font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
-            Spacer(minLength: 12)
-            Text(value).font(.system(size: 15)).foregroundStyle(Palette.textSecondary).lineLimit(1).minimumScaleFactor(0.8)
-        }
-        .padding(.horizontal, 18)
-        .frame(minHeight: 48)
-        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct ErrorText: View {
-    let text: String
-
-    init(_ text: String) { self.text = text }
-
-    var body: some View {
-        Label(text, systemImage: "exclamationmark.circle.fill")
-            .font(.system(size: 17))
-            .foregroundStyle(Palette.warning)
+    private var credits: some View {
+        Text("Subtitles by OpenSubtitles.com · Metadata and artwork from TMDB")
+            .font(.system(size: 14))
+            .foregroundStyle(Palette.faint)
             .padding(.horizontal, 18)
-    }
-}
-
-/// The privacy policy and licences (Apple TV has no browser): the policy as a
-/// QR code to open on a phone, the credits and the open-source licences.
-private struct PrivacySheet: View {
-    let version: String
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 100) {
-            VStack(spacing: 22) {
-                QRCodeView(privacyPolicyURL.absoluteString)
-                    .frame(width: 360, height: 360)
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
-                Text("Scan to read the privacy policy").font(.system(size: 20)).foregroundStyle(Palette.muted)
-                Text(privacyPolicyURL.absoluteString.replacingOccurrences(of: "https://", with: ""))
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(Palette.text)
-            }
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Privacy policy and licences").font(.system(size: 44, weight: .heavy)).foregroundStyle(Palette.text)
-                Text("WatchMyMedia talks only to your own server. It keeps your sign-in in this Apple TV’s Keychain, and sends nothing to anyone else.")
-                    .font(.system(size: 22)).lineSpacing(6).foregroundStyle(Palette.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(openSubtitlesCredit).font(.system(size: 18)).foregroundStyle(Palette.muted)
-                Text(tmdbCredit).font(.system(size: 18)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
-                Text("Open-source software").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text).padding(.top, 10)
-                ForEach(openSourceNotices, id: \.name) { notice in
-                    Text("\(notice.name) · \(notice.licence)").font(.system(size: 18)).foregroundStyle(Palette.muted)
-                }
-                Text("WatchMyMedia \(version)").font(.system(size: 16)).foregroundStyle(Palette.faint).padding(.top, 10)
-                Button("Done") { dismiss() }
-                    .buttonStyle(TVButtonStyle(kind: .primary))
-                    .padding(.top, 10)
-            }
-            .frame(maxWidth: 900, alignment: .leading)
-        }
-        .padding(70)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.ground)
     }
 }
 

@@ -1,9 +1,5 @@
 import Foundation
 
-/// The API level that reads ``PlaybackProfile/hdrTypes`` and the dovi keys,
-/// and copies HDR only to a screen that shows it (PLAN-HDR-PROFILE.md).
-public let hdrProfileAPILevel = 8
-
 /// What this device can play, sent with every playback request
 /// (PLAN-CLIENTS.md §4.4; the server's `Profile`).
 public struct PlaybackProfile: Hashable, Sendable {
@@ -58,8 +54,9 @@ public struct PlaybackProfile: Hashable, Sendable {
     /// (android/core/model's `PlaybackProfile.forApiLevel`).
     public func forAPILevel(_ apiLevel: Int?) -> PlaybackProfile {
         var p = self
-        if (apiLevel ?? 0) < audioPreferencesAPILevel { p.selectsAudioTrack = nil }
-        guard (apiLevel ?? 0) < hdrProfileAPILevel, hdrTypes != nil else { return p }
+        let features = ServerFeatures(apiLevel: apiLevel)
+        if !features.audioLanguages { p.selectsAudioTrack = nil }
+        guard !features.hdrProfile, hdrTypes != nil else { return p }
         p.videoCodecs = videoCodecs.filter { !$0.hasPrefix("dovi") && ($0 != "hevc10" || hdr) }
         p.hdrTypes = nil
         return p
@@ -174,8 +171,16 @@ public struct PlaybackDecision: Hashable, Sendable {
     /// The file's seek thumbnails; nil until the server has made them, and
     /// from servers before ``trickplayAPILevel``.
     public var trickplay: Trickplay?
+    /// The profile's key for the video when it is sent as it is (direct play
+    /// or a remux): h264, hevc, hevc10, av1, dovi5…; nil when it is converted,
+    /// or the server didn't say. A decoder that fails on it asks again
+    /// without it (PLAN-APPLE-REVIEW.md §3.1.2).
+    public var copiedVideoCodec: String?
+    /// A media token sent with the decision, from ``decisionTokenAPILevel``;
+    /// the player then fetches none of its own.
+    public var mediaToken: MediaToken?
 
-    public init(mode: PlaybackMode, reasons: [String] = [], protocol: StreamProtocol, vod: Bool, url: URL, mimeType: String? = nil, playID: String, sessionID: String? = nil, durationMs: Int, startMs: Int = 0, resumeMs: Int = 0, audio: [AudioOption] = [], selectedAudio: Int? = nil, subtitles: [DecisionSubtitle] = [], selectedSubtitleID: String? = nil, burnInSubtitleID: String? = nil, segments: [Segment] = [], creditsMs: Int = 0, watchedAtMs: Int = 0, upNextMs: Int = 0, next: UpNext? = nil, video: StreamVideo? = nil, autoStep: StreamQuality? = nil, trickplay: Trickplay? = nil, growing: GrowingRecording? = nil) {
+    public init(mode: PlaybackMode, reasons: [String] = [], protocol: StreamProtocol, vod: Bool, url: URL, mimeType: String? = nil, playID: String, sessionID: String? = nil, durationMs: Int, startMs: Int = 0, resumeMs: Int = 0, audio: [AudioOption] = [], selectedAudio: Int? = nil, subtitles: [DecisionSubtitle] = [], selectedSubtitleID: String? = nil, burnInSubtitleID: String? = nil, segments: [Segment] = [], creditsMs: Int = 0, watchedAtMs: Int = 0, upNextMs: Int = 0, next: UpNext? = nil, video: StreamVideo? = nil, autoStep: StreamQuality? = nil, trickplay: Trickplay? = nil, growing: GrowingRecording? = nil, copiedVideoCodec: String? = nil, mediaToken: MediaToken? = nil) {
         self.growing = growing
         self.mode = mode
         self.reasons = reasons
@@ -201,6 +206,8 @@ public struct PlaybackDecision: Hashable, Sendable {
         self.video = video
         self.autoStep = autoStep
         self.trickplay = trickplay
+        self.copiedVideoCodec = copiedVideoCodec
+        self.mediaToken = mediaToken
     }
 }
 
@@ -324,16 +331,31 @@ public struct MediaToken: Hashable, Sendable {
     public var token: String
     public var expiresAt: Date
     public var param: String
+    /// The server that issued it (its base URL): the token goes on its
+    /// addresses only. Nil goes anywhere, for a token whose addresses were checked already.
+    public var server: URL?
 
-    public init(token: String, expiresAt: Date, param: String = "access_token") {
+    public init(token: String, expiresAt: Date, param: String = "access_token", server: URL? = nil) {
         self.token = token
         self.expiresAt = expiresAt
         self.param = param
+        self.server = server
     }
 
-    /// `url` with this token added as a query parameter; a file on the device is left as it is.
+    /// `url` with this token added as a query parameter. A file on the
+    /// device, and an address that isn't on ``server``, are left as they are.
     public func apply(to url: URL) -> URL {
-        url.isFileURL ? url : url.appending(queryItems: [URLQueryItem(name: param, value: token)])
+        guard !url.isFileURL, covers(url) else { return url }
+        return url.appending(queryItems: [URLQueryItem(name: param, value: token)])
+    }
+
+    /// `url` is on ``server``: the same scheme, host and port, under its
+    /// path (as `ServerAPI.owns`, which this module can't see).
+    public func covers(_ url: URL) -> Bool {
+        guard let server else { return true }
+        let path = server.path.hasSuffix("/") ? server.path : server.path + "/"
+        return server.scheme?.lowercased() == url.scheme?.lowercased() && server.host?.lowercased() == url.host?.lowercased()
+            && server.port == url.port && (url.path + "/").hasPrefix(path)
     }
 }
 
@@ -343,6 +365,11 @@ public protocol PlaybackGateway: Sendable {
     /// Freeze the server/account before a player queues any asynchronous work.
     @MainActor func bound() -> any PlaybackGateway
     func decide(_ request: DecisionRequest) async throws -> PlaybackDecision
+
+    /// Whether the player asks for ``mediaToken()`` at the same time as the
+    /// decision for `request`: false when that decision brings its own
+    /// (``PlaybackDecision/mediaToken``) or plays from the device.
+    @MainActor func needsTokenBeside(_ request: DecisionRequest) -> Bool
 
     func reportProgress(_ report: ProgressReport) async throws -> ProgressReply
 
@@ -368,10 +395,16 @@ public protocol PlaybackGateway: Sendable {
 
     /// The text of a subtitle track (WebVTT), fetched with the media token already on `url`.
     func subtitleText(_ url: URL) async throws -> String
+
+    /// The app's `User-Agent`, for the player's own requests for the media,
+    /// as the API's requests carry it; nil leaves AVFoundation's.
+    var userAgent: String? { get }
 }
 
 extension PlaybackGateway {
     @MainActor public func bound() -> any PlaybackGateway { self }
+    public var userAgent: String? { nil }
+    @MainActor public func needsTokenBeside(_ request: DecisionRequest) -> Bool { true }
     public func automaticSubtitle(fileID: Int, playID: String) async throws -> DecisionSubtitle? { nil }
     public func cancelAutomaticSubtitle(fileID: Int, playID: String) async throws {}
 }

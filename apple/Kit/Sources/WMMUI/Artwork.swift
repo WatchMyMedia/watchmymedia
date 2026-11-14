@@ -1,4 +1,3 @@
-import ImageIO
 import SwiftUI
 import WMMModel
 
@@ -15,8 +14,10 @@ public struct NoImageLoader: ImageLoader {
 }
 
 /// Artwork (a poster, backdrop or still) that draws the mockups' gradient,
-/// picked by `seed`, until the image arrives or when there is none. Decoded
-/// images are kept in memory, downsampled to `maxPixel`.
+/// picked by `seed`, until the image arrives or when there is none. Images
+/// are fetched and decoded off the main actor by ``ImagePipeline`` and kept
+/// in memory, downsampled to `maxPixel` (pixels on the longer side; ask for
+/// what is drawn: the points times the screen's scale).
 ///
 /// It takes the size it is offered, whatever the image's shape: the image
 /// fills that size and is cropped to it, so a backdrop never widens the card
@@ -47,7 +48,7 @@ public struct Artwork: View {
                 }
             }
             .clipped()
-            .task(id: url) { await load() }
+            .task(id: ArtworkRequest(url: url, step: ArtworkSize.step(for: maxPixel))) { await load() }
     }
 
     private func load() async {
@@ -55,33 +56,28 @@ public struct Artwork: View {
             image = nil
             return
         }
-        if let cached = ImageMemoryCache.shared.image(for: url) {
+        if let cached = ImageMemoryCache.shared.image(for: url, maxPixel: maxPixel) {
             image = cached
             return
         }
-        guard let data = try? await loader.data(for: url), let decoded = Self.decode(data, maxPixel: maxPixel) else { return }
-        ImageMemoryCache.shared.store(decoded, for: url)
+        guard let decoded = await ImagePipeline.shared.image(for: url, maxPixel: maxPixel, loader: loader), !Task.isCancelled else { return }
         withAnimation(.easeOut(duration: 0.2)) { image = decoded }
     }
 
     /// Loads `url` into the memory cache ahead of showing it, so a row screen's
     /// neighbouring cards do not flash their placeholder when focus reaches
-    /// them (PLAN-HOME.md §7.2). Nothing happens for nil or a cached picture.
+    /// them (PLAN-HOME.md §7.2). Nothing happens for nil or a cached picture;
+    /// a view that asks while it loads waits for this load.
     public static func prefetch(_ url: URL?, maxPixel: CGFloat, loader: any ImageLoader) async {
-        guard let url, ImageMemoryCache.shared.image(for: url) == nil else { return }
-        guard let data = try? await loader.data(for: url), let decoded = decode(data, maxPixel: maxPixel) else { return }
-        ImageMemoryCache.shared.store(decoded, for: url)
+        guard let url else { return }
+        _ = await ImagePipeline.shared.image(for: url, maxPixel: maxPixel, loader: loader)
     }
+}
 
-    static func decode(_ data: Data, maxPixel: CGFloat) -> CGImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
-        ]
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
-    }
+/// What an ``Artwork`` loads: a new address or size step loads again.
+struct ArtworkRequest: Hashable {
+    let url: URL?
+    let step: Int
 }
 
 /// The mockups' placeholder: a diagonal gradient from the palette with a soft light at the top left.
@@ -94,23 +90,6 @@ public struct ArtworkPlaceholder: View {
         let colors = Palette.artwork[Palette.index(for: seed, count: Palette.artwork.count)]
         LinearGradient(colors: [colors.0, colors.1], startPoint: UnitPoint(x: 0.3, y: 0), endPoint: UnitPoint(x: 0.7, y: 1))
             .overlay(RadialGradient(colors: [.white.opacity(0.10), .clear], center: UnitPoint(x: 0.2, y: 0), startRadius: 0, endRadius: 160))
-    }
-}
-
-/// Decoded artwork kept while the app runs, so scrolling back does not flash.
-final class ImageMemoryCache: @unchecked Sendable {
-    static let shared = ImageMemoryCache()
-    private let cache = NSCache<NSURL, CGImageBox>()
-
-    init() { cache.countLimit = 400 }
-
-    func image(for url: URL) -> CGImage? { cache.object(forKey: url as NSURL)?.image }
-
-    func store(_ image: CGImage, for url: URL) { cache.setObject(CGImageBox(image), forKey: url as NSURL) }
-
-    final class CGImageBox {
-        let image: CGImage
-        init(_ image: CGImage) { self.image = image }
     }
 }
 

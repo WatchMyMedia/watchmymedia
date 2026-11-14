@@ -40,6 +40,28 @@ struct DownloadRepositoryTests {
         #expect(h.notices.said == ["ask"])
     }
 
+    @Test func theListIsBuiltOncePerEngineTickNotAtEveryRead() async throws {
+        // PLAN-APPLE-REVIEW.md §5.1: the screens read `downloads` many times a tick.
+        let h = Harness()
+        h.gateway.made = [record("aaaaaaaaaaaaaaaa", fileID: 42)]
+        let repo = h.make()
+        _ = try await repo.plan(fileID: 42)
+        try await repo.download(DownloadChoice(fileID: 42, quality: .original))
+        _ = repo.downloads
+        let reads = h.engine.reads
+        for _ in 0..<5 { _ = repo.downloads }
+        #expect(h.engine.reads == reads)
+        // The engine moves on: the next read has it.
+        h.engine.move("aaaaaaaaaaaaaaaa", .downloading, fraction: 0.5)
+        #expect(repo.downloads.first?.status == .downloading(percent: 50, bytes: 2_000_000_000))
+        // The repository's own change to the engine shows at once too.
+        repo.pause("aaaaaaaaaaaaaaaa")
+        #expect(repo.downloads.first?.status == .paused(percent: 50, bytes: 2_000_000_000))
+        // And so does a change to the records: marked watched.
+        repo.mark(fileID: 42, watched: true)
+        #expect(repo.downloads.first?.watch?.completed == true)
+    }
+
     @Test func aPlanReturningAfterSignOutIsDiscarded() async {
         let h = Harness()
         let repo = h.make()

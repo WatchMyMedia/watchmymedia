@@ -130,6 +130,7 @@ private struct SearchView: View {
             PosterCard(item: item, imageURL: url(item.posterPath, .w500), width: 200, line: item.searchLine)
         }
         .buttonStyle(.borderless)
+        .playPauseCard(.card(item)) { model.open(item) }
         .contextMenu {
             if item.watchTarget != nil {
                 WatchToggleButton(watched: item.watched) { await model.setWatched(item, $0) }
@@ -163,6 +164,7 @@ private struct SearchView: View {
         }
         .buttonStyle(.borderless)
         .accessibilityHint("Opens the episode on its show")
+        .playPauseCard(.card(episode)) { model.open(episode) }
         .contextMenu {
             if episode.playRequest != nil {
                 Button { model.play(episode) } label: { Label("Play", systemImage: "play.fill") }

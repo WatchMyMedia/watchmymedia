@@ -415,3 +415,42 @@ extension PlaybackPlan {
 public func unmatchedCount(_ n: Int) -> String? {
     n > 0 ? "\(formatCount(n)) not matched yet" : nil
 }
+
+// MARK: Home's rows and cards, as both apps word them (PLAN-APPLE-REVIEW.md §5.8)
+
+public let continueWatchingTitle = "Continue watching"
+public let recentlyAddedTitle = "Recently added"
+public let recentlyAiredTitle = "Recently aired"
+public let recentlyReleasedTitle = "Recently released"
+/// A fixed row's detail beside its title: "TV Shows", "Movies", "Episodes".
+public let tvShowsDetail = "TV Shows"
+public let moviesDetail = "Movies"
+public let episodesDetail = "Episodes"
+/// An episode card whose file isn't in the library.
+public let notInLibraryBadge = "Not in library"
+public let resumesPlayingHint = "Resumes playing"
+public let opensEpisodeHint = "Opens the episode"
+/// An empty Home's button to look again.
+public let checkAgainTitle = "Check again"
+/// The line under a Home screen naming the next one, spoken: "Next row: Recently added".
+public func nextRowLabel(_ name: String) -> String { "Next row: \(name)" }
+/// A movie's or episode's Report a problem, its button and its sheet's title.
+public let reportProblemTitle = "Report a problem"
+
+extension HomeData {
+    /// The fixed rows of a server below API level 22, as arranged rows (Apple
+    /// TV draws them so): their titles split at " · " into the heading and its
+    /// detail, as an arranged Home's built-in rows are. The Live TV row draws
+    /// nothing without Live TV.
+    public var fixedRows: [ScreenRow] {
+        [
+            ScreenRow(id: "continue", style: .continue, title: continueWatchingTitle, continueItems: continueWatching),
+            ScreenRow(id: "live", style: .live, title: "Live TV"),
+            ScreenRow(id: "recentlyAddedShows", style: .poster, title: "\(recentlyAddedTitle) · \(tvShowsDetail)", items: recentlyAddedShows),
+            ScreenRow(id: "recentlyAired", style: .episode, title: "\(recentlyAiredTitle) · \(episodesDetail)", episodes: recentlyAired),
+            ScreenRow(id: "recentlyAddedMovies", style: .poster, title: "\(recentlyAddedTitle) · \(moviesDetail)", items: recentlyAddedMovies),
+            ScreenRow(id: "recentlyReleased", style: .wide, title: "\(recentlyReleasedTitle) · \(moviesDetail)", items: recentlyReleased),
+        ]
+        .filter { !$0.isEmpty }
+    }
+}

@@ -107,10 +107,15 @@ struct LiveStarButton: View {
     var size: CGFloat = 17
     var height: CGFloat = 44
     @Environment(LiveExtrasStore.self) private var extras
+    /// Counts taps, for the tap felt with each (not when a star changes on another device).
+    @State private var taps = 0
 
     var body: some View {
         let favourite = extras.isFavourite(channel)
-        Button { Task { await extras.toggleFavourite(channel) } } label: {
+        Button {
+            taps += 1
+            Task { await extras.toggleFavourite(channel) }
+        } label: {
             Image(systemName: favourite ? "star.fill" : "star")
                 .font(.system(size: size, weight: .semibold))
                 .foregroundStyle(favourite ? Palette.gold : Color(hex: 0x6B6B72))
@@ -118,6 +123,7 @@ struct LiveStarButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .sensoryFeedback(.selection, trigger: taps)
         .accessibilityLabel(liveFavouriteLabel(channel, favourite: favourite))
         .accessibilityAddTraits(favourite ? .isSelected : [])
         .accessibilityIdentifier("live-star-\(channel.number)")
@@ -264,7 +270,7 @@ struct LiveRemindersList: View {
                     } else if let error = extras.error, !extras.loaded {
                         ErrorState(title: "Couldn't load reminders", message: error, retry: { await extras.refresh() })
                     } else {
-                        EmptyState(systemImage: "bell", title: "No reminders",
+                        EmptyState(systemImage: "bell", title: liveNoReminders,
                                    message: "Choose Remind me on a programme in the guide to have one here.")
                             .padding(.vertical, 24)
                     }
@@ -319,7 +325,7 @@ struct LiveRemindersList: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(liveReminderAccessibilityLabel(reminder, previousStart: previous, now: now))
-            .accessibilityHint(reminder.state == .gone ? "Shows the reminder as it was kept" : "Opens the guide at it")
+            .accessibilityHint(reminder.state == .gone ? liveShowsKeptReminderHint : "Opens the guide at it")
             .accessibilityIdentifier("live-reminder-\(reminder.title)")
             Button("Remove") { Task { await extras.remove(reminder) } }
                 .buttonStyle(GoldTextButtonStyle(font: .system(size: 15, weight: .semibold)))
@@ -433,7 +439,7 @@ struct LiveSearchRow: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(liveSearchAccessibilityLabel(hit, reminded: reminded, now: now))
-            .accessibilityHint(compact ? "Shows it in the guide" : "Opens the guide at it")
+            .accessibilityHint(compact ? liveShowsInGuideHint : "Opens the guide at it")
             .accessibilityIdentifier("live-search-\(hit.channel.number)-\(p.title)")
             action(onNow: onNow, reminded: reminded)
         }
@@ -443,6 +449,8 @@ struct LiveSearchRow: View {
 
     @ViewBuilder private func action(onNow: Bool, reminded: Bool) -> some View {
         let label = liveSearchActionLabel(hit, reminded: reminded, now: now)
+        // Search's board offers one button: Watch while it is on, else the bell (LiveProgrammeActions).
+        let reminder = LiveProgrammeActions(hit.programme, on: hit.channel, now: now, extras: extras).reminder
         if onNow {
             Button { navigator.playLive(.init(channel: hit.channel)) } label: {
                 Image(systemName: "play.fill").font(.system(size: 15)).foregroundStyle(.white)
@@ -451,14 +459,14 @@ struct LiveSearchRow: View {
                     .overlay(Circle().strokeBorder(Palette.burgundyEdge))
             }
             .buttonStyle(.plain).accessibilityLabel(label).disabled(!hit.channel.available)
-        } else if reminded {
+        } else if reminder == .set {
             Button { Task { await extras.removeReminder(for: hit.programme) } } label: {
                 Image(systemName: "bell.fill").font(.system(size: 16)).foregroundStyle(Palette.gold)
                     .frame(width: 44, height: 44).background(Palette.gold.opacity(0.16), in: Circle())
             }
             .buttonStyle(.plain).accessibilityLabel(label).accessibilityAddTraits(.isSelected)
             .accessibilityIdentifier("live-search-bell-set")
-        } else if extras.canRemind(hit.programme) {
+        } else if reminder == .offered {
             Button { remind?(hit.programme, on: hit.channel) } label: {
                 Image(systemName: "bell").font(.system(size: 16)).foregroundStyle(Palette.text)
                     .frame(width: 44, height: 44).background(.white.opacity(0.12), in: Circle())

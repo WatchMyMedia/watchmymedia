@@ -43,19 +43,26 @@ struct RootView: View {
         .onChange(of: flow.choosingServer) { _, choosing in
             if choosing { navigator.closePlayer() }
         }
-        // Signing in may leave scenePhase unchanged; refresh this account's access then too.
-        .task(id: account) {
-            try? await services.liveTV.refresh()
-            await extras.refresh()
-        }
-        // A server upgraded meanwhile may do more (Automatic quality from API 3).
-        .task(id: scenePhase) {
+        // At launch, on every return to the app and on every sign-in (which
+        // may leave scenePhase unchanged): one task, so launch asks once. A
+        // server upgraded meanwhile may do more (Automatic quality from API 3),
+        // so its level comes first; the rest don't wait for each other
+        // (PLAN-APPLE-REVIEW.md §4.1.3–4).
+        .task(id: Refresh(account: account, active: scenePhase == .active)) {
             guard scenePhase == .active else { return }
             await services.servers.refreshCurrent()
-            await services.requests.refreshOptions()
-            try? await services.liveTV.refresh()
-            await extras.refresh()
+            let services = services, extras = extras
+            await together(
+                { await services.requests.refreshOptions() },
+                // Live TV's access, then its reminders, which need it.
+                { try? await services.liveTV.refresh(); await extras.refresh() }
+            )
         }
+    }
+
+    private struct Refresh: Equatable {
+        let account: Account
+        let active: Bool
     }
 
     private struct Account: Equatable {

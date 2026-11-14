@@ -11,6 +11,9 @@
 //   WMMUI        brand tokens and shared SwiftUI views (core:ui)
 //   WMMFeatures  screen models and navigation, shared by the iPhone and Apple TV
 //                screens (the ViewModels android/ keeps in tv/ and mobile/)
+//   WMMTopShelf  the Apple TV Top Shelf's snapshot in the App Group: its format,
+//                what it may hold, when it is stale. Foundation only, so the
+//                Top Shelf extension links nothing else (PLAN-APPLE-REVIEW.md §6.2)
 //
 // Everything but WMMUI's UIKit bits builds for macOS too, so `swift test`
 // runs the unit tests on the Mac without a simulator.
@@ -29,6 +32,7 @@ let package = Package(
         .library(name: "WMMUI", targets: ["WMMUI"]),
         .library(name: "WMMFeatures", targets: ["WMMFeatures"]),
         .library(name: "WMMCast", targets: ["WMMCast"]),
+        .library(name: "WMMTopShelf", targets: ["WMMTopShelf"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.7.0"),
@@ -60,18 +64,21 @@ let package = Package(
         .target(name: "WMMDownloads", dependencies: ["WMMModel"]),
         .target(name: "WMMFakes", dependencies: ["WMMModel"]),
         .target(name: "WMMUI", dependencies: ["WMMModel"]),
-        .target(name: "WMMFeatures", dependencies: ["WMMModel"]),
+        .target(name: "WMMFeatures", dependencies: ["WMMModel", "WMMTopShelf"]),
         .target(name: "WMMCast", dependencies: ["WMMModel"]),
+        .target(name: "WMMTopShelf"),
         .testTarget(name: "WMMModelTests", dependencies: ["WMMModel"]),
         .testTarget(
             name: "WMMDataTests",
-            dependencies: ["WMMData", "WMMModel", "WMMAPI", .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")]
+            // WMMFeatures: the screen models, fed by the real ServerEvents (ScreenEventsTests).
+            dependencies: ["WMMData", "WMMModel", "WMMAPI", "WMMFeatures", .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")]
         ),
         .testTarget(name: "WMMPlaybackTests", dependencies: ["WMMPlayback", "WMMModel", "WMMFakes"]),
         .testTarget(name: "WMMDownloadsTests", dependencies: ["WMMDownloads", "WMMModel"]),
         .testTarget(name: "WMMFakesTests", dependencies: ["WMMFakes", "WMMModel"]),
-        .testTarget(name: "WMMUITests", dependencies: ["WMMUI", "WMMModel"]),
-        .testTarget(name: "WMMFeaturesTests", dependencies: ["WMMFeatures", "WMMFakes", "WMMModel"]),
+        .testTarget(name: "WMMUITests", dependencies: ["WMMUI", "WMMModel", "WMMFeatures"]),
+        .testTarget(name: "WMMFeaturesTests", dependencies: ["WMMFeatures", "WMMFakes", "WMMModel", "WMMTopShelf"]),
         .testTarget(name: "WMMCastTests", dependencies: ["WMMCast", "WMMModel", "WMMFakes"]),
+        .testTarget(name: "WMMTopShelfTests", dependencies: ["WMMTopShelf"]),
     ]
 )

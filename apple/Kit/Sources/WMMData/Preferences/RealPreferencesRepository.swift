@@ -75,20 +75,20 @@ final class RealPreferencesRepository: PreferencesRepository {
 
     /// Sends only what changed (PLAN-LANGUAGES.md §5.3), and the audio
     /// languages and foreignAudio only to a server at
-    /// ``audioPreferencesAPILevel``, since older ones reject them.
+    /// ``ServerFeatures/audioLanguages``, since older ones reject them.
     func setLanguages(_ edit: LanguageChange) async throws {
-        let level = store.state.current?.server.apiLevel ?? 0
-        guard level >= subtitlePreferencesAPILevel else {
+        let features = store.features
+        guard features.subtitlePreferences else {
             throw APIError(status: nil, message: "Update the server to use subtitle preferences.")
         }
-        guard level >= audioPreferencesAPILevel || !edit.needsAudioLanguages else {
+        guard features.audioLanguages || !edit.needsAudioLanguages else {
             throw APIError(status: nil, message: "Update the server to use audio languages.")
         }
         guard !edit.isEmpty else { return }
         let subtitles: Components.Schemas.UpdateSubtitlePreferences? =
             edit.subtitleLanguages == nil && edit.choice == nil && edit.automaticDownload == nil ? nil : .init(
                 automaticDownload: edit.automaticDownload,
-                foreignAudio: level >= audioPreferencesAPILevel ? edit.choice?.foreignAudio : nil,
+                foreignAudio: features.audioLanguages ? edit.choice?.foreignAudio : nil,
                 languages: edit.subtitleLanguages,
                 mode: edit.choice?.mode.rawValue
             )
@@ -151,7 +151,6 @@ final class RealPreferencesRepository: PreferencesRepository {
             guard store.revision == accountRevision else { throw CancellationError() }
             setIfLatest(mine, saved)
         } catch {
-            if error is SignedOutError { store.tokenRejected(serverID: signedIn.serverID, token: signedIn.token) }
             setIfLatest(mine, before)
             throw error
         }

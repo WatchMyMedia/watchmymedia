@@ -72,6 +72,29 @@ public final class LiveGuideModel {
     @ObservationIgnored private let repository: any LiveTVRepository
     @ObservationIgnored private let now: @MainActor () -> Date
 
+    // What reading the grid would otherwise recompute on every read
+    // (PLAN-APPLE-REVIEW.md §4.3.4): kept until something they read changes,
+    // which observation reports at once; each revision tells the views.
+    @ObservationIgnored private var rowsKept: [Row]?
+    private var rowsRevision = 0
+    @ObservationIgnored private var filtersKept: [LiveGuideFilter]?
+    private var filtersRevision = 0
+    @ObservationIgnored private var hasFavouritesKept: Bool?
+    private var hasFavouritesRevision = 0
+    /// `.some(nil)`: worked out, and nothing is selected.
+    @ObservationIgnored private var selectedKept: SelectedKey??
+    private var selectedRevision = 0
+    /// How many times the rows were built (tests).
+    @ObservationIgnored private(set) var rowBuilds = 0
+
+    /// The selected channel and programme by id, and until when it holds
+    /// (the end of the programme on now, when nothing is chosen).
+    private struct SelectedKey {
+        var channelID: String
+        var programmeID: String?
+        var until: Date
+    }
+
     public init(repository: any LiveTVRepository, extras: LiveExtrasStore? = nil, spanMinutes: Int = 60, clock: LiveClock = .device,
                 now: @escaping @MainActor () -> Date = { Date() }) {
         self.repository = repository
@@ -169,11 +192,25 @@ public final class LiveGuideModel {
 
     /// The chips worth showing: those some loaded programme falls under.
     public var filters: [LiveGuideFilter] {
-        LiveGuideFilter.allCases.filter { f in store.channels.contains { $0.programmes.contains { $0.matches(f) } } }
+        _ = filtersRevision
+        if let filtersKept { return filtersKept }
+        let filters = kept({ model in
+            let channels = model.store.channels
+            return LiveGuideFilter.allCases.filter { f in channels.contains { $0.programmes.contains { $0.matches(f) } } }
+        }, invalidate: { $0.filtersKept = nil; $0.filtersRevision += 1 })
+        filtersKept = filters
+        return filters
     }
 
     /// The Favourites chip shows, first, once the person has a favourite.
-    public var hasFavourites: Bool { extras?.hasFavourite(in: store.channels.map(\.channel)) ?? false }
+    public var hasFavourites: Bool {
+        _ = hasFavouritesRevision
+        if let hasFavouritesKept { return hasFavouritesKept }
+        let has = kept({ model in model.extras?.hasFavourite(in: model.store.channels.map(\.channel)) ?? false },
+                       invalidate: { $0.hasFavouritesKept = nil; $0.hasFavouritesRevision += 1 })
+        hasFavouritesKept = has
+        return has
+    }
     /// Favourites is the chip chosen and still has channels; it goes when the last star does.
     public var showingFavourites: Bool { favouritesOnly && hasFavourites }
     /// All channels is the chip chosen.
@@ -187,14 +224,41 @@ public final class LiveGuideModel {
     /// guide's channel order; its listings don't matter.
     public static func showsUnderFavourites(favourite: Bool, favouritesOnly: Bool) -> Bool { !favouritesOnly || favourite }
 
+    /// The channels shown and their cells across the span. Built when what
+    /// it reads changes (the listings, the span, the query, the chips, the
+    /// stars), not on every read.
     public var rows: [Row] {
+        _ = rowsRevision
+        if let rowsKept { return rowsKept }
+        let rows = kept({ $0.buildRows() }, invalidate: { $0.rowsKept = nil; $0.rowsRevision += 1 })
+        rowsKept = rows
+        rowBuilds += 1
+        return rows
+    }
+
+    /// Runs `build`, then forgets its result (`invalidate`) the moment
+    /// anything it read changes. Observation calls back before the change
+    /// lands, so the next read builds from the new value.
+    private func kept<T>(_ build: (LiveGuideModel) -> T, invalidate: @escaping @MainActor (LiveGuideModel) -> Void) -> T {
+        withObservationTracking { build(self) } onChange: { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                invalidate(self)
+            }
+        }
+    }
+
+    private func buildRows() -> [Row] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let loadedThroughEnd = store.isLoaded(from: start, through: end.addingTimeInterval(1))
         let favouritesOnly = showingFavourites
+        // Looked up once per build, and only with the chip on.
+        let favourites = favouritesOnly ? Set(store.channels.map(\.channel).filter { extras?.isFavourite($0) ?? false }.map(\.id)) : []
+        let start = start, end = end
         return store.channels.compactMap { guideChannel in
             let channel = guideChannel.channel
             if !query.isEmpty, !(channel.number.hasPrefix(query) || channel.name.localizedCaseInsensitiveContains(query)) { return nil }
-            if !Self.showsUnderFavourites(favourite: extras?.isFavourite(channel) ?? false, favouritesOnly: favouritesOnly) { return nil }
+            if !Self.showsUnderFavourites(favourite: favourites.contains(channel.id), favouritesOnly: favouritesOnly) { return nil }
             let visible = guideChannel.programmes.filter { $0.end > start && $0.start < end }
             if let filter, !visible.contains(where: { $0.matches(filter) }) { return nil }
             guard guideChannel.listings else {
@@ -258,8 +322,25 @@ public final class LiveGuideModel {
         selection = Selection(channelID: reveal.channelID, programmeID: reveal.programmeID)
     }
 
+    /// Whether `cell` is the selected programme: two string comparisons
+    /// against the selection, worked out once (the grid asks for every cell).
     public func isSelected(_ row: Row, _ cell: Cell) -> Bool {
-        guard let selected else { return false }
-        return selected.channel.id == row.channel.id && selected.programme?.id == cell.programme?.id
+        guard let key = selectedKey else { return false }
+        return key.channelID == row.channel.id && key.programmeID == cell.programme?.id
+    }
+
+    private var selectedKey: SelectedKey? {
+        _ = selectedRevision
+        if case .some(let key) = selectedKept, key.map({ now() < $0.until }) ?? true { return key }
+        let date = now()
+        let key: SelectedKey? = kept({ model in
+            guard let selected = model.selected else { return nil }
+            // The programme on now stands in for a selection until it ends;
+            // without one, a programme may start on it within the minute.
+            let until = model.selection != nil ? .distantFuture : selected.programme?.end ?? date.addingTimeInterval(60)
+            return SelectedKey(channelID: selected.channel.id, programmeID: selected.programme?.id, until: until)
+        }, invalidate: { $0.selectedKept = .none; $0.selectedRevision += 1 })
+        selectedKept = .some(key)
+        return key
     }
 }

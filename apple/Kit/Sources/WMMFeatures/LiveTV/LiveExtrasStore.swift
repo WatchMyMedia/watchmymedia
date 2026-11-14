@@ -64,6 +64,12 @@ public final class LiveExtrasStore {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private let repository: any LiveTVRepository
     @ObservationIgnored private let now: @MainActor () -> Date
+    @ObservationIgnored private let flight = SingleFlight<Void>()
+    /// Reminder events heard, so a refresh after one asks again rather than joining an older request.
+    @ObservationIgnored private var heard = 0
+    @ObservationIgnored private var echoes = LiveEchoes()
+    /// The channel list as last indexed, and each channel's star by id (``isFavourite(_:)``).
+    @ObservationIgnored private var channelIndex: (channels: [LiveChannel], favourites: [String: Bool]) = ([], [:])
 
     public init(repository: any LiveTVRepository, now: @escaping @MainActor () -> Date = { Date() }) {
         self.repository = repository
@@ -80,7 +86,20 @@ public final class LiveExtrasStore {
     public func isFavourite(_ channel: LiveChannel) -> Bool {
         guard available else { return false }
         if context == repository.contextID, let changed = favourites[channel.id] { return changed }
-        return repository.channels.first { $0.id == channel.id }?.favourite ?? channel.favourite
+        return listedFavourite(channel.id) ?? channel.favourite
+    }
+
+    /// What the channel list says of a channel's star, by id. The guide asks
+    /// for every row it draws, so the list is indexed once each time it
+    /// changes rather than scanned per call. Reading `repository.channels`
+    /// here keeps a view that asks following the list; an unchanged list is
+    /// the same storage, which compares at once.
+    private func listedFavourite(_ id: String) -> Bool? {
+        let channels = repository.channels
+        if channels != channelIndex.channels {
+            channelIndex = (channels, Dictionary(channels.map { ($0.id, $0.favourite) }, uniquingKeysWith: { first, _ in first }))
+        }
+        return channelIndex.favourites[id]
     }
 
     /// Whether any of `channels` is a favourite, so the Favourites chip shows.
@@ -92,9 +111,11 @@ public final class LiveExtrasStore {
         let identity = context
         let before = favourites[channel.id]
         favourites[channel.id] = favourite
+        let echo = echoes.expect(.favourites, at: now())
         do {
             try await repository.setFavourite(favourite, channelID: channel.id)
         } catch {
+            echoes.forget(echo)
             guard identity == repository.contextID, !(error is CancellationError) else { return }
             favourites[channel.id] = before
             message = error.displayMessage
@@ -163,8 +184,14 @@ public final class LiveExtrasStore {
         reminder.state == .moved ? previousStarts[reminder.id] : nil
     }
 
-    /// Loads the list; at launch, on foreground, after an event and on the Reminders list.
+    /// Loads the list; at launch, on foreground, after an event and on the
+    /// Reminders list. Callers at once share one request; one after a
+    /// reminders event asks again (PLAN-APPLE-REVIEW.md §4.1.3).
     public func refresh() async {
+        await flight.run(stamp: "\(repository.contextID ?? "")#\(heard)") { [weak self] in await self?.load() }
+    }
+
+    private func load() async {
         syncContext()
         guard available else { return }
         generation += 1
@@ -198,6 +225,7 @@ public final class LiveExtrasStore {
         let pending = LiveReminder(programme: programme, channel: channel)
         items.removeAll { $0.programmeID == programme.id }
         insert(pending)
+        let echo = echoes.expect(.reminders, at: now())
         do {
             let saved = try await repository.remind(programmeID: programme.id)
             guard identity == repository.contextID else { return false }
@@ -206,6 +234,7 @@ public final class LiveExtrasStore {
             knownStarts[saved.id] = saved.start
             return true
         } catch {
+            echoes.forget(echo)
             guard identity == repository.contextID else { return false }
             items.removeAll { $0.id == pending.id }
             if !(error is CancellationError) {
@@ -223,9 +252,11 @@ public final class LiveExtrasStore {
         let identity = context
         items.removeAll { $0.id == reminder.id }
         guard !reminder.id.hasPrefix("pending-") else { return }
+        let echo = echoes.expect(.reminders, at: now())
         do {
             try await repository.removeReminder(id: reminder.id)
         } catch {
+            echoes.forget(echo)
             guard identity == repository.contextID, !(error is CancellationError) else { return }
             insert(reminder)
             message = error.displayMessage
@@ -250,9 +281,11 @@ public final class LiveExtrasStore {
         generation += 1
         let identity = context, before = lead
         lead = minutes
+        let echo = echoes.expect(.reminders, at: now())
         do {
             try await repository.setReminderLead(minutes: minutes)
         } catch {
+            echoes.forget(echo)
             guard identity == repository.contextID, !(error is CancellationError) else { return }
             lead = before
             message = error.displayMessage
@@ -298,17 +331,31 @@ public final class LiveExtrasStore {
         }
     }
 
-    /// Follows the server's events for the person's other devices: the list and
-    /// the channels' stars are asked for again. Runs while the app does.
+    /// Follows the server's events for the person's other devices: a
+    /// reminders event asks for the list again, a favourites event for the
+    /// channels' stars; a recordings event is the recordings store's. The
+    /// echo of a change made here asks for nothing (PLAN-APPLE-REVIEW.md
+    /// §4.1.8). Runs while the app does.
     public func follow() async {
-        for await _ in repository.changes() {
+        for await change in repository.liveChanges() {
+            defer { eventsFollowed += 1 }
             guard available else { continue }
-            await refresh()
-            try? await repository.refresh()
-            // What the channel list now says replaces this device's changes.
-            favourites = [:]
+            syncContext()
+            let date = now()
+            if change == .all || (change == .reminders && !echoes.consume(.reminders, at: date)) {
+                heard += 1
+                await refresh()
+            }
+            if change == .all || (change == .favourites && !echoes.consume(.favourites, at: date)) {
+                try? await repository.refresh()
+                // What the channel list now says replaces this device's changes.
+                favourites = [:]
+            }
         }
     }
+
+    /// Events ``follow()`` has finished with, so a test can tell one asked for nothing.
+    @ObservationIgnored private(set) var eventsFollowed = 0
 
     // MARK: Private
 
@@ -323,7 +370,35 @@ public final class LiveExtrasStore {
         context = repository.contextID
         generation += 1
         items = []; lead = LiveReminderLead.standard; listLoaded = false; favourites = [:]; seenProgrammes = [:]
-        knownStarts = [:]; previousStarts = [:]; bannersShown = []
+        knownStarts = [:]; previousStarts = [:]; bannersShown = []; echoes = LiveEchoes()
         error = nil; message = nil; reveal = nil; listedThrough = nil; banner = nil; loading = false
+    }
+}
+
+/// Changes made on this device whose echo from the server's events is still
+/// to come, so it asks for nothing (PLAN-APPLE-REVIEW.md §4.1.8). Expected
+/// before the request, since the echo can come before the reply; an echo
+/// that never comes is forgotten after ``window``.
+struct LiveEchoes {
+    static let window: TimeInterval = 30
+    private var expected: [(id: Int, part: LiveTVChange, at: Date)] = []
+    private var count = 0
+
+    mutating func expect(_ part: LiveTVChange, at date: Date) -> Int {
+        count += 1
+        expected.append((count, part, date))
+        return count
+    }
+
+    mutating func forget(_ id: Int) {
+        expected.removeAll { $0.id == id }
+    }
+
+    /// Whether an event for `part` is an echo; if so it is used up.
+    mutating func consume(_ part: LiveTVChange, at date: Date) -> Bool {
+        expected.removeAll { date.timeIntervalSince($0.at) > Self.window }
+        guard let index = expected.firstIndex(where: { $0.part == part }) else { return false }
+        expected.remove(at: index)
+        return true
     }
 }

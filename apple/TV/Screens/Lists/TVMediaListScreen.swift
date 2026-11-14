@@ -10,6 +10,8 @@ import WMMUI
 /// page; selecting a missing one opens the request dialog (where the person
 /// may request it); an imported title TMDB couldn't find says Not found. A
 /// list whose last fetch failed says so, with Try again for whoever may.
+/// Page Up and Page Down move two rows, as on the library grids
+/// (TvLibraryAZ.dc.html, `GridPaging`).
 struct TVMediaListScreen: View {
     let id: Int
     @Environment(AppServices.self) private var services
@@ -23,10 +25,33 @@ struct TVMediaListScreen: View {
 private struct TVMediaListView: View {
     @State var model: MediaListModel
     @Environment(AppServices.self) private var services
+    /// The focused title's rank, for Page Up and Page Down.
+    @FocusState private var focusedRank: Int?
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 24, alignment: .top), count: 7)
+    private static let columnCount = 7
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 24, alignment: .top), count: TVMediaListView.columnCount)
 
     var body: some View {
+        ScrollViewReader { proxy in
+            page
+                .onPageKeys(enabled: focusedRank != nil) { page(by: $0, proxy) }
+        }
+    }
+
+    /// Two rows back or on from the focused title, in the same column.
+    private func page(by pages: Int, _ proxy: ScrollViewProxy) {
+        guard let rank = focusedRank, let entries = model.state.value?.entries,
+              let place = entries.firstIndex(where: { $0.rank == rank }),
+              let target = GridPaging.target(from: place, pages: pages, columns: Self.columnCount, count: entries.count) else { return }
+        let id = entries[target].rank
+        withAnimation { proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.32)) }
+        Task {
+            await Task.yield()
+            focusedRank = id
+        }
+    }
+
+    private var page: some View {
         TabPage {
             TVLoadable(model.state, retry: model.retry) { page in
                 VStack(alignment: .leading, spacing: 28) {
@@ -36,7 +61,7 @@ private struct TVMediaListView: View {
                     }
                     .focusSection()
                     LazyVGrid(columns: columns, alignment: .leading, spacing: 36) {
-                        ForEach(page.entries) { entry in card(entry) }
+                        ForEach(page.entries) { entry in card(entry).focused($focusedRank, equals: entry.rank) }
                     }
                     .focusSection()
                 }
@@ -96,6 +121,7 @@ private struct TVMediaListView: View {
                 EntryFace(entry: entry, imageURL: services.library.imageURL(item.posterPath, size: .w500))
             }
             .buttonStyle(.borderless)
+            .playPauseCard(.card(item)) { model.open(entry) }
             .accessibilityLabel(entry.accessibilityLine)
             .contextMenu {
                 if let target = item.watchTarget {
@@ -122,6 +148,7 @@ private struct EntryFace: View {
     let imageURL: URL?
     var canRequest = false
     @Environment(\.isFocused) private var focused
+    @Environment(\.displayScale) private var scale
 
     private let width: CGFloat = 218
 
@@ -151,7 +178,7 @@ private struct EntryFace: View {
 
     @ViewBuilder private var artwork: some View {
         if let item = entry.item {
-            Artwork(url: imageURL, seed: item.title, maxPixel: width * 2.4)
+            Artwork(url: imageURL, seed: item.title, maxPixel: cardPixels(width: width, height: width * 1.5, scale: scale))
                 .overlay {
                     if let quality = item.quality { TVBadge(quality).pinned(.topTrailing) }
                     if item.watched {
@@ -166,7 +193,7 @@ private struct EntryFace: View {
                 .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Palette.outlineStrong, style: StrokeStyle(lineWidth: 2, dash: [8, 5])))
                 .overlay { TVBadge("Not found", style: .warning).pinned(.bottomLeading, padding: 10) }
         } else {
-            Artwork(url: imageURL, seed: entry.title, maxPixel: width * 2.4)
+            Artwork(url: imageURL, seed: entry.title, maxPixel: cardPixels(width: width, height: width * 1.5, scale: scale))
                 .overlay { Color(hex: 0x0F0F10).opacity(focused ? 0.35 : 0.62) }
         }
     }

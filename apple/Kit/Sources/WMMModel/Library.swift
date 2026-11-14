@@ -729,6 +729,18 @@ public enum ImageSize: String, Hashable, Sendable {
     case w92, w154, w185, w300, w342, w500, w780, w1280, original
 }
 
+/// Where a file's page is: its movie's, or its episode's in its show.
+public enum FilePage: Hashable, Sendable {
+    case movie(id: Int)
+    /// `season` and `episode` are nil when the server doesn't say.
+    case episode(showID: Int, season: Int?, episode: Int?)
+}
+
+extension LibraryRepository {
+    /// A repository that can't tell has no page for any file.
+    public func filePage(fileID: Int) async throws -> FilePage? { nil }
+}
+
 /// Browsing the current server's libraries. Methods throw ``APIError``; a
 /// revoked or expired sign-in throws ``SignedOutError``.
 @MainActor
@@ -757,6 +769,11 @@ public protocol LibraryRepository: AnyObject {
     /// `watchmymedia://play/{fileId}` link that carries no title.
     func playRequest(fileID: Int) async throws -> PlayRequest
 
+    /// The page of the movie or episode `fileID` plays, for a play link the
+    /// app didn't publish, which opens the page rather than playing
+    /// (PLAN-APPLE-REVIEW.md §3.4.7); nil for a file without one.
+    func filePage(fileID: Int) async throws -> FilePage?
+
     /// The full URL of a TMDB image path at `size`, or nil for no image. The
     /// image loader adds the sign-in, so the URL carries no token.
     func imageURL(_ path: String?, size: ImageSize) -> URL?
@@ -765,4 +782,9 @@ public protocol LibraryRepository: AnyObject {
     /// the server's watch.changed and library.changed events), so screens
     /// refetch. Each call is a new listener; it ends when the task is cancelled.
     func changes() -> AsyncStream<Void>
+
+    /// The same changes, saying what changed (``LibraryChange``), so a screen
+    /// patches or ignores what isn't its own. A repository that can't say
+    /// gives ``LibraryChange/unknown`` for each.
+    func libraryChanges() -> AsyncStream<LibraryChange>
 }

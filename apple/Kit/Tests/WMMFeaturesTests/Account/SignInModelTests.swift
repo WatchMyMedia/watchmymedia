@@ -192,14 +192,19 @@ import WMMModel
         try await servers.select(FakeServers.remoteHome)
         // Approved only after the screen has gone, however late that is on a busy machine.
         let (approval, approve) = AsyncStream.makeStream(of: Void.self)
-        let auth = FakeAuthRepository(signedIn: false, servers: servers, pairingDelay: { for await _ in approval { break } })
+        // Says when the fake's wait for approval has ended; whatever it does next runs in the same turn.
+        let (settled, settle) = AsyncStream.makeStream(of: Void.self)
+        let auth = FakeAuthRepository(signedIn: false, servers: servers, pairingDelay: {
+            for await _ in approval { break }
+            settle.yield()
+        })
         let model = SignInModel(servers: servers, auth: auth)
         let task = Task { await model.pair() }
         #expect(await eventually { model.waitingCode != nil })
         task.cancel()
         await task.value
         approve.yield()
-        try await Task.sleep(for: .milliseconds(300))
+        for await _ in settled { break }
         #expect(auth.user == nil, "a cancelled pairing never signs in")
     }
 
@@ -343,5 +348,30 @@ import WMMModel
         #expect(await model.linkTV(navigator: nav) == .none)
         #expect(auth.signInCalls == 0)
         #expect(nav.pendingLinkTV != nil)
+    }
+}
+
+/// The form kept above the iPhone and iPad sign-in screens (PLAN-APPLE-REVIEW.md §3.3.4).
+@MainActor
+@Suite struct SignInFormTests {
+    init() { FakeLatency.duration = .zero }
+
+    @Test func aResizedWindowKeepsWhatWasTypedUntilTheServerOrSignInChanges() async throws {
+        let servers = FakeServerRepository(signedIn: false)
+        let auth = FakeAuthRepository(signedIn: false, servers: servers)
+        let form = SignInForm()
+        let compact = form.model(servers: servers, auth: auth)
+        compact.name = "Sam"
+        // The window widens: the iPad screen asks for the form.
+        let wide = form.model(servers: servers, auth: auth)
+        #expect(wide === compact)
+        #expect(wide.name == "Sam")
+        // Another server: a form of its own.
+        try await servers.select(FakeServers.remoteHome)
+        #expect(form.model(servers: servers, auth: auth) !== compact)
+        // Signed in or out: afresh.
+        let current = form.model(servers: servers, auth: auth)
+        form.forget()
+        #expect(form.model(servers: servers, auth: auth) !== current)
     }
 }

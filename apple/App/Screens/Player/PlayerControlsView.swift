@@ -37,6 +37,8 @@ struct PlayerControlsView: View {
     var metrics: PlayerMetrics = .phone
     var portrait = false
     var onEpisodes: (() -> Void)?
+    /// Fit and fill, beside Close (PlayerFitFill.dc.html).
+    var fitButton: VideoFitButton?
 
     var body: some View {
         let state = model.state
@@ -65,25 +67,11 @@ struct PlayerControlsView: View {
         .overlayPreferenceValue(ScrubTrackKey.self) { track in
             if model.showsScrubTile, let track {
                 GeometryReader { proxy in
-                    scrubTile(track: proxy[track], in: proxy.size)
+                    ScrubTileOverlay(model: model, track: proxy[track], size: proxy.size, insets: insets, metrics: metrics)
                 }
                 .allowsHitTesting(false)
             }
         }
-    }
-
-    /// The seek thumbnail and its time, centred on the thumb and kept inside the controls' edges.
-    private func scrubTile(track: CGRect, in size: CGSize) -> some View {
-        let shown = model.shownPositionMs
-        let width = metrics.tileWidth
-        let height = (width * model.scrubTileAspect).rounded()
-        let thumbX = track.minX + track.width * fraction(ofMs: shown, durationMs: model.state.durationMs)
-        let x = min(max(thumbX, insets.leading + width / 2), size.width - insets.trailing - width / 2)
-        // Its bottom (the time) clears the dragged thumb.
-        let tall = height + metrics.tileGap + 24
-        return SeekTile(image: model.scrubTile, time: formatClock(ms: shown), width: width, height: height, metrics: metrics)
-            .fixedSize()
-            .position(x: x, y: track.midY - 16 - tall / 2)
     }
 
     private func topBar(_ state: PlayerState) -> some View {
@@ -120,6 +108,7 @@ struct PlayerControlsView: View {
             .frame(minHeight: metrics.button)
             HStack(spacing: metrics.streamChip ? 12 : 10) {
                 RoundIconButton(systemImage: "xmark", label: "Close", size: metrics.button, iconSize: metrics.buttonIcon) { model.close() }
+                if let fitButton { fitButton }
                 Spacer(minLength: 0)
                 if cast.available && !state.isOffline {
                     CastHandoverButton(model: model)
@@ -159,18 +148,17 @@ struct PlayerControlsView: View {
     }
 
     private func bottomBar(_ state: PlayerState) -> some View {
-        let shown = model.shownPositionMs
-        return VStack(spacing: 8) {
+        VStack(spacing: 8) {
             HStack(spacing: metrics.streamChip ? 16 : 14) {
-                Text(formatClock(ms: shown))
+                PlayerTime(model: model, remaining: false)
                     .font(metrics.time)
                     .frame(minWidth: 40, alignment: .leading)
                     .accessibilityHidden(true)
                 PlayerScrubber(model: model)
-                if state.showsGoToNow {
-                    Button("Go to now") { model.seek(toMs: max(state.durationMs - 3000, 0)) }.font(.caption.bold()).foregroundStyle(Palette.gold).frame(minHeight: 44)
+                if state.growing != nil {
+                    GoToNowButton(model: model)
                 }
-                Text(remainingLabel(positionMs: shown, durationMs: state.durationMs))
+                PlayerTime(model: model, remaining: true)
                     .font(metrics.time)
                     .frame(minWidth: 48, alignment: .trailing)
                     .accessibilityHidden(true)
@@ -207,14 +195,15 @@ struct PlayerScrubber: View {
     let model: PlayerChromeModel
 
     var body: some View {
-        let state = model.state
+        let clock = model.clock
+        let durationMs = clock.durationMs
         let shown = model.shownPositionMs
         GeometryReader { geo in
             let width = geo.size.width
-            let timeline = state.timelineDurationMs
-            let recorded = fraction(ofMs: state.durationMs, durationMs: timeline)
+            let timeline = model.state.growing?.plannedDurationMs ?? durationMs
+            let recorded = fraction(ofMs: durationMs, durationMs: timeline)
             let played = fraction(ofMs: shown, durationMs: timeline)
-            let buffered = min(bufferedFraction(positionMs: state.positionMs, bufferedMs: state.bufferedMs, durationMs: timeline), recorded)
+            let buffered = min(bufferedFraction(positionMs: clock.positionMs, bufferedMs: clock.bufferedMs, durationMs: timeline), recorded)
             let dragging = model.scrubMs != nil
             ZStack(alignment: .leading) {
                 Capsule().fill(.white.opacity(0.12)).frame(height: 5)
@@ -251,12 +240,14 @@ struct PlayerScrubber: View {
                     .onEnded { _ in model.endScrub() }
             )
             .animation(.easeOut(duration: 0.12), value: dragging)
+            // A tick as the thumb is taken (PLAN-APPLE-REVIEW.md §6.3).
+            .sensoryFeedback(.impact(weight: .light), trigger: dragging) { _, now in now }
         }
         .frame(height: 44)
         .accessibilityElement()
         .accessibilityLabel("Playback position")
-        .accessibilityValue(scrubberAccessibilityValue(positionMs: shown, durationMs: state.durationMs))
-        .accessibilityHint(model.bands.map { $0.accessibilityLabel(durationMs: state.durationMs) }.joined(separator: ". "))
+        .accessibilityValue(scrubberAccessibilityValue(positionMs: shown, durationMs: durationMs))
+        .accessibilityHint(model.bands.map { $0.accessibilityLabel(durationMs: durationMs) }.joined(separator: ". "))
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: model.seek(byMs: DoubleTapSeek.stepMs)
@@ -264,6 +255,52 @@ struct PlayerScrubber: View {
             @unknown default: break
             }
         }
+    }
+}
+
+/// The elapsed time, or what is left, beside the scrubber: views of their
+/// own, since they change with every tick and the controls around them don't.
+private struct PlayerTime: View {
+    let model: PlayerChromeModel
+    let remaining: Bool
+
+    var body: some View {
+        let shown = model.shownPositionMs
+        Text(remaining ? remainingLabel(positionMs: shown, durationMs: model.clock.durationMs) : formatClock(ms: shown))
+    }
+}
+
+/// "Go to now" on a recording that is still recording, once the play is more than 10 s behind it.
+private struct GoToNowButton: View {
+    let model: PlayerChromeModel
+
+    var body: some View {
+        let clock = model.clock
+        if clock.durationMs - clock.positionMs > PlayerState.goToNowBehindMs {
+            Button("Go to now") { model.seek(toMs: max(model.clock.durationMs - 3000, 0)) }.font(.caption.bold()).foregroundStyle(Palette.gold).frame(minHeight: 44)
+        }
+    }
+}
+
+/// The seek thumbnail and its time, centred on the thumb and kept inside the controls' edges.
+private struct ScrubTileOverlay: View {
+    let model: PlayerChromeModel
+    let track: CGRect
+    let size: CGSize
+    let insets: PlayerInsets
+    let metrics: PlayerMetrics
+
+    var body: some View {
+        let shown = model.shownPositionMs
+        let width = metrics.tileWidth
+        let height = (width * model.scrubTileAspect).rounded()
+        let thumbX = track.minX + track.width * fraction(ofMs: shown, durationMs: model.clock.durationMs)
+        let x = min(max(thumbX, insets.leading + width / 2), size.width - insets.trailing - width / 2)
+        // Its bottom (the time) clears the dragged thumb.
+        let tall = height + metrics.tileGap + 24
+        SeekTile(image: model.scrubTile, time: formatClock(ms: shown), width: width, height: height, metrics: metrics)
+            .fixedSize()
+            .position(x: x, y: track.midY - 16 - tall / 2)
     }
 }
 
@@ -326,6 +363,8 @@ private struct BandMark: View {
 /// "Skip Intro": in auto-delay mode a burgundy fill runs across it before the skip happens by itself.
 struct SkipButton: View {
     let prompt: SkipPrompt
+    /// Where the fill is: it runs with the clock.
+    let clock: PlayerClock
     var metrics: PlayerMetrics = .phone
     let action: () -> Void
 
@@ -343,10 +382,10 @@ struct SkipButton: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Palette.ground.opacity(0.78)
-                        Palette.burgundy.frame(width: geo.size.width * (prompt.autoProgress ?? 0))
+                        Palette.burgundy.frame(width: geo.size.width * (clock.skipProgress ?? 0))
                     }
                 }
-                .animation(.linear(duration: 0.25), value: prompt.autoProgress)
+                .animation(.linear(duration: 0.25), value: clock.skipProgress)
             }
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.white.opacity(0.35)))

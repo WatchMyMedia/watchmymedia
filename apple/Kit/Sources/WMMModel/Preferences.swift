@@ -158,7 +158,7 @@ public enum SubtitleChoice: String, CaseIterable, Hashable, Sendable {
 
     /// The choices a server at `apiLevel` keeps: the foreign-audio one from ``audioPreferencesAPILevel``.
     public static func offered(apiLevel: Int?) -> [SubtitleChoice] {
-        (apiLevel ?? 0) >= audioPreferencesAPILevel ? allCases : allCases.filter { $0 != .foreign }
+        ServerFeatures(apiLevel: apiLevel).audioLanguages ? allCases : allCases.filter { $0 != .foreign }
     }
 }
 
@@ -192,12 +192,6 @@ public struct LanguageChange: Hashable, Sendable {
         if let automaticDownload { p.subtitles.automaticDownload = automaticDownload }
     }
 }
-
-public let subtitlePreferencesAPILevel = 18
-
-/// Audio languages, the foreign-audio subtitle choice and the profile's
-/// `selectsAudioTrack` (PLAN-LANGUAGES.md §4). Older servers reject them.
-public let audioPreferencesAPILevel = 21
 
 /// Streaming quality, remembered per device. The caps narrow the device's
 /// profile. Automatic has none: the server picks the step and lowers it when
@@ -290,12 +284,8 @@ public enum StreamQuality: String, CaseIterable, Hashable, Sendable {
         self == .auto && !Self.supportsAuto(apiLevel) ? .original : self
     }
 
-    private static func supportsAuto(_ apiLevel: Int?) -> Bool { (apiLevel ?? 0) >= autoQualityAPILevel }
+    private static func supportsAuto(_ apiLevel: Int?) -> Bool { ServerFeatures(apiLevel: apiLevel).automaticQuality }
 }
-
-/// The server API level from which a server picks the step for Automatic
-/// quality. Older servers are still used; they just do not offer it.
-public let autoQualityAPILevel = 3
 
 @MainActor
 public protocol PreferencesRepository: AnyObject, Observable {

@@ -27,8 +27,16 @@ public struct PlayRequest: Hashable, Sendable, Identifiable {
     /// Episode context for the tablet player's season list; absent for movies and unmatched files.
     public var showID: Int?
     public var seasonNumber: Int?
+    /// What the page that played it already knows, for the Apple TV player's
+    /// Info panel (PLAN-APPLE-REVIEW.md §6.2): the description, the year, the
+    /// certification ("TV-14") and the genres. Nil or empty shows nothing.
+    public var overview: String?
+    public var year: Int?
+    public var contentRating: String?
+    public var genres: [String]
 
-    public init(fileID: Int, startMs: Int? = nil, title: String, subtitle: String? = nil, backdropPath: String? = nil, stillPath: String? = nil, posterPath: String? = nil, audioIndex: Int? = nil, subtitleID: String? = nil, subtitleMode: SubtitleSelectionMode = .auto, qualityOverride: StreamQuality? = nil, showID: Int? = nil, seasonNumber: Int? = nil, recordingID: String? = nil) {
+    public init(fileID: Int, startMs: Int? = nil, title: String, subtitle: String? = nil, backdropPath: String? = nil, stillPath: String? = nil, posterPath: String? = nil, audioIndex: Int? = nil, subtitleID: String? = nil, subtitleMode: SubtitleSelectionMode = .auto, qualityOverride: StreamQuality? = nil, showID: Int? = nil, seasonNumber: Int? = nil, recordingID: String? = nil,
+                overview: String? = nil, year: Int? = nil, contentRating: String? = nil, genres: [String] = []) {
         self.recordingID = recordingID
         self.fileID = fileID
         self.startMs = startMs
@@ -43,6 +51,10 @@ public struct PlayRequest: Hashable, Sendable, Identifiable {
         self.qualityOverride = qualityOverride
         self.showID = showID
         self.seasonNumber = seasonNumber
+        self.overview = overview
+        self.year = year
+        self.contentRating = contentRating
+        self.genres = genres
     }
 
     public var id: String { "\(recordingID ?? String(fileID))@\(startMs.map(String.init) ?? "resume")" }

@@ -55,7 +55,7 @@ public final class ServerPickerModel {
     public var found: [Row] {
         let saved = Dictionary(servers.saved.map { ($0.server.id, $0) }, uniquingKeysWith: { a, _ in a })
         return servers.discovered.map { d in
-            let tooOld = d.apiLevel < requiredAPILevel
+            let tooOld = !ServerFeatures(apiLevel: d.apiLevel).supported
             return Row(
                 id: d.id, kind: .found, name: d.name, address: d.baseURL.absoluteString,
                 detail: [d.displayAddress, versionLabel(d.version), tooOld ? "too old for this app" : accountLabel(saved[d.id])].joined(separator: " · "),

@@ -56,25 +56,66 @@ private struct NativeCastButton: UIViewRepresentable {
     }
 }
 
+/// What the mini controller shows of a cast: whether one is under way, its
+/// title, and whether it plays. The TV reports its position every second,
+/// which changes `CastService.media` and so anything that reads
+/// `CastService.state`; this follows the service and changes only when what
+/// it holds does, so the mini controllers in all five tabs don't redraw
+/// every second (PLAN-APPLE-REVIEW.md §4.3.6). One per service, shared.
+@MainActor @Observable
+final class CastMiniState {
+    private(set) var active = false
+    private(set) var title = ""
+    private(set) var playing = false
+    @ObservationIgnored private weak var cast: CastService?
+    @ObservationIgnored private static var shared: [ObjectIdentifier: CastMiniState] = [:]
+
+    static func of(_ cast: CastService) -> CastMiniState {
+        if let made = shared[ObjectIdentifier(cast)] { return made }
+        let made = CastMiniState(cast)
+        shared[ObjectIdentifier(cast)] = made
+        return made
+    }
+
+    private init(_ cast: CastService) {
+        self.cast = cast
+        update()
+    }
+
+    private func update() {
+        guard let cast else { return }
+        let now = withObservationTracking {
+            let state = cast.state
+            return (active: cast.active, title: state.title, playing: state.status == .playing)
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in self?.update() }
+        }
+        if active != now.active { active = now.active }
+        if title != now.title { title = now.title }
+        if playing != now.playing { playing = now.playing }
+    }
+}
+
 struct CastMiniController: View {
     @Environment(CastService.self) private var cast
     @Environment(Navigator.self) private var navigator
     var body: some View {
-        if cast.active {
+        let mini = CastMiniState.of(cast)
+        if mini.active {
             HStack(spacing: 12) {
                 Button { cast.remotePresented = true } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "tv.fill").foregroundStyle(Palette.gold)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(cast.state.title).font(.subheadline.weight(.semibold)).lineLimit(1)
+                            Text(mini.title).font(.subheadline.weight(.semibold)).lineLimit(1)
                             Text("On \(cast.deviceName)").font(.caption).foregroundStyle(Palette.muted).lineLimit(1)
                         }
                         Spacer(minLength: 0)
                     }.contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityLabel("Open Cast remote for \(cast.deviceName)")
                 Button { cast.togglePlayPause() } label: {
-                    Image(systemName: cast.state.status == .playing ? "pause.fill" : "play.fill").frame(width: 44, height: 44)
-                }.accessibilityLabel(cast.state.status == .playing ? "Pause on TV" : "Play on TV")
+                    Image(systemName: mini.playing ? "pause.fill" : "play.fill").frame(width: 44, height: 44)
+                }.accessibilityLabel(mini.playing ? "Pause on TV" : "Play on TV")
                 CastButton()
             }
             .padding(.horizontal, 16).padding(.vertical, 6)

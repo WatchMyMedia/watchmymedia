@@ -8,7 +8,7 @@ VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev
 OPENSUBTITLES_API_KEY ?=
 LDFLAGS  = -s -w -X main.version=$(VERSION) -X main.openSubtitlesKey=$(OPENSUBTITLES_API_KEY)
 
-.PHONY: help dev web-dev gen gen-sqlc gen-api web build build-universal release ffmpeg-macos ffmpeg-windows windows-app windows-installer windows-test macos-app macos-dmg test bench lint docker docker-up clean fixture fixture-serve apple-api apple-gen apple-test apple-build apple-test-sim apple-archive apple-upload apple-tv-archive apple-tv-upload apple-e2e apple-tv-build apple-tv-test-sim agents-check server-deps android-verify-metadata
+.PHONY: help dev web-dev gen gen-sqlc gen-api web build build-universal release ffmpeg-macos ffmpeg-windows windows-app windows-installer windows-test macos-app macos-dmg test bench lint docker docker-up clean fixture fixture-serve apple-api apple-gen apple-test apple-build apple-test-sim apple-archive apple-upload apple-tv-archive apple-tv-upload apple-e2e apple-tv-build apple-tv-test-sim apple-tv-test-sim-ci apple-build-release apple-tv-build-release apple-perf agents-check server-deps android-verify-metadata
 .PHONY: streaming-check release-tag
 
 PLATFORMS := darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64
@@ -87,6 +87,76 @@ apple-tv-test-sim: apple-gen ## Build the Apple TV app and run every test on the
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
 	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVTests.xcresult $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) \
 	  $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) test
+
+# CI's way to run the same tests (PLAN-CI-SPEED.md C5): build once, run the
+# Kit's tests, then the remote UI tests on their own. Both runs go ahead, and
+# either failing fails the target. Results: TVTests.xcresult (Kit),
+# TVUITests.xcresult (UI). TV_UI_WORKERS above 1 runs the UI tests on that many
+# clones of the simulator. That helps on a Mac with cores to spare, not on
+# GitHub's three-core runner: there two clones made every test two to three
+# times slower, and the UI tests took no less time (runs of 2026-11-12 and
+# 2026-11-14), so CI keeps one.
+#
+# CI splits the UI tests between two jobs instead: TV_UI_SHARD=1/2 runs the
+# first share of the test classes (apple/scripts/tv-ui-shard.py shares them out
+# by test count), and TV_KIT_TESTS=no leaves the Kit's tests to the other job.
+TV_UI_WORKERS ?= 1
+TV_UI_SHARD ?=
+TV_KIT_TESTS ?= yes
+comma := ,
+apple-tv-test-sim-ci: apple-gen ## Build once, then the Kit tests and the UI tests apart on the $(TV_SIM) simulator (TV_UI_SHARD=1/2 for half the UI tests)
+	ui_tests="$$($(if $(TV_UI_SHARD),python3 -I apple/scripts/tv-ui-shard.py $(subst /, ,$(TV_UI_SHARD)),echo -only-testing:WatchMyMediaTVUITests))" && \
+	[ -n "$$ui_tests" ] && \
+	id=$$(apple/scripts/simulator.sh "$(TV_SIM)" appletv) && \
+	{ xcrun simctl boot "$$id" 2>/dev/null || true; } && \
+	rm -rf apple/build/TVTests.xcresult apple/build/TVUITests.xcresult && \
+	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
+	  -derivedDataPath $(APPLE_DERIVED) $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) build-for-testing && \
+	{ kit=0; ui=0; \
+	  $(if $(filter yes,$(TV_KIT_TESTS)),xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator$(comma)id=$$id" \
+	    -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVTests.xcresult $(APPLE_TEST_FLAGS) \
+	    $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) \
+	    -skip-testing:WatchMyMediaTVUITests test-without-building || kit=$$?;) \
+	  xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
+	    -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVUITests.xcresult $(APPLE_TEST_FLAGS) \
+	    $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) \
+	    $$ui_tests \
+	    $(if $(filter-out 1,$(TV_UI_WORKERS)),-parallel-testing-enabled YES -parallel-testing-worker-count $(TV_UI_WORKERS)) \
+	    test-without-building || ui=$$?; \
+	  echo "Kit tests: exit $$kit; UI tests: exit $$ui"; \
+	  [ $$kit -eq 0 ] && [ $$ui -eq 0 ]; }
+
+# The Release configuration for devices, unsigned: what an archive compiles
+# (optimised, no DEBUG, so no fakes), without signing. CI runs both, so a
+# release-only break shows before a tag. No coverage, as in an archive (the
+# scheme's test coverage otherwise instruments the build). The check then
+# fails without the privacy manifest or with the fakes' code in the binary.
+apple-build-release: apple-gen ## Build the iPhone app in Release for devices, unsigned (as CI does)
+	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMedia -configuration Release -destination 'generic/platform=iOS' \
+	  -derivedDataPath $(APPLE_DERIVED) CLANG_COVERAGE_MAPPING=NO CODE_SIGNING_ALLOWED=NO build
+	apple/scripts/check-release-binary.sh $(APPLE_DERIVED)/Build/Products/Release-iphoneos/WatchMyMedia.app
+
+apple-tv-build-release: apple-gen ## Build the Apple TV app in Release for devices, unsigned (as CI does)
+	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -configuration Release -destination 'generic/platform=tvOS' \
+	  -derivedDataPath $(APPLE_DERIVED) CLANG_COVERAGE_MAPPING=NO CODE_SIGNING_ALLOWED=NO build
+	apple/scripts/check-release-binary.sh $(APPLE_DERIVED)/Build/Products/Release-appletvos/WatchMyMediaTV.app
+
+# apple-perf measures a signed-in launch and scrolling Home and Movies on
+# $(SIM), and a launch on $(TV_SIM), five runs each, on the fakes (so Debug
+# builds; PLAN-APPLE-REVIEW.md §4.3.1). Not in CI: the numbers need a quiet Mac.
+apple-perf: apple-gen ## Measure launch and scrolling on $(SIM) and $(TV_SIM) (Debug, fakes) -> apple/build/Perf.xcresult, TVPerf.xcresult
+	id=$$(apple/scripts/simulator.sh "$(SIM)") && \
+	{ xcrun simctl boot "$$id" 2>/dev/null || true; } && \
+	rm -rf apple/build/Perf.xcresult && \
+	TEST_RUNNER_WMM_PERF=1 xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMediaE2E -destination "platform=iOS Simulator,id=$$id" \
+	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/Perf.xcresult $(APPLE_SIM_SIGNING) \
+	  -only-testing:WatchMyMediaUITests/PerformanceTests test
+	id=$$(apple/scripts/simulator.sh "$(TV_SIM)" appletv) && \
+	{ xcrun simctl boot "$$id" 2>/dev/null || true; } && \
+	rm -rf apple/build/TVPerf.xcresult && \
+	TEST_RUNNER_WMM_PERF=1 xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
+	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVPerf.xcresult $(APPLE_SIM_SIGNING) \
+	  -only-testing:WatchMyMediaTVUITests/PerformanceTests test
 
 # apple-e2e runs the app on $(SIM) against a server: E2E_SERVER as typed in
 # the server picker (from the simulator, localhost is this Mac), and an account

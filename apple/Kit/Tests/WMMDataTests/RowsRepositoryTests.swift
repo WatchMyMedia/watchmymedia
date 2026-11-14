@@ -154,7 +154,7 @@ struct RowsRepositoryTests {
         let changes = Counter()
         let listening = Task { for await _ in rows.changes() { changes.count += 1 } }
         defer { listening.cancel() }
-        try await Task.sleep(for: .milliseconds(20))
+        #expect(await eventually { h.services.events.listenerCount == 1 })
 
         let saved = try await rows.saveLayout([RowPlacement(id: "list:9"), RowPlacement(id: "recentlyAdded", hidden: true)], for: .library(1))
         #expect(saved.customized)

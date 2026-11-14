@@ -47,6 +47,8 @@ final class SystemDownloadEngine: NSObject, DownloadEngine {
 
     /// Background session events delivered while the app was away, by session identifier.
     static var completions: [String: () -> Void] = [:]
+    /// Holds the app awake until the next download is handed to the system.
+    private let handover = HandoverHold()
 
     private let folder: URL
     private let home = URL(fileURLWithPath: NSHomeDirectory())
@@ -197,9 +199,27 @@ final class SystemDownloadEngine: NSObject, DownloadEngine {
 
     func notMet() -> DownloadStatus.Reason? {
         guard let path else { return nil }
-        if path.status != .satisfied { return .network }
-        if wifiOnly && !(path.usesInterfaceType(.wifi) || path.usesInterfaceType(.wiredEthernet)) { return .wifi }
+        return Self.notMet(satisfied: path.status == .satisfied, wifi: path.usesInterfaceType(.wifi),
+                           wired: path.usesInterfaceType(.wiredEthernet), expensive: path.isExpensive,
+                           constrained: path.isConstrained, wifiOnly: wifiOnly)
+    }
+
+    /// What holds downloads back on a network. Wi-Fi only means no mobile
+    /// data, so a phone's personal hotspot (Wi-Fi the system marks
+    /// expensive) and Low Data Mode (constrained) wait as mobile data does.
+    static func notMet(satisfied: Bool, wifi: Bool, wired: Bool, expensive: Bool, constrained: Bool, wifiOnly: Bool) -> DownloadStatus.Reason? {
+        if !satisfied { return .network }
+        if wifiOnly && (!(wifi || wired) || expensive || constrained) { return .wifi }
         return nil
+    }
+
+    /// A request kept to Wi-Fi and wired networks that cost nothing while Wi-Fi only is on.
+    private func limited(_ request: URLRequest) -> URLRequest {
+        var request = request
+        request.allowsCellularAccess = !wifiOnly
+        request.allowsExpensiveNetworkAccess = !wifiOnly
+        request.allowsConstrainedNetworkAccess = !wifiOnly
+        return request
     }
 
     // MARK: Running
@@ -243,8 +263,7 @@ final class SystemDownloadEngine: NSObject, DownloadEngine {
 
     private func startFile(_ id: String) {
         guard let e = entries[id], e.state == .preparing else { return }
-        guard var request = delegate?.request(for: id, url: e.request.url) else { return giveUp(id, .refused(401)) }
-        request.allowsCellularAccess = !wifiOnly
+        guard let request = delegate?.request(for: id, url: e.request.url).map(limited) else { return giveUp(id, .refused(401)) }
         let task: URLSessionDownloadTask
         if let data = try? Data(contentsOf: resumeFile(id)) {
             task = fileSession.downloadTask(withResumeData: data)
@@ -268,8 +287,7 @@ final class SystemDownloadEngine: NSObject, DownloadEngine {
                 return tokenFailed(id, error)
             }
             let url = token.apply(to: e.request.url)
-            var probe = URLRequest(url: url)
-            probe.allowsCellularAccess = !wifiOnly
+            let probe = limited(URLRequest(url: url))
             let status: Int
             let retryAfter: TimeInterval
             do {
@@ -310,7 +328,11 @@ final class SystemDownloadEngine: NSObject, DownloadEngine {
             e.location = nil
             e.tokenAt = Date()
             entries[id] = e
-            asset = AVURLAsset(url: url, options: [AVURLAssetAllowsCellularAccessKey: !wifiOnly])
+            asset = AVURLAsset(url: url, options: [
+                AVURLAssetAllowsCellularAccessKey: !wifiOnly,
+                AVURLAssetAllowsExpensiveNetworkAccessKey: !wifiOnly,
+                AVURLAssetAllowsConstrainedNetworkAccessKey: !wifiOnly,
+            ])
         }
         let task = hlsSession.makeAssetDownloadTask(downloadConfiguration: AVAssetDownloadConfiguration(asset: asset, title: e.request.title))
         task.taskDescription = id
@@ -330,8 +352,7 @@ final class SystemDownloadEngine: NSObject, DownloadEngine {
     /// Subtitles are small: they go at once, beside the media.
     private func startParts(_ e: Entry) {
         for (track, url) in e.request.parts where e.parts[track] == nil && partTasks[partKey(e.request.id, track)] == nil {
-            guard var request = delegate?.request(for: e.request.id, url: url) else { continue }
-            request.allowsCellularAccess = !wifiOnly
+            guard let request = delegate?.request(for: e.request.id, url: url).map(limited) else { continue }
             let task = fileSession.downloadTask(with: request)
             task.taskDescription = partKey(e.request.id, track)
             partTasks[partKey(e.request.id, track)] = task
@@ -459,6 +480,8 @@ final class SystemDownloadEngine: NSObject, DownloadEngine {
     }
 
     private func save() {
+        // Every change of state is saved: while one is being made ready, the app stays awake for it.
+        handover.setPreparing(entries.values.contains { $0.state == .preparing })
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         guard let data = try? JSONEncoder().encode(Array(entries.values)) else { return }
         try? data.write(to: indexFile, options: .atomic)
@@ -521,7 +544,13 @@ extension SystemDownloadEngine: AVAssetDownloadDelegate, URLSessionDownloadDeleg
 
     nonisolated func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
         let identifier = session.configuration.identifier ?? ""
-        MainActor.assumeIsolated { Self.completions.removeValue(forKey: identifier)?() }
+        // Delivered after the session's other events, so a download that
+        // finished has started the next one by now: the app is suspended
+        // only once that one is handed to the system.
+        MainActor.assumeIsolated {
+            guard let completion = Self.completions.removeValue(forKey: identifier) else { return }
+            handover.delivered(completion)
+        }
     }
 
     private func finishedFile(_ description: String, status: Int, at location: URL) {

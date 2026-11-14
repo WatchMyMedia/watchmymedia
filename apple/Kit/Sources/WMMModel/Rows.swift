@@ -4,9 +4,6 @@ import Foundation
 // and rows made from lists (PLAN-ROWS.md §6). The server orders and fills the
 // rows; the apps draw them by style. Mirrors android/core/model's rows.
 
-/// The API level from which the server arranges rows and makes them from lists.
-public let rowsAPILevel = 22
-
 /// A screen a person arranges: Home, or a library's Movies or TV screen.
 public enum RowScreen: Hashable, Sendable {
     case home

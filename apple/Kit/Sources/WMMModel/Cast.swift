@@ -1,7 +1,5 @@
 import Foundation
 
-public let castAPILevel = 2
-public let liveCastAPILevel = 14
 public let watchMyMediaCastAppID = "0A4D0B6A"
 
 /// A non-secret session identity. Revision changes on sign-in, sign-out and endpoint changes.

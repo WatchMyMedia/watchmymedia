@@ -126,7 +126,7 @@ struct TVLiveRemindersScreen: View {
                         if extras.loading && !extras.loaded {
                             ProgressView().frame(maxWidth: .infinity, minHeight: 300)
                         } else {
-                            TVEmptyState(systemImage: "bell", title: "No reminders", message: "Hold Select on a programme in the guide and choose Remind me.")
+                            TVEmptyState(systemImage: "bell", title: liveNoReminders, message: "Hold Select on a programme in the guide and choose Remind me.")
                                 .frame(minHeight: 300)
                         }
                     } else {
@@ -163,7 +163,7 @@ struct TVLiveRemindersScreen: View {
             }
             .buttonStyle(TVLiveCardButtonStyle())
             .accessibilityLabel(liveReminderAccessibilityLabel(reminder, previousStart: extras.previousStart(of: reminder), now: now))
-            .accessibilityHint(reminder.state == .gone ? "Shows the reminder as it was kept" : "Shows it in the guide")
+            .accessibilityHint(reminder.state == .gone ? liveShowsKeptReminderHint : liveShowsInGuideHint)
             .accessibilityIdentifier("live-reminder-\(reminder.title)")
             Button("Remove") { Task { await extras.remove(reminder) } }
                 .buttonStyle(TVButtonStyle())
@@ -336,7 +336,10 @@ struct TVLiveSearchSection: View {
                     if let hit = hits.first(where: { $0.id == focused }) ?? hits.first {
                         HStack(spacing: 16) {
                             TVLiveHint(systemImage: "list.bullet.rectangle", text: "Show it in the guide")
-                            TVLiveHint(systemImage: "hand.tap", text: "Hold · \(liveSearchHoldHint(hit, reminded: extras.isReminded(hit.programme), now: context.date))")
+                            // Only what the result's menu offers (LiveProgrammeActions).
+                            if let hold = LiveProgrammeActions(hit.programme, on: hit.channel, now: context.date, extras: extras).searchHoldHint(hit, now: context.date) {
+                                TVLiveHint(systemImage: "hand.tap", text: "Hold · \(hold)")
+                            }
                         }
                         .foregroundStyle(Palette.text)
                         .padding(.horizontal, TVLayout.gutter)
@@ -357,20 +360,23 @@ struct TVLiveSearchSection: View {
         .buttonStyle(TVLiveCardButtonStyle())
         .focused($focused, equals: hit.id)
         .contextMenu {
-            if !hit.programme.isOn(at: now) {
-                if reminded {
-                    Button { Task { await extras.removeReminder(for: hit.programme) } } label: { Label(liveRemoveReminder, systemImage: "bell.slash") }
-                } else if extras.canRemind(hit.programme) {
-                    Button { Task { await extras.remind(hit.programme, on: hit.channel) } } label: { Label(liveRemindMe, systemImage: "bell") }
-                }
+            // Search's board offers no Record: the guide's menu does.
+            let actions = LiveProgrammeActions(hit.programme, on: hit.channel, now: now, extras: extras)
+            switch actions.reminder {
+            case .set?:
+                Button { Task { await extras.removeReminder(for: hit.programme) } } label: { Label(liveRemoveReminder, systemImage: "bell.slash") }
+            case .offered?:
+                Button { Task { await extras.remind(hit.programme, on: hit.channel) } } label: { Label(liveRemindMe, systemImage: "bell") }
+            case .unavailable?, nil:
+                EmptyView()
             }
             Button { navigator.playLive(.init(channel: hit.channel)) } label: {
                 Label(liveWatchLabel(hit.channel, programme: hit.programme, now: now), systemImage: "play.fill")
             }
-            .disabled(!hit.channel.available)
+            .disabled(!actions.watch)
         }
         .accessibilityLabel(liveSearchAccessibilityLabel(hit, reminded: reminded, now: now))
-        .accessibilityHint("Shows it in the guide")
+        .accessibilityHint(liveShowsInGuideHint)
         .accessibilityIdentifier("live-search-\(hit.channel.number)-\(hit.programme.title)")
     }
 

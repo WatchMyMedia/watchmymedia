@@ -1,8 +1,5 @@
 import Foundation
 
-/// Recording is additive; older servers expose finished recordings as ordinary files.
-public let liveRecordingAPILevel = 19
-
 public enum LiveRecordingSection: String, CaseIterable, Hashable, Sendable {
     case now, conflicts, upcoming, series, recorded
     public var title: String {

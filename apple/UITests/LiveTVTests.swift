@@ -47,6 +47,32 @@ final class LiveTVTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10))
     }
 
+    /// The Live TV player's controls hide by themselves as the film player's
+    /// do, and a tap on the picture brings them back (PLAN-APPLE-REVIEW.md §3.3.1).
+    @MainActor
+    func testLiveControlsHideByThemselvesAndComeBackOnATap() {
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-fakes", "-fakesLiveTV", "-open", "watchmymedia://live-tv/live-1"]
+        app.launch()
+        defer { app.terminate() }
+        let playPause = app.buttons["live-play-pause"]
+        XCTAssertTrue(playPause.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitForAbsence(playPause, timeout: 8), "The controls hide about 3 s after the last touch")
+        shot("Live TV controls hidden")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+        XCTAssertTrue(playPause.waitForExistence(timeout: 3), "A tap on the picture shows them again")
+        playPause.tap()
+        expect(playPause, "label == 'Play live TV'")
+        sleep(5)
+        XCTAssertTrue(playPause.exists, "Paused, they stay")
+    }
+
+    private func waitForAbsence(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: element)
+        return XCTWaiter().wait(for: [gone], timeout: timeout) == .completed
+    }
+
     @MainActor
     func testOlderServerKeepsSettingsAndHidesLiveTV() {
         let app = XCUIApplication()
@@ -76,7 +102,7 @@ final class LiveTVTests: XCTestCase {
         XCTAssertTrue(quality.label.contains("Auto · Original"))
 
         app.terminate()
-        app.launchArguments = ["-fakes", "-fakesLiveAutomatic", "-open", "watchmymedia://live-tv/live-1", "-liveAutoLow"]
+        app.launchArguments = ["-fakes", "-fakesLiveAutomatic", "-open", "watchmymedia://live-tv/live-1", "-liveAutoLow", "-playerKeepControls"]
         app.launch()
         waitForPlayer(app)
         XCTAssertTrue(app.buttons["live-quality"].label.contains("Auto · 480p"))
@@ -92,7 +118,7 @@ final class LiveTVTests: XCTestCase {
         waitForPlayer(app)
         app.terminate()
 
-        app.launchArguments = ["-fakes", "-fakesLiveTV", "-open", "watchmymedia://live-tv/live-1", "-livePauseExpired"]
+        app.launchArguments = ["-fakes", "-fakesLiveTV", "-open", "watchmymedia://live-tv/live-1", "-livePauseExpired", "-playerKeepControls"]
         app.launch()
         XCTAssertTrue(app.staticTexts["Live TV stopped"].waitForExistence(timeout: 20))
         XCTAssertTrue(element(app, containing: "five minutes paused").exists)
@@ -102,7 +128,7 @@ final class LiveTVTests: XCTestCase {
         waitForPlayer(app)
         app.terminate()
 
-        app.launchArguments = ["-fakes", "-fakesLiveTV", "-open", "watchmymedia://live-tv/live-1", "-liveBusy"]
+        app.launchArguments = ["-fakes", "-fakesLiveTV", "-open", "watchmymedia://live-tv/live-1", "-liveBusy", "-playerKeepControls"]
         app.launch()
         defer { app.terminate() }
         XCTAssertTrue(app.staticTexts["Can't play this channel"].waitForExistence(timeout: 20))
@@ -182,6 +208,8 @@ final class LiveTVTests: XCTestCase {
             return false
         }
         XCUIDevice.shared.orientation = .portrait
+        // The player's controls stay up, so the test can reach them at its own pace.
+        app.launchArguments = ["-playerKeepControls"]
         app.launch()
         defer { app.terminate() }
         let address = app.textFields.firstMatch
@@ -287,7 +315,7 @@ final class LiveTVTests: XCTestCase {
     @MainActor private func launchFake(extra: [String] = []) -> XCUIApplication {
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
-        app.launchArguments = ["-fakes", "-fakesLiveTV", "-tab", "liveTV"] + extra
+        app.launchArguments = ["-fakes", "-fakesLiveTV", "-tab", "liveTV", "-playerKeepControls"] + extra
         app.launch()
         return app
     }

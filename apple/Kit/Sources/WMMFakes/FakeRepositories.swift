@@ -41,9 +41,9 @@ public final class FakeServerRepository: ServerRepository {
     public init(signedIn: Bool = true, chosen: Bool = true, admin: Bool = true, liveTV: Bool = false, liveGuide: Bool = false, liveExtras: Bool = false, apiLevel: Int? = nil) {
         let account = admin ? User(id: 1, name: "Sam", isAdmin: true) : User(id: 2, name: "Alex", isAdmin: false)
         var livingRoom = FakeServers.livingRoom
-        if liveTV { livingRoom.apiLevel = liveTVAPILevel }
-        if liveGuide { livingRoom.apiLevel = liveGuideAPILevel }
-        if liveGuide && liveExtras { livingRoom.apiLevel = liveExtrasAPILevel }
+        if liveTV { livingRoom.apiLevel = ServerFeatures.Level.liveTV }
+        if liveGuide { livingRoom.apiLevel = ServerFeatures.Level.liveGuide }
+        if liveGuide && liveExtras { livingRoom.apiLevel = ServerFeatures.Level.livePersonal }
         if let apiLevel { livingRoom.apiLevel = apiLevel }
         saved = [
             SavedServer(server: livingRoom, userName: account.name, signedIn: signedIn, lastUsedAt: .now),
@@ -274,6 +274,8 @@ public final class FakeLibraryRepository: LibraryRepository {
     public var trailerKeys: [String]?
     /// First-run previews (PLAN-IOS-COMPLETION), with fictional library errors.
     public var firstRun: FakeFirstRunState?
+    /// The Movies library holds ``FakeData/largeMovies`` (about 1,200), for measuring the grid (`-fakesLargeLibrary`).
+    public var largeLibrary = false
     /// Arranged rows (PLAN-ROWS.md): from ``rowsAPILevel``, Home comes as its rows in order.
     public var rows: FakeRowsRepository?
     /// Watched marks set here, by target, so the fake reflects a mark after a refetch.
@@ -287,6 +289,7 @@ public final class FakeLibraryRepository: LibraryRepository {
     /// Episodes whose file was deleted, by ID.
     var deleted: Set<Int> = []
     private var listeners: [UUID: AsyncStream<Void>.Continuation] = [:]
+    private var typedListeners: [UUID: AsyncStream<LibraryChange>.Continuation] = [:]
 
     struct SeasonKey: Hashable {
         var showID: Int
@@ -329,7 +332,7 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public func items(_ query: ItemQuery) async throws -> ItemPage {
         await FakeLatency.wait()
-        let all = query.libraryID == FakeData.movieLibrary ? FakeData.movies : FakeData.shows
+        let all = query.libraryID == FakeData.movieLibrary ? (largeLibrary ? FakeData.largeMovies : FakeData.movies) : FakeData.shows
         var list = all.filter { item in
             switch query.filter {
             case .all: true
@@ -366,10 +369,17 @@ public final class FakeLibraryRepository: LibraryRepository {
             items: Array(list.dropFirst(query.offset).prefix(query.limit)), total: list.count, offset: query.offset,
             genres: Array(Set(all.flatMap(\.genres))).sorted(),
             decades: Array(Set(all.compactMap { $0.year.map { $0 / 10 * 10 } })).sorted(by: >),
-            summary: FakeData.summary(libraryID: query.libraryID),
+            summary: summary(libraryID: query.libraryID),
             letters: query.sort == .title ? letters : nil,
             genreCounts: genreCounts
         )
+    }
+
+    /// The library's counts, with the large library's in the Movies' when it holds them.
+    private func summary(libraryID: Int) -> LibrarySummary {
+        var summary = FakeData.summary(libraryID: libraryID)
+        if largeLibrary, libraryID == FakeData.movieLibrary { summary.items = FakeData.largeMovies.count }
+        return summary
     }
 
     public func show(id: Int) async throws -> ShowDetail {
@@ -460,6 +470,15 @@ public final class FakeLibraryRepository: LibraryRepository {
         return FakeData.playRequest(fileID: fileID)
     }
 
+    public func filePage(fileID: Int) async throws -> FilePage? {
+        await FakeLatency.wait()
+        if let m = FakeData.movies.first(where: { fileID == 9400 + $0.id || fileID == 9500 + $0.id }) { return .movie(id: m.id) }
+        if let found = FakeData.playbackEpisode(fileID: fileID) {
+            return .episode(showID: found.show.id, season: found.episode.season, episode: found.episode.id)
+        }
+        return nil
+    }
+
     private func checkOnline() throws {
         if offline { throw APIError(status: nil, message: "Couldn’t reach the server. Check the connection and try again.") }
     }
@@ -473,6 +492,14 @@ public final class FakeLibraryRepository: LibraryRepository {
             let id = UUID()
             listeners[id] = continuation
             continuation.onTermination = { [weak self] _ in Task { @MainActor in self?.listeners[id] = nil } }
+        }
+    }
+
+    public func libraryChanges() -> AsyncStream<LibraryChange> {
+        AsyncStream { continuation in
+            let id = UUID()
+            typedListeners[id] = continuation
+            continuation.onTermination = { [weak self] _ in Task { @MainActor in self?.typedListeners[id] = nil } }
         }
     }
 
@@ -497,12 +524,18 @@ public final class FakeLibraryRepository: LibraryRepository {
         default: break
         }
         marks[target] = watched
-        changed()
+        switch target {
+        case .movie(let id): changed(.watched(.movie, ids: [id], watched: watched))
+        case .episode(let id): changed(.watched(.episode, ids: [id], watched: watched))
+        case .season(let showID, let number): changed(.markedShow(id: showID, season: number, watched: watched))
+        case .show(let id): changed(.markedShow(id: id, season: nil, watched: watched))
+        }
     }
 
-    /// Tells the screens following ``changes()`` to refetch.
-    func changed() {
+    /// Tells the screens following ``changes()`` and ``libraryChanges()`` what changed, as the real repository does.
+    public func changed(_ change: LibraryChange = .unknown) {
         for listener in listeners.values { listener.yield() }
+        for listener in typedListeners.values { listener.yield(change) }
     }
 
     private func sortTitle(_ title: String) -> String {

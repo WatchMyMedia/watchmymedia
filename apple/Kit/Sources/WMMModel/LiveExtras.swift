@@ -1,10 +1,5 @@
 import Foundation
 
-/// Favourite channels, searching the listings and reminders
-/// (PLAN-LIVE-TV-GUIDE.md §5.7, §6.5): servers from this level offer them
-/// alongside listings. Below it, or without listings, the guide is G5's.
-public let liveExtrasAPILevel = 15
-
 /// A reminder for one programme, kept on the server for all of a person's
 /// devices. It keeps its own copy of the programme, since the listings it was
 /// set from are replaced every day.

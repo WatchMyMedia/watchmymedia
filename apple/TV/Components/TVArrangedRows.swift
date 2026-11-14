@@ -91,6 +91,7 @@ struct TVArrangedRow: View {
             PosterCard(item: item, imageURL: url(item.posterPath, .w500), width: 160)
         }
         .buttonStyle(.borderless)
+        .playPauseCard(.card(item)) { actions.open(item) }
         .contextMenu { watchMenu(item) }
     }
 
@@ -102,6 +103,7 @@ struct TVArrangedRow: View {
             }
         }
         .buttonStyle(.borderless)
+        .playPauseCard(.card(item)) { actions.open(item) }
         .contextMenu { watchMenu(item) }
     }
 
@@ -112,7 +114,8 @@ struct TVArrangedRow: View {
             }
         }
         .buttonStyle(.borderless)
-        .accessibilityHint("Resumes playing")
+        .accessibilityHint(resumesPlayingHint)
+        .playPauseCard(.card(item)) { actions.resume(item) }
         .contextMenu {
             Button { actions.resume(item) } label: { Label("Resume", systemImage: "play.fill") }
             if let target = item.watchTarget {
@@ -129,7 +132,7 @@ struct TVArrangedRow: View {
             WideCard(title: episode.showTitle, line: episode.airedLine(), imageURL: url(episode.stillPath ?? episode.showBackdropPath, .w780), seed: episode.showTitle) {
                 if episode.isNew { TVBadge("New", style: .gold).pinned(.topLeading, padding: 10) }
                 if !episode.hasFile {
-                    TVBadge("Not in library", style: .warning).pinned(.topTrailing, padding: 10)
+                    TVBadge(notInLibraryBadge, style: .warning).pinned(.topTrailing, padding: 10)
                 } else if episode.watched {
                     WatchedCheck(size: 28).pinned(.topTrailing, padding: 10)
                 }
@@ -138,6 +141,7 @@ struct TVArrangedRow: View {
         }
         .buttonStyle(.borderless)
         .accessibilityHint("Opens the episode on its show")
+        .playPauseCard(.card(episode)) { actions.openEpisode(episode) }
         .contextMenu {
             if episode.playRequest != nil {
                 Button { actions.playEpisode(episode) } label: { Label("Play", systemImage: "play.fill") }

@@ -18,6 +18,9 @@ public final class OfflinePlaybackGateway: PlaybackGateway, @unchecked Sendable 
     /// What this player plays now, when from the device.
     private let playing = Locked<OfflinePlay?>(nil)
 
+    /// The online gateway's: a download plays from the device and asks for nothing.
+    public var userAgent: String? { online.userAgent }
+
     init(online: any PlaybackGateway, downloads: RealDownloadRepository?) {
         self.online = online
         self.downloads = downloads
@@ -32,6 +35,12 @@ public final class OfflinePlaybackGateway: PlaybackGateway, @unchecked Sendable 
         playing.value = play
         if let play { return Self.asked(play.decision, audioIndex: request.audioIndex) }
         return try await online.decide(request)
+    }
+
+    /// A download plays from the device and needs no token.
+    @MainActor public func needsTokenBeside(_ request: DecisionRequest) -> Bool {
+        if request.recordingID == nil, downloads?.offlinePlay(request.fileID) != nil { return false }
+        return online.needsTokenBeside(request)
     }
 
     /// A copy of the whole file plays the track the player asks for, as the

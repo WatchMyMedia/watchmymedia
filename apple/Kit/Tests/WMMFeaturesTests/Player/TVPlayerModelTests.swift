@@ -164,10 +164,17 @@ private struct TVHarness {
         let h = TVHarness()
         h.spy.state.title = "Harbor Lights"
         h.spy.state.subtitle = "S03 E08 · Ebb"
+        h.spy.state.stillPath = "/e8.jpg"
+        h.spy.state.posterPath = "/harbor.jpg"
         h.spy.send(.startedNext(fileID: 9102))
         await settle()
         #expect(h.model.request.fileID == 9102)
         #expect(h.model.request.subtitle == "S03 E08 · Ebb")
+        // A retry keeps the episode's still and poster for Now Playing.
+        #expect(h.model.request.stillPath == "/e8.jpg")
+        #expect(h.model.request.posterPath == "/harbor.jpg")
+        h.model.retry()
+        #expect(h.spy.calls.last == "start 9102")
         h.spy.send(.exit)
         await settle()
         #expect(h.exits.count == 1)

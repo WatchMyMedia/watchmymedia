@@ -26,10 +26,15 @@ final class LocalStore {
     @ObservationIgnored let session: URLSession
     @ObservationIgnored let userAgent: String
     @ObservationIgnored let deviceID: String
+    /// Local Network access as discovery last heard it, for the APIs made here.
+    @ObservationIgnored let localNetwork = LocalNetworkAccess()
     @ObservationIgnored private let baseClient: ClientInfo
     @ObservationIgnored private var sessionKey: String?
     @ObservationIgnored private var sessionListeners: [(_ signedIn: Bool) -> Void] = []
     @ObservationIgnored private var cachedAPI: (key: String, api: ServerAPI)?
+    /// Servers whose sign-in couldn't be read (a launch before the first
+    /// unlock), read again when protected data becomes available.
+    @ObservationIgnored private(set) var unreadable: Set<String> = []
 
     /// - Parameter client: how this device describes itself; its ID is
     ///   replaced by the stored one and its name is the first device name.
@@ -41,17 +46,15 @@ final class LocalStore {
         baseClient = client
         var loaded = storage.loadState()
         var creds: [String: StoredCredential] = [:]
+        var unreadable: Set<String> = []
         for s in loaded.servers {
-            if var c = storage.credential(serverID: s.server.id) {
-                // Upgrade an existing install using its previously saved address.
-                // An orphan Keychain credential after reinstall has no such evidence.
-                if c.baseURL == nil {
-                    c.baseURL = s.server.baseURL
-                    storage.setCredential(c, serverID: s.server.id)
-                }
-                if c.baseURL.map({ ServerAPI.sameEndpoint($0, s.server.baseURL) }) == true { creds[s.server.id] = c }
+            switch Self.read(storage, s.server) {
+            case .found(let c): creds[s.server.id] = c
+            case .unavailable: unreadable.insert(s.server.id)
+            case .missing: break
             }
         }
+        self.unreadable = unreadable
         if loaded.deviceName == nil {
             loaded.deviceName = ClientIdentity.cleanName(client.name) ?? ClientIdentity.defaultName
             storage.saveState(loaded)
@@ -59,6 +62,44 @@ final class LocalStore {
         state = loaded
         credentials = creds
         sessionKey = Self.key(loaded, creds)
+    }
+
+    /// `server`'s sign-in as kept, if it was issued by that address.
+    private static func read(_ storage: any LocalStorage, _ server: Server) -> CredentialRead {
+        switch storage.readCredential(serverID: server.id) {
+        case .found(var c):
+            // Upgrade an existing install using its previously saved address.
+            // An orphan Keychain credential after reinstall has no such evidence.
+            if c.baseURL == nil {
+                c.baseURL = server.baseURL
+                storage.setCredential(c, serverID: server.id)
+            }
+            return c.baseURL.map({ ServerAPI.sameEndpoint($0, server.baseURL) }) == true ? .found(c) : .missing
+        case .missing: return .missing
+        case .unavailable: return .unavailable
+        }
+    }
+
+    /// Protected data is available again (the first unlock after a restart):
+    /// the sign-ins that couldn't be read at launch are read now, so a run
+    /// that started locked doesn't stay signed out (PLAN-APPLE-REVIEW.md §3.4.3).
+    func readUnreadableAgain() {
+        guard !unreadable.isEmpty else { return }
+        for id in unreadable {
+            guard let server = state.servers.first(where: { $0.server.id == id })?.server else {
+                unreadable.remove(id)
+                continue
+            }
+            switch Self.read(storage, server) {
+            case .found(let c):
+                unreadable.remove(id)
+                mutate { credentials[id] = c }
+            case .missing:
+                unreadable.remove(id)
+            case .unavailable:
+                break
+            }
+        }
     }
 
     // MARK: Reading
@@ -73,6 +114,9 @@ final class LocalStore {
     var currentCredential: StoredCredential? { state.currentID.flatMap { credentials[$0] } }
 
     var user: User? { currentCredential?.user }
+
+    /// What the server in use offers at its level as last refreshed; nothing with no server.
+    var features: ServerFeatures { ServerFeatures(apiLevel: state.current?.server.apiLevel) }
 
     var deviceName: String { state.deviceName ?? baseClient.name }
 
@@ -104,6 +148,7 @@ final class LocalStore {
 
     /// Keeps (or with nil, forgets) the sign-in on a server.
     func setCredential(_ credential: StoredCredential?, serverID: String) {
+        unreadable.remove(serverID)
         mutate {
             let previous = credentials[serverID]
             credentials[serverID] = credential
@@ -167,33 +212,40 @@ final class LocalStore {
         if let cached = cachedAPI, cached.key == key {
             return SignedInSession(serverID: server.id, token: credential.token, api: cached.api)
         }
-        let serverID = server.id, token = credential.token
-        let api = ServerAPI(
-            baseURL: server.baseURL, session: session, userAgent: userAgent, token: { token },
-            onSignedOut: { [weak self] in Task { @MainActor in self?.tokenRejected(serverID: serverID, token: token) } }
-        )
+        let api = api(serverID: server.id, baseURL: server.baseURL, token: credential.token)
         cachedAPI = (key, api)
-        return SignedInSession(serverID: serverID, token: token, api: api)
+        return SignedInSession(serverID: server.id, token: credential.token, api: api)
     }
 
-    /// Runs a call as the signed-in user; a refused token signs out before the
-    /// ``SignedOutError`` reaches the caller.
+    /// Runs a call as the signed-in user; a refused token signs out (in
+    /// ``ServerAPI``) before the ``SignedOutError`` reaches the caller.
     func call<T: Sendable>(_ operation: @Sendable (Client) async throws -> T) async throws -> T {
         let signedIn = try signedIn()
         let started = revision
-        do {
-            let result = try await signedIn.api.call(operation)
-            guard revision == started else { throw CancellationError() }
-            return result
-        } catch is SignedOutError {
-            tokenRejected(serverID: signedIn.serverID, token: signedIn.token)
-            throw SignedOutError()
-        }
+        let result = try await signedIn.api.call(operation)
+        guard revision == started else { throw CancellationError() }
+        return result
     }
 
-    /// An API at `baseURL` that sends `token` (or none), for sign-in and for a server no longer in use.
+    /// The API of a kept sign-in: `token` on `baseURL`'s addresses only, and a
+    /// 401 that revokes it forgets that sign-in (unless it was replaced
+    /// since), wherever the request came from (PLAN-APPLE-REVIEW.md §5.6).
+    func api(serverID: String, baseURL: URL, token: String, session: URLSession? = nil) -> ServerAPI {
+        ServerAPI(
+            baseURL: baseURL, session: session ?? self.session, userAgent: userAgent, token: { token },
+            onSignedOut: { [weak self] in await self?.tokenRejected(serverID: serverID, token: token) }, localNetwork: localNetwork
+        )
+    }
+
+    /// An API at `baseURL` that sends `token` (or none) and keeps no sign-in:
+    /// for signing in, probing, and signing out of a server being forgotten.
     func api(baseURL: URL, token: String? = nil, session: URLSession? = nil) -> ServerAPI {
-        ServerAPI(baseURL: baseURL, session: session ?? self.session, userAgent: userAgent, token: { token })
+        ServerAPI(baseURL: baseURL, session: session ?? self.session, userAgent: userAgent, token: { token }, localNetwork: localNetwork)
+    }
+
+    /// How a request to `baseURL` carries `token`, for what isn't an API call (the offline routes' fetches).
+    func signer(baseURL: URL, token: String) -> RequestSigner {
+        RequestSigner(baseURL: baseURL, token: token, userAgent: userAgent)
     }
 
     /// POST /api/auth/logout with `token`, ignoring every failure, for at most 5 s.

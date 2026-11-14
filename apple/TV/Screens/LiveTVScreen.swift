@@ -33,7 +33,7 @@ private struct LiveTVContent: View {
             VStack(alignment: .leading, spacing: 30) {
                 selection
                 HStack(spacing: 28) {
-                    TextField("Channel number or name", text: $model.query)
+                    TextField(liveChannelNumberOrName, text: $model.query)
                         .autocorrectionDisabled()
                         .frame(maxWidth: 620)
                         .accessibilityIdentifier("live-channel-search")
@@ -75,15 +75,15 @@ private struct LiveTVContent: View {
 
     @ViewBuilder private var content: some View {
         if model.loading && model.channels.isEmpty {
-            ProgressView("Loading channels").frame(maxWidth: .infinity, minHeight: 220)
+            ProgressView(liveLoadingChannels).frame(maxWidth: .infinity, minHeight: 220)
         } else if let error = model.error {
-            TVErrorState(title: "Couldn't load channels", message: error, retry: model.refresh)
+            TVErrorState(title: liveChannelsFailedTitle, message: error, retry: model.refresh)
                 .frame(minHeight: 260)
         } else if let message = model.unavailableMessage {
-            TVEmptyState(systemImage: "antenna.radiowaves.left.and.right.slash", title: "Live TV isn't available", message: message)
+            TVEmptyState(systemImage: "antenna.radiowaves.left.and.right.slash", title: liveUnavailableTitle, message: message)
                 .frame(minHeight: 260)
         } else if model.filteredChannels.isEmpty {
-            TVEmptyState(systemImage: "magnifyingglass", title: "No channels match", message: "Try another channel number or name.")
+            TVEmptyState(systemImage: "magnifyingglass", title: "No channels match", message: liveNoChannelNumberMatches)
                 .frame(minHeight: 260)
         } else {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 258), spacing: 30)], alignment: .leading, spacing: 36) {
@@ -93,6 +93,7 @@ private struct LiveTVContent: View {
                     }
                     .buttonStyle(.borderless)
                     .disabled(!channel.available)
+                    .playPauseCard(.card(channel)) { navigator.playLive(.init(channel: channel)) }
                     .focused($focused, equals: channel.id)
                     .accessibilityLabel("Watch \(channel.title)")
                     .accessibilityIdentifier("live-channel-\(channel.id)")
@@ -124,7 +125,7 @@ struct TVLiveChannelCard: View {
             }
             Spacer(minLength: 0)
             Text(channel.name).font(.system(size: 21, weight: .semibold)).lineLimit(1)
-            Text(channel.available ? "No listings" : LiveTVError.message(channel.reason ?? "unavailable"))
+            Text(channel.available ? liveNoListings : LiveTVError.message(channel.reason ?? "unavailable"))
                 .font(.system(size: 17)).foregroundStyle(focused ? Palette.ground.opacity(0.75) : Palette.muted)
                 .lineLimit(1)
         }
@@ -169,6 +170,7 @@ struct TVLiveHomeRow: View {
                                 TVLiveChannelCard(channel: channel, width: 320, height: 180)
                             }
                             .buttonStyle(.borderless)
+                            .playPauseCard(.card(channel)) { navigator.playLive(.init(channel: channel)) }
                             .focused($focused, equals: .channel(channel.id))
                             .accessibilityLabel("Watch \(channel.title)")
                             .accessibilityIdentifier("home-live-channel-\(channel.id)")
@@ -201,7 +203,7 @@ struct TVLiveHomeRow: View {
 }
 
 private struct LiveAllChannelsCard: View {
-    var title = "All channels"
+    var title = liveAllChannels
     var width: CGFloat = 320
     var height: CGFloat = 180
     @Environment(\.isFocused) private var focused
@@ -232,7 +234,7 @@ private struct TVLiveOnNowRow: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             VStack(alignment: .leading, spacing: 0) {
-                RowHeading(title: "On now", detail: "Live TV · \(LiveClock.device.time(context.date))", counter: counter)
+                RowHeading(title: liveOnNowTitle, detail: "Live TV · \(LiveClock.device.time(context.date))", counter: counter)
                     .padding(.horizontal, TVLayout.gutter)
                 ScrollView(.horizontal) {
                     LazyHStack(alignment: .top, spacing: 28) {
@@ -243,6 +245,7 @@ private struct TVLiveOnNowRow: View {
                                                 nextReminded: channel.programme(after: context.date).map(extras.isReminded) ?? false)
                             }
                             .buttonStyle(TVLiveCardButtonStyle())
+                            .playPauseCard(.card(channel)) { navigator.playLive(.init(channel: channel)) }
                             .focused($focused, equals: .channel(channel.id))
                             .accessibilityIdentifier("home-live-channel-\(channel.id)")
                         }
@@ -362,13 +365,13 @@ struct TVLiveOnNowCard: View {
         }
         .frame(width: width, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(channel.number) \(channel.name), \(programme.map { "\($0.title), \(liveTimeLeft($0, now: now))" } ?? "No listings")"
+        .accessibilityLabel("\(channel.number) \(channel.name), \(programme.map { "\($0.title), \(liveTimeLeft($0, now: now))" } ?? liveNoListings)"
             + (nextReminded ? channel.programme(after: now).map { ". Next, \($0.title) at \(LiveClock.device.time($0.start)), reminder set" } ?? "" : ""))
-        .accessibilityHint("Watches live")
+        .accessibilityHint(liveWatchesLiveHint)
     }
 
     private func subtitle(_ programme: LiveProgramme?) -> String {
-        guard let programme else { return "No listings" }
+        guard let programme else { return liveNoListings }
         let left = watching == true ? "Watching · \(liveTimeLeft(programme, now: now))" : liveTimeLeft(programme, now: now)
         guard let next = channel.programme(after: now) else { return left }
         return "\(left) · \(liveNextLine(next, colon: false))"

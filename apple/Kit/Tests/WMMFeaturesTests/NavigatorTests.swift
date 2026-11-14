@@ -77,6 +77,8 @@ import WMMModel
         ("watchmymedia://link?code=K7M4PQ", .linkTV(code: "K7M4PQ")),
         ("watchmymedia://link", .linkTV(code: nil)),
         ("watchmymedia://lists/9001", .mediaList(id: 9001)),
+        ("watchmymedia://search", .search),
+        ("watchmymedia://home", .home),
     ])
     func parses(_ text: String, _ expected: DeepLink) throws {
         #expect(DeepLink(url: try #require(URL(string: text))) == expected)
@@ -87,7 +89,7 @@ import WMMModel
         #expect(DeepLink(url: try #require(URL(string: text))) == nil)
     }
 
-    @Test(arguments: [DeepLink.play(fileID: 1), .show(id: 2, season: 3), .show(id: 2, season: 3, episode: 2037), .movie(id: 4), .linkTV(code: "ABC234"), .mediaList(id: 9)])
+    @Test(arguments: [DeepLink.play(fileID: 1), .show(id: 2, season: 3), .show(id: 2, season: 3, episode: 2037), .movie(id: 4), .linkTV(code: "ABC234"), .mediaList(id: 9), .search, .home, .downloads, .liveTV(channelID: nil)])
     func roundTrips(_ link: DeepLink) {
         #expect(DeepLink(url: link.url) == link)
     }
@@ -124,5 +126,118 @@ import WMMModel
         await navigator.open(.liveTV(channelID: "channel-7"), library: FakeLibraryRepository(), liveTV: UnavailableLiveTVRepository())
         #expect(navigator.tab == .liveTV)
         #expect(navigator.livePlaying == nil)
+    }
+}
+
+/// Links that start playback or take a tuner only when the app published
+/// them for the server signed in (PLAN-APPLE-REVIEW.md §2.5, §3.4.7), as
+/// android/core/model's DeepLinkTest checks the same rule.
+@MainActor @Suite struct PublishedLinkTests {
+    init() { FakeLatency.duration = .zero }
+
+    private func url(_ text: String) -> URL { URL(string: text)! }
+
+    @Test func aPublishedLinkNamesTheServerItWasPublishedFor() {
+        #expect(DeepLink.publishedServer(url("watchmymedia://play/4?source=reminder&server=srv-a")) == "srv-a")
+        #expect(DeepLink.publishedServer(url("watchmymedia://play/4?source=reminder")) == "")
+        #expect(DeepLink.publishedServer(url("watchmymedia://play/4?server=")) == "")
+        #expect(DeepLink.publishedServer(url("watchmymedia://play/4")) == nil)
+        #expect(DeepLink.publishedServer(url("https://example.com/?source=reminder")) == nil)
+        #expect(DeepLink.play(fileID: 4).url(publishedFor: "srv-a", source: "reminder") == url("watchmymedia://play/4?source=reminder&server=srv-a"))
+    }
+
+    @Test func aPlayLinkPlaysOnlyWhenTheAppPublishedItForTheServerSignedIn() {
+        let published = DeepLink.play(fileID: 4).url(publishedFor: "srv-a")
+        #expect(DeepLink.opening(published, signedInServer: "srv-a") == .play(fileID: 4))
+        #expect(DeepLink.opening(published, signedInServer: "srv-b") == nil, "another server")
+        #expect(DeepLink.opening(published, signedInServer: nil) == nil, "no one signed in")
+        #expect(DeepLink.opening(url("watchmymedia://play/4?source=reminder"), signedInServer: "srv-a") == nil, "a published link naming no server")
+        // From a web page, a QR code or another app: the file's page, with Play ready.
+        #expect(DeepLink.opening(url("watchmymedia://play/4"), signedInServer: "srv-a") == .filePage(fileID: 4))
+        #expect(DeepLink.opening(url("watchmymedia://play/4"), signedInServer: nil) == .filePage(fileID: 4))
+        // Every other link opens as it reads.
+        #expect(DeepLink.opening(url("watchmymedia://shows/100?season=3&episode=100035"), signedInServer: nil) == .show(id: 100, season: 3, episode: 100035))
+        #expect(DeepLink.opening(url("watchmymedia://movies/500"), signedInServer: "srv-a") == .movie(id: 500))
+        #expect(DeepLink.opening(url("watchmymedia://link?code=KQ7F2W"), signedInServer: nil) == .linkTV(code: "KQ7F2W"))
+        #expect(DeepLink.opening(url("https://example.com/play/4"), signedInServer: "srv-a") == nil)
+    }
+
+    @Test func aChannelLinkTunesOnlyWhenTheAppPublishedIt() {
+        let reminder = DeepLink.liveTV(channelID: "a07f09").url(publishedFor: "srv-a", source: "reminder")
+        #expect(DeepLink.opening(reminder, signedInServer: "srv-a") == .liveTV(channelID: "a07f09"))
+        #expect(DeepLink.opening(reminder, signedInServer: "srv-b") == nil)
+        // Taking a tuner is the app's to do: anyone else's link opens the guide.
+        #expect(DeepLink.opening(url("watchmymedia://live-tv/a07f09"), signedInServer: "srv-a") == .liveTV(channelID: nil))
+        #expect(DeepLink.opening(url("watchmymedia://live-tv/recordings"), signedInServer: "srv-a") == .liveRecordings)
+    }
+
+    @Test func aPlayLinkFromOutsideOpensTheEpisodesPageAndPlaysNothing() async throws {
+        let nav = Navigator()
+        await nav.open(.filePage(fileID: 9001), library: FakeLibraryRepository())
+        #expect(nav.playing == nil)
+        let route = try #require(nav.path(for: .home).single)
+        guard case .episode(_, let season, _) = route else { Issue.record("not an episode page: \(route)"); return }
+        #expect(season == 2)
+    }
+
+    @Test func aPlayLinkFromOutsideForAMovieOpensTheMoviesPage() async {
+        let nav = Navigator()
+        await nav.open(.filePage(fileID: 9900), library: FakeLibraryRepository())
+        #expect(nav.playing == nil)
+        #expect(nav.path(for: .home) == [.movie(id: 500)])
+    }
+
+    @Test func theAppsOwnLaunchArgumentsStillPlay() async {
+        let nav = Navigator()
+        await nav.applyLaunchArguments(["app", "-open", "watchmymedia://play/9101"], library: FakeLibraryRepository())
+        #expect(nav.playing?.fileID == 9101)
+    }
+}
+
+@Suite @MainActor
+struct FindInSearchTests {
+    @Test func commandFOpensSearchWithTheFieldAskedForButNotOverAPlayer() {
+        let navigator = Navigator()
+        navigator.open(.movie(id: 500))
+        navigator.findInSearch()
+        #expect(navigator.tab == .search)
+        #expect(navigator.searchFieldRequested)
+        #expect(navigator.path(for: .home) == [.movie(id: 500)], "Home keeps its place")
+        navigator.searchFieldRequested = false
+        navigator.select(.home)
+        navigator.play(PlayRequest(fileID: 9101, title: "Harbor Lights"))
+        navigator.findInSearch()
+        #expect(navigator.tab == .home)
+        #expect(!navigator.searchFieldRequested)
+    }
+}
+
+/// The Home Screen quick actions and App Shortcuts open the app's own links,
+/// published for the server signed in (PLAN-APPLE-REVIEW.md §2.5, §6.3).
+@MainActor @Suite struct QuickActionLinkTests {
+    @Test func searchAndHomeOpenTheirTabsOverAPlayer() async {
+        FakeLatency.duration = .zero
+        let nav = Navigator()
+        nav.select(.movies)
+        nav.open(.movie(id: 500))
+        nav.play(PlayRequest(fileID: 9101, title: "Harbor Lights"))
+        await nav.open(.search, library: FakeLibraryRepository())
+        #expect(nav.tab == .search)
+        #expect(nav.searchFieldRequested)
+        #expect(nav.playbackPresentation == nil)
+        nav.open(.show(id: 100))
+        await nav.open(.home, library: FakeLibraryRepository())
+        #expect(nav.tab == .home)
+        #expect(nav.path(for: .home).isEmpty)
+        #expect(nav.path(for: .movies) == [.movie(id: 500)], "Other tabs keep their place")
+    }
+
+    @Test func aQuickActionsLinkOpensOnlyForItsServer() throws {
+        for link in [DeepLink.search, .home, .downloads, .liveTV(channelID: nil)] {
+            let url = link.url(publishedFor: "server-a", source: "quick-action")
+            #expect(DeepLink.opening(url, signedInServer: "server-a") == link)
+            #expect(DeepLink.opening(url, signedInServer: "server-b") == nil)
+            #expect(DeepLink.opening(url, signedInServer: nil) == nil, "Signed out, the app opens as it is")
+        }
     }
 }

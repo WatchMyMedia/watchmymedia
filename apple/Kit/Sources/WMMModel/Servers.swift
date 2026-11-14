@@ -1,9 +1,6 @@
 import Foundation
 import Observation
 
-/// The API level this app needs; servers below it are refused (GET /api/server).
-public let requiredAPILevel = 1
-
 /// A WatchMyMedia server as GET /api/server describes it.
 public struct Server: Hashable, Sendable, Codable, Identifiable {
     /// Stable random ID; servers are remembered by it, not by address.
@@ -28,7 +25,7 @@ public struct Server: Hashable, Sendable, Codable, Identifiable {
         self.turnstile = turnstile
     }
 
-    public var tooOld: Bool { apiLevel < requiredAPILevel }
+    public var tooOld: Bool { !features.supported }
 
     /// "192.168.1.20:27587" or "home.example.net": the address without the scheme.
     public var displayAddress: String {
@@ -63,6 +60,11 @@ public func isLANHost(_ host: String) -> Bool {
     guard octets.count == 4, octets.allSatisfy({ $0 <= 255 }) else { return false }
     return octets[0] == 10 || (octets[0] == 172 && (16...31).contains(octets[1])) || (octets[0] == 192 && octets[1] == 168)
 }
+
+/// Why a server on this network can't be reached when the person said no to
+/// Local Network for this app, worded as the Android app words its
+/// equivalent (LocalNetworkGate.kt).
+public let localNetworkOffMessage = "Local network access is turned off for WatchMyMedia. To use a server on this network, allow Local Network in Settings."
 
 /// A server found on the local network over Bonjour (`_watchmymedia._tcp`).
 public struct DiscoveredServer: Hashable, Sendable, Identifiable {
@@ -142,4 +144,14 @@ public protocol ServerRepository: AnyObject, Observable {
     /// Asks the server in use who it is again (GET /api/server), so its
     /// version and API level follow an upgrade; quiet when it cannot be reached.
     func refreshCurrent() async
+
+    /// Whether the server in use answered the last ``refreshCurrent()``: nil
+    /// before one has, or for a server since chosen. The check gives up within
+    /// seconds, so a screen can show what works offline (the offline Home)
+    /// before its own request times out (PLAN-APPLE-REVIEW.md §4.1.5).
+    var reachable: Bool? { get }
+}
+
+extension ServerRepository {
+    public var reachable: Bool? { nil }
 }

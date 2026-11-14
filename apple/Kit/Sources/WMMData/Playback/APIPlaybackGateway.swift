@@ -20,6 +20,12 @@ public struct APIPlaybackGateway: PlaybackGateway {
         self.apiLevel = apiLevel
     }
 
+    /// "WatchMyMedia/1.0 (ios; iOS 27.1)": the API's own (``ClientIdentity``),
+    /// for the media requests AVFoundation makes, the Live TV player's included.
+    public static var userAgent: String { ClientIdentity.userAgent() }
+
+    public var userAgent: String? { Self.userAgent }
+
     @MainActor public func bound() -> any PlaybackGateway {
         let captured = Result { try api() }
         let level = apiLevel()
@@ -29,10 +35,10 @@ public struct APIPlaybackGateway: PlaybackGateway {
     public func decide(_ request: DecisionRequest) async throws -> PlaybackDecision {
         let api = try await api()
         let level = await apiLevel()
-        if request.recordingID != nil && (level ?? 0) < liveRecordingAPILevel { throw LiveTVError(reason: "unavailable") }
+        if request.recordingID != nil && !ServerFeatures(apiLevel: level).liveRecordings { throw LiveTVError(reason: "unavailable") }
         let body = Components.Schemas.Request(
             audioIndex: request.audioIndex.map(Int64.init),
-            autoRecovery: (level ?? 0) >= 24 && request.quality == .auto && request.autoRecovery ? true : nil,
+            autoRecovery: ServerFeatures(apiLevel: level).autoRecovery && request.quality == .auto && request.autoRecovery ? true : nil,
             burnIn: request.burnIn ? true : nil,
             client: PlaybackMapping.client(request.client),
             playId: request.playID,
@@ -41,8 +47,8 @@ public struct APIPlaybackGateway: PlaybackGateway {
             quality: request.quality.rawValue,
             startMs: request.startMs.map { Int64(max($0, 0)) },
             subtitleId: request.subtitleID,
-            subtitleMode: (level ?? 0) >= subtitlePreferencesAPILevel ? .init(rawValue: request.subtitleMode.rawValue) : nil,
-            switchGeneration: (level ?? 0) >= 24 ? request.switchGeneration : nil
+            subtitleMode: ServerFeatures(apiLevel: level).subtitlePreferences ? .init(rawValue: request.subtitleMode.rawValue) : nil,
+            switchGeneration: ServerFeatures(apiLevel: level).autoRecovery ? request.switchGeneration : nil
         )
         let decision = try await api.call { client in
             if let recordingID = request.recordingID {
@@ -53,8 +59,14 @@ public struct APIPlaybackGateway: PlaybackGateway {
         return try PlaybackMapping.decision(decision, on: api, apiLevel: level)
     }
 
+    /// Every decision needs its token fetched beside it until the generated
+    /// client has `Decision.mediaToken` (API level 28). Then this answers
+    /// `!ServerFeatures(apiLevel: apiLevel()).tokenWithDecision`, and
+    /// ``PlaybackMapping/decision(_:base:apiLevel:)`` maps the field.
+    @MainActor public func needsTokenBeside(_ request: DecisionRequest) -> Bool { true }
+
     public func reportProgress(_ report: ProgressReport) async throws -> ProgressReply {
-        let recovery = (await apiLevel() ?? 0) >= 24
+        let recovery = ServerFeatures(apiLevel: await apiLevel()).autoRecovery
         let body = Components.Schemas.ProgressInputBody(
             bufferedMs: Int64(max(report.bufferedMs, 0)),
             durationMs: Int64(max(report.durationMs, 0)),
@@ -87,9 +99,11 @@ public struct APIPlaybackGateway: PlaybackGateway {
         )
     }
 
+    /// Scoped to the server that issued it: the player puts it on that server's addresses only.
     public func mediaToken() async throws -> MediaToken {
-        let t = try await api().call { try await $0.createMediaToken().ok.body.json }
-        return MediaToken(token: t.token, expiresAt: t.expiresAt, param: PlaybackMapping.nonBlank(t.param) ?? "access_token")
+        let api = try await api()
+        let t = try await api.call { try await $0.createMediaToken().ok.body.json }
+        return t.model(server: api.baseURL)
     }
 
     public func stopSession(_ sessionID: String) async throws {
@@ -132,7 +146,7 @@ public struct APIPlaybackGateway: PlaybackGateway {
     }
 
     public func automaticSubtitle(fileID: Int, playID: String) async throws -> DecisionSubtitle? {
-        guard await (apiLevel() ?? 0) >= subtitlePreferencesAPILevel else { return nil }
+        guard ServerFeatures(apiLevel: await apiLevel()).subtitlePreferences else { return nil }
         let api = try await api()
         let result = try await api.call {
             try await $0.automaticSubtitle(path: .init(id: Int64(fileID)), body: .json(.init(playId: playID))).ok.body.json
@@ -144,7 +158,7 @@ public struct APIPlaybackGateway: PlaybackGateway {
     }
 
     public func cancelAutomaticSubtitle(fileID: Int, playID: String) async throws {
-        guard await (apiLevel() ?? 0) >= subtitlePreferencesAPILevel else { return }
+        guard ServerFeatures(apiLevel: await apiLevel()).subtitlePreferences else { return }
         _ = try await api().call {
             try await $0.automaticSubtitle(path: .init(id: Int64(fileID)), body: .json(.init(cancel: true, playId: playID))).ok.body.json
         }
@@ -163,27 +177,15 @@ enum PlaybackMapping {
 
     static func unknownRoute(_ error: APIError) -> Bool { error.status == 404 || error.status == 405 }
 
-    /// Nil for nil, "" and whitespace.
-    static func nonBlank(_ text: String?) -> String? {
-        guard let text, !text.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        return text
-    }
+    /// Nil for nil, "" and whitespace, newlines too (``Mapping/nonBlank(_:)``).
+    static func nonBlank(_ text: String?) -> String? { Mapping.nonBlank(text) }
 
     /// The server refuses any other play ID (a pattern in the API).
     static func validPlayID(_ id: String) -> String? {
         id.count == 16 && id.allSatisfy { ("0"..."9").contains($0) || ("a"..."f").contains($0) } ? id : nil
     }
 
-    static func client(_ c: ClientInfo) -> Components.Schemas.Client {
-        .init(
-            deviceId: String(c.deviceID.prefix(64)),
-            model: nonBlank(String(c.model.prefix(64))),
-            name: String(c.name.prefix(64)),
-            platform: String(c.platform.prefix(32)),
-            product: String(c.product.prefix(64)),
-            version: String(c.version.prefix(32))
-        )
-    }
+    static func client(_ c: ClientInfo) -> Components.Schemas.Client { c.api }
 
     static func profile(_ p: PlaybackProfile) -> Components.Schemas.Profile {
         .init(
@@ -220,13 +222,22 @@ enum PlaybackMapping {
 
     /// The decision with its relative URLs made absolute on the server at
     /// `base`. A download's is read with `apiLevel` 0: the copy plays from the
-    /// device, and its seek thumbnails stay on the server.
+    /// device, and its seek thumbnails stay on the server. The media token
+    /// goes on these addresses, so a stream elsewhere is refused, as Live
+    /// TV's is, and a subtitle or seek thumbnails elsewhere are left out.
+    ///
+    /// From ``decisionTokenAPILevel`` the decision carries a media token:
+    /// once the generated client has the field, map it here as
+    /// `mediaToken: d.mediaToken.map { $0.model(server: base) }` (and
+    /// ``APIPlaybackGateway/needsTokenBeside(_:)`` answers by level).
     static func decision(_ d: Components.Schemas.Decision, base: URL, apiLevel: Int? = trickplayAPILevel) throws -> PlaybackDecision {
         guard Components.Schemas.Decision.ModePayload.allCases.contains(d.mode),
               Components.Schemas.Decision._ProtocolPayload.allCases.contains(d._protocol),
               d.playlist.map({ Components.Schemas.Decision.PlaylistPayload.allCases.contains($0) }) ?? true else {
             throw APIError(status: nil, message: "This stream needs a newer version of WatchMyMedia.")
         }
+        let stream = absolute(d.url, base: base)
+        guard ServerAPI.owns(base, stream) else { throw APIError(status: nil, message: "The server sent a stream outside this server.") }
         let proto: StreamProtocol = d._protocol == .hls ? .hls : .file
         return PlaybackDecision(
             mode: mode(d.mode.rawValue),
@@ -234,7 +245,7 @@ enum PlaybackMapping {
             protocol: proto,
             // A file plays from its start, so its time is file time, as with a VOD playlist.
             vod: proto == .file || d.playlist == .vod,
-            url: absolute(d.url, base: base),
+            url: stream,
             mimeType: nonBlank(d.mimeType),
             playID: d.playId,
             sessionID: nonBlank(d.sessionId),
@@ -244,7 +255,7 @@ enum PlaybackMapping {
             audio: d.audioTracks.map(audio),
             selectedAudio: d.audio.index >= 0 ? Int(d.audio.index) : nil,
             subtitles: d.subtitles.filter { Components.Schemas.SubtitleTrack.FormatPayload.allCases.contains($0.format) }.map { s in
-                DecisionSubtitle(option: subtitle(s), format: s.format.rawValue, url: nonBlank(s.url).map { absolute($0, base: base) })
+                DecisionSubtitle(option: subtitle(s), format: s.format.rawValue, url: nonBlank(s.url).map { absolute($0, base: base) }.flatMap { ServerAPI.owns(base, $0) ? $0 : nil })
             },
             selectedSubtitleID: d.subtitleId,
             burnInSubtitleID: d.burnIn?.id,
@@ -255,12 +266,25 @@ enum PlaybackMapping {
             next: d.nextEpisode.map(upNext),
             video: video(d.video),
             autoStep: d.auto.flatMap { StreamQuality(rawValue: $0.step.rawValue) },
-            trickplay: (apiLevel ?? 0) >= trickplayAPILevel ? d.trickplay.flatMap { trickplay($0, base: base) } : nil,
-            growing: (apiLevel ?? 0) >= liveRecordingAPILevel ? d.growing.flatMap { value in
+            trickplay: ServerFeatures(apiLevel: apiLevel).trickplay ? d.trickplay.flatMap { trickplay($0, base: base) }.flatMap { t in
+                URL(string: t.urlTemplate.replacingOccurrences(of: "{sheet}", with: "0")).map { ServerAPI.owns(base, $0) } == true ? t : nil
+            } : nil,
+            growing: ServerFeatures(apiLevel: apiLevel).liveRecordings ? d.growing.flatMap { value in
                 guard let start = value.startedAt, let end = value.endsAt, end > start else { return nil }
                 return .init(startedAt: start, endsAt: end)
-            } : nil
+            } : nil,
+            copiedVideoCodec: copiedVideoCodec(d.video)
         )
+    }
+
+    /// The profile's key for a copied video, as the server classifies it
+    /// (`classify` in server/internal/playback/decide.go): Dolby Vision kept
+    /// is its profile's dovi key, 10-bit HEVC hevc10, the rest its codec.
+    static func copiedVideoCodec(_ v: Components.Schemas.VideoPlan) -> String? {
+        guard v.copy, let codec = nonBlank(v.codec)?.lowercased() else { return nil }
+        if v.hdr == "dolbyvision", let profile = v.dvProfile, profile > 0 { return "dovi\(profile)" }
+        if codec == "hevc" && (v.bitDepth ?? 8) > 8 { return "hevc10" }
+        return codec
     }
 
     /// A decision's seek thumbnails with the sheet URL made absolute; nil

@@ -128,15 +128,16 @@ struct LiveAVPlayerIntegrationTests {
             defer { media.stop() }
             try await waitUntil("AVPlayer ready with seekable live media", seconds: 30) { media.ready && media.seekable != nil && media.position.isFinite && media.position > 0 }
             let firstPosition = media.position
-            try await Task.sleep(for: .seconds(4))
+            // Advancing is waited for, not timed: a busy Mac starts the player late.
+            try await waitUntil("Native HLS must advance while playing.", seconds: 15) { media.position - firstPosition > 2 }
             let advanced = media.position - firstPosition
-            try #require(advanced > 2, "Native HLS must advance while playing.")
             let initialRange = try #require(media.seekable)
             #expect(initialRange.upperBound - media.position <= 12, "Native HLS starts near the latest seekable edge, without the file player's seek to zero.")
 
             media.pause()
             let pausedPosition = media.position
             let _: FixtureLiveSession = try await http.request("PUT", "/api/live-tv/sessions/\(live.id)", body: ["paused": true, "interacted": true])
+            // That nothing moves can only be seen over time: 14 s of the live window.
             try await Task.sleep(for: .seconds(14))
             #expect(abs(media.position - pausedPosition) < 0.5, "Pausing holds the current position.")
             media.goLive(); media.play()

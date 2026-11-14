@@ -37,7 +37,7 @@ public enum AppTab: String, CaseIterable, Hashable, Sendable {
 }
 
 /// A screen pushed onto a tab's stack.
-public enum Route: Hashable, Sendable {
+public enum Route: Hashable, Sendable, Codable {
     /// A show's page (PLAN-SHOW-PAGE.md) with its up-next episode on top, or
     /// on `season` with that season's first unfinished one. With `episode`
     /// it is pushed as ``episode(showID:season:id:)``.
@@ -98,7 +98,19 @@ public final class Navigator {
     /// had it has gone.
     public var toast: String?
 
+    /// ⌘F asked for Search: the Search screen puts the cursor in its field, then clears this.
+    public var searchFieldRequested = false
+
     public init() {}
+
+    /// ⌘F on a hardware keyboard (PLAN-APPLE-REVIEW.md §6.3): the Search tab,
+    /// with the cursor in its field. Nothing while a player is open.
+    public func findInSearch() {
+        guard playbackPresentation == nil else { return }
+        liveIntent += 1
+        tab = .search
+        searchFieldRequested = true
+    }
 
     public func path(for tab: AppTab) -> [Route] { paths[tab] ?? [] }
 
@@ -160,7 +172,9 @@ public final class Navigator {
 
     /// Applies launch arguments: `-tab settings` picks a tab, `-open <url>`
     /// opens a `watchmymedia://` link. For screenshots and UI checks on a
-    /// simulator, where nothing can tap.
+    /// simulator, where nothing can tap. They are the app's own, so a play
+    /// or channel link acts as it reads (``DeepLink/opening(_:signedInServer:)``
+    /// is for links from outside).
     public func applyLaunchArguments(_ arguments: [String], library: any LibraryRepository, liveTV: (any LiveTVRepository)? = nil) async {
         func value(after flag: String) -> String? {
             guard let i = arguments.firstIndex(of: flag), arguments.indices.contains(i + 1) else { return nil }
@@ -172,9 +186,21 @@ public final class Navigator {
         }
     }
 
-    /// Opens a `watchmymedia://` link the app was opened with.
+    /// Opens a `watchmymedia://` link the app was opened with, as
+    /// ``DeepLink/opening(_:signedInServer:)`` read it.
     public func open(_ link: DeepLink, library: any LibraryRepository, liveTV: (any LiveTVRepository)? = nil) async {
         switch link {
+        case .filePage(let fileID):
+            // Not this app's link: the page, with Play ready, rather than playing.
+            liveIntent += 1
+            let intent = liveIntent
+            guard let page = try? await library.filePage(fileID: fileID), intent == liveIntent else { return }
+            closePlayer()
+            switch page {
+            case .movie(let id): open(.movie(id: id))
+            case .episode(let showID, let season, let episode?): open(.episode(showID: showID, season: season, id: episode))
+            case .episode(let showID, let season, nil): open(.show(id: showID, season: season))
+            }
         case .liveRecordings:
             closePlayer()
             tab = .liveTV
@@ -202,6 +228,9 @@ public final class Navigator {
         case .movie(let id):
             closePlayer()
             open(.movie(id: id))
+        case .playMovie(let id):
+            // As Play/Pause on its card: loaded, then played; its page if it can't be.
+            await playPause(.playMovie(id: id), library: library) {}
         case .mediaList(let id):
             closePlayer()
             open(.mediaList(id: id))
@@ -221,6 +250,13 @@ public final class Navigator {
             closePlayer()
             tab = .settings
             paths[.settings] = [.downloads]
+        case .search:
+            closePlayer()
+            findInSearch()
+        case .home:
+            closePlayer()
+            tab = .home
+            paths[.home] = []
         }
     }
 }

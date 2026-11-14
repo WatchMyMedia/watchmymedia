@@ -9,7 +9,7 @@ final class LiveGuideTests: XCTestCase {
     func testACellOpensItsDetailsAndWatchesTheChannel() {
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
-        app.launchArguments = ["-fakes", "-fakesLiveGuide", "-tab", "liveTV"]
+        app.launchArguments = ["-fakes", "-fakesLiveGuide", "-tab", "liveTV", "-playerKeepControls"]
         app.launch()
         defer { app.terminate() }
         let cell = app.buttons["live-cell-4.1-The Sleuth Files"]

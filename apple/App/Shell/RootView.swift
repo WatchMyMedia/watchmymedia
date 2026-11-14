@@ -12,6 +12,17 @@ final class AppFlow {
     /// the original account needed by Cancel.
     var serverSwitch: ServerSwitchModel?
     var appliedSwitchLaunch = false
+    /// The sign-in form, kept here like the server switch, so an iPad window
+    /// resized during sign-in (which swaps the iPhone and iPad screens) keeps
+    /// what was typed (PLAN-APPLE-REVIEW.md §3.3.4).
+    @ObservationIgnored private let signIn = SignInForm()
+
+    func signInModel(_ services: AppServices) -> SignInModel {
+        signIn.model(servers: services.servers, auth: services.auth)
+    }
+
+    /// A sign-in or sign-out: the next form starts afresh.
+    func forgetSignIn() { signIn.forget() }
 }
 
 /// Server picker until a server is chosen, sign-in until someone is signed
@@ -45,6 +56,7 @@ struct RootView: View {
         .animation(.default, value: services.auth.user)
         .animation(.default, value: flow.choosingServer)
         .onChange(of: account) { old, _ in
+            flow.forgetSignIn()
             // Another account's reminders never notify here.
             Task { await notifier.reschedule([]) }
             if let switching = flow.serverSwitch {
@@ -62,34 +74,57 @@ struct RootView: View {
             resetAccountViews(rebuild: outcome != .cancelled)
             navigator.tab = outcome == .cancelled ? .settings : .home
         }
-        // Sign-in changes do not change scenePhase. Load this account's live
-        // access immediately, including after switching servers.
-        .task(id: account) {
-            try? await services.liveTV.refresh()
-            await extras.refresh()
+        // At launch, on every return to the app and on every sign-in (which
+        // doesn't change scenePhase): one task, so launch asks once. A server
+        // upgraded meanwhile may do more (Automatic quality from API 3), so its
+        // level comes first; the rest don't wait for each other
+        // (PLAN-APPLE-REVIEW.md §4.1.3–4).
+        .task(id: Refresh(account: account, active: scenePhase == .active)) {
+            guard scenePhase == .active else { return }
+            await services.servers.refreshCurrent()
+            let services = services, extras = extras
+            await together(
+                { await services.requests.refreshOptions() },
+                // Live TV's access, then its reminders, which need it.
+                { try? await services.liveTV.refresh(); await extras.refresh() },
+                // Offline progress and what the server decided of the downloads (PLAN-DOWNLOADS.md §6).
+                { await services.downloads.sync() }
+            )
         }
         // Reminders as notifications (PLAN-LIVE-TV-GUIDE.md §6.5): the soonest 64,
         // again whenever they or the lead time change, once the list is loaded.
         // A server that keeps none clears them; offline, they stay as they were.
+        // The quick actions on the app's icon follow the sign-in and what its server offers.
+        .onChange(of: quickActions, initial: true) { _, key in
+            QuickActions.shared.update(serverID: key.serverID, liveTV: key.liveTV, downloads: key.downloads)
+        }
         .task(id: reminderSchedule) {
             if services.auth.user == nil {
                 await notifier.reschedule([])
             } else if extras.loaded {
-                await notifier.reschedule(extras.alerts())
+                await notifier.reschedule(extras.alerts(), serverID: services.servers.current?.server.id)
             } else if let capabilities = services.liveTV.capabilities, !capabilities.extrasAvailable {
                 await notifier.reschedule([])
             }
         }
-        // A server upgraded meanwhile may do more (Automatic quality from API 3).
-        .task(id: scenePhase) {
-            guard scenePhase == .active else { return }
-            await services.servers.refreshCurrent()
-            await services.requests.refreshOptions()
-            try? await services.liveTV.refresh()
-            await extras.refresh()
-            // Offline progress and what the server decided of the downloads (PLAN-DOWNLOADS.md §6).
-            await services.downloads.sync()
-        }
+    }
+
+    private struct QuickActionsKey: Equatable {
+        let serverID: String?
+        let liveTV: Bool
+        let downloads: Bool
+    }
+
+    private var quickActions: QuickActionsKey {
+        let signedIn = services.auth.user != nil && services.servers.current?.signedIn == true
+        return QuickActionsKey(serverID: signedIn ? services.servers.current?.server.id : nil,
+                               liveTV: signedIn && services.liveTV.capabilities?.available == true,
+                               downloads: signedIn && services.downloads.enabled)
+    }
+
+    private struct Refresh: Equatable {
+        let account: Account
+        let active: Bool
     }
 
     /// Changes when the notifications to schedule might.

@@ -1,6 +1,8 @@
 import AVKit
 import SwiftUI
+#if DEBUG
 import WMMFakes
+#endif
 import WMMFeatures
 import WMMModel
 import WMMUI
@@ -55,6 +57,8 @@ private struct TVLivePlayerContent: View {
     let model: TVLivePlayerModel
     @State private var standIn = AVPlayer()
     @State private var previewPanel: LivePanel?
+    /// The reminder banner Menu put away; the store keeps it up for its ten seconds elsewhere.
+    @State private var closedBanner: String?
     @FocusState private var focused: String?
     @Environment(LiveExtrasStore.self) private var extras
     @Environment(LiveRecordingsStore.self) private var recordings
@@ -77,8 +81,8 @@ private struct TVLivePlayerContent: View {
         content
             // AVKit closes its own info panel first; only bubbled commands reach the app.
             .onExitCommand {
-                if previewPanel != nil { previewPanel = nil }
-                else { model.back() }
+                if previewPanel != nil { previewPanel = nil; return }
+                if model.back(bannerShowing: banner != nil) == .closeBanner { closedBanner = banner?.id }
             }
             .onPlayPauseCommand { model.playPause() }
     }
@@ -86,9 +90,14 @@ private struct TVLivePlayerContent: View {
     private var content: some View {
         ZStack {
             if model.showsVideo {
-                LiveSystemPlayer(model: model, extras: extras, recordings: recordings, player: model.controller.player ?? standIn,
-                                 contextualActions: model.contextualActions, transportBarActions: model.transportBarActions)
-                    .disabled(!model.videoTakesInput || previewPanel != nil)
+                SystemPlayer(
+                    player: model.controller.player ?? standIn,
+                    contextualActions: model.contextualActions,
+                    transportBarActions: model.transportBarActions,
+                    behavior: .live(model, extras: extras, recordings: recordings),
+                    overlay: LiveVideoOverlay(model: model, standIn: model.controller.player == nil)
+                )
+                    .disabled(!model.videoTakesInput || previewPanel != nil || model.goTo != nil)
             }
             if let previewPanel, model.overlay == nil {
                 // The fake player has no AVPlayerItem, so AVKit cannot open its
@@ -149,13 +158,21 @@ private struct TVLivePlayerContent: View {
                 .accessibilityIdentifier("live-recording-takeover")
             }
             // A Live TV reminder: Swipe down opens Channels with it first (TvLiveReminder's `bannerPlayer`).
-            if let reminder = extras.banner, model.overlay == nil {
+            if let reminder = banner, model.overlay == nil {
                 TVLiveReminderBanner(reminder: reminder, inPlayer: true)
                     .padding(.top, 60)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
+            // Page Up and Down's note and Go to channel (TvLiveChannelKeys.dc.html).
+            if model.overlay == nil { LiveChannelKeysLayer(model: model) }
         }
-        .animation(.easeOut(duration: 0.3), value: extras.banner)
+        .animation(.easeOut(duration: 0.3), value: banner)
+    }
+
+    /// The reminder banner, unless Menu put it away (TvLiveReminder's `bannerPlayer`).
+    private var banner: LiveReminder? {
+        guard let banner = extras.banner, banner.id != closedBanner else { return nil }
+        return banner
     }
 
     private func prompt<Actions: View>(title: String, message: String, @ViewBuilder actions: () -> Actions) -> some View {
@@ -206,7 +223,7 @@ private struct LiveVideoOverlay: View {
                         .accessibilityIdentifier("live-player-title")
                     Text("No programme listings").font(.system(size: 20)).foregroundStyle(Palette.muted)
                     if state.status == .paused {
-                        Text("Paused · Tuner releases in \(state.pauseRemainingSeconds / 60):\(String(format: "%02d", state.pauseRemainingSeconds % 60))")
+                        Text("Paused · \(liveTunerReleasesIn(seconds: state.pauseRemainingSeconds))")
                             .font(.system(size: 22)).foregroundStyle(Palette.gold)
                     }
                 }
@@ -238,87 +255,49 @@ private struct LiveVideoOverlay: View {
     }
 }
 
-/// AVKit retains its familiar transport, but seeking and file skips are disabled.
-private struct LiveSystemPlayer: UIViewControllerRepresentable {
-    let model: TVLivePlayerModel
-    let extras: LiveExtrasStore
-    let recordings: LiveRecordingsStore
-    let player: AVPlayer
-    let contextualActions: [TVLivePlayerAction]
-    let transportBarActions: [TVLivePlayerAction]
-    func makeCoordinator() -> Coordinator { Coordinator(model: model) }
+/// Live TV on the shared ``SystemPlayer``: AVKit keeps its familiar
+/// transport, but seeking and file skips are off; Last channel, Ch−, Ch+, Go
+/// to channel and Stop are its transport bar's buttons and Go live its
+/// contextual action, Page Up, Page Down and the 123 key change channel,
+/// Channels and Quality are its tabs, and picture in picture stays on.
+private extension SystemPlayerBehavior where Action == TVLivePlayerAction {
+    @MainActor static func live(_ model: TVLivePlayerModel, extras: LiveExtrasStore, recordings: LiveRecordingsStore) -> Self {
+        Self(
+            linear: true,
+            pictureInPicture: PictureInPicture(
+                possible: { model.pictureInPicturePossibleChanged($0) },
+                changed: { model.pictureInPictureChanged(active: $0, appActive: $1) },
+                canRestore: { model.controller.player?.currentItem != nil }
+            ),
+            infoTabs: { LivePanel.allCases.map { LiveOptionsController(model: model, panel: $0, extras: extras, recordings: recordings) } },
+            uiAction: { item in
+                let result = UIAction(title: item.title, image: UIImage(systemName: item.systemImage), identifier: .init("media.watchmy.live.\(item.kind.rawValue)")) { [weak model] _ in
+                    model?.perform(item.kind)
+                }
+                result.subtitle = item.subtitle
+                result.accessibilityLabel = item.accessibilityLabel
+                return result
+            },
+            transportBarChanged: { model.transportBarChanged(visible: $0) },
+            // Nothing moves: a press on the bar counts as input.
+            seek: { old, _ in
+                model.controller.noteUserInput()
+                return old
+            },
+            presses: livePresses(model)
+        )
+    }
 
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let controller = AVPlayerViewController()
-        controller.player = player
-        controller.delegate = context.coordinator
-        controller.requiresLinearPlayback = true
-        controller.allowedSubtitleOptionLanguages = []
-        controller.customInfoViewControllers = LivePanel.allCases.map { LiveOptionsController(model: model, panel: $0, extras: extras, recordings: recordings) }
-        context.coordinator.installOverlay(in: controller, standIn: model.controller.player == nil)
-        context.coordinator.updateActions(in: controller, contextual: contextualActions, transport: transportBarActions)
-        model.pictureInPicturePossibleChanged(controller.allowsPictureInPicturePlayback && AVPictureInPictureController.isPictureInPictureSupported())
-        return controller
-    }
-    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
-        if controller.player !== player { controller.player = player }
-        context.coordinator.updateActions(in: controller, contextual: contextualActions, transport: transportBarActions)
-    }
-    static func dismantleUIViewController(_ controller: AVPlayerViewController, coordinator: Coordinator) {
-        controller.player = nil
-    }
-
-    @MainActor final class Coordinator: NSObject, @MainActor AVPlayerViewControllerDelegate {
-        let model: TVLivePlayerModel
-        private var overlayHost: UIViewController?
-        private var contextual: [TVLivePlayerAction] = []
-        private var transport: [TVLivePlayerAction] = []
-        init(model: TVLivePlayerModel) { self.model = model }
-        func installOverlay(in controller: AVPlayerViewController, standIn: Bool) {
-            guard let container = controller.contentOverlayView else { return }
-            let host = UIHostingController(rootView: LiveVideoOverlay(model: model, standIn: standIn))
-            host.view.backgroundColor = .clear
-            host.view.isUserInteractionEnabled = false
-            host.view.frame = container.bounds
-            host.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            container.addSubview(host.view)
-            overlayHost = host
+    /// Page Up and Page Down change channel; the 123 key (tvOS 18.1) opens Go to channel.
+    @MainActor private static func livePresses(_ model: TVLivePlayerModel) -> [UIPress.PressType: @MainActor () -> Void] {
+        var presses: [UIPress.PressType: @MainActor () -> Void] = [
+            .pageUp: { [weak model] in model?.pageUp() },
+            .pageDown: { [weak model] in model?.pageDown() },
+        ]
+        if #available(tvOS 18.1, *) {
+            presses[.tvRemoteOneTwoThree] = { [weak model] in model?.openGoToChannel() }
         }
-        func updateActions(in controller: AVPlayerViewController, contextual newContextual: [TVLivePlayerAction], transport newTransport: [TVLivePlayerAction]) {
-            if contextual != newContextual {
-                contextual = newContextual
-                controller.contextualActions = contextual.map(action)
-            }
-            if transport != newTransport {
-                transport = newTransport
-                controller.transportBarCustomMenuItems = transport.map(action)
-            }
-        }
-        private func action(_ item: TVLivePlayerAction) -> UIAction {
-            let result = UIAction(title: item.title, image: UIImage(systemName: item.systemImage), identifier: .init("media.watchmy.live.\(item.kind.rawValue)")) { [weak model] _ in model?.perform(item.kind) }
-            result.accessibilityLabel = item.accessibilityLabel
-            return result
-        }
-        func playerViewController(_ playerViewController: AVPlayerViewController, willTransitionToVisibilityOfTransportBar visible: Bool, with coordinator: any AVPlayerViewControllerAnimationCoordinator) {
-            model.transportBarChanged(visible: visible)
-        }
-        func playerViewController(_ playerViewController: AVPlayerViewController, timeToSeekAfterUserNavigatedFrom oldTime: CMTime, to targetTime: CMTime) -> CMTime {
-            model.controller.noteUserInput()
-            return oldTime
-        }
-        func playerViewControllerShouldAutomaticallyDismissAtPictureInPictureStart(_ playerViewController: AVPlayerViewController) -> Bool { false }
-        func playerViewControllerWillStartPictureInPicture(_ playerViewController: AVPlayerViewController) {
-            model.pictureInPictureChanged(active: true, appActive: UIApplication.shared.applicationState == .active)
-        }
-        func playerViewControllerDidStopPictureInPicture(_ playerViewController: AVPlayerViewController) {
-            model.pictureInPictureChanged(active: false, appActive: UIApplication.shared.applicationState == .active)
-        }
-        func playerViewController(_ playerViewController: AVPlayerViewController, failedToStartPictureInPictureWithError error: any Error) {
-            model.pictureInPictureChanged(active: false, appActive: UIApplication.shared.applicationState == .active)
-        }
-        func playerViewController(_ playerViewController: AVPlayerViewController, restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
-            completionHandler(model.controller.player?.currentItem != nil)
-        }
+        return presses
     }
 }
 
@@ -542,7 +521,7 @@ private struct TVLiveBanner: View {
                         Text("No listings for this channel.").font(.system(size: 21)).foregroundStyle(Palette.muted)
                     }
                     if state.status == .paused {
-                        Text("Paused · Tuner releases in \(state.pauseRemainingSeconds / 60):\(String(format: "%02d", state.pauseRemainingSeconds % 60))")
+                        Text("Paused · \(liveTunerReleasesIn(seconds: state.pauseRemainingSeconds))")
                             .font(.system(size: 21)).foregroundStyle(Palette.gold)
                     }
                 }

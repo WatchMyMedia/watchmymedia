@@ -4,6 +4,11 @@ import WMMModel
 
 /// Household schedule shared by the guide and the list. Loads only sections the
 /// person opens, by keyset page; server events invalidate them without polling.
+/// An event asks again only for what is on screen (``show(_:)``, the guide's
+/// span while ``showGuide(from:to:)`` holds it); a section that has left the
+/// screen is forgotten and loads again when it returns. The echo of a change
+/// made here asks for nothing more, as the change already did
+/// (PLAN-APPLE-REVIEW.md §4.1.8).
 ///
 /// A programme's mark is the newest this device has learnt: from Record and
 /// Don't record, the lists, or the guide's span on screen, asked again after
@@ -32,8 +37,17 @@ public final class LiveRecordingsStore {
     /// The guide's span on screen, and the event count each span's marks were last asked at.
     @ObservationIgnored private var visible: (start: Date, end: Date)?
     @ObservationIgnored private var askedAt: [Date: Int] = [:]
+    /// Sections on screen now (``show(_:)``), counted, and those that ever were.
+    @ObservationIgnored private var shown: [LiveRecordingSection: Int] = [:]
+    @ObservationIgnored private var leased: Set<LiveRecordingSection> = []
+    @ObservationIgnored private var echoes = LiveEchoes()
+    @ObservationIgnored private let now: @MainActor () -> Date
 
-    public init(repository: any LiveTVRepository) { self.repository = repository; context = repository.contextID }
+    public init(repository: any LiveTVRepository, now: @escaping @MainActor () -> Date = { Date() }) {
+        self.repository = repository
+        self.now = now
+        context = repository.contextID
+    }
     public var available: Bool { repository.capabilities?.recordingsAvailable == true }
     public func page(_ section: LiveRecordingSection) -> LiveRecordingPage? { context == repository.contextID ? pages[section] : nil }
     public func mark(for programme: LiveProgramme) -> LiveRecordingMark? {
@@ -41,13 +55,38 @@ public final class LiveRecordingsStore {
         guard context == repository.contextID, let known = marks[programme.id] else { return programme.recording }
         return known.mark
     }
-    /// The guide's span on screen. Its marks are asked again after each event, and
+    /// The guide's span on screen, until the calling task is cancelled (the
+    /// guide's `.task(id:)`): its marks are asked again after each event, and
     /// when a span is first shown after one, since its listings may be older.
+    /// Once it has gone, events ask nothing for it.
     public func showGuide(from start: Date, to end: Date) async {
         syncContext()
         visible = (start, end)
-        guard available, (askedAt[start] ?? 0) < events else { return }
-        await refreshVisibleMarks()
+        let identity = context
+        if available, (askedAt[start] ?? 0) < events { await refreshVisibleMarks() }
+        await untilCancelled()
+        if context == identity, visible?.start == start, visible?.end == end { visible = nil }
+    }
+
+    /// Sections on screen until the calling task is cancelled (the list's
+    /// `.task`): an event asks again for them; once they have gone, it
+    /// forgets them, and they load again when they return.
+    public func show(_ sections: [LiveRecordingSection]) async {
+        syncContext()
+        let identity = context
+        for section in sections {
+            shown[section, default: 0] += 1
+            leased.insert(section)
+        }
+        await untilCancelled()
+        guard context == identity else { return }
+        for section in sections { shown[section, default: 1] -= 1 }
+    }
+
+    private func untilCancelled() async {
+        let (wait, continuation) = AsyncStream.makeStream(of: Void.self)
+        for await _ in wait {}
+        continuation.finish()
     }
     public func load(_ section: LiveRecordingSection, more: Bool = false, force: Bool = false) async {
         syncContext()
@@ -148,14 +187,37 @@ public final class LiveRecordingsStore {
         guard available else { return }
         for section in LiveRecordingSection.allCases where pages[section] != nil { await load(section, force: true) }
     }
-    /// Server events (and this device's own changes) ask again for what is on screen.
+    /// Server events ask again for what is on screen; favourites and
+    /// reminders events, and the echo of a change made here, ask nothing.
     public func follow() async {
-        for await _ in repository.changes() {
+        for await change in repository.liveChanges() {
             guard !Task.isCancelled else { return }
+            defer { eventsFollowed += 1 }
+            guard change == .all || (change == .recordings && !echoes.consume(.recordings, at: now())) else { continue }
             syncContext()
             events += 1; revision += 1
             await refreshVisibleMarks()
-            await refresh()
+            await refreshShown()
+        }
+    }
+
+    /// Events ``follow()`` has finished with, so a test can tell one asked for nothing.
+    @ObservationIgnored private(set) var eventsFollowed = 0
+    /// A guide span is on screen (``showGuide(from:to:)`` has begun), for tests.
+    var showsGuideSpan: Bool { visible != nil }
+
+    /// The sections on screen again; those that have left it are forgotten.
+    /// A section loaded by a screen that never said it shows them (an older
+    /// one) is asked again, as before.
+    private func refreshShown() async {
+        guard available else { return }
+        for section in LiveRecordingSection.allCases where pages[section] != nil {
+            if (shown[section] ?? 0) > 0 || !leased.contains(section) {
+                await load(section, force: true)
+            } else {
+                pages[section] = nil
+                errors[section] = nil
+            }
         }
     }
     /// The visible span's marks from the guide, one request; a programme it lists with none records nothing.
@@ -182,6 +244,7 @@ public final class LiveRecordingsStore {
         let identity = context, version = generation
         changing.insert(key); message = nil
         defer { if identity == repository.contextID && version == generation { changing.remove(key) } }
+        let echo = echoes.expect(.recordings, at: now())
         do {
             let result = try await operation()
             guard identity == repository.contextID, version == generation else { return nil }
@@ -189,6 +252,7 @@ public final class LiveRecordingsStore {
             await refresh()
             return result
         } catch {
+            echoes.forget(echo)
             guard identity == repository.contextID, version == generation, !(error is CancellationError) else { return nil }
             message = error.displayMessage
             return nil
@@ -198,6 +262,6 @@ public final class LiveRecordingsStore {
         guard context != repository.contextID else { return }
         context = repository.contextID; generation += 1; revision += 1
         pages = [:]; loading = []; changing = []; errors = [:]; marks = [:]; invalidated = []; message = nil
-        events = 0; askedAt = [:]; visible = nil
+        events = 0; askedAt = [:]; visible = nil; shown = [:]; leased = []; echoes = LiveEchoes()
     }
 }

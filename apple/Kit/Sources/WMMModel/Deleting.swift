@@ -1,10 +1,5 @@
 import Foundation
 
-/// The API level from which the apps offer Delete episode
-/// (PLAN-EPISODE-PAGE.md §4): `RequestOptions.delete`, and members may
-/// delete episodes and movies when the server allows it.
-public let deleteAPILevel = 6
-
 /// What deleting an episode would do, as the server's `previewDelete` says
 /// (PLAN-ARR.md §8): the Radarrs or Sonarrs that hold it, asked just now.
 public struct DeletePreview: Hashable, Sendable {

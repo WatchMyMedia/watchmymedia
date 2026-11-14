@@ -133,7 +133,8 @@ func meanGrey(_ image: CGImage) -> Int {
 
     /// A request that fails after the next scrub has begun (a sheet fetched
     /// ahead, answered late) must not stop that scrub asking for the sheet.
-    @Test func aFailureFromBeforeTheScrubDoesNotStopItAsking() async {
+    @Test func aFailureFromBeforeTheScrubDoesNotStopItAsking() async throws {
+        let sheet = try #require(layout.sheetURL(1))
         let loader = SheetLoader(layout)
         loader.failing = [1]
         loader.held = [1]
@@ -145,7 +146,7 @@ func meanGrey(_ image: CGImage) -> Int {
         loader.held = []
         thumbnails.retryFailed()
         loader.release() // the first request fails only now
-        try? await Task.sleep(for: .milliseconds(50))
+        #expect(await eventually(timeout: .seconds(5)) { !thumbnails.hasFetched(sheet) }, "the late failure has come in")
         #expect(await thumbnails.tile(layout, atMs: 13_000) != nil)
         #expect(loader.requests.count == 2)
     }
@@ -175,6 +176,7 @@ func meanGrey(_ image: CGImage) -> Int {
         h.spy.state.durationMs = 120_000
         h.spy.state.trickplay = layout
         h.spy.state.skip = SkipPrompt(segment: Segment(kind: .intro, startMs: 0, endMs: 30_000), label: "Skip Intro")
+        await h.time.settle()
         #expect(h.model.showsSkip)
 
         h.model.scrub(x: 0.25, width: 1) // 30 s: tile 3
@@ -205,6 +207,7 @@ func meanGrey(_ image: CGImage) -> Int {
     @Test func withoutThumbnailsTheTimeShowsAlone() async {
         let h = PlayerHarness(thumbnails: SeekThumbnails(images: SheetLoader(layout)))
         h.spy.state.durationMs = 120_000
+        await h.time.settle()
         h.model.scrub(x: 0.5, width: 1)
         #expect(!h.model.showsScrubTile)
 
@@ -212,6 +215,7 @@ func meanGrey(_ image: CGImage) -> Int {
         let tv = PlayerHarness()
         tv.spy.state.durationMs = 120_000
         tv.spy.state.trickplay = layout
+        await tv.time.settle()
         tv.model.scrub(x: 0.5, width: 1)
         #expect(!tv.model.showsScrubTile)
     }
@@ -222,6 +226,7 @@ func meanGrey(_ image: CGImage) -> Int {
         let h = PlayerHarness(thumbnails: SeekThumbnails(images: loader))
         h.spy.state.durationMs = 120_000
         h.spy.state.trickplay = layout
+        await h.time.settle()
         h.model.scrub(x: 0.1, width: 1)
         #expect(await eventually { !h.model.showsScrubTile })
         h.model.endScrub()

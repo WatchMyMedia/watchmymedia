@@ -42,6 +42,25 @@ import WMMModel
         #expect(info.artwork?.data == Data("e7".utf8))
     }
 
+    @Test func theAppleTVInfoPanelGetsTheRequestsDetailsAndThePicture() async throws {
+        // PLAN-APPLE-REVIEW.md §6.2: from the request and Now Playing's picture, with no request of its own.
+        var r = episode
+        r.overview = "The harbour freezes over."
+        r.year = 2024
+        r.contentRating = "TV-14"
+        r.genres = ["Drama", "Mystery"]
+        await h.start(r, decision())
+        let loaded = try #require(h.player.loads.last?.details)
+        #expect(loaded.overview == "The harbour freezes over.")
+        #expect(loaded.year == 2024)
+        #expect(loaded.contentRating == "TV-14")
+        #expect(loaded.genres == ["Drama", "Mystery"])
+        // The picture comes once loaded, to the item already playing.
+        let pictured = try #require(h.player.described.last)
+        #expect(pictured.artwork?.data == Data("e7".utf8))
+        #expect(pictured.overview == "The harbour freezes over.")
+    }
+
     @Test func aPictureThatFailsToLoadLeavesNoneAndThePlayGoesOn() async {
         var r = episode
         r.stillPath = "/missing.jpg"

@@ -14,6 +14,7 @@ import WMMModel
 ///     -playerStopped                     an admin's stop message
 ///     -playerError                       the can't-play state; Try again plays
 ///     -playerAutomatic slowed|recovered|failed  Automatic quality note and current step
+///     -playerPanel episodes              the info panel's Episodes tab, over the video
 @MainActor
 enum PlayerLaunchArguments {
     private static var arguments: [String] { ProcessInfo.processInfo.arguments }
@@ -21,6 +22,13 @@ enum PlayerLaunchArguments {
     private static func value(after flag: String) -> String? {
         guard let i = arguments.firstIndex(of: flag), arguments.indices.contains(i + 1) else { return nil }
         return arguments[i + 1]
+    }
+
+    /// `-playerPanel episodes`: the fake player has no item, so AVKit opens no
+    /// info panel; the screen shows the Episodes tab over the video instead.
+    static var episodesPanel: Bool {
+        guard arguments.contains("-fakes") else { return false }
+        return value(after: "-playerPanel") == "episodes"
     }
 
     static func wrap(_ controller: any PlaybackController) -> any PlaybackController {

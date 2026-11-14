@@ -31,9 +31,11 @@ struct LiveGuideScreen: View {
     @Environment(LiveRecordingsStore.self) private var recordings
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    init(repository: any LiveTVRepository, extras: LiveExtrasStore, mode: Binding<LiveTVMode>) {
+    /// `model` belongs to the Live TV tab, so the guide keeps its time,
+    /// selection and listings when an iPad goes to Channels and back.
+    init(model: LiveGuideModel, repository: any LiveTVRepository, extras: LiveExtrasStore, mode: Binding<LiveTVMode>) {
         _mode = mode
-        _model = State(initialValue: LiveGuideModel(repository: repository, extras: extras))
+        _model = State(initialValue: model)
         _live = State(initialValue: LiveTVModel(repository: repository))
         _listingsSearch = State(initialValue: LiveSearchModel(repository: repository, extras: extras))
     }
@@ -53,6 +55,7 @@ struct LiveGuideScreen: View {
                         controls
                         HStack(alignment: .top, spacing: 20) {
                             ScrollView { content(now: now) }
+                                .refreshable { await refresh() }
                                 .background(Palette.surface, in: RoundedRectangle(cornerRadius: 14))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
                             panel(now: now).frame(width: 380)
@@ -210,7 +213,7 @@ struct LiveGuideScreen: View {
     private var search: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(Palette.muted)
-            TextField("Go to channel", text: $model.query, prompt: Text("Go to channel: 7.1 or a name").foregroundStyle(Palette.muted))
+            TextField(liveGoToChannel, text: $model.query, prompt: Text("Go to channel: 7.1 or a name").foregroundStyle(Palette.muted))
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                 .accessibilityIdentifier("live-channel-search")
         }
@@ -262,7 +265,7 @@ struct LiveGuideScreen: View {
                     }
                     .accessibilityIdentifier("live-filter-favourites")
                 }
-                Chip("All channels", selected: model.showingAll) { model.showAll() }
+                Chip(liveAllChannels, selected: model.showingAll) { model.showAll() }
                 ForEach(model.filters, id: \.self) { filter in
                     Chip(filter.title, selected: model.filter == filter) { model.filter = model.filter == filter ? nil : filter }
                 }
@@ -273,14 +276,14 @@ struct LiveGuideScreen: View {
 
     @ViewBuilder private func content(now: Date) -> some View {
         if model.loading {
-            ProgressView("Loading listings").frame(maxWidth: .infinity).padding(40)
+            ProgressView(liveLoadingListings).frame(maxWidth: .infinity).padding(40)
         } else if let error = model.error {
             ContentUnavailableView {
-                Label("Couldn't load listings", systemImage: "list.bullet.rectangle")
-            } description: { Text("\(error) Channels still play.") } actions: { Button("Try again") { Task { await model.load() } } }
+                Label(liveListingsFailedTitle, systemImage: "list.bullet.rectangle")
+            } description: { Text(liveListingsFailed(error)) } actions: { Button("Try again") { Task { await model.load() } } }
         } else if model.rows.isEmpty {
             ContentUnavailableView("No channels", systemImage: "tv",
-                                   description: Text(model.query.isEmpty && model.filter == nil ? "Your server's administrator can add channels in the web app." : "Try another channel, or All channels."))
+                                   description: Text(model.query.isEmpty && model.filter == nil ? "Your server's administrator can add channels in the web app." : liveNoChannelMatches))
         } else {
             LiveGuideGrid(model: model, now: now, wide: wide, stars: extras.available) { row, cell in
                 model.select(row, cell)
@@ -438,6 +441,7 @@ struct LiveGuideGrid: View {
     private var rowHeight: CGFloat { wide ? 54 : 56 }
 
     var body: some View {
+        let rows = model.rows
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 Text(model.dayLabel).font(.subheadline.weight(.semibold))
@@ -456,7 +460,7 @@ struct LiveGuideGrid: View {
             .background(Palette.surfaceRaised)
             .accessibilityHidden(true)
             LazyVStack(spacing: 0) {
-                ForEach(model.rows) { row in
+                ForEach(rows) { row in
                     Divider().overlay(Palette.separator)
                     HStack(spacing: 0) {
                         HStack(spacing: 0) {
@@ -467,7 +471,8 @@ struct LiveGuideGrid: View {
                         .frame(width: column, height: rowHeight)
                         HStack(spacing: 0) {
                             ForEach(row.cells) { cell in
-                                cellView(row, cell)
+                                LiveGuideCell(clock: model.clock, row: row, cell: cell, selected: model.isSelected(row, cell), now: now, choose: choose)
+                                    .equatable()
                                     .frame(width: max(track * cell.end.timeIntervalSince(cell.start) / model.span, 0), height: rowHeight)
                             }
                         }
@@ -487,18 +492,35 @@ struct LiveGuideGrid: View {
             }
         }
     }
+}
 
-    @ViewBuilder private func cellView(_ row: LiveGuideModel.Row, _ cell: LiveGuideModel.Cell) -> some View {
+/// One cell of the guide: a view of its own, compared by what it shows, so
+/// a change of selection or a pass of the grid redraws only the cells it
+/// changes (PLAN-APPLE-REVIEW.md §4.3.4).
+private struct LiveGuideCell: View, Equatable {
+    let clock: LiveClock
+    let row: LiveGuideModel.Row
+    let cell: LiveGuideModel.Cell
+    let selected: Bool
+    let now: Date
+    let choose: (LiveGuideModel.Row, LiveGuideModel.Cell) -> Void
+    @Environment(LiveExtrasStore.self) private var extras
+    @Environment(LiveRecordingsStore.self) private var recordings
+
+    nonisolated static func == (a: Self, b: Self) -> Bool {
+        a.row.channel == b.row.channel && a.cell == b.cell && a.selected == b.selected && a.now == b.now
+    }
+
+    var body: some View {
         switch cell.kind {
         case .programme(let p):
-            let selected = model.isSelected(row, cell)
             let reminded = extras.isReminded(p)
             let mark = recordings.mark(for: p)
-            let detail = p.episodeLine ?? model.clock.shortRange(p.start, p.end)
+            let detail = p.episodeLine ?? clock.shortRange(p.start, p.end)
             let title = (cell.startsBefore ? "‹ " : "") + p.title
             var spokenProgramme = p
             let _ = { spokenProgramme.recording = mark }()
-            let spoken = liveAccessibilityLabel(spokenProgramme, clock: model.clock) + (reminded ? ", reminder set" : "") + ", \(row.channel.number) \(row.channel.name)"
+            let spoken = liveCellAccessibilityLabel(spokenProgramme, reminded: reminded, channel: row.channel, clock: clock)
             Button { choose(row, cell) } label: {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 4) {
@@ -538,18 +560,18 @@ struct LiveGuideGrid: View {
         case .noListings:
             Button { choose(row, cell) } label: {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("No listings").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.textSecondary)
+                    Text(liveNoListings).font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.textSecondary)
                     Text("It still plays").font(.system(size: 12)).foregroundStyle(Palette.muted)
                 }
                 .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .overlay { if model.isSelected(row, cell) { Rectangle().strokeBorder(Palette.gold, lineWidth: 2) } }
+                .overlay { if selected { Rectangle().strokeBorder(Palette.gold, lineWidth: 2) } }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(row.channel.number) \(row.channel.name), No listings. It still plays.")
+            .accessibilityLabel(liveNoListingsAccessibilityLabel(row.channel))
         case .listingsEnd(let date):
-            Text(liveNoListingsAfter(date, clock: model.clock))
+            Text(liveNoListingsAfter(date, clock: clock))
                 .font(.system(size: 12)).foregroundStyle(Palette.muted).lineLimit(2)
                 .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -639,7 +661,7 @@ struct LiveSelectedCard: View {
                             }
                             Text(liveTimeLine(programme, now: now)).font(.footnote).foregroundStyle(Palette.muted).lineLimit(1)
                         } else {
-                            Text("No listings for this channel. It still plays.").font(.footnote).foregroundStyle(Palette.muted)
+                            Text(liveNoListingsStillPlays).font(.footnote).foregroundStyle(Palette.muted)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -651,7 +673,9 @@ struct LiveSelectedCard: View {
             .accessibilityHint("Shows the programme's details")
             .accessibilityIdentifier("live-selected-card")
             HStack(spacing: 10) {
-                if let programme, programme.start > now, extras.isReminded(programme) {
+                // What it offers is decided once, for every menu (LiveProgrammeActions).
+                let reminder = programme.flatMap { LiveProgrammeActions($0, on: channel, now: now, extras: extras).reminder }
+                if let programme, reminder == .set {
                     // Reminder set, or where it moved to; the details have Remove.
                     let moved = extras.reminder(for: programme).flatMap { $0.state == .moved ? $0 : nil }
                     Button(action: showDetails) {
@@ -663,12 +687,12 @@ struct LiveSelectedCard: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("live-card-reminder-set")
                     watchNow(programme)
-                } else if let programme, programme.start > now, extras.canRemind(programme) {
+                } else if let programme, reminder == .offered {
                     Button { remind?(programme, on: channel) } label: { Label(liveRemindMe, systemImage: "bell") }
                         .buttonStyle(GhostButtonStyle(height: 44))
                         .accessibilityIdentifier("live-card-remind")
                     watchNow(programme)
-                } else if let programme, programme.start > now {
+                } else if let programme, reminder == .unavailable {
                     Text(liveOnAt(channel, programme: programme, now: now)).font(.subheadline.weight(.semibold))
                     Spacer()
                     watchNow(programme)
@@ -737,13 +761,13 @@ struct LiveProgrammeDetails: View {
                         }
                     }
                     .frame(minHeight: 44)
-                    LivePictureView(programme: programme, channel: channel, wide: wide, maxPixel: 900)
+                    LivePictureView(programme: programme, channel: channel, wide: wide, maxPixel: 1200)
                         .aspectRatio(16 / 9, contentMode: .fit)
                         .frame(maxWidth: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .padding(.top, 8)
                     if let programme, programme.picture(wide: wide)?.fromTMDB == true {
-                        Text("Picture: TMDB").font(.caption2).foregroundStyle(Palette.faint).padding(.top, 6)
+                        Text(livePictureFromTMDB).font(.caption2).foregroundStyle(Palette.faint).padding(.top, 6)
                     }
                     if let programme {
                         Text(programme.title).font(.title2.weight(.bold)).padding(.top, 12)
@@ -767,29 +791,31 @@ struct LiveProgrammeDetails: View {
                             Text(description).font(.body).foregroundStyle(Palette.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true).padding(.top, 12)
                             if programme.descriptionFromTMDB {
-                                Text("Description from TMDB").font(.caption2).foregroundStyle(Palette.faint).padding(.top, 6)
+                                Text(liveDescriptionFromTMDB).font(.caption2).foregroundStyle(Palette.faint).padding(.top, 6)
                             }
                         }
                     } else {
                         Text(channel.name).font(.title2.weight(.bold)).padding(.top, 12)
-                        Text("No listings for this channel. It still plays.").font(.body).foregroundStyle(Palette.muted).padding(.top, 6)
+                        Text(liveNoListingsStillPlays).font(.body).foregroundStyle(Palette.muted).padding(.top, 6)
                     }
                 }
                 .padding(16)
             }
             Divider().overlay(Palette.separator)
             VStack(spacing: 10) {
-                if let programme { LiveRecordControls(programme: programme, now: now) }
+                if let programme { LiveRecordControls(programme: programme, channel: channel, now: now) }
                 if let programme, programme.start > now, let reminder = extras.reminder(for: programme), reminder.state != .gone {
                     LiveReminderStatus(reminder: reminder, now: now)
                 }
                 HStack(spacing: 12) {
-                    if let programme, programme.start > now, extras.isReminded(programme) {
+                    // What it offers is decided once, for every menu (LiveProgrammeActions).
+                    let reminder = programme.flatMap { LiveProgrammeActions($0, on: channel, now: now, extras: extras).reminder }
+                    if let programme, reminder == .set {
                         Button(action: watch) { Label(liveWatchLabel(channel, programme: programme, now: now), systemImage: "play.fill") }
                             .buttonStyle(GhostButtonStyle(height: 50))
                             .disabled(!channel.available)
                             .accessibilityIdentifier("live-details-watch")
-                    } else if let programme, programme.start > now, extras.canRemind(programme) {
+                    } else if let programme, reminder == .offered {
                         Button { remind?(programme, on: channel) } label: { Label(liveRemindMe, systemImage: "bell") }
                             .buttonStyle(PrimaryButtonStyle(height: 50))
                             .accessibilityIdentifier("live-details-remind")
@@ -797,7 +823,7 @@ struct LiveProgrammeDetails: View {
                             .buttonStyle(GhostButtonStyle(height: 50, fullWidth: false))
                             .disabled(!channel.available)
                             .accessibilityIdentifier("live-details-watch")
-                    } else if let programme, programme.start > now {
+                    } else if let programme, reminder == .unavailable {
                         Text(liveOnAt(channel, programme: programme, now: now)).font(.body.weight(.semibold))
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Button(action: watch) { Label(liveWatchLabel(channel, programme: programme, now: now), systemImage: "play.fill") }
