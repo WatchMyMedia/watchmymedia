@@ -57,6 +57,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -104,6 +106,7 @@ internal enum class ExtrasPanel { Programme, Search, Reminders, Recordings }
  * 1000 dp they are header buttons that switch the panel beside the guide.
  * [target] opens the guide at a programme once, then [onTargetShown].
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveChannelsScreen(
     state: LiveChannelsViewModel.State,
@@ -154,51 +157,56 @@ fun LiveChannelsScreen(
             }
         }
         if (!state.listings && state.capabilities.canRecord) GoldTextButton("Recordings", onRecordings, Modifier.padding(horizontal = 16.dp))
-        when {
-            state.loading && !state.available -> LoadingState()
-            state.error != null && state.channels.isEmpty() -> ErrorState(state.error!!, onRefresh)
-            !state.available -> EmptyState("Live TV isn't available", "An admin can set up a tuner and allow access in the web app.", action = "Check again", onAction = onRefresh)
-            state.channels.isEmpty() -> EmptyState("No channels yet", "An admin can refresh the tuner’s lineup and enable channels in the web app.", action = "Check again", onAction = onRefresh)
-            state.listings -> LiveGuideContent(state, onSearch, onSelect, onWatch = { channel ->
-                if (channel.available) onWatch(channel) else unavailable = channel
-            }, onRefresh, panel = panel.takeIf { state.extras } ?: ExtrasPanel.Programme, onPanel = { panel = it },
-                onReminderTime = onReminderTime, onPlayRecording = onPlayRecording, target = target, onTargetShown = onTargetShown, castDevice = castDevice, notLiveDevice = notLiveDevice)
-            else -> {
-                if (state.error != null) InlineError(state.error!!, onRefresh)
-                Row(Modifier.fillMaxSize().padding(horizontal = if (layout.isTablet) 24.dp else 16.dp), horizontalArrangement = if (layout.twoPane) Arrangement.spacedBy(24.dp) else Arrangement.Center) {
-                    Column(if (layout.twoPane) Modifier.width(360.dp) else Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = state.query,
-                            onValueChange = onSearch,
-                            label = { Text("Find a channel") },
-                            leadingIcon = { Icon(WmmIcons.Search, contentDescription = null) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        )
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${state.channels.size} channels", color = WmmColors.TextMuted, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                            TextButton(onClick = onRefresh, enabled = !state.loading) { Text(if (state.loading) "Checking…" else "Refresh", color = WmmColors.Accent) }
-                        }
-                        if (state.visibleChannels.isEmpty()) {
-                            EmptyState("No matching channels", "Try the channel name or number.")
-                        } else LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-                            items(state.visibleChannels, key = { it.id }) { channel ->
-                                LiveChannelRow(channel, selected = layout.twoPane && channel.id == state.selected?.id, onClick = {
-                                    onSelect(channel)
-                                    if (!layout.twoPane) {
-                                        if (channel.available) onWatch(channel) else unavailable = channel
+        // Pulling the guide or the channel list down asks the server again (§6.3).
+        PullToRefreshBox(isRefreshing = state.loading && state.channels.isNotEmpty(), onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize()) {
+                when {
+                    state.loading && !state.available -> LoadingState()
+                    state.error != null && state.channels.isEmpty() -> ErrorState(state.error!!, onRefresh)
+                    !state.available -> EmptyState("Live TV isn't available", "An admin can set up a tuner and allow access in the web app.", action = "Check again", onAction = onRefresh)
+                    state.channels.isEmpty() -> EmptyState("No channels yet", "An admin can refresh the tuner’s lineup and enable channels in the web app.", action = "Check again", onAction = onRefresh)
+                    state.listings -> LiveGuideContent(state, onSearch, onSelect, onWatch = { channel ->
+                        if (channel.available) onWatch(channel) else unavailable = channel
+                    }, onRefresh, panel = panel.takeIf { state.extras } ?: ExtrasPanel.Programme, onPanel = { panel = it },
+                        onReminderTime = onReminderTime, onPlayRecording = onPlayRecording, target = target, onTargetShown = onTargetShown, castDevice = castDevice, notLiveDevice = notLiveDevice)
+                    else -> {
+                        if (state.error != null) InlineError(state.error!!, onRefresh)
+                        Row(Modifier.fillMaxSize().padding(horizontal = if (layout.isTablet) 24.dp else 16.dp), horizontalArrangement = if (layout.twoPane) Arrangement.spacedBy(24.dp) else Arrangement.Center) {
+                            Column(if (layout.twoPane) Modifier.width(360.dp) else Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
+                                OutlinedTextField(
+                                    value = state.query,
+                                    onValueChange = onSearch,
+                                    label = { Text("Find a channel") },
+                                    leadingIcon = { Icon(WmmIcons.Search, contentDescription = null) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                )
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("${state.channels.size} channels", color = WmmColors.TextMuted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                    TextButton(onClick = onRefresh, enabled = !state.loading) { Text(if (state.loading) "Checking…" else "Refresh", color = WmmColors.Accent) }
+                                }
+                                if (state.visibleChannels.isEmpty()) {
+                                    EmptyState("No matching channels", "Try the channel name or number.")
+                                } else LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+                                    items(state.visibleChannels, key = { it.id }) { channel ->
+                                        LiveChannelRow(channel, selected = layout.twoPane && channel.id == state.selected?.id, onClick = {
+                                            onSelect(channel)
+                                            if (!layout.twoPane) {
+                                                if (channel.available) onWatch(channel) else unavailable = channel
+                                            }
+                                        })
                                     }
-                                })
+                                }
                             }
-                        }
-                    }
-                    if (layout.twoPane) state.selected?.let { channel ->
-                        Column(Modifier.weight(1f).panel().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Text(channel.number, color = WmmColors.Accent, fontFamily = Inter, fontSize = 40.sp, fontWeight = FontWeight.Bold)
-                            Text(channel.name, color = WmmColors.Text, fontFamily = Inter, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                            Text("No listings for this channel", color = WmmColors.TextMuted)
-                            Text(channel.reason?.let(::liveTVError) ?: "Watch this channel live. Brief pauses use a rolling buffer. Recordings are managed separately from the live player.", color = WmmColors.TextMuted)
-                            FilledButton("Watch live", { onWatch(channel) }, enabled = channel.available, icon = WmmIcons.Play, large = true)
+                            if (layout.twoPane) state.selected?.let { channel ->
+                                Column(Modifier.weight(1f).panel().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    Text(channel.number, color = WmmColors.Accent, fontFamily = Inter, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+                                    Text(channel.name, color = WmmColors.Text, fontFamily = Inter, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                                    Text("No listings for this channel", color = WmmColors.TextMuted)
+                                    Text(channel.reason?.let(::liveTVError) ?: "Watch this channel live. Brief pauses use a rolling buffer. Recordings are managed separately from the live player.", color = WmmColors.TextMuted)
+                                    FilledButton("Watch live", { onWatch(channel) }, enabled = channel.available, icon = WmmIcons.Play, large = true)
+                                }
+                            }
                         }
                     }
                 }
