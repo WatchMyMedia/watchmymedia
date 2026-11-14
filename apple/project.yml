@@ -198,6 +198,9 @@ targets:
         CFBundleDisplayName: WatchMyMedia
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # App Store Connect refuses a tvOS extension with an arm64 binary that doesn't
+        # say so here, as it does the app (1.8.4's first upload, 2026-11-14).
+        UIRequiredDeviceCapabilities: [arm64]
         NSExtension:
           NSExtensionPointIdentifier: com.apple.tv-top-shelf
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ContentProvider

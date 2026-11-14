@@ -6,6 +6,8 @@
 # its PlugIns (the Apple TV app's Top Shelf) has its own privacy manifest, no
 # fakes, and none of the Kit's data or playback code: the Top Shelf links only
 # WMMTopShelf, so it can't reach a sign-in or a server (PLAN-APPLE-REVIEW.md §6.2).
+# An extension with an arm64 binary lists arm64 in UIRequiredDeviceCapabilities,
+# or App Store Connect refuses the upload ("Invalid Bundle").
 #
 #   apple/scripts/check-release-binary.sh path/to/WatchMyMedia.app
 set -euo pipefail
@@ -40,6 +42,11 @@ for appex in "$app"/PlugIns/*.appex; do
   name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$appex/Info.plist")
   if [[ ! -f "$appex/PrivacyInfo.xcprivacy" ]]; then
     echo "error: $appex has no PrivacyInfo.xcprivacy" >&2
+    failed=1
+  fi
+  if lipo -archs "$appex/$name" 2>/dev/null | grep -qw arm64 &&
+    ! /usr/libexec/PlistBuddy -c 'Print :UIRequiredDeviceCapabilities' "$appex/Info.plist" 2>/dev/null | grep -qw arm64; then
+    echo "error: $appex has an arm64 binary but no arm64 in UIRequiredDeviceCapabilities; App Store Connect refuses it" >&2
     failed=1
   fi
   for module in WMMFakes WMMModel WMMData WMMAPI WMMPlayback WMMFeatures; do
