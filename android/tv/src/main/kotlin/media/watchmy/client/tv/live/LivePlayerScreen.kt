@@ -18,30 +18,22 @@ import media.watchmy.client.tv.components.TvButtonSize
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.WmmColors
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -61,8 +53,9 @@ import media.watchmy.client.model.liveSwitchMessage
 import media.watchmy.client.presentation.live.editLiveNumber
 import media.watchmy.client.presentation.live.nextLiveChannel
 import media.watchmy.client.tv.components.rememberFocusMemory
+import media.watchmy.client.tv.player.PlayerShell
+import media.watchmy.client.tv.player.rememberPlayerShellState
 import media.watchmy.client.ui.LocalAppServices
-import media.watchmy.client.ui.onBack
 import media.watchmy.client.ui.components.rememberLiveClockFormat
 import media.watchmy.client.ui.components.rememberLiveNow
 
@@ -94,8 +87,7 @@ fun LivePlayerScreen(
     LivePlayerContent(viewing, target, channels, onExit, onChannels, onSelect, listings, modifier, cast, onRecordings, onPlayRecording)
 }
 
-private class LiveFocus {
-    val root = FocusRequester()
+private class LiveFocus(val root: FocusRequester) {
     val playPause = FocusRequester()
     val channels = FocusRequester()
     val quality = FocusRequester()
@@ -129,18 +121,15 @@ private fun LivePlayerContent(
     val exit by rememberUpdatedState(onExit)
     val fullGuide by rememberUpdatedState(onChannels)
     val select by rememberUpdatedState(onSelect)
-    val focus = remember { LiveFocus() }
+    // Back, focus, hiding the controls and keeping the screen on: the frame the file player shares.
+    val shell = rememberPlayerShellState()
+    val focus = remember { LiveFocus(shell.root) }
     val channelMemory = rememberFocusMemory()
     var controls by remember { mutableStateOf(true) }
     var banner by remember { mutableStateOf(true) }
     var panel by remember { mutableStateOf<LivePanel?>(null) }
     var numeric by remember { mutableStateOf("") }
     var channelProblem by remember { mutableStateOf<LiveChannel?>(null) }
-    var inputTick by remember { mutableIntStateOf(0) }
-    var wanted by remember { mutableStateOf<FocusRequester?>(focus.playPause) }
-    var treeHasFocus by remember { mutableStateOf(false) }
-    var rootFocused by remember { mutableStateOf(false) }
-    var leaving by remember { mutableStateOf(false) }
     val consumed = remember { mutableSetOf<Int>() }
     val terminal = state.status in listOf(PlayerStatus.Error, PlayerStatus.Ended)
     // The takeover warning never takes focus, like the reminder banner: Hold OK is Don't record it, Back dismisses it.
@@ -155,14 +144,13 @@ private fun LivePlayerContent(
     }
 
     fun leave(toGuide: Boolean = false) {
-        if (leaving) return
-        leaving = true
+        if (!shell.leave()) return
         controller.stop()
         if (toGuide) fullGuide() else exit()
     }
     fun interact() {
         controller.noteUserInput()
-        inputTick++
+        shell.noteInput()
     }
     fun hideControls() {
         focus.root.requestFocus()
@@ -171,12 +159,12 @@ private fun LivePlayerContent(
     fun openPanel(next: LivePanel) {
         interact()
         panel = next
-        if (next != LivePanel.Number) wanted = focus.panel
+        if (next != LivePanel.Number) shell.wanted = focus.panel
     }
     fun closePanel() {
         val closed = panel
         panel = null
-        wanted = if (!controls) focus.root else when (closed) {
+        shell.wanted = if (!controls) focus.root else when (closed) {
             LivePanel.Channels -> focus.channels
             LivePanel.Quality -> focus.quality
             LivePanel.Number -> focus.number
@@ -189,7 +177,7 @@ private fun LivePlayerContent(
         panel = null
         controller.start(LiveTarget(channel))
         banner = true
-        wanted = if (controls) focus.playPause else focus.root
+        shell.wanted = if (controls) focus.playPause else focus.root
     }
     fun step(direction: Int) { nextLiveChannel(channels, controller.state.value.target?.channel?.id ?: current.id, direction)?.let(::watch) }
     fun back() {
@@ -197,14 +185,14 @@ private fun LivePlayerContent(
         interact()
         when (action) {
             LiveBackAction.ClosePanel -> closePanel()
-            LiveBackAction.KeepWatching -> { controller.answerStillWatching(true); controls = true; wanted = focus.playPause }
+            LiveBackAction.KeepWatching -> { controller.answerStillWatching(true); controls = true; shell.wanted = focus.playPause }
             LiveBackAction.HideControls -> hideControls()
             LiveBackAction.Leave -> leave()
         }
     }
     fun perform(action: LiveAction) {
         when (action) {
-            LiveAction.Controls -> { controls = true; wanted = focus.playPause }
+            LiveAction.Controls -> { controls = true; shell.wanted = focus.playPause }
             LiveAction.Channels -> openPanel(LivePanel.Channels)
             LiveAction.Quality -> openPanel(LivePanel.Quality)
             LiveAction.NextChannel -> step(1)
@@ -227,86 +215,74 @@ private fun LivePlayerContent(
     LaunchedEffect(state.status, state.askStillWatching) {
         if (terminal || state.askStillWatching) {
             panel = null
-            wanted = focus.prompt
+            shell.wanted = focus.prompt
         } else if (state.status == PlayerStatus.Paused) {
             controls = true
-            wanted = focus.playPause
+            shell.wanted = focus.playPause
         }
     }
-    LaunchedEffect(controls, state.status, state.askStillWatching, panel, inputTick) {
-        if (controls && state.status == PlayerStatus.Playing && !state.askStillWatching && panel == null) {
-            delay(5_000)
-            hideControls()
+    fun onKey(event: KeyEvent): Boolean {
+        val native = event.nativeKeyEvent
+        val code = native.keyCode
+        if (takeover != null && takeoverKeys.handle(code, event.type == KeyEventType.KeyDown, native.repeatCount)) return true
+        if (event.type == KeyEventType.KeyUp) return consumed.remove(code)
+        if (event.type != KeyEventType.KeyDown) return false
+        val prompt = controller.state.value.askStillWatching
+        shell.noteInput()
+        if (prompt && code != AndroidKey.KEYCODE_MEDIA_STOP) {
+            // Let the remote reach both prompt buttons. noteUserInput itself
+            // dismisses this prompt, so only an explicit answer calls it.
+            if (code in listOf(AndroidKey.KEYCODE_DPAD_LEFT, AndroidKey.KEYCODE_DPAD_RIGHT, AndroidKey.KEYCODE_DPAD_UP, AndroidKey.KEYCODE_DPAD_DOWN, AndroidKey.KEYCODE_DPAD_CENTER, AndroidKey.KEYCODE_ENTER, AndroidKey.KEYCODE_NUMPAD_ENTER, AndroidKey.KEYCODE_TAB)) return false
+            controller.answerStillWatching(true)
+            controls = true
+            shell.wanted = focus.playPause
+            consumed += code
+            return true
         }
-    }
-    LaunchedEffect(wanted, controls, panel, terminal, state.askStillWatching, treeHasFocus, rootFocused, leaving) {
-        if (leaving || panel == LivePanel.Number || channelProblem != null) return@LaunchedEffect
-        // A prompt can disappear before the controller's asynchronous retry begins.
-        // Resolve the requested focus against the surface that is actually composed.
-        val destination = if (wanted != null || !treeHasFocus || rootFocused) when {
-            terminal || state.askStillWatching -> focus.prompt
-            panel != null -> focus.panel
-            controls -> wanted?.takeIf { it in listOf(focus.playPause, focus.channels, focus.quality, focus.number) } ?: focus.playPause
-            else -> focus.root
-        } else null
-        if (destination != null) {
-            withFrameNanos { }
-            destination.requestFocus()
+        if (native.repeatCount == 0) controller.noteUserInput()
+        val char = liveNumberKey(code)
+        // A cast channel changes from the phone's list; the TV keeps only ▲ ▼ and the channel keys.
+        if (cast == null && char != null && char in '0'..'9' && panel != LivePanel.Number) {
+            numeric = editLiveNumber("", char)
+            openPanel(LivePanel.Number)
+            consumed += code
+            return true
         }
-        wanted = null
-    }
-    val view = LocalView.current
-    DisposableEffect(view, state.status) {
-        val previous = view.keepScreenOn
-        view.keepScreenOn = state.status in listOf(PlayerStatus.Loading, PlayerStatus.Buffering, PlayerStatus.Playing)
-        onDispose { view.keepScreenOn = previous }
+        if (panel == LivePanel.Channels && code == AndroidKey.KEYCODE_DPAD_RIGHT) {
+            closePanel()
+            consumed += code
+            return true
+        }
+        val action = liveKeyAction(code, panel, controls, terminal, prompt)
+            .let { if (cast != null && it in listOf(LiveAction.Channels, LiveAction.Quality)) LiveAction.Swallow else it }
+        if (action == LiveAction.Pass) return false
+        consumed += code
+        if (native.repeatCount == 0 || action !in listOf(LiveAction.NextChannel, LiveAction.PreviousChannel)) perform(action)
+        return true
     }
 
-    Box(
+    PlayerShell(
+        shell,
+        keepScreenOn = state.status in listOf(PlayerStatus.Loading, PlayerStatus.Buffering, PlayerStatus.Playing),
+        autoHide = controls && state.status == PlayerStatus.Playing && !state.askStillWatching && panel == null,
+        onHide = ::hideControls,
         // Back dismisses the takeover warning first, as the reminder banner's does.
-        modifier.fillMaxSize().background(Color.Black).onBack(enabled = !leaving) {
-            if (takeover != null) dismissedTakeover = takeover.takeoverKey() else back()
-        }.onPreviewKeyEvent { event ->
-            if (leaving) return@onPreviewKeyEvent false
-            val native = event.nativeKeyEvent
-            val code = native.keyCode
-            if (takeover != null && takeoverKeys.handle(code, event.type == KeyEventType.KeyDown, native.repeatCount)) return@onPreviewKeyEvent true
-            if (event.type == KeyEventType.KeyUp) return@onPreviewKeyEvent consumed.remove(code)
-            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-            val prompt = controller.state.value.askStillWatching
-            inputTick++
-            if (prompt && code != AndroidKey.KEYCODE_MEDIA_STOP) {
-                // Let the remote reach both prompt buttons. noteUserInput itself
-                // dismisses this prompt, so only an explicit answer calls it.
-                if (code in listOf(AndroidKey.KEYCODE_DPAD_LEFT, AndroidKey.KEYCODE_DPAD_RIGHT, AndroidKey.KEYCODE_DPAD_UP, AndroidKey.KEYCODE_DPAD_DOWN, AndroidKey.KEYCODE_DPAD_CENTER, AndroidKey.KEYCODE_ENTER, AndroidKey.KEYCODE_NUMPAD_ENTER, AndroidKey.KEYCODE_TAB)) return@onPreviewKeyEvent false
-                controller.answerStillWatching(true)
-                controls = true
-                wanted = focus.playPause
-                consumed += code
-                return@onPreviewKeyEvent true
-            }
-            if (native.repeatCount == 0) controller.noteUserInput()
-            val char = liveNumberKey(code)
-            // A cast channel changes from the phone's list; the TV keeps only ▲ ▼ and the channel keys.
-            if (cast == null && char != null && char in '0'..'9' && panel != LivePanel.Number) {
-                numeric = editLiveNumber("", char)
-                openPanel(LivePanel.Number)
-                consumed += code
-                return@onPreviewKeyEvent true
-            }
-            if (panel == LivePanel.Channels && code == AndroidKey.KEYCODE_DPAD_RIGHT) {
-                closePanel()
-                consumed += code
-                return@onPreviewKeyEvent true
-            }
-            val action = liveKeyAction(code, panel, controls, terminal, prompt)
-                .let { if (cast != null && it in listOf(LiveAction.Channels, LiveAction.Quality)) LiveAction.Swallow else it }
-            if (action == LiveAction.Pass) false else {
-                consumed += code
-                if (native.repeatCount == 0 || action !in listOf(LiveAction.NextChannel, LiveAction.PreviousChannel)) perform(action)
-                true
-            }
-        }.onFocusChanged { treeHasFocus = it.hasFocus; rootFocused = it.isFocused }.focusRequester(focus.root).focusable(),
+        onBack = { if (takeover != null) dismissedTakeover = takeover.takeoverKey() else back() },
+        onKey = ::onKey,
+        // A prompt can disappear before the controller's asynchronous retry begins.
+        // Resolve the requested focus against the surface that is actually composed.
+        focusTarget = { wanted ->
+            if (wanted != null || !shell.treeHasFocus || shell.rootFocused) when {
+                terminal || state.askStillWatching -> focus.prompt
+                panel != null -> focus.panel
+                controls -> wanted?.takeIf { it in listOf(focus.playPause, focus.channels, focus.quality, focus.number) } ?: focus.playPause
+                else -> focus.root
+            } else null
+        },
+        focusKeys = arrayOf<Any?>(controls, panel, terminal, state.askStillWatching),
+        // Go to channel and an unavailable channel's message are dialogs that hold focus themselves.
+        arbitrate = panel != LivePanel.Number && channelProblem == null,
+        modifier = modifier,
     ) {
         player?.let { LiveVideo(it) }
         if (player == null) LiveFakeBackdrop(current)
@@ -334,13 +310,13 @@ private fun LivePlayerContent(
                 interact()
                 controller.answerStillWatching(true)
                 controls = true
-                wanted = focus.playPause
+                shell.wanted = focus.playPause
             },
             onRetry = {
                 interact()
                 controller.retry()
                 controls = true
-                wanted = focus.playPause
+                shell.wanted = focus.playPause
             },
             onStop = { leave() },
         ) else if (terminal || state.askStillWatching) LivePlayerPrompt(
@@ -352,13 +328,13 @@ private fun LivePlayerContent(
                 interact()
                 if (state.takeoverRecording != null) state.takeoverRecording?.let(onPlayRecording) else if (state.reason == "recording") onRecordings() else if (answering) controller.answerStillWatching(true) else controller.retry()
                 controls = true
-                wanted = focus.playPause
+                shell.wanted = focus.playPause
             },
             onLeave = { leave(toGuide = true) }, focus = focus.prompt, leaveLabel = if (state.askStillWatching) "Stop" else "Back to channels",
         )
         takeover?.let { session -> TvRecordingTakeover(session, recorder, format, Modifier.align(Alignment.TopCenter).padding(top = 100.dp)) }
         if (panel == LivePanel.Number) ChannelNumberDialog(channels, numeric, ::watch, ::closePanel, onStop = { leave() }, onInteraction = ::interact)
-        channelProblem?.let { channel -> LiveMessageDialog("${channel.number} · ${channel.name}", liveTVError(channel.reason), onDismiss = { channelProblem = null; wanted = focus.panel }, onStop = { leave() }) }
+        channelProblem?.let { channel -> LiveMessageDialog("${channel.number} · ${channel.name}", liveTVError(channel.reason), onDismiss = { channelProblem = null; shell.wanted = focus.panel }, onStop = { leave() }) }
     }
 }
 

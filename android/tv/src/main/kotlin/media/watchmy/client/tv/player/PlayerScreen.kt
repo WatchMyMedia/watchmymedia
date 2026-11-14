@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +18,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -34,10 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -45,7 +41,6 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.ContentFrame
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import media.watchmy.client.model.ImageSize
@@ -59,7 +54,6 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.CaptionLook
 import media.watchmy.client.ui.components.SubtitleCues
-import media.watchmy.client.ui.onBack
 import media.watchmy.client.ui.playerKey
 
 /**
@@ -116,8 +110,7 @@ private class Viewing(val controller: PlaybackController) {
     }
 }
 
-private class PlayerFocus {
-    val root = FocusRequester()
+private class PlayerFocus(val root: FocusRequester) {
     val back = FocusRequester()
     val skip = FocusRequester()
     val scrubber = FocusRequester()
@@ -128,9 +121,6 @@ private class PlayerFocus {
     val picker = PickerSection.entries.associateWith { FocusRequester() }
 }
 
-/** Controls hide after this long without a key while playing. */
-private const val HIDE_AFTER_MS = 5_000L
-
 @Composable
 private fun PlayerContent(
     controller: PlaybackController,
@@ -138,7 +128,9 @@ private fun PlayerContent(
     onLeave: (reportStop: Boolean) -> Unit,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
-    val focus = remember { PlayerFocus() }
+    // Back, focus, hiding the controls and keeping the screen on: the frame Live TV's player shares.
+    val shell = rememberPlayerShellState()
+    val focus = remember { PlayerFocus(shell.root) }
     val seek = remember { SeekState() }
     // Read only by the scrubber and the clocks, through these lambdas, so its ticks recompose only them.
     val progress = controller.progress.collectAsStateWithLifecycle()
@@ -148,22 +140,11 @@ private fun PlayerContent(
     var picker by remember { mutableStateOf<PickerSection?>(null) }
     var pickerOpenedFromControls by remember { mutableStateOf(false) }
     var area by remember { mutableStateOf(FocusArea.Root) }
-    var treeHasFocus by remember { mutableStateOf(false) }
-    var rootFocused by remember { mutableStateOf(false) }
-    var inputTick by remember { mutableIntStateOf(0) }
-    // A focus move asked for by an action, honoured once its target is composed.
-    var wanted by remember { mutableStateOf<FocusRequester?>(null) }
     val consumedKeys = remember { mutableSetOf<Int>() }
     val onLeaveNow by rememberUpdatedState(onLeave)
-    // Set once the viewer leaves. The screen stays composed while it fades out, and the
-    // screen underneath takes focus meanwhile: the player must not take it back, or focus
-    // goes down with it and lands on the rail.
-    var leaving by remember { mutableStateOf(false) }
 
     fun leave(reportStop: Boolean) {
-        if (leaving) return
-        leaving = true
-        onLeaveNow(reportStop)
+        if (shell.leave()) onLeaveNow(reportStop)
     }
 
     val overlay = overlayOf(state, picker)
@@ -182,14 +163,14 @@ private fun PlayerContent(
         val start = section.takeIf { it in present } ?: present.firstOrNull() ?: return
         pickerOpenedFromControls = controlsVisible && area == FocusArea.Buttons
         picker = start
-        wanted = focus.picker.getValue(start)
+        shell.wanted = focus.picker.getValue(start)
     }
 
     fun closePicker() {
         val opened = picker ?: return
         picker = null
         controlsVisible = pickerOpenedFromControls
-        wanted = if (pickerOpenedFromControls) focus.openers.getValue(opened) else null
+        shell.wanted = if (pickerOpenedFromControls) focus.openers.getValue(opened) else null
     }
 
     fun seekStep(forward: Boolean, nowMs: Long, repeat: Boolean) {
@@ -207,7 +188,7 @@ private fun PlayerContent(
                 seekStep(action.forward, nowMs, repeat)
                 // Under the Next Episode card the controls show once a seek back takes the card away.
                 controlsVisible = true
-                if (current == Overlay.None && area != FocusArea.Scrubber) wanted = focus.scrubber
+                if (current == Overlay.None && area != FocusArea.Scrubber) shell.wanted = focus.scrubber
             }
             KeyAction.TogglePlayPause -> {
                 controller.togglePlayPause()
@@ -227,7 +208,7 @@ private fun PlayerContent(
 
     fun onBack() {
         controller.noteUserInput()
-        inputTick++
+        shell.noteInput()
         val current = overlayOf(controller.state.value, picker)
         when (backAction(current, controlsVisible)) {
             BackAction.Leave -> if (current == Overlay.Message) finishMessage() else leave(true)
@@ -239,9 +220,6 @@ private fun PlayerContent(
     }
 
     fun onKey(event: KeyEvent): Boolean {
-        // Keys pressed while the player fades out belong to the screen underneath: a quick
-        // second Back leaves it too.
-        if (leaving) return false
         val native = event.nativeKeyEvent
         val key = playerKey(native.keyCode)
         if (event.type == KeyEventType.KeyUp) {
@@ -252,7 +230,7 @@ private fun PlayerContent(
         if (event.type != KeyEventType.KeyDown) return false
         val repeat = native.repeatCount > 0
         if (!repeat) controller.noteUserInput()
-        inputTick++
+        shell.noteInput()
         val action = routeKey(key, overlayOf(controller.state.value, picker), controlsVisible, area)
         if (action == KeyAction.PassThrough) return false
         consumedKeys += native.keyCode
@@ -278,9 +256,9 @@ private fun PlayerContent(
         when (overlay) {
             Overlay.UpNext -> {
                 controlsVisible = false
-                wanted = focus.upNext
+                shell.wanted = focus.upNext
             }
-            Overlay.StillWatching, Overlay.Message -> wanted = focus.prompt
+            Overlay.StillWatching, Overlay.Message -> shell.wanted = focus.prompt
             Overlay.Picker, Overlay.None -> Unit
         }
     }
@@ -288,32 +266,7 @@ private fun PlayerContent(
     // The Skip button takes focus when it appears, as in PlayerControls.
     val skipSegment = state.skip?.segment
     LaunchedEffect(skipSegment) {
-        if (skipSegment != null && overlayOf(controller.state.value, picker) == Overlay.None) wanted = focus.skip
-    }
-
-    // Focus always rests somewhere that takes the remote: what an action asked
-    // for, else the open overlay, the Skip button, the scrubber, or the screen.
-    LaunchedEffect(wanted, treeHasFocus, rootFocused, controlsVisible, overlay, skipShown, leaving) {
-        if (leaving) return@LaunchedEffect
-        val target = wanted ?: when {
-            overlay != Overlay.None -> if (treeHasFocus && !rootFocused) null else overlayFocus(overlay, picker, focus)
-            !treeHasFocus -> when {
-                skipShown -> focus.skip
-                controlsVisible -> focus.scrubber
-                else -> focus.root
-            }
-            rootFocused && controlsVisible -> focus.scrubber
-            else -> null
-        }
-        target?.focusSoon()
-        wanted = null
-    }
-
-    LaunchedEffect(controlsVisible, inputTick, state.status, overlay, seek.holding) {
-        if (controlsVisible && overlay == Overlay.None && state.status == PlayerStatus.Playing && !seek.holding) {
-            delay(HIDE_AFTER_MS)
-            hideControls()
-        }
+        if (skipSegment != null && overlayOf(controller.state.value, picker) == Overlay.None) shell.wanted = focus.skip
     }
 
     // After a seek is sent, keep showing its target until the player gets there.
@@ -323,8 +276,6 @@ private fun PlayerContent(
             seek.settle()
         }
     }
-
-    KeepScreenOn(state.status == PlayerStatus.Playing || state.status == PlayerStatus.Buffering || state.status == PlayerStatus.Loading)
 
     // Kept across the state's updates (the countdowns, the Skip button's fill), so the buttons skip recomposing.
     val chromeFocus = remember(skipShown) {
@@ -346,20 +297,29 @@ private fun PlayerContent(
         )
     }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            // Back as the remote's key or as a back callback (Android 16 and later send TVs only the callback).
-            .onBack(enabled = !leaving) { onBack() }
-            .onPreviewKeyEvent { onKey(it) }
-            .onFocusChanged {
-                treeHasFocus = it.hasFocus
-                rootFocused = it.isFocused
-                if (it.isFocused || !it.hasFocus) area = FocusArea.Root
+    PlayerShell(
+        shell,
+        keepScreenOn = state.status == PlayerStatus.Playing || state.status == PlayerStatus.Buffering || state.status == PlayerStatus.Loading,
+        autoHide = controlsVisible && overlay == Overlay.None && state.status == PlayerStatus.Playing && !seek.holding,
+        onHide = ::hideControls,
+        onBack = ::onBack,
+        onKey = ::onKey,
+        // Focus always rests somewhere that takes the remote: what an action asked
+        // for, else the open overlay, the Skip button, the scrubber, or the screen.
+        focusTarget = { wanted ->
+            wanted ?: when {
+                overlay != Overlay.None -> if (shell.treeHasFocus && !shell.rootFocused) null else overlayFocus(overlay, picker, focus)
+                !shell.treeHasFocus -> when {
+                    skipShown -> focus.skip
+                    controlsVisible -> focus.scrubber
+                    else -> focus.root
+                }
+                shell.rootFocused && controlsVisible -> focus.scrubber
+                else -> null
             }
-            .focusRequester(focus.root)
-            .focusable(),
+        },
+        focusKeys = arrayOf<Any?>(controlsVisible, overlay, skipShown),
+        onFocusChanged = { if (it.isFocused || !it.hasFocus) area = FocusArea.Root },
     ) {
         VideoLayer(controller, state, imageUrl, raisedSubtitles = chromeVisible || overlay == Overlay.UpNext)
 
@@ -485,15 +445,5 @@ private fun VideoLayer(controller: PlaybackController, state: PlayerUiState, ima
     } else {
         Artwork(imageUrl(state.backdropPath, ImageSize.W1280), seed = state.title.ifEmpty { "player" }, contentDescription = null, modifier = Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
-    }
-}
-
-/** Keeps the TV from dimming or starting its screensaver while video plays. */
-@Composable
-private fun KeepScreenOn(on: Boolean) {
-    val view = LocalView.current
-    DisposableEffect(view, on) {
-        view.keepScreenOn = on
-        onDispose { view.keepScreenOn = false }
     }
 }
