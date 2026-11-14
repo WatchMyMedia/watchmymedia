@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import Hls, { PlaylistLevelType } from 'hls.js'
 import { RecordingNotReady, automaticSubtitle, downloadSubtitle, searchSubtitles, startPlayback, stopPlayback, type Decision, type OnlineSubtitle, type SubtitleTrack } from '../api/playback'
-import { AutomaticSubtitles } from '../lib/automaticSubtitles'
+import { AutomaticSubtitles, asksForAutomaticSubtitle } from '../lib/automaticSubtitles'
 import { authScope } from '../lib/authScope'
 import type { SubtitleSelection } from '../lib/subtitleIntent'
 import { formatDuration, languageName, seCode } from '../lib/format'
@@ -363,7 +363,7 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
   // Provider work follows the first playing frame and never delays deciding a stream.
   useEffect(() => {
     const playId = decision?.playId
-    if (recordingId || !started || !playId || !prefs?.subtitles?.automaticDownload || prefs.subtitles.mode !== 'on' || subtitleId || (apiLevel ?? 0) < 18) return
+    if (recordingId || !started || !playId || !asksForAutomaticSubtitle(prefs?.subtitles) || subtitleId || (apiLevel ?? 0) < 18) return
     void subtitleWork.begin(playId).then((result) => {
       if (!result) return
       if (result.error) setSubNote(result.error)
@@ -374,7 +374,7 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
       void latestLoad.current(posRef.current, { subtitleId: track.id, resume: false })
       void qc.invalidateQueries({ queryKey: ['subtitleSearch', fileId] })
     }).catch(() => setSubNote('Couldn’t get an automatic subtitle. Video will keep playing; choose a subtitle in the player or try again later.'))
-  }, [recordingId, started, decision?.playId, prefs?.subtitles?.automaticDownload, prefs?.subtitles?.mode, subtitleId, apiLevel, subtitleWork, qc, fileId])
+  }, [recordingId, started, decision?.playId, prefs?.subtitles, subtitleId, apiLevel, subtitleWork, qc, fileId])
 
   // Initial load: an explicit start, else the server's saved position (handled in load), else the beginning.
   useEffect(() => {
