@@ -37,17 +37,6 @@
     <issue
         id="ComposeModifierMissing"
         message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
-        errorLine1="fun BoxScope.QualityBadges(quality: String?, hdr: Boolean, inset: Dp = 8.dp) {"
-        errorLine2="             ~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/media/watchmy/client/tv/components/Cards.kt"
-            line="227"
-            column="14"/>
-    </issue>
-
-    <issue
-        id="ComposeModifierMissing"
-        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
         errorLine1="fun BoxScope.PlayMark() {"
         errorLine2="             ~~~~~~~~">
         <location
@@ -174,17 +163,6 @@
         <location
             file="src/main/kotlin/media/watchmy/client/tv/requests/RequestsScreen.kt"
             line="87"
-            column="5"/>
-    </issue>
-
-    <issue
-        id="ComposeModifierMissing"
-        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
-        errorLine1="fun ScreenStub(name: String, mockup: String) {"
-        errorLine2="    ~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/media/watchmy/client/tv/components/ScreenStub.kt"
-            line="15"
             column="5"/>
     </issue>
 
