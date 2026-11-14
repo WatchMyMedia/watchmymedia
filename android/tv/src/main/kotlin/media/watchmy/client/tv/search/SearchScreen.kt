@@ -84,6 +84,7 @@ import media.watchmy.client.tv.components.LocalLiveTVAvailable
 import media.watchmy.client.tv.live.TvLiveSearchRow
 import media.watchmy.client.presentation.search.SearchViewModel
 import media.watchmy.client.presentation.search.isEmpty
+import androidx.compose.runtime.withFrameNanos
 
 /** Where the results start: right of the keyboard (154 + 712 + 60). */
 private val ResultsStart = 926.dp
@@ -145,7 +146,19 @@ fun SearchScreen(
         }
         Notice(state.message, vm::messageShown)
     }
-    InitialFocus(firstKey)
+    // Back from a result puts focus back on it (§3.2.3); a first visit starts on the keyboard.
+    val returning = remember { memory.key != null }
+    if (returning) {
+        LaunchedEffect(Unit) {
+            repeat(10) {
+                withFrameNanos { }
+                if (memory.restore(fallback = null)) return@LaunchedEffect
+            }
+            runCatching { firstKey.requestFocus() }
+        }
+    } else {
+        InitialFocus(firstKey)
+    }
 
     asking?.let { item ->
         RequestDialog(
