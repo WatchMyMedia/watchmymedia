@@ -50,7 +50,8 @@ type MovieList struct {
 
 type MovieDetail struct {
 	Movie
-	// Files are the versions on disk, each with its full probe for track lists.
+	// Files are the versions on disk, each with its full probe for track
+	// lists; files that went missing are left out.
 	Files     []MediaFileDetail `json:"files" nullable:"false"`
 	Quality   string            `json:"quality,omitempty" enum:",4K,1080p,720p,SD"`
 	HDR       bool              `json:"hdr"`
@@ -240,6 +241,12 @@ func registerBrowse(h huma.API, deps Deps) {
 		out := &GetMovieOutput{Body: MovieDetail{Movie: movieFromDB(row), Files: make([]MediaFileDetail, 0, len(files))}}
 		var maxHeight int64
 		for _, f := range files {
+			// Only present files, as on the season page: one that went
+			// missing (deleted on disk or in Radarr) is not a version to
+			// pick. The apps list every file here as a version.
+			if f.Status != "present" {
+				continue
+			}
 			d := MediaFileDetail{MediaFile: mediaFileFromDB(f, lib.Path)}
 			if f.Probe != nil {
 				if info, err := probe.Parse(*f.Probe); err == nil {
@@ -247,9 +254,6 @@ func registerBrowse(h huma.API, deps Deps) {
 				}
 			}
 			out.Body.Files = append(out.Body.Files, d)
-			if f.Status != "present" {
-				continue
-			}
 			out.Body.TotalSize += f.Size
 			maxHeight = max(maxHeight, deref(f.Height))
 			if f.Hdr != "" {
@@ -259,7 +263,7 @@ func registerBrowse(h huma.API, deps Deps) {
 				out.Body.AddedAt = &t
 			}
 		}
-		out.Body.FileCount = int64(len(files))
+		out.Body.FileCount = int64(len(out.Body.Files))
 		out.Body.Quality = qualityLabel(maxHeight)
 		if out.Body.Trailers, err = fileTrailers(ctx, deps, row.ID); err != nil {
 			return nil, err
