@@ -77,6 +77,10 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.WmmIcons
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
+import media.watchmy.client.presentation.requests.RequestFormViewModel
 
 /** A missing episode's colour, as ShowMissing.dc.html gives each state. */
 internal fun MissingEpisode.Kind.tone(): Color = when (this) {
@@ -219,25 +223,15 @@ internal fun NoteLine(text: String, icon: ImageVector = WmmIcons.Info) {
 @Composable
 internal fun RequestSheet(subject: Requestable, options: RequestOptions, onSent: (String) -> Unit, onDismiss: () -> Unit, only: Int? = null) {
     val services = LocalAppServices.current
-    val scope = rememberCoroutineScope()
-    var item by remember(subject.tmdbId) { mutableStateOf(subject) }
-    var lookupError by remember(subject.tmdbId) { mutableStateOf<String?>(null) }
-    var picked by rememberSaveable(subject.tmdbId, only) { mutableStateOf<Set<Int>?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val isShow = subject.mediaType == MediaType.Tv
-    LaunchedEffect(subject.tmdbId) {
-        if (!isShow && subject.overview.isNotBlank()) return@LaunchedEffect
-        attempt { services.requests.lookup(subject.mediaType, subject.tmdbId) }
-            .onSuccess { found ->
-                item = found
-                if (picked == null) picked = initialSeasonPicks(found.seasons.map { it.choice() }, only)
-            }
-            .onFailure { e -> lookupError = errorMessage(e) }
-    }
-    val choices = item.seasons.map { it.choice() }
-    val chosen = picked.orEmpty().filter { n -> choices.any { it.number == n && !it.locked } }
-    val count = if (isShow) chosen.size else 1
+    val form = viewModel(rememberViewModelStoreOwner()) { RequestFormViewModel(services.requests, subject, only) }
+    val state by form.state.collectAsStateWithLifecycle()
+    val item = state.item
+    val isShow = state.isShow
+    val lookupError = state.lookupError
+    val error = state.error
+    val choices = state.choices
+    val chosen = state.chosen
+    LaunchedEffect(state.sent) { if (state.sent) onSent(options.requestedMessage) }
 
     RequestBottomSheet(onDismiss) {
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -255,8 +249,7 @@ internal fun RequestSheet(subject: Requestable, options: RequestOptions, onSent:
                     style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, lineHeight = 25.sp, color = WmmColors.Text),
                     modifier = Modifier.semantics { heading() },
                 )
-                val seasons = item.seasons.count { it.number > 0 }
-                val meta = listOfNotNull(item.year?.toString(), if (isShow && seasons > 0) "$seasons season${if (seasons == 1) "" else "s"}" else null).joinToString(" · ")
+                val meta = state.meta
                 if (meta.isNotEmpty()) Text(meta, style = TextStyle(fontFamily = Inter, fontSize = 12.sp, color = WmmColors.TextMuted))
                 if (item.overview.isNotBlank()) {
                     Text(
@@ -278,16 +271,13 @@ internal fun RequestSheet(subject: Requestable, options: RequestOptions, onSent:
                     modifier = Modifier.padding(start = 8.dp, bottom = 6.dp),
                 )
                 when {
-                    lookupError != null -> Text(lookupError!!, style = TextStyle(fontFamily = Inter, fontSize = 14.sp, color = WmmColors.TextMuted), modifier = Modifier.padding(8.dp))
+                    lookupError != null -> Text(lookupError, style = TextStyle(fontFamily = Inter, fontSize = 14.sp, color = WmmColors.TextMuted), modifier = Modifier.padding(8.dp))
                     choices.isEmpty() -> Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(Modifier.size(24.dp), color = WmmColors.Accent, strokeWidth = 2.dp)
                     }
                     else -> choices.forEach { c ->
                         val checked = c.locked || c.number in chosen
-                        SeasonOption(c.name, c.detail, c.state, checked, c.locked) {
-                            val now = picked.orEmpty()
-                            picked = if (c.number in now) now - c.number else now + c.number
-                        }
+                        SeasonOption(c.name, c.detail, c.state, checked, c.locked) { form.toggle(c.number) }
                     }
                 }
             }
@@ -295,21 +285,12 @@ internal fun RequestSheet(subject: Requestable, options: RequestOptions, onSent:
         options.approvalNote?.let { NoteLine(it) }
         error?.let { Text(it, style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = WmmColors.Error), modifier = Modifier.padding(horizontal = 8.dp)) }
         FilledButton(
-            requestButtonLabel(subject.mediaType, count),
-            onClick = {
-                busy = true
-                error = null
-                scope.launch {
-                    attempt { services.requests.request(subject.mediaType, subject.tmdbId, if (isShow) chosen.sorted() else emptyList()) }
-                        .onSuccess { onSent(options.requestedMessage) }
-                        .onFailure { e -> error = errorMessage(e) }
-                    busy = false
-                }
-            },
+            state.buttonLabel,
+            onClick = form::send,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             large = true,
-            enabled = count > 0 && (!isShow || choices.isNotEmpty()),
-            busy = busy,
+            enabled = state.count > 0 && (!isShow || choices.isNotEmpty()),
+            busy = state.busy,
         )
     }
 }

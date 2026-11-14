@@ -50,6 +50,23 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   ViewModel in `core:presentation`, tested there against the fakes; the TV
   and phone screens only draw it. Where the two UIs used to differ, the
   Apple apps' `WMMFeatures` models decide.
+- **Server changes.** A page's ViewModel reloads for `libraryChanges`
+  (core:model's `LibraryChange`, with the items and libraries an event
+  names) through `Freshness` in core:presentation, which ignores changes
+  that aren't the page's and holds them while the page is hidden. Its
+  screen calls `ReportShown(vm::setShown)` (core:ui) once, so a page under
+  another one, or with the app in the background, reloads when next shown
+  rather than with every event. Tests drive `libraryChanges`, not `changes`.
+- **Text fields.** A field holds its own text in a `TextFieldState`
+  (`rememberModelTextField` in core:ui) and tells the ViewModel what is
+  typed; a ViewModel that sets the text itself (cleared, a recent search,
+  the form started over) moves its state's `revision` on. Driving a field
+  through a StateFlow lost characters to fast typing and paste. The TV's
+  `OnScreenKeyboard(field = …)` edits the same state and offers "Use the
+  TV's keyboard".
+- **Live TV polling.** The channel list is polled only while a screen that
+  shows channels is on screen: such a screen or row calls
+  `ShowsLiveChannels()` (core:ui) once. Nothing else polls it.
 - **Stored settings in tests.** `LocalStore` writes behind: a change is in
   memory at once and on disk a moment later. In `core:data` tests, write
   storage with `Harness.editStorage`, not `dataStore.edit`, and reopen with

@@ -130,6 +130,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.ui.ReportShown
+import media.watchmy.client.ui.ShowsLiveChannels
 
 /**
  * Home. Arranged (servers that send `rows`): screens, one row each, paged
@@ -154,6 +156,7 @@ fun HomeScreen(
 ) {
     val services = LocalAppServices.current
     val vm = viewModel { HomeViewModel(services.library, services.auth, services.rows) }
+    ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val user by vm.user.collectAsStateWithLifecycle()
     val server by services.servers.current.collectAsStateWithLifecycle()
@@ -414,6 +417,7 @@ private fun LiveRow(
     counter: String? = null,
     onFocusItem: OnFocusItem? = null,
 ) {
+    ShowsLiveChannels()
     val available = liveChannels.filter { it.available }
     if (liveListings) {
         val now = rememberLiveNow()

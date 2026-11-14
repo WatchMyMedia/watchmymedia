@@ -1,4 +1,4 @@
-package media.watchmy.client.mobile.search
+package media.watchmy.client.presentation.search
 
 import kotlinx.coroutines.CompletableDeferred
 import androidx.lifecycle.SavedStateHandle
@@ -13,8 +13,8 @@ import media.watchmy.client.fake.FakeArr
 import media.watchmy.client.fake.FakeAuthRepository
 import media.watchmy.client.fake.FakeLibraryRepository
 import media.watchmy.client.fake.FakeRequestRepository
-import media.watchmy.client.mobile.MainDispatcherRule
-import media.watchmy.client.mobile.TestLibrary
+import media.watchmy.client.presentation.MainDispatcherRule
+import media.watchmy.client.presentation.TestLibrary
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.RequestOptions
 import media.watchmy.client.model.RequestRepository
@@ -200,5 +200,18 @@ class SearchViewModelTest {
         assertEquals("Harbor Lights", restored.state.value.results?.shows?.single()?.title)
         restored.clear()
         assertEquals("", saved.get<String>("query"))
+    }
+
+    @Test fun `clearing or choosing a recent search moves the revision on, and typing doesn't`() = runTest {
+        vm.setQuery("harbor")
+        val typed = vm.state.value.revision
+        advanceUntilIdle()
+        vm.clear()
+        assertEquals("", vm.state.value.query)
+        assertTrue(vm.state.value.revision > typed)
+        val cleared = vm.state.value.revision
+        vm.selectRecentQuery("harbor")
+        assertEquals("harbor", vm.state.value.query)
+        assertTrue(vm.state.value.revision > cleared)
     }
 }

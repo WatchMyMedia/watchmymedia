@@ -201,6 +201,33 @@ class SettingsViewModel(
 
     fun moveAudioLanguage(tag: String, offset: Int) = changeAudio { moved(it, tag, offset) }
 
+    /** The languages of [list], in order. */
+    fun languages(list: LanguageList): List<String> = state.value.playback.let { if (list == LanguageList.Audio) it.audio.languages else it.subtitles.languages }
+
+    fun addLanguage(list: LanguageList, tag: String) = if (list == LanguageList.Audio) addAudioLanguage(tag) else addSubtitleLanguage(tag)
+
+    fun removeLanguage(list: LanguageList, tag: String) = if (list == LanguageList.Audio) removeAudioLanguage(tag) else removeSubtitleLanguage(tag)
+
+    /** Moves [tag] [offset] places up (negative) or down [list]. */
+    fun moveLanguage(list: LanguageList, tag: String, offset: Int) = if (list == LanguageList.Audio) moveAudioLanguage(tag, offset) else moveSubtitleLanguage(tag, offset)
+
+    /** What can be done to [tag] in [list]: move up, move down (when it can), remove. */
+    fun languageActions(list: LanguageList, tag: String): List<LanguageAction> {
+        val languages = languages(list)
+        val index = languages.indexOf(tag)
+        return listOfNotNull(
+            LanguageAction.MoveUp.takeIf { index > 0 },
+            LanguageAction.MoveDown.takeIf { index >= 0 && index < languages.lastIndex },
+            LanguageAction.Remove,
+        )
+    }
+
+    fun act(list: LanguageList, tag: String, action: LanguageAction) = when (action) {
+        LanguageAction.MoveUp -> moveLanguage(list, tag, -1)
+        LanguageAction.MoveDown -> moveLanguage(list, tag, 1)
+        LanguageAction.Remove -> removeLanguage(list, tag)
+    }
+
     private fun changeSubtitles(change: (SubtitlePreferences) -> SubtitlePreferences) {
         if (!state.value.subtitlePreferencesAvailable) return
         saveLanguages("Couldn't save subtitle settings. Your previous settings are still in use.") {
@@ -290,3 +317,9 @@ class SettingsViewModel(
         }
     }
 }
+
+/** The two ordered language lists in Audio & subtitles, with their titles. */
+enum class LanguageList(val title: String) { Audio("Audio languages"), Subtitles("Subtitle languages") }
+
+/** What a language's options offer, in the order they are listed. */
+enum class LanguageAction(val label: String) { MoveUp("Move up"), MoveDown("Move down"), Remove("Remove language") }

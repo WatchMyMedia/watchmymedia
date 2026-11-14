@@ -114,6 +114,7 @@ import media.watchmy.client.ui.components.Badge
 import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.ProgressStrip
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.ui.ReportShown
 
 /**
  * Home (Home.dc.html, HomeScrolled.dc.html): the hero, then Continue
@@ -139,6 +140,7 @@ fun HomeScreen(
     val layout = rememberTabletLayout()
     val services = LocalAppServices.current
     val vm = viewModel { HomeViewModel(services.library, services.auth, services.rows) }
+    ReportShown(vm::setShown)
     val notMatched = rememberNotMatchedNotice()
     val state by vm.state.collectAsStateWithLifecycle()
     val user by vm.user.collectAsStateWithLifecycle()

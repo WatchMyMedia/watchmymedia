@@ -1,24 +1,34 @@
-package media.watchmy.client.mobile.servers
+package media.watchmy.client.presentation.servers
 
 import app.cash.turbine.test
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import media.watchmy.client.fake.FakeServerRepository
-import media.watchmy.client.mobile.MainDispatcherRule
-import media.watchmy.client.mobile.keepCollecting
+import media.watchmy.client.presentation.MainDispatcherRule
+import media.watchmy.client.presentation.keepCollecting
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.SavedServer
 import media.watchmy.client.model.Server
 import media.watchmy.client.model.ServerRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
+import media.watchmy.client.model.DiscoveredServer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
 class ServerPickerViewModelTest {
-    @get:Rule val main = MainDispatcherRule()
+    @get:Rule val main = MainDispatcherRule(UnconfinedTestDispatcher())
 
     /** The fake, plus an old server and an unreachable one. */
     private class TestServers(val fake: FakeServerRepository = FakeServerRepository(signedIn = true)) : ServerRepository by fake {
@@ -98,7 +108,7 @@ class ServerPickerViewModelTest {
     @Test fun `an empty address asks for one`() = runTest {
         keepCollecting(vm.state)
         vm.connectToAddress()
-        assertEquals("Enter the server's address.", vm.state.value.addressError)
+        assertEquals("Enter the server's address, such as 192.168.1.20 or nas.local.", vm.state.value.addressError)
         vm.setAddress("n")
         assertNull(vm.state.value.addressError)
     }
@@ -107,5 +117,48 @@ class ServerPickerViewModelTest {
         keepCollecting(vm.state)
         vm.forget(vm.state.value.remembered.single())
         assertTrue(vm.state.value.remembered.isEmpty())
+    }
+
+    @Test fun `each choice is told once, and a later look at the picker is not told again`() = runTest {
+        val vm = ServerPickerViewModel(FakeServerRepository(signedIn = true))
+        keepCollecting(vm.state)
+        advanceUntilIdle()
+        vm.chosen.test {
+            vm.choose(vm.state.value.discovered!![1])
+            awaitItem()
+            vm.choose(vm.state.value.discovered!![0])
+            awaitItem()
+            expectNoEvents()
+        }
+        vm.chosen.test { expectNoEvents() }
+    }
+
+    @Test fun `looking for servers stops soon after the picker goes`() = runTest {
+        val looking = MutableStateFlow(0)
+        val repo = object : ServerRepository by FakeServerRepository() {
+            override val discovered: Flow<List<DiscoveredServer>> = MutableStateFlow(emptyList<DiscoveredServer>())
+                .onStart { looking.value++ }
+                .onCompletion { looking.value-- }
+        }
+        val vm = ServerPickerViewModel(repo)
+        assertEquals(0, looking.value)
+        val shown = backgroundScope.launch { vm.state.collect {} }
+        runCurrent()
+        assertEquals(1, looking.value)
+        shown.cancel()
+        advanceTimeBy(5_001)
+        assertEquals(0, looking.value)
+    }
+
+    @Test fun `addresses on this network are the ones local network access covers`() {
+        assertTrue(isLocalAddress("192.168.1.20:8080"))
+        assertTrue(isLocalAddress("http://nas.local:27587"))
+        assertTrue(isLocalAddress("[fd7a:115c:a1e0::1]:27587"))
+        assertFalse(isLocalAddress("https://media.example.net"))
+        assertFalse(isLocalAddress("203.0.113.5"))
+        assertEquals(
+            "Couldn't reach 192.168.1.20:8080. Local network access is off for WatchMyMedia, so this TV can't reach addresses on your network.",
+            localNetworkOffMessage(" 192.168.1.20:8080 ", "TV"),
+        )
     }
 }

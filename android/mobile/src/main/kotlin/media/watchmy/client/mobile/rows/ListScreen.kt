@@ -80,6 +80,7 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.open
 import media.watchmy.client.ui.rememberNotMatchedNotice
 import media.watchmy.client.ui.rememberTabletLayout
+import media.watchmy.client.ui.ReportShown
 
 /**
  * A list's page (ListPage.dc.html), from its row's See all: the list's name,
@@ -101,6 +102,7 @@ fun ListScreen(
     val services = LocalAppServices.current
     val layout = rememberTabletLayout()
     val vm = viewModel(key = "list-$listId") { MediaListViewModel(services.rows, services.requests, services.library, listId) }
+    ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val notMatched = rememberNotMatchedNotice()
     val uri = androidx.compose.ui.platform.LocalUriHandler.current

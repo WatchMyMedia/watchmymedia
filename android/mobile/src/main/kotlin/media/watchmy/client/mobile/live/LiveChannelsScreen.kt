@@ -91,6 +91,7 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.components.rememberLiveClockFormat
 import media.watchmy.client.ui.components.rememberLiveNow
 import media.watchmy.client.ui.rememberTabletLayout
+import media.watchmy.client.ui.ShowsLiveChannels
 
 /** The tablet's panel beside the guide from 1000 dp: the programme, Search listings or Reminders (TabLiveExtras). */
 internal enum class ExtrasPanel { Programme, Search, Reminders, Recordings }
@@ -124,6 +125,7 @@ fun LiveChannelsScreen(
     castDevice: String? = null,
     notLiveDevice: String? = null,
 ) {
+    ShowsLiveChannels()
     val layout = rememberTabletLayout()
     var unavailable by remember { mutableStateOf<LiveChannel?>(null) }
     var panel by rememberSaveable { mutableStateOf(ExtrasPanel.Programme) }
@@ -246,6 +248,7 @@ fun LiveHomeRow(
     lead: Int = -1,
     counter: String? = null,
 ) {
+    ShowsLiveChannels()
     if (listings) {
         LiveOnNowRow(channels, onWatch, onSeeAll, modifier, state, flingBehavior, lead, counter)
         return

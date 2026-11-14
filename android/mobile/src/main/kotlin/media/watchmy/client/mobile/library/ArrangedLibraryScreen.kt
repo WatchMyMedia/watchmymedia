@@ -46,6 +46,7 @@ import media.watchmy.client.mobile.components.EmptyState
 import media.watchmy.client.mobile.components.ErrorState
 import media.watchmy.client.mobile.components.InlineError
 import media.watchmy.client.mobile.components.MainTopBar
+import media.watchmy.client.mobile.components.LoadContent
 import media.watchmy.client.mobile.components.MessageHost
 import media.watchmy.client.mobile.components.PosterCard
 import media.watchmy.client.mobile.navigation.MobileRoutes
@@ -62,6 +63,8 @@ import media.watchmy.client.model.RowLink
 import media.watchmy.client.model.RowStyle
 import media.watchmy.client.model.drawn
 import media.watchmy.client.model.formatCount
+import media.watchmy.client.presentation.library.LibraryViewModel
+import media.watchmy.client.presentation.library.gridSubtitle
 import media.watchmy.client.presentation.rows.LibraryRowsViewModel
 import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.Inter
@@ -80,6 +83,7 @@ internal fun ArrangedLibraryScreen(
     type: LibraryType,
     state: LibraryViewModel.State,
     vm: LibraryViewModel,
+    grid: androidx.compose.foundation.lazy.grid.LazyGridState,
     rows: LibraryRowsViewModel.State,
     rowsVm: LibraryRowsViewModel,
     userName: String?,
@@ -92,24 +96,13 @@ internal fun ArrangedLibraryScreen(
     chips: @Composable () -> Unit,
 ) {
     val library = LocalAppServices.current.library
-    val grid = rememberLazyGridState()
     val title = if (type == LibraryType.Tv) "TV Shows" else "Movies"
     val noun = if (type == LibraryType.Tv) "show" else "movie"
     val drawn = rows.rows.drawn(live = false)
     // A new sort or filter from deep in the grid goes back up to its heading; with the heading or
     // the rows in view nothing moves, and coming back from a show keeps the place.
-    val queryKey = "${state.sort} ${state.filter} ${state.genre} ${state.decade} ${state.text} ${state.offset}"
-    var shownKey by rememberSaveable { mutableStateOf(queryKey) }
-    LaunchedEffect(queryKey) {
-        if (queryKey != shownKey) {
-            shownKey = queryKey
-            val heading = drawn.size + 1
-            if (grid.firstVisibleItemIndex > heading) grid.scrollToItem(heading)
-        }
-    }
+    grid.FollowLibrary(state, top = drawn.size + 1, first = drawn.size + 2, loadMore = vm::loadMore)
     ShowRowsWhenTheyArrive(grid, drawn.size)
-    val nearEnd by remember { derivedStateOf { (grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) >= grid.layoutInfo.totalItemsCount - 12 } }
-    LaunchedEffect(grid, state.items.size) { snapshotFlow { nearEnd }.collect { if (it) vm.loadMore() } }
     val actions = libraryRowActions(onPlay, onOpenShow, onOpenMovie, onNavigate, onNotMatched, rowsVm)
 
     Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
@@ -142,7 +135,7 @@ internal fun ArrangedLibraryScreen(
                             chips()
                         }
                     }
-                    gridItems(state, vm, library, noun, onOpenShow, onOpenMovie, onPlay, onNotMatched)
+                    gridItems(type, state, vm, library, onOpenShow, onOpenMovie, onPlay, onNotMatched)
                 }
             }
             MessageHost(state.message ?: rows.message, { vm.messageShown(); rowsVm.messageShown() }, Modifier.align(Alignment.BottomCenter))
@@ -187,34 +180,29 @@ internal fun LazyGridScope.libraryRows(rows: List<media.watchmy.client.model.Scr
 
 /** The grid's posters, or why there are none, under its heading and chips. */
 private fun LazyGridScope.gridItems(
+    type: LibraryType,
     state: LibraryViewModel.State,
     vm: LibraryViewModel,
     library: LibraryRepository,
-    noun: String,
     onOpenShow: (Long) -> Unit,
     onOpenMovie: (Long) -> Unit,
     onPlay: (PlayRequest) -> Unit,
     onNotMatched: () -> Unit,
 ) {
     val full: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
+    val status = state.loadStatus(type, vm)
     when {
-        state.items.isEmpty() && state.loading -> item(key = "loading", span = full) {
-            Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(28.dp), color = WmmColors.Accent, strokeWidth = 2.dp) }
-        }
-        state.items.isEmpty() && state.error != null -> item(key = "error", span = full) { ErrorState(state.error, vm::retry, Modifier.height(240.dp)) }
-        state.noLibrary -> item(key = "none", span = full) { EmptyState("No $noun library", "Add one in the web app.", Modifier.height(240.dp)) }
-        state.items.isEmpty() && state.filtered -> item(key = "nothing", span = full) {
-            EmptyState("Nothing matches", "No ${noun}s match these filters.", Modifier.height(240.dp), action = "Clear filters", onAction = vm::clearFilters)
-        }
-        state.items.isEmpty() -> item(key = "empty", span = full) {
-            EmptyState("No ${noun}s yet", "When the server has scanned the library, its ${noun}s appear here.", Modifier.height(240.dp), action = "Check again", onAction = vm::retry)
+        status != null -> item(key = "status", span = full) {
+            LoadContent(status, vm::retry, Modifier.height(240.dp), loading = {
+                Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(28.dp), color = WmmColors.Accent, strokeWidth = 2.dp) }
+            }) {}
         }
         else -> {
             items(state.items, key = { it.id }, contentType = { "poster" }) { item ->
                 PosterCard(
                     item = item,
                     imageUrl = library.imageUrl(item.posterPath, ImageSize.W342),
-                    subtitle = gridSubtitle(item),
+                    subtitle = item.gridSubtitle(),
                     onClick = { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched) },
                     onSetWatched = { vm.setWatched(item, it) },
                     titleSize = 13.sp,

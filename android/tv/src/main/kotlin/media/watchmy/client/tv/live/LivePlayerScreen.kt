@@ -65,6 +65,7 @@ import media.watchmy.client.tv.components.rememberFocusMemory
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.components.rememberLiveClockFormat
 import media.watchmy.client.ui.components.rememberLiveNow
+import media.watchmy.client.ui.ShowsLiveChannels
 
 /**
  * A dedicated TV live surface: no file timeline, progress or next episode.
@@ -86,6 +87,8 @@ fun LivePlayerScreen(
     onRecordings: () -> Unit = onChannels,
     onPlayRecording: (media.watchmy.client.model.PlayRequest) -> Unit = {},
 ) {
+    // Now and next on the player (banner, On now, picture in picture) follow the polled channel list.
+    ShowsLiveChannels()
     val services = LocalAppServices.current
     val viewing = remember(services, controller) { controller ?: services.livePlayback.create() }
     LaunchedEffect(viewing, target) { viewing.start(target) }

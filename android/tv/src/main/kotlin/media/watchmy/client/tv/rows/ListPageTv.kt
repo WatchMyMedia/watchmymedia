@@ -88,6 +88,7 @@ import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.open
 import media.watchmy.client.ui.rememberNotMatchedNotice
+import media.watchmy.client.ui.ReportShown
 
 /**
  * A list's page on the TV (android-tv/ListPage.dc.html), from its row's See
@@ -109,6 +110,7 @@ fun ListPageTv(
 ) {
     val services = LocalAppServices.current
     val vm = viewModel(key = "tv-list-$listId") { MediaListViewModel(services.rows, services.requests, services.library, listId) }
+    ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val notMatched = rememberNotMatchedNotice()
     val memory = rememberFocusMemory()

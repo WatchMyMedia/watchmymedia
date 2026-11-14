@@ -1,16 +1,17 @@
-package media.watchmy.client.mobile.signin
+package media.watchmy.client.presentation.signin
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import media.watchmy.client.fake.FakeServerRepository
 import media.watchmy.client.fake.OfficeMini
 import media.watchmy.client.fake.RemoteHome
-import media.watchmy.client.mobile.MainDispatcherRule
-import media.watchmy.client.mobile.TestAuth
+import media.watchmy.client.presentation.MainDispatcherRule
+import media.watchmy.client.presentation.TestAuth
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.DiscoveredServer
 import media.watchmy.client.model.PairingState
@@ -25,7 +26,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class SignInViewModelTest {
-    @get:Rule val main = MainDispatcherRule()
+    @get:Rule val main = MainDispatcherRule(UnconfinedTestDispatcher())
 
     private val auth = TestAuth()
     private val vm by lazy { SignInViewModel(auth, FakeServerRepository(signedIn = false)) }
@@ -85,7 +86,7 @@ class SignInViewModelTest {
         vm.signIn()
         assertEquals("sam", auth.user.value?.name)
         auth.signOut()
-        assertEquals(SignInViewModel.State(), vm.state.value)
+        assertEquals(SignInViewModel.State(), vm.state.value.copy(revision = 0))
     }
 
     @Test fun `a server that turned the browser check on since turns to a code`() = runTest {
@@ -171,6 +172,18 @@ class SignInViewModelTest {
         assertFalse(vm.state.value.checking)
         assertFalse("the saved server knows too", servers.current.value!!.server.setupRequired)
     }
+
+    @Test fun `starting the form over moves the revision on, so the screen's fields take the new text`() = runTest {
+        val servers = FakeServerRepository(signedIn = false)
+        val vm = SignInViewModel(auth, servers)
+        val first = vm.state.value.revision
+        vm.setName("sam")
+        vm.setPassword("password")
+        assertEquals("typing doesn't", first, vm.state.value.revision)
+        vm.signIn()
+        assertEquals("", vm.state.value.password)
+        assertTrue("a sign-in clears the password", vm.state.value.revision > first)
+    }
 }
 
 /** One server with no accounts until [setUp]. */
@@ -185,4 +198,5 @@ private class NewServer : ServerRepository {
         current.value = SavedServer(server, null, false, 0)
     }
     override suspend fun forget(serverId: String) = Unit
+
 }

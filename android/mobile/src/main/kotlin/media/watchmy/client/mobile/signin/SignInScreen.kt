@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
@@ -53,8 +52,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -82,6 +79,11 @@ import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.BrandMark
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.presentation.signin.SignInViewModel
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextObfuscationMode
+import androidx.compose.material3.OutlinedSecureTextField
+import media.watchmy.client.ui.rememberModelTextField
 
 /**
  * Password sign-in (Main.dc.html). Linking a TV needs a signed-in phone, so
@@ -95,6 +97,14 @@ fun SignInScreen(onSwitchServer: () -> Unit, linkTv: DeepLink.LinkTv? = null, on
     val state by vm.state.collectAsStateWithLifecycle()
     val server by vm.server.collectAsStateWithLifecycle()
     val nameFocus = remember { FocusRequester() }
+    // The fields hold their text (§3.3.3); the model hears it as it is typed.
+    val nameField = rememberModelTextField(state.name, state.revision, vm::setName)
+    val passwordField = rememberModelTextField(state.password, state.revision, vm::setPassword)
+    val submit = {
+        vm.setName(nameField.text.toString())
+        vm.setPassword(passwordField.text.toString())
+        vm.signIn()
+    }
     // Back from the server's web page: see whether its first account is there now.
     LifecycleResumeEffect(state.setupRequired) {
         if (state.setupRequired) vm.checkSetup(quiet = true)
@@ -160,29 +170,26 @@ fun SignInScreen(onSwitchServer: () -> Unit, linkTv: DeepLink.LinkTv? = null, on
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         ServerCard(server, onSwitchServer.takeIf { showServerChange }, warnNotEncrypted = true)
                         OutlinedTextField(
-                            value = state.name,
-                            onValueChange = vm::setName,
+                            state = nameField,
                             label = { Text("Username") },
-                            singleLine = true,
+                            lineLimits = TextFieldLineLimits.SingleLine,
                             enabled = !state.busy,
                             textStyle = FieldText,
                             colors = fieldColors(),
                             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
                             modifier = Modifier.fillMaxWidth().focusRequester(nameFocus).semantics { contentType = ContentType.Username }.testTag(TestTags.SIGN_IN_NAME),
                         )
-                        OutlinedTextField(
-                            value = state.password,
-                            onValueChange = vm::setPassword,
+                        OutlinedSecureTextField(
+                            state = passwordField,
                             label = { Text("Password") },
-                            singleLine = true,
                             enabled = !state.busy,
                             isError = state.error != null,
                             supportingText = state.error?.let { { Text(it) } },
                             textStyle = FieldText,
                             colors = fieldColors(),
-                            visualTransformation = if (state.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                            textObfuscationMode = if (state.showPassword) TextObfuscationMode.Visible else TextObfuscationMode.RevealLastTyped,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = { vm.signIn() }),
+                            onKeyboardAction = { submit() },
                             trailingIcon = {
                                 IconButton(onClick = vm::toggleShowPassword) {
                                     Icon(
@@ -197,7 +204,7 @@ fun SignInScreen(onSwitchServer: () -> Unit, linkTv: DeepLink.LinkTv? = null, on
                     }
                     FilledButton(
                         text = if (linkTv != null) "Sign in and link a TV" else "Sign in",
-                        onClick = vm::signIn,
+                        onClick = submit,
                         large = true,
                         busy = state.busy,
                         modifier = Modifier.fillMaxWidth().testTag(TestTags.SIGN_IN),
@@ -217,8 +224,8 @@ fun SignInScreen(onSwitchServer: () -> Unit, linkTv: DeepLink.LinkTv? = null, on
                             when {
                                 // Signed in by the code, the phone goes on to Link a TV.
                                 state.codeSignIn -> Unit
-                                state.canSubmit -> vm.signIn()
-                                state.name.isBlank() -> nameFocus.requestFocus()
+                                state.canSubmit -> submit()
+                                nameField.text.isBlank() -> nameFocus.requestFocus()
                             }
                         },
                     )

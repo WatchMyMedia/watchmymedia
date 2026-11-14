@@ -109,11 +109,12 @@ import media.watchmy.client.model.TMDB_NOTICE
 import media.watchmy.client.ui.PRIVACY_POLICY_URL
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.presentation.settings.LanguageList
+import media.watchmy.client.presentation.settings.LanguageAction
 
 private enum class Overlay { Quality, Passthrough, SubtitleSize, SubtitleChoice, AddLanguage, LanguageActions, DeviceName, Privacy, Licences, ReminderLead }
 
 /** The list Add language and a language's options are for. */
-private enum class LanguageList(val title: String) { Audio("Audio languages"), Subtitles("Subtitle languages") }
 
 /** What a quality does, under it in Settings (SettingsQuality.dc.html). */
 private fun qualityDescription(quality: StreamQuality): String = when (quality) {
@@ -403,12 +404,12 @@ fun SettingsScreen(
             },
         )
         Overlay.AddLanguage -> {
-            val chosen = if (languageList == LanguageList.Audio) state.playback.audio.languages else state.playback.subtitles.languages
+            val chosen = vm.languages(languageList)
             OptionsDialog(
                 title = "Add language", context = languageList.title, options = languageChoices.filter { it.tag !in chosen }, selected = languageChoices.first(),
                 label = { it.label },
                 onSelect = {
-                    if (languageList == LanguageList.Audio) vm.addAudioLanguage(it.tag) else vm.addSubtitleLanguage(it.tag)
+                    vm.addLanguage(languageList, it.tag)
                     overlay = null
                 },
                 onDismiss = { overlay = null },
@@ -417,23 +418,11 @@ fun SettingsScreen(
         Overlay.LanguageActions -> {
             val tag = editingLanguage.orEmpty()
             val audio = languageList == LanguageList.Audio
-            val languages = if (audio) state.playback.audio.languages else state.playback.subtitles.languages
-            val index = languages.indexOf(tag)
-            val actions = buildList {
-                if (index > 0) add("Move up")
-                if (index >= 0 && index < languages.lastIndex) add("Move down")
-                add("Remove language")
-            }
-            OptionsDialog(title = subtitleLanguageLabel(tag, displayLocale), context = languageList.title, options = actions, selected = actions.first(), label = { it },
+            val actions = vm.languageActions(languageList, tag)
+            OptionsDialog(title = subtitleLanguageLabel(tag, displayLocale), context = languageList.title, options = actions, selected = actions.first(), label = { it.label },
                 onSelect = {
-                    when (it) {
-                        "Move up" -> if (audio) vm.moveAudioLanguage(tag, -1) else vm.moveSubtitleLanguage(tag, -1)
-                        "Move down" -> if (audio) vm.moveAudioLanguage(tag, 1) else vm.moveSubtitleLanguage(tag, 1)
-                        else -> {
-                            if (audio) vm.removeAudioLanguage(tag) else vm.removeSubtitleLanguage(tag)
-                            refocus = if (audio) audioAdd else subtitleAdd
-                        }
-                    }
+                    vm.act(languageList, tag, it)
+                    if (it == LanguageAction.Remove) refocus = if (audio) audioAdd else subtitleAdd
                     overlay = null
                 }, onDismiss = { overlay = null },
             )

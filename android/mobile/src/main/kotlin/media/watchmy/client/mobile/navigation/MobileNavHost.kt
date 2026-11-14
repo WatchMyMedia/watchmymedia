@@ -22,10 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -40,7 +37,6 @@ import media.watchmy.client.mobile.rows.RowEditorScreen
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import media.watchmy.client.mobile.components.Avatar
 import media.watchmy.client.mobile.components.CastMiniController
@@ -79,6 +75,8 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.rememberRequestBadge
 import media.watchmy.client.ui.rememberTabletLayout
+import media.watchmy.client.ui.LocalLiveChannelsShown
+import androidx.compose.runtime.CompositionLocalProvider
 
 fun NavHostController.play(request: PlayRequest) =
     navigate(MobileRoutes.Player(request.fileId, request.startMs, request.title, request.subtitle, request.backdropPath, request.recordingId))
@@ -141,15 +139,8 @@ fun MobileNavHost(
     val services = LocalAppServices.current
     val liveModel = viewModel { LiveChannelsViewModel(services.live, services.servers, services.auth) }
     val live by liveModel.state.collectAsStateWithLifecycle()
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(liveModel, lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                liveModel.refresh()
-                delay(30_000)
-            }
-        }
-    }
+    // The channel list is polled only while a screen showing channels is on screen (§4.1.3).
+    val showChannels = remember(liveModel) { liveModel::showing }
     // With a TV connected that plays Live TV, and a server that lets this account cast, Watch casts (PLAN-LIVE-TV.md §4.1).
     val castState by services.cast.state.collectAsStateWithLifecycle()
     val liveCast by services.cast.live.state.collectAsStateWithLifecycle()
@@ -245,7 +236,7 @@ fun MobileNavHost(
                 }
             },
         ) {
-            Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize()) { CompositionLocalProvider(LocalLiveChannelsShown provides showChannels) {
                 NavHost(nav, startDestination = MobileRoutes.Home, modifier = Modifier.weight(1f)) {
                     composable<MobileRoutes.Home> {
                         HomeScreen(onPlay = nav::play, onOpenShow = openShow, onOpenMovie = openMovie, onNavigate = go, onOpenSeason = openSeason, onOpenEpisode = openEpisode, liveChannels = live.channels.takeIf { live.available }.orEmpty(), onWatchLive = watchLive, liveListings = live.listings)
@@ -375,7 +366,7 @@ fun MobileNavHost(
                 if (!inPlayer && castMiniLine(liveCast, liveCast.deviceName.orEmpty()) != null) LiveCastMini(live.channels, onOpen = openLiveRemote)
                 else if (!inPlayer && tab != MobileTab.LiveTV) CastMiniController(onOpen = nav::play)
                 if (tab != null && !showRail) MobileBottomBar(tab, onSelect = nav::openTab, settingsCount = badge.inbox ?: 0, tabs = tabs)
-            }
+            }}
         }
         if (showRail) {
             IconButton(

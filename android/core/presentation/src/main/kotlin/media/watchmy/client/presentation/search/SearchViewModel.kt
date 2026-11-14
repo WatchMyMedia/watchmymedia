@@ -1,4 +1,4 @@
-package media.watchmy.client.mobile.search
+package media.watchmy.client.presentation.search
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -24,11 +24,12 @@ import media.watchmy.client.model.markWatched
 import media.watchmy.client.model.watchTarget
 
 /**
- * Search by title as the viewer types, a moment after they stop. Beside the
- * library, what can be requested (Not in your library, PLAN-ARR.md §7.1) is
- * looked up on its own, so the library's results never wait for it. The
- * query outlives the process ([saved]) and is searched again when the page
- * comes back; the recent searches don't.
+ * Search by title as the viewer types, a moment after they stop, on the
+ * phone, the tablet and the TV. Beside the library, what can be requested
+ * (Not in your library, PLAN-ARR.md §7.1) is looked up on its own, so the
+ * library's results never wait for it. The query outlives the process
+ * ([saved]) and is searched again when the page comes back; the recent
+ * searches don't. A new account starts it over.
  */
 class SearchViewModel(
     private val library: LibraryRepository,
@@ -52,6 +53,8 @@ class SearchViewModel(
         val options: RequestOptions = RequestOptions.None,
         /** Movies and shows not in the library that this user can ask for; empty when there are none or it failed. */
         val requestable: List<Requestable> = emptyList(),
+        /** Moves on when the model sets [query] itself (cleared, a recent search, another account), for the screen's field to take it. */
+        val revision: Int = 0,
     ) {
         val noResults: Boolean get() = results != null && results.movies.isEmpty() && results.shows.isEmpty() && results.episodes.isEmpty() && requestable.isEmpty()
     }
@@ -77,7 +80,7 @@ class SearchViewModel(
                         searchRevision++
                         requestRevision++
                         accountRevision++
-                        _state.value = State()
+                        _state.value = State(revision = _state.value.revision + 1)
                         saved.remove<String>(QUERY)
                     }
                 }
@@ -105,12 +108,17 @@ class SearchViewModel(
         search(debounce = true)
     }
 
-    fun clear() = setQuery("")
+    fun clear() {
+        if (_state.value.query.isEmpty()) return
+        _state.update { it.copy(query = "", revision = it.revision + 1) }
+        saved[QUERY] = ""
+        search(debounce = true)
+    }
 
     fun clearRecentQueries() = _state.update { it.copy(recentQueries = emptyList()) }
 
     fun selectRecentQuery(query: String) {
-        _state.update { it.copy(query = query) }
+        _state.update { it.copy(query = query, revision = it.revision + 1) }
         saved[QUERY] = query
         search(debounce = false)
     }
@@ -192,3 +200,6 @@ class SearchViewModel(
         private const val QUERY = "query"
     }
 }
+
+/** Nothing matched in any group of the library's. */
+fun SearchResults.isEmpty(): Boolean = movies.isEmpty() && shows.isEmpty() && episodes.isEmpty()

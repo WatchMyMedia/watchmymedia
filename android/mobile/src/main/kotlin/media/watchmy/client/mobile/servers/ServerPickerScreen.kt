@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -66,6 +65,14 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.presentation.servers.ServerPickerViewModel
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import media.watchmy.client.ui.rememberModelTextField
+import media.watchmy.client.ui.rememberLocalNetworkAccess
+import media.watchmy.client.ui.LocalNetworkAccess
+import media.watchmy.client.presentation.servers.isLocalAddress
+import media.watchmy.client.presentation.servers.localNetworkOffMessage
+import androidx.compose.foundation.border
 
 /**
  * Choosing a server (ServerPicker.dc.html): on this network, remembered, or
@@ -78,6 +85,15 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
     val vm = viewModel { ServerPickerViewModel(services.servers) }
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.chosen.collect { onServerChosen() } }
+    // The field holds its text (§3.3.3); the model hears it as it is typed.
+    val address = rememberModelTextField(state.address, state.revision, vm::setAddress)
+    // Android 17's local network access, offered again here when nothing is found (§3.4.2).
+    val access = rememberLocalNetworkAccess()
+    val offline = access.needed && state.addressError != null && isLocalAddress(address.text.toString())
+    val connect = {
+        vm.setAddress(address.text.toString())
+        vm.connectToAddress()
+    }
     if (onBack != null) BackHandler(onBack = onBack)
 
     Box(Modifier.fillMaxSize().background(WmmColors.Ground), contentAlignment = Alignment.TopCenter) {
@@ -95,7 +111,10 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                     val found = state.discovered
                     when {
                         found == null -> Hint("Looking for servers…", busy = true)
-                        found.isEmpty() -> Hint("No servers found on this network. Enter an address below.")
+                        found.isEmpty() -> {
+                            Hint("No servers found on this network. Enter an address below.")
+                            if (access.needed) LocalNetworkCard(access)
+                        }
                         else -> found.forEach { row -> ServerRow(row, connecting = state.connecting == row.key, remembered = false, onClick = { vm.choose(row) }, onForget = {}) }
                     }
                     state.error?.let { ErrorNote(it, vm::dismissError) }
@@ -108,14 +127,13 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                     SectionLabel("Enter an address", Modifier.padding(top = 12.dp))
                     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         OutlinedTextField(
-                            value = state.address,
-                            onValueChange = vm::setAddress,
+                            state = address,
                             label = { Text("Server address") },
                             placeholder = { Text("192.168.1.20 or https://home.example.net") },
-                            singleLine = true,
+                            lineLimits = TextFieldLineLimits.SingleLine,
                             isError = state.addressError != null,
-                            supportingText = state.addressError?.let { e -> { Text(e) } }
-                                ?: if (needsHttpsNudge(state.address)) {
+                            supportingText = (if (offline) "${localNetworkOffMessage(address.text.toString(), "phone")} ${if (access.stopped) "Open settings" else "Allow"}, above, turns it on." else state.addressError)?.let { e -> { Text(e) } }
+                                ?: if (needsHttpsNudge(address.text.toString())) {
                                     { Text("Plain http sends your password unencrypted. Use https for a hostname.", color = WmmColors.Warn) }
                                 } else {
                                     null
@@ -123,7 +141,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                             textStyle = FieldText,
                             colors = fieldColors(),
                             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-                            keyboardActions = KeyboardActions(onGo = { vm.connectToAddress() }),
+                            onKeyboardAction = { connect() },
                             modifier = Modifier.fillMaxWidth().testTag(TestTags.SERVER_ADDRESS),
                         )
                         Text(
@@ -132,7 +150,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                         )
                         FilledButton(
                             "Connect",
-                            onClick = vm::connectToAddress,
+                            onClick = connect,
                             busy = state.connecting == ServerPickerViewModel.ADDRESS,
                             modifier = Modifier.align(Alignment.End).testTag(TestTags.SERVER_CONNECT),
                         )
@@ -201,5 +219,34 @@ private fun ErrorNote(message: String, onDismiss: () -> Unit) {
     ) {
         Text(message, style = TextStyle(fontFamily = Inter, fontSize = 14.sp, lineHeight = 20.sp, color = WmmColors.Error), modifier = Modifier.weight(1f).padding(vertical = 8.dp))
         IconButton(onClick = onDismiss) { Icon(WmmIcons.Close, contentDescription = "Dismiss", tint = WmmColors.Error, modifier = Modifier.size(20.dp)) }
+    }
+}
+
+/** "Allow local network access" (LocalNetwork.dc.html), or "Open settings" once Android has stopped asking. */
+@Composable
+private fun LocalNetworkCard(access: LocalNetworkAccess) {
+    val stopped = access.stopped
+    Column(
+        Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(WmmColors.Surface, RoundedCornerShape(16.dp)).border(1.dp, WmmColors.Line2, RoundedCornerShape(16.dp)).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(
+                Modifier.size(40.dp).background(if (stopped) WmmColors.Line2 else WmmColors.Accent.copy(alpha = 0.16f), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center,
+            ) { Icon(WmmIcons.Server, contentDescription = null, tint = if (stopped) WmmColors.TextSoft else WmmColors.Accent, modifier = Modifier.size(22.dp)) }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(if (stopped) "Local network access is off" else "Allow local network access", style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = WmmColors.Text))
+                Text(
+                    if (stopped) {
+                        "Android has stopped asking. In WatchMyMedia’s settings, open Permissions › Nearby devices and allow it, then come back."
+                    } else {
+                        "WatchMyMedia needs it to find servers on this network and reach them at their local address. Servers over the internet work without it."
+                    },
+                    style = TextStyle(fontFamily = Inter, fontSize = 14.sp, lineHeight = 20.sp, color = WmmColors.TextMuted),
+                )
+            }
+        }
+        FilledButton(if (stopped) "Open settings" else "Allow", onClick = access::ask, modifier = Modifier.align(Alignment.End))
     }
 }

@@ -4,6 +4,7 @@ import media.watchmy.client.fake.FakeLibraryRepository
 import media.watchmy.client.model.ContinueItem
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.MovieDetail
+import media.watchmy.client.model.SearchResults
 import media.watchmy.client.model.SeasonDetail
 import media.watchmy.client.model.ShowDetail
 
@@ -22,6 +23,8 @@ class TestLibrary(private val fake: LibraryRepository = FakeLibraryRepository())
     override suspend fun season(showId: Long, number: Int): SeasonDetail = maybeFail().let { fake.season(showId, number) }
 
     override suspend fun movie(id: Long): MovieDetail = maybeFail().let { fake.movie(id) }
+
+    override suspend fun search(text: String): SearchResults = maybeFail().let { fake.search(text) }
 
     override suspend fun setWatched(kind: ContinueItem.Kind, id: Long, watched: Boolean) {
         maybeFail()

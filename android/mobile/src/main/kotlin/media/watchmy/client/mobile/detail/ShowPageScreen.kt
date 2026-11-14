@@ -163,6 +163,7 @@ import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.ProgressStrip
 import media.watchmy.client.ui.components.WatchedCheck
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.ui.ReportShown
 
 /**
  * One page for a show, its seasons and its episodes (ShowPage.dc.html,
@@ -187,6 +188,7 @@ fun ShowPageScreen(
 ) {
     val services = LocalAppServices.current
     val vm = viewModel { ShowPageViewModel(services.library, showId, arrival, services.requests, services.downloads, createSavedStateHandle()) }
+    ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val downloadsVm = viewModel { DownloadsViewModel(services.downloads) }
     val downloads by downloadsVm.state.collectAsStateWithLifecycle()
