@@ -23,65 +23,25 @@ import androidx.compose.ui.unit.sp
 import media.watchmy.client.mobile.components.FilledButton
 import media.watchmy.client.mobile.components.GoldTextButton
 import media.watchmy.client.mobile.components.TonalButton
+import media.watchmy.client.model.DIAGNOSTICS_NOTE
+import media.watchmy.client.model.NO_EXITS
 import media.watchmy.client.model.ProcessExit
+import media.watchmy.client.model.STOPPED_BY_YOU
+import media.watchmy.client.model.detail
+import media.watchmy.client.model.diagnosticsText
+import media.watchmy.client.model.headline
+import media.watchmy.client.model.whenLabel
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /*
  * Copy diagnostics (PLAN-ANDROID-REVIEW §6.4, the Diagnostics board): the
  * last times the app's process ended, as Android recorded them, for a bug
  * report. Nothing is sent anywhere; Copy puts the text on the clipboard.
- * No account, server address or titles are in it.
+ * The words are the TV's too (core:model DiagnosticsWords), but for a force
+ * stop, which the phone board words as the person's own: [STOPPED_BY_YOU].
  */
-
-/** The process exit in the board's words: "Crashed", "Closed by Android to free memory". */
-internal fun exitHeadline(exit: ProcessExit): String = when (exit.reason) {
-    "low memory" -> "Closed by Android to free memory"
-    "crash", "native crash" -> "Crashed"
-    "anr" -> "Stopped responding"
-    "app updated" -> "Updated"
-    "stopped by the user", "user stopped" -> "Stopped by you"
-    "exited" -> "Closed itself"
-    "excessive resource use" -> "Stopped by Android for using too much"
-    "permission change" -> "Closed when a permission changed"
-    "freezer" -> "Frozen by Android"
-    else -> exit.reason.replaceFirstChar { it.uppercase() }
-}
-
-/** Where the app was and what Android said: "on screen · java.lang.IllegalStateException". */
-internal fun exitDetail(exit: ProcessExit): String = listOfNotNull(
-    if (exit.importance in listOf("foreground", "visible")) "on screen" else "in the background",
-    exit.description,
-    "trace kept".takeIf { exit.hasTrace },
-).joinToString(" · ")
-
-/** "Today, 9:41 PM", "Yesterday, 11:02 PM" or "Wed 11 Nov, 8:15 PM". */
-internal fun exitWhen(atMs: Long, nowMs: Long, zone: ZoneId = ZoneId.systemDefault()): String {
-    val at = Instant.ofEpochMilli(atMs).atZone(zone)
-    val today = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
-    val time = at.format(DateTimeFormatter.ofPattern("h:mm a", Locale.US))
-    return when (at.toLocalDate()) {
-        today -> "Today, $time"
-        today.minusDays(1) -> "Yesterday, $time"
-        else -> at.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.US)) + ", " + time
-    }
-}
-
-/** What Copy puts on the clipboard: the app and device line, then each exit on its own line. */
-internal fun diagnosticsText(about: String, exits: List<ProcessExit>, nowMs: Long, zone: ZoneId = ZoneId.systemDefault()): String =
-    buildString {
-        appendLine(about)
-        if (exits.isEmpty()) appendLine(NO_EXITS)
-        exits.forEach { appendLine("${exitWhen(it.atMs, nowMs, zone)} · ${exitHeadline(it)} · ${exitDetail(it)}") }
-    }.trimEnd()
-
-private const val NO_EXITS = "Android hasn’t recorded any exits for this app yet."
 
 @Composable
 internal fun DiagnosticsDialog(onDismiss: () -> Unit) {
@@ -107,18 +67,18 @@ internal fun DiagnosticsDialog(onDismiss: () -> Unit) {
                     list.isEmpty() -> Text(NO_EXITS, style = body)
                     else -> list.forEach { exit ->
                         Column {
-                            Text(exitHeadline(exit), style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = WmmColors.Text))
-                            Text("${exitWhen(exit.atMs, now)} · ${exitDetail(exit)}", style = body.copy(fontSize = 13.sp))
+                            Text(exit.headline(STOPPED_BY_YOU), style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = WmmColors.Text))
+                            Text("${exit.whenLabel(now)} · ${exit.detail()}", style = body.copy(fontSize = 13.sp))
                         }
                     }
                 }
-                Text("Up to the last five. No account, server address or titles are included.", style = body.copy(fontSize = 12.sp, color = WmmColors.TextFaint))
+                Text(DIAGNOSTICS_NOTE, style = body.copy(fontSize = 12.sp, color = WmmColors.TextFaint))
             }
         },
         dismissButton = { GoldTextButton("Close", onDismiss) },
         confirmButton = {
             val copy = {
-                clipboard.setText(AnnotatedString(diagnosticsText(about, exits.orEmpty(), now)))
+                clipboard.setText(AnnotatedString(diagnosticsText(about, exits.orEmpty(), now, stoppedByUser = STOPPED_BY_YOU)))
                 copied = true
             }
             if (copied) TonalButton("Copied", copy) else FilledButton("Copy", copy)

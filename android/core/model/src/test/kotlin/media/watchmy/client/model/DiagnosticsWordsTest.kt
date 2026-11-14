@@ -21,6 +21,10 @@ class DiagnosticsWordsTest {
         assertEquals("Crashed", crash.headline())
         assertEquals("Stopped responding", anr.headline())
         assertEquals("Force-stopped", lowMemory.copy(reason = "stopped by the user").headline())
+        // The phone's board words a force stop as the person's own doing.
+        assertEquals("Stopped by you", lowMemory.copy(reason = "stopped by the user").headline(STOPPED_BY_YOU))
+        assertEquals("Closed when a permission changed", lowMemory.copy(reason = "permission change").headline())
+        assertEquals("Frozen by Android", lowMemory.copy(reason = "freezer").headline())
         assertEquals("Updated", lowMemory.copy(reason = "app updated").headline())
         assertEquals("in the background", lowMemory.detail())
         assertEquals("on screen · java.lang.IllegalStateException", crash.detail())
