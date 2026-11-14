@@ -63,7 +63,9 @@ final class RemoteTests: XCTestCase {
         XCTAssertTrue(focused(resume), "with focus on Resume")
         XCTAssertTrue(app.buttons["From the start"].exists)
         remote.press(.down)
-        XCTAssertTrue(focused(app.buttons["Season 3"].firstMatch) || app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Season 3")).firstMatch.hasFocus,
+        // One look for either label ("Season 3" alone or with more after it),
+        // rather than ten seconds on the first before trying the second.
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND hasFocus == true", "Season 3")).firstMatch.waitUntilExists(timeout: 10),
                       "Down reaches the chosen season's tab")
         remote.press(.down)
         let this = app.buttons["episode-card-100035"]
