@@ -139,23 +139,26 @@ final class LiveExtrasTests: XCTestCase {
     @MainActor
     func testTheBannerComesOverHomeWithoutTakingFocus() {
         // The reminder comes 8 s after launch, once Home is up, rather than the
-        // fakes' default 20 s.
-        let app = launch(["-fakesLiveReminderSoon", "8"])
+        // fakes' default 20 s. The banner stays 30 s rather than 10: on a busy
+        // simulator one look at the screen took 8 s, and the banner had gone
+        // between finding it and reading its label.
+        let app = launch(["-fakesLiveReminderSoon", "8", "-liveBannerSeconds", "30"])
         let banner = app.descendants(matching: .any)["live-reminder-banner"]
         XCTAssertTrue(banner.waitForExistence(timeout: 45), "The reminder's banner comes at its time")
         XCTAssertTrue(banner.label.contains("Pro Hockey starts in 5 minutes on 9.1 PNVL-HD. Watch it from Live TV."), banner.label)
         XCTAssertFalse(banner.hasFocus)
-        sleep(1)
         snap("tv-banner-home")
-        let goes = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: banner)
-        XCTAssertEqual(XCTWaiter().wait(for: [goes], timeout: 15), .completed, "It goes after ten seconds")
+        // waitForNonExistence looks about once a second; an
+        // XCTNSPredicateExpectation looked only every 6 s here.
+        XCTAssertTrue(banner.waitForNonExistence(timeout: 45), "It goes by itself")
         app.terminate()
     }
 
     @MainActor
     func testMenuPutsThePlayersBannerAwayBeforeLeaving() {
         // 10 s: the channel is playing before the reminder comes.
-        let app = launch(["-fakesLiveReminderSoon", "10", "-open", "watchmymedia://live-tv/ch-7.1"])
+        // A 30 s banner, so it is Menu that puts it away and not its own time.
+        let app = launch(["-fakesLiveReminderSoon", "10", "-liveBannerSeconds", "30", "-open", "watchmymedia://live-tv/ch-7.1"])
         let player = app.descendants(matching: .any)["live-player-screen"]
         let banner = app.descendants(matching: .any)["live-reminder-banner"]
         XCTAssertTrue(banner.waitForExistence(timeout: 45), "the reminder's banner comes over the channel")
@@ -171,7 +174,7 @@ final class LiveExtrasTests: XCTestCase {
     func testThePlayersChannelsPutTheDueReminderFirst() {
         // 12 s: the channel plays and its Channels panel is open before the
         // reminder comes, so the banner is the player's.
-        let app = launch(["-fakesLiveReminderSoon", "12", "-open", "watchmymedia://live-tv/ch-7.1", "-livePanel", "channels"])
+        let app = launch(["-fakesLiveReminderSoon", "12", "-liveBannerSeconds", "30", "-open", "watchmymedia://live-tv/ch-7.1", "-livePanel", "channels"])
         let banner = app.descendants(matching: .any)["live-reminder-banner"]
         XCTAssertTrue(banner.waitForExistence(timeout: 45))
         XCTAssertTrue(banner.label.contains("Swipe down to watch."), banner.label)

@@ -203,6 +203,13 @@ didn't start.
   ⌘F: `UITests/KeyboardTests.swift`, on an iPad), but its Escape reached
   neither `onKeyPress`, a cancel action nor a `UIKeyCommand` on iPadOS 27.2:
   check Escape with a real keyboard.
+- An `XCTNSPredicateExpectation` waited on with `XCTWaiter` checked its
+  predicate only every 6 s in the Apple TV UI tests (tvOS 27.2 simulator),
+  where `waitForExistence` and `waitForNonExistence` look about once a
+  second. Wait for something that comes or goes at a set time with those, or
+  give the waiter several polls' slack. A look at the screen once took 8 s
+  on a busy simulator, so a test that reads something shown briefly makes it
+  stay longer (`-liveBannerSeconds 30` for the reminder banner).
 - XCUITest's Siri Remote has no touch-surface swipe, and Right while paused
   skips 10 s, so AVKit's own scrubbing (and the thumbnails it draws from an
   I-frame playlist) can't be driven from a test; check it by hand.

@@ -25,6 +25,20 @@ struct WatchMyMediaTVApp: App {
         _recordings = State(initialValue: LiveRecordingsStore(repository: services.liveTV))
     }
 
+    /// How long a reminder's banner stays: ten seconds, or, in a debug build,
+    /// the seconds after `-liveBannerSeconds`, so a UI test on a busy
+    /// simulator isn't racing the banner's ten seconds to read it.
+    private static var bannerDuration: Duration {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let i = arguments.firstIndex(of: "-liveBannerSeconds"), arguments.indices.contains(i + 1),
+           let seconds = Int(arguments[i + 1]), seconds > 0 {
+            return .seconds(seconds)
+        }
+        #endif
+        return .seconds(10)
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
@@ -45,7 +59,7 @@ struct WatchMyMediaTVApp: App {
                 .task { await extras.follow() }
                 .task { await recordings.follow() }
                 // tvOS notifications carry only badges: a reminder is a banner while the app is open.
-                .task(id: extras.alertsKey) { await extras.runBanners() }
+                .task(id: extras.alertsKey) { await extras.runBanners(duration: Self.bannerDuration) }
         }
     }
 }
