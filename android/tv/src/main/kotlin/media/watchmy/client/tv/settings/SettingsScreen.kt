@@ -115,7 +115,7 @@ import media.watchmy.client.ui.PRIVACY_POLICY_URL
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
-private enum class Overlay { Quality, Passthrough, SubtitleSize, SubtitleChoice, AddLanguage, LanguageActions, DeviceName, Privacy, Licences, ReminderLead }
+private enum class Overlay { Quality, Passthrough, SubtitleSize, SubtitleChoice, AddLanguage, LanguageActions, DeviceName, Privacy, Licences, ReminderLead, Diagnostics }
 
 /** The list Add language and a language's options are for. */
 private enum class LanguageList(val title: String) { Audio("Audio languages"), Subtitles("Subtitle languages") }
@@ -358,6 +358,10 @@ fun SettingsScreen(
                     AboutRow("Server", server?.let { "${it.name} · ${versionLabel(it.version)} · ${displayAddress(it.baseUrl)}" } ?: "Not chosen")
                     AboutRow("App", "${services.client.product} ${services.client.version}")
                     AboutRow("Admin tools", server?.let { "In the web app at ${displayAddress(it.baseUrl)}" } ?: "In the web app")
+                    // The app's last exits, for a bug report (android-tv/TvDiagnostics).
+                    SettingRow("Copy diagnostics", onClick = { overlay = Overlay.Diagnostics }, description = "The app’s last exits and why, for a bug report", stacked = true, labelSize = 19) {
+                        Value("", chevron = true)
+                    }
                     SettingRow("Privacy policy", onClick = { overlay = Overlay.Privacy }, minHeight = 56.dp, labelSize = 19) {
                         Value(PRIVACY_POLICY_URL.removePrefix("https://"), chevron = true)
                     }
@@ -498,6 +502,11 @@ fun SettingsScreen(
         )
         Overlay.Privacy -> PrivacyDialog(onDismiss = { overlay = null })
         Overlay.Licences -> LicencesDialog(onDismiss = { overlay = null })
+        Overlay.Diagnostics -> DiagnosticsPanel(
+            services.diagnostics,
+            app = "${services.client.product} ${services.client.version} · Android ${Build.VERSION.RELEASE} · ${Build.MODEL}",
+            onDismiss = { overlay = null },
+        )
         null -> Unit
     }
 }
