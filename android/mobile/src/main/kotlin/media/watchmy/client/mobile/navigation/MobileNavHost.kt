@@ -135,6 +135,16 @@ private fun NavHostController.openTab(tab: MobileTab) = navigate(tab.route()) {
     restoreState = tab != MobileTab.Home
 }
 
+/**
+ * [tab]'s own page, for a link to it: not the page last open in the tab,
+ * which [openTab] brings back. A shortcut to Live TV opens the guide even
+ * when a show page was opened from it before.
+ */
+private fun NavHostController.openTabRoot(tab: MobileTab) = navigate(tab.route()) {
+    popUpTo(graph.findStartDestination().id) { saveState = true }
+    launchSingleTop = true
+}
+
 /** Navigates to [route], as a tab switch when it is one of the tabs' routes. */
 private fun NavHostController.go(route: Any) {
     val tab = MobileTab.entries.firstOrNull { it.route() == route }
@@ -219,12 +229,12 @@ fun MobileNavHost(
                     liveModel.state.first { it.channels.any { c -> c.id == deepLink.channelId } || it.error != null || (!it.loading && it.capabilities.enabled && it.channels.isNotEmpty()) }
                 }
                 val channel = listed?.channels?.firstOrNull { it.id == deepLink.channelId }
-                if (channel != null && channel.available) watchLive(channel) else nav.openTab(MobileTab.LiveTV)
+                if (channel != null && channel.available) watchLive(channel) else nav.openTabRoot(MobileTab.LiveTV)
             }
-            DeepLink.LiveGuide -> nav.openTab(MobileTab.LiveTV)
-            // The launcher's shortcuts.
-            DeepLink.Search -> nav.go(MobileRoutes.Search)
-            DeepLink.Downloads -> nav.go(MobileRoutes.Downloads)
+            // A link to a tab (the guide link, the launcher's shortcuts) opens the tab's own page.
+            DeepLink.LiveGuide -> nav.openTabRoot(MobileTab.LiveTV)
+            DeepLink.Search -> nav.openTabRoot(MobileTab.Search)
+            DeepLink.Downloads -> nav.openTabRoot(MobileTab.Downloads)
         }
         onDeepLinkHandled()
     }
@@ -255,7 +265,7 @@ fun MobileNavHost(
     val searchAllowed by rememberUpdatedState(!inPlayer)
     DisposableEffect(shortcuts, nav) {
         shortcuts?.onSearch = {
-            searchAllowed.also { if (it) nav.go(MobileRoutes.Search) }
+            searchAllowed.also { if (it) nav.openTabRoot(MobileTab.Search) }
         }
         onDispose { shortcuts?.onSearch = null }
     }

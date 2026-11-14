@@ -3,8 +3,14 @@ package media.watchmy.client.mobile.navigation
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import media.watchmy.client.fake.FakeAppServices
@@ -76,6 +82,31 @@ class ShortcutLinksTest {
         compose.runOnUiThread { assertTrue(shortcuts.onKeyUp(KeyEvent.KEYCODE_F, ctrlF)) }
         compose.waitForIdle()
         assertTrue(nav.currentDestination!!.hasRoute<MobileRoutes.Search>())
+    }
+
+    @Test fun `the Live TV shortcut opens the guide, not the page last opened from it`() {
+        val link = mutableStateOf<DeepLink?>(null)
+        lateinit var nav: NavHostController
+        compose.setContent {
+            CompositionLocalProvider(LocalAppServices provides FakeAppServices(), LocalKeyboardShortcuts provides shortcuts) {
+                nav = rememberNavController()
+                MobileNavHost(onSwitchServer = {}, onSignedOut = {}, nav = nav, deepLink = link.value)
+            }
+        }
+        compose.waitForIdle()
+        // A show page opened from the Live TV tab, then Home.
+        compose.onAllNodes(hasText("Live TV") and hasClickAction()).onFirst().performClick()
+        compose.runOnIdle {
+            nav.navigate(MobileRoutes.Show(100))
+            // To Home as a tab tap goes (the bar hides on a show page), keeping Live TV's pages for its tab.
+            nav.navigate(MobileRoutes.Home) {
+                popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+            }
+        }
+        compose.runOnIdle { link.value = DeepLink.LiveGuide }
+        compose.waitForIdle()
+        assertTrue(nav.currentDestination!!.hasRoute<MobileRoutes.LiveTV>())
     }
 
     @Test fun `the Downloads shortcut opens Downloads`() {
