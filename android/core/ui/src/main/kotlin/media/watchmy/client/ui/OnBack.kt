@@ -9,11 +9,9 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.KeyInputModifierNode
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
-import androidx.compose.ui.node.currentValueOf
+import androidx.compose.ui.node.requireView
 import androidx.compose.ui.platform.InspectorInfo
-import androidx.compose.ui.platform.LocalView
 
 /**
  * Back for a screen or an overlay, however the device sends it.
@@ -45,7 +43,7 @@ private data class OnBackElement(val enabled: Boolean, val onBack: () -> Unit) :
 }
 
 private class OnBackNode(private var enabled: Boolean, private var onBack: () -> Unit) :
-    Modifier.Node(), KeyInputModifierNode, CompositionLocalConsumerModifierNode {
+    Modifier.Node(), KeyInputModifierNode {
     private var dispatcher: OnBackPressedDispatcher? = null
 
     /** A key-down this element took, so a key-up left over from the screen before is not a press. */
@@ -56,7 +54,8 @@ private class OnBackNode(private var enabled: Boolean, private var onBack: () ->
     }
 
     override fun onAttach() {
-        dispatcher = currentValueOf(LocalView).findViewTreeOnBackPressedDispatcherOwner()?.onBackPressedDispatcher
+        // The view the node is attached in, not LocalView: a node can't follow a CompositionLocal from onAttach.
+        dispatcher = requireView().findViewTreeOnBackPressedDispatcherOwner()?.onBackPressedDispatcher
         register()
     }
 
