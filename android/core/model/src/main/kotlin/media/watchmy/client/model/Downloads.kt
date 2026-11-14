@@ -304,9 +304,27 @@ fun downloadMenuLine(d: OfflineDownload, device: String = "phone", wifiOnly: Boo
     else -> downloadHelp(s)
 }
 
-/** "19.4 of about 46 GB", "1.8 of 4.2 GB". */
-fun progressBytes(bytes: Long, d: OfflineDownload): String =
-    "${String.format(Locale.ROOT, "%.1f", bytes / GB)} of ${downloadSize(d.sizeBytes, d.sizeEstimated)}"
+/**
+ * "19.4 of about 46 GB", "1.8 of 4.2 GB", "12.6 of 93.2 MB": the bytes so far
+ * in the unit [downloadSize] gives the size; just "12.6 MB" when the size is
+ * unknown.
+ */
+fun progressBytes(bytes: Long, d: OfflineDownload): String {
+    if (d.sizeBytes <= 0) return formatBytes(bytes.coerceAtLeast(0))
+    val unit = if (d.sizeBytes / GB >= 0.1) GB else byteUnit(d.sizeBytes)
+    return "${String.format(Locale.ROOT, "%.1f", bytes.coerceAtLeast(0) / unit)} of ${downloadSize(d.sizeBytes, d.sizeEstimated)}"
+}
+
+/** What [formatBytes] divides [bytes] by: 1 for B, 1024 for KB, and so on to PB. */
+private fun byteUnit(bytes: Long): Double {
+    var unit = 1.0
+    var steps = 0
+    while (bytes / unit >= 1024 && steps < 5) {
+        unit *= 1024
+        steps++
+    }
+    return unit
+}
 
 /** The Downloads list's state line: "Downloading 42% · 1.8 of 4.2 GB", or the server's mark. */
 fun downloadRowState(d: OfflineDownload): String = when {
