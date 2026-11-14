@@ -5,9 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,23 +19,12 @@ import androidx.compose.foundation.rememberScrollState
 import media.watchmy.client.mobile.navigation.OnTabReselected
 import media.watchmy.client.mobile.components.MobileTab
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -50,19 +37,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import media.watchmy.client.mobile.components.FieldText
 import media.watchmy.client.mobile.components.FilledButton
 import media.watchmy.client.mobile.components.GoldTextButton
 import media.watchmy.client.mobile.components.IconTile
@@ -73,17 +56,10 @@ import media.watchmy.client.mobile.components.MessageHost
 import media.watchmy.client.mobile.components.PhoneIcons
 import media.watchmy.client.mobile.components.RowValue
 import media.watchmy.client.mobile.components.SectionLabel
-import media.watchmy.client.mobile.components.fieldColors
-import media.watchmy.client.mobile.downloads.DangerText
-import media.watchmy.client.mobile.downloads.usedSize
 import media.watchmy.client.mobile.navigation.MobileRoutes
 import media.watchmy.client.mobile.components.panel
 import media.watchmy.client.model.DeviceSession
-import media.watchmy.client.model.DownloadQuality
-import media.watchmy.client.model.freeSize
-import media.watchmy.client.model.plural
 import media.watchmy.client.model.SKIP_KINDS
-import media.watchmy.client.model.SkipMode
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.languagesSummary
 import media.watchmy.client.model.displayAddress
@@ -412,195 +388,14 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun Section(title: String) = SectionLabel(title, Modifier.padding(top = 16.dp, bottom = 4.dp))
-
-/**
- * A skip kind and its four modes as an M3 segmented button row. Where the
- * row is too narrow for the label beside the buttons (under ~400 dp), the
- * label sits above them.
- */
-@Composable
-private fun SkipRow(label: String, mode: SkipMode, onChange: (SkipMode) -> Unit) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val inline = (maxWidth - 32.dp - 64.dp - 12.dp) / 4 >= 76.dp
-        val title = @Composable { m: Modifier -> Text(label, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 16.sp, color = WmmColors.Text), modifier = m) }
-        if (inline) {
-            Row(Modifier.heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                title(Modifier.width(64.dp))
-                SkipButtons(mode, onChange, Modifier.weight(1f))
-            }
-        } else {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                title(Modifier)
-                SkipButtons(mode, onChange, Modifier.fillMaxWidth())
-            }
-        }
-    }
-}
-
-@Composable
-private fun SkipButtons(mode: SkipMode, onChange: (SkipMode) -> Unit, modifier: Modifier) {
-    val modes = SkipMode.entries.map { it to it.shortLabel }
-    SingleChoiceSegmentedButtonRow(modifier) {
-        modes.forEachIndexed { i, (m, text) ->
-            SegmentedButton(
-                selected = m == mode,
-                onClick = { onChange(m) },
-                shape = SegmentedButtonDefaults.itemShape(i, modes.size),
-                colors = SegmentedButtonDefaults.colors(
-                    activeContainerColor = WmmColors.Accent,
-                    activeContentColor = WmmColors.OnAccent,
-                    activeBorderColor = WmmColors.Line3,
-                    inactiveContainerColor = Color.Transparent,
-                    inactiveContentColor = WmmColors.TextSoft,
-                    inactiveBorderColor = WmmColors.Line3,
-                ),
-                contentPadding = PaddingValues(horizontal = 2.dp),
-                label = { Text(text, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 12.sp), maxLines = 1, softWrap = false) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun RenameDialog(current: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    var name by rememberSaveable { mutableStateOf(current) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = WmmColors.Surface2,
-        title = { Text("Device name") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("The name people see in Signed-in devices and in the server's Activity.", style = TextStyle(fontFamily = Inter, fontSize = 14.sp, color = WmmColors.TextMuted))
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it.take(60) },
-                    singleLine = true,
-                    textStyle = FieldText,
-                    colors = fieldColors(),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onSave(name) }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        },
-        confirmButton = { GoldTextButton("Save", { onSave(name) }, enabled = name.isNotBlank()) },
-        dismissButton = { GoldTextButton("Cancel", onDismiss, color = WmmColors.TextSoft) },
-    )
-}
-
-/** SettingsQuality.dc.html: Automatic first (where the server can do it), with what it does under it. */
-@Composable
-private fun QualityDialog(current: StreamQuality, options: List<StreamQuality>, onDismiss: () -> Unit, onPick: (StreamQuality) -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = WmmColors.Surface2,
-        title = { Text("Default quality") },
-        text = {
-            // Scrolls where the dialog is shorter than its choices (a phone held sideways).
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                options.forEach { q ->
-                    Row(
-                        Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(selected = q == current, role = Role.RadioButton, onClick = { onPick(q) }),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = q == current, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = WmmColors.Accent, unselectedColor = WmmColors.TextMuted))
-                        Column(Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp)) {
-                            Text(q.label, style = TextStyle(fontFamily = Inter, fontSize = 15.sp, color = WmmColors.Text))
-                            if (q == StreamQuality.Auto) {
-                                Text(AUTO_DETAIL, style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = WmmColors.TextMuted))
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = { GoldTextButton("Close", onDismiss, color = WmmColors.TextSoft) },
-    )
-}
-
-/**
- * SettingsMobileData.dc.html: Same as on Wi-Fi first, with the Default
- * quality under it, then the qualities as Default quality lists them.
- */
-@Composable
-private fun MobileQualityDialog(
-    current: StreamQuality?,
-    wifi: StreamQuality,
-    options: List<StreamQuality>,
-    device: String,
-    onDismiss: () -> Unit,
-    onPick: (StreamQuality?) -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = WmmColors.Surface2,
-        title = { Text("On mobile data") },
-        text = {
-            Column {
-                Text(
-                    "Used when this $device isn’t on Wi-Fi.",
-                    style = TextStyle(fontFamily = Inter, fontSize = 13.sp, lineHeight = 19.sp, color = WmmColors.TextMuted),
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
-                Column(Modifier.selectableGroup().verticalScroll(rememberScrollState())) {
-                    (listOf(null) + options).forEach { q ->
-                        Row(
-                            Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(selected = q == current, role = Role.RadioButton, onClick = { onPick(q) }),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = q == current, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = WmmColors.Accent, unselectedColor = WmmColors.TextMuted))
-                            Column(Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp)) {
-                                Text(q?.label ?: SAME_AS_WIFI, style = TextStyle(fontFamily = Inter, fontSize = 15.sp, color = WmmColors.Text))
-                                val detail = when (q) {
-                                    null -> "Follows Default quality · ${wifi.label}"
-                                    StreamQuality.Auto -> AUTO_DETAIL
-                                    else -> null
-                                }
-                                if (detail != null) Text(detail, style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = WmmColors.TextMuted))
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = { GoldTextButton("Close", onDismiss, color = WmmColors.TextSoft) },
-    )
-}
-
-@Composable
-private fun LicencesDialog(onDismiss: () -> Unit) {
-    val entries = listOf(
-        "Inter" to "SIL Open Font License 1.1",
-        "AndroidX, Jetpack Compose, Material 3, Media3" to "Apache License 2.0",
-        "Kotlin, kotlinx.coroutines, kotlinx.serialization" to "Apache License 2.0",
-        "Coil" to "Apache License 2.0",
-        "OkHttp" to "Apache License 2.0",
-    )
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = WmmColors.Surface2,
-        title = { Text("Open-source licences") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                entries.forEach { (name, licence) ->
-                    Column {
-                        Text(name, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = WmmColors.Text))
-                        Text(licence, style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = WmmColors.TextMuted))
-                    }
-                }
-            }
-        },
-        confirmButton = { GoldTextButton("Close", onDismiss) },
-    )
-}
+internal fun Section(title: String) = SectionLabel(title, Modifier.padding(top = 16.dp, bottom = 4.dp))
 
 /** Automatic in the Default quality row and dialog. */
 private const val AUTO_NOTE = "Original first, lower when it can’t keep up"
-private const val AUTO_DETAIL = "Original first, lowered when the connection can’t keep up"
+internal const val AUTO_DETAIL = "Original first, lowered when the connection can’t keep up"
 
 /** On mobile data, when it plays at the Default quality. */
-private const val SAME_AS_WIFI = "Same as on Wi-Fi"
+internal const val SAME_AS_WIFI = "Same as on Wi-Fi"
 
 private const val DIALOG_NAME = "name"
 private const val DIALOG_QUALITY = "quality"
@@ -612,7 +407,7 @@ private const val DIALOG_REMOVE_ALL = "remove-all"
 
 private enum class SettingsPage(val title: String) { Playback("Playback"), Subtitles("Audio & subtitles"), Downloads("Downloads"), Skip("Skip intros and credits"), Device("This tablet"), Devices("Signed-in devices"), Server("Server"), About("About this app") }
 
-private val SwitchColors @Composable get() = SwitchDefaults.colors(
+internal val SwitchColors @Composable get() = SwitchDefaults.colors(
     checkedThumbColor = WmmColors.Ground,
     checkedTrackColor = WmmColors.Accent,
     checkedBorderColor = WmmColors.Accent,
@@ -620,111 +415,6 @@ private val SwitchColors @Composable get() = SwitchDefaults.colors(
     uncheckedTrackColor = WmmColors.Surface3,
     uncheckedBorderColor = WmmColors.FieldOutline,
 )
-
-/**
- * Settings › Downloads (SettingsDownloads.dc.html): the quality new downloads
- * are made at, Wi-Fi only, the space they take (to Downloads), and Remove
- * all downloads.
- */
-@Composable
-private fun DownloadSettings(
-    downloads: DownloadsViewModel.State,
-    device: String,
-    onQuality: () -> Unit,
-    onWifiOnly: (Boolean) -> Unit,
-    onSpace: () -> Unit,
-    onRemoveAll: () -> Unit,
-) = Column {
-    Section("Downloads")
-    ListRow(
-        "Quality",
-        subtitle = "For new downloads; each can pick another",
-        modifier = Modifier.clickable(onClick = onQuality),
-        trailing = { RowValue(downloads.settings.quality.short) },
-    )
-    val wifiOnly = downloads.settings.wifiOnly
-    ListRow(
-        "Wi-Fi only",
-        subtitle = if (wifiOnly) "Downloads wait for Wi-Fi" else "Downloads use mobile data too",
-        modifier = Modifier.toggleable(value = wifiOnly, role = Role.Switch, onValueChange = onWifiOnly),
-        trailing = { Switch(checked = wifiOnly, onCheckedChange = null, colors = SwitchColors) },
-    )
-    val held = downloads.all.size
-    ListRow(
-        "Space used",
-        subtitle = if (held == 0) "${freeSize(downloads.storage.freeBytes)} free on this $device" else "${plural(held, "download")} · ${freeSize(downloads.storage.freeBytes)} free",
-        modifier = Modifier.clickable(onClick = onSpace),
-        trailing = { RowValue(usedSize(downloads.usedBytes)) },
-    )
-    if (held > 0) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClick = onRemoveAll).padding(horizontal = 16.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(WmmIcons.Trash, contentDescription = null, tint = DangerText, modifier = Modifier.size(22.dp))
-            Text("Remove all downloads", style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 16.sp, color = DangerText))
-        }
-    }
-}
-
-/** Download quality (SettingsDownloads.dc.html, dialog quality): Original, said in full, then the steps. */
-@Composable
-private fun DownloadQualityDialog(current: DownloadQuality, device: String, onDismiss: () -> Unit, onPick: (DownloadQuality) -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = WmmColors.Surface2,
-        title = { Text("Download quality") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text(
-                    "Used for new downloads. The download sheet shows each size before you start.",
-                    style = TextStyle(fontFamily = Inter, fontSize = 13.sp, lineHeight = 19.sp, color = WmmColors.TextMuted),
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
-                Column(Modifier.selectableGroup()) {
-                    DownloadQuality.entries.forEach { q ->
-                        Row(
-                            Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(selected = q == current, role = Role.RadioButton, onClick = { onPick(q) }),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = q == current, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = WmmColors.Accent, unselectedColor = WmmColors.TextMuted))
-                            Column(Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp)) {
-                                Text(q.label, style = TextStyle(fontFamily = Inter, fontSize = 15.sp, color = WmmColors.Text))
-                                if (q == DownloadQuality.Original) {
-                                    Text("Full quality: the file itself when this $device can play it", style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = WmmColors.TextMuted))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = { GoldTextButton("Close", onDismiss, color = WmmColors.TextSoft) },
-    )
-}
-
-/** Remove all downloads? (SettingsDownloads.dc.html, dialog removeAll). */
-@Composable
-private fun RemoveAllDialog(downloads: DownloadsViewModel.State, device: String, onDismiss: () -> Unit, onRemove: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = WmmColors.Surface2,
-        title = { Text("Remove all downloads?") },
-        text = {
-            Text(
-                "${plural(downloads.all.size, "download")}, ${usedSize(downloads.usedBytes)}, are deleted from this $device. You can download them again.",
-                style = TextStyle(fontFamily = Inter, fontSize = 14.sp, lineHeight = 21.sp, color = WmmColors.TextSoft),
-            )
-        },
-        confirmButton = {
-            Button(onClick = onRemove, shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB42318), contentColor = Color.White)) {
-                Text("Remove all", style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp))
-            }
-        },
-        dismissButton = { GoldTextButton("Cancel", onDismiss, color = WmmColors.TextSoft) },
-    )
-}
 
 @Composable
 private fun RequestLinks(onOpenRequests: (() -> Unit)?, onOpenInbox: (() -> Unit)?, inboxCount: Int) {
