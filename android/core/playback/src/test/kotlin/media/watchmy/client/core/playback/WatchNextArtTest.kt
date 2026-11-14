@@ -67,6 +67,7 @@ class WatchNextArtTest {
     @Test fun `the provider reads the picture for the account signed in, and refuses the rest`() {
         val provider = provider()
         val read = provider.openFile(WatchNextArt.uri(app, "server-1:7", "/still.jpg"), "r")
+        awaitWriters()
         val bytes = android.os.ParcelFileDescriptor.AutoCloseInputStream(read).use { it.readBytes() }
         assertArrayEquals(byteArrayOf(1, 2, 3), bytes)
 
@@ -76,6 +77,14 @@ class WatchNextArtTest {
         assertTrue(fails { provider.openFile(Uri.parse("content://${app.packageName}.watchnext.art/server-1:8?path=/still.jpg&s=forged"), "r") })
         assertEquals("A forged address never reaches the server", asked, app.asked.size)
         assertTrue(runCatching { provider.openFile(WatchNextArt.uri(app, "server-1:8", "/still.jpg"), "rw") }.exceptionOrNull() is SecurityException)
+    }
+
+    /**
+     * Robolectric's pipe is a file, which reads as empty until the provider's
+     * writer has finished; a device's pipe waits for the writer.
+     */
+    private fun awaitWriters() {
+        Thread.getAllStackTraces().keys.filter { it.name == "WatchNextArt" }.forEach { it.join(5_000) }
     }
 
     private fun fails(block: () -> Unit): Boolean = runCatching(block).exceptionOrNull() is FileNotFoundException
