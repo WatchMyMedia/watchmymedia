@@ -55,6 +55,10 @@ import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.BrandLockup
 import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.presentation.servers.ServerPickerViewModel
+import media.watchmy.client.ui.rememberLocalNetworkAccess
+import media.watchmy.client.ui.LocalNetworkAccess
+import media.watchmy.client.presentation.servers.isLocalAddress
+import media.watchmy.client.presentation.servers.localNetworkOffMessage
 
 private const val HTTP_NOTE =
     "An IP address or a .local name works over http on your own network. A hostname needs https; Tailscale Serve or a reverse proxy gives it one."
@@ -74,6 +78,11 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
     // One list on the TV: found on this network, then remembered.
     val rows = form.discovered?.let { it + form.remembered }
     val needsHttps = form.addressNeedsHttps
+    // Android 17's local network access, offered again in the list's place when nothing is found (§3.4.2).
+    val access = rememberLocalNetworkAccess()
+    val showAccess = access.needed && form.discovered?.isEmpty() == true
+    val accessRow = remember { FocusRequester() }
+    val offline = access.needed && form.addressError != null && isLocalAddress(form.address)
     val deviceName by services.auth.deviceName.collectAsStateWithLifecycle()
     var typing by remember { mutableStateOf(false) }
     val firstRow = remember { FocusRequester() }
@@ -97,7 +106,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
             val list = rows
             when {
                 list == null -> Text("Looking for servers…", style = inter(22.sp), color = WmmColors.TextMuted)
-                list.isEmpty() -> Text(
+                list.isEmpty() && !showAccess -> Text(
                     "No servers found on this network yet. Enter an address instead.",
                     style = inter(22.sp),
                     color = WmmColors.TextMuted,
@@ -108,6 +117,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                     contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp, start = 12.dp, end = 12.dp),
                 ) {
+                    if (showAccess) item(key = "local-network") { AccessRow(access, Modifier.focusRequester(accessRow)) }
                     items(list, key = { it.key }) { row ->
                         val isFirst = row == (list.firstOrNull { it.current } ?: list.first())
                         ServerRow(
@@ -138,7 +148,12 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                 )
                 if (onBack != null) TvButton("Cancel", onBack)
             }
-            form.addressError?.let { Text(it, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.Error) }
+            val addressError = if (offline) {
+                "${localNetworkOffMessage(form.address, "TV")} Focus moved to ${if (access.stopped) "Local network access is off" else "Allow local network access"}, on the left."
+            } else {
+                form.addressError
+            }
+            addressError?.let { Text(it, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.Error) }
         }
 
         Row(
@@ -169,10 +184,68 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
     }
 
     val hasRows = rows?.isNotEmpty() == true
-    LaunchedEffect(rows != null) {
+    LaunchedEffect(rows != null, showAccess) {
         if (rows == null) return@LaunchedEffect
         withFrameNanos { }
-        if (hasRows) firstRow.requestFocus() else addressField.requestFocus()
+        when {
+            showAccess -> accessRow.requestFocus()
+            hasRows -> firstRow.requestFocus()
+            else -> addressField.requestFocus()
+        }
+    }
+    // A local address that failed for want of local network access: focus goes to the row that allows it.
+    LaunchedEffect(offline, showAccess) {
+        if (!offline || !showAccess) return@LaunchedEffect
+        withFrameNanos { }
+        runCatching { accessRow.requestFocus() }
+    }
+}
+
+/**
+ * "Allow local network access" in the list's place (TvLocalNetwork.dc.html):
+ * OK shows the TV's own question, or opens WatchMyMedia's page in the TV's
+ * settings once the TV has stopped asking.
+ */
+@Composable
+private fun AccessRow(access: LocalNetworkAccess, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(18.dp)
+    val stopped = access.stopped
+    FocusableBox(onClick = access::ask, modifier = modifier.fillMaxWidth(), cornerRadius = 18.dp, focusedScale = 1.02f) { focused ->
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 120.dp)
+                .background(if (focused) WmmColors.Surface3 else WmmColors.Surface2, shape)
+                .border(1.dp, WmmColors.Line2, shape)
+                .padding(horizontal = 28.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            Box(
+                Modifier.size(64.dp).background(if (stopped) WmmColors.Line2 else WmmColors.Accent.copy(alpha = 0.16f), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(WmmIcons.Server, contentDescription = null, tint = if (stopped) WmmColors.TextSoft else WmmColors.Accent, modifier = Modifier.size(34.dp))
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(if (stopped) "Local network access is off" else "Allow local network access", style = inter(26.sp, FontWeight.SemiBold), color = WmmColors.Text)
+                Text(
+                    if (stopped) {
+                        "The TV has stopped asking. In its settings, open Permissions › Nearby devices and allow it for WatchMyMedia, then come back."
+                    } else {
+                        "WatchMyMedia needs it to find servers on this network and to reach them at their local address. Servers you reach over the internet work without it."
+                    },
+                    style = inter(19.sp, lineHeight = 27.sp),
+                    color = WmmColors.TextMuted,
+                )
+            }
+            Text(
+                if (stopped) "Open settings" else "Allow",
+                modifier = Modifier.background(WmmColors.Brand, RoundedCornerShape(12.dp)).padding(horizontal = 22.dp, vertical = 12.dp),
+                style = inter(20.sp, FontWeight.SemiBold),
+                color = WmmColors.Text,
+            )
+        }
     }
 }
 

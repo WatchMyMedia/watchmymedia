@@ -180,3 +180,14 @@ fun connectMessage(e: Throwable, label: String): String = when {
     e is ApiException && !e.message.isNullOrBlank() -> e.message.orEmpty()
     else -> "Couldn't reach $label. Check the address, and that the server is running and on this network."
 }
+
+/** Whether [address], as typed, is on this network (an IP address, a .local name): what local network access covers. */
+fun isLocalAddress(address: String): Boolean {
+    val authority = address.trim().substringAfter("://").substringBefore('/').substringBefore('?')
+    val host = if (authority.startsWith("[")) authority.substringBefore(']') + "]" else authority.substringBefore(':')
+    return media.watchmy.client.model.isPrivateNetworkHost(host)
+}
+
+/** The board's words when a local address fails while local network access is off ([device]: "phone", "TV"). */
+fun localNetworkOffMessage(address: String, device: String): String =
+    "Couldn't reach ${address.trim()}. Local network access is off for WatchMyMedia, so this $device can't reach addresses on your network."

@@ -21,6 +21,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import media.watchmy.client.model.DiscoveredServer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -147,5 +148,17 @@ class ServerPickerViewModelTest {
         shown.cancel()
         advanceTimeBy(5_001)
         assertEquals(0, looking.value)
+    }
+
+    @Test fun `addresses on this network are the ones local network access covers`() {
+        assertTrue(isLocalAddress("192.168.1.20:8080"))
+        assertTrue(isLocalAddress("http://nas.local:27587"))
+        assertTrue(isLocalAddress("[fd7a:115c:a1e0::1]:27587"))
+        assertFalse(isLocalAddress("https://media.example.net"))
+        assertFalse(isLocalAddress("203.0.113.5"))
+        assertEquals(
+            "Couldn't reach 192.168.1.20:8080. Local network access is off for WatchMyMedia, so this TV can't reach addresses on your network.",
+            localNetworkOffMessage(" 192.168.1.20:8080 ", "TV"),
+        )
     }
 }
