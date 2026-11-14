@@ -1,16 +1,17 @@
-package media.watchmy.client.mobile.signin
+package media.watchmy.client.presentation.signin
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import media.watchmy.client.fake.FakeServerRepository
 import media.watchmy.client.fake.OfficeMini
 import media.watchmy.client.fake.RemoteHome
-import media.watchmy.client.mobile.MainDispatcherRule
-import media.watchmy.client.mobile.TestAuth
+import media.watchmy.client.presentation.MainDispatcherRule
+import media.watchmy.client.presentation.TestAuth
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.DiscoveredServer
 import media.watchmy.client.model.PairingState
@@ -25,7 +26,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class SignInViewModelTest {
-    @get:Rule val main = MainDispatcherRule()
+    @get:Rule val main = MainDispatcherRule(UnconfinedTestDispatcher())
 
     private val auth = TestAuth()
     private val vm by lazy { SignInViewModel(auth, FakeServerRepository(signedIn = false)) }

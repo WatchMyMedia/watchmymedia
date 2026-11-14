@@ -82,6 +82,7 @@ import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.BrandMark
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.presentation.signin.SignInViewModel
 
 /**
  * Password sign-in (Main.dc.html). Linking a TV needs a signed-in phone, so

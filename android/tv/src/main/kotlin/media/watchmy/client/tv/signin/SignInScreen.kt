@@ -55,6 +55,9 @@ import media.watchmy.client.tv.components.radialGlow
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.BrandLockup
+import media.watchmy.client.presentation.signin.SignInViewModel
+import media.watchmy.client.presentation.signin.countdownLabel
+import media.watchmy.client.model.PairingState
 
 /**
  * Sign in on the TV (mockup: design/mockups/android-tv/Main.dc.html): a
@@ -65,10 +68,11 @@ import media.watchmy.client.ui.components.BrandLockup
 fun SignInScreen(onSwitchServer: () -> Unit) {
     val services = LocalAppServices.current
     // Its own for each visit, not the Activity's: after a sign-out or another server, a new code for the server in use.
-    val vm = viewModel(rememberViewModelStoreOwner()) { SignInViewModel(services.auth, services.servers) }
+    val vm = viewModel(rememberViewModelStoreOwner()) { SignInViewModel(services.auth, services.servers, codeFirst = true) }
     val server by vm.server.collectAsStateWithLifecycle()
     val deviceName by vm.deviceName.collectAsStateWithLifecycle()
-    var passwordMode by rememberSaveable { mutableStateOf(false) }
+    val state by vm.state.collectAsStateWithLifecycle()
+    val passwordMode = !state.codeSignIn
     val serverName = server?.server?.name ?: "your server"
 
     Box(
@@ -80,26 +84,14 @@ fun SignInScreen(onSwitchServer: () -> Unit) {
     ) {
         BrandLockup(markSize = 44.dp, fontSize = 26.sp, modifier = Modifier.padding(start = 58.dp, top = 48.dp))
         if (passwordMode) {
-            BackHandler {
-                passwordMode = false
-                vm.startPairing()
-            }
-            PasswordSignIn(
-                vm = vm,
-                serverName = serverName,
-                onUseCode = {
-                    passwordMode = false
-                    vm.startPairing()
-                },
-            )
+            BackHandler(onBack = vm::useCode)
+            PasswordSignIn(vm = vm, state = state, serverName = serverName, onUseCode = vm::useCode)
         } else {
             PairingSignIn(
                 vm = vm,
+                state = state,
                 serverName = serverName,
-                onPassword = {
-                    vm.stopPairing()
-                    passwordMode = true
-                },
+                onPassword = vm::usePassword,
                 onSwitchServer = onSwitchServer,
                 // A server that wants a browser check first refuses password sign-in from apps.
                 passwordAllowed = server?.server?.turnstile != true,
@@ -110,10 +102,10 @@ fun SignInScreen(onSwitchServer: () -> Unit) {
 }
 
 @Composable
-private fun PairingSignIn(vm: SignInViewModel, serverName: String, onPassword: () -> Unit, onSwitchServer: () -> Unit, passwordAllowed: Boolean = true) {
-    val pairing by vm.pairing.collectAsStateWithLifecycle()
+private fun PairingSignIn(vm: SignInViewModel, state: SignInViewModel.State, serverName: String, onPassword: () -> Unit, onSwitchServer: () -> Unit, passwordAllowed: Boolean = true) {
+    val pairing = state.pairing ?: PairingState.Starting
     val first = remember { FocusRequester() }
-    val waiting = pairing as? SignInViewModel.Pairing.Waiting
+    val waiting = (pairing as? PairingState.Waiting)?.code
 
     Column(Modifier.padding(start = 160.dp, top = 236.dp).width(960.dp), verticalArrangement = Arrangement.spacedBy(26.dp)) {
         Kicker("Sign in")
@@ -121,7 +113,7 @@ private fun PairingSignIn(vm: SignInViewModel, serverName: String, onPassword: (
         Text(
             buildAnnotatedString {
                 append("On your phone or computer, open ")
-                withStyle(SpanStyle(color = WmmColors.Text, fontWeight = FontWeight.SemiBold)) { append(waiting?.linkLabel ?: "the link page") }
+                withStyle(SpanStyle(color = WmmColors.Text, fontWeight = FontWeight.SemiBold)) { append(waiting?.let { displayAddress(it.linkUrl) } ?: "the link page") }
                 append(" and enter this code.")
             },
             style = inter(26.sp, lineHeight = 38.sp),
@@ -129,10 +121,10 @@ private fun PairingSignIn(vm: SignInViewModel, serverName: String, onPassword: (
             modifier = Modifier.widthIn(max = 820.dp),
         )
         CodeBoxes(waiting?.code, Modifier.padding(top = 6.dp))
-        StatusLine(pairing)
+        StatusLine(pairing, state.codeRemainingMs)
         Row(Modifier.padding(top = 26.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            if (pairing is SignInViewModel.Pairing.Failed) {
-                TvButton("Try again", vm::startPairing, style = TvButtonStyle.Primary)
+            if (pairing is PairingState.Failed) {
+                TvButton("Try again", vm::newCode, style = TvButtonStyle.Primary)
             }
             if (passwordAllowed) TvButton("Sign in with a password instead", onPassword, Modifier.focusRequester(first))
             TvButton("Switch server", onSwitchServer, if (passwordAllowed) Modifier else Modifier.focusRequester(first))
@@ -184,16 +176,16 @@ private fun CodeGroup(chars: String) {
 }
 
 @Composable
-private fun StatusLine(pairing: SignInViewModel.Pairing) {
+private fun StatusLine(pairing: PairingState, remainingMs: Long) {
     val (text, color) = when (pairing) {
-        SignInViewModel.Pairing.Starting -> "Getting a code…" to WmmColors.TextMuted
-        is SignInViewModel.Pairing.Waiting ->
-            "Waiting for the code · refreshes in ${countdownLabel(pairing.remainingMs)} · this TV signs in by itself once it is entered" to WmmColors.TextMuted
-        SignInViewModel.Pairing.Approved -> "Code accepted. Signing in…" to WmmColors.Accent
-        is SignInViewModel.Pairing.Failed -> pairing.message to WmmColors.Error
+        PairingState.Starting, PairingState.Expired -> "Getting a code…" to WmmColors.TextMuted
+        is PairingState.Waiting ->
+            "Waiting for the code · refreshes in ${countdownLabel(remainingMs)} · this TV signs in by itself once it is entered" to WmmColors.TextMuted
+        is PairingState.Approved -> "Code accepted. Signing in…" to WmmColors.Accent
+        is PairingState.Failed -> pairing.message to WmmColors.Error
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(12.dp).background(if (pairing is SignInViewModel.Pairing.Failed) WmmColors.Error else WmmColors.Accent, CircleShape))
+        Box(Modifier.size(12.dp).background(if (pairing is PairingState.Failed) WmmColors.Error else WmmColors.Accent, CircleShape))
         Text(text, style = inter(20.sp), color = color)
     }
 }
@@ -201,8 +193,8 @@ private fun StatusLine(pairing: SignInViewModel.Pairing) {
 private enum class Field { Name, Password }
 
 @Composable
-private fun PasswordSignIn(vm: SignInViewModel, serverName: String, onUseCode: () -> Unit) {
-    val form by vm.form.collectAsStateWithLifecycle()
+private fun PasswordSignIn(vm: SignInViewModel, state: SignInViewModel.State, serverName: String, onUseCode: () -> Unit) {
+    val form = state
     var target by rememberSaveable { mutableStateOf(if (form.name.isBlank()) Field.Name else Field.Password) }
     val firstKey = remember { FocusRequester() }
 
