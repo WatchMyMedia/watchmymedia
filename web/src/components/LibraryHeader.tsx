@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { healthQuery } from '../api/queries'
 import { ActivityBar } from './ActivityBar'
 import { LibraryActions } from './LibraryActions'
+import { HrefLink } from './settings/Frame'
+import { settingsHref } from '../lib/settingsRoutes'
 import type { components } from '../api/schema'
 
 type Library = components['schemas']['Library']
@@ -16,7 +18,11 @@ export function LibraryHeader({ library }: { library: Library }) {
         <Link to="/settings/libraries" className="hover:text-neutral-300">
           Settings
         </Link>{' '}
-        / {library.name} / Files
+        /{' '}
+        <HrefLink href={settingsHref('libraries', library.id)} className="hover:text-neutral-300">
+          {library.name}
+        </HrefLink>{' '}
+        / Files
       </nav>
       <header className="rounded-lg border border-line bg-surface p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -27,7 +33,14 @@ export function LibraryHeader({ library }: { library: Library }) {
               {library.fileCount} files
               {library.missingCount > 0 && <span className="text-warn"> · {library.missingCount} missing</span>}
               {library.pendingCount > 0 && <span className="text-neutral-500"> · {library.pendingCount} awaiting match</span>}
-              {library.unmatchedCount > 0 && <span className="text-warn"> · {library.unmatchedCount} unmatched</span>}
+              {library.unmatchedCount > 0 && (
+                <>
+                  {' · '}
+                  <HrefLink href={settingsHref('libraries', library.id, 'unmatched')} className="text-warn underline-offset-4 hover:underline">
+                    {library.unmatchedCount} unmatched
+                  </HrefLink>
+                </>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-3">

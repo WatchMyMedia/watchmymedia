@@ -419,48 +419,6 @@ function SeekThumbnailsPanel() {
   )
 }
 
-const SCAN_INTERVALS: readonly (readonly [number, string])[] = [
-  [5, 'Every 5 minutes'],
-  [15, 'Every 15 minutes'],
-  [30, 'Every 30 minutes'],
-  [60, 'Every hour'],
-  [360, 'Every 6 hours'],
-  [1440, 'Once a day'],
-]
-
-/** How often every library is read in full, to find what the watcher misses. */
-export function ScanIntervalSection() {
-  const settings = useQuery(settingsQuery)
-  const update = useUpdateSettings()
-  const value = settings.data?.scanIntervalMinutes
-  // An interval set in config.yaml may be none of these.
-  const options = value && !SCAN_INTERVALS.some(([m]) => m === value) ? [...SCAN_INTERVALS, [value, `Every ${value} minutes`] as const] : SCAN_INTERVALS
-  return (
-    <Panel>
-      <Row
-        label="Scan every library"
-        hint="Where the server can watch a folder, new files show up within seconds. This scan finds the rest: network shares written to by other computers, and folders beyond the system’s limit on watches. Each scan reads every folder, which can wake sleeping drives."
-        htmlFor="scan-interval"
-      >
-        <select
-          id="scan-interval"
-          value={value ?? 15}
-          disabled={!settings.data}
-          onChange={(e) => update.mutate({ scanIntervalMinutes: Number(e.target.value) })}
-          className={`${textInput} px-2`}
-        >
-          {options.map(([m, l]) => (
-            <option key={m} value={m}>
-              {l}
-            </option>
-          ))}
-        </select>
-      </Row>
-      {update.isError && visibleConfirmationError(update.error) && <p className="px-5 pb-4 text-sm text-red-400">{update.error.message}</p>}
-    </Panel>
-  )
-}
-
 export function BackupSection() {
   const settings = useQuery(settingsQuery)
   const update = useUpdateSettings()
