@@ -66,6 +66,7 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.presentation.servers.ServerPickerViewModel
 
 /**
  * Choosing a server (ServerPicker.dc.html): on this network, remembered, or

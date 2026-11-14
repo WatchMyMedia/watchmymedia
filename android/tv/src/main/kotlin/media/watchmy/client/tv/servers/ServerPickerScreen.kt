@@ -54,6 +54,7 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.BrandLockup
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.presentation.servers.ServerPickerViewModel
 
 private const val HTTP_NOTE =
     "An IP address or a .local name works over http on your own network. A hostname needs https; Tailscale Serve or a reverse proxy gives it one."
@@ -69,9 +70,10 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
     val services = LocalAppServices.current
     // Its own for each visit, not the Activity's: a second visit starts afresh, and looking for servers stops when it goes.
     val vm = viewModel(rememberViewModelStoreOwner()) { ServerPickerViewModel(services.servers) }
-    val rows by vm.rows.collectAsStateWithLifecycle()
-    val form by vm.form.collectAsStateWithLifecycle()
-    val needsHttps by vm.addressNeedsHttps.collectAsStateWithLifecycle()
+    val form by vm.state.collectAsStateWithLifecycle()
+    // One list on the TV: found on this network, then remembered.
+    val rows = form.discovered?.let { it + form.remembered }
+    val needsHttps = form.addressNeedsHttps
     val deviceName by services.auth.deviceName.collectAsStateWithLifecycle()
     var typing by remember { mutableStateOf(false) }
     val firstRow = remember { FocusRequester() }
@@ -106,18 +108,18 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                     contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp, start = 12.dp, end = 12.dp),
                 ) {
-                    items(list, key = { it.id }) { row ->
+                    items(list, key = { it.key }) { row ->
                         val isFirst = row == (list.firstOrNull { it.current } ?: list.first())
                         ServerRow(
                             row = row,
-                            connecting = form.connecting == row.id,
+                            connecting = form.connecting == row.key,
                             onClick = { vm.choose(row) },
                             modifier = if (isFirst) Modifier.focusRequester(firstRow) else Modifier,
                         )
                     }
                 }
             }
-            form.rowError?.let { Text(it, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.Error) }
+            form.error?.let { Text(it, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.Error) }
         }
 
         Column(Modifier.padding(start = 1100.dp, top = 380.dp).width(660.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
@@ -130,7 +132,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 TvButton(
                     if (form.connecting == ServerPickerViewModel.ADDRESS) "Connecting…" else "Connect",
-                    vm::connectAddress,
+                    vm::connectToAddress,
                     style = TvButtonStyle.Primary,
                     enabled = form.connecting == null,
                 )
@@ -161,7 +163,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
             onSubmit = {
                 typing = false
                 vm.setAddress(it)
-                vm.connectAddress()
+                vm.connectToAddress()
             },
         )
     }
@@ -210,7 +212,7 @@ private fun ServerRow(row: ServerPickerViewModel.Row, connecting: Boolean, onCli
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(row.name, style = inter(26.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    if (connecting) "Connecting…" else row.detail,
+                    if (connecting) "Connecting…" else if (row.onNetwork) row.detail else "Remembered · ${row.detail.replaceFirstChar { it.lowercase() }}",
                     style = inter(19.sp),
                     color = if (row.tooOld) WmmColors.Warn else WmmColors.TextMuted,
                     maxLines = 1,

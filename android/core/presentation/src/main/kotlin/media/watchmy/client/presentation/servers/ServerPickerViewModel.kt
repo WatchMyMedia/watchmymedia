@@ -1,4 +1,4 @@
-package media.watchmy.client.mobile.servers
+package media.watchmy.client.presentation.servers
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
@@ -24,9 +25,15 @@ import media.watchmy.client.model.attempt
 import media.watchmy.client.model.displayAddress
 import media.watchmy.client.model.formatAgo
 import media.watchmy.client.model.isNotEncrypted
+import media.watchmy.client.model.needsHttpsNudge
 import media.watchmy.client.model.versionLabel
 
-/** Choosing a server: found on this network, remembered, or typed. */
+/**
+ * Choosing a server, on the phone, the tablet and the TV: found on this
+ * network, remembered, or typed. Choosing one checks it answers and is new
+ * enough, then makes it the server in use ([chosen]). The network is
+ * searched only while the list is on screen (and for 5 s after).
+ */
 class ServerPickerViewModel(
     private val servers: ServerRepository,
     private val now: () -> Long = System::currentTimeMillis,
@@ -39,7 +46,9 @@ class ServerPickerViewModel(
         val tooOld: Boolean = false,
         val current: Boolean = false,
         val savedId: String? = null,
-        /** Plain http beyond this network ([Server.notEncrypted]): marked Not encrypted. */
+        /** Announcing itself on this network (the TV's "On this network" badge). */
+        val onNetwork: Boolean = false,
+        /** Plain http beyond this network ([media.watchmy.client.model.Server.notEncrypted]): marked Not encrypted. */
         val notEncrypted: Boolean = false,
     )
 
@@ -47,6 +56,7 @@ class ServerPickerViewModel(
         /** Null while still looking. */
         val discovered: List<Row>? = null,
         val remembered: List<Row> = emptyList(),
+        /** The typed address, as the screen's field reports it ([setAddress]). */
         val address: String = "",
         /** The key of the row (or [ADDRESS]) being connected to. */
         val connecting: String? = null,
@@ -54,18 +64,21 @@ class ServerPickerViewModel(
         val error: String? = null,
         /** Why connecting to the typed address failed. */
         val addressError: String? = null,
-    )
+    ) {
+        /** An address typed with http:// is a host name, which needs https. */
+        val addressNeedsHttps: Boolean get() = needsHttpsNudge(address)
+    }
 
     private data class Local(val address: String = "", val connecting: String? = null, val error: String? = null, val addressError: String? = null)
 
     private val local = MutableStateFlow(Local())
     private val chosenEvents = Channel<Unit>(Channel.BUFFERED)
 
-    /** Emits once a server has been chosen. */
+    /** Emits once each time a server has been chosen and is now in use. */
     val chosen: Flow<Unit> = chosenEvents.receiveAsFlow()
 
     val state: StateFlow<State> = combine(
-        servers.discovered.map<List<DiscoveredServer>, List<DiscoveredServer>?> { it }.onStart { emit(null) },
+        servers.discovered.map<List<DiscoveredServer>, List<DiscoveredServer>?> { it }.onStart { emit(null) }.catch { emit(emptyList()) },
         servers.saved,
         servers.current,
         local,
@@ -73,10 +86,7 @@ class ServerPickerViewModel(
         val savedById = saved.associateBy { it.server.id }
         val found = discovered?.map { d ->
             val s = savedById[d.id]
-            val account = when {
-                s?.signedIn == true && s.userName != null -> "signed in as ${s.userName}"
-                else -> "not signed in"
-            }
+            val account = if (s?.signedIn == true && s.userName != null) "signed in as ${s.userName}" else "not signed in"
             val tooOld = d.apiLevel < REQUIRED_API_LEVEL
             Row(
                 key = d.baseUrl,
@@ -85,6 +95,7 @@ class ServerPickerViewModel(
                 tooOld = tooOld,
                 current = current?.server?.id == d.id,
                 savedId = s?.server?.id,
+                onNetwork = true,
                 notEncrypted = isNotEncrypted(d.baseUrl),
             )
         }
@@ -102,16 +113,18 @@ class ServerPickerViewModel(
     private fun SavedServer.toRow(current: SavedServer?) = Row(
         key = server.baseUrl,
         name = server.name,
-        detail = listOf(
+        detail = listOfNotNull(
             "Last used ${formatAgo(lastUsedAtMs, now())}",
             if (signedIn && userName != null) "signed in as $userName" else "not signed in",
+            "too old for this app".takeIf { server.tooOld },
         ).joinToString(" · "),
+        tooOld = server.tooOld,
         current = current?.server?.id == server.id,
         savedId = server.id,
         notEncrypted = server.notEncrypted,
     )
 
-    fun setAddress(address: String) = local.update { it.copy(address = address, addressError = null) }
+    fun setAddress(address: String) = local.update { if (it.address == address) it else it.copy(address = address, addressError = null) }
 
     /** Connects to a listed server. */
     fun choose(row: Row) = connect(row.key, row.key, row.name)
@@ -120,7 +133,7 @@ class ServerPickerViewModel(
     fun connectToAddress() {
         val address = local.value.address.trim()
         if (address.isEmpty()) {
-            local.update { it.copy(addressError = "Enter the server's address.") }
+            local.update { it.copy(addressError = "Enter the server's address, such as 192.168.1.20 or nas.local.") }
             return
         }
         connect(address, ADDRESS, address)
@@ -153,12 +166,13 @@ class ServerPickerViewModel(
     }
 
     companion object {
+        /** [State.connecting] while the typed address is. */
         const val ADDRESS = "address"
     }
 }
 
 /** Too old says which version and what to do; an unreachable server says so. */
-internal fun connectMessage(e: Throwable, label: String): String = when {
+fun connectMessage(e: Throwable, label: String): String = when {
     e is ServerTooOldException -> e.message.orEmpty()
     e is ApiException && !e.message.isNullOrBlank() -> e.message.orEmpty()
     else -> "Couldn't reach $label. Check the address, and that the server is running and on this network."
