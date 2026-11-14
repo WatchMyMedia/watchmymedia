@@ -166,6 +166,16 @@ didn't start.
   iPhone Pro or Apple TV 4K, which other sessions use.
   `scripts/simulator.sh` resolves names to a UDID and falls back to the newest
   iPhone Pro or Apple TV when the named one is missing (as on CI's runners).
+- `make apple-test-sim` runs the Kit's tests on the simulator: the
+  `WatchMyMedia` scheme has no UI test target, so `UITests/` runs only
+  through the `WatchMyMediaE2E` scheme, one class or test at a time with
+  `-only-testing:WatchMyMediaUITests/<Class>` (README's trailer recipe;
+  `-test-iterations 5 -run-tests-until-failure` repeats one).
+- On iPhone the keyboard covers the tab bar: a UI test that taps a tab while
+  a field has the keyboard up taps a key instead. Put the keyboard away
+  first, wait for the tab's `isSelected`, and find a page's search field by
+  its prompt, since another tab's may still be in the tree
+  (`UITests/LiveExtrasTests.swift`).
 - Builds for the simulator are signed ad hoc (`APPLE_SIM_SIGNING` in the
   Makefile). Without it the Keychain refuses the app and the sign-in does not
   survive a relaunch, so use the make targets or copy those flags.

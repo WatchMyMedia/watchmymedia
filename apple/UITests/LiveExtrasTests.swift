@@ -30,6 +30,19 @@ final class LiveExtrasTests: XCTestCase {
 
     private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
+    /// Waits until `element` matches `predicate`.
+    @MainActor
+    private func becomes(_ element: XCUIElement, _ predicate: String, timeout: TimeInterval = 10) -> Bool {
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: predicate), object: element)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    /// Waits until `element` is gone.
+    @MainActor
+    private func gone(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
+        becomes(element, "exists == false", timeout: timeout)
+    }
+
     @MainActor
     func testAStarAndTheFavouritesChip() throws {
         let app = launch()
@@ -152,8 +165,19 @@ final class LiveExtrasTests: XCTestCase {
         XCTAssertTrue(app.buttons["Watch 20.1"].exists, "What is on has Watch")
         snap("guide-search")
 
-        app.tabBars.buttons["Search"].tap()
-        let tabField = app.searchFields.firstMatch
+        // The keyboard covers the tab bar: a tap on the tab could land on a key
+        // and the guide's field stay on screen. Put it away first.
+        let keyboard = app.keyboards.firstMatch
+        if keyboard.exists {
+            app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] %@", "search")).firstMatch.tap()
+            XCTAssertTrue(gone(keyboard), "the keyboard went away")
+        }
+        let searchTab = app.tabBars.buttons["Search"]
+        XCTAssertTrue(searchTab.waitForExistence(timeout: 10))
+        searchTab.tap()
+        XCTAssertTrue(becomes(searchTab, "isSelected == true"), "the Search tab is chosen")
+        // The Search tab's own field, by its prompt: the guide's may still be in the tree.
+        let tabField = app.searchFields.matching(NSPredicate(format: "placeholderValue == %@", "Shows, movies, episodes, Live TV")).firstMatch
         XCTAssertTrue(tabField.waitForExistence(timeout: 10))
         tabField.tap(); tabField.typeText("harbor")
         let station = app.buttons["live-search-7.1-Station 9"].firstMatch
