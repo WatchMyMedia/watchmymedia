@@ -34,13 +34,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param complete The fixed window was fully read. False means bounded backfill continues in a later run.
- * @param from 
- * @param sectionId 
- * @param through 
- * @param userId 
+ * @param from
+ * @param sectionId
+ * @param through
+ * @param userId
  */
 @Serializable
 

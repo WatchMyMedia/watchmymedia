@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param local 
- * @param remote 
- * @param tailnet 
+ * @param local
+ * @param remote
+ * @param tailnet
  */
 @Serializable
 

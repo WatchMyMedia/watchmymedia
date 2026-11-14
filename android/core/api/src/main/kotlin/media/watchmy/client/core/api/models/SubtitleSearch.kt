@@ -36,15 +36,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param attribution Show this where the results are listed.
  * @param available An online provider is set up; false in builds without an API key.
  * @param canDownload The signed-in person may download (Settings can keep downloads to admins).
- * @param languages 
- * @param provider 
- * @param quota 
- * @param results 
+ * @param languages
+ * @param provider
+ * @param quota
+ * @param results
  * @param error Why the search failed; the results are then empty.
  */
 @Serializable
@@ -82,8 +80,6 @@ data class SubtitleSearch (
 ) {
 
     /**
-     * 
-     *
      * Values: opensubtitles,unknown_default_open_api
      */
     @Serializable(with = ProviderSerializer::class)

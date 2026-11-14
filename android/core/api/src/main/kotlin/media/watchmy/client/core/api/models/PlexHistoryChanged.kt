@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param cleared All earlier imported viewings were cleared for this private event's owner.
  * @param deletedIds Imported viewing IDs removed for this private event's owner.
  */

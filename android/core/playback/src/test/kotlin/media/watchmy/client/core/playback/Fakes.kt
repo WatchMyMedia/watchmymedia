@@ -1,13 +1,21 @@
 package media.watchmy.client.core.playback
 
 import androidx.media3.common.Player
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Delay
+import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.InternalCoroutinesApi
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -76,10 +84,16 @@ class FakeGateway(private val clock: Clock) : PlaybackGateway {
     /** Set, decisions wait for it: a request still out. */
     var hold: CompletableDeferred<Unit>? = null
 
+    /** Set, decisions come with a media token, as from a level-28 server: "dec1", "dec2"… */
+    var tokenWithDecision = false
+    var decisionTokens = 0
+
     override suspend fun decide(request: DecisionRequest): PlaybackDecision {
         decisions += request
         hold?.await()
-        return decide.invoke(request)
+        val decision = decide.invoke(request)
+        if (!tokenWithDecision || decision.mediaToken != null) return decision
+        return decision.copy(mediaToken = MediaToken("dec${++decisionTokens}", clock.wallMs() + tokenLifetimeMs, serverUrl = "http://srv"))
     }
 
     override suspend fun reportProgress(report: ProgressReport): ProgressReply {
@@ -87,7 +101,15 @@ class FakeGateway(private val clock: Clock) : PlaybackGateway {
         return reply(report)
     }
 
-    override suspend fun mediaToken(): MediaToken = MediaToken("tok${++tokens}", clock.wallMs() + tokenLifetimeMs, serverUrl = "http://srv")
+    /** Set, token requests fail with it. */
+    var tokenError: Exception? = null
+    var tokenCalls = 0
+
+    override suspend fun mediaToken(): MediaToken {
+        tokenCalls++
+        tokenError?.let { throw it }
+        return MediaToken("tok${++tokens}", clock.wallMs() + tokenLifetimeMs, serverUrl = "http://srv")
+    }
 
     override suspend fun stopSession(sessionId: String) {
         stoppedSessions += sessionId
@@ -118,12 +140,47 @@ class FakeGateway(private val clock: Clock) : PlaybackGateway {
     }
 }
 
+/** True while a task of an [OffMainDispatcher] runs: what the app's IO threads are to the player. */
+private val offMain = ThreadLocal.withInitial { false }
+
+/**
+ * The controllers' IO dispatcher in tests: [delegate]'s virtual time, with
+ * every task it runs marked as off the main thread, so a [FakeMediaPlayer]
+ * fails there as ExoPlayer does ("Player is accessed on the wrong thread").
+ * With one dispatcher for both, a read of the player inside `withContext(io)`
+ * went unnoticed (PLAN-ANDROID-REVIEW.md §3.1.2).
+ */
+@OptIn(ExperimentalCoroutinesApi::class, InternalCoroutinesApi::class)
+class OffMainDispatcher(private val delegate: TestDispatcher) : CoroutineDispatcher(), Delay {
+    override fun dispatch(context: CoroutineContext, block: Runnable) {
+        delegate.dispatch(context, Runnable {
+            val was = offMain.get()
+            offMain.set(true)
+            try {
+                block.run()
+            } finally {
+                offMain.set(was)
+            }
+        })
+    }
+
+    override fun scheduleResumeAfterDelay(timeMillis: Long, continuation: CancellableContinuation<Unit>) =
+        (delegate as Delay).scheduleResumeAfterDelay(timeMillis, continuation)
+
+    override fun invokeOnTimeout(timeMillis: Long, block: Runnable, context: CoroutineContext): DisposableHandle =
+        (delegate as Delay).invokeOnTimeout(timeMillis, block, context)
+}
+
 /**
  * A player whose position runs with virtual time while it is ready and
  * playing. Tests move it between phases with [buffer], [ready] and [end].
+ * Like ExoPlayer it throws when called from an [OffMainDispatcher]'s tasks.
  */
 class FakeMediaPlayer(private val clock: Clock) : MediaPlayer {
     override val media3: Player? = null
+
+    /** What ExoPlayer does on a call from another thread than its own. */
+    private fun onItsThread() = check(!offMain.get()) { "Player is accessed on the wrong thread" }
     private var listener: MediaPlayer.Listener? = null
     val loads = mutableListOf<PlayerSource>()
     val seeks = mutableListOf<Long>()
@@ -140,14 +197,19 @@ class FakeMediaPlayer(private val clock: Clock) : MediaPlayer {
     var liveSeeks = 0
     val liveTokens = mutableListOf<MediaToken>()
     override var liveOffsetMs: Long? = null
+        get() = field.also { onItsThread() }
     override var liveWindowDurationMs: Long? = null
+        get() = field.also { onItsThread() }
     override var endedEventDurationMs: Long? = null
-    override fun seekToLiveEdge() { liveSeeks++; change { anchorPos = 0 } }
+        get() = field.also { onItsThread() }
+    override fun seekToLiveEdge() { onItsThread(); liveSeeks++; change { anchorPos = 0 } }
     override fun updateMediaToken(token: MediaToken) { liveTokens += token }
 
     override var phase = PlayerPhase.Idle
+        get() = field.also { onItsThread() }
         private set
     override var playWhenReady = false
+        get() = field.also { onItsThread() }
         private set
     private var anchorPos = 0L
     private var anchorAt = 0L
@@ -158,16 +220,21 @@ class FakeMediaPlayer(private val clock: Clock) : MediaPlayer {
     override val bufferedPositionMs: Long get() = positionMs + bufferAheadMs
 
     override var throughputBps: Long? = null
+        get() = field.also { onItsThread() }
     override var transfer: media.watchmy.client.core.playback.player.TransferSample? = null
+        get() = field.also { onItsThread() }
 
     /** What the player counted since its last load; tests set it. */
     override var stalls = Stalls()
+        get() = field.also { onItsThread() }
 
     /** The video's frame rate as the player read it; tests set it with [readFrameRate]. */
     override var frameRate: Float? = null
+        get() = field.also { onItsThread() }
         private set
 
     private fun change(block: () -> Unit) {
+        onItsThread()
         anchorPos = positionMs
         anchorAt = clock.elapsedMs()
         block()
@@ -179,6 +246,7 @@ class FakeMediaPlayer(private val clock: Clock) : MediaPlayer {
     }
 
     override fun load(source: PlayerSource) {
+        onItsThread()
         failNextLoad?.let { failure ->
             failNextLoad = null
             throw failure
@@ -208,14 +276,19 @@ class FakeMediaPlayer(private val clock: Clock) : MediaPlayer {
     }
 
     override fun selectText(selection: TextSelection) {
+        onItsThread()
         text = selection
     }
 
-    override fun selectAudio(ordinal: Int): Boolean = playsAudio(ordinal).also { if (it) audioOrdinal = ordinal }
+    override fun selectAudio(ordinal: Int): Boolean {
+        onItsThread()
+        return playsAudio(ordinal).also { if (it) audioOrdinal = ordinal }
+    }
 
     override fun stop() = change { phase = PlayerPhase.Idle }
 
     override fun release() {
+        onItsThread()
         released = true
     }
 
@@ -383,9 +456,11 @@ class Harness(
     lookups: PlaybackLookups = PlaybackLookups.None,
     profileProvider: ProfileProvider = ProfileProvider { TV_PROFILE },
     quality: StreamQuality = StreamQuality.Original,
+    stopInBackground: Boolean = false,
 ) {
     val scheduler = TestCoroutineScheduler()
     private val dispatcher = StandardTestDispatcher(scheduler)
+    private val io = OffMainDispatcher(StandardTestDispatcher(scheduler))
     val scope = TestScope(dispatcher)
     val clock = TestClock(scheduler)
     val gateway = FakeGateway(clock)
@@ -411,7 +486,8 @@ class Harness(
         network = { metered },
         clock = clock,
         dispatcher = dispatcher,
-        io = dispatcher,
+        io = io,
+        stopInBackground = stopInBackground,
     )
     val events = mutableListOf<PlayerEvent>()
 

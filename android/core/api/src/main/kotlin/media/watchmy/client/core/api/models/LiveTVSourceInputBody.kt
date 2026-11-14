@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param address The tuner's LAN IP or hostname; HTTP control port 80 only.
- * @param name 
+ * @param name
  */
 @Serializable
 

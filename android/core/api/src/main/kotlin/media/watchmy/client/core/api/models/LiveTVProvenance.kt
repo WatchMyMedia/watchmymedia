@@ -35,14 +35,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param adBreaks finding, found or none.
- * @param channel 
- * @param gaps 
- * @param number 
- * @param startedAt 
- * @param ruleId 
+ * @param channel
+ * @param gaps
+ * @param number
+ * @param startedAt
+ * @param ruleId
  */
 @Serializable
 

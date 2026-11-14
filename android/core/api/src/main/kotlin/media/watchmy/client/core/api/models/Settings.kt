@@ -46,32 +46,30 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param activity 
+ * @param activity
  * @param backupKeep Nightly backups to keep; 0 disables them.
- * @param backups 
- * @param cast 
- * @param dataDir 
- * @param hwaccel 
+ * @param backups
+ * @param cast
+ * @param dataDir
+ * @param hwaccel
  * @param scanIntervalMinutes Minutes between scheduled scans of every library, which find what the filesystem watcher misses.
  * @param serverName What TV and phone apps call this server.
  * @param serverNameDefault The name used when none is set: the host name.
- * @param subtitles 
- * @param tmdbConfigured 
- * @param turnstile 
- * @param capabilities 
- * @param hardwareAdapters 
+ * @param subtitles
+ * @param tmdbConfigured
+ * @param turnstile
+ * @param capabilities
+ * @param hardwareAdapters
  * @param hardwareDiagnostics Bounded results of transcoder probes, including failures. Admin-only; synthetic inputs, never library files.
  * @param hwDevice Requested adapter: a CUDA index for NVENC, the render node number for QSV and VAAPI on Linux (N is /dev/dri/renderD128+N), a DirectX index for QSV/AMF on Windows; absent means backend default.
  * @param listsMdblistConfigured An MDBList key is stored, so lists can come from MDBList (API level 22).
  * @param listsMdblistKeyHint Last four characters of the stored MDBList key.
- * @param remoteAdmin 
- * @param storage 
+ * @param remoteAdmin
+ * @param storage
  * @param tmdbKeyHint Last four characters of the stored key.
  * @param trailersYouTube Movie pages offer TMDB's trailers, which play from YouTube (on by default). Absent on older servers.
- * @param trickplay 
- * @param upload 
+ * @param trickplay
+ * @param upload
  */
 @Serializable
 
@@ -162,8 +160,6 @@ data class Settings (
 ) {
 
     /**
-     * 
-     *
      * Values: auto,software,videotoolbox,nvenc,qsv,vaapi,amf,unknown_default_open_api
      */
     @Serializable(with = HwaccelSerializer::class)

@@ -37,18 +37,16 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param peak 
- * @param playedMs 
- * @param plays 
- * @param popularMovies 
- * @param popularShows 
- * @param recent 
- * @param topDevices 
- * @param topMovies 
- * @param topShows 
- * @param topUsers 
+ * @param peak
+ * @param playedMs
+ * @param plays
+ * @param popularMovies
+ * @param popularShows
+ * @param recent
+ * @param topDevices
+ * @param topMovies
+ * @param topShows
+ * @param topUsers
  */
 @Serializable
 

@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param status Overall server status.
  * @param time Current server time in UTC.
- * @param tmdbConfigured 
+ * @param tmdbConfigured
  * @param version Server build version.
  */
 @Serializable

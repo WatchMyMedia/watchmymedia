@@ -17,6 +17,7 @@ import media.watchmy.client.model.LIVE_PERSONAL_API_LEVEL
 import media.watchmy.client.model.LIVE_TV_API_LEVEL
 import media.watchmy.client.model.LiveCapabilities
 import media.watchmy.client.model.LiveChannel
+import media.watchmy.client.model.LivePersonalChange
 import media.watchmy.client.model.LiveRepository
 import media.watchmy.client.model.ServerRepository
 import media.watchmy.client.model.User
@@ -70,6 +71,11 @@ class LiveChannelsViewModel(
     private var ending: Job? = null
     private var endingAt = 0L
 
+    /** The screens showing channels now ([showing]), and the poll that runs while there are any. */
+    private val shown = mutableSetOf<Any>()
+    private var poll: Job? = null
+    private var askedAt = 0L
+
     init {
         viewModelScope.launch {
             combine(servers.current, auth.user) { _, _ -> identity() }
@@ -87,20 +93,50 @@ class LiveChannelsViewModel(
                     if (_state.value.supported) refresh()
                 }
         }
+        // A favourite changed elsewhere, or the event stream came back (it then reports every kind).
+        viewModelScope.launch { live.personalChanges.collect { if (it == LivePersonalChange.Favourites) load(quiet = true) } }
+    }
+
+    /**
+     * A screen that shows channels came on screen or left it (`ShowsLiveChannels`
+     * in core:ui). While any is on screen the list is asked again every
+     * [POLL_MS], quietly; nothing is asked while none is, during a film for
+     * one. Coming back to one after longer than that asks at once.
+     */
+    fun showing(screen: Any, shown: Boolean) {
+        if (shown) this.shown += screen else this.shown -= screen
+        if (this.shown.isEmpty()) {
+            poll?.cancel()
+            poll = null
+        } else if (poll?.isActive != true) {
+            poll = viewModelScope.launch {
+                while (true) {
+                    val wait = askedAt + POLL_MS - clock()
+                    if (wait > 0) {
+                        delay(wait)
+                    } else {
+                        askedAt = clock()
+                        load(quiet = true)
+                    }
+                }
+            }
+        }
     }
 
     fun search(query: String) = _state.update { it.copy(query = query) }
     fun select(channel: LiveChannel) = _state.update { it.copy(selectedId = channel.id) }
 
-    /** Also called on resume and periodically by visible shells, so changed permissions do not linger. */
-    fun refresh() = load(quiet = false)
+    /** Try again and pull to refresh: it says why it failed, and shows loading only while there is no list yet. */
+    fun refresh() = load(quiet = false, showLoading = _state.value.channels.isEmpty())
 
-    private fun load(quiet: Boolean) {
+    /** A [quiet] load (a poll, a programme's end) shows neither loading nor a failure; it changes the state only when the list did. */
+    private fun load(quiet: Boolean, showLoading: Boolean = !quiet) {
         if (!_state.value.supported) return
         val current = identity()
         val request = ++generation
         load?.cancel()
-        if (!quiet) _state.update { it.copy(loading = true, error = null) }
+        askedAt = clock()
+        if (!quiet) _state.update { it.copy(loading = showLoading, error = null) }
         load = viewModelScope.launch {
             attempt {
                 val capabilities = live.capabilities()
@@ -133,8 +169,11 @@ class LiveChannelsViewModel(
         }
     }
 
-    private companion object {
+    companion object {
         /** The server answers with the new now a moment after the end, not before. */
-        const val END_GRACE_MS = 5_000L
+        private const val END_GRACE_MS = 5_000L
+
+        /** How often the list is asked again while a screen shows channels. */
+        const val POLL_MS = 30_000L
     }
 }

@@ -34,18 +34,16 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param dropped Programmes in the last fetch left out as invalid.
  * @param flagged Channels matched by number whose names disagree.
  * @param matched Channels the feed lists.
  * @param missing Channels the feed doesn't list; they still play.
  * @param overlaps Programmes in the last fetch moved to start when the one before ended.
- * @param programmes 
+ * @param programmes
  * @param refreshesLeft How many more times Refresh now works today.
  * @param state off, waiting, fetching, ok, stale, firmware (the tuner's firmware gives no DeviceAuth), refused (SiliconDust refused the tuner or account), unavailable (SiliconDust is down or busy), failed or no_tuner. Other values may follow.
- * @param lastAttemptAt 
- * @param lastSuccessAt 
+ * @param lastAttemptAt
+ * @param lastSuccessAt
  * @param listedThrough When the last listing ends.
  * @param message What the state means and what to do about it.
  * @param nextAt When the next fetch is due.

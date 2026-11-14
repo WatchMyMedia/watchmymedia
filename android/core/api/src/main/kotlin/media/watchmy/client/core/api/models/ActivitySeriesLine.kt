@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param key 
- * @param label 
+ * @param key
+ * @param label
  * @param propertyValues Plays, or milliseconds played, per bucket.
  */
 @Serializable

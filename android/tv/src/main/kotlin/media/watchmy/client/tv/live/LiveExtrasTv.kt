@@ -229,12 +229,13 @@ internal fun TvReminderBanner(reminder: LiveReminder, leadMinutes: Int, channel:
 internal const val BANNER_MS = 15_000L
 
 /**
- * The banner's keys, read before anything on screen does: a long press of
- * OK (its first repeat) watches, and Back dismisses. A short OK, and every
- * other key, goes to what has focus; so does a long one when the banner has
- * nothing for it ([holdsOk] false).
+ * The banner's OK, read before anything on screen does: a long press (its
+ * first repeat) watches. A short OK, and every other key, goes to what has
+ * focus; so does a long one when the banner has nothing for it ([holdsOk]
+ * false). Back, which dismisses it, comes by `Modifier.onBack` on the same
+ * element, so it works where the remote's Back is not a key.
  */
-internal class BannerKeys(private val onWatch: () -> Unit, private val onDismiss: () -> Unit, private val holdsOk: Boolean = true) {
+internal class BannerKeys(private val onWatch: () -> Unit, private val holdsOk: Boolean = true) {
     private var swallowing = mutableSetOf<Int>()
 
     fun handle(code: Int, down: Boolean, repeat: Int): Boolean {
@@ -247,11 +248,6 @@ internal class BannerKeys(private val onWatch: () -> Unit, private val onDismiss
                 }
                 true
             } else false
-            AndroidKey.KEYCODE_BACK -> {
-                swallowing += code
-                onDismiss()
-                true
-            }
             else -> false
         }
     }

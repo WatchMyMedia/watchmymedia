@@ -35,10 +35,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param expiresAt 
- * @param id 
+ * @param expiresAt
+ * @param id
  * @param status pending until the admin has signed in on Plex's page.
  * @param authUrl Plex's own sign-in page for this attempt, while pending. WatchMyMedia never asks for a Plex password.
  * @param servers The servers the signed-in Plex account owns, once ready.

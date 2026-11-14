@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param name 
- * @param password 
- * @param isAdmin 
+ * @param name
+ * @param password
+ * @param isAdmin
  */
 @Serializable
 

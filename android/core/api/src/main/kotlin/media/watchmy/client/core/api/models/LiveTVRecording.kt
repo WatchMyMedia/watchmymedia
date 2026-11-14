@@ -36,37 +36,35 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param bytes 
- * @param canCancel 
- * @param channelId 
- * @param channelName 
- * @param end 
- * @param gaps 
- * @param id 
- * @param number 
- * @param padAfter 
- * @param padBefore 
- * @param series 
- * @param sourceId 
- * @param start 
- * @param state 
- * @param title 
- * @param userName 
+ * @param bytes
+ * @param canCancel
+ * @param channelId
+ * @param channelName
+ * @param end
+ * @param gaps
+ * @param id
+ * @param number
+ * @param padAfter
+ * @param padBefore
+ * @param series
+ * @param sourceId
+ * @param start
+ * @param state
+ * @param title
+ * @param userName
  * @param canDelete The current delete policy permits removing this finished recording's owned file.
  * @param conflictsWith For a recording that won't record (state conflict): the recordings holding the tuners while it would run. Choosing one with PATCH {prefer, over} makes that one give way.
- * @param endedAt 
- * @param episode 
- * @param episodeTitle 
- * @param mediaFileId 
- * @param pictureUrl 
- * @param programmeId 
- * @param reason 
- * @param ruleId 
- * @param season 
- * @param startedAt 
- * @param userId 
+ * @param endedAt
+ * @param episode
+ * @param episodeTitle
+ * @param mediaFileId
+ * @param pictureUrl
+ * @param programmeId
+ * @param reason
+ * @param ruleId
+ * @param season
+ * @param startedAt
+ * @param userId
  */
 @Serializable
 

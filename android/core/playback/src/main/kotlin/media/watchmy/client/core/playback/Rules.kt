@@ -1,20 +1,19 @@
 package media.watchmy.client.core.playback
 
 import media.watchmy.client.core.playback.player.EmbeddedSubtitle
+import media.watchmy.client.core.playback.player.FailedVideo
+import media.watchmy.client.core.playback.profile.VideoSize
+import media.watchmy.client.core.playback.profile.videoCodecKeys
+import media.watchmy.client.model.PlaybackProfile
 import media.watchmy.client.core.playback.player.PlayerFailure
 import media.watchmy.client.core.playback.player.TextSelection
-import media.watchmy.client.model.MediaToken
 import media.watchmy.client.model.PlaybackDecision
-import media.watchmy.client.model.PlaybackProfile
 import media.watchmy.client.model.Segment
 import media.watchmy.client.model.SegmentKind
 import media.watchmy.client.model.SkipMode
 import media.watchmy.client.model.StreamProtocol
-import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleSource
 import media.watchmy.client.model.UP_NEXT_COUNTDOWN_MS
-import media.watchmy.client.model.isOnServer
-import java.net.URLEncoder
 
 // The numbers of PLAN-CLIENTS.md §2.3, which are the web player's.
 
@@ -77,17 +76,6 @@ internal data class StreamClock(val offsetMs: Long, val event: Boolean) {
     }
 }
 
-/** [url] with the media token appended (`?access_token=` or `&access_token=`) when it is on the token's server; any other URL as it is. */
-internal fun withToken(url: String, token: MediaToken): String {
-    val server = token.serverUrl ?: return url
-    if (!isOnServer(server, url)) return url
-    val hash = url.indexOf('#')
-    val base = if (hash >= 0) url.substring(0, hash) else url
-    val fragment = if (hash >= 0) url.substring(hash) else ""
-    val sep = if ('?' in base) "&" else "?"
-    return base + sep + token.param + "=" + URLEncoder.encode(token.token, "UTF-8") + fragment
-}
-
 /** Whether the decision's text subtitles arrive as renditions in the master playlist rather than as files. */
 internal fun PlaybackDecision.hasRenditions(): Boolean = protocol == StreamProtocol.Hls && vod
 
@@ -115,30 +103,6 @@ internal fun textSelection(d: PlaybackDecision, id: String?): TextSelection {
         return if (ordinal >= 0) TextSelection.Rendition(ordinal) else TextSelection.Off
     }
     return if (track.url != null) TextSelection.Sideloaded(id) else TextSelection.Off
-}
-
-/** The profile narrowed by the viewer's quality pick. */
-internal fun PlaybackProfile.capped(quality: StreamQuality): PlaybackProfile = copy(
-    maxWidth = minOfNullable(maxWidth, quality.maxWidth),
-    maxHeight = minOfNullable(maxHeight, quality.maxHeight),
-    maxBitrate = minOfNullable(maxBitrate, quality.maxBitrate),
-)
-
-/** A step as the switch note names it: "4K", "720p". */
-internal fun stepName(quality: StreamQuality): String = quality.label.substringBefore(" · ")
-
-private fun <T : Comparable<T>> minOfNullable(a: T?, b: T?): T? = when {
-    a == null -> b
-    b == null -> a
-    else -> minOf(a, b)
-}
-
-internal fun skipLabel(kind: SegmentKind): String = when (kind) {
-    SegmentKind.Intro -> "Skip Intro"
-    SegmentKind.Recap -> "Skip Recap"
-    SegmentKind.Credits -> "Skip Credits"
-    SegmentKind.Preview -> "Skip Preview"
-    SegmentKind.Commercial -> "Skip Ad"
 }
 
 internal fun Segment.endOr(durationMs: Long): Long = endMs ?: durationMs
@@ -199,6 +163,38 @@ internal fun errorMessage(failure: PlayerFailure): String = when (failure.kind) 
     PlayerFailure.Kind.Source -> "The stream could not be read."
     PlayerFailure.Kind.BehindLiveWindow -> "The stream fell behind."
     PlayerFailure.Kind.Other -> "Playback failed (${failure.detail})."
+}
+
+/** What a viewing's decisions leave out after a video decoder failed on its stream (PLAN-ANDROID-REVIEW.md §3.1.3). */
+internal sealed interface VideoNarrowing {
+    /** The codec's keys: the server sends the video another way, or transcodes it. */
+    data class LeaveOut(val keys: Set<String>) : VideoNarrowing
+
+    /** A picture the decoder takes: the server transcodes to it. */
+    data class Within(val size: VideoSize) : VideoNarrowing
+}
+
+/**
+ * What to ask for after a video decoder failed on [video]: a picture within
+ * the decoder's [limit] when the video was larger; else, when the server
+ * sent the file's own video ([copied]: direct play, remux, audio
+ * transcode), the decision without that codec; else nothing (a transcode
+ * the decoder should take failed: an error as before).
+ */
+internal fun videoNarrowing(video: FailedVideo, limit: VideoSize?, copied: Boolean): VideoNarrowing? = when {
+    limit != null && video.width > 0 && video.height > 0 && !limit.fits(video.width, video.height) -> VideoNarrowing.Within(limit)
+    copied -> videoCodecKeys(video.mimeType).takeIf { it.isNotEmpty() }?.let(VideoNarrowing::LeaveOut)
+    else -> null
+}
+
+/** The profile with [narrowing] applied. */
+internal fun PlaybackProfile.narrowed(narrowing: VideoNarrowing?): PlaybackProfile = when (narrowing) {
+    null -> this
+    is VideoNarrowing.LeaveOut -> copy(videoCodecs = videoCodecs - narrowing.keys)
+    is VideoNarrowing.Within -> copy(
+        maxWidth = minOf(maxWidth ?: narrowing.size.width, narrowing.size.width),
+        maxHeight = minOf(maxHeight ?: narrowing.size.height, narrowing.size.height),
+    )
 }
 
 /** Failures worth one more try at the current position: an expired token, a session the server dropped, a network hiccup. */

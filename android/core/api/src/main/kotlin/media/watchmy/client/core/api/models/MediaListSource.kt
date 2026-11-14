@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param kind tmdb, mdblist, library or import. A plain string: show a list whose kind you don't know, and don't offer to edit it.
  * @param chart tmdb: trending-day, trending-week, popular, top-rated, now-playing (movies), upcoming (movies), on-the-air (TV), airing-today (TV), discover, list or collection.
  * @param decade library: e.g. 1990.

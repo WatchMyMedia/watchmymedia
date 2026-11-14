@@ -35,10 +35,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param channels 
- * @param device 
+ * @param channels
+ * @param device
  */
 @Serializable
 

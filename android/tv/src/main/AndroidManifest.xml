@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- TV Search's voice typing (TvSearchKeyboard.dc.html) listens in the app, with the TV's
+         speech recognizer. The permission is asked for at the microphone key's first press, on a
+         TV only: the phone has no microphone key and never asks. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Not required: the one APK also runs on phones, tablets and TVs without a microphone, and
+         Play would otherwise hide it from them. Without one, Search has no microphone key. -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
+    <!-- The microphone key shows only where the TV offers speech recognition to apps
+         (SpeechRecognizer.isRecognitionAvailable): without this, Android 11 and later hide the
+         recognition service from the app. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+</manifest>

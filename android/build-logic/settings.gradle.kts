@@ -20,13 +20,8 @@ dependencyResolutionManagement {
     repositories {
         exclusiveContent {
             forRepository { google() }
-            filter {
-                includeGroupByRegex("androidx\\..*")
-                includeGroupByRegex("com\\.android(\\..*)?")
-                includeGroupByRegex("com\\.google\\.android\\..*")
-                includeGroup("com.google.firebase")
-                includeGroup("com.google.testing.platform")
-            }
+            // Google's groups (../gradle/google-groups.txt), and nothing else from Google.
+            filter { file("../gradle/google-groups.txt").readLines().filter { it.isNotBlank() && !it.startsWith("#") }.forEach(::includeGroupByRegex) }
         }
         mavenCentral()
     }

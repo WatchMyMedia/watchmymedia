@@ -35,8 +35,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param manual Replaces every manual segment of the file.
  * @param suppressed IDs of detected segments to hide; detection will not bring them back.
  * @param restored IDs of suppressed segments to show again.

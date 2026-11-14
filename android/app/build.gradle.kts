@@ -1,4 +1,5 @@
 import com.github.triplet.gradle.androidpublisher.ReleaseStatus
+import media.watchmy.client.buildlogic.versionCodeOf
 
 plugins {
     alias(libs.plugins.wmm.android.application)
@@ -8,8 +9,8 @@ plugins {
 }
 
 // Releases take their version from the tag: the release workflow passes
-// -PappVersion=v1.2.3, and the version code is derived from it (see
-// versionCodeOf below; -PappVersionCode overrides it). Local builds without
+// -PappVersion=v1.2.3, and the version code is derived from it (versionCodeOf
+// in build-logic, with its tests; -PappVersionCode overrides it). Local builds without
 // the property are 0.0.0-dev, code 1.
 val appVersion = providers.gradleProperty("appVersion").map { it.removePrefix("v") }
 val appVersionCode = providers.gradleProperty("appVersionCode").map(String::toInt)
@@ -74,6 +75,9 @@ android {
             signingConfig = signingConfigs.findByName("upload")
         }
     }
+    // ShortcutsTest reads res/xml/shortcuts.xml, as the other modules' tests read their resources.
+    testOptions { unitTests.isIncludeAndroidResources = true }
+
     buildFeatures {
         buildConfig = true
     }
@@ -142,28 +146,4 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.robolectric)
     baselineProfile(project(":baselineprofile"))
-}
-
-/**
- * The version code for major.minor.patch[-pre], in an order that matches the
- * tags': major × 10⁷ + minor × 10⁵ + patch × 100 + a last pair that puts the
- * pre-releases before their release (alpha.N is N, beta.N 30 + N, rc.N
- * 60 + N, the release 99). So 1.2.3-rc.1 is 10200361 and 1.2.3 is 10200399.
- * Play takes codes up to 2100000000, which leaves majors up to 209.
- */
-fun versionCodeOf(version: String): Int {
-    val match = Regex("""(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.?(\d+)?)?""").matchEntire(version)
-        ?: error("appVersion $version is not major.minor.patch, optionally with -alpha.N, -beta.N or -rc.N")
-    val (major, minor, patch, pre, n) = match.destructured
-    val number = n.ifEmpty { "0" }.toInt()
-    require(major.toInt() <= 209 && minor.toInt() <= 99 && patch.toInt() <= 999 && number <= 29) {
-        "appVersion $version is out of range for a version code (major ≤ 209, minor ≤ 99, patch ≤ 999, pre-release ≤ 29)"
-    }
-    val last = when (pre) {
-        "alpha" -> number
-        "beta" -> 30 + number
-        "rc" -> 60 + number
-        else -> 99
-    }
-    return major.toInt() * 10_000_000 + minor.toInt() * 100_000 + patch.toInt() * 100 + last
 }

@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Icon
@@ -117,6 +118,8 @@ fun MediaCard(
                 contentDescription = null,
                 modifier = Modifier.scaledSize(artWidth, artHeight, scale),
                 shape = RoundedCornerShape(12.dp),
+                // Decoded at the size a focused row draws it, not the resting size it is first laid out at (§4.3.6).
+                decodeSize = row?.let { DpSize(artWidth, artHeight) * ((if (landscape) CardRowFocus.FOCUSED_LANDSCAPE else CardRowFocus.FOCUSED_POSTER) * focusedScale) },
                 overlay = { Box(Modifier.fillMaxSize(), content = overlay) },
             )
             Text(

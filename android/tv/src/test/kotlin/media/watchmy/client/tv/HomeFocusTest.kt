@@ -13,7 +13,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
-import media.watchmy.client.fake.FakeAppServices
 import media.watchmy.client.fake.FakeData
 import media.watchmy.client.fake.fakeLatencyMs
 import media.watchmy.client.ui.LocalAppServices
@@ -45,8 +44,9 @@ class HomeFocusTest {
     @Before
     fun start() {
         fakeLatencyMs = 0
+        val services = quietTvFakes()
         compose.setContent {
-            CompositionLocalProvider(LocalAppServices provides FakeAppServices(tv = true)) { TvApp() }
+            CompositionLocalProvider(LocalAppServices provides services) { TvApp() }
         }
         compose.waitForIdle()
     }
@@ -134,6 +134,25 @@ class HomeFocusTest {
         assertEquals(card, focused())
         press(Key.DirectionLeft)
         assertEquals("And the row is where it was", landed, focused())
+    }
+
+    @Test
+    fun `A row keeps its card while a page opened from the next row comes and goes`() {
+        press(Key.DirectionDown)
+        press(Key.DirectionDown) // Live TV.
+        press(Key.DirectionRight)
+        val channel = focused()
+        press(Key.DirectionDown) // Recently added shows.
+        val show = focused()
+        press(Key.DirectionCenter)
+        assertNotEquals("The show page took focus", show, focused())
+
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+        assertEquals(show, focused())
+        press(Key.DirectionUp)
+        assertEquals("The Live row comes back to the channel it had before the show page opened", channel, focused())
+        assertFocusShowing("Row 2 of ")
     }
 
     @Test

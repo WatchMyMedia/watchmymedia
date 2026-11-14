@@ -65,6 +65,25 @@ func (s *Service) signAs(prefix string, payload []byte) []byte {
 	return m.Sum(nil)[:mediaSigBytes]
 }
 
+// MediaToken is a media token as the API hands it out: from
+// createMediaToken, and with a playback decision from API level 28.
+type MediaToken struct {
+	Token     string    `json:"token" doc:"Append as ?access_token= to media URLs (streams, HLS playlists, subtitles, images)."`
+	ExpiresAt time.Time `json:"expiresAt" doc:"Request a new token (and new playback URLs) after this."`
+	Param     string    `json:"param" doc:"The query parameter name, access_token."`
+}
+
+// MediaTokenFor is IssueMediaToken in the shape the API returns. Every
+// route that hands out a media token goes through it, so each gives the
+// same token for the same session.
+func (s *Service) MediaTokenFor(ctx context.Context, sessionToken string) (MediaToken, error) {
+	tok, exp, err := s.IssueMediaToken(ctx, sessionToken)
+	if err != nil {
+		return MediaToken{}, err
+	}
+	return MediaToken{Token: tok, ExpiresAt: exp.UTC(), Param: QueryParam}, nil
+}
+
 // IssueMediaToken makes a media token tied to the given session token.
 func (s *Service) IssueMediaToken(ctx context.Context, sessionToken string) (string, time.Time, error) {
 	if _, err := s.Authenticate(ctx, sessionToken); err != nil {

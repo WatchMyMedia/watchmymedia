@@ -34,9 +34,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param access 
+ * @param access
  */
 @Serializable
 
@@ -48,8 +46,6 @@ data class LiveTVAccessInputBody (
 ) {
 
     /**
-     * 
-     *
      * Values: none,admins,everyone,unknown_default_open_api
      */
     @Serializable(with = AccessSerializer::class)

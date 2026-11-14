@@ -50,6 +50,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -186,6 +188,7 @@ private const val RESET_NOTE = "Reset goes back to the rows everyone on this ser
 private fun EditorList(state: RowLayoutViewModel.State, vm: RowLayoutViewModel, name: String, tablet: Boolean, onOpenList: (Long) -> Unit) {
     val list = rememberLazyListState()
     var dragging by remember { mutableStateOf<String?>(null) }
+    val haptics = LocalHapticFeedback.current
     var offset by remember { mutableFloatStateOf(0f) }
     val entries by rememberUpdatedState(state.entries)
     LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(start = if (tablet) 12.dp else 0.dp, end = if (tablet) 12.dp else 0.dp, bottom = 16.dp)) {
@@ -211,10 +214,12 @@ private fun EditorList(state: RowLayoutViewModel.State, vm: RowLayoutViewModel, 
             val handle: Modifier.() -> Modifier = { pointerInput(entry.id) {
                 detectDragGestures(
                     onDragStart = {
+                        haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
                         dragging = entry.id
                         offset = 0f
                     },
                     onDragEnd = {
+                        haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
                         dragging = null
                         offset = 0f
                         vm.dropped()
@@ -238,6 +243,8 @@ private fun EditorList(state: RowLayoutViewModel.State, vm: RowLayoutViewModel, 
                             // The row moves to the slot it is over; it stays under the finger.
                             offset += me.offset - target.offset
                             vm.drag(from, to)
+                            // A tick each time the row takes another's place (§6.3).
+                            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                         }
                     },
                 )

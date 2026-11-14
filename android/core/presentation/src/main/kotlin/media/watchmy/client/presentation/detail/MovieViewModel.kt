@@ -29,8 +29,10 @@ import media.watchmy.client.model.toMovieDetail
 import media.watchmy.client.model.trailer
 import media.watchmy.client.model.trailerRequest
 import media.watchmy.client.model.youTubeTrailers
+import media.watchmy.client.presentation.Freshness
 import media.watchmy.client.presentation.Latest
 import media.watchmy.client.presentation.Load
+import media.watchmy.client.presentation.ShownPage
 import media.watchmy.client.presentation.value
 
 /**
@@ -52,7 +54,7 @@ class MovieViewModel(
     private val downloads: DownloadRepository = DownloadRepository.Unavailable,
     youTube: Boolean = true,
     private val plans: suspend (List<Long>) -> Map<Long, PlaybackPlan> = { emptyMap() },
-) : ViewModel() {
+) : ViewModel(), ShownPage {
     data class State(
         val movie: Load<MovieDetail> = Load.Loading,
         /** By file ID; empty until known, and when the server cannot say. */
@@ -85,10 +87,15 @@ class MovieViewModel(
 
     private val loads = Latest(viewModelScope)
 
+    /** Its own movie's marks and progress, and library changes that may have rematched it. */
+    private val freshness = Freshness(viewModelScope) { load(quiet = true) }
+
+    override fun setShown(shown: Boolean) = freshness.setShown(shown)
+
     init {
         load()
         viewModelScope.launch { attempt { requests.options() }.onSuccess { o -> _state.update { it.copy(options = o) } } }
-        viewModelScope.launch { library.changes.collect { load(quiet = true) } }
+        freshness.follow(library.libraryChanges) { it.touchesMovie(movieId) }
         // Offline, the page is the download: it follows what is watched or marked here.
         viewModelScope.launch {
             downloads.downloads.collect {

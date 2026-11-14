@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param name 
- * @param path 
- * @param type 
+ * @param name
+ * @param path
+ * @param type
  */
 @Serializable
 
@@ -56,8 +54,6 @@ data class CreateLibraryInputBody (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,tv,unknown_default_open_api
      */
     @Serializable(with = TypeSerializer::class)

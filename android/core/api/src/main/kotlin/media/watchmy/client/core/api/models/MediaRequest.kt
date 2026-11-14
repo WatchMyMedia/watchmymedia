@@ -35,23 +35,21 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param createdAt 
- * @param id 
- * @param mediaType 
+ * @param createdAt
+ * @param id
+ * @param mediaType
  * @param mine The signed-in user asked for it.
- * @param requestedBy 
+ * @param requestedBy
  * @param seasons Season numbers asked for; empty for a movie.
- * @param status 
- * @param title 
- * @param tmdbId 
- * @param download 
- * @param movieId 
+ * @param status
+ * @param title
+ * @param tmdbId
+ * @param download
+ * @param movieId
  * @param note Why it was declined, or why carrying it out failed.
- * @param posterPath 
- * @param showId 
- * @param year 
+ * @param posterPath
+ * @param showId
+ * @param year
  */
 @Serializable
 
@@ -108,8 +106,6 @@ data class MediaRequest (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,tv,unknown_default_open_api
      */
     @Serializable(with = MediaTypeSerializer::class)
@@ -133,8 +129,6 @@ data class MediaRequest (
         }
     }
     /**
-     * 
-     *
      * Values: pending,approved,declined,failed,available,unknown_default_open_api
      */
     @Serializable(with = StatusSerializer::class)

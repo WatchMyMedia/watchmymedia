@@ -5,13 +5,14 @@ import media.watchmy.client.model.PlayerUiState
 import media.watchmy.client.ui.PlayerKey
 
 /** What is over the video and takes the remote. */
-internal enum class Overlay { None, UpNext, Picker, StillWatching, Message }
+internal enum class Overlay { None, UpNext, Picker, Episodes, StillWatching, Message }
 
-/** The overlay up now, most important first: an admin's stop or a fatal error, Still watching, the picker, the Next Episode card. */
-internal fun overlayOf(state: PlayerUiState, picker: PickerSection?): Overlay = when {
+/** The overlay up now, most important first: an admin's stop or a fatal error, Still watching, the picker or the episode list, the Next Episode card. */
+internal fun overlayOf(state: PlayerUiState, picker: PickerSection?, episodes: Boolean = false): Overlay = when {
     state.stopMessage != null || state.status == PlayerStatus.Error -> Overlay.Message
     state.askStillWatching -> Overlay.StillWatching
     picker != null -> Overlay.Picker
+    episodes -> Overlay.Episodes
     state.upNext != null -> Overlay.UpNext
     else -> Overlay.None
 }
@@ -55,7 +56,7 @@ internal sealed interface KeyAction {
  * picker. Back is not routed here: the screen takes it on key-up and asks
  * [backAction].
  */
-internal fun routeKey(key: PlayerKey, overlay: Overlay, controlsVisible: Boolean, focus: FocusArea): KeyAction {
+internal fun routeKey(key: PlayerKey, overlay: Overlay, controlsVisible: Boolean, focus: FocusArea, hasNext: Boolean = false): KeyAction {
     if (key == PlayerKey.Back || key == PlayerKey.Other) return KeyAction.PassThrough
     if (overlay == Overlay.Message) return if (key == PlayerKey.Stop) KeyAction.Leave else if (isDpad(key)) KeyAction.PassThrough else KeyAction.Swallow
     val prompt = overlay == Overlay.StillWatching
@@ -77,7 +78,8 @@ internal fun routeKey(key: PlayerKey, overlay: Overlay, controlsVisible: Boolean
         PlayerKey.Rewind, PlayerKey.FastForward ->
             if (overlay == Overlay.None || overlay == Overlay.UpNext) KeyAction.Seek(forward = key == PlayerKey.FastForward) else KeyAction.Swallow
         PlayerKey.Stop -> KeyAction.Leave
-        PlayerKey.Next -> if (overlay == Overlay.UpNext) KeyAction.PlayNext else KeyAction.Swallow
+        // The remote's Next plays the next episode, from the card or with nothing over the video.
+        PlayerKey.Next -> if (overlay == Overlay.UpNext || (overlay == Overlay.None && hasNext)) KeyAction.PlayNext else KeyAction.Swallow
         PlayerKey.Captions -> if (overlay == Overlay.None) KeyAction.OpenPicker(PickerSection.Subtitles) else KeyAction.Swallow
         PlayerKey.AudioTrack -> if (overlay == Overlay.None) KeyAction.OpenPicker(PickerSection.Audio) else KeyAction.Swallow
         PlayerKey.Menu -> if (overlay == Overlay.None) KeyAction.OpenPicker(PickerSection.Audio) else KeyAction.Swallow
@@ -89,12 +91,13 @@ internal fun routeKey(key: PlayerKey, overlay: Overlay, controlsVisible: Boolean
 private fun isDpad(key: PlayerKey) = key == PlayerKey.Left || key == PlayerKey.Right || key == PlayerKey.Up || key == PlayerKey.Down || key == PlayerKey.Centre
 
 /** What Back does: close what is open first, then hide the controls, then leave. */
-internal enum class BackAction { Leave, KeepWatching, ClosePicker, WatchCredits, HideControls }
+internal enum class BackAction { Leave, KeepWatching, ClosePicker, CloseEpisodes, WatchCredits, HideControls }
 
 internal fun backAction(overlay: Overlay, controlsVisible: Boolean): BackAction = when (overlay) {
     Overlay.Message -> BackAction.Leave
     Overlay.StillWatching -> BackAction.KeepWatching
     Overlay.Picker -> BackAction.ClosePicker
+    Overlay.Episodes -> BackAction.CloseEpisodes
     Overlay.UpNext -> BackAction.WatchCredits
     Overlay.None -> if (controlsVisible) BackAction.HideControls else BackAction.Leave
 }

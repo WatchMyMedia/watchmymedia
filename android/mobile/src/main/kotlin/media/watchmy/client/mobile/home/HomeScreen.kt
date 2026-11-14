@@ -1,6 +1,7 @@
 package media.watchmy.client.mobile.home
 
 import androidx.compose.foundation.background
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -51,8 +54,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import media.watchmy.client.mobile.components.CardAction
-import media.watchmy.client.mobile.components.EmptyState
-import media.watchmy.client.mobile.components.ErrorState
+import media.watchmy.client.mobile.components.LoadContent
+import media.watchmy.client.mobile.components.LoadStatus
 import media.watchmy.client.mobile.components.FilledButton
 import media.watchmy.client.mobile.components.HomeSkeleton
 import media.watchmy.client.mobile.components.MainTopBar
@@ -80,6 +83,8 @@ import media.watchmy.client.model.episodeCards
 import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.model.BrowseItem
 import media.watchmy.client.model.ContinueItem
+import media.watchmy.client.mobile.components.MobileTab
+import media.watchmy.client.mobile.navigation.OnTabReselected
 import media.watchmy.client.model.EpisodeCard
 import media.watchmy.client.model.Hero
 import media.watchmy.client.model.HomeData
@@ -92,17 +97,21 @@ import media.watchmy.client.model.codeBadge
 import media.watchmy.client.model.formatDate
 import media.watchmy.client.model.HomeEmptyState
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
+import media.watchmy.client.model.SavedServer
 import media.watchmy.client.model.heroBadges
 import media.watchmy.client.model.playRequest
 import media.watchmy.client.model.remainingLine
 import media.watchmy.client.model.totalsLine
 import media.watchmy.client.model.watchTarget
 import media.watchmy.client.presentation.downloads.DownloadsViewModel
+import media.watchmy.client.presentation.home.HomeViewModel.State as HomeState
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.TabletLayout
 import media.watchmy.client.ui.rememberTabletLayout
 import media.watchmy.client.mobile.components.PressableCard
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.rememberNotMatchedNotice
 import media.watchmy.client.ui.open
 import media.watchmy.client.ui.WmmColors
@@ -111,6 +120,7 @@ import media.watchmy.client.ui.components.Badge
 import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.ProgressStrip
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.ui.ReportShown
 
 /**
  * Home (Home.dc.html, HomeScrolled.dc.html): the hero, then Continue
@@ -136,6 +146,7 @@ fun HomeScreen(
     val layout = rememberTabletLayout()
     val services = LocalAppServices.current
     val vm = viewModel { HomeViewModel(services.library, services.auth, services.rows) }
+    ReportShown(vm::setShown)
     val notMatched = rememberNotMatchedNotice()
     val state by vm.state.collectAsStateWithLifecycle()
     val user by vm.user.collectAsStateWithLifecycle()
@@ -143,6 +154,13 @@ fun HomeScreen(
     val uri = LocalUriHandler.current
     val downloads = viewModel { DownloadsViewModel(services.downloads) }
     val held by downloads.state.collectAsStateWithLifecycle()
+    // Above the tablet branch and the loading states: a window that crosses into or out of the tablet
+    // layouts (a split screen resized, a foldable opened) comes back to the place it was.
+    val list = rememberLazyListState()
+    OnTabReselected(MobileTab.Home) { list.animateScrollToItem(0) }
+    // Fully drawn once Home has its rows, or has settled on an error or the offline Home: a cold start's
+    // time to full display (the startup benchmarks, :baselineprofile).
+    ReportDrawnWhen { state.home != null || state.error != null || (state.offline && held.enabled) }
 
     Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
         // Offline there is nothing to search (HomeOffline.dc.html).
@@ -164,15 +182,15 @@ fun HomeScreen(
                     onSeeAll = { onNavigate(MobileRoutes.Downloads) },
                     tablet = layout.isTablet,
                 )
-                home == null && state.error != null -> ErrorState(state.error!!, vm::retry)
-                home == null -> HomeSkeleton()
-                else -> {
+                // Loading, failed or empty: the shared states (PLAN-ANDROID-REVIEW §5.4), with Home's skeleton.
+                else -> LoadContent(homeStatus(state, home, liveChannels, user?.isAdmin == true, server, uri, vm::retry, vm::say), vm::retry, Modifier.fillMaxSize(), loading = { HomeSkeleton() }) {
+                    if (home == null) return@LoadContent
                     val pull = rememberPullToRefreshState()
                     PullToRefreshBox(
                         isRefreshing = state.refreshing,
                         onRefresh = vm::refresh,
                         state = pull,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().testTag(TestTags.HOME),
                         indicator = {
                             PullToRefreshDefaults.Indicator(
                                 state = pull,
@@ -207,24 +225,9 @@ fun HomeScreen(
                                 liveListings = liveListings,
                                 modifier = Modifier.fillMaxSize(),
                             )
-                        } else LazyColumn(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        } else LazyColumn(Modifier.fillMaxSize(), state = list, horizontalAlignment = Alignment.CenterHorizontally, contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             if (liveFirst || (arranged && state.isEmpty)) liveRow()
-                            if (state.isEmpty && liveChannels.isEmpty()) {
-                                item {
-                                    val empty = state.emptyState ?: HomeEmptyState(HomeEmptyState.Kind.Unavailable)
-                                    val setup = user?.isAdmin == true && empty.offersSetup && server != null
-                                    EmptyState(
-                                        empty.title,
-                                        empty.message(user?.isAdmin == true),
-                                        Modifier.fillParentMaxSize(),
-                                        action = if (setup) "Open the web page" else "Check again",
-                                        onAction = {
-                                            if (setup) runCatching { uri.openUri(server!!.server.baseUrl) }.onFailure { vm.say("Couldn't open a browser. Open ${server!!.server.baseUrl} on another device.") }
-                                            else vm.retry()
-                                        },
-                                    )
-                                }
-                            } else if (arranged) {
+                            if (arranged) {
                                 val actions = RowActions(onPlay, onOpenShow, onOpenMovie, onOpenEpisode, notMatched, vm::setWatched)
                                 arrangedRows(home, services.library, vm, actions, layout.isTablet, layout.twoPane, onNavigate, live = liveRow.takeIf { liveChannels.isNotEmpty() && !state.isEmpty })
                             } else {
@@ -237,6 +240,34 @@ fun HomeScreen(
             MessageHost(state.message, vm::messageShown, Modifier.align(Alignment.BottomCenter))
         }
     }
+}
+
+/**
+ * What Home shows instead of its rows: loading, why it failed, or why the
+ * library is empty (with nothing on Live TV either), where an admin can open
+ * the web app to set it up. Null once there are rows or channels to show.
+ */
+internal fun homeStatus(
+    state: HomeState,
+    home: HomeData?,
+    liveChannels: List<LiveChannel>,
+    admin: Boolean,
+    server: SavedServer?,
+    uri: UriHandler,
+    retry: () -> Unit,
+    say: (String) -> Unit,
+): LoadStatus? = when {
+    home == null && state.error != null -> LoadStatus.Failed(state.error!!)
+    home == null -> LoadStatus.Loading
+    state.isEmpty && liveChannels.isEmpty() -> {
+        val empty = state.emptyState ?: HomeEmptyState(HomeEmptyState.Kind.Unavailable)
+        val setup = admin && empty.offersSetup && server != null
+        LoadStatus.Empty(empty.title, empty.message(admin), action = if (setup) "Open the web page" else "Check again") {
+            if (setup) runCatching { uri.openUri(server!!.server.baseUrl) }.onFailure { say("Couldn't open a browser. Open ${server!!.server.baseUrl} on another device.") }
+            else retry()
+        }
+    }
+    else -> null
 }
 
 private fun LazyListScope.homeRows(
@@ -258,29 +289,8 @@ private fun LazyListScope.homeRows(
     val sideContinue = twoPane && home.hero != null && home.continueWatching.isNotEmpty()
     home.hero?.let { hero ->
         item(key = "hero", contentType = "hero") {
-            val goTo = {
-                when {
-                    hero.movieId != null -> onOpenMovie(hero.movieId!!)
-                    hero.showId != null -> onOpenShow(hero.showId!!)
-                }
-            }
-            // An episode's season comes from its Recently aired card; without one the hero opens the show.
-            val episode = hero.episodeId?.takeIf { hero.kind == Hero.Kind.Episode }?.let { id -> home.recentlyAired.firstOrNull { it.episodeId == id } }
             Row(Modifier.widthIn(max = if (tablet && !twoPane) TabletLayout.singleColumnMax else Dp.Infinity).fillMaxWidth().padding(horizontal = if (tablet) 24.dp else 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                HeroCard(
-                    modifier = Modifier.weight(1f),
-                    height = if (twoPane) 340.dp else 400.dp,
-                hero = hero,
-                badges = home.heroBadges,
-                imageUrl = library.imageUrl(hero.backdropPath, ImageSize.W780),
-                onPlay = hero.playRequest(home.recentlyAired)?.let { r -> { onPlay(r) } },
-                onOpen = episode?.let { e -> { onOpenEpisode(e.showId, e.season, e.episodeId) } } ?: goTo,
-                openLabel = when {
-                    episode != null -> "Go to episode"
-                    hero.kind == Hero.Kind.Movie -> "Go to movie"
-                    else -> "Go to show"
-                },
-            )
+                HomeHero(hero, home.recentlyAired, home.heroBadges, library, onPlay, onOpenShow, onOpenMovie, onOpenEpisode, Modifier.weight(1f), height = if (twoPane) 340.dp else 400.dp)
                 if (sideContinue) ContinuePanel(home.continueWatching, library, vm::setWatched, onPlay, onOpenShow, onOpenMovie, Modifier.width(340.dp).height(340.dp))
             }
         }
@@ -381,28 +391,8 @@ private fun LazyListScope.arrangedRows(
     val sideContinue = twoPane && home.hero != null && rows.firstOrNull()?.style == RowStyle.Continue
     home.hero?.let { hero ->
         item(key = "hero", contentType = "hero") {
-            val goTo = {
-                when {
-                    hero.movieId != null -> actions.onOpenMovie(hero.movieId!!)
-                    hero.showId != null -> actions.onOpenShow(hero.showId!!)
-                }
-            }
-            val episode = hero.episodeId?.takeIf { hero.kind == Hero.Kind.Episode }?.let { id -> home.episodeCards.firstOrNull { it.episodeId == id } }
             Row(Modifier.widthIn(max = if (tablet && !twoPane) TabletLayout.singleColumnMax else Dp.Infinity).fillMaxWidth().padding(horizontal = if (tablet) 24.dp else 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                HeroCard(
-                    modifier = Modifier.weight(1f),
-                    height = if (twoPane) 340.dp else 400.dp,
-                    hero = hero,
-                    badges = home.heroBadges,
-                    imageUrl = library.imageUrl(hero.backdropPath, ImageSize.W780),
-                    onPlay = hero.playRequest(home.episodeCards)?.let { r -> { actions.onPlay(r) } },
-                    onOpen = episode?.let { e -> { actions.onOpenEpisode(e.showId, e.season, e.episodeId) } } ?: goTo,
-                    openLabel = when {
-                        episode != null -> "Go to episode"
-                        hero.kind == Hero.Kind.Movie -> "Go to movie"
-                        else -> "Go to show"
-                    },
-                )
+                HomeHero(hero, home.episodeCards, home.heroBadges, library, actions.onPlay, actions.onOpenShow, actions.onOpenMovie, actions.onOpenEpisode, Modifier.weight(1f), height = if (twoPane) 340.dp else 400.dp)
                 if (sideContinue) ContinuePanel(rows.first().continueItems, library, actions.onSetWatched, actions.onPlay, actions.onOpenShow, actions.onOpenMovie, Modifier.width(340.dp).height(340.dp))
             }
         }
@@ -525,10 +515,53 @@ private fun ContinueRow(item: ContinueItem, library: LibraryRepository, onSetWat
     }
 }
 
+/**
+ * Home's hero, on the phone, the tablet and the paged tablet Home alike
+ * (PLAN-ANDROID-REVIEW §5.4): Play plays it, and the second button opens
+ * its page. An episode's page needs its season, which comes from its card
+ * in [episodes]; without one the hero opens the show. [height] null fills
+ * the height the parent gives it.
+ */
+@Composable
+internal fun HomeHero(
+    hero: Hero,
+    episodes: List<EpisodeCard>,
+    badges: List<String>,
+    library: LibraryRepository,
+    onPlay: (PlayRequest) -> Unit,
+    onOpenShow: (Long) -> Unit,
+    onOpenMovie: (Long) -> Unit,
+    onOpenEpisode: (showId: Long, season: Int, episodeId: Long) -> Unit,
+    modifier: Modifier = Modifier,
+    height: Dp? = 400.dp,
+) {
+    val episode = hero.episodeId?.takeIf { hero.kind == Hero.Kind.Episode }?.let { id -> episodes.firstOrNull { it.episodeId == id } }
+    HeroCard(
+        modifier = modifier,
+        height = height,
+        hero = hero,
+        badges = badges,
+        imageUrl = library.imageUrl(hero.backdropPath, ImageSize.W780),
+        onPlay = hero.playRequest(episodes)?.let { r -> { onPlay(r) } },
+        onOpen = {
+            when {
+                episode != null -> onOpenEpisode(episode.showId, episode.season, episode.episodeId)
+                hero.movieId != null -> onOpenMovie(hero.movieId!!)
+                hero.showId != null -> onOpenShow(hero.showId!!)
+            }
+        },
+        openLabel = when {
+            episode != null -> "Go to episode"
+            hero.kind == Hero.Kind.Movie -> "Go to movie"
+            else -> "Go to show"
+        },
+    )
+}
+
 /** The hero card; [height] null fills the height the parent gives it (the paged tablet Home). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun HeroCard(hero: Hero, badges: List<String>, imageUrl: String?, onPlay: (() -> Unit)?, onOpen: () -> Unit, openLabel: String, modifier: Modifier = Modifier, height: Dp? = 400.dp) {
+private fun HeroCard(hero: Hero, badges: List<String>, imageUrl: String?, onPlay: (() -> Unit)?, onOpen: () -> Unit, openLabel: String, modifier: Modifier = Modifier, height: Dp? = 400.dp) {
     Box(
         modifier.fillMaxWidth().then(if (height != null) Modifier.height(height) else Modifier).clip(RoundedCornerShape(16.dp)).clickable(onClick = onOpen),
     ) {

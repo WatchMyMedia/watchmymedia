@@ -35,10 +35,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param items 
- * @param serverAddresses 
+ * @param items
+ * @param serverAddresses
  */
 @Serializable
 

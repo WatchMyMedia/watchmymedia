@@ -60,9 +60,9 @@ import media.watchmy.client.presentation.settings.SettingsViewModel
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.presentation.settings.LanguageList
 
 /** Which list a language dialog adds to or edits. */
-private enum class LanguageList { Audio, Subtitles }
 
 private val Heading = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = WmmColors.Text)
 private val Description = TextStyle(fontFamily = Inter, fontSize = 13.sp, lineHeight = 19.sp, color = WmmColors.TextMuted)
@@ -119,28 +119,28 @@ internal fun LanguageSettings(state: SettingsViewModel.State, vm: SettingsViewMo
 
     adding?.let { list ->
         AddLanguageDialog(
-            chosen = if (list == LanguageList.Audio) state.playback.audio.languages else state.playback.subtitles.languages,
+            chosen = vm.languages(list),
             displayLocale = displayLocale,
             onDismiss = { adding = null },
             onPick = { tag ->
-                if (list == LanguageList.Audio) vm.addAudioLanguage(tag) else vm.addSubtitleLanguage(tag)
+                vm.addLanguage(list, tag)
                 adding = null
             },
         )
     }
     editing?.let { (list, tag) ->
-        val languages = if (list == LanguageList.Audio) state.playback.audio.languages else state.playback.subtitles.languages
+        val languages = vm.languages(list)
         LanguageActionsDialog(
             name = subtitleLanguageLabel(tag, displayLocale),
             index = languages.indexOf(tag),
             last = languages.lastIndex,
             onDismiss = { editing = null },
             onMove = { by ->
-                if (list == LanguageList.Audio) vm.moveAudioLanguage(tag, by) else vm.moveSubtitleLanguage(tag, by)
+                vm.moveLanguage(list, tag, by)
                 editing = null
             },
             onRemove = {
-                if (list == LanguageList.Audio) vm.removeAudioLanguage(tag) else vm.removeSubtitleLanguage(tag)
+                vm.removeLanguage(list, tag)
                 editing = null
             },
         )

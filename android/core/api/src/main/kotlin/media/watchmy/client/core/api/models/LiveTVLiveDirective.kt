@@ -23,6 +23,7 @@
 
 package media.watchmy.client.core.api.models
 
+import media.watchmy.client.core.api.models.AdaptiveStream
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -34,15 +35,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param from 
- * @param generation 
- * @param mode 
- * @param modeReason 
- * @param reason 
- * @param to 
- * @param url 
+ * @param from
+ * @param generation
+ * @param mode
+ * @param modeReason
+ * @param reason
+ * @param to
+ * @param url
+ * @param adaptive
  */
 @Serializable
 
@@ -67,7 +67,10 @@ data class LiveTVLiveDirective (
     val to: kotlin.String,
 
     @SerialName(value = "url")
-    val url: kotlin.String
+    val url: kotlin.String,
+
+    @SerialName(value = "adaptive")
+    val adaptive: AdaptiveStream? = null
 
 ) {
 

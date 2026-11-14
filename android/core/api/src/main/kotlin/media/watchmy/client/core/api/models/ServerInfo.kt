@@ -34,14 +34,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param apiLevel Apps compare this with the level they need.
  * @param id Stable random ID; apps remember servers by it, not by address.
  * @param name Shown in apps' server lists; set under Settings.
  * @param setupRequired No account exists yet; finish setup in a browser.
  * @param turnstile Password sign-in needs a Cloudflare Turnstile check, which only the web page can show: sign in by pairing instead (/auth/pair, opening linkPath in a browser on a phone).
- * @param version 
+ * @param version
  * @param castAppId The Google Cast receiver application the web UI launches; absent when it shows no Cast button.
  * @param casting The server issues cast tokens (POST /auth/cast-token), so apps may offer casting.
  * @param host The platform a container install runs on, when the server can tell: unraid. Settings word updates and GPU setup for it. Absent otherwise and on older servers.

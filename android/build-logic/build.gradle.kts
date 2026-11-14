@@ -9,6 +9,8 @@ dependencies {
     compileOnly(libs.android.gradle.plugin)
     compileOnly(libs.compose.compiler.gradle.plugin)
     compileOnly(libs.kotlin.gradle.plugin)
+    // versionCodeOf's tests (VersionCodeTest); the root build's testDebugUnitTest runs them.
+    testImplementation(libs.junit)
 }
 
 gradlePlugin {

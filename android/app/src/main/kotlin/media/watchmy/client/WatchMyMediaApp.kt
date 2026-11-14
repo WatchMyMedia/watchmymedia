@@ -12,15 +12,13 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
-import media.watchmy.client.model.LivePersonalChange
 import media.watchmy.client.reminders.LiveReminderAlarms
+import media.watchmy.client.reminders.ReminderFollower
 import media.watchmy.client.core.cast.CastConnectLive
 import media.watchmy.client.core.cast.CastConnectPlay
 import media.watchmy.client.core.cast.CastConnectReceiver
@@ -36,6 +34,7 @@ import media.watchmy.client.model.AuthRepository
 import media.watchmy.client.model.CastReceiver
 import media.watchmy.client.model.CastService
 import media.watchmy.client.model.ClientInfo
+import media.watchmy.client.model.Diagnostics
 import media.watchmy.client.model.DownloadRepository
 import media.watchmy.client.model.LIVE_CAST_API_LEVEL
 import media.watchmy.client.model.LibraryRepository
@@ -49,10 +48,12 @@ import media.watchmy.client.model.SeekThumbnails
 import media.watchmy.client.model.ServerRepository
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.ui.CoilSeekThumbnails
+import media.watchmy.client.core.playback.watchnext.WatchNextArtSource
 import okhttp3.OkHttpClient
+import androidx.work.Configuration as WorkConfiguration
 import java.time.Instant
 
-class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDownloads.Host {
+class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDownloads.Host, WorkConfiguration.Provider, WatchNextArtSource {
     /** True on Android TV and Google TV (the TV UI), false on phones and tablets. */
     val isTv: Boolean by lazy {
         val uiMode = getSystemService(UiModeManager::class.java)
@@ -67,17 +68,38 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
     /** The real data layer; null when running on the fakes (`-Pfakes=true`). */
     private var data: DataServices? = null
 
+    /**
+     * A Watch Next card's picture for the launcher ([WatchNextArtProvider]): the
+     * server's image, through the client that signs in to it, and only while
+     * [account] is the one signed in.
+     */
+    override suspend fun watchNextArt(account: String, path: String): ByteArray? {
+        val data = data ?: return null
+        if (media.watchmy.client.model.watchNextAccount(data.servers.current.value?.server, data.auth.user.value) != account) return null
+        val url = data.library.imageUrl(path, media.watchmy.client.model.ImageSize.W780) ?: return null
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            data.imageHttpClient.newCall(okhttp3.Request.Builder().url(url).build()).execute().use { if (it.isSuccessful) it.body.bytes() else null }
+        }
+    }
+
     /** Whether the local network question (Android 17) is still open; [LocalNetworkGate] answers it. */
-    val localNetwork: LocalNetworkQuestion by lazy { LocalNetworkQuestion.of(this) }
+    val localNetwork: LocalNetworkQuestion by lazy { allowingStartupReads { LocalNetworkQuestion.of(this) } }
 
     /** Cast Connect on a TV with a receiver App ID; null elsewhere. */
     var castConnect: CastConnectReceiver? = null
         private set
 
-    /** Live TV reminders' alarms, on phones and tablets with the real data layer; null on TVs (a banner) and the fakes. */
-    private var reminderAlarms: LiveReminderAlarms? = null
+    /** Live TV reminders, on phones and tablets with the real data layer; null on TVs (a banner) and the fakes. */
+    private var reminders: ReminderFollower? = null
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /** WorkManager's settings, the defaults: it starts on first use, not at every process start (the manifest). */
+    override val workManagerConfiguration: WorkConfiguration
+        get() = WorkConfiguration.Builder().build()
+
+    /** The process's first ON_START, when what only someone using the app needs starts. */
+    private val firstForeground by lazy { FirstForeground(ProcessLifecycleOwner.get().lifecycle) }
 
     /** Downloads to watch offline, on phones and tablets with the real data layer; null on TVs and the fakes. */
     override var offlineDownloads: OfflineDownloads? = null
@@ -85,6 +107,7 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
 
     override fun onCreate() {
         super.onCreate()
+        if (BuildConfig.DEBUG) StrictModeChecks.install()
         services = if (BuildConfig.FAKE_DATA) FakeAppServices(signedIn = false, tv = isTv, seerr = BuildConfig.FAKE_SEERR, offline = BuildConfig.FAKE_OFFLINE, cast = BuildConfig.FAKE_CAST) else realServices()
     }
 
@@ -92,10 +115,14 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
      * The data layer and the player engine. The data layer reads a few
      * hundred bytes of saved state once, synchronously, so the saved server
      * and sign-in are right from the first frame; the player engine has to be
-     * built on the main thread. Casting starts after the first frame.
+     * built on the main thread. The Cast SDK starts after the first frame of
+     * the app's first time in the foreground ([FirstForeground]), not for a
+     * process started for a broadcast or a job.
      */
     private fun realServices(): AppServices {
-        val data = traced("WMM DataServices") { DataServices.create(this, tv = isTv, version = BuildConfig.VERSION_NAME) }.also { data = it }
+        val data = traced("WMM DataServices") { allowingStartupReads { DataServices.create(this, tv = isTv, version = BuildConfig.VERSION_NAME) } }.also { data = it }
+        // The event stream and the start-up checks wait for the app to be in front (PLAN-ANDROID-REVIEW.md §4.1.5).
+        appScope.launch { ProcessLifecycleOwner.get().lifecycle.currentStateFlow.collect { data.setInFront(it.isAtLeast(Lifecycle.State.STARTED)) } }
         fun account() = media.watchmy.client.model.watchNextAccount(data.servers.current.value?.server, data.auth.user.value)
         // Downloads (PLAN-DOWNLOADS.md) are for phones and tablets: the TV app never shows them.
         lateinit var engine: PlaybackEngine
@@ -103,7 +130,14 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
             null
         } else {
             traced("WMM OfflineDownloads") {
-                OfflineDownloads(this, data.offlineGateway, { data.client }, { engine.profiles.current() }, "WatchMyMedia/${BuildConfig.VERSION_NAME} (android; Android ${android.os.Build.VERSION.RELEASE})")
+                // The downloads' list is read once, here, on purpose: memory is its truth from then on.
+                allowingStartupReads {
+                    OfflineDownloads(
+                        this, data.offlineGateway, { data.client }, { engine.profiles.current() },
+                        media.watchmy.client.model.userAgent(data.client, android.os.Build.VERSION.RELEASE),
+                        httpClient = { data.mediaHttpClient },
+                    )
+                }
             }.also { offlineDownloads = it }
         }
         val library = object : LibraryRepository by data.library {
@@ -114,69 +148,38 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
             PlaybackEngine(
                 this, downloads?.playbackGateway(data.playbackGateway) ?: data.playbackGateway, data.preferences, data.client, isTv = isTv,
                 library = library, watchNextAccount = account(), playerSources = downloads?.playerSources ?: { it },
-                artwork = ArtworkLoader(this),
+                artwork = ArtworkLoader(this), httpClient = { data.mediaHttpClient },
             )
         }.also { engine = it }
         data.onSessionChange { playback.setWatchNextAccount(account()) }
         val castable = traced("WMM cast check") { BuildConfig.CAST_APP_ID.isNotEmpty() && RealCastService.isSupported(this) }
         val cast = if (castable && !isTv) {
-            traced("WMM RealCastService") { RealCastService(this, data.castGateway, data.servers, data.auth, data.preferences, data.library, client = { data.client }) }
+            traced("WMM RealCastService") { RealCastService(this, data.castGateway, data.servers, data.auth, data.preferences, client = { data.client }) }
+                .also { sender -> firstForeground.then(sender::start) }
         } else {
             CastService.None
         }
-        val receiver = if (castable && isTv) castConnect(data, playback).also { castConnect = it } else CastReceiver.None
-        if (!isTv) followReminders(data, ::account)
-        return RealAppServices(data, playback, cast, receiver, library = playback.screensLibrary(library), downloads = downloads?.repository ?: DownloadRepository.Unavailable, seekThumbnails = CoilSeekThumbnails(this), livePlayback = playback.live(data.livePlaybackGateway))
+        val receiver = if (castable && isTv) traced("WMM castConnect") { castConnect(data, playback) }.also { castConnect = it } else CastReceiver.None
+        if (!isTv) traced("WMM followReminders") { followReminders(data, ::account) }
+        return RealAppServices(data, playback, cast, receiver, library = playback.screensLibrary(library), downloads = downloads?.repository ?: DownloadRepository.Unavailable, seekThumbnails = CoilSeekThumbnails(this), livePlayback = playback.live(data.livePlaybackGateway), diagnostics = AndroidDiagnostics(this))
     }
 
-    /**
-     * Live TV reminders on a phone or tablet (PLAN-LIVE-TV-GUIDE.md §6.5):
-     * every read or change of the list sets the alarms again, and a sign-out
-     * or another account cancels them. The list is read at start and on each
-     * return to the foreground, and again on the server's
-     * live.reminders.changed while the app is in the foreground; after a
-     * reboot, LiveReminderBoot. Servers below API level 15 have no list.
-     */
+    /** Live TV reminders' alarms on a phone or tablet ([ReminderFollower]). */
     private fun followReminders(data: DataServices, account: () -> String?) {
-        val alarms = LiveReminderAlarms(this).also { it.createChannel(); reminderAlarms = it }
-        var logos: Pair<Long, Map<String, String>>? = null
-        var scheduledFor: String? = null
-        appScope.launch {
-            combine(data.auth.user, data.servers.current, data.live.reminders) { _, _, reminders -> reminders }.collect { reminders ->
-                val who = account()
-                if (who == null || who != scheduledFor && reminders == null) {
-                    if (scheduledFor != null || who == null) alarms.cancelAll()
-                    scheduledFor = null
-                }
-                if (who == null || reminders == null) return@collect
-                val now = System.currentTimeMillis()
-                val known = logos?.takeIf { it.first > now - LOGOS_FOR_MS }?.second ?: LiveReminderAlarms.logos(data.live).also { logos = now to it }
-                alarms.schedule(reminders, who, known)
-                scheduledFor = who
+        val session = combine(data.auth.user, data.servers.current) { user, server -> user to server }
+        // The alarms kept, and whose they are, are read now, on purpose: the follower starts from them.
+        reminders = allowingStartupReads {
+            val alarms = LiveReminderAlarms(this).also {
+                it.createChannel()
+                // The boot receiver follows the alarms; a version before it was always on.
+                it.matchBootReceiver()
             }
-        }
-        val process = ProcessLifecycleOwner.get()
-        appScope.launch {
-            process.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch { syncReminders() }
-                data.live.personalChanges.collect { if (it == LivePersonalChange.Reminders) syncReminders() }
-            }
-        }
+            ReminderFollower(alarms, data.live, session, account, appScope)
+        }.also { it.start(ProcessLifecycleOwner.get().lifecycle) }
     }
 
-    /** Reads the reminders again, which sets the alarms; false when the server couldn't be asked. */
-    suspend fun syncReminders(): Boolean {
-        val live = data?.live ?: return true
-        if (reminderAlarms == null) return true
-        return try {
-            live.refreshReminders()
-            true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            false
-        }
-    }
+    /** Reads the reminders again, which sets the alarms; false when the server couldn't be asked (LiveReminderSync). */
+    suspend fun syncReminders(): Boolean = reminders?.sync() ?: true
 
     /** Plays cast to this TV: from the caster's server, as the caster, through this TV's own players. */
     private fun castConnect(data: DataServices, playback: PlaybackEngine): CastConnectReceiver {
@@ -220,9 +223,6 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
             .build()
 }
 
-/** The channels' logos for reminders are asked for again after this. */
-private const val LOGOS_FOR_MS = 10 * 60_000L
-
 /** How long artwork takes to fade in. */
 private const val CROSSFADE_MS = 150
 
@@ -250,6 +250,7 @@ private class RealAppServices(
     override val downloads: DownloadRepository,
     override val seekThumbnails: SeekThumbnails,
     override val livePlayback: LivePlaybackControllerFactory,
+    override val diagnostics: Diagnostics,
 ) : AppServices {
     override val servers: ServerRepository get() = data.servers
     override val auth: AuthRepository get() = data.auth

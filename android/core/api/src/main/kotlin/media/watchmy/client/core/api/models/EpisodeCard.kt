@@ -34,23 +34,21 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param episodeId 
- * @param episodeNumber 
- * @param hasFile 
+ * @param episodeId
+ * @param episodeNumber
+ * @param hasFile
  * @param isNew A present file arrived within the last 7 days and the signed-in user has not watched the episode.
- * @param overview 
- * @param seasonNumber 
- * @param showId 
- * @param showTitle 
- * @param title 
- * @param addedAt 
- * @param airDate 
- * @param fileId 
- * @param showBackdropPath 
- * @param showPosterPath 
- * @param stillPath 
+ * @param overview
+ * @param seasonNumber
+ * @param showId
+ * @param showTitle
+ * @param title
+ * @param addedAt
+ * @param airDate
+ * @param fileId
+ * @param showBackdropPath
+ * @param showPosterPath
+ * @param stillPath
  * @param watched The signed-in user has watched it.
  */
 @Serializable

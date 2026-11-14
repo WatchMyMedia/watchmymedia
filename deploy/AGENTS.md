@@ -11,6 +11,7 @@ it covers releases, the downloads Worker and the CI runners.
 |---|---|
 | `Dockerfile`, `entrypoint.sh`, `docker-compose*.yml`, `Caddyfile`, `swag/` | The image (built from source; see `../.dockerignore`) and example setups behind proxies. The image's ffmpeg is jellyfin-ffmpeg from Jellyfin's apt repository, which carries the Intel, AMD and Vulkan user-mode drivers; the entrypoint runs the server as `PUID`/`PGID` in the groups that own `/dev/dri` |
 | `unraid/` | The Unraid Docker template (`watchmymedia.xml`), the templates repository's profile, their test, and `mirror.sh`, which assembles the public `WatchMyMedia/unraid-templates` repository Community Applications reads; [its README](unraid/README.md) has the hand install, the test list for an Unraid server and the submission checklist |
+| `ci/baseline_profile.py` | Fails when the Android app's committed baseline and startup profiles have many rules for app classes that are gone (CI's `android` job runs it; `baseline_profile_test.py` tests it) |
 | `ci/docker-smoke.sh` | Checks a built image without a GPU: ffmpeg's hardware encoders and filters, the entrypoint's device groups, `--group-add` and `UMASK`, and that the server comes up healthy (`make docker-smoke`; CI's `docker` job runs it) |
 | `config.example.yaml` | Every server option, commented; update it with any new option |
 | `release/` | `tag.sh` (`make release-tag`) and `notes.sh` (a version's CHANGELOG section), with `version_test.py` for `apple/scripts/version.sh` |
@@ -64,7 +65,7 @@ Changes to `release.yml` are only fully exercised by a tag. Say what could
 not be checked, and leave tagging an rc to the user.
 
 Version numbers come from the tag everywhere: `apple/scripts/version.sh` for
-Apple and the Mac app, `versionCodeOf` in `android/app/build.gradle.kts` for
+Apple and the Mac app, `versionCodeOf` in `android/build-logic` (`VersionCode.kt`) for
 Android, using the same build number so pre-releases sort before their
 release. The iPhone, iPad and Apple TV apps' version stays on 1.x: `v0.M.P`
 is 1.M.P, `v1.0.0` is 1.6.0, and from `v1.3.0` `v1.M.P` is 1.(M + 4).P.

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -61,7 +62,7 @@ internal fun SkipButton(prompt: SkipPrompt, onSkip: () -> Unit, modifier: Modifi
     val shape = RoundedCornerShape(10.dp)
     Row(
         modifier
-            .height(44.dp)
+            .heightIn(min = 44.dp)
             .clip(shape)
             .background(WmmColors.Ground.copy(alpha = 0.86f))
             .drawBehind { if (fill > 0f) drawRect(WmmColors.Brand, size = Size(size.width * fill, size.height)) }
@@ -86,7 +87,7 @@ internal fun AutoNote(text: String, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(18.dp)
     Row(
         modifier
-            .height(36.dp)
+            .heightIn(min = 36.dp)
             .shadow(12.dp, shape)
             .background(WmmColors.Ground.copy(alpha = 0.86f), shape)
             .border(1.dp, Color.White.copy(alpha = 0.14f), shape)
@@ -96,6 +97,23 @@ internal fun AutoNote(text: String, modifier: Modifier = Modifier) {
     ) {
         Icon(PlayerIcons.Signal, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(18.dp))
         Text(text, style = PlayerType.Note, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** A short note over the video, as Automatic's, with no icon: "Fit · the whole picture". */
+@Composable
+internal fun PlayerNote(text: String, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(18.dp)
+    Box(
+        modifier
+            .heightIn(min = 36.dp)
+            .shadow(12.dp, shape)
+            .background(WmmColors.Ground.copy(alpha = 0.86f), shape)
+            .border(1.dp, Color.White.copy(alpha = 0.14f), shape)
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = PlayerType.Note, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -128,7 +146,7 @@ internal fun NextEpisodeCard(prompt: UpNextPrompt, stillUrl: String?, onPlayNow:
                 CountdownButton(prompt.countdownMs, prompt.countdownProgress, onPlayNow, Modifier.weight(1f))
                 val ghost = RoundedCornerShape(20.dp)
                 Box(
-                    Modifier.height(40.dp).clip(ghost).border(1.dp, Color.White.copy(alpha = 0.28f), ghost)
+                    Modifier.heightIn(min = 40.dp).clip(ghost).border(1.dp, Color.White.copy(alpha = 0.28f), ghost)
                         .clickable(role = Role.Button, onClick = onWatchCredits).padding(horizontal = 14.dp),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -144,7 +162,7 @@ private fun CountdownButton(countdownMs: Long?, progress: Float, onClick: () -> 
     val fill by animateFloatAsState(progress, tween(250, easing = LinearEasing), label = "nextFill")
     Row(
         modifier
-            .height(40.dp)
+            .heightIn(min = 40.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(Color.White.copy(alpha = 0.14f))
             .drawBehind { if (fill > 0f) drawRect(WmmColors.Brand, size = Size(size.width * fill, size.height)) }

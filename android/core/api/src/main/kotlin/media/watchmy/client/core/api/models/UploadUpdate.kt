@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param bps Aggregate remote media upload ceiling in bits per second; 0 means unlimited. Omit to keep the current value.
  * @param enforce Apply the ceiling to remote delivery and starts. Defaults to false until an operator enables it.
  * @param expectedPolicyRevision Reject a stale edit with 409; read the current revision from Settings.upload.policyRevision.

@@ -34,12 +34,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param id 
- * @param series 
- * @param state 
- * @param canCancel 
+ * @param id
+ * @param series
+ * @param state
+ * @param canCancel
  * @param reason Why the programme won't record or didn't, a reason code such as already_recorded, already_scheduled, in_library, not_new, tuners_busy or listing_gone (API level 19).
  */
 @Serializable

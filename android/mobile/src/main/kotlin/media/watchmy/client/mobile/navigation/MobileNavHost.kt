@@ -1,5 +1,16 @@
 package media.watchmy.client.mobile.navigation
 
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
@@ -14,7 +25,10 @@ import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -22,10 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -40,7 +51,6 @@ import media.watchmy.client.mobile.rows.RowEditorScreen
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import media.watchmy.client.mobile.components.Avatar
 import media.watchmy.client.mobile.components.CastMiniController
@@ -79,6 +89,7 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.rememberRequestBadge
 import media.watchmy.client.ui.rememberTabletLayout
+import media.watchmy.client.ui.LocalLiveChannelsShown
 
 fun NavHostController.play(request: PlayRequest) =
     navigate(MobileRoutes.Player(request.fileId, request.startMs, request.title, request.subtitle, request.backdropPath, request.recordingId))
@@ -110,12 +121,25 @@ private fun NavDestination.tab(): MobileTab? = when {
 }
 
 /** Switches tab the Material way: one copy of each tab, each keeping its own back stack and scroll. */
+/** How long a page fades in and out, as on the TV. */
+private const val PAGE_FADE_MS = 180
+
 private fun NavHostController.openTab(tab: MobileTab) = navigate(tab.route()) {
     popUpTo(graph.findStartDestination().id) { saveState = true }
     launchSingleTop = true
     // Home is the retained root. Restoring its saved stack would reopen the
     // detail page just popped by a tablet rail tap instead of showing Home.
     restoreState = tab != MobileTab.Home
+}
+
+/**
+ * [tab]'s own page, for a link to it: not the page last open in the tab,
+ * which [openTab] brings back. A shortcut to Live TV opens the guide even
+ * when a show page was opened from it before.
+ */
+private fun NavHostController.openTabRoot(tab: MobileTab) = navigate(tab.route()) {
+    popUpTo(graph.findStartDestination().id) { saveState = true }
+    launchSingleTop = true
 }
 
 /** Navigates to [route], as a tab switch when it is one of the tabs' routes. */
@@ -141,20 +165,14 @@ fun MobileNavHost(
     val services = LocalAppServices.current
     val liveModel = viewModel { LiveChannelsViewModel(services.live, services.servers, services.auth) }
     val live by liveModel.state.collectAsStateWithLifecycle()
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(liveModel, lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                liveModel.refresh()
-                delay(30_000)
-            }
-        }
-    }
+    // The channel list is polled only while a screen showing channels is on screen (§4.1.3).
+    val showChannels = remember(liveModel) { liveModel::showing }
     // With a TV connected that plays Live TV, and a server that lets this account cast, Watch casts (PLAN-LIVE-TV.md §4.1).
     val castState by services.cast.state.collectAsStateWithLifecycle()
     val liveCast by services.cast.live.state.collectAsStateWithLifecycle()
-    val castDevice = (castState as? CastState.Connected)?.deviceName?.takeIf { live.castable && liveCast.receiverLive == true }
-    val notLiveDevice = (castState as? CastState.Connected)?.deviceName?.takeIf { live.castable && liveCast.receiverLive == false }
+    // States, not values: the graph's builder captures them, and a changed capture rebuilds the graph (§4.3.5).
+    val castDevice by remember { derivedStateOf { (castState as? CastState.Connected)?.deviceName?.takeIf { live.castable && liveCast.receiverLive == true } } }
+    val notLiveDevice by remember { derivedStateOf { (castState as? CastState.Connected)?.deviceName?.takeIf { live.castable && liveCast.receiverLive == false } } }
     val watchLive = { channel: LiveChannel ->
         nav.navigate(MobileRoutes.LivePlayer(channel.id, channel.sourceId, channel.number, channel.name, onTv = castDevice != null))
     }
@@ -201,9 +219,12 @@ fun MobileNavHost(
                     liveModel.state.first { it.channels.any { c -> c.id == deepLink.channelId } || it.error != null || (!it.loading && it.capabilities.enabled && it.channels.isNotEmpty()) }
                 }
                 val channel = listed?.channels?.firstOrNull { it.id == deepLink.channelId }
-                if (channel != null && channel.available) watchLive(channel) else nav.openTab(MobileTab.LiveTV)
+                if (channel != null && channel.available) watchLive(channel) else nav.openTabRoot(MobileTab.LiveTV)
             }
-            DeepLink.LiveGuide -> nav.openTab(MobileTab.LiveTV)
+            // A link to a tab (the guide link, the launcher's shortcuts) opens the tab's own page.
+            DeepLink.LiveGuide -> nav.openTabRoot(MobileTab.LiveTV)
+            DeepLink.Search -> nav.openTabRoot(MobileTab.Search)
+            DeepLink.Downloads -> nav.openTabRoot(MobileTab.Downloads)
         }
         onDeepLinkHandled()
     }
@@ -223,165 +244,192 @@ fun MobileNavHost(
         entry?.destination?.hasRoute<MobileRoutes.Trailer>() != true
     val downloads by services.downloads.enabled.collectAsStateWithLifecycle()
     val tabs = MobileTab.shown(downloads, rail = showRail, liveTV = live.available)
-    Box(Modifier.fillMaxSize()) {
-        NavigationSuiteScaffold(
-            layoutType = if (showRail) NavigationSuiteType.NavigationRail else NavigationSuiteType.None,
-            containerColor = WmmColors.Ground,
-            contentColor = WmmColors.Text,
-            navigationSuiteItems = {
-                tabs.forEach { destination ->
-                    item(
-                        selected = destination == railTab,
-                        onClick = { nav.openTab(destination) },
-                        icon = {
-                            androidx.compose.material3.BadgedBox(badge = {
-                                if (destination == MobileTab.Settings && (badge.inbox ?: 0) > 0) {
-                                    androidx.compose.material3.Badge { Text("${badge.inbox}") }
-                                }
-                            }) { Icon(destination.icon, contentDescription = null) }
-                        },
-                        label = { Text(destination.label) },
-                    )
-                }
-            },
-        ) {
-            Column(Modifier.fillMaxSize()) {
-                NavHost(nav, startDestination = MobileRoutes.Home, modifier = Modifier.weight(1f)) {
-                    composable<MobileRoutes.Home> {
-                        HomeScreen(onPlay = nav::play, onOpenShow = openShow, onOpenMovie = openMovie, onNavigate = go, onOpenSeason = openSeason, onOpenEpisode = openEpisode, liveChannels = live.channels.takeIf { live.available }.orEmpty(), onWatchLive = watchLive, liveListings = live.listings)
-                    }
-                    composable<MobileRoutes.TvShows> {
-                        LibraryScreen(type = LibraryType.Tv, onOpenShow = openShow, onOpenMovie = openMovie, onNavigate = go, onPlay = nav::play)
-                    }
-                    composable<MobileRoutes.Movies> {
-                        LibraryScreen(type = LibraryType.Movie, onOpenShow = openShow, onOpenMovie = openMovie, onNavigate = go, onPlay = nav::play)
-                    }
-                    composable<MobileRoutes.Show> { entry ->
-                        val route = entry.toRoute<MobileRoutes.Show>()
-                        val arrival = when {
-                            route.episode != null -> ShowArrival.Episode(route.episode, route.season)
-                            route.season != null -> ShowArrival.Season(route.season)
-                            else -> ShowArrival.Show
-                        }
-                        ShowPage(nav, route.id, arrival)
-                    }
-                    composable<MobileRoutes.Episode> {
-                        val route = it.toRoute<MobileRoutes.Episode>()
-                        ShowPage(nav, route.showId, ShowArrival.Episode(route.episodeId, route.season))
-                    }
-                    composable<MobileRoutes.Movie> {
-                        MovieScreen(
-                            movieId = it.toRoute<MobileRoutes.Movie>().id,
-                            onPlay = nav::play,
-                            onBack = { nav.popBackStack() },
-                            onOpenSettings = { go(MobileRoutes.Settings) },
-                            onOpenTrailer = { t -> nav.navigate(MobileRoutes.Trailer(t.movieId, t.movieTitle, t.trailers.map { it.key }, t.trailers.map { it.name })) },
-                        )
-                    }
-                    composable<MobileRoutes.Downloads> {
-                        DownloadsScreen(onPlay = nav::play, onOpenMovie = openMovie, onOpenShow = openShow, onOpenEpisode = openEpisode, onNavigate = go)
-                    }
-                    composable<MobileRoutes.Search> {
-                        SearchScreen(onOpenShow = openShow, onOpenMovie = openMovie, onPlay = nav::play, onNavigate = go, onOpenSeason = openSeason, onOpenEpisode = openEpisode)
-                    }
-                    composable<MobileRoutes.LiveTV> {
-                        LiveChannelsScreen(
-                            live, user?.name, liveModel::search, liveModel::select, watchLive, liveModel::refresh, onSettings = { go(MobileRoutes.Settings) },
-                            onSearchListings = { nav.navigate(MobileRoutes.LiveSearch) },
-                            onReminders = { nav.navigate(MobileRoutes.LiveReminders) },
-                            onRecordings = { nav.navigate(MobileRoutes.LiveRecordings) },
-                            onPlayRecording = nav::play,
-                            onReminderTime = { go(MobileRoutes.Settings) },
-                            target = guideTarget, onTargetShown = { guideTarget = null },
-                            castDevice = castDevice, notLiveDevice = notLiveDevice,
-                        )
-                    }
-                    composable<MobileRoutes.LiveSearch> {
-                        LiveSearchScreen(
-                            onBack = { nav.popBackStack() }, onWatch = watchLive,
-                            onOpen = { hit -> openInGuide(LiveGuideViewModel.Target(hit.channel.id, hit.programme.id, hit.programme.startMs)) },
-                            castDevice = castDevice,
-                        )
-                    }
-                composable<MobileRoutes.LiveRecordings> {
-                    media.watchmy.client.mobile.live.LiveRecordingsScreen(live.channels, onBack = { nav.popBackStack() }, onPlay = nav::play)
-                }
-                    composable<MobileRoutes.LiveReminders> {
-                        LiveRemindersScreen(
-                            live.channels, onBack = { nav.popBackStack() },
-                            onOpen = { r -> r.channelId?.let { openInGuide(LiveGuideViewModel.Target(it, r.programmeId, r.startMs)) } },
-                            onSettings = { go(MobileRoutes.Settings) },
-                        )
-                    }
-                    composable<MobileRoutes.LivePlayer> {
-                        val route = it.toRoute<MobileRoutes.LivePlayer>()
-                        LivePlayerScreen(
-                            LiveTarget(LiveChannel(route.channelId, route.sourceId, route.number, route.name)), channels = live.channels, onExit = { nav.popBackStack() },
-                            listings = live.listings, castable = live.castable, onTv = route.onTv,
-                            onRecordings = { nav.navigate(MobileRoutes.LiveRecordings) },
-                        onPlayRecording = nav::play,
-                            onGuide = {
-                                // Back to the guide whether the player was opened from it or from Home.
-                                if (!nav.popBackStack<MobileRoutes.LiveTV>(inclusive = false)) {
-                                    nav.popBackStack()
-                                    go(MobileRoutes.LiveTV)
-                                }
-                            },
-                        )
-                    }
-                    composable<MobileRoutes.Settings> {
-                        SettingsScreen(
-                            onSwitchServer = onSwitchServer,
-                            onSignedOut = onSignedOut,
-                            onLinkTv = { nav.navigate(MobileRoutes.LinkTv()) },
-                            onNavigate = go,
-                            onOpenRequests = { nav.navigate(MobileRoutes.MyRequests) }.takeIf { badge.requests },
-                            onOpenInbox = { nav.navigate(MobileRoutes.Inbox) }.takeIf { badge.inbox != null },
-                            inboxCount = badge.inbox ?: 0,
-                        )
-                    }
-                    composable<MobileRoutes.EditRows> {
-                        val r = it.toRoute<MobileRoutes.EditRows>()
-                        RowEditorScreen(r.screen, r.name, onClose = { nav.popBackStack() }, onOpenList = { id -> nav.navigate(MobileRoutes.MediaList(id)) })
-                    }
-                    dialog<MobileRoutes.EditRowsDialog>(dialogProperties = DialogProperties(usePlatformDefaultWidth = false)) {
-                        val r = it.toRoute<MobileRoutes.EditRowsDialog>()
-                        Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
-                            RowEditorScreen(r.screen, r.name, onClose = { nav.popBackStack() }, onOpenList = { id -> nav.popBackStack(); nav.navigate(MobileRoutes.MediaList(id)) }, tablet = true)
-                        }
-                    }
-                    composable<MobileRoutes.MediaList> {
-                        ListScreen(it.toRoute<MobileRoutes.MediaList>().id, onBack = { nav.popBackStack() }, onOpenShow = openShow, onOpenMovie = openMovie, onPlay = nav::play)
-                    }
-                    composable<MobileRoutes.MyRequests> { MyRequestsScreen(onBack = { nav.popBackStack() }) }
-                    composable<MobileRoutes.Inbox> { InboxScreen(onBack = { nav.popBackStack() }) }
-                    composable<MobileRoutes.LinkTv> {
-                        LinkTvScreen(initialCode = it.toRoute<MobileRoutes.LinkTv>().code, onDone = { nav.popBackStack() })
-                    }
-                    composable<MobileRoutes.Trailer> {
-                        val r = it.toRoute<MobileRoutes.Trailer>()
-                        val trailers = r.keys.zip(r.names) { key, name -> Trailer.YouTube(name, key) }.filter { t -> isYouTubeKey(t.key) }
-                        TrailerScreen(movieTitle = r.movieTitle, trailers = trailers, onBack = { nav.popBackStack() })
-                    }
-                    composable<MobileRoutes.Player> {
-                        val r = it.toRoute<MobileRoutes.Player>()
-                        PlayerScreen(request = PlayRequest(r.fileId, r.startMs, r.title, r.subtitle, r.backdropPath, recordingId = r.recordingId), onExit = { nav.popBackStack() })
-                    }
-                }
-                // While casting, the TV's play on every screen but the player itself: a channel's
-                // (Live TV included), or a file's (as before, not on Live TV).
-                val inPlayer = entry?.destination?.hasRoute<MobileRoutes.Player>() == true || entry?.destination?.hasRoute<MobileRoutes.LivePlayer>() == true ||
-                    entry?.destination?.hasRoute<MobileRoutes.Trailer>() == true
-                if (!inPlayer && castMiniLine(liveCast, liveCast.deviceName.orEmpty()) != null) LiveCastMini(live.channels, onOpen = openLiveRemote)
-                else if (!inPlayer && tab != MobileTab.LiveTV) CastMiniController(onOpen = nav::play)
-                if (tab != null && !showRail) MobileBottomBar(tab, onSelect = nav::openTab, settingsCount = badge.inbox ?: 0, tabs = tabs)
-            }
+    // The players and the trailer draw under the cutout and the bars on purpose and place their own controls.
+    val inPlayer = entry?.destination?.hasRoute<MobileRoutes.Player>() == true || entry?.destination?.hasRoute<MobileRoutes.LivePlayer>() == true ||
+        entry?.destination?.hasRoute<MobileRoutes.Trailer>() == true
+    // Every other page clears the camera cutout and a side navigation bar (a phone held sideways) here, once,
+    // rather than each page: titles sat under the cutout and lists under the bar.
+    val sides = if (inPlayer) Modifier else Modifier.windowInsetsPadding(WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal))
+    // A keyboard's Ctrl+F, / or Search key opens Search, except in a player.
+    val shortcuts = LocalKeyboardShortcuts.current
+    val searchAllowed by rememberUpdatedState(!inPlayer)
+    DisposableEffect(shortcuts, nav) {
+        shortcuts?.onSearch = {
+            searchAllowed.also { if (it) nav.openTabRoot(MobileTab.Search) }
         }
-        if (showRail) {
-            IconButton(
-                onClick = { nav.openTab(MobileTab.Settings) },
-                modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(start = 16.dp, bottom = 16.dp).semantics { contentDescription = "Settings" },
-            ) { Avatar(user?.name) }
+        onDispose { shortcuts?.onSearch = null }
+    }
+    // Tapping the tab already shown takes its page to the top rather than doing nothing.
+    val reselect = remember { TabReselect() }
+    val selectTab = { t: MobileTab -> if (t == tab) reselect.reselect(t) else nav.openTab(t) }
+    CompositionLocalProvider(LocalTabReselect provides reselect, LocalLiveChannelsShown provides showChannels) {
+        Box(Modifier.fillMaxSize()) {
+            NavigationSuiteScaffold(
+                layoutType = if (showRail) NavigationSuiteType.NavigationRail else NavigationSuiteType.None,
+                containerColor = WmmColors.Ground,
+                contentColor = WmmColors.Text,
+                navigationSuiteItems = {
+                    tabs.forEach { destination ->
+                        item(
+                            selected = destination == railTab,
+                            onClick = { selectTab(destination) },
+                            icon = {
+                                androidx.compose.material3.BadgedBox(badge = {
+                                    if (destination == MobileTab.Settings && (badge.inbox ?: 0) > 0) {
+                                        androidx.compose.material3.Badge { Text("${badge.inbox}") }
+                                    }
+                                }) { Icon(destination.icon, contentDescription = null) }
+                            },
+                            label = { Text(destination.label) },
+                        )
+                    }
+                },
+            ) {
+                Column(Modifier.fillMaxSize().then(sides)) {
+                    // The TV's short fades, not Navigation's 700 ms default (§4.3.5).
+                    NavHost(
+                        nav,
+                        startDestination = MobileRoutes.Home,
+                        modifier = Modifier.weight(1f),
+                        enterTransition = { fadeIn(tween(PAGE_FADE_MS)) },
+                        exitTransition = { fadeOut(tween(PAGE_FADE_MS)) },
+                        popEnterTransition = { fadeIn(tween(PAGE_FADE_MS)) },
+                        popExitTransition = { fadeOut(tween(PAGE_FADE_MS)) },
+                    ) {
+                        composable<MobileRoutes.Home> {
+                            HomeScreen(onPlay = nav::play, onOpenShow = openShow, onOpenMovie = openMovie, onNavigate = go, onOpenSeason = openSeason, onOpenEpisode = openEpisode, liveChannels = live.channels.takeIf { live.available }.orEmpty(), onWatchLive = watchLive, liveListings = live.listings)
+                        }
+                        composable<MobileRoutes.TvShows> {
+                            LibraryScreen(type = LibraryType.Tv, onOpenShow = openShow, onOpenMovie = openMovie, onNavigate = go, onPlay = nav::play)
+                        }
+                        composable<MobileRoutes.Movies> {
+                            LibraryScreen(type = LibraryType.Movie, onOpenShow = openShow, onOpenMovie = openMovie, onNavigate = go, onPlay = nav::play)
+                        }
+                        composable<MobileRoutes.Show> { entry ->
+                            val route = entry.toRoute<MobileRoutes.Show>()
+                            val arrival = when {
+                                route.episode != null -> ShowArrival.Episode(route.episode, route.season)
+                                route.season != null -> ShowArrival.Season(route.season)
+                                else -> ShowArrival.Show
+                            }
+                            ShowPage(nav, route.id, arrival)
+                        }
+                        composable<MobileRoutes.Episode> {
+                            val route = it.toRoute<MobileRoutes.Episode>()
+                            ShowPage(nav, route.showId, ShowArrival.Episode(route.episodeId, route.season))
+                        }
+                        composable<MobileRoutes.Movie> {
+                            MovieScreen(
+                                movieId = it.toRoute<MobileRoutes.Movie>().id,
+                                onPlay = nav::play,
+                                onBack = { nav.popBackStack() },
+                                onOpenSettings = { go(MobileRoutes.Settings) },
+                                onOpenTrailer = { t -> nav.navigate(MobileRoutes.Trailer(t.movieId, t.movieTitle, t.trailers.map { it.key }, t.trailers.map { it.name })) },
+                            )
+                        }
+                        composable<MobileRoutes.Downloads> {
+                            DownloadsScreen(onPlay = nav::play, onOpenMovie = openMovie, onOpenShow = openShow, onOpenEpisode = openEpisode, onNavigate = go)
+                        }
+                        composable<MobileRoutes.Search> {
+                            SearchScreen(onOpenShow = openShow, onOpenMovie = openMovie, onPlay = nav::play, onNavigate = go, onOpenSeason = openSeason, onOpenEpisode = openEpisode)
+                        }
+                        composable<MobileRoutes.LiveTV> {
+                            LiveChannelsScreen(
+                                live, user?.name, liveModel::search, liveModel::select, watchLive, liveModel::refresh, onSettings = { go(MobileRoutes.Settings) },
+                                onSearchListings = { nav.navigate(MobileRoutes.LiveSearch) },
+                                onReminders = { nav.navigate(MobileRoutes.LiveReminders) },
+                                onRecordings = { nav.navigate(MobileRoutes.LiveRecordings) },
+                                onPlayRecording = nav::play,
+                                onReminderTime = { go(MobileRoutes.Settings) },
+                                target = guideTarget, onTargetShown = { guideTarget = null },
+                                castDevice = castDevice, notLiveDevice = notLiveDevice,
+                            )
+                        }
+                        composable<MobileRoutes.LiveSearch> {
+                            LiveSearchScreen(
+                                onBack = { nav.popBackStack() }, onWatch = watchLive,
+                                onOpen = { hit -> openInGuide(LiveGuideViewModel.Target(hit.channel.id, hit.programme.id, hit.programme.startMs)) },
+                                castDevice = castDevice,
+                            )
+                        }
+                    composable<MobileRoutes.LiveRecordings> {
+                        media.watchmy.client.mobile.live.LiveRecordingsScreen(live.channels, onBack = { nav.popBackStack() }, onPlay = nav::play)
+                    }
+                        composable<MobileRoutes.LiveReminders> {
+                            LiveRemindersScreen(
+                                live.channels, onBack = { nav.popBackStack() },
+                                onOpen = { r -> r.channelId?.let { openInGuide(LiveGuideViewModel.Target(it, r.programmeId, r.startMs)) } },
+                                onSettings = { go(MobileRoutes.Settings) },
+                            )
+                        }
+                        composable<MobileRoutes.LivePlayer> {
+                            val route = it.toRoute<MobileRoutes.LivePlayer>()
+                            LivePlayerScreen(
+                                LiveTarget(LiveChannel(route.channelId, route.sourceId, route.number, route.name)), channels = live.channels, onExit = { nav.popBackStack() },
+                                listings = live.listings, castable = live.castable, onTv = route.onTv,
+                                onRecordings = { nav.navigate(MobileRoutes.LiveRecordings) },
+                            onPlayRecording = nav::play,
+                                onGuide = {
+                                    // Back to the guide whether the player was opened from it or from Home.
+                                    if (!nav.popBackStack<MobileRoutes.LiveTV>(inclusive = false)) {
+                                        nav.popBackStack()
+                                        go(MobileRoutes.LiveTV)
+                                    }
+                                },
+                            )
+                        }
+                        composable<MobileRoutes.Settings> {
+                            SettingsScreen(
+                                onSwitchServer = onSwitchServer,
+                                onSignedOut = onSignedOut,
+                                onLinkTv = { nav.navigate(MobileRoutes.LinkTv()) },
+                                onNavigate = go,
+                                onOpenRequests = { nav.navigate(MobileRoutes.MyRequests) }.takeIf { badge.requests },
+                                onOpenInbox = { nav.navigate(MobileRoutes.Inbox) }.takeIf { badge.inbox != null },
+                                inboxCount = badge.inbox ?: 0,
+                            )
+                        }
+                        composable<MobileRoutes.EditRows> {
+                            val r = it.toRoute<MobileRoutes.EditRows>()
+                            RowEditorScreen(r.screen, r.name, onClose = { nav.popBackStack() }, onOpenList = { id -> nav.navigate(MobileRoutes.MediaList(id)) })
+                        }
+                        dialog<MobileRoutes.EditRowsDialog>(dialogProperties = DialogProperties(usePlatformDefaultWidth = false)) {
+                            val r = it.toRoute<MobileRoutes.EditRowsDialog>()
+                            Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
+                                RowEditorScreen(r.screen, r.name, onClose = { nav.popBackStack() }, onOpenList = { id -> nav.popBackStack(); nav.navigate(MobileRoutes.MediaList(id)) }, tablet = true)
+                            }
+                        }
+                        composable<MobileRoutes.MediaList> {
+                            ListScreen(it.toRoute<MobileRoutes.MediaList>().id, onBack = { nav.popBackStack() }, onOpenShow = openShow, onOpenMovie = openMovie, onPlay = nav::play)
+                        }
+                        composable<MobileRoutes.MyRequests> { MyRequestsScreen(onBack = { nav.popBackStack() }) }
+                        composable<MobileRoutes.Inbox> { InboxScreen(onBack = { nav.popBackStack() }) }
+                        composable<MobileRoutes.LinkTv> {
+                            LinkTvScreen(initialCode = it.toRoute<MobileRoutes.LinkTv>().code, onDone = { nav.popBackStack() })
+                        }
+                        composable<MobileRoutes.Trailer> {
+                            val r = it.toRoute<MobileRoutes.Trailer>()
+                            val trailers = r.keys.zip(r.names) { key, name -> Trailer.YouTube(name, key) }.filter { t -> isYouTubeKey(t.key) }
+                            TrailerScreen(movieTitle = r.movieTitle, trailers = trailers, onBack = { nav.popBackStack() })
+                        }
+                        composable<MobileRoutes.Player> {
+                            val r = it.toRoute<MobileRoutes.Player>()
+                            PlayerScreen(request = PlayRequest(r.fileId, r.startMs, r.title, r.subtitle, r.backdropPath, recordingId = r.recordingId), onExit = { nav.popBackStack() })
+                        }
+                    }
+                    // While casting, the TV's play on every screen but the player itself: a channel's
+                    // (Live TV included), or a file's (as before, not on Live TV).
+                    if (!inPlayer && castMiniLine(liveCast, liveCast.deviceName.orEmpty()) != null) LiveCastMini(live.channels, onOpen = openLiveRemote)
+                    else if (!inPlayer && tab != MobileTab.LiveTV) CastMiniController(onOpen = nav::play)
+                    if (tab != null && !showRail) MobileBottomBar(tab, onSelect = selectTab, settingsCount = badge.inbox ?: 0, tabs = tabs)
+                }
+            }
+            if (showRail) {
+                IconButton(
+                    onClick = { nav.openTab(MobileTab.Settings) },
+                    modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(start = 16.dp, bottom = 16.dp).semantics { contentDescription = "Settings" },
+                ) { Avatar(user?.name) }
+            }
         }
     }
 }

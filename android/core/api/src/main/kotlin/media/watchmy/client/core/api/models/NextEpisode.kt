@@ -34,13 +34,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param episodeId 
- * @param episodeNumber 
- * @param fileId 
- * @param seasonNumber 
- * @param title 
+ * @param episodeId
+ * @param episodeNumber
+ * @param fileId
+ * @param seasonNumber
+ * @param title
  */
 @Serializable
 

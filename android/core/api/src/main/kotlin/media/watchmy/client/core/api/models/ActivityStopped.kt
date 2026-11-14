@@ -34,14 +34,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param playId 
- * @param positionMs 
- * @param state 
- * @param userId 
- * @param message 
- * @param reason 
+ * @param playId
+ * @param positionMs
+ * @param state
+ * @param userId
+ * @param message
+ * @param reason
  */
 @Serializable
 
@@ -68,8 +66,6 @@ data class ActivityStopped (
 ) {
 
     /**
-     * 
-     *
      * Values: playing,paused,buffering,stopped,unknown_default_open_api
      */
     @Serializable(with = StateSerializer::class)
@@ -95,8 +91,6 @@ data class ActivityStopped (
         }
     }
     /**
-     * 
-     *
      * Values: none,stopped,ended,closed,timeout,terminated,unknown_default_open_api
      */
     @Serializable(with = ReasonSerializer::class)

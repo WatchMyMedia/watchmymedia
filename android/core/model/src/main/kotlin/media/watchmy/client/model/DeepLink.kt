@@ -9,7 +9,9 @@ import java.net.URLDecoder
  * start in ms, and `title` and `subtitle` fill in the player's header until
  * it loads), `shows/{id}` (optionally `?season=`, and `&episode=` for an
  * episode's page), `movies/{id}`, `link?code=` (a TV's pairing code) and
- * `live/{channelId}` (a Live TV reminder's Watch). Open links with [open],
+ * `live/{channelId}` (a Live TV reminder's Watch; `live` alone opens the
+ * guide), and the phone launcher's shortcuts' `search` and `downloads`.
+ * Open links with [open],
  * which plays only what a launcher or reminder published for the account
  * signed in.
  */
@@ -32,6 +34,12 @@ sealed interface DeepLink {
      */
     data class Details(val fileId: Long) : DeepLink
 
+    /** Search, from the phone launcher's shortcut (`search`). The TV opens nothing for it. */
+    data object Search : DeepLink
+
+    /** Downloads, from the phone launcher's shortcut (`downloads`). The TV opens nothing for it. */
+    data object Downloads : DeepLink
+
     companion object {
         const val SCHEME = "watchmymedia"
 
@@ -47,6 +55,8 @@ sealed interface DeepLink {
                 "shows" -> id?.let { Show(it, query["season"]?.toIntOrNull(), query["episode"]?.toLongOrNull()) }
                 "movies" -> id?.let { Movie(it) }
                 "link" -> LinkTv(query["code"])
+                "search" -> Search
+                "downloads" -> Downloads
                 else -> null
             }
         }

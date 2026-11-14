@@ -34,15 +34,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param hidden The person hid it, or it is a list made for another screen and not placed here yet. Add a row offers the hidden rows.
- * @param id 
+ * @param id
  * @param kind builtin or list. A plain string.
  * @param shown It is drawn when it has something: not hidden and within the screen's 30 rows, and for a list, some of its titles are in the library. A built-in row with nothing in it right now (no Continue watching yet) still counts as shown; the screen leaves it out until it has something.
  * @param style As ScreenRow.style.
- * @param title 
- * @param listId 
+ * @param title
+ * @param listId
  * @param note Why a row that is not hidden is not shown.
  * @param owner Lists: me (the person's own) or everyone (the household's).
  */

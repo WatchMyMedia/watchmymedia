@@ -12,6 +12,7 @@ import media.watchmy.client.model.DeletePreview
 import media.watchmy.client.model.DownloadRepository
 import media.watchmy.client.model.EPISODE_GONE_NOTE
 import media.watchmy.client.model.EpisodeDetail
+import media.watchmy.client.model.LibraryChange
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.MissingEpisode
 import media.watchmy.client.model.OnTop
@@ -53,8 +54,10 @@ import media.watchmy.client.model.watched
 import media.watchmy.client.model.withAllWatched
 import media.watchmy.client.model.withSeasonsWatched
 import media.watchmy.client.model.withWatched
+import media.watchmy.client.presentation.Freshness
 import media.watchmy.client.presentation.Latest
 import media.watchmy.client.presentation.Load
+import media.watchmy.client.presentation.ShownPage
 import media.watchmy.client.presentation.value
 
 /**
@@ -99,7 +102,7 @@ class ShowPageViewModel(
     private val downloads: DownloadRepository = DownloadRepository.Unavailable,
     /** From `createSavedStateHandle()`; tests pass their own or none. */
     private val saved: SavedStateHandle = SavedStateHandle(),
-) : ViewModel(), ShowPageActions {
+) : ViewModel(), ShowPageActions, ShownPage {
     /** The delete dialog: checking with Sonarr, asking, or saying it can't. */
     sealed interface Deleting {
         data object Checking : Deleting
@@ -200,13 +203,16 @@ class ShowPageViewModel(
     /** Page and season loads: a newer one replaces one still running. */
     private val loads = Latest(viewModelScope)
 
+    /** Its episodes' marks and progress, and library changes; another show's episodes, or a movie, don't touch it. */
+    private val freshness = Freshness(viewModelScope) { load(quiet = true) }
+
     /** Seasons fetched since the last full load, so going back to a tab is at once. */
     private val seasons = mutableMapOf<Int, SeasonDetail>()
 
     init {
         load()
         loadOptions()
-        viewModelScope.launch { library.changes.collect { load(quiet = true) } }
+        freshness.follow(library.libraryChanges, ::touches)
         // Offline, the page is the season's downloads: it follows what is watched or marked here.
         viewModelScope.launch {
             downloads.downloads.collect { held ->
@@ -222,6 +228,20 @@ class ShowPageViewModel(
                 load(quiet = true)
             }
         }
+    }
+
+    override fun setShown(shown: Boolean) = freshness.setShown(shown)
+
+    /**
+     * True for a change to an episode of a season this page has loaded. An
+     * episode it doesn't know may be in another of this show's seasons: the
+     * page drops those seasons, so their tabs load afresh, but doesn't reload.
+     */
+    private fun touches(change: LibraryChange): Boolean {
+        val known = (seasons.values.asSequence() + listOfNotNull(_state.value.season)).flatMap { it.episodes.asSequence() }.mapTo(HashSet()) { it.id }
+        if (change.touchesEpisodes(known)) return true
+        if (change.episodes.isNotEmpty()) seasons.keys.retainAll(setOfNotNull(_state.value.seasonNumber))
+        return false
     }
 
     fun retry() = load()

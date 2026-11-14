@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param id 
- * @param isAdmin 
- * @param name 
+ * @param id
+ * @param isAdmin
+ * @param name
  * @param sessionId Names this sign-in in the signed-in devices list.
  * @param expiresAt Device sign-ins only: when the token lapses if unused; every use slides it forward.
  * @param token Device sign-ins only: send as Authorization: Bearer on every request. Browsers get an HttpOnly cookie instead.

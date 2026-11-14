@@ -36,13 +36,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param bufferingMs 
- * @param bytesSent 
- * @param startPositionMs 
- * @param stream 
- * @param auto 
+ * @param bufferingMs
+ * @param bytesSent
+ * @param startPositionMs
+ * @param stream
+ * @param auto
  */
 @Serializable
 

@@ -34,24 +34,22 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param createdAt 
+ * @param createdAt
  * @param current The session this request was made with.
- * @param expiresAt 
- * @param id 
- * @param kind 
+ * @param expiresAt
+ * @param id
+ * @param kind
  * @param lastSeenAt Updated at most once an hour.
- * @param name 
- * @param userId 
- * @param userName 
+ * @param name
+ * @param userId
+ * @param userName
  * @param deviceId The device's own ID, for device sessions.
- * @param lastIp 
+ * @param lastIp
  * @param model The device's model, as the app reported it at sign-in.
- * @param platform 
- * @param product 
- * @param userAgent 
- * @param version 
+ * @param platform
+ * @param product
+ * @param userAgent
+ * @param version
  */
 @Serializable
 
@@ -112,8 +110,6 @@ data class Session (
 ) {
 
     /**
-     * 
-     *
      * Values: browser,device,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

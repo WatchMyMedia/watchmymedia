@@ -17,6 +17,7 @@ import media.watchmy.client.model.ProgressReport
 import media.watchmy.client.model.StreamProtocol
 import media.watchmy.client.model.requiresBurnIn
 import media.watchmy.client.model.StreamQuality
+import media.watchmy.client.model.watchedFromMs
 
 /** What an offline play needs of the downloads, on the main thread. */
 internal interface OfflinePlays {
@@ -55,7 +56,7 @@ internal class OfflinePlaybackGateway(
     override suspend fun reportProgress(report: ProgressReport): ProgressReply {
         val play = playing?.takeIf { it.download.fileId == report.fileId } ?: return online.reportProgress(report)
         withContext(main) { plays.progress(play, report) }
-        val watchedAt = play.decision.watchedAtMs.takeIf { it > 0 } ?: (report.durationMs * 0.92).toLong()
+        val watchedAt = watchedFromMs(report.durationMs, play.decision.watchedAtMs)
         return ProgressReply(completed = report.durationMs > 0 && report.positionMs >= watchedAt, stopMessage = null, newPlayId = null)
     }
 

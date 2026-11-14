@@ -35,8 +35,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param items In the order asked; files that are missing, not probed yet or unknown are left out.
  */
 @Serializable

@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param address This server's address as the app reaches it: http://192.168.1.20:27587.
  */
 @Serializable

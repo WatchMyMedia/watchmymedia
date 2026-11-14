@@ -34,13 +34,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param episodeCount 
- * @param name 
- * @param number 
- * @param state 
- * @param airDate 
+ * @param episodeCount
+ * @param name
+ * @param number
+ * @param state
+ * @param airDate
  */
 @Serializable
 
@@ -64,8 +62,6 @@ data class RequestableSeason (
 ) {
 
     /**
-     * 
-     *
      * Values: available,partial,requested,unaired,missing,unknown_default_open_api
      */
     @Serializable(with = StateSerializer::class)

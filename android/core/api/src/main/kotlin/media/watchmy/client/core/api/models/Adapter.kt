@@ -34,12 +34,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param index 
- * @param name 
- * @param namespace 
- * @param vendorId 
+ * @param index
+ * @param name
+ * @param namespace
+ * @param vendorId
  */
 @Serializable
 
@@ -60,8 +58,6 @@ data class Adapter (
 ) {
 
     /**
-     * 
-     *
      * Values: cuda,directx,unknown_default_open_api
      */
     @Serializable(with = NamespaceSerializer::class)

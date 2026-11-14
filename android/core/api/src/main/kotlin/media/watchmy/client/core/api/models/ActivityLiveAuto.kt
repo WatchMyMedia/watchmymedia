@@ -35,8 +35,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param estimate The link speed Automatic works from, in bits per second; 0 before it knows.
  * @param floor At the lowest step and still stalling.
  * @param on The viewer picked Automatic. Otherwise this is what Automatic would have done at the quality they picked.

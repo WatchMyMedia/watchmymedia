@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import media.watchmy.client.model.AudioOption
+import media.watchmy.client.model.loweredNote
+import media.watchmy.client.model.raisedNote
+import media.watchmy.client.model.skipLabel
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.PlaybackController
 import media.watchmy.client.model.PlaybackMode
@@ -134,7 +137,8 @@ class FakePlaybackController(
         val pos = _progress.value.positionMs
         _state.update { s ->
             val inIntro = pos in intro.startMs until (intro.endMs ?: Long.MAX_VALUE) && (intro.endMs!! - pos) >= 3_000
-            val skip = if (inIntro) SkipPrompt(if (growing != null) intro.copy(kind = SegmentKind.Commercial) else intro, if (growing != null) "Skip Ad" else "Skip Intro", null) else null
+            val segment = if (growing != null) intro.copy(kind = SegmentKind.Commercial) else intro
+            val skip = if (inIntro) SkipPrompt(segment, skipLabel(segment.kind), null) else null
             val showNext = s.nextEpisode != null && !creditsDismissed && pos >= credits.startMs
             val prevCountdown = s.upNext?.countdownMs ?: UP_NEXT_COUNTDOWN_MS
             val countdown = if (s.status == PlayerStatus.Playing) (prevCountdown - (250 * speed).toLong()).coerceAtLeast(0) else prevCountdown
@@ -228,7 +232,7 @@ class FakePlaybackController(
         it.copy(
             autoStep = step, bitrate = step.maxBitrate ?: 0, mode = PlaybackMode.Transcode,
             video = StreamVideo(step.maxWidth ?: 1280, step.maxHeight ?: 720, null),
-            note = "Lowered to ${step.label.substringBefore(" · ")} for your connection.",
+            note = loweredNote(step),
         )
     }
 
@@ -242,8 +246,7 @@ class FakePlaybackController(
             mode = if (original) PlaybackMode.Direct else PlaybackMode.Transcode,
             video = if (original) StreamVideo(3840, 2160, "HDR10")
                 else StreamVideo(step.maxWidth ?: 1280, step.maxHeight ?: 720, null),
-            note = if (original) "Connection recovered; playing the original file."
-                else "Raised to ${step.label.substringBefore(" · ")} for your connection.",
+            note = raisedNote(step),
         )
     }
 

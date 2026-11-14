@@ -2,23 +2,29 @@ package media.watchmy.client
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import media.watchmy.client.mobile.MobileApp
+import media.watchmy.client.mobile.navigation.KeyboardShortcuts
+import media.watchmy.client.mobile.navigation.LocalKeyboardShortcuts
 import media.watchmy.client.tv.TvApp
 import media.watchmy.client.ui.ProvideAppServices
 
 class MainActivity : ComponentActivity() {
-    private var deepLink by mutableStateOf<String?>(null)
+    /** A cast to this TV to Cast Connect (the TV UI then opens the player from AppServices.castReceiver); a link to the UI. */
+    private val intents = IntentRouter { intent -> (application as WatchMyMediaApp).castConnect?.onNewIntent(intent) == true }
 
-    /** Bumped on every link, so the same link opened twice is handled twice. */
-    private var deepLinkCount by mutableLongStateOf(0L)
+    /** The phone's keyboard shortcuts, from the keys no screen took. */
+    private val shortcuts = KeyboardShortcuts()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Before super: the launch screen stays until the first frame, so it goes straight to the page or its skeleton.
@@ -26,26 +32,30 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val app = application as WatchMyMediaApp
-        if (savedInstanceState == null) receive(intent)
+        if (savedInstanceState == null) intents.receive(intent)
         setContent {
-            LocalNetworkGate(isTv = app.isTv, question = app.localNetwork) {
-                ProvideAppServices(app.services) {
-                    if (app.isTv) TvApp(deepLink, deepLinkKey = deepLinkCount) else MobileApp(deepLink, deepLinkKey = deepLinkCount)
+            // Test tags (TestTags) read as resource ids, for the baseline-profile journeys and benchmarks.
+            Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
+                LocalNetworkGate(isTv = app.isTv, question = app.localNetwork) {
+                    ProvideAppServices(app.services) {
+                        if (app.isTv) {
+                            TvApp(intents.deepLink, deepLinkKey = intents.deepLinkCount)
+                        } else {
+                            CompositionLocalProvider(LocalKeyboardShortcuts provides shortcuts) {
+                                MobileApp(intents.deepLink, deepLinkKey = intents.deepLinkCount)
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
+        shortcuts.onKeyDown(keyCode, event) || super.onKeyDown(keyCode, event)
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        receive(intent)
-    }
-
-    private fun receive(intent: Intent?) {
-        // A cast to this TV (Cast Connect): the TV UI opens the player from AppServices.castReceiver.
-        if ((application as WatchMyMediaApp).castConnect?.onNewIntent(intent) == true) return
-        val link = intent?.dataString ?: return
-        deepLink = link
-        deepLinkCount++
+        intents.receive(intent)
     }
 }

@@ -1,6 +1,7 @@
 package media.watchmy.client.core.downloads
 
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
@@ -15,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.MediaToken
 import media.watchmy.client.model.SignedOutException
+import media.watchmy.client.model.withMediaToken
 
 /** What the downloader meets on a download's routes, for the repository to show and act on. */
 internal interface FetchEvents {
@@ -142,7 +144,7 @@ internal class OfflineDataSource(
         fun downloadIdOf(uri: Uri): String? = uri.path?.let { OFFLINE_ROUTE.find(it)?.groupValues?.get(1) }
 
         /** [uri] with [token] as its only `access_token`. */
-        fun withToken(uri: Uri, token: MediaToken): Uri = withoutToken(uri, token.param).buildUpon().appendQueryParameter(token.param, token.token).build()
+        fun withToken(uri: Uri, token: MediaToken): Uri = withMediaToken(uri.toString(), token.param, token.token).toUri()
 
         /** [uri] without its access token: the same bytes whatever token fetched them. */
         fun withoutToken(uri: Uri, param: String = "access_token"): Uri {

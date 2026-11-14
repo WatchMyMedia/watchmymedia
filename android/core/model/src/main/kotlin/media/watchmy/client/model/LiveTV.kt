@@ -39,6 +39,11 @@ data class LiveCapabilities(
     val recording: Boolean = false,
     val canRecord: Boolean = false,
     val automatic: Boolean = false,
+    /**
+     * The server holds a status read until a tuning channel plays
+     * ([LivePlaybackGateway.awaitStatus]); from [DECISION_TOKEN_API_LEVEL].
+     */
+    val statusWaits: Boolean = false,
 ) {
     val available: Boolean get() = enabled && allowed && playback
 }
@@ -197,6 +202,13 @@ interface LivePlaybackGateway {
     suspend fun startNegotiated(target: LiveTarget, quality: StreamQuality, requestId: String, client: ClientInfo, profile: PlaybackProfile): LiveSession =
         start(target, quality, requestId, client)
     suspend fun status(sessionId: String): LiveSession
+
+    /**
+     * The status, which a server that can ([LiveCapabilities.statusWaits])
+     * holds up to [waitMs] while the session is starting, replying once it
+     * plays, fails or stops; other servers reply at once.
+     */
+    suspend fun awaitStatus(sessionId: String, waitMs: Long): LiveSession = status(sessionId)
     suspend fun heartbeat(sessionId: String, paused: Boolean, interacted: Boolean): LiveSession
     suspend fun heartbeatMeasured(sessionId: String, paused: Boolean, interacted: Boolean, measurement: LiveMeasurement): LiveSession =
         heartbeat(sessionId, paused, interacted)

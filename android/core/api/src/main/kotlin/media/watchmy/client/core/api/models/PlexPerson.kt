@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param plexUserId The person's Plex user ID, which links them.
  * @param status Only ready people can be linked.
  * @param title Plex's display name, to recognise the person by. Never used to match anyone.

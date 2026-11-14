@@ -1,5 +1,6 @@
 package media.watchmy.client.core.data
 
+import media.watchmy.client.model.ServerFeatures
 import java.time.Instant
 import java.io.ByteArrayOutputStream
 import media.watchmy.client.model.ImageSize
@@ -9,7 +10,6 @@ import kotlinx.coroutines.withContext
 import media.watchmy.client.core.api.apis.OfflineApi
 import media.watchmy.client.core.api.apis.RequestsApi
 import media.watchmy.client.core.api.infrastructure.Serializer
-import media.watchmy.client.core.api.models.Client
 import media.watchmy.client.core.api.models.CreateOfflineInputBody
 import media.watchmy.client.core.api.models.OfflinePlanInputBody
 import media.watchmy.client.core.api.models.OfflineSyncDownload
@@ -18,7 +18,6 @@ import media.watchmy.client.core.api.models.OfflineSyncProgress
 import media.watchmy.client.core.data.RealPlaybackGateway.Companion.absolute
 import media.watchmy.client.core.data.RealPlaybackGateway.Companion.toApi
 import media.watchmy.client.core.data.RealPlaybackGateway.Companion.toModel
-import media.watchmy.client.model.AUDIO_LANGUAGES_API_LEVEL
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.ClientInfo
 import media.watchmy.client.model.CreatedDownload
@@ -28,7 +27,6 @@ import media.watchmy.client.model.DownloadOption
 import media.watchmy.client.model.DownloadPlan
 import media.watchmy.client.model.DownloadQuality
 import media.watchmy.client.model.MediaToken
-import media.watchmy.client.model.OFFLINE_API_LEVEL
 import media.watchmy.client.model.OfflineGateway
 import media.watchmy.client.model.OfflineItem
 import media.watchmy.client.model.OfflineOwner
@@ -81,7 +79,7 @@ internal class RealOfflineGateway(
 
     /** Older servers, and servers that turned requests off, offer no downloads. */
     override suspend fun allowed(owner: OfflineOwner): Boolean {
-        if (level(owner) < OFFLINE_API_LEVEL) return false
+        if (!ServerFeatures(level(owner)).offline) return false
         val access = http.bindTo(owner.serverId, owner.userId) ?: throw SignedOutException()
         return try {
             access.call { base, client -> RequestsApi(base, client).getRequestOptions() }.offline == true
@@ -105,7 +103,7 @@ internal class RealOfflineGateway(
                     estimated = q.sizeEstimated,
                     audioConverted = !q.audio.copy,
                     // Before audio languages, always the file's default: the sheet works that out itself.
-                    audioIndex = q.audio.index.toInt().takeIf { it >= 0 && level(owner) >= AUDIO_LANGUAGES_API_LEVEL },
+                    audioIndex = q.audio.index.toInt().takeIf { it >= 0 && ServerFeatures(level(owner)).audioLanguages },
                 )
             },
             audio = plan.audioTracks.map { it.toModel() },
@@ -157,8 +155,7 @@ internal class RealOfflineGateway(
         Serializer.kotlinxSerializationJson.decodeFromString(ApiOfflineDownload.serializer(), json).toModel(owner.baseUrl)
 
     override suspend fun token(owner: OfflineOwner, downloadId: String): MediaToken {
-        val t = call(owner) { it.createOfflineToken(downloadId) }
-        return MediaToken(t.token, epochMs(t.expiresAt) ?: (System.currentTimeMillis() + 60 * 60_000L), t.`param`.ifBlank { "access_token" }, serverUrl = owner.baseUrl)
+        return call(owner) { it.createOfflineToken(downloadId) }.toModel(owner.baseUrl)
     }
 
     override suspend fun sync(owner: OfflineOwner, client: ClientInfo, sentAtMs: Long, downloads: List<SyncedDownload>, progress: List<OfflineProgress>): SyncReply {
@@ -203,11 +200,6 @@ internal class RealOfflineGateway(
         )
     }
 
-    private fun ClientInfo.toApi() = Client(
-        deviceId = deviceId.take(64), name = name.take(64), product = product.take(64), platform = platform.take(32), version = version.take(32),
-        model = model.take(64).ifBlank { null },
-    )
-
     companion object {
         fun mode(value: String) = when (value) {
             "direct" -> PlaybackMode.Direct
@@ -243,7 +235,7 @@ internal class RealOfflineGateway(
             // The offline routes play from the start; a decision's play and session are not this download's.
             // A copy plays from the device, so its stored decision carries no seek thumbnails (they live on
             // the server, under URLs that change with the file's version).
-            decision = decision?.toModel(base, apiLevel = 0),
+            decision = decision?.toModel(base, ServerFeatures(0)),
         )
 
         fun ApiOfflineItem.toModel() = OfflineItem(

@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param canRequest Seerr lets the user request movies or shows.
- * @param id 
+ * @param id
  * @param name Seerr's display name.
  * @param names Every name Seerr has for the user (username, Plex and Jellyfin names, email), for suggesting links.
  */

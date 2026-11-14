@@ -37,6 +37,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import media.watchmy.client.ui.WmmColors
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.delete
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.runtime.LaunchedEffect
+import media.watchmy.client.ui.onBack
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
 
 private val Digits = "1234567890".map { it.toString() }
 private val Letters = listOf("qwertyuiop", "asdfghjkl'", "zxcvbnm,.-").map { row -> row.map { it.toString() } }
@@ -129,6 +146,98 @@ fun OnScreenKeyboard(
     }
 }
 
+/**
+ * The keyboard typing into [field]: a field's text is held in its
+ * TextFieldState (PLAN-ANDROID-REVIEW.md §3.3.3), which the keys edit.
+ * Under it, "Use the TV's keyboard" hands the same field to the system's
+ * keyboard (TvSearchKeyboard.dc.html), with the TV's languages, accents and
+ * voice key; its Done, or Back, comes back to that key. [masked] fields
+ * (passwords) ask it for a password keyboard. [note] goes under the key.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun OnScreenKeyboard(
+    field: TextFieldState,
+    modifier: Modifier = Modifier,
+    onDone: (() -> Unit)? = null,
+    doneLabel: String = "Done",
+    extraKeys: List<String> = emptyList(),
+    keySize: Dp = 64.dp,
+    firstKey: FocusRequester? = null,
+    masked: Boolean = false,
+    note: String? = null,
+    tvKey: FocusRequester = remember { FocusRequester() },
+    opener: TvKeyboardOpener? = null,
+) {
+    val editor = remember { FocusRequester() }
+    val ime = LocalSoftwareKeyboardController.current
+    var onTvKeyboard by remember { mutableStateOf(false) }
+    val openTvKeyboard: () -> Unit = {
+        onTvKeyboard = true
+        editor.requestFocus()
+        ime?.show()
+    }
+    SideEffect { opener?.action = openTvKeyboard }
+    val gap = 8.dp
+    // Back with the TV's keyboard already hidden: back to the key, not out of the screen.
+    Column(
+        modifier.onBack(enabled = onTvKeyboard) {
+            ime?.hide()
+            tvKey.requestFocus()
+        },
+        verticalArrangement = Arrangement.spacedBy(gap),
+    ) {
+        OnScreenKeyboard(
+            onText = { t -> field.edit { append(t) } },
+            onBackspace = { field.edit { if (length > 0) delete(length - 1, length) } },
+            onDone = onDone,
+            doneLabel = doneLabel,
+            extraKeys = extraKeys,
+            keySize = keySize,
+            firstKey = firstKey,
+        )
+        Key(
+            "Use the TV’s keyboard",
+            openTvKeyboard,
+            Modifier.width((keySize + gap) * 10 - gap).height(keySize).focusRequester(tvKey),
+            fontSize = 20.sp,
+        )
+        if (note != null) Text(note, style = inter(17.sp, lineHeight = 25.sp), color = WmmColors.TextFaint, modifier = Modifier.width((keySize + gap) * 10 - gap))
+        // The system's keyboard types into the same field through an editor of its own, out of sight.
+        BasicTextField(
+            state = field,
+            modifier = Modifier
+                .size(1.dp)
+                .alpha(0f)
+                .focusRequester(editor)
+                .onFocusChanged { if (!it.isFocused) onTvKeyboard = false },
+            keyboardOptions = KeyboardOptions(keyboardType = if (masked) KeyboardType.Password else KeyboardType.Text, imeAction = ImeAction.Done),
+            onKeyboardAction = {
+                ime?.hide()
+                tvKey.requestFocus()
+            },
+        )
+    }
+    // The TV's keyboard put away (its own Back hides it first): focus comes back to the key.
+    val imeVisible = WindowInsets.isImeVisible
+    var imeShown by remember { mutableStateOf(false) }
+    LaunchedEffect(imeVisible, onTvKeyboard) {
+        if (onTvKeyboard && imeVisible) imeShown = true
+        if (onTvKeyboard && imeShown && !imeVisible) {
+            imeShown = false
+            tvKey.requestFocus()
+        }
+    }
+}
+
+/** Opens the TV's keyboard for a [OnScreenKeyboard]'s field from elsewhere on the screen (Search's box). */
+@Stable
+class TvKeyboardOpener {
+    internal var action: () -> Unit = {}
+
+    fun open() = action()
+}
+
 @Composable
 private fun Key(
     label: String,
@@ -167,6 +276,7 @@ fun KeyboardField(
     masked: Boolean = false,
     active: Boolean = false,
     height: Dp = 72.dp,
+    dim: Boolean = false,
 ) {
     val shape = RoundedCornerShape(14.dp)
     Row(
@@ -182,7 +292,8 @@ fun KeyboardField(
         if (shown.isEmpty() && !active) {
             Text(placeholder, style = inter(24.sp), color = WmmColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
         } else {
-            Text(shown, style = inter(24.sp), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.StartEllipsis, modifier = Modifier.weight(1f, fill = false))
+            // [dim]: words still being heard (voice typing), a shade softer.
+            Text(shown, style = inter(24.sp), color = if (dim) WmmColors.TextSoft else WmmColors.Text, maxLines = 1, overflow = TextOverflow.StartEllipsis, modifier = Modifier.weight(1f, fill = false))
             if (active) Box(Modifier.padding(start = 2.dp).width(3.dp).height(30.dp).background(WmmColors.Accent))
             if (shown.isEmpty()) Text(placeholder, style = inter(24.sp), color = WmmColors.TextFaint, maxLines = 1, modifier = Modifier.padding(start = 10.dp))
         }
@@ -208,7 +319,7 @@ fun KeyboardDialog(
     extraKeys: List<String> = emptyList(),
     noteWarns: (String) -> Boolean = { false },
 ) {
-    var text by remember { mutableStateOf(initial) }
+    val field = rememberTextFieldState(initial)
     val first = remember { FocusRequester() }
     TvDialog(onDismiss) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)), contentAlignment = Alignment.BottomCenter) {
@@ -223,13 +334,13 @@ fun KeyboardDialog(
             ) {
                 Column(Modifier.width(980.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text(title, style = inter(30.sp, FontWeight.SemiBold), color = WmmColors.Text)
-                    KeyboardField(text, placeholder = placeholder, masked = masked, active = true)
-                    if (note != null) Text(note, style = inter(18.sp, lineHeight = 27.sp), color = if (noteWarns(text)) WmmColors.Warn else WmmColors.TextFaint)
+                    KeyboardField(field.text.toString(), placeholder = placeholder, masked = masked, active = true)
+                    if (note != null) Text(note, style = inter(18.sp, lineHeight = 27.sp), color = if (noteWarns(field.text.toString())) WmmColors.Warn else WmmColors.TextFaint)
                 }
                 OnScreenKeyboard(
-                    onText = { text += it },
-                    onBackspace = { text = text.dropLast(1) },
-                    onDone = { onSubmit(text) },
+                    field = field,
+                    masked = masked,
+                    onDone = { onSubmit(field.text.toString()) },
                     doneLabel = submitLabel,
                     extraKeys = extraKeys,
                     firstKey = first,

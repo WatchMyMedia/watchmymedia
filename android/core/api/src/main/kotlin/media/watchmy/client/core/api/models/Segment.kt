@@ -34,15 +34,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param confidence 
+ * @param confidence
  * @param `final` On credits: the last credits block, after which nothing but previews follows.
- * @param id 
- * @param kind 
- * @param source 
- * @param startMs 
- * @param endMs 
+ * @param id
+ * @param kind
+ * @param source
+ * @param startMs
+ * @param endMs
  */
 @Serializable
 
@@ -73,8 +71,6 @@ data class Segment (
 ) {
 
     /**
-     * 
-     *
      * Values: intro,recap,credits,preview,commercial,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)
@@ -101,8 +97,6 @@ data class Segment (
         }
     }
     /**
-     * 
-     *
      * Values: manual,chapter,fingerprint,blackframe,subtitle,`external`,unknown_default_open_api
      */
     @Serializable(with = SourceSerializer::class)

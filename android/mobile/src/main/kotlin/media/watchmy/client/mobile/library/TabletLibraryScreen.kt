@@ -43,6 +43,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +53,7 @@ import media.watchmy.client.mobile.components.GoldChip
 import media.watchmy.client.mobile.components.InlineError
 import media.watchmy.client.mobile.components.LoadingState
 import media.watchmy.client.mobile.components.MainTopBar
+import media.watchmy.client.mobile.components.LoadContent
 import media.watchmy.client.mobile.components.MessageHost
 import media.watchmy.client.mobile.components.PosterCard
 import media.watchmy.client.mobile.components.fieldColors
@@ -59,6 +61,9 @@ import media.watchmy.client.mobile.navigation.MobileRoutes
 import media.watchmy.client.mobile.rows.EditRowsButton
 import media.watchmy.client.mobile.rows.rowEditorRoute
 import media.watchmy.client.model.drawn
+import media.watchmy.client.presentation.library.LibraryViewModel
+import media.watchmy.client.presentation.library.countLine
+import media.watchmy.client.presentation.library.gridSubtitle
 import media.watchmy.client.presentation.rows.LibraryRowsViewModel
 import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.ItemFilter
@@ -68,6 +73,7 @@ import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.filterOptions
 import media.watchmy.client.model.label
 import media.watchmy.client.model.sortOptions
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.TabletLayout
 import media.watchmy.client.ui.WmmColors
@@ -79,6 +85,7 @@ internal fun TabletLibraryScreen(
     type: LibraryType,
     state: LibraryViewModel.State,
     vm: LibraryViewModel,
+    grid: androidx.compose.foundation.lazy.grid.LazyGridState,
     userName: String?,
     twoPane: Boolean,
     onOpenShow: (Long) -> Unit,
@@ -94,46 +101,37 @@ internal fun TabletLibraryScreen(
     val arranged = rowsVm?.arranges == true && state.libraryId != null
     val drawn = if (arranged) rows.rows.drawn(live = false) else emptyList()
     val rowActions = rowsVm?.let { libraryRowActions(onPlay, onOpenShow, onOpenMovie, onNavigate, onNotMatched, it) }
-    val grid = rememberLazyGridState()
     ShowRowsWhenTheyArrive(grid, drawn.size)
     var filtersVisible by rememberSaveable { mutableStateOf(true) }
     var filtersSheet by remember { mutableStateOf(false) }
     val noun = if (type == LibraryType.Tv) "show" else "movie"
-    val query = "${state.sort}/${state.filter}/${state.genre}/${state.decade}/${state.text}/${state.offset}/${state.jumpRevision}"
-    var shownQuery by rememberSaveable { mutableStateOf(query) }
-    LaunchedEffect(query) { if (query != shownQuery) { shownQuery = query; grid.scrollToItem(0) } }
-    val nearEnd by remember { derivedStateOf { (grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= grid.layoutInfo.totalItemsCount - 12 } }
-    LaunchedEffect(state.items.size, state.offset, state.loading, state.refreshing) { snapshotFlow { nearEnd }.collect { if (it) vm.loadMore() } }
+    // A new sort or filter goes back up to the grid; a letter jumped to, to its first title, under the rows when there are any.
+    grid.FollowLibrary(state, top = 0, first = if (arranged) drawn.size + 2 else 0, loadMore = vm::loadMore)
 
     Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
         MainTopBar(if (type == LibraryType.Tv) "TV Shows" else "Movies", userName, { onNavigate(MobileRoutes.Search) }, { onNavigate(MobileRoutes.Settings) })
         Row(Modifier.fillMaxWidth().padding(horizontal = TabletLayout.margin), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(countLine(state, noun), color = WmmColors.TextMuted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Text(state.countLine(type), color = WmmColors.TextMuted, fontSize = 13.sp, modifier = Modifier.weight(1f))
             TextButton(onClick = { if (twoPane) filtersVisible = !filtersVisible else filtersSheet = true }) {
-                Text("Filters${if (state.filterCount > 0) " · ${state.filterCount}" else ""}", color = WmmColors.Accent)
+                Text("Filters${if (state.choices.filterCount > 0) " · ${state.choices.filterCount}" else ""}", color = WmmColors.Accent)
             }
             var sortOpen by remember { mutableStateOf(false) }
             Box {
-                TextButton(onClick = { sortOpen = true }) { Text("${state.sort.label} ▾", color = WmmColors.Accent) }
+                TextButton(onClick = { sortOpen = true }) { Text("${state.choices.sort.label} ▾", color = WmmColors.Accent) }
                 DropdownMenu(sortOpen, { sortOpen = false }, containerColor = WmmColors.Surface3) {
-                    sortOptions(type).forEach { sort -> MenuChoice(sort.label, state.sort == sort) { sortOpen = false; vm.setSort(sort) } }
+                    sortOptions(type).forEach { sort -> MenuChoice(sort.label, state.choices.sort == sort) { sortOpen = false; vm.setSort(sort) } }
                 }
             }
         }
-        OutlinedTextField(state.text, vm::setText, singleLine = true, placeholder = { Text("Filter ${noun}s") }, colors = fieldColors(), modifier = Modifier.padding(horizontal = TabletLayout.margin).fillMaxWidth().padding(bottom = 16.dp))
+        OutlinedTextField(state.choices.text, vm::setText, singleLine = true, placeholder = { Text("Filter ${noun}s") }, colors = fieldColors(), modifier = Modifier.padding(horizontal = TabletLayout.margin).fillMaxWidth().padding(bottom = 16.dp))
         Row(Modifier.weight(1f).padding(horizontal = TabletLayout.margin), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             if (twoPane && filtersVisible) {
                 FilterPanel(state, vm, type, Modifier.width(220.dp).fillMaxHeight()) { filtersVisible = false }
             }
             Box(Modifier.weight(1f).fillMaxHeight()) {
-                when {
-                    state.loading && state.items.isEmpty() -> LoadingState()
-                    state.error != null && state.items.isEmpty() -> ErrorState(state.error, vm::retry)
-                    state.noLibrary -> EmptyState("No ${noun} library", "Add a library in the web app.")
-                    state.items.isEmpty() && state.filtered -> EmptyState("Nothing matches", "No ${noun}s match these filters.", action = "Clear filters", onAction = vm::clearFilters)
-                    state.items.isEmpty() -> EmptyState("No ${noun}s yet", "Pull down to check again.", action = "Check again", onAction = vm::retry)
-                    else -> androidx.compose.material3.pulltorefresh.PullToRefreshBox(state.refreshing, vm::refresh, Modifier.fillMaxSize()) {
-                        LazyVerticalGrid(GridCells.Adaptive(TabletLayout.posterMinimum), state = grid, contentPadding = PaddingValues(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                LoadContent(state.loadStatus(type, vm), vm::retry) {
+                    androidx.compose.material3.pulltorefresh.PullToRefreshBox(state.refreshing, vm::refresh, Modifier.fillMaxSize()) {
+                        LazyVerticalGrid(GridCells.Adaptive(TabletLayout.posterMinimum), state = grid, modifier = Modifier.testTag(TestTags.LIBRARY), contentPadding = PaddingValues(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             if (arranged && rowActions != null) {
                                 libraryRows(drawn, library, rowActions, tablet = true, edge = 0.dp, onNavigate = onNavigate)
                                 item(key = "edit", span = { GridItemSpan(maxLineSpan) }, contentType = "edit") {
@@ -148,10 +146,10 @@ internal fun TabletLibraryScreen(
                                 }
                             }
                             items(state.items, key = { it.id }) { item ->
-                                PosterCard(item, library.imageUrl(item.posterPath, ImageSize.W342), gridSubtitle(item), { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched) }, { vm.setWatched(item, it) })
+                                PosterCard(item, library.imageUrl(item.posterPath, ImageSize.W342), item.gridSubtitle(), { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched) }, { vm.setWatched(item, it) })
                             }
                             if (state.loadingMore || state.moreError != null) item(span = { GridItemSpan(maxLineSpan) }) {
-                                if (state.moreError != null) InlineError(state.moreError, vm::retryMore)
+                                if (state.moreError != null) InlineError(state.moreError!!, vm::retryMore)
                                 else Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = WmmColors.Accent) }
                             }
                         }
@@ -161,7 +159,7 @@ internal fun TabletLibraryScreen(
                 MessageHost(state.message, vm::messageShown, Modifier.align(Alignment.BottomCenter))
             }
             val letters = state.letters
-            if (state.sort == ItemSort.Title && !letters.isNullOrEmpty()) {
+            if (state.choices.sort == ItemSort.Title && !letters.isNullOrEmpty()) {
                 LazyColumn(Modifier.width(48.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
                     items(letters, key = { it.letter }) { entry ->
                         TextButton(onClick = { vm.jumpToLetter(entry.letter) }, modifier = Modifier.size(48.dp), contentPadding = PaddingValues(0.dp)) {
@@ -187,19 +185,19 @@ private fun FilterPanel(state: LibraryViewModel.State, vm: LibraryViewModel, typ
                 Text("Show", color = WmmColors.TextMuted, fontWeight = FontWeight.Bold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     filterOptions(type).filter { it != ItemFilter.FourK && it != ItemFilter.Hdr }.forEach { filter ->
-                        GoldChip(filter.label, state.filter == filter, { vm.setFilter(filter) })
+                        GoldChip(filter.label, state.choices.filter == filter, { vm.setFilter(filter) })
                     }
                 }
                 Text("Quality", color = WmmColors.TextMuted, fontWeight = FontWeight.Bold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(ItemFilter.FourK, ItemFilter.Hdr).forEach { filter -> GoldChip(filter.label, state.filter == filter, { vm.setFilter(if (state.filter == filter) ItemFilter.All else filter) }) }
+                    listOf(ItemFilter.FourK, ItemFilter.Hdr).forEach { filter -> GoldChip(filter.label, state.choices.filter == filter, { vm.setFilter(if (state.choices.filter == filter) ItemFilter.All else filter) }) }
                 }
                 Text("Genre", color = WmmColors.TextMuted, fontWeight = FontWeight.Bold)
             }
         }
         items(state.genres, key = { it }) { genre ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = state.genre == genre, onCheckedChange = { vm.setGenre(genre) })
+                Checkbox(checked = state.choices.genre == genre, onCheckedChange = { vm.setGenre(genre) })
                 TextButton(onClick = { vm.setGenre(genre) }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(0.dp)) { Text(genre, color = WmmColors.Text, modifier = Modifier.fillMaxWidth()) }
                 state.genreCounts[genre]?.let { Text(it.toString(), color = WmmColors.TextMuted, fontSize = 12.sp) }
             }
@@ -208,7 +206,7 @@ private fun FilterPanel(state: LibraryViewModel.State, vm: LibraryViewModel, typ
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Decade", color = WmmColors.TextMuted, fontWeight = FontWeight.Bold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.decades.forEach { decade -> GoldChip("${decade}s", state.decade == decade, { vm.setDecade(if (state.decade == decade) null else decade) }) }
+                    state.decades.forEach { decade -> GoldChip("${decade}s", state.choices.decade == decade, { vm.setDecade(if (state.choices.decade == decade) null else decade) }) }
                 }
                 TextButton(onClick = vm::clearFilters) { Text("Clear filters", color = WmmColors.Accent) }
                 TextButton(onClick = onClose) { Text("Hide filters", color = WmmColors.TextSoft) }

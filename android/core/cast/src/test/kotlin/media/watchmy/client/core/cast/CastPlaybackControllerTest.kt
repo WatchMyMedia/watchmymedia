@@ -38,7 +38,6 @@ class CastPlaybackControllerTest {
         gateway,
         preferences,
         client = { client },
-        imageUrl = { path -> path?.let { "http://192.168.1.20:27587/api/images/w1280$it" } },
         elapsedMs = { nowMs },
         dispatcher = dispatcher,
         io = dispatcher,
@@ -65,7 +64,6 @@ class CastPlaybackControllerTest {
         val load = link.loads.single()
         assertEquals(9101L, load.fileId)
         assertEquals("Harbor Lights", load.title)
-        assertEquals(null, load.imageUrl)
         val d = load.data
         assertEquals("srv-1", d.server.id)
         assertEquals(listOf("https://media.example.com", "http://192.168.1.20:27587"), d.server.urls)

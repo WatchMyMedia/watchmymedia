@@ -17,6 +17,7 @@ import media.watchmy.client.model.ItemPage
 import media.watchmy.client.model.ItemQuery
 import media.watchmy.client.model.ItemSort
 import media.watchmy.client.model.Library
+import media.watchmy.client.model.LibraryChange
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.MovieDetail
@@ -33,32 +34,43 @@ internal class RealLibraryRepository(
     private val store: LocalStore,
     private val http: Http,
     events: ServerEvents,
+    scope: kotlinx.coroutines.CoroutineScope,
+    clock: () -> Long,
 ) : LibraryRepository {
-    private fun browse(base: String, client: okhttp3.OkHttpClient) = BrowseApi(base, client)
+    /** The library list, asked again after a scan or a change to a library, or after a while ([SessionMemo]). */
+    private val libraryList = SessionMemo(store, scope, clock) {
+        http.signedIn { base, client -> LibrariesApi(base, client).listLibraries() }.items.mapNotNull { lib ->
+            when (lib.type) {
+                ApiLibrary.Type.movie -> Library(lib.id, lib.name, LibraryType.Movie, lib.scan != null, lib.lastScannedAt, lib.lastScanError, lib.lastScanErrorAt)
+                ApiLibrary.Type.tv -> Library(lib.id, lib.name, LibraryType.Tv, lib.scan != null, lib.lastScannedAt, lib.lastScanError, lib.lastScanErrorAt)
+                ApiLibrary.Type.unknown_default_open_api -> null
+            }
+        }
+    }
+
+    init {
+        events.onEvent { if (it == ServerEvents.RECONNECTED || it in ServerEvents.LIBRARY_EVENTS) libraryList.clear() }
+    }
+
+    private fun browse(base: String, client: okhttp3.Call.Factory) = BrowseApi(base, client)
 
     override suspend fun home(): HomeData = http.signedIn { base, client -> browse(base, client).getHome() }.toModel()
 
     /** arranged=true only from [ROWS_API_LEVEL]: an older server sends its fixed rows. */
     override suspend fun arrangedHome(): HomeData {
-        if (http.apiLevel() < ROWS_API_LEVEL) return home()
+        if (!http.features().rows) return home()
         return http.signedIn { base, client -> browse(base, client).getHome(arranged = true) }.toModel(arranged = true)
     }
 
     override suspend fun libraryRows(libraryId: Long): List<ScreenRow> {
-        if (http.apiLevel() < ROWS_API_LEVEL) return emptyList()
+        if (!http.features().rows) return emptyList()
         return http.signedIn { base, client -> browse(base, client).getLibraryRows(libraryId, arranged = true) }.rows.toRows()
     }
 
     override suspend fun continueWatching(): List<ContinueItem> =
         http.signedIn { base, client -> WatchApi(base, client).listContinueWatching() }.items.mapNotNull { it.toModel() }
 
-    override suspend fun libraries(): List<Library> = http.signedIn { base, client -> LibrariesApi(base, client).listLibraries() }.items.mapNotNull { lib ->
-        when (lib.type) {
-            ApiLibrary.Type.movie -> Library(lib.id, lib.name, LibraryType.Movie, lib.scan != null, lib.lastScannedAt, lib.lastScanError, lib.lastScanErrorAt)
-            ApiLibrary.Type.tv -> Library(lib.id, lib.name, LibraryType.Tv, lib.scan != null, lib.lastScannedAt, lib.lastScanError, lib.lastScanErrorAt)
-            ApiLibrary.Type.unknown_default_open_api -> null
-        }
-    }
+    override suspend fun libraries(): List<Library> = libraryList.get()
 
     override suspend fun items(query: ItemQuery): ItemPage {
         val list = http.signedIn { base, client ->
@@ -119,14 +131,11 @@ internal class RealLibraryRepository(
 
     /** One call for the whole show; servers without it get one per season. */
     override suspend fun setShowWatched(showId: Long, watched: Boolean) {
-        try {
+        orIfUnknownRoute({ super.setShowWatched(showId, watched) }) {
             http.signedIn { base, client ->
                 val api = WatchApi(base, client)
                 if (watched) api.markShowWatched(showId) else api.markShowUnwatched(showId)
             }
-        } catch (e: ApiException) {
-            if (!e.unknownRoute()) throw e
-            super.setShowWatched(showId, watched)
         }
     }
 
@@ -211,6 +220,8 @@ internal class RealLibraryRepository(
     }
 
     override val changes: Flow<Unit> = events.changes
+
+    override val libraryChanges: Flow<LibraryChange> = events.libraryChanges
 
     private fun ItemSort.toApi() = when (this) {
         ItemSort.Title -> BrowseApi.SortListLibraryItems.title

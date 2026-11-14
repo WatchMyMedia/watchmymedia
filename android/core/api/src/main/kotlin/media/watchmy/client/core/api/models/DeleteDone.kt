@@ -34,12 +34,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param connection 
- * @param connectionId 
- * @param files 
- * @param propertySize 
+ * @param connection
+ * @param connectionId
+ * @param files
+ * @param propertySize
  * @param error Why this app's delete failed; the others went ahead.
  */
 @Serializable

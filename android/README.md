@@ -201,7 +201,15 @@ Off leaves the bitstream formats out of the profile (logged under
 `adb shell settings put global use_external_surround_sound_flag 1` and
 `external_surround_sound_enabled 1` (then restart the app) make Media3
 report AC-3 and E-AC-3 passthrough, so the two settings send different
-profiles. Subtitle size scales the TV's subtitles; phones follow the
+profiles. The profile's size limit is the largest picture the offered
+codecs' decoders take at 24 fps, whatever the screen, so a phone whose
+hardware decodes 4K direct-plays a 4K file: read from
+`MediaCodecInfo.VideoCapabilities` (the decoders' performance points from
+Android 10), hardware decoders first, a software-only codec counting for
+1080p at most, and the display's size only when no decoder says. A video
+decoder that fails on a stream gets one more decision for that viewing, at
+a size it takes or without its codec (logged under `WmmPlayback`).
+Subtitle size scales the TV's subtitles; phones follow the
 system's caption settings while captions are on there. Phones and tablets
 keep 15 s of played video so a jump back plays at once (`PlayerOptions`);
 TVs keep none, as it would come out of the buffer ahead of a 4K remux, and
@@ -289,10 +297,24 @@ How it works (`core:downloads`):
 - **Media3** `DownloadManager` and `WmmDownloadService` (a `dataSync`
   foreground service with the progress notification) fetch one download at a
   time, segments in order, into a `SimpleCache` in `noBackupFilesDir/offline/`
-  that never evicts. Wi-Fi only and enough storage are requirements;
-  `WorkManagerScheduler` starts the service again when they are met. A
+  that never evicts. Wi-Fi only and enough storage are requirements. A
   download that would leave under 1 GB free is refused. The resulting
   prepared copy's size is checked again before queuing its media bytes.
+- **After the app's process ends** (`DownloadRestarts`): the manager starts
+  paused, so the app resumes it as soon as it is made, and starts the service
+  on its first time in the foreground when a download is unfinished. Below
+  Android 12 `WorkManagerScheduler` starts the service again when Wi-Fi or
+  space comes back and after a reboot. Android 12 and later refuse a
+  foreground service started from the background and Media3 drops that
+  scheduler there, so while the app is away with a download unfinished a
+  WorkManager job with the same requirements (`DownloadJobWorker`) runs the
+  downloads in the app's process, without the notification: when the network
+  or space returns, after a reboot, and again each time Android stops the job
+  (about ten minutes a run). Coming back to the foreground cancels it and the
+  service takes over. A user-initiated data transfer job (Android 14) is not
+  used: Media3 1.11 has no downloader on one, it can be scheduled only while
+  the app is in front, and it needs the service replaced by a job service of
+  the app's own.
 - **Tokens**: each fetch carries the download's own `o1.` token, renewed with
   the device's session on 401 (`OfflineDataSource`); 503 with Retry-After
   shows Preparing and is waited out; 409 starts the download over; 403 and
@@ -347,7 +369,14 @@ apps targeting API 37). `LocalNetworkGate` in `app` asks once at launch; after
 devices. A system dialog dismissed without an answer asks again at the next
 launch, and a Cast Connect play that opens the app while the question is
 up waits for the answer (two minutes at most) before it looks for the
-caster's server.
+caster's server. The server picker offers it again when nothing is found.
+
+TV Search's microphone listens in the app (`VoiceTyping`, with the TV's
+`SpeechRecognizer`), so the app declares `RECORD_AUDIO` in `tv`'s manifest,
+with `android.hardware.microphone` not required (the one APK runs on phones
+and TVs without one). The permission is asked for at the microphone's first
+press, on a TV only; the phone has no microphone key and never asks. A TV
+that offers no speech recognition to apps has no microphone key.
 
 ## Live TV on phones and tablets
 
@@ -434,9 +463,14 @@ Android 12 and later stretch a window under 10 minutes to 10 for such apps,
 as `adb shell dumpsys alarm` shows, and Doze may hold one back further, so
 the notification says how long is left as it comes. The alarms follow the
 list as it is read at start, on coming to the foreground, on
-`live.reminders.changed` while in the foreground and after any change here (`WatchMyMediaApp.followReminders`, `app/reminders/`).
-After a reboot `LiveReminderBoot` sets them again from what it kept and a
-WorkManager job reads the list once there is a network. The notification
+`live.reminders.changed` while in the foreground and after any change here
+(`ReminderFollower`, `app/reminders/`). The alarms belong to the account
+that set them: a sign-out or another account cancels them, also at a start
+with alarms kept from before. After a reboot `LiveReminderBoot` sets them
+again from what it kept and a WorkManager job reads the list once there is
+a network. That receiver is off in the manifest and on only while alarms
+are kept, so a boot with none, and every boot of a TV, doesn't start the
+app. The notification
 ("Starting in 5 min", "Dollar Dash · 2.1 HRBR-HD", the channel's logo, Watch)
 opens the channel only for the account that set it
 (`watchmymedia://live/{channelId}?source=reminder&account=`; any other
@@ -529,7 +563,13 @@ hides itself after 15 s.
 
 When player controls are hidden, Up/Down changes channel, Left opens Channels,
 and OK shows controls. Dedicated Channel Up/Down keys also work while controls
-or the Channels and Quality panels are visible. Menu opens Quality. Back closes a panel, then hides the
+or the Channels and Quality panels are visible. Menu opens Quality. The
+remote's Last goes back to the channel watched before, Record offers to
+record what is on (to people who may record; in the guide it opens the
+programme's menu), and Guide opens the full guide, as it opens Live TV from
+any other screen. In the file player, Next and Previous play the next and
+the previous episode, and Episodes, before Audio, lists the season's
+episodes (android-tv/TvPlayerEpisodes). Back closes a panel, then hides the
 controls, then leaves; Stop releases the tuner and leaves immediately. Pausing
 shows the controls. There is no file seek bar or next-episode action.
 
@@ -562,7 +602,7 @@ against `cmd/livetvfixture`.
 
 | Module | What |
 |---|---|
-| `app` | Application (builds `DataServices` and `PlaybackEngine`, the image loader, which also fetches the media notification's artwork), the one activity for both launchers, deep links, the local network prompt, manifest, icons |
+| `app` | Application (builds `DataServices` and `PlaybackEngine`, the image loader, which also fetches the media notification's artwork; starts the Cast SDK at the first `ON_START`, `FirstForeground`; WorkManager starts on first use), the one activity for both launchers and its routing of casts and links (`IntentRouter`), the local network prompt, reminders' alarms (`app/reminders/`), debug builds' StrictMode (`StrictModeChecks`), the process's past exits (`AndroidDiagnostics`), manifest, icons |
 | `core:model` | Domain models and the interfaces everything builds against: `ServerRepository`, `AuthRepository`, `LibraryRepository`, `PreferencesRepository`, `PlaybackController`, `PlaybackGateway`, `LiveRepository`, `LivePlaybackController`, `AppServices`; and the pure helpers both UIs share, so the phone and the TV say the same thing: labels, dates and counts, error messages and `attempt`, play requests, deep links |
 | `core:presentation` | The ViewModels the phone and the TV share, so both pages behave alike (the Apple apps' WMMFeatures models): their state, with what loads as a `Load` (loading, failed or ready), and their one-shot events. Depends only on `core:model`, lifecycle's ViewModel and SavedStateHandle, and coroutines: no Compose, no Android UI |
 | `core:ui` | Brand tokens (`WmmColors`), Inter, the phone Material 3 theme, `LocalAppServices`, shared pieces: `Artwork`, `Badge`, `ProgressStrip`, `WatchedCheck`, `BrandMark`, `WmmIcons`, the loading skeletons' blocks, lines and sheen (`Skeleton.kt`, still with animations off), `SubtitleCues` (both players' text subtitles, in a `CaptionLook`: the TV's Subtitle size, the phone's system caption settings), `playerKey` (both players' remote and keyboard keys), `SeekThumbnail` and `ScrubberLayout` (both players' seek thumbnails) and `CoilSeekThumbnails` (their tiles), `PRIVACY_POLICY_URL` |
@@ -574,7 +614,7 @@ against `cmd/livetvfixture`.
 | `core:cast` | Casting ([PLAN-CAST.md](../PLAN-CAST.md)): the phone's `RealCastService` and its remote `CastPlaybackController` on the Cast SDK, Cast Connect's `CastConnectReceiver` for the TV app, and `CastProtocol`, the Kotlin side of `web/src/cast/protocol.ts` |
 | `tv` | Compose for TV screens; `tv/player/` is the TV player, with a debug harness in `tv/src/debug` |
 | `mobile` | Material 3 phone screens; `mobile/player/` is the phone player, with a debug harness in `mobile/src/debug` |
-| `baselineprofile` | Tests that drive `app` on a device: the journeys that write its baseline and startup profiles, and the cold-start benchmark (Macrobenchmark; "Baseline profile" below) |
+| `baselineprofile` | Tests that drive `app` on a device: the journeys that write its baseline and startup profiles, the startup and frame-timing benchmarks (Macrobenchmark), and `fixture_server.py`, the seeded fixture server the real-build journey uses ("Baseline profile" below) |
 
 ## Build conventions
 
@@ -596,6 +636,12 @@ which `build-logic` reads too. `isReturnDefaultValues` makes `android.jar`'s
 stubs return 0, false or null in unit tests instead of throwing, so a test
 that reaches Android by mistake passes quietly; use Robolectric where a test
 needs Android.
+
+`build-logic` also holds `versionCodeOf` (`VersionCode.kt`), which turns a
+release tag into the app's version code, and its tests (`VersionCodeTest`):
+the order across alpha, beta, rc and the release, and the bounds Play sets.
+The root project's `testDebugUnitTest` runs them, so `./gradlew
+testDebugUnitTest` covers build-logic as well as the modules.
 
 `coverageReport` runs the debug unit tests and reports line and branch
 coverage across the modules, leaving out generated code: `R` and
@@ -636,9 +682,11 @@ it runs is taken on trust. The repositories are filtered too, in
 `settings.gradle.kts` and `build-logic/settings.gradle.kts`: AndroidX,
 `com.android.*` and Google's Play services groups come only from Google's
 Maven repository, two plugins and kotlin-dsl only from the Gradle Plugin
-Portal, and everything else only from Maven Central. A library from
-Google's repository in a group the filter doesn't name needs its group
-added there.
+Portal, and everything else only from Maven Central. Google's groups are
+listed once, in `gradle/google-groups.txt`, which both settings scripts
+read; a library from Google's repository in a group not listed there needs
+its group added. Each script still names `google()` in its own
+`dependencyResolutionManagement`, which is where Dependabot looks for it.
 
 After changing a version in `libs.versions.toml`, adding a library or
 plugin, or updating the Gradle wrapper, rewrite the file and commit it with
@@ -695,40 +743,97 @@ first launches and the first scrolls don't run interpreted; the startup
 profile puts the code a cold start runs first in the dex files (R8's dex
 layout, `dexLayoutOptimization`). Debug builds don't use them.
 
-The journeys run on the fakes, so they need no server: a cold start to Home
-(the startup profile), then Home's rows, the TV Shows grid, a show, and the
-player with its controls and a picker; on the TV build, pairing, Home with
-the remote, the rail, the library grid and the player. The fakes' player has
-no video, so ExoPlayer itself isn't in the profile. Regenerate them after a
-change to what a start or those screens run, on throwaway `android-35`
-emulators (`google_apis`; AGENTS.md, Emulators), with `ANDROID_SERIAL`
-naming the one to use. A portrait phone draws the TV UI oddly, so make the
-TV half on a `tv_1080p` AVD:
+The journeys come in three parts. Two run on the fakes and need no server:
+on a phone build, a cold start to Home (the startup profile), then Home's
+rows, the TV Shows grid, a show, and the player with its controls and a
+picker; on the TV build, pairing, Home with the remote, the rail, the
+library grid and the player. The fakes' player has no video and their
+cards no posters, so the third part runs a real phone build against a
+throwaway fixture server: it signs in, loads Home's posters and the Movies
+grid through the image loader, and plays a file through ExoPlayer, so the
+data layer, the images and the player are in the profiles too. The fakes'
+own rules (`core:fake`, which a release never runs) are left out of the
+merged files.
+
+`baselineprofile/fixture_server.py` runs that server: a copy of the
+fixture library's database (Test environments in the root `AGENTS.md`;
+`make fixture`, then `make fixture-serve` once) on `127.0.0.1:$FIXTURE_PORT`
+(28130 unless set), with each movie file given a page and a test-pattern
+poster through the admin's upload route, deleted when it stops. It needs
+the server built (`make build`); `FIXTURE_DIR` points it at a fixture
+elsewhere. The emulator reaches it at `10.0.2.2`, and the journey types
+that address in the server picker, never a server discovery lists.
+
+The journeys find the screens by test tags (`TestTags` in `core:ui`,
+spelled again in `Journeys.kt`), which `MainActivity` exposes as resource
+ids, not by their wording: renaming a button doesn't break them, and a tag
+removed does. A journey that fails leaves `journey-failure.png` and
+`journey-failure.xml` (the window's hierarchy, with each element's
+resource id) in
+`baselineprofile/build/outputs/connected_android_test_additional_output/`.
+
+Regenerate the profiles after a change to what a start or those screens
+run, on throwaway `android-35` emulators (`google_apis`; AGENTS.md,
+Emulators), with `ANDROID_SERIAL` naming the one to use. A portrait phone
+draws the TV UI oddly, so make the TV part on a `tv_1080p` AVD:
 
 ```bash
 baselineprofile/generate.sh phone   # on a phone emulator (pixel_8)
-baselineprofile/generate.sh tv      # on a TV-shaped one (tv_1080p); then commit what changes
+baselineprofile/generate.sh tv      # on a TV-shaped one (tv_1080p)
+baselineprofile/generate.sh real    # on the phone emulator again; then commit what changes
 ```
 
-Each half keeps its rules in `baselineprofile/build/profiles/`, and the
-app's files are written, phone rules first, once both are there;
-`generate.sh` alone runs both on one device. A half installs the release
-build with the debug key and takes about a quarter of an hour on a busy Mac.
+Each part keeps its rules in `baselineprofile/build/profiles/`, and the
+app's files are written, phone rules first, once all three are there;
+`generate.sh` alone runs them all on one device. A part installs the
+release build with the debug key and takes about a quarter of an hour on a
+busy Mac.
 
-`StartupBenchmark` measures a cold start to the first frame, as installed
-without a profile and with this one, on whatever build you choose (without
-`-Pfakes`, the real app's start into the server picker):
+The profiles go stale quietly: a renamed screen's rules match nothing, and
+its replacement runs interpreted. CI's android job runs
+`deploy/ci/baseline_profile.py`, which fails when more than 5% of the
+profiles' rules for the app's own code (and at least 50) name classes no
+longer in the sources; it lists them, most rules first. Run it from the
+repository root before a pull request that renames screens:
+`python3 -I deploy/ci/baseline_profile.py android`.
+
+Three benchmarks measure what the profiles are for, each as installed
+without a profile and with this one where it says so:
+
+- `StartupBenchmark`: a cold start to the first frame, on whatever build
+  you choose (without `-Pfakes`, the real app's start into the server
+  picker, or Home's skeleton when signed in).
+- `SignedInStartupBenchmark`: a real build's signed-in cold start against
+  a fixture server, to the first frame and to Home loaded (time to full
+  display, which both Homes report with `ReportDrawnWhen`). It needs the
+  `fixtureServer` argument and is skipped without it.
+- `FrameTimingBenchmark`: the frames drawn moving through Home's rows (a
+  phone flings, a TV uses the remote) and, on a `-PforceTv` fakes build,
+  through the Live TV guide with the remote; five runs, with the profile.
 
 ```bash
 ./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=media.watchmy.client.baselineprofile.StartupBenchmark
+python3 -I baselineprofile/fixture_server.py &   # from android/, for the next one
+./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=media.watchmy.client.baselineprofile.SignedInStartupBenchmark \
+  -Pandroid.testInstrumentationRunnerArguments.fixtureServer=10.0.2.2:28130
+./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest -Pfakes=true -PforceTv=true \
+  -Pandroid.testInstrumentationRunnerArguments.class=media.watchmy.client.baselineprofile.FrameTimingBenchmark
 ```
 
-Its results (time to the first frame, `bindApplication` and the app's own
-`WMM …` startup sections, which `WatchMyMediaApp` marks in the trace) are in
+Their results (the times to first frame and full display, `bindApplication`
+and the app's own `WMM …` startup sections, which `WatchMyMediaApp` marks in
+the trace; the frames' CPU time and overrun) are in
 `baselineprofile/build/outputs/connected_android_test_additional_output/`.
 An emulator's numbers compare builds with each other; they say little about
 devices, and a busy Mac makes them noisy, so compare medians of several runs.
+
+To count what the app asks a server for, run against `fixture_server.py`,
+whose log (at debug level, so media requests too) lists every request:
+`--log FILE` keeps it after the server stops. Count the `"msg":"http"`
+lines over a fixed stretch, such as five idle minutes on Home or five
+minutes of playing a file, before and after a change.
 
 ## Conventions
 
@@ -751,13 +856,39 @@ devices, and a busy Mac makes them noisy, so compare medians of several runs.
   ViewModel start over when what it shows changes (the phone's sign-in).
 - **Repositories throw** `ApiException` (status and the server's message);
   `SignedOutException` means show sign-in. Screens show the message.
+- **The data layer** (`core:data`) builds its OkHttp clients off the main
+  thread, on one connection pool shared by the API, images, the event stream
+  and media (`DataServices.mediaHttpClient`, for the player and downloads).
+  A request carries who it is sent as (a `Credential` tag), and one
+  interceptor adds that token, only to its server, and handles 401. API
+  replies with an ETag stay in a 20 MB HTTP cache and are asked again each
+  time, so a quiet reload gets a 304. The event stream connects only while
+  the app is in front (`DataServices.setInFront`, from the process
+  lifecycle) and on a network, and again at once on the return to either;
+  `LibraryRepository.libraryChanges` says which movies, episodes and
+  libraries a burst of events touched. Request options, Live TV
+  capabilities and the library list are asked once a sign-in, for five
+  minutes, and again on their events. What a newer server brings is gated
+  with `ServerFeatures(apiLevel)`.
 - **Images**: `services.library.imageUrl(path, ImageSize.W342)` into
   `Artwork(url, seed = title, …)`, which draws the mockups' gradient when the
   URL is null or loading. The app's image loader adds the sign-in.
 - **TV focus**: the focused card gets a 4 dp gold ring and a slight scale;
-  rows remember their focused item; Back closes overlays first. Compose
-  turns the remote's Back into a focus move while something has focus, so a
-  `BackHandler` never sees it: handle Back in `onPreviewKeyEvent`.
+  rows remember their focused item; a screen's remembered item survives
+  navigation (`rememberFocusMemory`, and `rememberSaveable` for anything
+  else focus depends on); a button busy with its work stays focusable and
+  ignores OK (`FocusableBox`'s `enabled`). Back closes overlays first:
+  handle it with `Modifier.onBack` (`core:ui`) on the screen or overlay it
+  belongs to. A remote's Back arrives as a key, which Compose turns into a
+  focus move before a `BackHandler` sees it; on Android 16 and later, where
+  the app targets SDK 36 or higher, it arrives only as a back callback,
+  with no key (seen on the `android-37.0` image: `adb shell input keyevent
+  KEYCODE_BACK` reaches the app through `WindowOnBackDispatcher`). `onBack`
+  takes both, once a press, and the overlay enabled last takes it first;
+  `onPreviewKeyEvent` or `BackHandler` alone misses one. Something that
+  floats over every screen, like the reminder banner, passes
+  `overlay = true`, so it also comes before a page opened after it. A
+  `TvDialog` gets Back from its own window.
 - **TV sizes**: a 1080p Google TV is 960×540 dp, so `TvTheme` sets the
   density to make the window 1920 dp wide. Inside it, a mockup px is a dp
   on every TV and on the tablet emulator. `Dialog`, `Popup` and

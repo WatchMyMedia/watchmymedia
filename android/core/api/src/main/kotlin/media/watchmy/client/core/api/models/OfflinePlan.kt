@@ -37,11 +37,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param audioTracks For hls downloads, which carry one: pick it with audioIndex.
- * @param durationMs 
- * @param fileId 
+ * @param durationMs
+ * @param fileId
  * @param qualities Best first; several may be the same download when the file is small.
  * @param subtitles Text subtitles come with every download; an image subtitle only burned in (subtitleId and burnIn), for hls downloads.
  */

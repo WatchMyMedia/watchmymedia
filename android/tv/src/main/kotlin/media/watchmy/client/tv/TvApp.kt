@@ -12,13 +12,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import media.watchmy.client.tv.live.CastLivePlayer
 import media.watchmy.client.tv.navigation.TvNavHost
 import media.watchmy.client.tv.servers.ServerPickerScreen
 import media.watchmy.client.tv.signin.SignInScreen
 import media.watchmy.client.tv.player.PlayerScreen
+import media.watchmy.client.ui.SessionViewModels
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 
 /**
@@ -42,7 +45,7 @@ fun TvApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
     val castLive by services.castReceiver.incomingLive.collectAsStateWithLifecycle()
 
     TvTheme {
-        Box(Modifier.fillMaxSize().background(WmmColors.Ground)) {
+        Box(Modifier.fillMaxSize().background(WmmColors.Ground).testTag(TestTags.TV)) {
             // A play cast to this TV (Cast Connect) takes the screen, signed in or not: it plays as whoever cast it.
             cast?.let { play ->
                 key(play.id) {
@@ -63,13 +66,16 @@ fun TvApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
                     onBack = if (server != null) ({ picking = false }) else null,
                 )
                 user == null -> SignInScreen(onSwitchServer = { picking = true })
+                // Each sign-in's screens keep their ViewModels to themselves, cleared when it ends.
                 else -> key(server?.server?.id, user) {
-                    TvNavHost(
-                        onSwitchServer = { picking = true },
-                        onSignedOut = {},
-                        deepLink = pendingLink,
-                        onDeepLinkHandled = { pendingLink = null },
-                    )
+                    SessionViewModels {
+                        TvNavHost(
+                            onSwitchServer = { picking = true },
+                            onSignedOut = {},
+                            deepLink = pendingLink,
+                            onDeepLinkHandled = { pendingLink = null },
+                        )
+                    }
                 }
             }
         }

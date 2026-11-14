@@ -35,13 +35,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param inLibrary 
+ * @param inLibrary
  * @param items The first 50 entries.
  * @param total Entries the list would keep.
  * @param format Imports: imdb, letterboxd or lines.
- * @param notFound 
+ * @param notFound
  */
 @Serializable
 

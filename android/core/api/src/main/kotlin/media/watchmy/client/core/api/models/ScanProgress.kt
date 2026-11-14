@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param libraryId 
- * @param scanned 
- * @param total 
+ * @param libraryId
+ * @param scanned
+ * @param total
  * @param current Path of the file most recently processed, relative to the library root.
  */
 @Serializable

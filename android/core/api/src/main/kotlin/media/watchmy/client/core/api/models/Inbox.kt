@@ -37,11 +37,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param problems 
+ * @param problems
  * @param requests Waiting for approval, failed, then approved and still on their way.
- * @param seerr 
+ * @param seerr
  */
 @Serializable
 

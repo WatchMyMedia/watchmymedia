@@ -35,13 +35,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param status 
- * @param expiresAt 
- * @param sessionId 
+ * @param status
+ * @param expiresAt
+ * @param sessionId
  * @param token Approved: the device's session token, for Authorization: Bearer. Returned once.
- * @param user 
+ * @param user
  */
 @Serializable
 
@@ -66,8 +64,6 @@ data class PairingClaim (
 ) {
 
     /**
-     * 
-     *
      * Values: pending,approved,unknown_default_open_api
      */
     @Serializable(with = StatusSerializer::class)

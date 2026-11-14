@@ -34,18 +34,16 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param id 
- * @param matchStatus 
- * @param relativePath 
- * @param propertySize 
+ * @param id
+ * @param matchStatus
+ * @param relativePath
+ * @param propertySize
  * @param airDate For files named by air date (daily shows), YYYY-MM-DD.
  * @param airDateAlt The other reading of a date whose day and month could be either way round.
- * @param durationMs 
- * @param episodes 
- * @param matchError 
- * @param season 
+ * @param durationMs
+ * @param episodes
+ * @param matchError
+ * @param season
  */
 @Serializable
 
@@ -86,8 +84,6 @@ data class UnmatchedFile (
 ) {
 
     /**
-     * 
-     *
      * Values: pending,unmatched,failed,unknown_default_open_api
      */
     @Serializable(with = MatchStatusSerializer::class)

@@ -8,8 +8,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -75,19 +75,17 @@ class RealLivePlaybackController(
     private val job = SupervisorJob()
     private val scope = CoroutineScope(job + dispatcher)
     private val lane = Mutex()
-    private val mutableState = MutableStateFlow(LivePlayerState(quality = preferences.qualityOn(network).forLiveTV()))
+    private val choice = QualityChoice(preferences, network)
+    private val mutableState = MutableStateFlow(LivePlayerState(quality = choice.current().forLiveTV()))
     override val state = mutableState.asStateFlow()
-    private val mutablePlayer = MutableStateFlow<Player?>(null)
-    override val player = mutablePlayer.asStateFlow()
-    private var media: MediaPlayer? = null
-    private var mediaSession: AutoCloseable? = null
-    private var visibilityHandle: AutoCloseable? = null
+    private val host = PlayerHost(scope, playerFactory, sessions, visibility, clock)
+    private val media: MediaPlayer? get() = host.media
+    override val player: StateFlow<Player?> = host.player
     private var generation = 0L
     private var released = false
     private var foreground = true
     private var selected: LiveTarget? = null
-    private var quality = preferences.qualityOn(network).forLiveTV()
-    private var qualityPicked = false
+    private var quality = choice.current().forLiveTV()
     /** Ownership is retained after a failed DELETE, even though the video is detached. */
     private var owned: LiveSession? = null
     /**
@@ -99,17 +97,23 @@ class RealLivePlaybackController(
     private var unresolved: PendingStart? = null
     private var loadedSession: String? = null
     private var loadedUrl: String? = null
-    private var handledOutputGeneration = 0L
-    private var pendingOutput: PendingOutput? = null
-    private var acceptedOutputGeneration: Long? = null
-    private var failedOutputGeneration: Long? = null
-    private var tickJob: Job? = null
+
+    /** Automatic's output switches; what a failed one goes back to is the URL before it. */
+    private val switch = OutputSwitch<String>(keepFallbackUntilReported = false)
     private var pollJob: Job? = null
+    /** A status read the server holds until the channel plays ([LiveCapabilities.statusWaits]), and its session. */
+    private var statusJob: Job? = null
+    private var statusSession: String? = null
     /** The last stop's DELETE, which [stopAndRelease] waits for. */
     private var releaseJob: Job? = null
     private var lastPollAt = 0L
     private var lastBeatAt = 0L
-    private var tokenRefreshAt = Long.MAX_VALUE
+    private val tokens = MediaTokenClock(clock)
+
+    /** The server's Live TV capabilities as last read, and when; a channel change uses them rather than asking again. */
+    private var capabilities: LiveCapabilities? = null
+    private var capabilitiesAt = 0L
+    private var capabilitiesJob: Job? = null
     private var interaction = 0L
     private var sentInteraction = 0L
     private var lastInputAt = clock.elapsedMs()
@@ -122,7 +126,6 @@ class RealLivePlaybackController(
     private var behindWindowRecoveries = 0
 
     private data class PendingStart(val target: LiveTarget, val quality: StreamQuality, val id: String, val profile: PlaybackProfile)
-    private data class PendingOutput(val generation: Long, val previousUrl: String)
 
     private val accountJob = scope.launch {
         gateway.active.collect { current ->
@@ -138,7 +141,7 @@ class RealLivePlaybackController(
         }
         if (selected == target && state.value.status in listOf(PlayerStatus.Loading, PlayerStatus.Playing, PlayerStatus.Paused, PlayerStatus.Buffering)) return
         selected = target
-        if (!qualityPicked) quality = preferences.qualityOn(network).forLiveTV()
+        if (!choice.picked) quality = choice.current().forLiveTV()
         noteUserInput()
         paused = false
         pauseAt = null
@@ -146,10 +149,7 @@ class RealLivePlaybackController(
         tuningAt = clock.elapsedMs()
         firstReady = false
         takeover = null
-        handledOutputGeneration = 0
-        pendingOutput = null
-        acceptedOutputGeneration = null
-        failedOutputGeneration = null
+        switch.reset()
         val currentGeneration = ++generation
         detachMedia()
         mutableState.value = LivePlayerState(target = target, quality = quality, automaticAvailable = state.value.automaticAvailable)
@@ -160,11 +160,9 @@ class RealLivePlaybackController(
             lane.withLock {
                 if (!current(currentGeneration)) return@withLock
                 try {
-                    val capabilities = try { withContext(io) { gateway.liveCapabilities() } }
-                        catch (e: CancellationException) { throw e }
-                        catch (_: Exception) { LiveCapabilities() }
+                    val capabilities = capabilitiesForStart()
                     if (!current(currentGeneration)) return@withLock
-                    val chosen = (if (qualityPicked) quality else preferences.qualityOn(network)).forLiveTV(capabilities.automatic)
+                    val chosen = choice.current().forLiveTV(capabilities.automatic)
                     quality = chosen
                     mutableState.update { it.copy(quality = chosen, automaticAvailable = capabilities.automatic) }
                     val requested = PendingStart(target, chosen, nextId, profile())
@@ -213,7 +211,7 @@ class RealLivePlaybackController(
     override fun pause() {
         if (released || state.value.session?.state != LiveSessionState.Playing) return
         noteUserInput()
-        pendingOutput?.let { rejectOutput(state.value.session!!) }
+        if (switch.pending != null) rejectOutput(state.value.session!!)
         if (!paused) pauseAt = clock.elapsedMs()
         paused = true
         media?.pause()
@@ -241,10 +239,8 @@ class RealLivePlaybackController(
     override fun selectQuality(quality: StreamQuality) {
         if (released || quality !in LIVE_QUALITIES || quality == this.quality || quality == StreamQuality.Auto && !state.value.automaticAvailable) return
         this.quality = quality
-        qualityPicked = true
-        // Match ordinary playback's Default / On mobile data preference routing.
-        val mobile = preferences.device.value.mobileQuality != null && network.metered()
-        scope.launch { runCatching { if (mobile) preferences.setMobileQuality(quality) else preferences.setQuality(quality) } }
+        // Saved as ordinary playback saves it: the Default or the On mobile data quality.
+        choice.pick(quality, scope)
         val target = selected
         selected = null
         mutableState.update { it.copy(quality = quality) }
@@ -283,17 +279,36 @@ class RealLivePlaybackController(
         end(null)
         released = true
         accountJob.cancel()
-        tickJob?.cancel()
-        visibilityHandle?.close()
-        visibilityHandle = null
-        mediaSession?.close()
-        mediaSession = null
-        mutablePlayer.value = null
-        media?.setListener(null)
-        media?.release()
-        media = null
+        host.release()
         // Already queued network work drains, including a late POST's DELETE.
         job.complete()
+    }
+
+    /**
+     * The capabilities a start goes by: read once, then held, and read again
+     * in the background once older than [CAPABILITIES_FRESH_MS], so a
+     * channel change never waits for them. A failed read is not kept.
+     */
+    private suspend fun capabilitiesForStart(): LiveCapabilities {
+        val held = capabilities ?: return readCapabilities() ?: LiveCapabilities()
+        if (clock.elapsedMs() - capabilitiesAt >= CAPABILITIES_FRESH_MS && capabilitiesJob?.isActive != true) {
+            capabilitiesJob = scope.launch {
+                val fresh = readCapabilities() ?: return@launch
+                if (!released) mutableState.update { it.copy(automaticAvailable = fresh.automatic) }
+            }
+        }
+        return held
+    }
+
+    private suspend fun readCapabilities(): LiveCapabilities? = try {
+        withContext(io) { gateway.liveCapabilities() }.also {
+            capabilities = it
+            capabilitiesAt = clock.elapsedMs()
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
     }
 
     private fun current(value: Long): Boolean = !released && generation == value && gateway.isCurrent
@@ -330,12 +345,9 @@ class RealLivePlaybackController(
         selected = null
         paused = false
         pauseAt = null
-        pendingOutput = null
-        acceptedOutputGeneration = null
-        failedOutputGeneration = null
+        switch.reset()
         detachMedia()
-        tickJob?.cancel()
-        tickJob = null
+        host.stopTicker()
         mutableState.update { it.copy(status = PlayerStatus.Ended, session = null, askStillWatching = false, error = reason, reason = code, takeoverRecording = null) }
         releaseJob = scope.launch {
             lane.withLock {
@@ -350,10 +362,9 @@ class RealLivePlaybackController(
     }
 
     private fun fail(error: String, reason: String? = null, takeoverRecording: PlayRequest? = null) {
-        pendingOutput = null
+        switch.reset()
         detachMedia()
-        tickJob?.cancel()
-        tickJob = null
+        host.stopTicker()
         mutableState.update { it.copy(status = PlayerStatus.Error, session = null, askStillWatching = false, error = error, reason = reason, takeoverRecording = takeoverRecording) }
     }
 
@@ -372,11 +383,11 @@ class RealLivePlaybackController(
         mutableState.update { it.copy(session = session, error = null) }
         if (session.state == LiveSessionState.Playing && loadedSession != session.id) {
             val url = session.url ?: throw IllegalStateException("The server did not provide the live stream.")
-            renewToken()
+            ensureToken()
             if (!current(currentGeneration)) return
             loadedSession = session.id
             loadedUrl = url
-            media?.load(liveSource(session, url))
+            host.load(liveSource(session, url))
         }
         if (session.state == LiveSessionState.Playing && session.automatic && !paused) prepareOutput(session)
         refresh()
@@ -392,27 +403,24 @@ class RealLivePlaybackController(
      * rendered frame may promote it; a failed load reports the generation. */
     private fun prepareOutput(session: LiveSession) {
         val directive: LiveOutputDirective = session.directive ?: return
-        if (pendingOutput != null || directive.generation <= maxOf(handledOutputGeneration, session.outputGeneration)) return
-        handledOutputGeneration = directive.generation
+        if (switch.pending != null || !switch.take(directive.generation, floor = session.outputGeneration)) return
         if (directive.url.isBlank()) {
-            failedOutputGeneration = directive.generation
+            switch.failed(directive.generation)
             poll(forceHeartbeat = true)
             return
         }
         val previous = loadedUrl ?: session.url ?: return
-        pendingOutput = PendingOutput(directive.generation, previous)
+        switch.begin(directive.generation, previous, host.loads + 1)
         loadedUrl = directive.url
-        try { media?.load(liveSource(session, directive.url)) }
+        try { host.load(liveSource(session, directive.url)) }
         catch (_: Exception) { rejectOutput(session) }
     }
 
     private fun rejectOutput(session: LiveSession) {
-        val pending = pendingOutput ?: return
-        pendingOutput = null
-        failedOutputGeneration = pending.generation
-        loadedUrl = pending.previousUrl
+        val previous = switch.reject()?.fallback ?: return
+        loadedUrl = previous
         mutableState.update { it.copy(message = "Keeping the current Live TV quality after a switch failed.") }
-        try { media?.load(liveSource(session, pending.previousUrl)) }
+        try { host.load(liveSource(session, previous)) }
         catch (_: Exception) { end("The Live TV output could not be restored. Try the channel again.") }
         poll(forceHeartbeat = true)
     }
@@ -437,23 +445,19 @@ class RealLivePlaybackController(
         }
     }
 
-    private suspend fun renewToken() {
-        val token = withContext(io) { gateway.mediaToken() }
-        if (!gateway.isCurrent || released) return
+    /** Puts a media token on the stream's requests: the one held while it is fresh, else a new one. */
+    private suspend fun ensureToken() {
+        val token = tokens.fresh() ?: withContext(io) { gateway.mediaToken() }.also {
+            if (!gateway.isCurrent || released) return
+            tokens.accept(it)
+        }
         media?.updateMediaToken(token)
-        // Small test tokens and ordinary six-hour tokens both renew before expiry.
-        val remaining = (token.expiresAtMs - clock.wallMs()).coerceAtLeast(1_000)
-        tokenRefreshAt = clock.elapsedMs() + (remaining - minOf(60_000, remaining / 5)).coerceAtLeast(1_000)
     }
 
     private fun startTicker() {
-        if (tickJob?.isActive == true) return
-        tickJob = scope.launch {
-            while (true) {
-                delay(TICK_MS)
-                refresh()
-                poll()
-            }
+        host.startTicker {
+            refresh()
+            poll()
         }
     }
 
@@ -461,12 +465,16 @@ class RealLivePlaybackController(
     private fun poll(forceHeartbeat: Boolean = false) {
         val session = state.value.session ?: return
         val currentGeneration = generation
-        if (!playing(currentGeneration, session.id) || pollJob?.isActive == true) return
+        if (!playing(currentGeneration, session.id)) return
         val now = clock.elapsedMs()
+        val tuning = session.state == LiveSessionState.Starting && now - lastPollAt >= STATUS_MS
+        val waits = capabilities?.statusWaits == true
+        if (tuning && waits) awaitStatus(session, currentGeneration)
+        if (pollJob?.isActive == true) return
         val beat = forceHeartbeat || paused != lastReportedPause || interaction != sentInteraction ||
-            acceptedOutputGeneration != null || failedOutputGeneration != null || now - lastBeatAt >= HEARTBEAT_MS
-        val status = session.state == LiveSessionState.Starting && now - lastPollAt >= STATUS_MS
-        val renew = loadedSession != null && now >= tokenRefreshAt
+            switch.accepted != null || switch.failed != null || now - lastBeatAt >= HEARTBEAT_MS
+        val status = tuning && !waits
+        val renew = loadedSession != null && tokens.due
         if (!beat && !status && !renew) return
         pollJob = scope.launch {
             lane.withLock {
@@ -475,45 +483,96 @@ class RealLivePlaybackController(
                     // Capture after waiting for the lane: pause/input may have changed.
                     val reportedInput = interaction
                     val reportedPause = paused
-                    val accepted = acceptedOutputGeneration
-                    val failed = failedOutputGeneration
+                    val accepted = switch.accepted
+                    val failed = switch.failed
+                    // Measured here, on the player's thread: ExoPlayer throws when read from IO.
+                    val measurement = if (beat && session.automatic) liveMeasurement(reportedPause) else null
                     val updated = withContext(io) {
-                        if (!beat) gateway.status(session.id)
-                        else if (session.automatic) {
-                            val p = media
-                            val transfer = p?.transfer
-                            gateway.heartbeatMeasured(session.id, reportedPause, reportedInput != sentInteraction, LiveMeasurement(
-                                state = if (reportedPause) LivePlaybackState.Paused else if (p?.phase == PlayerPhase.Ready) LivePlaybackState.Playing else LivePlaybackState.Buffering,
-                                bufferedMs = p?.let { (it.bufferedPositionMs - it.positionMs).coerceAtLeast(0) },
-                                throughputBps = transfer?.bps, throughputAgeMs = transfer?.ageMs,
-                                stalls = p?.stalls?.count?.toLong(), switchGeneration = accepted, switchFailedGeneration = failed,
-                            ))
-                        } else gateway.heartbeat(session.id, reportedPause, reportedInput != sentInteraction)
+                        when {
+                            !beat -> gateway.status(session.id)
+                            measurement != null -> gateway.heartbeatMeasured(session.id, reportedPause, reportedInput != sentInteraction, measurement)
+                            else -> gateway.heartbeat(session.id, reportedPause, reportedInput != sentInteraction)
+                        }
                     }
                     lastPollAt = clock.elapsedMs()
                     if (beat) {
                         sentInteraction = reportedInput
                         lastReportedPause = reportedPause
                         lastBeatAt = clock.elapsedMs()
-                        if (accepted == acceptedOutputGeneration) acceptedOutputGeneration = null
-                        if (failed == failedOutputGeneration) failedOutputGeneration = null
+                        switch.reported(accepted, failed)
                     }
                     if (!playing(currentGeneration, session.id)) return@withLock
                     require(updated.id == session.id) { "The server returned a different Live TV session." }
                     accept(updated, currentGeneration)
-                    if (renew && playing(currentGeneration, session.id)) renewToken()
+                    if (renew && playing(currentGeneration, session.id)) ensureToken()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    if (!playing(currentGeneration, session.id)) return@withLock
-                    val recording = dueTakeover()
-                    if (recording != null) fail(liveTVError("recording"), "recording", recording) else fail(message(e), reasonOf(e))
-                    // Stop media immediately so requests cannot indefinitely renew
-                    // a tuner while the control connection is broken.
-                    runCatching { releaseOwned() }
+                    lostControl(e, session, currentGeneration)
                 }
             }
         }
+    }
+
+    /**
+     * Asks a server that waits ([LiveCapabilities.statusWaits]) for the
+     * tuning session's status, which it holds until the channel plays, fails
+     * or stops, or [STATUS_WAIT_MS] passes. Asked outside [lane], so
+     * heartbeats, controls and a stop never queue behind it; its answer is
+     * taken in the lane, as the poll's is. A still-starting answer is asked
+     * again at the next tick. Another session's read is dropped here, never
+     * from inside itself, where its own failure may still be releasing the
+     * tuner; its answer would be dropped anyway, by [playing].
+     */
+    private fun awaitStatus(session: LiveSession, currentGeneration: Long) {
+        if (statusJob?.isActive == true && statusSession == session.id) return
+        statusJob?.cancel()
+        statusSession = session.id
+        statusJob = scope.launch {
+            val updated = try {
+                withContext(io) { gateway.awaitStatus(session.id, STATUS_WAIT_MS) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                lastPollAt = clock.elapsedMs()
+                lane.withLock { lostControl(e, session, currentGeneration) }
+                return@launch
+            }
+            lastPollAt = clock.elapsedMs()
+            lane.withLock {
+                if (!playing(currentGeneration, session.id)) return@withLock
+                try {
+                    require(updated.id == session.id) { "The server returned a different Live TV session." }
+                    accept(updated, currentGeneration)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    lostControl(e, session, currentGeneration)
+                }
+            }
+        }
+    }
+
+    /** A control call failed: the session ends. Called only in [lane]. */
+    private suspend fun lostControl(e: Exception, session: LiveSession, currentGeneration: Long) {
+        if (!playing(currentGeneration, session.id)) return
+        val recording = dueTakeover()
+        if (recording != null) fail(liveTVError("recording"), "recording", recording) else fail(message(e), reasonOf(e))
+        // Stop media immediately so requests cannot indefinitely renew
+        // a tuner while the control connection is broken.
+        runCatching { releaseOwned() }
+    }
+
+    /** Automatic's measurement for a heartbeat, as [measure] takes it for files too. Main thread only, as the player is. */
+    private fun liveMeasurement(paused: Boolean): LiveMeasurement {
+        val p = media
+        val m = measure(p, p?.let { (it.bufferedPositionMs - it.positionMs).coerceAtLeast(0) }, switch)
+        return LiveMeasurement(
+            state = if (paused) LivePlaybackState.Paused else if (p?.phase == PlayerPhase.Ready) LivePlaybackState.Playing else LivePlaybackState.Buffering,
+            bufferedMs = m.bufferedMs,
+            throughputBps = m.transfer?.bps, throughputAgeMs = m.transfer?.ageMs,
+            stalls = m.stalls?.count?.toLong(), switchGeneration = m.switchGeneration, switchFailedGeneration = m.switchFailedGeneration,
+        )
     }
 
     private fun refresh() {
@@ -561,53 +620,43 @@ class RealLivePlaybackController(
     }
 
     private fun ensurePlayer() {
-        if (media != null) return
-        val instance = playerFactory()
-        media = instance
-        instance.setListener(object : MediaPlayer.Listener {
-            override fun onChanged() { scope.launch { refresh() } }
-            override fun onError(failure: PlayerFailure) {
-                scope.launch {
-                    if (state.value.session == null || released) return@launch
-                    if (pendingOutput != null) { rejectOutput(state.value.session!!); return@launch }
-                    if (failure.kind == PlayerFailure.Kind.BehindLiveWindow && behindWindowRecoveries++ < 2) {
-                        instance.seekToLiveEdge()
-                        if (!paused) instance.play()
-                        mutableState.update { it.copy(message = "The buffer expired. Returning to live.") }
-                    } else {
-                        dueTakeover()?.let { endForRecording(it); return@launch }
-                        end(when (failure.kind) {
-                            PlayerFailure.Kind.Network -> "The connection to the server was lost. Try again when it is reachable."
-                            PlayerFailure.Kind.Http -> if (failure.httpStatus in listOf(401, 403)) liveTVError("access_revoked") else liveTVError("signal_lost")
-                            PlayerFailure.Kind.Decoder, PlayerFailure.Kind.Audio -> "This broadcast could not play on this device. Try a lower quality."
-                            else -> liveTVError("signal_lost")
-                        })
-                    }
-                }
-            }
-            override fun onFirstFrame() {
-                // Capture at callback time. The first source can render
-                // synchronously before a directive is loaded; its queued
-                // handler must not acknowledge the next source's generation.
-                val renderedGeneration = pendingOutput?.generation ?: return
-                scope.launch {
-                    val pending = pendingOutput ?: return@launch
-                    if (pending.generation != renderedGeneration || state.value.session?.automatic != true || released) return@launch
-                    pendingOutput = null
-                    acceptedOutputGeneration = pending.generation
-                    mutableState.update { it.copy(message = null) }
-                    poll(forceHeartbeat = true)
-                }
-            }
-        })
-        instance.media3?.let {
-            val wrapped = LiveSessionPlayer(it, this)
-            mutablePlayer.value = wrapped
-            mediaSession = sessions.open(wrapped)
-        }
-        visibilityHandle = visibility.observe { visible ->
+        host.ensure(playerEvents) { LiveSessionPlayer(it, this) }
+        host.followVisibility { visible ->
             foreground = visible
             if (!visible && !released) end(null)
+        }
+    }
+
+    /** The player's callbacks, posted by [host]. */
+    private val playerEvents = object : PlayerHost.Events {
+        override fun onChanged() = refresh()
+
+        override fun onError(failure: PlayerFailure) {
+            val session = state.value.session
+            if (session == null || released) return
+            if (switch.pending != null) { rejectOutput(session); return }
+            if (failure.kind == PlayerFailure.Kind.BehindLiveWindow && behindWindowRecoveries++ < 2) {
+                media?.seekToLiveEdge()
+                if (!paused) media?.play()
+                mutableState.update { it.copy(message = "The buffer expired. Returning to live.") }
+            } else {
+                dueTakeover()?.let { endForRecording(it); return }
+                end(when (failure.kind) {
+                    PlayerFailure.Kind.Network -> "The connection to the server was lost. Try again when it is reachable."
+                    PlayerFailure.Kind.Http -> if (failure.httpStatus in listOf(401, 403)) liveTVError("access_revoked") else liveTVError("signal_lost")
+                    PlayerFailure.Kind.Decoder, PlayerFailure.Kind.Audio -> "This broadcast could not play on this device. Try a lower quality."
+                    else -> liveTVError("signal_lost")
+                })
+            }
+        }
+
+        override fun onFirstFrame(load: Int) {
+            // The frame names its load, taken when it rendered: the first source can render
+            // before a directive's source loads, and must not acknowledge that one.
+            if (state.value.session?.automatic != true || released) return
+            switch.frame(load) ?: return
+            mutableState.update { it.copy(message = null) }
+            poll(forceHeartbeat = true)
         }
     }
 
@@ -626,8 +675,11 @@ class RealLivePlaybackController(
 
     private companion object {
         val REASON = Regex("^[a-z_]+$")
-        const val TICK_MS = 250L
-        const val STATUS_MS = 1_000L
+        /** While the server tunes, its status is asked at every tick (one call at a time), unless the server waits. */
+        const val STATUS_MS = PlayerHost.TICK_MS
+        /** How long a server that waits holds a status read: its most, and inside the API client's 30 s read timeout. */
+        const val STATUS_WAIT_MS = 10_000L
+        const val CAPABILITIES_FRESH_MS = 5 * 60_000L
         const val TUNE_TIMEOUT_MS = 35_000L
         const val HEARTBEAT_MS = 10_000L
         const val LIVE_EDGE_TOLERANCE_MS = 10_000L

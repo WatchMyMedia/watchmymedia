@@ -3,4 +3,5 @@
 <full-backup-content>
     <exclude domain="file" path="datastore/" />
     <exclude domain="database" path="exoplayer_internal.db" />
+    <exclude domain="sharedpref" path="." />
 </full-backup-content>

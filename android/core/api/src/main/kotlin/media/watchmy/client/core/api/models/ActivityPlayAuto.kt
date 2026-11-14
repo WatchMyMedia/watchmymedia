@@ -35,8 +35,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param floor At the lowest step and still stalling.
  * @param on The viewer picked Automatic. Otherwise this is what Automatic would have done at the quality they picked.
  * @param step The step the stream is at.

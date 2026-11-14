@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param location Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'
  * @param message Error message text
  * @param `value` The value at the given location

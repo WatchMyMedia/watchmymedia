@@ -16,11 +16,11 @@ class HomeViewModelTest {
     private val empty = FakeData.home().copy(hero = null, continueWatching = emptyList(), recentlyAddedShows = emptyList(), recentlyAired = emptyList(), recentlyAddedMovies = emptyList(), recentlyReleased = emptyList())
 
     @Test fun `scan transitions refresh the shared Home explanation and a failed status fetch stays truthful`() = runTest(main.dispatcher) {
-        val changes = MutableSharedFlow<Unit>()
+        val changes = MutableSharedFlow<LibraryChange>()
         var libraries = listOf(Library(1, "Movies", LibraryType.Movie, scanning = true))
         var fail = false
         val repository = object : LibraryRepository by FakeLibraryRepository() {
-            override val changes = changes
+            override val libraryChanges = changes
             override suspend fun home() = empty
             override suspend fun libraries(): List<Library> { if (fail) throw ApiException(500, "Unavailable"); return libraries }
         }
@@ -28,7 +28,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
         assertEquals(HomeEmptyState.Kind.Scanning, vm.state.value.emptyState?.kind)
         libraries = listOf(libraries.single().copy(scanning = false, lastScanError = "Folder missing"))
-        changes.emit(Unit); advanceUntilIdle()
+        changes.emit(LibraryChange(libraries = setOf(1))); advanceUntilIdle()
         assertEquals(HomeEmptyState.Kind.ScanFailed, vm.state.value.emptyState?.kind)
         fail = true
         vm.refresh(); advanceUntilIdle()

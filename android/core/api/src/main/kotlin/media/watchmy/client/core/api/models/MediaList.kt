@@ -35,23 +35,21 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param canEdit The person may change or delete it: their own, or any household list for an admin.
- * @param createdAt 
+ * @param createdAt
  * @param propertyEntries Entries fetched.
  * @param fetching A fetch is running.
- * @param id 
+ * @param id
  * @param inLibrary Entries the library has now.
  * @param limit Most entries kept.
  * @param mediaType movie, tv or all (imports and MDBList lists can hold both). A plain string.
- * @param name 
+ * @param name
  * @param owner me (the person's own) or everyone (the household's). A plain string.
  * @param screen The screen its row was made on and first shows on: home or library-<id>.
- * @param source 
- * @param updatedAt 
+ * @param source
+ * @param updatedAt
  * @param error Why the last fetch failed; the list keeps its last good entries.
- * @param errorAt 
+ * @param errorAt
  * @param fetchedAt The last fetch that worked.
  * @param nextFetchAt Absent for imports and library lists, which are not fetched.
  * @param notFound Imports: entries TMDB could not find.

@@ -34,14 +34,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param deviceId A stable random ID the client keeps for itself.
  * @param model The device's model; kept with a sign-in for the signed-in devices list.
  * @param name Such as Chrome on macOS or Living room Apple TV.
- * @param platform 
- * @param product 
- * @param version 
+ * @param platform
+ * @param product
+ * @param version
  */
 @Serializable
 

@@ -37,8 +37,10 @@ import media.watchmy.client.model.placements
 import media.watchmy.client.model.watchTarget
 import media.watchmy.client.model.withHidden
 import media.watchmy.client.model.withWatched
+import media.watchmy.client.presentation.Freshness
 import media.watchmy.client.presentation.Latest
 import media.watchmy.client.presentation.Load
+import media.watchmy.client.presentation.ShownPage
 
 /**
  * A library's Movies or TV rows, above its grid (PLAN-ROWS.md Decision 11),
@@ -47,7 +49,7 @@ import media.watchmy.client.presentation.Load
  * layout or a list changes; a failure keeps what is on screen, since the
  * grid below is the page.
  */
-class LibraryRowsViewModel(private val library: LibraryRepository, private val rows: RowsRepository? = null) : ViewModel() {
+class LibraryRowsViewModel(private val library: LibraryRepository, private val rows: RowsRepository? = null) : ViewModel(), ShownPage {
     data class State(
         val libraryId: Long? = null,
         val rows: List<ScreenRow> = emptyList(),
@@ -70,12 +72,14 @@ class LibraryRowsViewModel(private val library: LibraryRepository, private val r
 
     private val loads = Latest(viewModelScope)
 
+    /** Its library's contents and the marks on its cards, and its layout: at once while shown, else when next shown. */
+    private val freshness = Freshness(viewModelScope, library.libraryChanges, { change -> _state.value.libraryId?.let { change.touchesLibrary(it) } == true }) { load() }
+
     init {
-        viewModelScope.launch { library.changes.collect { load() } }
-        rows?.let { r ->
-            viewModelScope.launch { r.changes.collect { change -> _state.value.screen?.let { if (change.affects(it)) load() } } }
-        }
+        rows?.let { r -> freshness.follow(r.changes) { change -> _state.value.screen?.let { change.affects(it) } == true } }
     }
+
+    override fun setShown(shown: Boolean) = freshness.setShown(shown)
 
     /** The library the screen shows; null before it knows, or when it has none. */
     fun show(libraryId: Long?) {
@@ -300,7 +304,7 @@ class MediaListViewModel(
     private val requests: RequestRepository,
     private val library: LibraryRepository,
     val listId: Long,
-) : ViewModel() {
+) : ViewModel(), ShownPage {
     data class Page(val list: MediaList, val entries: List<MediaListEntry>, val total: Int)
 
     data class State(
@@ -327,16 +331,19 @@ class MediaListViewModel(
     private val _events = Channel<Event>(Channel.BUFFERED)
     val events: Flow<Event> = _events.receiveAsFlow()
 
+    /** Its entries' marks and progress, its own changes and requests'. */
+    private val freshness = Freshness(viewModelScope) { load(quiet = true) }
+
     private val loads = Latest(viewModelScope)
 
     init {
         load()
-        viewModelScope.launch {
-            rows.changes.collect { if (it is RowsChange.Lists && (it.listId == null || it.listId == listId) && !_state.value.deleting) load(quiet = true) }
-        }
-        viewModelScope.launch { requests.changes.collect { load(quiet = true) } }
-        viewModelScope.launch { library.changes.collect { load(quiet = true) } }
+        freshness.follow(library.libraryChanges)
+            .follow(rows.changes) { it is RowsChange.Lists && (it.listId == null || it.listId == listId) && !_state.value.deleting }
+            .follow(requests.changes)
     }
+
+    override fun setShown(shown: Boolean) = freshness.setShown(shown)
 
     fun retry() = load()
 

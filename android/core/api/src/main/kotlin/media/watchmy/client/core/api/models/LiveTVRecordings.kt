@@ -36,13 +36,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param items 
- * @param freeBytes 
- * @param nextCursor 
- * @param rules 
- * @param tuners 
+ * @param items
+ * @param freeBytes
+ * @param nextCursor
+ * @param rules
+ * @param tuners
  */
 @Serializable
 

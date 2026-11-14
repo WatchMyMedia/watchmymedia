@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param tmdbId TMDB movie ID (movie libraries) or show ID (TV libraries).
  * @param episodes Episode numbers; default to what the file name says.
  * @param season Season number; defaults to what the file name says.

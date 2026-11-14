@@ -35,13 +35,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param completed 
- * @param durationMs 
- * @param positionMs 
- * @param updatedAt 
- * @param directive 
+ * @param completed
+ * @param durationMs
+ * @param positionMs
+ * @param updatedAt
+ * @param directive
  * @param fileId Version the position refers to.
  * @param playId Set when the play had ended (it timed out or the server restarted) and a new one carries on; send this one from now on.
  */

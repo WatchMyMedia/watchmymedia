@@ -35,30 +35,28 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param end 
+ * @param end
  * @param id Stable for this channel and start time.
- * @param start 
- * @param title 
+ * @param start
+ * @param title
  * @param airDate The original air date as YYYY-MM-DD, or a movie's year as YYYY.
- * @param categories 
- * @param description 
+ * @param categories
+ * @param description
  * @param descriptionSource provider or tmdb.
- * @param episode 
+ * @param episode
  * @param episodeLabel The provider's own episode numbering when it isn't a season and episode.
- * @param episodeTitle 
- * @param hd 
+ * @param episodeTitle
+ * @param hd
  * @param kind episode, show (a programme without episodes, such as news) or movie. Other values may follow.
- * @param live 
- * @param new 
+ * @param live
+ * @param new
  * @param pictureSource provider or tmdb.
  * @param pictureUrl A 16:9 picture: a path on this server, fetched with the usual authentication.
  * @param posterUrl A movie's 2:3 poster: a path on this server.
  * @param rating A parental rating, when the provider gives one.
- * @param recording 
+ * @param recording
  * @param reminder The viewer has a reminder for this programme (API level 15), in the guide and search replies.
- * @param repeat 
+ * @param repeat
  * @param season A season the provider numbers by year is that year, such as 2026.
  * @param seriesKey The provider series identity, for recording a series (API level 19).
  * @param stillUrl A TMDB episode still or movie backdrop matched to this programme: a path on this server. The wide details panel and the TVs' hero show it before pictureUrl, credited as from TMDB; everywhere else shows pictureUrl.

@@ -34,19 +34,17 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param id 
- * @param importedAt 
- * @param itemType 
- * @param source 
- * @param title 
- * @param userId 
- * @param viewedAt 
- * @param episode 
- * @param itemId 
- * @param season 
- * @param show 
+ * @param id
+ * @param importedAt
+ * @param itemType
+ * @param source
+ * @param title
+ * @param userId
+ * @param viewedAt
+ * @param episode
+ * @param itemId
+ * @param season
+ * @param show
  */
 @Serializable
 
@@ -88,8 +86,6 @@ data class PlexHistoryItem (
 ) {
 
     /**
-     * 
-     *
      * Values: plex,unknown_default_open_api
      */
     @Serializable(with = SourceSerializer::class)

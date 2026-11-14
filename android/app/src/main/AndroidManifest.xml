@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -43,10 +44,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WatchMyMedia">
 
-        <!-- Listed in both launchers; at launch it shows the TV or the phone UI. -->
+        <!-- Listed in both launchers; at launch it shows the TV or the phone UI. Compose takes
+             these changes in place (LocalConfiguration, LocalDensity, the layout direction), so the
+             activity is not recreated for them: a recreated activity ended the play and started
+             the route's first file again, as a font size change during picture-in-picture did. -->
         <activity
             android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|layoutDirection|locale"
             android:exported="true"
             android:launchMode="singleTask"
             android:supportsPictureInPicture="true"
@@ -56,7 +60,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-            <!-- watchmymedia://play/{fileId}, watchmymedia://shows/{id}, watchmymedia://movies/{id}, watchmymedia://link?code= -->
+            <!-- Search, Live TV and Downloads on a long press of the phone launcher's icon. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+            <!-- watchmymedia://play/{fileId}, watchmymedia://shows/{id}, watchmymedia://movies/{id}, watchmymedia://link?code=,
+                 and the shortcuts' watchmymedia://search, watchmymedia://live and watchmymedia://downloads -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -78,18 +87,35 @@
              the system's Output Switcher on Android 17, where the in-app chooser finds no devices
              without local network access and the switcher needs none. -->
         <receiver android:name="androidx.mediarouter.media.MediaTransferReceiver" />
-        <!-- Live TV reminders: the alarm's notification, and the alarms again after a reboot or an update. -->
+        <!-- Live TV reminders: the alarm's notification, and the alarms again after a reboot or an
+             update. The boot receiver is off until LiveReminderAlarms keeps an alarm, and off again
+             once it keeps none, so a boot starts the app only when there is something to set. -->
         <receiver
             android:name=".reminders.LiveReminderReceiver"
             android:exported="false" />
         <receiver
             android:name=".reminders.LiveReminderBoot"
+            android:enabled="false"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+        <!-- WorkManager starts the first time something uses it (the reminder and download syncs,
+             the download service's scheduler, a job it set coming due), through WatchMyMediaApp's
+             Configuration.Provider, not at every process start: its initializer was the costliest
+             in androidx.startup's provider, about 7-23 ms on the main thread before
+             Application.onCreate on an emulator (StartupBenchmark). -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                tools:node="remove" />
+        </provider>
         <!-- Casting to the TV app (Cast Connect). -->
         <meta-data
             android:name="com.google.android.gms.cast.tv.RECEIVER_OPTIONS_PROVIDER_CLASS_NAME"

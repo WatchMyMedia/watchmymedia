@@ -35,16 +35,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param current This server's version, as built.
  * @param development Not a release build, so it is never offered an update.
  * @param enabled Checking is on (updates.enabled in config); when off, Settings hides the button.
  * @param install How the server was installed, which decides the download.
- * @param updateAvailable 
+ * @param updateAvailable
  * @param checked When the last check that worked ran; absent before the first.
  * @param date Release date of latest (YYYY-MM-DD).
- * @param download 
+ * @param download
  * @param error Why the most recent check failed; the other fields are from the last one that worked.
  * @param latest Newest release for this server: stable releases, and pre-releases too when this is one.
  * @param notes What changed in latest, as Markdown list items.

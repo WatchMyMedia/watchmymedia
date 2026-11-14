@@ -34,12 +34,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param files 
- * @param found 
+ * @param files
+ * @param found
  * @param onTmdb Episodes TMDB lists for this season; 0 when the show has no such season.
- * @param season 
+ * @param season
  */
 @Serializable
 

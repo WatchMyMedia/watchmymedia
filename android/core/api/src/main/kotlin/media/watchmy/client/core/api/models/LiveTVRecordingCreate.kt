@@ -34,15 +34,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param programmeId 
- * @param scope 
- * @param anyChannel 
- * @param keep 
- * @param newOnly 
- * @param padAfter 
- * @param padBefore 
+ * @param programmeId
+ * @param scope
+ * @param anyChannel
+ * @param keep
+ * @param newOnly
+ * @param padAfter
+ * @param padBefore
  */
 @Serializable
 
@@ -72,8 +70,6 @@ data class LiveTVRecordingCreate (
 ) {
 
     /**
-     * 
-     *
      * Values: once,series,unknown_default_open_api
      */
     @Serializable(with = ScopeSerializer::class)

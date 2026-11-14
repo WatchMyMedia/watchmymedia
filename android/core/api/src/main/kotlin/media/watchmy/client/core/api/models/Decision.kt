@@ -23,10 +23,12 @@
 
 package media.watchmy.client.core.api.models
 
+import media.watchmy.client.core.api.models.AdaptiveStream
 import media.watchmy.client.core.api.models.AudioPlan
 import media.watchmy.client.core.api.models.AudioTrack
 import media.watchmy.client.core.api.models.AutoChoice
 import media.watchmy.client.core.api.models.Growing
+import media.watchmy.client.core.api.models.MediaToken
 import media.watchmy.client.core.api.models.Segment
 import media.watchmy.client.core.api.models.SubtitleTrack
 import media.watchmy.client.core.api.models.Trickplay
@@ -43,34 +45,34 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param audio 
- * @param audioTracks 
+ * @param audio
+ * @param audioTracks
  * @param creditsMs Where the final end credits start; 0 when unknown.
- * @param durationMs 
- * @param mode 
+ * @param durationMs
+ * @param mode
  * @param playId Identifies this viewing; send it back with later requests for the same file.
- * @param protocol 
+ * @param protocol
  * @param reasons Why a cheaper mode was not possible.
  * @param resumeMs The user's saved position for this item, if partway through.
- * @param segments 
+ * @param segments
  * @param startMs Where the HLS session starts; add to the player's time to get the file position.
- * @param subtitles 
+ * @param subtitles
  * @param upNextMs When to offer the next episode: the credits, else shortly before the end; 0 means do not offer it.
- * @param url 
- * @param video 
+ * @param url
+ * @param video
  * @param watchedAtMs Position past which the item counts as watched: the final credits, else 92%.
- * @param auto 
+ * @param adaptive
+ * @param auto
  * @param bitrate About how many bits per second the stream needs: the file's average when its video is copied, else the video encoder's cap plus the audio; 0 when unknown.
- * @param burnIn 
- * @param growing 
- * @param mimeType 
- * @param nextEpisode 
+ * @param burnIn
+ * @param growing
+ * @param mediaToken
+ * @param mimeType
+ * @param nextEpisode
  * @param playlist HLS only: vod (start at 0, file time = player time) or event (file time = startMs + player time).
- * @param sessionId 
+ * @param sessionId
  * @param subtitleId The initial subtitle track selected from the request or the person's preferences (API level 18); absent means Off.
- * @param trickplay 
+ * @param trickplay
  */
 @Serializable
 
@@ -131,6 +133,9 @@ data class Decision (
     @SerialName(value = "watchedAtMs")
     val watchedAtMs: kotlin.Long,
 
+    @SerialName(value = "adaptive")
+    val adaptive: AdaptiveStream? = null,
+
     @SerialName(value = "auto")
     val auto: AutoChoice? = null,
 
@@ -143,6 +148,9 @@ data class Decision (
 
     @SerialName(value = "growing")
     val growing: Growing? = null,
+
+    @SerialName(value = "mediaToken")
+    val mediaToken: MediaToken? = null,
 
     @SerialName(value = "mimeType")
     val mimeType: kotlin.String? = null,
@@ -167,8 +175,6 @@ data class Decision (
 ) {
 
     /**
-     * 
-     *
      * Values: direct,remux,audio,transcode,unknown_default_open_api
      */
     @Serializable(with = ModeSerializer::class)
@@ -194,8 +200,6 @@ data class Decision (
         }
     }
     /**
-     * 
-     *
      * Values: file,hls,unknown_default_open_api
      */
     @Serializable(with = ProtocolSerializer::class)

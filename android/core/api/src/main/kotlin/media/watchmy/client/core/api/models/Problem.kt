@@ -34,21 +34,19 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param createdAt 
+ * @param createdAt
  * @param details What the server knew about the file: its name, codecs and resolution.
- * @param id 
- * @param itemId 
- * @param itemType 
- * @param kind 
- * @param note 
- * @param reportedBy 
+ * @param id
+ * @param itemId
+ * @param itemType
+ * @param kind
+ * @param note
+ * @param reportedBy
  * @param title The movie, or the show and episode.
- * @param fileId 
- * @param season 
+ * @param fileId
+ * @param season
  * @param seerrIssueId The Seerr issue the report became; it is not in the Inbox then, and id is 0.
- * @param showId 
+ * @param showId
  */
 @Serializable
 
@@ -99,8 +97,6 @@ data class Problem (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,episode,unknown_default_open_api
      */
     @Serializable(with = ItemTypeSerializer::class)
@@ -124,8 +120,6 @@ data class Problem (
         }
     }
     /**
-     * 
-     *
      * Values: video,audio,subtitles,other,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

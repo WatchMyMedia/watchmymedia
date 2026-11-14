@@ -28,6 +28,10 @@ type LiveTVStartInput struct {
 	}
 }
 type LiveTVSessionOutput struct{ Body livetv.SessionView }
+type LiveTVSessionStatusInput struct {
+	ID     string `path:"id" maxLength:"64"`
+	WaitMs int64  `query:"waitMs" minimum:"0" required:"false" doc:"API level 28: while the session is starting, wait up to this many milliseconds (at most 10000; more counts as 10000) for it to play, fail or stop, and reply then. Absent or 0 replies at once, as older servers do, which ignore it."`
+}
 type LiveTVHeartbeatInput struct {
 	ID   string `path:"id"`
 	Body struct {
@@ -91,12 +95,12 @@ func registerLiveTVSessions(h huma.API, r chi.Router, deps Deps) {
 		takeoverCanCancel(ctx, deps.Recordings, u, &v)
 		return &LiveTVSessionOutput{Body: v}, liveError(err)
 	})
-	huma.Register(h, op("getLiveTVSession", "GET", "/live-tv/sessions/{id}", "Read the state of this sign-in's live session"), func(ctx context.Context, in *LiveTVIDInput) (*LiveTVSessionOutput, error) {
+	huma.Register(h, op("getLiveTVSession", "GET", "/live-tv/sessions/{id}", "Read the state of this sign-in's live session"), func(ctx context.Context, in *LiveTVSessionStatusInput) (*LiveTVSessionOutput, error) {
 		owner, err := viewer(ctx)
 		if err != nil {
 			return nil, err
 		}
-		v, err := deps.LiveSessions.Status(ctx, owner, in.ID)
+		v, err := deps.LiveSessions.StatusWait(ctx, owner, in.ID, time.Duration(min(in.WaitMs, livetv.MaxStatusWait.Milliseconds()))*time.Millisecond)
 		u, _ := currentUser(ctx)
 		takeoverCanCancel(ctx, deps.Recordings, u, &v)
 		return &LiveTVSessionOutput{Body: v}, liveError(err)

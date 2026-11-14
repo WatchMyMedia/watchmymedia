@@ -37,24 +37,22 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param createdAt 
+ * @param createdAt
  * @param fileCount Video files currently present.
  * @param id Library ID.
  * @param missingCount Files seen before that are gone now.
- * @param name 
+ * @param name
  * @param path Root folder of the library on the server.
  * @param pendingCount Present files not yet matched to TMDB.
  * @param type Kind of content in the library.
  * @param unmatchedCount Present files with no confident TMDB match, or whose lookup failed.
- * @param updatedAt 
+ * @param updatedAt
  * @param lastScanError Why the last scan failed, such as an unmounted or unreadable folder; gone once a full scan succeeds.
  * @param lastScanErrorAt When the last scan failed.
- * @param lastScannedAt 
- * @param match 
- * @param scan 
- * @param watch 
+ * @param lastScannedAt
+ * @param match
+ * @param scan
+ * @param watch
  */
 @Serializable
 

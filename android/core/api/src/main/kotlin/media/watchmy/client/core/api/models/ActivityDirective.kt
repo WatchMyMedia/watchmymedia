@@ -34,12 +34,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param action 
+ * @param action
  * @param generation Negotiated quality switch generation. Older step-down-only players do not receive it.
- * @param message 
- * @param quality 
+ * @param message
+ * @param quality
  */
 @Serializable
 
@@ -61,8 +59,6 @@ data class ActivityDirective (
 ) {
 
     /**
-     * 
-     *
      * Values: stop,quality,unknown_default_open_api
      */
     @Serializable(with = ActionSerializer::class)
@@ -86,8 +82,6 @@ data class ActivityDirective (
         }
     }
     /**
-     * 
-     *
      * Values: none,original,_2160,_1080,_720,_480,_360,unknown_default_open_api
      */
     @Serializable(with = QualitySerializer::class)

@@ -34,21 +34,19 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param access 
- * @param enabled 
- * @param findAds 
- * @param minFreeBytes 
- * @param padAfter 
- * @param padBefore 
- * @param tunersReserved 
- * @param tvLibraryId 
- * @param tvPath 
- * @param warningSeconds 
- * @param movieLibraryId 
- * @param moviePath 
- * @param wakeSupported 
+ * @param access
+ * @param enabled
+ * @param findAds
+ * @param minFreeBytes
+ * @param padAfter
+ * @param padBefore
+ * @param tunersReserved
+ * @param tvLibraryId
+ * @param tvPath
+ * @param warningSeconds
+ * @param movieLibraryId
+ * @param moviePath
+ * @param wakeSupported
  */
 @Serializable
 
@@ -96,8 +94,6 @@ data class LiveTVRecordingSettings (
 ) {
 
     /**
-     * 
-     *
      * Values: none,admins,everyone,unknown_default_open_api
      */
     @Serializable(with = AccessSerializer::class)

@@ -35,14 +35,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param channelId 
+ * @param channelId
  * @param requestId Retry with the same ID to retrieve the same session for two minutes after it ends; use a new ID for a deliberate retry or channel change.
+ * @param adaptive API level 27: accept experimental adaptive live HLS with Automatic; server opt-in required.
  * @param autoRecovery API level 26: explicitly opt into live Automatic recovery; requires quality auto, a profile and shared sources.
- * @param clientName 
+ * @param clientName
  * @param initialThroughputBps A fresh measured link estimate for the first live output; zero starts at the usual 1080p cap.
- * @param profile 
+ * @param profile
  * @param quality Fixed output cap; defaults to 1080p. API-level-26 clients may opt into auto with a live profile and autoRecovery.
  */
 @Serializable
@@ -55,6 +54,10 @@ data class LiveTVStartInputBody (
     /* Retry with the same ID to retrieve the same session for two minutes after it ends; use a new ID for a deliberate retry or channel change. */
     @SerialName(value = "requestId")
     val requestId: kotlin.String,
+
+    /* API level 27: accept experimental adaptive live HLS with Automatic; server opt-in required. */
+    @SerialName(value = "adaptive")
+    val adaptive: kotlin.Boolean? = null,
 
     /* API level 26: explicitly opt into live Automatic recovery; requires quality auto, a profile and shared sources. */
     @SerialName(value = "autoRecovery")

@@ -36,12 +36,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param channels 
+ * @param channels
  * @param email An HDHomeRun DVR account's email, sent with the tuners' device IDs when their firmware gives no DeviceAuth.
  * @param enabled Fetch listings from SiliconDust about once a day.
- * @param status 
+ * @param status
  * @param tmdb Use TMDB pictures and descriptions matched to the same programme, when TMDB is configured.
  */
 @Serializable

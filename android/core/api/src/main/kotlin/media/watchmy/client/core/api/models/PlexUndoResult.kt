@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param localKept 
- * @param undone 
+ * @param localKept
+ * @param undone
  */
 @Serializable
 

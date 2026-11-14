@@ -4415,6 +4415,8 @@ export interface components {
             durationMs: number;
             /** @description A recording still being written. Use event playback and extend the recorded duration from the clock, up to endsAt (API level 19). */
             growing?: components["schemas"]["Growing"];
+            /** @description API level 28: the media token createMediaToken would give this request, for players that send ?access_token= on this decision's URLs. Present when the request signed in with a session; absent for cast tokens, on offline downloads' decisions and from older servers, where clients call createMediaToken as before. */
+            mediaToken?: components["schemas"]["MediaToken"];
             mimeType?: string;
             /** @enum {string} */
             mode: "direct" | "remux" | "audio" | "transcode";
@@ -13461,7 +13463,10 @@ export interface operations {
     };
     getLiveTVSession: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description API level 28: while the session is starting, wait up to this many milliseconds (at most 10000; more counts as 10000) for it to play, fail or stop, and reply then. Absent or 0 replies at once, as older servers do, which ignore it. */
+                waitMs?: number;
+            };
             header?: never;
             path: {
                 id: string;

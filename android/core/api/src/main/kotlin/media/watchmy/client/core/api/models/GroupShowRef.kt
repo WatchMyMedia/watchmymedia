@@ -34,13 +34,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param id 
- * @param title 
- * @param tmdbId 
- * @param posterPath 
- * @param year 
+ * @param id
+ * @param title
+ * @param tmdbId
+ * @param posterPath
+ * @param year
  */
 @Serializable
 

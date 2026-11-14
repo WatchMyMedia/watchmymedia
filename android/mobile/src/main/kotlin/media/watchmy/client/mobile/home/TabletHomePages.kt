@@ -201,28 +201,8 @@ private fun StartPage(
 ) {
     val hero = home.hero ?: return
     val counter = row?.let { "Row 1 of ${rows.size}" }
-    val goTo = {
-        when {
-            hero.movieId != null -> actions.onOpenMovie(hero.movieId!!)
-            hero.showId != null -> actions.onOpenShow(hero.showId!!)
-        }
-    }
-    val episode = hero.episodeId?.takeIf { hero.kind == Hero.Kind.Episode }?.let { id -> home.episodeCards.firstOrNull { it.episodeId == id } }
     val heroCard: @Composable (Modifier, Dp?) -> Unit = { m, height ->
-        HeroCard(
-            modifier = m,
-            height = height,
-            hero = hero,
-            badges = home.heroBadges,
-            imageUrl = library.imageUrl(hero.backdropPath, ImageSize.W780),
-            onPlay = hero.playRequest(home.episodeCards)?.let { r -> { actions.onPlay(r) } },
-            onOpen = episode?.let { e -> { actions.onOpenEpisode(e.showId, e.season, e.episodeId) } } ?: goTo,
-            openLabel = when {
-                episode != null -> "Go to episode"
-                hero.kind == Hero.Kind.Movie -> "Go to movie"
-                else -> "Go to show"
-            },
-        )
+        HomeHero(hero, home.episodeCards, home.heroBadges, library, actions.onPlay, actions.onOpenShow, actions.onOpenMovie, actions.onOpenEpisode, m, height)
     }
     val sideContinue = twoPane && row?.style == RowStyle.Continue
     BoxWithConstraints(modifier.fillMaxWidth().padding(top = 8.dp)) {

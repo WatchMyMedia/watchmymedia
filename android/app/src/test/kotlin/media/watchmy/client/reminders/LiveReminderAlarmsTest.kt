@@ -2,7 +2,9 @@ package media.watchmy.client.reminders
 
 import android.app.AlarmManager
 import android.app.Application
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
 import media.watchmy.client.model.LiveReminder
 import media.watchmy.client.model.LiveReminderState
 import media.watchmy.client.model.LiveReminders
@@ -66,6 +68,47 @@ class LiveReminderAlarmsTest {
         // Long past by the time the phone is back: nothing comes.
         LiveReminderAlarms(context).restore(now + 3 * 60 * minute)
         assertTrue(scheduled().isEmpty())
+    }
+
+    private val bootReceiver get() = context.packageManager.getComponentEnabledSetting(ComponentName(context, LiveReminderBoot::class.java))
+
+    @Test fun `the boot receiver is on only while there are alarms`() {
+        val alarms = LiveReminderAlarms(context)
+        assertEquals(PackageManager.COMPONENT_ENABLED_STATE_DEFAULT, bootReceiver)
+        alarms.schedule(LiveReminders(listOf(reminder("a", 18 * minute))), "acct", emptyMap(), now)
+        assertEquals(PackageManager.COMPONENT_ENABLED_STATE_ENABLED, bootReceiver)
+        // A list with nothing still to come keeps no alarms: back to the manifest's off.
+        alarms.schedule(LiveReminders(listOf(reminder("past", -60 * minute))), "acct", emptyMap(), now)
+        assertEquals(PackageManager.COMPONENT_ENABLED_STATE_DEFAULT, bootReceiver)
+        alarms.schedule(LiveReminders(listOf(reminder("a", 18 * minute))), "acct", emptyMap(), now)
+        alarms.cancelAll()
+        assertEquals(PackageManager.COMPONENT_ENABLED_STATE_DEFAULT, bootReceiver)
+    }
+
+    @Test fun `a start after an update sets the boot receiver from the kept alarms`() {
+        LiveReminderAlarms(context).schedule(LiveReminders(listOf(reminder("a", 18 * minute))), "acct", emptyMap(), now)
+        // An older version left the receiver to the manifest.
+        context.packageManager.setComponentEnabledSetting(ComponentName(context, LiveReminderBoot::class.java), PackageManager.COMPONENT_ENABLED_STATE_DEFAULT, 0)
+        LiveReminderAlarms(context).matchBootReceiver()
+        assertEquals(PackageManager.COMPONENT_ENABLED_STATE_ENABLED, bootReceiver)
+        assertEquals("acct", LiveReminderAlarms(context).keptAccount())
+    }
+
+    @Test fun `a boot with no alarms kept asks for no sync`() {
+        var syncs = 0
+        LiveReminderBoot.afterBoot(LiveReminderAlarms(context)) { syncs++ }
+        assertEquals(0, syncs)
+        assertTrue(scheduled().isEmpty())
+        assertEquals(PackageManager.COMPONENT_ENABLED_STATE_DEFAULT, bootReceiver)
+    }
+
+    @Test fun `a boot with alarms kept sets them again and asks for the list`() {
+        LiveReminderAlarms(context).schedule(LiveReminders(listOf(reminder("a", 18 * minute))), "acct", emptyMap(), System.currentTimeMillis())
+        scheduled().forEach { alarm -> alarm.operation?.let { context.getSystemService(AlarmManager::class.java).cancel(it) } }
+        var syncs = 0
+        LiveReminderBoot.afterBoot(LiveReminderAlarms(context)) { syncs++ }
+        assertEquals(1, syncs)
+        assertEquals(1, scheduled().size)
     }
 
     @Test fun `a late alarm says how long is really left`() {

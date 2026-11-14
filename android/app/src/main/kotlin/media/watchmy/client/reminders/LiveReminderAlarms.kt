@@ -4,8 +4,10 @@ import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import kotlinx.coroutines.CancellationException
@@ -32,6 +34,10 @@ import org.json.JSONObject
  * the server's list ([schedule]), and what each will say is kept here too,
  * so [restore] can set them again after a reboot without the network. TVs
  * don't use this: they show a banner while the app is open.
+ *
+ * The receiver that sets them again after a reboot, [LiveReminderBoot], is
+ * off in the manifest and on only while there are alarms, so a boot starts
+ * the app only then, and never on a TV.
  */
 class LiveReminderAlarms(private val context: Context) {
     private val alarms = context.getSystemService(AlarmManager::class.java)
@@ -62,6 +68,19 @@ class LiveReminderAlarms(private val context: Context) {
         replace(kept)
     }
 
+    /** True while alarms are kept: set by the last [schedule] or [restore], and not cancelled since. */
+    fun hasAlarms(): Boolean = synchronized(LOCK) { stored().isNotEmpty() }
+
+    /** The account the kept alarms were set for, or null when none are kept. */
+    fun keptAccount(): String? = synchronized(LOCK) { stored().firstOrNull()?.account }
+
+    /**
+     * Turns the boot receiver on or off to match the alarms kept. [schedule],
+     * [cancelAll] and [restore] do it themselves; this is for a start after
+     * an update from a version that left the receiver on.
+     */
+    fun matchBootReceiver() = synchronized(LOCK) { bootReceiver(stored().isNotEmpty()) }
+
     /** True once, for the reminder [key]: a reminder comes once, even if its alarm is set again. */
     fun firstTime(key: String): Boolean = synchronized(LOCK) {
         val came = prefs.getStringSet(CAME, emptySet()).orEmpty()
@@ -76,6 +95,17 @@ class LiveReminderAlarms(private val context: Context) {
         before.filter { it.id !in keep }.forEach { alarms?.cancel(pending(it)) }
         planned.forEach { alarms?.setWindow(AlarmManager.RTC_WAKEUP, it.atMs, WINDOW_MS, pending(it)) }
         prefs.edit { putString(ALARMS, JSONArray(planned.map(Planned::toJson)).toString()) }
+        bootReceiver(planned.isNotEmpty())
+    }
+
+    /** [LiveReminderBoot] on while there are alarms to set again after a reboot; otherwise as the manifest has it, off. */
+    private fun bootReceiver(on: Boolean) {
+        val packages = context.packageManager
+        val receiver = ComponentName(context, LiveReminderBoot::class.java)
+        val state = if (on) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+        if (packages.getComponentEnabledSetting(receiver) != state) {
+            packages.setComponentEnabledSetting(receiver, state, PackageManager.DONT_KILL_APP)
+        }
     }
 
     private fun stored(): List<Planned> = runCatching {

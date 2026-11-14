@@ -119,33 +119,45 @@ class TestServer : Closeable {
 class Harness internal constructor(
     private val sealer: TokenSealer = PlainSealer,
     private val httpClient: OkHttpClient = OkHttpClient(),
+    /** Gives the API client an HTTP cache, in the harness's folder. */
+    httpCache: Boolean = false,
+    /** The default network as the data layer sees it; [network] sets it, null for none. */
+    private val network: TestNetwork = TestNetwork(),
+    /** How long the event stream waits before its next try. */
+    private val eventBackoffMs: (attempt: Int) -> Long = { 20L },
 ) : Closeable {
     val server = TestServer()
     val dir: File = Files.createTempDirectory("wmm-data").toFile()
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val dataStore = PreferenceDataStoreFactory.create(scope = scope, produceFile = { File(dir, "watchmymedia.preferences_pb") })
     var now = 1_800_000_000_000L
+    private val cache = if (httpCache) okhttp3.Cache(File(dir, "http"), 1L shl 20) else null
     val client = ClientInfo("dev-1", "Living room TV", "WatchMyMedia for Android TV", "androidtv", "0.1.0", model = "Chromecast with Google TV")
 
     /** Made with the harness; [reopen] makes another on the same storage, as after a restart. */
     var services = create()
         private set
 
-    private fun create() = DataServices(
+    private fun create(inFront: Boolean = true) = DataServices(
         baseClient = client,
         dataStore = dataStore,
-        httpClient = httpClient,
+        httpClient = { httpClient },
+        httpCache = cache,
+        network = network,
         discovery = ServerDiscovery.None,
         sealer = sealer,
         scope = scope,
         clock = { now },
-        eventBackoffMs = { 20L },
+        eventBackoffMs = eventBackoffMs,
+        inFront = inFront,
     )
 
-    fun reopen(): DataServices {
-        // As after a restart: what the last one wrote behind is on disk before the next one reads it.
-        runBlocking { services.awaitWrites() }
-        return create().also { services = it }
+    /** Another DataServices on the same storage, as after a restart; [inFront] false as for a start in the background. */
+    fun reopen(inFront: Boolean = true): DataServices {
+        // As after a restart: what the last one wrote behind, its sign-in's checks included, is on disk
+        // before the next one reads it. A check finishing late wrote the old sign-in back (AuthRepositoryTest, 2026-11-13).
+        runBlocking { services.awaitIdle() }
+        return create(inFront).also { services = it }
     }
 
     /**
@@ -176,4 +188,9 @@ class Harness internal constructor(
         server.close()
         dir.deleteRecursively()
     }
+}
+
+/** A default network a test turns off and on ([network] null for none). */
+internal class TestNetwork : NetworkMonitor {
+    override val network = kotlinx.coroutines.flow.MutableStateFlow<Long?>(1L)
 }

@@ -35,12 +35,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param encoder 
- * @param max 
+ * @param encoder
+ * @param max
  * @param sessions ffmpeg sessions running, for plays and downloads: what max limits.
- * @param cache 
+ * @param cache
  * @param downloads Of the sessions, how many are offline downloads' transcodes (they give way to plays).
  */
 @Serializable

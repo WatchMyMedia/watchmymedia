@@ -36,23 +36,21 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param bandwidth Bits per second over the last 30 seconds.
  * @param bytesSent Sent since this transfer started.
- * @param deviceName 
- * @param downloadId 
- * @param fileId 
- * @param item 
- * @param lastSeenAt 
- * @param mode 
+ * @param deviceName
+ * @param downloadId
+ * @param fileId
+ * @param item
+ * @param lastSeenAt
+ * @param mode
  * @param network local, tailnet or remote.
  * @param progress How far through the download the device has fetched, 0 to 1.
- * @param quality 
- * @param sizeBytes 
- * @param sizeEstimated 
- * @param startedAt 
- * @param user 
+ * @param quality
+ * @param sizeBytes
+ * @param sizeEstimated
+ * @param startedAt
+ * @param user
  * @param encoder A transcode's encoder.
  * @param speed A transcode's ffmpeg speed, as a multiple of real time.
  */

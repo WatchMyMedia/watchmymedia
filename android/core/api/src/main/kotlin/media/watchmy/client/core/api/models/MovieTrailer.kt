@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param name TMDB's name for it (\"Official Trailer\"), or the file's.
  * @param source \"youtube\": Key is a YouTube video id, played by YouTube's own player or app. \"file\": play FileID like any other file. Apps skip sources they don't know.
  * @param durationMs The trailer file's length; absent for YouTube trailers.

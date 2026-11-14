@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param decades 
- * @param genres 
+ * @param decades
+ * @param genres
  */
 @Serializable
 

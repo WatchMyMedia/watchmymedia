@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param exists 
- * @param path 
- * @param readable 
+ * @param exists
+ * @param path
+ * @param readable
  * @param sample A few entry names, to confirm it is the right folder.
  * @param videoFiles Video files found down to three levels (Show/Season 1/episode).
  * @param truncated The count stopped after the first thousand folders; the folder holds more.

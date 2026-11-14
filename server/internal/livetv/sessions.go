@@ -330,6 +330,49 @@ func (m *Sessions) Status(ctx context.Context, owner Owner, id string) (SessionV
 	defer m.mu.Unlock()
 	return m.viewLocked(s, time.Now()), nil
 }
+
+// MaxStatusWait is the longest StatusWait waits.
+const MaxStatusWait = 10 * time.Second
+
+// StatusWait is Status for a player waiting on a channel to tune. While the
+// session is starting, it waits up to wait (at most MaxStatusWait) for the
+// session to play, fail or stop, then reads it again; a player that polled
+// once a second learns at once instead (API level 28). Nothing is held while
+// it waits: each read is Status, which checks access again, and between them
+// it only watches the session's channels.
+func (m *Sessions) StatusWait(ctx context.Context, owner Owner, id string, wait time.Duration) (SessionView, error) {
+	v, err := m.Status(ctx, owner, id)
+	if err != nil || wait <= 0 || v.State != "starting" {
+		return v, err
+	}
+	s, err := m.find(owner, id)
+	if err != nil {
+		return SessionView{}, err
+	}
+	if !awaitStarted(ctx, s, min(wait, MaxStatusWait)) {
+		return v, nil
+	}
+	return m.Status(ctx, owner, id)
+}
+
+// awaitStarted waits until s leaves starting or wait runs out, and reports
+// whether to read the session again (false when the caller went away).
+// Playing closes ready; failing, stopping and the server closing cancel the
+// session's context. An Automatic session that played once and is starting
+// its next output has ready closed already, so it is read again at once.
+func awaitStarted(ctx context.Context, s *session, wait time.Duration) bool {
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	select {
+	case <-s.ready:
+	case <-s.ctx.Done():
+	case <-timer.C:
+	case <-ctx.Done():
+		return false
+	}
+	return true
+}
+
 func (m *Sessions) Heartbeat(ctx context.Context, owner Owner, id string, paused, interacted bool) (SessionView, error) {
 	if _, err := m.Status(ctx, owner, id); err != nil {
 		return SessionView{}, err

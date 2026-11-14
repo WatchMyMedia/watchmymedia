@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param endsAt 
- * @param startedAt 
+ * @param endsAt
+ * @param startedAt
  */
 @Serializable
 

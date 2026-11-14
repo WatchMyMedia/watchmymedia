@@ -36,6 +36,9 @@ import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.relocation.BringIntoViewModifierNode
 import androidx.compose.ui.relocation.bringIntoView
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.zIndex
 import media.watchmy.client.ui.WmmColors
 
@@ -63,6 +66,11 @@ fun Modifier.focusRing(focused: Boolean, cornerRadius: Dp, offset: Dp = 4.dp, wi
  * focus draws the 4 dp gold ring and scales by [focusedScale], as the
  * mockups' `.focus` class does. [content] gets the focused state.
  *
+ * Not [enabled], it stays focusable and its clicks do nothing, and TalkBack
+ * says it is disabled. A disabled clickable can't take focus, so a button
+ * that disabled itself while it worked (Sign in, Connect, Mark season
+ * watched) dropped focus to wherever the system put it next.
+ *
  * The focus target sits outside the scale, so the bounds a scrolling
  * parent brings into view stay put while the scale animates. Inside it,
  * Home's pinned rows chased the growing card on every move along a row and
@@ -79,6 +87,8 @@ fun FocusableBox(
     ringColor: Color = WmmColors.Accent,
     enabled: Boolean = true,
     contentAlignment: Alignment = Alignment.TopStart,
+    /** What TalkBack calls it: a button for the TV's controls; null leaves it to the modifier (a switch row, a chip). */
+    role: Role? = null,
     content: @Composable BoxScope.(focused: Boolean) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -87,7 +97,14 @@ fun FocusableBox(
     Box(
         modifier
             .zIndex(if (focused) 1f else 0f)
-            .combinedClickable(interactionSource = interaction, indication = null, enabled = enabled, onLongClick = onLongClick, onClick = onClick)
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = null,
+                role = role,
+                onLongClick = onLongClick?.let { long -> { if (enabled) long() } },
+                onClick = { if (enabled) onClick() },
+            )
+            .then(if (enabled) Modifier else Modifier.semantics { disabled() })
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale

@@ -34,16 +34,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param audioCodecs 
+ * @param audioCodecs
  * @param hdrTypes HDR formats the current display can show, such as hdr10 or hlg.
  * @param interlaced The live player can present interlaced source without server deinterlacing.
- * @param maxAudioChannels 
+ * @param maxAudioChannels
  * @param maxBitrate Sustained total bits per second; zero means the client has not measured it.
- * @param maxHeight 
+ * @param maxHeight
  * @param segmentFormats HLS segment formats the player accepts: mpegts or fmp4.
- * @param videoCodecs 
+ * @param videoCodecs
  */
 @Serializable
 

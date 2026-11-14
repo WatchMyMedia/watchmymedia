@@ -34,13 +34,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param matched 
+ * @param matched
  * @param needEpisodes TV files whose episode is not on TMDB; they stay unmatched under the chosen show.
  * @param folder The folder remembered for new files, when remember was set.
- * @param movieId 
- * @param showId 
+ * @param movieId
+ * @param showId
  */
 @Serializable
 

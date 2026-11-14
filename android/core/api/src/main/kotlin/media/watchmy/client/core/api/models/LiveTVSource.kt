@@ -35,15 +35,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param address 
- * @param device 
- * @param enabled 
- * @param id 
- * @param lastError 
- * @param name 
- * @param refreshedAt 
+ * @param address
+ * @param device
+ * @param enabled
+ * @param id
+ * @param lastError
+ * @param name
+ * @param refreshedAt
  */
 @Serializable
 

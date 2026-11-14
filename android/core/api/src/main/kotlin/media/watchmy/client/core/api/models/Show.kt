@@ -35,26 +35,25 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param credits 
+ * @param credits
  * @param episodeCount Episodes with a present file.
- * @param genres 
- * @param id 
- * @param libraryId 
- * @param overview 
- * @param title 
- * @param tmdbId 
- * @param backdropPath 
+ * @param genres
+ * @param id
+ * @param libraryId
+ * @param overview
+ * @param title
+ * @param tmdbId
+ * @param backdropPath
  * @param contentRating US certification from TMDB; empty when it has none.
- * @param firstAirDate 
- * @param lastAirDate 
- * @param nextAirDate 
- * @param originalTitle 
- * @param posterPath 
- * @param rating 
- * @param status 
- * @param year 
+ * @param firstAirDate
+ * @param lastAirDate
+ * @param nextAirDate
+ * @param originalTitle
+ * @param posterPath
+ * @param posterSource Set when an admin chose the poster; absent for the match's own.
+ * @param rating
+ * @param status
+ * @param year
  */
 @Serializable
 
@@ -107,6 +106,10 @@ data class Show (
     @SerialName(value = "posterPath")
     val posterPath: kotlin.String? = null,
 
+    /* Set when an admin chose the poster; absent for the match's own. */
+    @SerialName(value = "posterSource")
+    val posterSource: Show.PosterSource? = null,
+
     @SerialName(value = "rating")
     val rating: kotlin.Double? = null,
 
@@ -118,6 +121,32 @@ data class Show (
 
 ) {
 
+    /**
+     * Set when an admin chose the poster; absent for the match's own.
+     *
+     * Values: tmdb,upload,url,unknown_default_open_api
+     */
+    @Serializable(with = PosterSourceSerializer::class)
+    enum class PosterSource(val value: kotlin.String) {
+        @SerialName(value = "tmdb") tmdb("tmdb"),
+        @SerialName(value = "upload") upload("upload"),
+        @SerialName(value = "url") url("url"),
+        @SerialName(value = "unknown_default_open_api") unknown_default_open_api("unknown_default_open_api");
+    }
+
+    internal object PosterSourceSerializer : KSerializer<PosterSource> {
+        override val descriptor = kotlin.String.serializer().descriptor
+
+        override fun deserialize(decoder: Decoder): PosterSource {
+            val value = decoder.decodeSerializableValue(kotlin.String.serializer())
+            return PosterSource.entries.firstOrNull { it.value == value }
+                ?: PosterSource.unknown_default_open_api
+        }
+
+        override fun serialize(encoder: Encoder, value: PosterSource) {
+            encoder.encodeSerializableValue(kotlin.String.serializer(), value.value)
+        }
+    }
 
 }
 

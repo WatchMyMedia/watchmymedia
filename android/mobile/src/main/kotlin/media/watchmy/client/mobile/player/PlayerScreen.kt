@@ -1,6 +1,5 @@
 package media.watchmy.client.mobile.player
 
-import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -15,7 +14,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,15 +34,16 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toAndroidRect
-import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -54,7 +53,13 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import media.watchmy.client.presentation.Load
+import media.watchmy.client.presentation.player.PlayerEpisodesViewModel
+import media.watchmy.client.presentation.player.PlayerSelection
+import media.watchmy.client.presentation.player.PlayerViewModel
+import media.watchmy.client.presentation.player.handOver
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.PlayerSurface
@@ -99,47 +104,48 @@ fun PlayerScreen(request: PlayRequest, onExit: () -> Unit) {
     val services = LocalAppServices.current
     val castState by services.cast.state.collectAsStateWithLifecycle()
     val castDevice = (castState as? CastState.Connected)?.deviceName.takeIf { request.recordingId == null }
-    // Where the play is now, and what it is (a handover carries the position and tracks).
-    var selection by remember { mutableStateOf(PlayerSelection(request)) }
-    var remote by remember { mutableStateOf(castDevice != null) }
+    // The play, on this screen's nav entry: where it is now (here or on a TV) and what it is, through a
+    // recreated activity or process death (a handover carries the position and tracks).
+    val model = viewModel { PlayerViewModel(services.playback, createSavedStateHandle(), request, onTv = castDevice != null) }
+    val selection by model.selection.collectAsStateWithLifecycle()
+    val remote by model.remote.collectAsStateWithLifecycle()
     CompositionLocalProvider(LocalContentColor provides WmmColors.Text) {
+        // The model stays here; its players get its parts (compose-lints: no ViewModel forwarding).
         if (remote) {
-            RemotePlayer(selection, castState, onExit, onPlay = { selection = selection.select(it) }, onContinueHere = {
-                selection = selection.select(it)
-                remote = false
-            })
+            RemotePlayer(selection, model::start, castState, onExit, onPlay = model::select, onContinueHere = model::continueHere)
         } else {
-            LocalPlayer(selection, castDevice, onExit, onPlay = { selection = selection.select(it) }, onCast = {
-                selection = selection.select(it)
-                remote = true
-            })
+            // The model's, kept through recreation; casting releases it, which reports the play stopped here.
+            val controller = remember(model) { model.controller() }
+            LocalPlayer(controller, selection, model::start, playingFileId = { model.fileId.value }, castDevice, onExit, onPlay = model::select, onCast = model::castTo)
         }
     }
 }
 
 @Composable
-private fun LocalPlayer(selection: PlayerSelection, castDevice: String?, onExit: () -> Unit, onPlay: (PlayRequest) -> Unit, onCast: (PlayRequest) -> Unit) {
-    val request = selection.request
-    val services = LocalAppServices.current
-    val controller = remember(services) { services.playback.create() }
-    // Releasing reports the play stopped, so a handover to the TV ends it here.
-    DisposableEffect(controller) { onDispose { controller.release() } }
-    var fileId by remember(selection) { mutableLongStateOf(request.fileId) }
-    StartSelectedPlayback(controller, selection)
-    LaunchedEffect(controller, selection) { controller.events.collect { if (it is PlayerEvent.StartedNext) fileId = it.fileId } }
+private fun LocalPlayer(
+    controller: PlaybackController,
+    selection: PlayerSelection,
+    start: (PlaybackController) -> Unit,
+    playingFileId: () -> Long,
+    castDevice: String?,
+    onExit: () -> Unit,
+    onPlay: (PlayRequest) -> Unit,
+    onCast: (PlayRequest) -> Unit,
+) {
+    StartSelectedPlayback(selection, controller, start)
     // A Cast device connected while playing here: the TV carries on.
     LaunchedEffect(castDevice) {
-        if (castDevice != null) onCast(handOver(request, fileId, controller.state.value, controller.progress.value.positionMs))
+        if (castDevice != null) onCast(handOver(selection.request, playingFileId(), controller.state.value, controller.progress.value.positionMs))
     }
     PlayerContent(controller, selection, onExit, onPlay, remoteDevice = null)
 }
 
 @Composable
-private fun RemotePlayer(selection: PlayerSelection, castState: CastState, onExit: () -> Unit, onPlay: (PlayRequest) -> Unit, onContinueHere: (PlayRequest) -> Unit) {
+private fun RemotePlayer(selection: PlayerSelection, start: (PlaybackController) -> Unit, castState: CastState, onExit: () -> Unit, onPlay: (PlayRequest) -> Unit, onContinueHere: (PlayRequest) -> Unit) {
     val request = selection.request
     val cast = LocalAppServices.current.cast
     val controller = cast.remote
-    StartSelectedPlayback(controller, selection)
+    StartSelectedPlayback(selection, controller, start)
     // The device's name and what it plays outlive the session, for the offer to carry on here.
     val device = latest(castState.deviceName) ?: "TV"
     val playing = latest(cast.nowPlaying.collectAsStateWithLifecycle().value) ?: request
@@ -169,7 +175,10 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
     var playingFileId by remember(selection) { mutableLongStateOf(request.fileId) }
     var showEpisodes by remember { mutableStateOf(false) }
     LaunchedEffect(tablet, playingFileId) {
-        if (tablet && request.recordingId == null) episodesModel.load(if (playingFileId == request.fileId) request else PlayRequest(playingFileId, title = state.title))
+        // The shared episode list (core:presentation): the request first, then the file the play moved on to.
+        if (tablet && request.recordingId == null) {
+            if (playingFileId == request.fileId) episodesModel.load(request) else episodesModel.playing(playingFileId)
+        }
     }
     val activity = LocalActivity.current as? ComponentActivity
     val exit by rememberUpdatedState(onExit)
@@ -182,6 +191,15 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
     var rotationLocked by remember { mutableStateOf(false) }
     var exitAfterMessage by remember(playingFileId, selection) { mutableStateOf(false) }
     var videoBounds by remember { mutableStateOf<android.graphics.Rect?>(null) }
+    // Fit or fill (PlayerFitFill): kept for the rest of the play, and said for a moment on each switch.
+    var fill by rememberSaveable { mutableStateOf(false) }
+    var fillNote by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(fillNote) {
+        if (fillNote != null) {
+            delay(FILL_NOTE_MS)
+            fillNote = null
+        }
+    }
     val seek = rememberSeekForFile(playingFileId, selection.generation)
     var ripple by remember(playingFileId, selection) { mutableStateOf<SeekBurst?>(null) }
     var rippleShown by remember(playingFileId, selection) { mutableStateOf(false) }
@@ -250,6 +268,8 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                     PipAction.Replay -> act { seekBy(-DoubleTapSeek.STEP_MS) }
                     PipAction.PlayPause -> act { togglePlayPause() }
                     PipAction.Forward -> act { seekBy(DoubleTapSeek.STEP_MS) }
+                    // Live TV's; the file player's window doesn't show them.
+                    PipAction.ChannelDown, PipAction.ChannelUp -> Unit
                 }
             },
         )
@@ -280,13 +300,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
 
     // A remote keeps its controls up.
     val autoHide = local && ControlsState.autoHides(state.status, scrubbing, picker != null || showEpisodes)
-    var autoHideSince by remember(playingFileId, selection) { mutableLongStateOf(0L) }
-    LaunchedEffect(autoHide, playingFileId, selection) { if (autoHide) autoHideSince = now() }
-    LaunchedEffect(controls, autoHide, autoHideSince, playingFileId, selection) {
-        val at = controls.hideAtMs(autoHide, autoHideSince) ?: return@LaunchedEffect
-        delay((at - now()).coerceAtLeast(0))
-        controls = controls.hidden()
-    }
+    AutoHideControls(controls, autoHide, reset = playingFileId to selection) { controls = controls.hidden() }
     LaunchedEffect(ripple, playingFileId, selection) {
         if (ripple != null) {
             delay(DoubleTapSeek.WINDOW_MS + 300)
@@ -304,24 +318,30 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
         }
     }
 
-    val noteTouch by rememberUpdatedState(::input)
-    val keys = remember { FocusRequester() }
-    LaunchedEffect(keys) { keys.requestFocus() }
-    BoxWithConstraints(
-        Modifier.fillMaxSize().background(WmmColors.Ground).pointerInput(Unit) {
-            awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                noteTouch()
-            }
-        }.playerKeyboard(keys, enabled = !inPip && picker == null && !showEpisodes) { action ->
+    PlayerShell(
+        keys = ::fileKeyboardAction,
+        keysEnabled = !inPip && picker == null && !showEpisodes,
+        onKey = { action ->
             when (action) {
                 KeyboardAction.TogglePlayPause -> act { togglePlayPause() }
                 is KeyboardAction.SeekBy -> act { seekBy(action.deltaMs) }
+                is KeyboardAction.ChannelBy -> Unit
             }
         },
+        onTouch = ::input,
     ) {
         val portrait = tablet && maxHeight > maxWidth && !inPip
         val videoHeight = maxWidth * 9 / 16
+        val crop = fillCrop(presentation?.videoSizeDp?.width, presentation?.videoSizeDp?.height, maxWidth.value, maxHeight.value)
+        val fillOffered = local && !portrait && !inPip && offersFill(crop)
+        val filling = fill && fillOffered
+        val setFill = { on: Boolean ->
+            if (fillOffered && on != fill) {
+                input()
+                fill = on
+                fillNote = fitFillNote(on, crop ?: 0f)
+            }
+        }
         Column(Modifier.fillMaxSize()) {
             Box(
                 Modifier
@@ -334,6 +354,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                     VideoLayer(
                         player = player,
                         coverSurface = presentation?.coverSurface ?: true,
+                        fill = filling,
                         videoSize = presentation?.videoSizeDp,
                         backdropUrl = library.imageUrl(state.backdropPath, ImageSize.W1280),
                         seed = state.title.ifEmpty { request.title },
@@ -368,6 +389,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                         ripple = seek.burst
                         rippleShown = true
                     },
+                    onPinch = setFill.takeIf { fillOffered },
                 )
                 val shownRipple = ripple
                 androidx.compose.animation.AnimatedVisibility(
@@ -388,6 +410,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                             portrait = portrait,
                             rotationLocked = rotationLocked,
                             rotationLockWorks = rotationLockWorks,
+                            filled = filling,
                             actions = ControlsActions(
                                 onBack = { leave(stop = true) },
                                 onTogglePlay = { act { togglePlayPause() } },
@@ -411,7 +434,8 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                                     rotationLocked = !rotationLocked
                                 },
                                 onPlayNext = { act { playNext() } },
-                                onEpisodes = if (tablet && (episodes.season != null || episodes.error != null)) { { input(); showEpisodes = true } } else null,
+                                onEpisodes = if (tablet && (episodes.season is Load.Ready || episodes.season is Load.Failed)) { { input(); showEpisodes = true } } else null,
+                                onToggleFill = { setFill(!fill) }.takeIf { fillOffered },
                             ),
                         )
                     }
@@ -429,6 +453,15 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                     exit = fadeOut(),
                 ) {
                     note?.let { AutoNote(it) }
+                }
+                val shownFillNote = latest(fillNote)
+                androidx.compose.animation.AnimatedVisibility(
+                    fillNote != null && picker == null && !showEpisodes,
+                    Modifier.align(Alignment.TopCenter).padding(top = if (state.note != null) 124.dp else 76.dp, start = 16.dp, end = 16.dp),
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    shownFillNote?.let { PlayerNote(it) }
                 }
 
                 val upNext = latest(state.upNext)
@@ -475,6 +508,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                     state, episodes, ::openPicker,
                     onPlay = { input(); showEpisodes = false; onPlay(it) },
                     onRetry = episodesModel::retry,
+                    playRequest = episodesModel::playRequest,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
             }
@@ -501,6 +535,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                 episodes,
                 onPlay = { input(); showEpisodes = false; onPlay(it) },
                 onRetry = episodesModel::retry,
+                playRequest = episodesModel::playRequest,
                 onDismiss = { showEpisodes = false; controls = controls.shown(now()) },
             )
         }
@@ -518,6 +553,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
 private fun VideoLayer(
     player: Player?,
     coverSurface: Boolean,
+    fill: Boolean,
     videoSize: androidx.compose.ui.geometry.Size?,
     backdropUrl: String?,
     seed: String,
@@ -532,7 +568,7 @@ private fun VideoLayer(
             PlayerSurface(
                 player,
                 Modifier
-                    .resizeWithContentScale(ContentScale.Fit, videoSize)
+                    .resizeWithContentScale(if (fill) ContentScale.Crop else ContentScale.Fit, videoSize)
                     .onGloballyPositioned { onBounds(it.boundsInWindow().toAndroidRect()) },
             )
         }
@@ -561,21 +597,48 @@ private fun PlayingOn(device: String, modifier: Modifier = Modifier) {
 /**
  * Taps on the video: a tap shows or hides the controls; a double tap on the
  * left or right seeks (see [DoubleTapSeek]), and further taps on that side
- * keep seeking without waiting for a double tap.
+ * keep seeking without waiting for a double tap. A tap in the middle, where
+ * a double tap doesn't seek, shows or hides the controls at once rather
+ * than after the double-tap wait (PLAN-ANDROID-REVIEW §6.3); a quick second
+ * tap there is taken as part of it. Pinching out fills the screen with the
+ * picture and pinching in fits it ([onPinch]: true to fill).
  */
 @Composable
-internal fun TouchLayer(seek: DoubleTapSeek, onTap: () -> Unit, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
+internal fun TouchLayer(seek: DoubleTapSeek, onTap: () -> Unit, onSeek: (Long) -> Unit, modifier: Modifier = Modifier, onPinch: ((Boolean) -> Unit)? = null) {
     val tap by rememberUpdatedState(onTap)
     val seekBy by rememberUpdatedState(onSeek)
+    val pinch by rememberUpdatedState(onPinch)
     key(seek) {
         Box(
-            modifier.fillMaxSize().pointerInput(seek) {
+            modifier.fillMaxSize().pointerInput(Unit) {
+                // Two fingers only, so a tap or a one-finger drag is left to the taps below.
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    var zoom = 1f
+                    do {
+                        val event = awaitPointerEvent()
+                        if (event.changes.count { it.pressed } >= 2) {
+                            zoom *= event.calculateZoom()
+                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                        }
+                    } while (event.changes.any { it.pressed })
+                    when {
+                        zoom > PINCH_FILL -> pinch?.invoke(true)
+                        zoom < 1 / PINCH_FILL -> pinch?.invoke(false)
+                    }
+                }
+            }.pointerInput(seek) {
                 awaitEachGesture {
                     awaitFirstDown()
                     val up = waitForUpOrCancellation() ?: return@awaitEachGesture
                     val width = size.width.toFloat()
                     seek.onTap(up.position.x, width, up.uptimeMillis)?.let {
                         seekBy(it)
+                        return@awaitEachGesture
+                    }
+                    if (seekZone(up.position.x, width) == SeekZone.None) {
+                        tap()
+                        withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) { awaitFirstDown() }?.let { waitForUpOrCancellation() }
                         return@awaitEachGesture
                     }
                     val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) { awaitFirstDown() }
@@ -592,6 +655,12 @@ internal fun TouchLayer(seek: DoubleTapSeek, onTap: () -> Unit, onSeek: (Long) -
     }
 }
 
+/** How long the note after switching between fit and fill shows. */
+private const val FILL_NOTE_MS = 2_500L
+
+/** How far two fingers pinch, out or in, before the picture fills the screen or fits it. */
+private const val PINCH_FILL = 1.15f
+
 private class Last<T>(var value: T?)
 
 /** [value], or the last non-null one, so content can fade out after its value is gone. */
@@ -602,4 +671,4 @@ private fun <T : Any> latest(value: T?): T? {
     return value ?: last.value
 }
 
-private fun now() = SystemClock.uptimeMillis()
+private fun now() = playerNow()

@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param local On the server's own network.
- * @param url 
+ * @param url
  */
 @Serializable
 

@@ -34,38 +34,36 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param addedAt When the newest present file was added (see MediaFile.addedAt).
- * @param genres 
- * @param hdr 
- * @param id 
+ * @param genres
+ * @param hdr
+ * @param id
  * @param isNew A present file arrived within the last 7 days and the signed-in user has not watched it: the film, or for a show an episode added in that time.
- * @param kind 
- * @param libraryId 
- * @param overview 
- * @param title 
+ * @param kind
+ * @param libraryId
+ * @param overview
+ * @param title
  * @param totalSize Bytes across present files.
- * @param watched 
- * @param backdropPath 
- * @param contentRating 
+ * @param watched
+ * @param backdropPath
+ * @param contentRating
  * @param episodeCount Shows: episodes with a present file.
  * @param episodeId Recently added shows: the one episode added, when the subtitle is its code. Apps open its page rather than the show's.
  * @param fileCount Movies: versions on disk.
  * @param fileName Unmatched: the file's path in the library, or the folder for a group of files.
- * @param lastAirDate 
+ * @param lastAirDate
  * @param libraryType Unmatched: the library's type, for the link to its Unmatched view.
- * @param nextAirDate 
- * @param posterPath 
- * @param progress 
+ * @param nextAirDate
+ * @param posterPath
+ * @param progress
  * @param quality Best resolution across present files.
- * @param rating 
- * @param releaseDate 
- * @param runtimeMin 
+ * @param rating
+ * @param releaseDate
+ * @param runtimeMin
  * @param seasonNumber Recently added shows: that episode's season.
- * @param status 
- * @param subtitle 
- * @param year 
+ * @param status
+ * @param subtitle
+ * @param year
  */
 @Serializable
 
@@ -174,8 +172,6 @@ data class BrowseItem (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,show,unmatched,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

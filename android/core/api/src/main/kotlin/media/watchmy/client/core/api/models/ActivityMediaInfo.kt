@@ -34,21 +34,19 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param audioChannels 
- * @param audioCodec 
- * @param audioDecision 
- * @param audioLanguage 
+ * @param audioChannels
+ * @param audioCodec
+ * @param audioDecision
+ * @param audioLanguage
  * @param bitrate Bits per second.
- * @param container 
- * @param hdr 
- * @param height 
+ * @param container
+ * @param hdr
+ * @param height
  * @param subtitle Language and format of the subtitle shown, if any.
- * @param subtitleMode 
- * @param videoCodec 
- * @param videoDecision 
- * @param width 
+ * @param subtitleMode
+ * @param videoCodec
+ * @param videoDecision
+ * @param width
  */
 @Serializable
 
@@ -98,8 +96,6 @@ data class ActivityMediaInfo (
 ) {
 
     /**
-     * 
-     *
      * Values: none,copy,transcode,unknown_default_open_api
      */
     @Serializable(with = AudioDecisionSerializer::class)
@@ -124,8 +120,6 @@ data class ActivityMediaInfo (
         }
     }
     /**
-     * 
-     *
      * Values: none,text,burn,unknown_default_open_api
      */
     @Serializable(with = SubtitleModeSerializer::class)
@@ -150,8 +144,6 @@ data class ActivityMediaInfo (
         }
     }
     /**
-     * 
-     *
      * Values: none,copy,transcode,unknown_default_open_api
      */
     @Serializable(with = VideoDecisionSerializer::class)

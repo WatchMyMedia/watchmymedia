@@ -33,4 +33,7 @@ interface AppServices {
 
     /** The players' seek thumbnails' pictures; [SeekThumbnails.None] where there are none. */
     val seekThumbnails: SeekThumbnails get() = SeekThumbnails.None
+
+    /** How the app has fared on this device, for Settings; [Diagnostics.None] on the fakes. */
+    val diagnostics: Diagnostics get() = Diagnostics.None
 }

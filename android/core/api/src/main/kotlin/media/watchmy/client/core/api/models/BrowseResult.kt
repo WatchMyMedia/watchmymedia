@@ -35,11 +35,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param propertyEntries 
- * @param path 
- * @param parent 
+ * @param propertyEntries
+ * @param path
+ * @param parent
  */
 @Serializable
 

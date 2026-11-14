@@ -36,11 +36,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param generation The generation last read; a save made from an older one is refused (409).
- * @param libraries 
- * @param users 
+ * @param libraries
+ * @param users
  */
 @Serializable
 

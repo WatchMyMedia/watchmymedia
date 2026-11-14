@@ -34,9 +34,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param connection 
+ * @param connection
  * @param error Why Seerr couldn't be told. The delete went ahead; Seerr may still show the item as available.
  */
 @Serializable

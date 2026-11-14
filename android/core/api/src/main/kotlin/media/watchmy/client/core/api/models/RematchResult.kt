@@ -34,15 +34,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param moved 
+ * @param moved
  * @param needEpisodes TV files whose episode is not in the new show; they are left unmatched.
- * @param watchedCleared 
- * @param watchedKept 
+ * @param watchedCleared
+ * @param watchedKept
  * @param folder The folder remembered for new files, when remember was set.
- * @param movieId 
- * @param showId 
+ * @param movieId
+ * @param showId
  */
 @Serializable
 

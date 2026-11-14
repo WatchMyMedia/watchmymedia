@@ -36,10 +36,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param apps Each app that holds the item; several Radarrs (1080p and 4K) can hold one movie.
- * @param choices 
+ * @param choices
  * @param files Files the apps list, across every app.
  * @param kept The item's files in the library that no app holds. They stay.
  * @param managed Some Radarr or Sonarr manages the item. When false there is no delete: it is deleted where it was downloaded, or on disk.

@@ -34,6 +34,11 @@ import org.junit.Test
 class RequestRepositoryTest {
     private val h = Harness()
 
+    /** Past the options' memo ([SessionMemo]), so the next call asks the server. */
+    private fun later() {
+        h.now += SessionMemo.TTL_MS
+    }
+
     @After
     fun tearDown() = h.close()
 
@@ -68,6 +73,7 @@ class RequestRepositoryTest {
         assertTrue(o.canRequest(MediaType.Movie))
         assertFalse(o.missingEpisodes)
         // A server with integrations off answers 503: nothing to offer, no error.
+        later()
         h.server.on("GET /api/requests/options", TestServer.problem(503, "integrations are off"))
         assertEquals(RequestOptions.None, h.services.requests.options())
     }
@@ -76,6 +82,7 @@ class RequestRepositoryTest {
     fun `Seerr and unknown backends keep server capabilities without requiring enum updates`() = runBlocking {
         signInAt(REQUESTS_API_LEVEL)
         for ((backend, expected) in listOf("seerr" to RequestBackend.Seerr, "future" to RequestBackend.Other)) {
+            later()
             h.server.on("GET /api/requests/options", json("""{"movies":true,"shows":false,"needsApproval":true,"problems":true,"manage":false,"backend":"$backend","inbox":0}"""))
             val options = h.services.requests.options()
             assertEquals(expected, options.backend)
@@ -84,6 +91,7 @@ class RequestRepositoryTest {
             assertFalse(options.canOpenInbox)
             assertEquals(backend == "seerr", options.viaSeerr)
         }
+        later()
         h.server.on("GET /api/requests/options", json("""{"movies":false,"shows":false,"needsApproval":false,"problems":true,"manage":false,"backend":"seerr","inbox":0}"""))
         assertFalse(h.services.requests.options().canRequest)
     }
@@ -93,12 +101,14 @@ class RequestRepositoryTest {
         signInAt(REQUESTS_API_LEVEL, admin = true)
         h.server.always("GET /api/requests/options", json("""{"movies":true,"shows":true,"needsApproval":false,"problems":true,"manage":false,"backend":"seerr","inbox":2}"""))
         for ((allowed, admin) in listOf(true to true, false to true, true to false)) {
+            later()
             h.server.on("GET /api/auth/status", json("""{"setupRequired":false,"adminAllowed":$allowed,"user":{"id":2,"name":"viewer","isAdmin":$admin}}"""))
             val options = h.services.requests.options()
             assertEquals(allowed && admin, options.canOpenInbox)
             assertFalse(options.manage)
             assertTrue(options.canRequest)
         }
+        later()
         h.server.on("GET /api/auth/status", TestServer.problem(503, "unavailable"))
         assertFalse(h.services.requests.options().canOpenInbox)
     }
@@ -276,6 +286,7 @@ class RequestRepositoryTest {
         signInAt(DELETE_API_LEVEL, admin = true)
         h.server.on("GET /api/requests/options", json(reply))
         assertTrue(h.services.requests.options().delete)
+        later()
         h.server.on("GET /api/requests/options", json(reply.replace(",\"delete\":true", "")))
         assertFalse("a reply without the field is no", h.services.requests.options().delete)
     }

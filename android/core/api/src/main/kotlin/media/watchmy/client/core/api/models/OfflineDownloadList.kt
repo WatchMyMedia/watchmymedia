@@ -36,8 +36,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param items Newest first.
  * @param transfers Downloads fetched in the last minute, oldest first.
  */

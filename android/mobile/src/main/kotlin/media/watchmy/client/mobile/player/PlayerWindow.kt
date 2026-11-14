@@ -128,7 +128,17 @@ internal fun KeepScreenOn(on: Boolean) {
 }
 
 /** The buttons Android shows on the picture-in-picture window. */
-internal enum class PipAction { Replay, PlayPause, Forward }
+internal enum class PipAction { Replay, PlayPause, Forward, ChannelDown, ChannelUp }
+
+/** A button on the picture-in-picture window, and what it says to TalkBack. */
+internal data class PipButton(val action: PipAction, val title: String)
+
+/** The file player's: back 10 seconds, play or pause, forward 10 seconds. */
+internal fun filePipButtons(playing: Boolean) = listOf(
+    PipButton(PipAction.Replay, "Back 10 seconds"),
+    PipButton(PipAction.PlayPause, if (playing) "Pause" else "Play"),
+    PipButton(PipAction.Forward, "Forward 10 seconds"),
+)
 
 /** Whether the activity is in picture in picture, and a way in. */
 @Stable
@@ -145,8 +155,8 @@ internal class PictureInPicture(private val activity: ComponentActivity) {
 }
 
 /**
- * Picture in picture for the player: keeps the window's aspect ratio and
- * buttons current, enters it when the viewer leaves the app while
+ * Picture in picture for a player: keeps the window's aspect ratio and
+ * [buttons] current, enters it when the viewer leaves the app while
  * [playing] (Android 12 and later do that by themselves with auto-enter),
  * and passes the window's buttons to [onAction]. [aspect] is width to
  * height; [sourceRect] is where the video sits, for the animation.
@@ -157,6 +167,7 @@ internal fun rememberPictureInPicture(
     aspect: Pair<Int, Int>,
     sourceRect: android.graphics.Rect?,
     playing: Boolean,
+    buttons: List<PipButton> = filePipButtons(playing),
     onAction: (PipAction) -> Unit,
 ): PictureInPicture {
     val pip = remember(activity) { PictureInPicture(activity) }
@@ -184,8 +195,8 @@ internal fun rememberPictureInPicture(
             }
         }
     }
-    DisposableEffect(activity, aspect, sourceRect, playing) {
-        val params = pipParams(activity, broadcast, aspect, sourceRect, playing)
+    DisposableEffect(activity, aspect, sourceRect, playing, buttons) {
+        val params = pipParams(activity, broadcast, aspect, sourceRect, playing, buttons)
         pip.params = params
         if (pip.supported) runCatching { activity.setPictureInPictureParams(params) }
         onDispose {}
@@ -193,17 +204,21 @@ internal fun rememberPictureInPicture(
     return pip
 }
 
-private fun pipParams(activity: Activity, broadcast: String, aspect: Pair<Int, Int>, sourceRect: android.graphics.Rect?, playing: Boolean): PictureInPictureParams {
-    fun action(a: PipAction, icon: Int, title: String): RemoteAction {
+private fun pipParams(activity: Activity, broadcast: String, aspect: Pair<Int, Int>, sourceRect: android.graphics.Rect?, playing: Boolean, buttons: List<PipButton>): PictureInPictureParams {
+    fun action(button: PipButton): RemoteAction {
+        val a = button.action
+        val icon = when (a) {
+            PipAction.Replay -> android.R.drawable.ic_media_rew
+            PipAction.PlayPause -> if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+            PipAction.Forward -> android.R.drawable.ic_media_ff
+            PipAction.ChannelDown -> android.R.drawable.arrow_down_float
+            PipAction.ChannelUp -> android.R.drawable.arrow_up_float
+        }
         val intent = Intent(broadcast).setPackage(activity.packageName).putExtra(EXTRA_PIP_ACTION, a.ordinal)
         val pending = PendingIntent.getBroadcast(activity, a.ordinal, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        return RemoteAction(Icon.createWithResource("android", icon), title, title, pending)
+        return RemoteAction(Icon.createWithResource("android", icon), button.title, button.title, pending)
     }
-    val actions = listOf(
-        action(PipAction.Replay, android.R.drawable.ic_media_rew, "Back 10 seconds"),
-        if (playing) action(PipAction.PlayPause, android.R.drawable.ic_media_pause, "Pause") else action(PipAction.PlayPause, android.R.drawable.ic_media_play, "Play"),
-        action(PipAction.Forward, android.R.drawable.ic_media_ff, "Forward 10 seconds"),
-    )
+    val actions = buttons.map(::action)
     val b = PictureInPictureParams.Builder().setAspectRatio(Rational(aspect.first, aspect.second)).setActions(actions)
     if (sourceRect != null && !sourceRect.isEmpty) b.setSourceRectHint(sourceRect)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

@@ -18,7 +18,8 @@ import androidx.media3.exoplayer.scheduler.Requirements
  * Changes go to the manager directly, and [WmmDownloadService] is started
  * with them where Android lets the app start it (in the foreground): once it
  * has run in a process, Media3 starts it again in the foreground whenever a
- * download runs, so the download goes on in the background.
+ * download runs, so the download goes on in the background. A new process
+ * picks unfinished downloads up through [DownloadRestarts].
  */
 @OptIn(UnstableApi::class)
 internal class Media3Engine(
@@ -105,7 +106,7 @@ internal class Media3Engine(
     }
 
     /** Starts the service, which goes into the foreground while a download runs; in the background Android may refuse. */
-    private fun startService() {
+    fun startService() {
         try {
             DownloadService.start(context, WmmDownloadService::class.java)
         } catch (e: IllegalStateException) {

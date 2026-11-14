@@ -26,6 +26,8 @@ internal object PlayerIcons {
     val Subtitles = icon { stroke(2f, FRAME, "M10 10a2 2 0 1 0 0 4M17 10a2 2 0 1 0 0 4") }
     val Quality = icon { stroke(2f, FRAME, "M8 9v6M8 12h3M11 9v6M14 9v6h2a3 3 0 0 0 0-6z") }
     val Check = icon { stroke(3f, "m5 12 5 5 9-10") }
+    /** A list of stills: the Episodes button (TvPlayerEpisodes). */
+    val Episodes = icon { stroke(2f, "M4 6h4v4H4zM4 14h4v4H4zM11 8h9M11 16h9") }
     val Signal = icon {
         stroke(2f, "M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0")
         fill("M12 18.5a1 1 0 1 1 0 2a1 1 0 1 1 0-2z")

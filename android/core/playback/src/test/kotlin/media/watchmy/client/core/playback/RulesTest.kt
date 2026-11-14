@@ -2,12 +2,12 @@ package media.watchmy.client.core.playback
 
 import media.watchmy.client.core.playback.player.EmbeddedSubtitle
 import media.watchmy.client.core.playback.player.TextSelection
-import media.watchmy.client.model.MediaToken
 import media.watchmy.client.model.Segment
 import media.watchmy.client.model.SegmentKind
 import media.watchmy.client.model.SkipMode
 import media.watchmy.client.model.StreamProtocol
 import media.watchmy.client.model.StreamQuality
+import media.watchmy.client.model.capped
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -15,28 +15,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RulesTest {
-    private val token = MediaToken("a b+c/d", expiresAtMs = 0, serverUrl = "http://srv")
-
-    @Test
-    fun tokenGoesOnUrlsWithAndWithoutAQuery() {
-        assertEquals("http://srv/api/playback/s1/master.m3u8?access_token=a+b%2Bc%2Fd", withToken("http://srv/api/playback/s1/master.m3u8", token))
-        assertEquals("http://srv/api/files/1/stream?play=a1&access_token=a+b%2Bc%2Fd", withToken("http://srv/api/files/1/stream?play=a1", token))
-        assertEquals("http://srv/x.vtt?access_token=t#frag", withToken("http://srv/x.vtt#frag", MediaToken("t", 0, serverUrl = "http://srv")))
-        assertEquals("http://srv/x.vtt?mt=t", withToken("http://srv/x.vtt", MediaToken("t", 0, param = "mt", serverUrl = "http://srv")))
-    }
-
-    @Test
-    fun tokenGoesOnlyOnTheServersOwnUrls() {
-        assertEquals("https://cdn.example/x.m3u8", withToken("https://cdn.example/x.m3u8", token))
-        assertEquals("another scheme", "https://srv/x.m3u8", withToken("https://srv/x.m3u8", token))
-        assertEquals("another port", "http://srv:8080/x.m3u8", withToken("http://srv:8080/x.m3u8", token))
-        assertEquals("a user name", "http://srv@cdn.example/x.m3u8", withToken("http://srv@cdn.example/x.m3u8", token))
-        assertEquals("no server named", "http://srv/x.m3u8", withToken("http://srv/x.m3u8", MediaToken("t", 0)))
-        val proxied = MediaToken("t", 0, serverUrl = "https://example.net/watch")
-        assertEquals("https://example.net/watch/api/x.m3u8?access_token=t", withToken("https://example.net/watch/api/x.m3u8", proxied))
-        assertEquals("outside the server's path", "https://example.net/other/x.m3u8", withToken("https://example.net/other/x.m3u8", proxied))
-    }
-
     @Test
     fun vodAndDirectPlayAreFileTime() {
         val vod = StreamClock.of(decision(vod = true, startMs = 0))
@@ -148,11 +126,5 @@ class RulesTest {
         assertNull(activeSegment(d, 104_600, nextOffered = true))
         assertNull(activeSegment(d, 49 * MIN, nextOffered = true))
         assertEquals(credits, activeSegment(d, 49 * MIN, nextOffered = false))
-    }
-
-    @Test
-    fun labels() {
-        assertEquals("Skip Intro", skipLabel(SegmentKind.Intro))
-        assertEquals("Skip Ad", skipLabel(SegmentKind.Commercial))
     }
 }

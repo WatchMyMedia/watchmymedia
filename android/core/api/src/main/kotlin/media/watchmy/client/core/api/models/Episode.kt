@@ -38,26 +38,24 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param aired Air date is today or earlier.
- * @param files 
- * @param hasFile 
- * @param id 
- * @param isNew 
- * @param number 
- * @param overview 
- * @param seasonId 
- * @param title 
+ * @param files
+ * @param hasFile
+ * @param id
+ * @param isNew
+ * @param number
+ * @param overview
+ * @param seasonId
+ * @param title
  * @param addedAt When its newest file was added: its date on disk when first found.
- * @param airDate 
- * @param download 
+ * @param airDate
+ * @param download
  * @param monitored Sonarr monitors the episode; absent when no Sonarr has the show.
- * @param rating 
- * @param request 
- * @param runtimeMin 
- * @param stillPath 
- * @param watch 
+ * @param rating
+ * @param request
+ * @param runtimeMin
+ * @param stillPath
+ * @param watch
  */
 @Serializable
 

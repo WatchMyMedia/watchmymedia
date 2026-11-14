@@ -1337,6 +1337,7 @@ open class LiveTvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * Read the state of this sign-in&#39;s live session
      * 
      * @param id 
+     * @param waitMs API level 28: while the session is starting, wait up to this many milliseconds (at most 10000; more counts as 10000) for it to play, fail or stop, and reply then. Absent or 0 replies at once, as older servers do, which ignore it. (optional)
      * @return LiveTVSessionView
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -1346,8 +1347,8 @@ open class LiveTvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    suspend fun getLiveTVSession(id: kotlin.String) : LiveTVSessionView = withContext(Dispatchers.IO) {
-        val localVarResponse = getLiveTVSessionWithHttpInfo(id = id)
+    suspend fun getLiveTVSession(id: kotlin.String, waitMs: kotlin.Long? = null) : LiveTVSessionView = withContext(Dispatchers.IO) {
+        val localVarResponse = getLiveTVSessionWithHttpInfo(id = id, waitMs = waitMs)
 
         return@withContext when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as LiveTVSessionView
@@ -1369,14 +1370,15 @@ open class LiveTvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * Read the state of this sign-in&#39;s live session
      * 
      * @param id 
+     * @param waitMs API level 28: while the session is starting, wait up to this many milliseconds (at most 10000; more counts as 10000) for it to play, fail or stop, and reply then. Absent or 0 replies at once, as older servers do, which ignore it. (optional)
      * @return ApiResponse<LiveTVSessionView?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    suspend fun getLiveTVSessionWithHttpInfo(id: kotlin.String) : ApiResponse<LiveTVSessionView?> = withContext(Dispatchers.IO) {
-        val localVariableConfig = getLiveTVSessionRequestConfig(id = id)
+    suspend fun getLiveTVSessionWithHttpInfo(id: kotlin.String, waitMs: kotlin.Long?) : ApiResponse<LiveTVSessionView?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = getLiveTVSessionRequestConfig(id = id, waitMs = waitMs)
 
         return@withContext request<Unit, LiveTVSessionView>(
             localVariableConfig
@@ -1387,11 +1389,17 @@ open class LiveTvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * To obtain the request config of the operation getLiveTVSession
      *
      * @param id 
+     * @param waitMs API level 28: while the session is starting, wait up to this many milliseconds (at most 10000; more counts as 10000) for it to play, fail or stop, and reply then. Absent or 0 replies at once, as older servers do, which ignore it. (optional)
      * @return RequestConfig
      */
-    fun getLiveTVSessionRequestConfig(id: kotlin.String) : RequestConfig<Unit> {
+    fun getLiveTVSessionRequestConfig(id: kotlin.String, waitMs: kotlin.Long?) : RequestConfig<Unit> {
         val localVariableBody = null
-        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                if (waitMs != null) {
+                    put("waitMs", listOf(waitMs.toString()))
+                }
+            }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
         localVariableHeaders["Accept"] = "application/json, application/problem+json"
 

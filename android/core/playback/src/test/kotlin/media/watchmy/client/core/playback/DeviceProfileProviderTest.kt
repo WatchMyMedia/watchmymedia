@@ -9,6 +9,7 @@ import android.provider.Settings
 import android.view.Display
 import android.view.Display.HdrCapabilities
 import media.watchmy.client.core.playback.profile.DeviceProfileProvider
+import media.watchmy.client.core.playback.profile.VideoSize
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -70,6 +71,41 @@ class DeviceProfileProviderTest {
         assertEquals(listOf("hevc", "hevc10"), sdr.videoCodecs)
         assertEquals(emptyList<String>(), sdr.hdrTypes)
         assertFalse(sdr.hdr)
+    }
+
+    @Test
+    fun `the size limit is the largest the decoders take, not the display's`() {
+        ShadowMediaCodecList.reset()
+        // H.264 in hardware to 1080p, HEVC in hardware to 4K, and a software HEVC that declares more.
+        val avc = CodecProfileLevel.AVCProfileHigh to CodecProfileLevel.AVCLevel42
+        val hevc = CodecProfileLevel.HEVCProfileMain to CodecProfileLevel.HEVCMainTierLevel62
+        videoDecoder("c2.vendor.avc.decoder", MediaFormat.MIMETYPE_VIDEO_AVC, "16x16-1920x1088", 489_600, avc, hardware = true)
+        videoDecoder("c2.vendor.hevc.decoder", MediaFormat.MIMETYPE_VIDEO_HEVC, "16x16-4096x2304", 1_000_000, hevc, hardware = true)
+        videoDecoder("c2.android.hevc.decoder", MediaFormat.MIMETYPE_VIDEO_HEVC, "16x16-8192x4320", 8_000_000, hevc, hardware = false)
+        val provider = DeviceProfileProvider(context, tv = false)
+        assertEquals(VideoSize(1920, 1080), provider.videoLimit(MediaFormat.MIMETYPE_VIDEO_AVC))
+        assertEquals("The hardware decoder's, not the software one's", VideoSize(4096, 2160), provider.videoLimit(MediaFormat.MIMETYPE_VIDEO_HEVC))
+        val p = provider.current()
+        assertEquals(listOf("h264", "hevc"), p.videoCodecs)
+        assertEquals("Whatever the display", 4096, p.maxWidth)
+        assertEquals(2160, p.maxHeight)
+    }
+
+    private fun videoDecoder(name: String, mime: String, sizes: String, blocksPerSecond: Int, profileLevel: Pair<Int, Int>, hardware: Boolean) {
+        val format = MediaFormat().apply {
+            setString(MediaFormat.KEY_MIME, mime)
+            setString("size-range", sizes)
+            setString("block-size", "16x16")
+            setString("blocks-per-second-range", "1-$blocksPerSecond")
+            setString("frame-rate-range", "1-60")
+        }
+        val caps = CodecCapabilitiesBuilder.newBuilder()
+            .setMediaFormat(format)
+            .setIsEncoder(false)
+            .setProfileLevels(arrayOf(CodecProfileLevel().apply { profile = profileLevel.first; level = profileLevel.second }))
+            .setColorFormats(intArrayOf(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible))
+            .build()
+        ShadowMediaCodecList.addCodec(MediaCodecInfoBuilder.newBuilder().setName(name).setIsEncoder(false).setIsHardwareAccelerated(hardware).setCapabilities(caps).build())
     }
 
     @Test

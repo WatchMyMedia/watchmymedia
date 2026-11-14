@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param mediaType 
- * @param tmdbId 
+ * @param mediaType
+ * @param tmdbId
  * @param seasons Season numbers; required for a show.
  */
 @Serializable
@@ -57,8 +55,6 @@ data class CreateRequestInputBody (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,tv,unknown_default_open_api
      */
     @Serializable(with = MediaTypeSerializer::class)

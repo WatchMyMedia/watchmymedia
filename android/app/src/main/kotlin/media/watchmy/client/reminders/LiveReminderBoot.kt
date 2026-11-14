@@ -15,13 +15,26 @@ import media.watchmy.client.WatchMyMediaApp
 /**
  * After a reboot (or an update of the app) the alarms are gone: set them
  * again at once from what LiveReminderAlarms kept, then ask the server for
- * the list once there is a network ([LiveReminderSync]).
+ * the list once there is a network ([LiveReminderSync]). The receiver is off
+ * in the manifest and LiveReminderAlarms turns it on only while it keeps
+ * alarms, so a boot with none (and every boot of a TV) doesn't start the app.
  */
 class LiveReminderBoot : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
-        LiveReminderAlarms(context).restore()
-        LiveReminderSync.enqueue(context)
+        afterBoot(LiveReminderAlarms(context)) { LiveReminderSync.enqueue(context) }
+    }
+
+    companion object {
+        /**
+         * Sets the kept alarms again, and [sync]s only when there were some: with
+         * none, no job waits for a network to ask for a list nobody follows.
+         */
+        internal fun afterBoot(alarms: LiveReminderAlarms, sync: () -> Unit) {
+            val had = alarms.hasAlarms()
+            alarms.restore()
+            if (had) sync()
+        }
     }
 }
 

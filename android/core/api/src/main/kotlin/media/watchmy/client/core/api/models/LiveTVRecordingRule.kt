@@ -34,27 +34,25 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param anyChannel 
- * @param canCancel 
- * @param id 
- * @param keep 
- * @param kind 
- * @param newOnly 
- * @param padAfter 
- * @param padBefore 
- * @param title 
- * @param userName 
- * @param channelId 
- * @param days 
- * @param end 
- * @param number 
- * @param repeat 
- * @param seriesKey 
- * @param start 
- * @param userId 
- * @param zone 
+ * @param anyChannel
+ * @param canCancel
+ * @param id
+ * @param keep
+ * @param kind
+ * @param newOnly
+ * @param padAfter
+ * @param padBefore
+ * @param title
+ * @param userName
+ * @param channelId
+ * @param days
+ * @param end
+ * @param number
+ * @param repeat
+ * @param seriesKey
+ * @param start
+ * @param userId
+ * @param zone
  */
 @Serializable
 

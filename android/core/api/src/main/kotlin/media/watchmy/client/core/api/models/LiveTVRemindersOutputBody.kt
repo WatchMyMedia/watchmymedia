@@ -35,8 +35,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param items Those that haven't ended, soonest first.
  * @param leadMinutes How long before a programme starts to remind the viewer: their liveTVReminderMinutes preference.
  */

@@ -35,13 +35,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param mediaType 
- * @param name 
+ * @param mediaType
+ * @param name
  * @param screen Where its row first shows: home or library-<id>.
- * @param source 
- * @param limit 
+ * @param source
+ * @param limit
  * @param shared Admins: a list for everyone in the household.
  */
 @Serializable
@@ -71,8 +69,6 @@ data class MediaListBody (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,tv,all,unknown_default_open_api
      */
     @Serializable(with = MediaTypeSerializer::class)

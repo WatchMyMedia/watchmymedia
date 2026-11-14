@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param progress How much is downloaded, 0 to 1.
- * @param state 
+ * @param state
  * @param finishesAt When the download client expects it to finish.
  * @param message Why it failed or is stuck, in the app's words.
  */
@@ -63,8 +61,6 @@ data class QueueDownload (
 ) {
 
     /**
-     * 
-     *
      * Values: queued,downloading,importing,failed,unknown_default_open_api
      */
     @Serializable(with = StateSerializer::class)

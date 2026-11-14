@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param expiresAt Ask for a new one before this.
  * @param `param` The query parameter name, access_token.
  * @param token Add as ?access_token= to this download's url and every URL its playlists list. Works on this download's routes only.

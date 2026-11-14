@@ -41,6 +41,9 @@ fun interface ProfileProvider {
      * for again; false when it already did not.
      */
     fun decoderFailed(codec: String): Boolean = false
+
+    /** The largest picture this device's decoders take in the video format [mimeType]; null when not known. */
+    fun videoLimit(mimeType: String): VideoSize? = null
 }
 
 /**
@@ -130,6 +133,8 @@ class DeviceProfileProvider(
         return rebuild("$codec decoder failed") != before
     }
 
+    override fun videoLimit(mimeType: String): VideoSize? = describe().videoLimit(mimeType)
+
     /** What the profile is built from, for logs and support. */
     fun describe(): DeviceDescription = DeviceDescription(
         tv = tv,
@@ -194,15 +199,35 @@ class DeviceProfileProvider(
                 } else {
                     emptyList()
                 }
+                val hardware = hardware(info)
                 out += DecoderInfo(
                     mimeType = mime,
-                    hardware = hardware(info),
+                    hardware = hardware,
                     main10 = mime == Mime.HEVC && profiles.any { it in MAIN10_PROFILES },
                     doviProfiles = if (mime == Mime.DOLBY_VISION) profiles.mapNotNull { DOVI_PROFILES[it] }.toSet() else emptySet(),
+                    maxSize = if (mime in VIDEO_MIMES) runCatching { info.getCapabilitiesForType(type).videoCapabilities?.let(::largestSize) }.getOrNull() else null,
                 )
             }
         }
         return out
+    }
+
+    /**
+     * The largest of the usual sizes a decoder takes at [DECODE_FRAME_RATE]:
+     * by its performance points from Android 10 when it lists any (what a
+     * hardware decoder measured it keeps up with), else by the sizes and
+     * rates it declares.
+     */
+    private fun largestSize(caps: MediaCodecInfo.VideoCapabilities): VideoSize? {
+        val points = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) caps.supportedPerformancePoints.orEmpty() else emptyList()
+        return SIZES.firstOrNull { size ->
+            if (points.isNotEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val wanted = MediaCodecInfo.VideoCapabilities.PerformancePoint(size.width, size.height, DECODE_FRAME_RATE)
+                points.any { it.covers(wanted) }
+            } else {
+                caps.areSizeAndRateSupported(size.width, size.height, DECODE_FRAME_RATE.toDouble())
+            }
+        }
     }
 
     private fun hardware(info: MediaCodecInfo): Boolean =
@@ -218,6 +243,12 @@ class DeviceProfileProvider(
         const val PREFS = "playback_profile"
         const val KEY_FAILED = "failed_decoders"
         const val KEY_FAILED_ON = "failed_decoders_build"
+
+        /** The sizes a decoder is tried at, largest first: 8K, DCI and UHD 4K, 1440p, 1080p, 720p, 480p, 360p. */
+        val SIZES = listOf(
+            VideoSize(7680, 4320), VideoSize(4096, 2160), VideoSize(3840, 2160), VideoSize(2560, 1440),
+            VideoSize(1920, 1080), VideoSize(1280, 720), VideoSize(854, 480), VideoSize(640, 360),
+        )
         // HEVCProfileMain10HDR10Plus is API 29; older decoders never report it.
         @SuppressLint("InlinedApi")
         val MAIN10_PROFILES = setOf(

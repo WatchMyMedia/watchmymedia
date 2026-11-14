@@ -34,14 +34,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param createdAt 
- * @param id 
+ * @param createdAt
+ * @param id
  * @param mine The signed-in user asked for it.
- * @param requestedBy 
+ * @param requestedBy
  * @param seasons Season numbers asked for; empty for a movie.
- * @param status 
+ * @param status
  * @param note Why it was declined, or why carrying it out failed.
  */
 @Serializable
@@ -75,8 +73,6 @@ data class RequestState (
 ) {
 
     /**
-     * 
-     *
      * Values: pending,approved,declined,failed,available,unknown_default_open_api
      */
     @Serializable(with = StatusSerializer::class)

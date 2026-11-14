@@ -35,11 +35,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param positionMs File position ffmpeg has encoded up to.
  * @param speed Encoding speed as a multiple of real time; 0 before ffmpeg reports.
- * @param preparation 
+ * @param preparation
  */
 @Serializable
 

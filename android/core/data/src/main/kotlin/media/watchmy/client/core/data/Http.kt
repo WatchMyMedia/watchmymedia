@@ -1,5 +1,7 @@
 package media.watchmy.client.core.data
 
+import media.watchmy.client.model.ServerFeatures
+import android.util.Log
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
@@ -15,10 +17,13 @@ import media.watchmy.client.core.api.models.ErrorModel
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.SignedOutException
 import media.watchmy.client.model.isOnServer
+import okhttp3.Cache
+import okhttp3.Call
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
 import okhttp3.MediaType
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody
 import okio.Buffer
@@ -27,60 +32,123 @@ import okio.ForwardingSource
 import okio.buffer
 
 /**
- * The HTTP side: one OkHttp client whose interceptors add the bearer token to
- * requests for the current server (never to other hosts) and clear the
- * sign-in when the server answers 401, plus [signedIn] and [call], which turn
- * every failure into [ApiException].
+ * Who a request is sent as: [token], added only to requests for the server at
+ * [baseUrl] (never to other hosts). [onRejected] runs when that server
+ * answers 401: an account's clears its sign-in; a cast token's has none.
  */
-internal class Http(base: OkHttpClient, private val store: LocalStore, private val userAgent: String) {
+internal class Credential(val baseUrl: String, val token: String, val onRejected: (() -> Unit)? = null)
+
+/**
+ * The HTTP side: one OkHttp client whose interceptor adds the bearer token of
+ * the request's [Credential] (its tag, else the current sign-in) to requests
+ * for that server, and clears the sign-in when the server answers 401, plus
+ * [signedIn] and [call], which turn every failure into [ApiException].
+ */
+internal class Http(
+    /** The shared client: its connection pool and dispatcher. Asked for only when a client is first used, which [warm] does off the main thread. */
+    base: () -> OkHttpClient,
+    private val store: LocalStore,
+    private val userAgent: String,
+    cache: Cache? = null,
+    private val network: NetworkMonitor = NetworkMonitor.Always,
+) {
+    constructor(base: OkHttpClient, store: LocalStore, userAgent: String) : this({ base }, store, userAgent)
+
     /**
-     * Public probes and sign-in never inherit the current account's token.
      * No client follows a redirect between http and https: one to http would
      * send on in the clear what was meant to be encrypted, and the app's own
      * calls are never redirected that way (a probe handles an upgrade itself).
+     * Building the first client sets up TLS, tens of milliseconds, so none is
+     * built until it is used.
      */
-    val publicClient: OkHttpClient = base.newBuilder().followSslRedirects(false).addInterceptor(ReplyLimit()).addInterceptor(::userAgent).build()
-    /** API calls and images. */
-    val client: OkHttpClient = base.newBuilder()
-        .followSslRedirects(false)
-        .addInterceptor(ReplyLimit())
-        .addInterceptor(::userAgent)
-        .addInterceptor(::authorize)
-        .build()
+    private val plain: OkHttpClient by lazy { base().newBuilder().followSslRedirects(false).addInterceptor(::userAgent).build() }
+
+    /** Public probes and sign-in never inherit the current account's token. */
+    val publicClient: OkHttpClient by lazy { plain.newBuilder().addInterceptor(ReplyLimit()).addInterceptor(::reachable).build() }
+
+    /**
+     * Signed requests without the HTTP cache: images (the image loader keeps
+     * its own) and the event stream. A request goes as its [Credential] tag
+     * ([calls]), or else as the current sign-in.
+     */
+    val signedClient: OkHttpClient by lazy { publicClient.newBuilder().addInterceptor(::authorize).build() }
+
+    /**
+     * Media for the player and the downloader (PLAN-ANDROID-REVIEW.md
+     * §4.2.1): the shared pool and dispatcher, so the first playlist request
+     * reuses the API's connection. No token (media URLs carry theirs), no
+     * reply limit (files are gigabytes), no cache, and the player's timeouts:
+     * 15 s to connect, 45 s between reads, none on the whole call.
+     */
+    val mediaClient: OkHttpClient by lazy {
+        plain.newBuilder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(45, TimeUnit.SECONDS)
+            .callTimeout(0, TimeUnit.SECONDS)
+            .build()
+    }
+
+    /** Builds the clients now, on the caller's thread: the data layer calls it on an IO thread at start. */
+    fun warm() {
+        client
+        mediaClient
+    }
+
+    /**
+     * API calls, signed as [signedClient] is, with [cache] (PLAN-ANDROID-REVIEW.md
+     * §4.1.1): the server gives library reads a weak ETag and answers 304
+     * while it still matches, so a quiet reload costs a few hundred bytes.
+     * Only replies with an ETag are kept, and each is asked again before
+     * it is used ([revalidated]).
+     */
+    val client: OkHttpClient by lazy { signedClient.newBuilder().cache(cache).addNetworkInterceptor(::revalidated).build() }
 
     /**
      * Signing in and pairing follow no redirects at all: a 307 or 308 would
      * send the password, or the pairing secret that collects the token, on
      * to wherever it points.
      */
-    val authClient: OkHttpClient = publicClient.newBuilder().followRedirects(false).build()
+    val authClient: OkHttpClient by lazy { publicClient.newBuilder().followRedirects(false).build() }
 
     /**
      * Looking up an address someone typed: give up quickly. A redirect is
      * not followed but reported ([RedirectException]), for the probe to
      * follow the ones that stay on the same host.
      */
-    val probeClient: OkHttpClient = publicClient.newBuilder()
-        .followRedirects(false)
-        .addInterceptor(::reportRedirect)
-        .connectTimeout(4, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
-        .callTimeout(10, TimeUnit.SECONDS)
-        .build()
+    val probeClient: OkHttpClient by lazy {
+        publicClient.newBuilder()
+            .followRedirects(false)
+            .addInterceptor(::reportRedirect)
+            .connectTimeout(4, TimeUnit.SECONDS)
+            .readTimeout(8, TimeUnit.SECONDS)
+            .callTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
 
     /** The event stream: the server pings every 15 s, so silence for longer means the connection is gone. */
-    val streamClient: OkHttpClient = client.newBuilder()
-        .readTimeout(45, TimeUnit.SECONDS)
-        .callTimeout(0, TimeUnit.SECONDS)
-        .build()
+    val streamClient: OkHttpClient by lazy {
+        signedClient.newBuilder()
+            .readTimeout(45, TimeUnit.SECONDS)
+            .callTimeout(0, TimeUnit.SECONDS)
+            .build()
+    }
 
-    /** A client that sends [token] itself, for a server that is no longer the current one. */
-    fun withToken(token: String): OkHttpClient = publicClient.newBuilder().apply {
-        interceptors().add(0, Interceptor { it.proceed(it.request().newBuilder().header(AUTHORIZATION, "Bearer $token").build()) })
-    }.build()
+    /**
+     * Calls on [on] (the API client unless said) sent as [credential],
+     * whoever is signed in now: a sign-in captured earlier, an offline
+     * download's owner, a cast token, or a session being signed out. Each
+     * request carries the credential as its tag, so one client serves them
+     * all and [authorize] handles their 401s in one place.
+     */
+    fun calls(credential: Credential, on: OkHttpClient = client): Call.Factory = Call.Factory { request ->
+        on.newCall(request.newBuilder().tag(Credential::class.java, credential).build())
+    }
+
+    /** [token] as the account it signs in on [server]: a 401 clears that sign-in, unless it has been replaced. */
+    fun accountCredential(server: StoredServer, token: String) = Credential(server.baseUrl, token) { store.tokenRejected(server.id, token) }
 
     /** Runs [block] with the current server's base URL as the signed-in user. */
-    suspend fun <T> signedIn(block: suspend (baseUrl: String, client: OkHttpClient) -> T): T {
+    suspend fun <T> signedIn(block: suspend (baseUrl: String, client: Call.Factory) -> T): T {
         val (session, revision) = store.requestSnapshot()
         val result = bind(session).call(block)
         if (store.revision != revision) throw CancellationException("The signed-in account changed.")
@@ -92,6 +160,9 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
 
     /** The current server's API level as last read; 0 before one is chosen. */
     fun apiLevel(): Int = store.session()?.server?.apiLevel ?: 0
+
+    /** What the current server offers, by its level as last read. */
+    fun features(): ServerFeatures = ServerFeatures(apiLevel())
 
     /**
      * Access to the saved server [serverId] as [userId], whether or not it is
@@ -107,18 +178,12 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
     /** Bind an already captured atomic identity/revision snapshot (Live TV). */
     internal fun bind(session: Session?): ServerAccess {
         return object : ServerAccess {
-            override suspend fun <T> call(block: suspend (baseUrl: String, client: OkHttpClient) -> T): T {
+            override suspend fun <T> call(block: suspend (baseUrl: String, client: Call.Factory) -> T): T {
                 val account = session?.account ?: throw SignedOutException()
-                val token = withContext(Dispatchers.IO) { store.tokenForRequest(session.server.id, account) } ?: throw SignedOutException()
-                val baseUrl = session.server.baseUrl
-                val fixed = publicClient.newBuilder().addInterceptor { chain ->
-                    val request = chain.request()
-                    val signed = if (owns(baseUrl, request.url)) request.newBuilder().header(AUTHORIZATION, "Bearer $token").build() else request
-                    val response = chain.proceed(signed)
-                    if (response.code == 401) store.tokenRejected(session.server.id, token)
-                    response
-                }.build()
-                return Http.call(signedIn = true) { block(baseUrl, fixed) }
+                val token = Http.call(signedIn = true) { withContext(Dispatchers.IO) { store.tokenForRequest(session.server.id, account) } }
+                    ?: throw SignedOutException()
+                val calls = calls(accountCredential(session.server, token))
+                return Http.call(signedIn = true) { block(session.server.baseUrl, calls) }
             }
 
             // The bound server's level as refreshed since, which the start-up check may still change.
@@ -127,6 +192,39 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
                 return store.value.servers.firstOrNull { it.id == server.id }?.apiLevel ?: server.apiLevel
             }
         }
+    }
+
+    /**
+     * What the cache may keep, whatever a reply says: a 200 GET with an ETag,
+     * to be checked every time (no-cache), and nothing else (no-store). The
+     * server's ETag hashes the body, which depends on who asks, so a reply
+     * kept for one account comes back for another only when the server
+     * answers 304 to them: when their body is the same. A reply that called
+     * itself fresh for an hour would otherwise be used for anyone, unasked.
+     */
+    private fun revalidated(chain: Interceptor.Chain): Response {
+        val response = chain.proceed(chain.request())
+        if (chain.request().method != "GET") return response
+        val keep = response.code == 304 || response.code == 200 && response.header("ETag") != null
+        return response.newBuilder().header("Cache-Control", if (keep) "no-cache" else "no-store").removeHeader("Expires").build()
+    }
+
+    /**
+     * Away from the server's network, a call to it waited out the 10 s
+     * connect timeout before the offline Home could show
+     * (PLAN-ANDROID-REVIEW.md §4.1.6). With no network at all a call fails at
+     * once (this device itself still answers); an address on the local
+     * network, which answers within milliseconds when it is there, gets
+     * [PRIVATE_CONNECT_MS] to connect.
+     */
+    private fun reachable(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val host = request.url.host
+        if (!network.available && !isLoopbackHost(host)) throw NoNetworkException()
+        if (isPrivateHost(host) && chain.connectTimeoutMillis() > PRIVATE_CONNECT_MS) {
+            return chain.withConnectTimeout(PRIVATE_CONNECT_MS, TimeUnit.MILLISECONDS).proceed(request)
+        }
+        return chain.proceed(request)
     }
 
     private fun reportRedirect(chain: Interceptor.Chain): Response {
@@ -143,23 +241,37 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
         return chain.proceed(request.newBuilder().header("User-Agent", userAgent).build())
     }
 
+    /**
+     * The one place a token is added and a 401 handled. A request tagged with
+     * a [Credential] goes as that and nothing else; an untagged one (an image)
+     * as the current sign-in. Either way only to its server, and never to the
+     * sign-in call itself.
+     */
     private fun authorize(chain: Interceptor.Chain): Response {
         val request = chain.request()
-        val session = store.session()
-        val account = session?.account
-        if (account == null || request.header(AUTHORIZATION) != null || !owns(session.server.baseUrl, request.url) ||
-            request.url.encodedPath.endsWith(LOGIN_PATH)
-        ) {
-            return chain.proceed(request)
-        }
-        val token = store.tokenForRequest(session.server.id, account) ?: return chain.proceed(request)
-        val response = chain.proceed(request.newBuilder().header(AUTHORIZATION, "Bearer $token").build())
-        if (response.code == 401) store.tokenRejected(session.server.id, token)
+        if (request.header(AUTHORIZATION) != null || request.url.encodedPath.endsWith(LOGIN_PATH)) return chain.proceed(request)
+        val credential = request.tag(Credential::class.java) ?: current(request) ?: return chain.proceed(request)
+        if (!owns(credential.baseUrl, request.url)) return chain.proceed(request)
+        val response = chain.proceed(request.newBuilder().header(AUTHORIZATION, "Bearer ${credential.token}").build())
+        if (response.code == 401) credential.onRejected?.invoke()
         return response
+    }
+
+    /** The current sign-in, for an untagged [request] to the current server; its token is opened only then. */
+    private fun current(request: Request): Credential? {
+        val session = store.session() ?: return null
+        val account = session.account ?: return null
+        if (!owns(session.server.baseUrl, request.url)) return null
+        val token = store.tokenForRequest(session.server.id, account) ?: return null
+        return accountCredential(session.server, token)
     }
 
     companion object {
         const val AUTHORIZATION = "Authorization"
+        private const val TAG = "WatchMyMedia"
+
+        /** How long an address on the local network gets to connect ([reachable]). */
+        const val PRIVATE_CONNECT_MS = 3_000
         private const val LOGIN_PATH = "/api/auth/login"
 
         /** True when [url] is on the server at [baseUrl] (same origin, under its path): [isOnServer], which the player uses for media URLs too. */
@@ -170,6 +282,14 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
          * the server's message for a refused request, [SignedOutException] for
          * 401 when [signedIn], and a plain sentence for network trouble or a
          * reply it doesn't understand.
+         *
+         * [block] is the generated call alone; the caller maps its reply
+         * outside. The generated client fails with NullPointerException,
+         * ClassCastException and IllegalStateException on replies and
+         * addresses it can't use, so those are caught here, and a mistake in
+         * the app's own mapping inside [block] would have read as "That server
+         * address is not valid" (PLAN-ANDROID-REVIEW.md §3.4.3). A reply it
+         * doesn't understand is logged with its cause.
          */
         suspend fun <T> call(signedIn: Boolean, block: suspend () -> T): T = try {
             block()
@@ -182,22 +302,31 @@ internal class Http(base: OkHttpClient, private val store: LocalStore, private v
             throw ApiException(e.statusCode, detail((e.response as? ClientError<*>)?.body) ?: clientMessage(e.statusCode), e)
         } catch (e: ServerException) {
             throw ApiException(e.statusCode, detail((e.response as? ServerError<*>)?.body) ?: "The server had a problem (${e.statusCode}). Try again.", e)
+        } catch (e: TokenUnavailableException) {
+            throw ApiException(null, "Couldn't read this device's saved sign-in. Try again.", e)
         } catch (e: ReplyTooLargeException) {
-            throw ApiException(null, "The server sent a reply this app doesn't understand.", e)
+            throw notUnderstood(e, "The server sent a reply this app doesn't understand.")
         } catch (e: IOException) {
             throw ApiException(null, "Couldn't reach the server. Check the connection and try again.", e)
         } catch (e: SerializationException) {
-            throw ApiException(null, "The server sent a reply this app doesn't understand. Update the app or the server.", e)
+            throw notUnderstood(e, "The server sent a reply this app doesn't understand. Update the app or the server.")
         } catch (e: UnsupportedOperationException) {
             // The generated client met a reply that is not JSON: not a WatchMyMedia server, or a proxy's error page.
-            throw ApiException(null, "The server sent a reply this app doesn't understand.", e)
+            throw notUnderstood(e, "The server sent a reply this app doesn't understand.")
         } catch (e: NullPointerException) {
             // A success with no body: the generated client casts its null to the reply's type.
-            throw ApiException(null, "The server sent a reply this app doesn't understand.", e)
+            throw notUnderstood(e, "The server sent a reply this app doesn't understand.")
         } catch (e: ClassCastException) {
-            throw ApiException(null, "The server sent a reply this app doesn't understand.", e)
+            throw notUnderstood(e, "The server sent a reply this app doesn't understand.")
         } catch (e: IllegalStateException) {
+            // The generated client's "baseUrl is invalid."
             throw ApiException(null, "That server address is not valid.", e)
+        }
+
+        /** [message] for a reply the app can't read, with its cause logged, which the sentence alone would hide. */
+        private fun notUnderstood(e: Exception, message: String): ApiException {
+            Log.w(TAG, "a reply this app doesn't understand", e)
+            return ApiException(null, message, e)
         }
 
         /** The `detail` of the server's problem+json body, as a sentence. */

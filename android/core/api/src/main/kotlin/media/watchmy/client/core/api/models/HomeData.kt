@@ -40,19 +40,17 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param continueWatching 
- * @param recentlyAddedMovies 
- * @param recentlyAddedShows 
- * @param recentlyAired 
- * @param recentlyReleased 
- * @param totals 
- * @param hero 
- * @param lastScannedAt 
- * @param movieLibraryId 
+ * @param continueWatching
+ * @param recentlyAddedMovies
+ * @param recentlyAddedShows
+ * @param recentlyAired
+ * @param recentlyReleased
+ * @param totals
+ * @param hero
+ * @param lastScannedAt
+ * @param movieLibraryId
  * @param rows With arranged=true: Home's rows in the person's order, and continueWatching and the four arrays above are empty. The hero and totals are sent either way. From API level 22.
- * @param tvLibraryId 
+ * @param tvLibraryId
  */
 @Serializable
 

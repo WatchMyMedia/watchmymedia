@@ -37,16 +37,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param apiKeyHint Last four characters of the API key.
- * @param id 
- * @param kind 
- * @param name 
- * @param pathMap 
- * @param status 
- * @param targets 
- * @param url 
+ * @param id
+ * @param kind
+ * @param name
+ * @param pathMap
+ * @param status
+ * @param targets
+ * @param url
  */
 @Serializable
 
@@ -80,8 +78,6 @@ data class Integration (
 ) {
 
     /**
-     * 
-     *
      * Values: radarr,sonarr,seerr,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

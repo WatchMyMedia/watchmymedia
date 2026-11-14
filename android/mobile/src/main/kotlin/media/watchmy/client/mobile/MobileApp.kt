@@ -32,6 +32,7 @@ import media.watchmy.client.mobile.signin.SignInScreen
 import media.watchmy.client.model.DeepLink
 import media.watchmy.client.model.watchNextAccount
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.SessionViewModels
 import media.watchmy.client.ui.WatchMyMediaPhoneTheme
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.rememberTabletLayout
@@ -88,14 +89,16 @@ fun MobileApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
                     onLinkTv = { if (pending !is DeepLink.LinkTv) pending = DeepLink.LinkTv(null) },
                 )
                 else -> {
-                    // A different server or account starts the signed-in screens afresh, releasing its player.
+                    // A different server or account starts the signed-in screens afresh, with ViewModels of its own, releasing its player.
                     key(current.server.id, user) {
-                        MobileNavHost(
-                            onSwitchServer = { picking = true },
-                            onSignedOut = { pending = null },
-                            deepLink = pending,
-                            onDeepLinkHandled = { pending = null },
-                        )
+                        SessionViewModels {
+                            MobileNavHost(
+                                onSwitchServer = { picking = true },
+                                onSignedOut = { pending = null },
+                                deepLink = pending,
+                                onDeepLinkHandled = { pending = null },
+                            )
+                        }
                     }
                     if (picking) {
                         Surface(Modifier.fillMaxSize(), color = WmmColors.Ground) {

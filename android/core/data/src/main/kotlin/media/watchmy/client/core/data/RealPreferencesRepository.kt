@@ -1,5 +1,6 @@
 package media.watchmy.client.core.data
 
+import media.watchmy.client.model.ServerFeatures
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +26,6 @@ import media.watchmy.client.model.SubtitleChoice
 import media.watchmy.client.model.SubtitleSize
 import media.watchmy.client.model.SubtitlePreferences
 import media.watchmy.client.model.SubtitleMode
-import media.watchmy.client.model.SUBTITLE_PREFERENCES_API_LEVEL
 import media.watchmy.client.model.ApiException
 
 /**
@@ -98,7 +98,7 @@ internal class RealPreferencesRepository(private val store: LocalStore, private 
 
     override suspend fun setSubtitles(value: SubtitlePreferences) {
         val level = http.apiLevel()
-        if (level < SUBTITLE_PREFERENCES_API_LEVEL) throw ApiException(503, "Update the server to use subtitle preferences.")
+        if (!ServerFeatures(level).subtitlePreferences) throw ApiException(503, "Update the server to use subtitle preferences.")
         val immutable = value.copy(languages = value.languages.toList())
         change({ it.copy(subtitles = immutable) }) { before ->
             subtitlePatch(before.subtitles, immutable, level)?.let { UpdatePreferencesInputBody(subtitles = it) }
@@ -106,7 +106,7 @@ internal class RealPreferencesRepository(private val store: LocalStore, private 
     }
 
     override suspend fun setAudioLanguages(languages: List<String>): Boolean {
-        if (http.apiLevel() < AUDIO_LANGUAGES_API_LEVEL) throw ApiException(503, "Update the server to choose audio languages.")
+        if (!http.features().audioLanguages) throw ApiException(503, "Update the server to choose audio languages.")
         val list = languages.toList()
         var basedOn: SubtitleChoice? = null
         val saved = change({ it.copy(audio = AudioPreferences(list)) }) { before ->
@@ -220,7 +220,7 @@ internal class RealPreferencesRepository(private val store: LocalStore, private 
  * chosen (PLAN-LANGUAGES.md §5.3).
  */
 internal fun subtitlePatch(before: SubtitlePreferences, after: SubtitlePreferences, apiLevel: Int): UpdateSubtitlePreferences? {
-    val flag = apiLevel >= AUDIO_LANGUAGES_API_LEVEL
+    val flag = ServerFeatures(apiLevel).audioLanguages
     val choiceChanged = if (flag) before.choice != after.choice else before.mode != after.mode
     val patch = UpdateSubtitlePreferences(
         automaticDownload = after.automaticDownload.takeIf { it != before.automaticDownload },

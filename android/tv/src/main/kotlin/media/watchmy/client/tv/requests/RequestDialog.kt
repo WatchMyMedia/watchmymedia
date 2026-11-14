@@ -64,6 +64,10 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.WmmIcons
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
+import media.watchmy.client.presentation.requests.RequestFormViewModel
 
 /** A missing episode's colour on the TV, as ShowMissing.dc.html (Android TV) gives each state. */
 internal fun MissingEpisode.Kind.tvTone(): Color = when (this) {
@@ -123,27 +127,15 @@ internal fun TvDownloadBar(progress: Float, width: androidx.compose.ui.unit.Dp =
 @Composable
 internal fun RequestDialog(subject: Requestable, options: RequestOptions, onSent: (String) -> Unit, onDismiss: () -> Unit, only: Int? = null) {
     val services = LocalAppServices.current
-    val scope = rememberCoroutineScope()
-    var item by remember(subject.tmdbId) { mutableStateOf(subject) }
-    var picked by remember(subject.tmdbId, only) { mutableStateOf<Set<Int>?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    val isShow = subject.mediaType == MediaType.Tv
+    val form = viewModel(rememberViewModelStoreOwner()) { RequestFormViewModel(services.requests, subject, only) }
+    val state by form.state.collectAsStateWithLifecycle()
+    val item = state.item
+    val isShow = state.isShow
+    val error = state.error ?: state.lookupError
     val primary = remember { FocusRequester() }
-    LaunchedEffect(subject.tmdbId) {
-        try {
-            val found = services.requests.lookup(subject.mediaType, subject.tmdbId)
-            item = found
-            if (picked == null) picked = initialSeasonPicks(found.seasons.map { it.choice() }, only)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            error = errorMessage(e)
-        }
-    }
-    val choices = item.seasons.map { it.choice() }
-    val chosen = picked.orEmpty().filter { n -> choices.any { it.number == n && !it.locked } }
-    val count = if (isShow) chosen.size else 1
+    LaunchedEffect(state.sent) { if (state.sent) onSent(options.requestedMessage) }
+    val choices = state.choices
+    val chosen = state.chosen
 
     TvDialog(onDismiss) {
         Box(Modifier.fillMaxSize().background(WmmColors.Ground)) {
@@ -167,35 +159,15 @@ internal fun RequestDialog(subject: Requestable, options: RequestOptions, onSent
             Column(Modifier.offset(440.dp, 150.dp).width(580.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Kicker("Request")
                 Text(item.title, style = inter(56.sp, FontWeight.ExtraBold, lineHeight = 59.sp, tracking = -0.025f), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                val seasons = item.seasons.count { it.number > 0 }
-                val meta = listOfNotNull(
-                    item.year?.toString(),
-                    if (isShow && seasons > 0) "$seasons season${if (seasons == 1) "" else "s"}" else null,
-                    if (isShow) "TV show" else "Movie",
-                ).joinToString(" · ")
+                val meta = listOf(state.meta, if (isShow) "TV show" else "Movie").filter { it.isNotEmpty() }.joinToString(" · ")
                 Text(meta, style = inter(21.sp), color = TextBright)
                 if (item.overview.isNotBlank()) {
                     Text(item.overview, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.TextSoft, maxLines = 4, overflow = TextOverflow.Ellipsis)
                 }
                 Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                     TvButton(
-                        if (busy) "Requesting…" else requestButtonLabel(subject.mediaType, count),
-                        onClick = {
-                            if (busy || count == 0 || (isShow && choices.isEmpty())) return@TvButton
-                            busy = true
-                            error = null
-                            scope.launch {
-                                try {
-                                    services.requests.request(subject.mediaType, subject.tmdbId, if (isShow) chosen.sorted() else emptyList())
-                                    onSent(options.requestedMessage)
-                                } catch (e: CancellationException) {
-                                    throw e
-                                } catch (e: Exception) {
-                                    error = errorMessage(e)
-                                }
-                                busy = false
-                            }
-                        },
+                        if (state.busy) "Requesting…" else state.buttonLabel,
+                        onClick = form::send,
                         // Stays focusable with nothing ticked (it reads "Request" and does nothing), so focus
                         // starts here while the seasons load and doesn't jump when the last one is unticked.
                         modifier = Modifier.focusRequester(primary),
@@ -224,10 +196,7 @@ internal fun RequestDialog(subject: Requestable, options: RequestOptions, onSent
                         if (c.locked) {
                             SeasonRow(c.name, c.detail, c.state, icon = if (s.availability == SeasonAvailability.Available) WmmIcons.CheckCircle else WmmIcons.Clock, ticked = false, onClick = null)
                         } else {
-                            SeasonRow(c.name, c.detail, c.state, icon = null, ticked = ticked) {
-                                val now = picked.orEmpty()
-                                picked = if (c.number in now) now - c.number else now + c.number
-                            }
+                            SeasonRow(c.name, c.detail, c.state, icon = null, ticked = ticked) { form.toggle(c.number) }
                         }
                     }
                 }

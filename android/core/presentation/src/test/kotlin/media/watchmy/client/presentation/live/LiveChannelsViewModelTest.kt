@@ -2,7 +2,9 @@ package media.watchmy.client.presentation.live
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -176,5 +178,47 @@ class LiveChannelsViewModelTest {
         advanceUntilIdle()
         assertNull(vm.state.value.error)
         assertFalse(vm.state.value.loading)
+    }
+
+    @Test
+    fun `the list is polled quietly only while a screen showing channels is on screen`() = runTest(main.dispatcher) {
+        val vm = LiveChannelsViewModel(live, servers, auth, clock = { testScheduler.currentTime })
+        advanceUntilIdle()
+        assertEquals(1, live.channelCalls)
+        val loaded = vm.state.value
+        val states = mutableListOf<LiveChannelsViewModel.State>()
+        backgroundScope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { states += it } }
+
+        // Nothing on screen shows channels (a film plays): nothing is asked.
+        advanceTimeBy(5 * LiveChannelsViewModel.POLL_MS)
+        assertEquals(1, live.channelCalls)
+
+        val home = Any()
+        val guide = Any()
+        vm.showing(home, true)
+        runCurrent()
+        assertEquals("long since the last ask: at once", 2, live.channelCalls)
+        vm.showing(guide, true)
+        vm.showing(home, false)
+        advanceTimeBy(LiveChannelsViewModel.POLL_MS + 1)
+        assertEquals(3, live.channelCalls)
+        assertEquals("quiet: no loading, and nothing new to draw", listOf(loaded), states)
+
+        vm.showing(guide, false)
+        advanceTimeBy(3 * LiveChannelsViewModel.POLL_MS)
+        assertEquals(3, live.channelCalls)
+    }
+
+    @Test
+    fun `a refresh with a list on screen keeps it, says why it failed, and doesn't show loading`() = runTest(main.dispatcher) {
+        val vm = model()
+        advanceUntilIdle()
+        live.failure = ApiException(500, "Tuner busy")
+        vm.refresh()
+        runCurrent()
+        assertFalse(vm.state.value.loading)
+        advanceUntilIdle()
+        assertEquals(listOf(channel, weather), vm.state.value.channels)
+        assertEquals("Tuner busy", vm.state.value.error)
     }
 }

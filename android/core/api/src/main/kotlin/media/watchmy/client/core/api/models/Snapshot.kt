@@ -34,18 +34,16 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param activeDownloads 
- * @param activeViews 
- * @param configuredBps 
- * @param deliveredBps 
- * @param deliveredBytes 
- * @param enforcing 
- * @param generation 
- * @param pacedBytes 
- * @param reservedBps 
- * @param waitNanos 
+ * @param activeDownloads
+ * @param activeViews
+ * @param configuredBps
+ * @param deliveredBps
+ * @param deliveredBytes
+ * @param enforcing
+ * @param generation
+ * @param pacedBytes
+ * @param reservedBps
+ * @param waitNanos
  * @param policyRevision Changes only when the configured upload policy changes; use to avoid overwriting another admin's edit. Absent on older servers.
  */
 @Serializable

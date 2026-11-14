@@ -48,7 +48,6 @@ import media.watchmy.client.model.besides
 import media.watchmy.client.model.codeBadge
 import media.watchmy.client.model.playRequest
 import media.watchmy.client.model.subtitle
-import media.watchmy.client.presentation.Load
 import media.watchmy.client.tv.components.ArtBadge
 import media.watchmy.client.tv.components.ArtProgress
 import media.watchmy.client.tv.components.ArtWatched
@@ -70,7 +69,7 @@ import media.watchmy.client.tv.components.TvScaffold
 import media.watchmy.client.tv.components.focusMemory
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.tv.components.rememberFocusMemory
-import media.watchmy.client.tv.library.gridSubtitle
+import media.watchmy.client.presentation.library.gridSubtitle
 import media.watchmy.client.tv.requests.RequestDialog
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
@@ -83,6 +82,24 @@ import media.watchmy.client.model.LiveSearchHit
 import media.watchmy.client.presentation.live.LiveSearchViewModel
 import media.watchmy.client.tv.components.LocalLiveTVAvailable
 import media.watchmy.client.tv.live.TvLiveSearchRow
+import media.watchmy.client.presentation.search.SearchViewModel
+import media.watchmy.client.presentation.search.isEmpty
+import media.watchmy.client.ui.rememberModelTextField
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import media.watchmy.client.tv.components.FocusableBox
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.foundation.layout.height
+import media.watchmy.client.tv.components.TvKeyboardOpener
+import media.watchmy.client.ui.onBack
 
 /** Where the results start: right of the keyboard (154 + 712 + 60). */
 private val ResultsStart = 926.dp
@@ -104,8 +121,10 @@ fun SearchScreen(
     onOpenLive: (LiveSearchHit) -> Unit = {},
 ) {
     val services = LocalAppServices.current
-    val vm = viewModel { SearchViewModel(services.library, requests = services.requests, saved = createSavedStateHandle()) }
+    val vm = viewModel { SearchViewModel(services.library, auth = services.auth, requests = services.requests, saved = createSavedStateHandle()) }
     val state by vm.state.collectAsStateWithLifecycle()
+    // The field holds its text (§3.3.3), which the keyboard edits; the model searches a moment after it changes.
+    val query = rememberModelTextField(state.query, state.revision, vm::setQuery)
     // On Live TV (android-tv/LiveSearch): the listings' titles too, from API level 15 with Live TV.
     val liveTv = LocalLiveTVAvailable.current
     val liveSearch = viewModel(key = "tv-live-search") { LiveSearchViewModel(createSavedStateHandle(), services.live, services.servers) }
@@ -118,34 +137,70 @@ fun SearchScreen(
     var asking by remember { mutableStateOf<Requestable?>(null) }
     val firstKey = remember { FocusRequester() }
     val memory = rememberFocusMemory()
+    // Voice typing in the app (TvSearchKeyboard.dc.html): what is heard fills the box as it is said.
+    val voice = rememberVoiceTyping { query.setTextAndPlaceCursorAtEnd(it) }
+    val pressMic = rememberVoicePress(voice)
+    val listening = voice.state == Voice.Listening
+    val tvKeyboard = remember { TvKeyboardOpener() }
 
     TvScaffold(RailSection.Search, onNavigate) {
-        Column(Modifier.padding(start = ContentStart, top = 56.dp).width(712.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        // Back while listening stops it now, before anything else takes Back.
+        Column(
+            Modifier.padding(start = ContentStart, top = 56.dp).width(712.dp).onBack(enabled = listening, onBack = voice::stop),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
             Text("Search", style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
-            KeyboardField(state.query, placeholder = if (withLive) "Titles of shows, movies, episodes or Live TV programmes" else "Titles of shows, movies or episodes", active = true)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                // ▲ from the keyboard's top row comes here, and ▶ from here to the microphone; OK opens the TV's keyboard.
+                FocusableBox(onClick = tvKeyboard::open, modifier = Modifier.weight(1f), cornerRadius = 14.dp, focusedScale = 1f, ringOffset = 0.dp) {
+                    KeyboardField(
+                        query.text.toString(),
+                        placeholder = if (withLive) "Titles of shows, movies, episodes or Live TV programmes" else "Titles of shows, movies or episodes",
+                        active = true,
+                        dim = listening,
+                    )
+                }
+                if (voice.available) MicKey(listening, pressMic)
+            }
+            voiceLine(voice.state)?.let { line -> VoiceLine(line, listening) }
             OnScreenKeyboard(
-                onText = vm::type,
-                onBackspace = vm::backspace,
+                field = query,
+                modifier = Modifier.alpha(if (listening) 0.4f else 1f),
                 onDone = vm::clear,
                 doneLabel = "Clear",
                 firstKey = firstKey,
+                note = (if (voice.available) "" else "No microphone key: this TV doesn’t offer speech recognition to apps. ") +
+                    "Accents and other alphabets come from the TV’s keyboard. Back or its Done returns here. Every field that uses this keyboard gets the same key, passwords included.",
+                opener = tvKeyboard,
             )
         }
+        if (!listening) KeyHints(voice.available, Modifier.align(Alignment.BottomStart).padding(start = ContentStart, bottom = 40.dp))
         Box(Modifier.fillMaxSize().padding(start = ResultsStart - ContentStart)) {
-            when (val r = state.results) {
-                null -> Hint("Find anything in your library", "Type part of a title. Shows, movies and episodes appear here as you type.")
-                Load.Loading -> LoadingState()
-                is Load.Failed -> ErrorState(r.message, vm::retry, title = "Search didn't work")
-                is Load.Ready -> if (r.data.isEmpty() && state.requestable.isEmpty() && (liveRow == null || live.results.isEmpty())) {
-                    Hint("Nothing matches", "No titles in your library match “${state.query.trim()}”.")
-                } else {
-                    Results(r.data, state.requestable, services.library, memory, onOpenShow, onOpenMovie, onPlay, onAsk = { asking = it }, viaSeerr = state.options.viaSeerr, onOpenEpisode = onOpenEpisode, liveRow = liveRow)
-                }
+            val results = state.results
+            when {
+                state.error != null -> ErrorState(state.error!!, vm::retry, title = "Search didn't work")
+                state.query.isBlank() -> Hint("Find anything in your library", "Type part of a title. Shows, movies and episodes appear here as you type.")
+                results == null -> LoadingState()
+                results.isEmpty() && state.requestable.isEmpty() && (liveRow == null || live.results.isEmpty()) ->
+                    Hint("Nothing matches", "No titles in your library match “${state.resultsFor}”.")
+                else -> Results(results, state.requestable, services.library, memory, onOpenShow, onOpenMovie, onPlay, onAsk = { asking = it }, viaSeerr = state.options.viaSeerr, onOpenEpisode = onOpenEpisode, liveRow = liveRow)
             }
         }
-        Notice(state.notice, vm::noticeShown)
+        Notice(state.message, vm::messageShown)
     }
-    InitialFocus(firstKey)
+    // Back from a result puts focus back on it (§3.2.3); a first visit starts on the keyboard.
+    val returning = remember { memory.key != null }
+    if (returning) {
+        LaunchedEffect(Unit) {
+            repeat(10) {
+                withFrameNanos { }
+                if (memory.restore(fallback = null)) return@LaunchedEffect
+            }
+            runCatching { firstKey.requestFocus() }
+        }
+    } else {
+        InitialFocus(firstKey)
+    }
 
     asking?.let { item ->
         RequestDialog(
@@ -299,5 +354,76 @@ private fun PosterSection(title: String, items: List<BrowseItem>, library: Libra
                 }
             }
         }
+    }
+}
+
+/**
+ * The microphone beside Search's box: "Voice typing", or gold and ringed
+ * with "Stop listening" while it listens (`.mic.live`).
+ */
+@Composable
+private fun MicKey(listening: Boolean, onPress: () -> Unit) {
+    FocusableBox(
+        onClick = onPress,
+        cornerRadius = 36.dp,
+        focusedScale = 1.06f,
+        modifier = Modifier.size(72.dp).semantics { contentDescription = if (listening) "Stop listening" else "Voice typing" },
+    ) { focused ->
+        Box(
+            Modifier
+                .fillMaxSize()
+                .then(if (listening) Modifier.drawBehind { drawRings() } else Modifier)
+                .background(
+                    when {
+                        listening -> WmmColors.Accent
+                        focused -> WmmColors.Surface3
+                        else -> WmmColors.Surface2
+                    },
+                    CircleShape,
+                )
+                .border(1.dp, if (listening) WmmColors.Accent else WmmColors.Line2, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(WmmIcons.Microphone, contentDescription = null, tint = if (listening) WmmColors.OnAccent else WmmColors.Text, modifier = Modifier.size(30.dp))
+        }
+    }
+}
+
+/** The live microphone's two gold rings, 10 and 22 dp out. */
+private fun DrawScope.drawRings() {
+    drawCircle(WmmColors.Accent.copy(alpha = 0.08f), radius = size.minDimension / 2 + 22.dp.toPx())
+    drawCircle(WmmColors.Accent.copy(alpha = 0.22f), radius = size.minDimension / 2 + 10.dp.toPx())
+}
+
+/** Under the box: listening (gold, with a dot), or why the microphone can't listen. */
+@Composable
+private fun VoiceLine(text: String, listening: Boolean) {
+    Row(Modifier.semantics { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (listening) Box(Modifier.size(12.dp).background(WmmColors.Accent, CircleShape))
+        Text(text, style = inter(20.sp, lineHeight = 28.sp), color = if (listening) WmmColors.Accent else WmmColors.TextMuted)
+    }
+}
+
+/** The board's key hints at the foot of the keyboard, while typing. */
+@Composable
+private fun KeyHints(mic: Boolean, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        if (mic) {
+            KeyCap("▲")
+            Text("From the top row: the search box, and ▶ from there the microphone", style = inter(19.sp), color = WmmColors.TextSoft)
+            Box(Modifier.width(18.dp))
+        }
+        KeyCap("▼")
+        Text("From the bottom row: the TV’s keyboard", style = inter(19.sp), color = WmmColors.TextSoft)
+    }
+}
+
+@Composable
+private fun KeyCap(key: String) {
+    Box(
+        Modifier.height(34.dp).border(2.dp, WmmColors.Text.copy(alpha = 0.32f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(key, style = inter(16.sp, FontWeight.Bold), color = WmmColors.Text)
     }
 }

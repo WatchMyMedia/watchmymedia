@@ -39,17 +39,15 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param id On Home: continue, live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>.
  * @param style How to draw it: poster (items), wide (items as 16:9 cards), episode (episodes), continue (continue) or live (no items: draw the app's Live TV row in this place). A plain string: skip a row whose style you don't know.
- * @param title 
+ * @param title
  * @param `continue` Style continue.
  * @param episodes Style episode.
  * @param items Styles poster and wide.
  * @param listId Lists: the list's ID.
- * @param seeAll 
- * @param source 
+ * @param seeAll
+ * @param source
  * @param subtitle Lists: how many of the list's titles the library has, and where it is from.
  */
 @Serializable

@@ -36,19 +36,17 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param connectionId 
- * @param counts 
- * @param generation 
+ * @param connectionId
+ * @param counts
+ * @param generation
  * @param history complete, unavailable, partial, not_read or disabled. History is independent of watched marks.
- * @param id 
- * @param phase 
- * @param startedAt 
- * @param status 
- * @param finishedAt 
+ * @param id
+ * @param phase
+ * @param startedAt
+ * @param status
+ * @param finishedAt
  * @param historyCoverage Per mapped person/library, the source window read by this run. Complete means fully traversed, not complete lifetime history. Details expire with run/privacy retention.
- * @param reason 
+ * @param reason
  */
 @Serializable
 
@@ -92,8 +90,6 @@ data class PlexRun (
 ) {
 
     /**
-     * 
-     *
      * Values: queued,running,complete,partial,failed,cancelled,unknown_default_open_api
      */
     @Serializable(with = StatusSerializer::class)

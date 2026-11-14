@@ -34,12 +34,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param downloads 
+ * @param downloads
  * @param languages Languages to search, in order (ISO 639-1, pt-br style for regions).
- * @param password 
- * @param username 
+ * @param password
+ * @param username
  */
 @Serializable
 
@@ -61,8 +59,6 @@ data class SubtitlesUpdate (
 ) {
 
     /**
-     * 
-     *
      * Values: everyone,admins,unknown_default_open_api
      */
     @Serializable(with = DownloadsSerializer::class)

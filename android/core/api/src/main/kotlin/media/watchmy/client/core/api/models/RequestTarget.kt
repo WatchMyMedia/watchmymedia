@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param libraryId 
- * @param qualityProfileId 
+ * @param libraryId
+ * @param qualityProfileId
  * @param rootFolder One of the app's root folders, as the app sees it.
  */
 @Serializable

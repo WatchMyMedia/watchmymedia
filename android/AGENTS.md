@@ -35,7 +35,10 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   ones (as `PlaybackProfile.forApiLevel` does) and it is not sent at all.
 - **Server levels.** A feature that needs a newer server is gated on the
   server's `apiLevel` and hidden below it; the app's minimum level does not
-  move for it. The app refreshes the level at each sign-in and at start.
+  move for it. Gate with `ServerFeatures` in `core:model` (named booleans:
+  `http.features().rows`), and give a new level its boolean there. The app
+  refreshes the level at each sign-in, at start and when the event stream
+  reconnects.
 - **Mirrors.** `core/cast`'s `CastProtocol` mirrors `web/src/cast/protocol.ts`;
   the wording in `core:model` and `core:ui` matches the Apple apps'. Change
   both sides together.
@@ -47,12 +50,44 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   ViewModel in `core:presentation`, tested there against the fakes; the TV
   and phone screens only draw it. Where the two UIs used to differ, the
   Apple apps' `WMMFeatures` models decide.
+- **Server changes.** A page's ViewModel reloads for `libraryChanges`
+  (core:model's `LibraryChange`, with the items and libraries an event
+  names) through `Freshness` in core:presentation, which ignores changes
+  that aren't the page's and holds them while the page is hidden. Its
+  screen calls `ReportShown(vm::setShown)` (core:ui) once, so a page under
+  another one, or with the app in the background, reloads when next shown
+  rather than with every event. Tests drive `libraryChanges`, not `changes`.
+- **Text fields.** A field holds its own text in a `TextFieldState`
+  (`rememberModelTextField` in core:ui) and tells the ViewModel what is
+  typed; a ViewModel that sets the text itself (cleared, a recent search,
+  the form started over) moves its state's `revision` on. Driving a field
+  through a StateFlow lost characters to fast typing and paste. The TV's
+  `OnScreenKeyboard(field = …)` edits the same state and offers "Use the
+  TV's keyboard".
+- **Live TV polling.** The channel list is polled only while a screen that
+  shows channels is on screen: such a screen or row calls
+  `ShowsLiveChannels()` (core:ui) once. Nothing else polls it.
 - **Stored settings in tests.** `LocalStore` writes behind: a change is in
   memory at once and on disk a moment later. In `core:data` tests, write
   storage with `Harness.editStorage`, not `dataStore.edit`, and reopen with
   `Harness.reopen`. Both wait for the writes still running, which would
   otherwise land over the test's: `StoredSettingsFormatTest` failed on CI
-  that way.
+  that way. `Harness.reopen` also waits for the old instance's sign-in
+  checks, which wrote the old sign-in back once when they finished late.
+  Request options, Live TV capabilities and the library list are kept per
+  sign-in (`SessionMemo`): a test that asks twice in one sign-in moves
+  `h.now` past `SessionMemo.TTL_MS` first.
+- **Crypto under Robolectric.** Robolectric installs Conscrypt, beside
+  which the JDK's AES-GCM fails to load ("Framework jar verification can
+  not be initialized"). A test that seals with a JVM key runs with
+  `@ConscryptMode(ConscryptMode.Mode.OFF)`, as `TokenSealerTest` does.
+- **Pipes under Robolectric.** `ParcelFileDescriptor.createPipe` is a
+  temporary file there, not a pipe: a read that comes before the writer
+  finishes finds nothing. Join the writer first, as `WatchNextArtTest` does.
+- **The fakes follow the wall clock.** Their Live TV schedule, and the two
+  reminders they seed for tonight, come from the time the test runs. While
+  a reminder is due, the TV's banner takes Back first, so a test that runs
+  the whole TV app and presses Back uses `quietTvFakes()` (tv tests).
 - **Build conventions.** The settings modules share (SDK levels, Java and
   Kotlin targets, test options, Compose) are set by the plugins in
   `build-logic/` (README, "Build conventions"); a module's build file holds
@@ -88,6 +123,30 @@ Lint warnings that were already on `main` are not yours to fix in passing.
 - **The fakes' artwork** is fictional and lives in `core/fake/src/fakes/assets`,
   a source set only `-Pfakes=true` builds include, so a release APK carries
   no sample art. `FakeData.backdrop` names a file there; posters stay null.
+- **The player's thread in tests.** ExoPlayer throws when read off its own
+  thread. Controller tests give the controller a separate IO dispatcher
+  (`OffMainDispatcher` in `core/playback`'s `Fakes.kt`), on whose tasks
+  `FakeMediaPlayer` throws the same way; with one dispatcher for both, Live
+  TV's Automatic heartbeat read the player inside `withContext(io)` unseen.
+  Read the player on the main thread, then call the server.
+- **Media3's download service from the background.** On Android 12 and
+  later, never start `WmmDownloadService` from a job or receiver: Media3's
+  `DownloadService` calls `startForeground` unguarded once a download runs,
+  which Android refuses from the background. `DownloadRestarts` runs the
+  `DownloadManager` itself from its WorkManager job instead.
+- **Start-up work.** `WatchMyMediaApp.onCreate` runs for every process
+  start: a reminder's alarm, the download service and WorkManager jobs
+  start the process too. Work only someone using the app needs waits for
+  the first `ON_START` (`FirstForeground`), as the Cast SDK does;
+  WorkManager starts on first use (the manifest removes its initializer).
+  Debug builds log StrictMode findings to logcat. A main-thread disk read
+  the start-up makes on purpose runs in `allowingStartupReads`; anything
+  else it logs is a finding to fix, not to allow.
+- **Baseline profile.** CI's android job fails when the committed profiles
+  have many rules for classes that are gone
+  (`deploy/ci/baseline_profile.py`). Generate them again (README,
+  "Baseline profile") rather than loosening the check. The journeys find
+  screens by `TestTags`; keep a tag when you rework its screen.
 - **Focus tests and cleared semantics.** `HomeFocusTest` finds the focused
   element by its `Focused` semantics. A card that `clearAndSetSemantics` to
   read as one thing must set `focused` itself (as `TvOnNowCard` does), or the

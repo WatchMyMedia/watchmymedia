@@ -34,14 +34,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param columns 
+ * @param columns
  * @param count Tiles in all; the last sheet is partly filled.
  * @param height A tile's height in pixels.
- * @param intervalMs 
- * @param rows 
- * @param sheets 
+ * @param intervalMs
+ * @param rows
+ * @param sheets
  * @param url A sheet's URL: replace {sheet} with its number, from 0. It names the version of the thumbnails, so a sheet can be cached for good.
  * @param width A tile's width in pixels.
  */

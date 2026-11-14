@@ -25,6 +25,8 @@ import media.watchmy.client.model.markWatched
 import media.watchmy.client.model.markedMessage
 import media.watchmy.client.model.watchTarget
 import media.watchmy.client.model.withWatched
+import media.watchmy.client.presentation.Freshness
+import media.watchmy.client.presentation.ShownPage
 
 /**
  * Home for phones, tablets and TV. With [rows] on a server that arranges them
@@ -32,7 +34,7 @@ import media.watchmy.client.model.withWatched
  * order ([HomeData.rows]) and is read again when its layout or a list
  * changes; otherwise it keeps its fixed rows.
  */
-class HomeViewModel(private val library: LibraryRepository, auth: AuthRepository? = null, private val rows: RowsRepository? = null) : ViewModel() {
+class HomeViewModel(private val library: LibraryRepository, auth: AuthRepository? = null, private val rows: RowsRepository? = null) : ViewModel(), ShownPage {
     data class State(
         val home: HomeData? = null,
         val loading: Boolean = true,
@@ -57,11 +59,16 @@ class HomeViewModel(private val library: LibraryRepository, auth: AuthRepository
 
     private var job: Job? = null
 
+    /** Continue watching and Recently added follow every kind of change, and Home's layout its own. */
+    private val freshness = Freshness(viewModelScope) { load(quiet = true) }
+
     init {
         load()
-        viewModelScope.launch { library.changes.collect { load(quiet = true) } }
-        rows?.let { r -> viewModelScope.launch { r.changes.collect { if (it.affects(RowScreens.HOME)) load(quiet = true) } } }
+        freshness.follow(library.libraryChanges)
+        rows?.let { r -> freshness.follow(r.changes) { it.affects(RowScreens.HOME) } }
     }
+
+    override fun setShown(shown: Boolean) = freshness.setShown(shown)
 
     fun retry() = load()
 

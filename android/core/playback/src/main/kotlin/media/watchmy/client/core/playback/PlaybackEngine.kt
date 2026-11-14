@@ -9,8 +9,10 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import media.watchmy.client.core.playback.player.ExoMediaPlayer
 import media.watchmy.client.core.playback.player.PlayerOptions
+import media.watchmy.client.core.playback.player.mediaHttpClient
 import media.watchmy.client.core.playback.profile.DeviceProfileProvider
 import media.watchmy.client.core.playback.session.AndroidMediaSessionHost
+import media.watchmy.client.core.playback.watchnext.TvPreviewChannel
 import media.watchmy.client.core.playback.watchnext.TvWatchNext
 import media.watchmy.client.core.playback.watchnext.WatchNext
 import media.watchmy.client.core.playback.watchnext.WatchNextLibrary
@@ -25,6 +27,8 @@ import media.watchmy.client.model.PlaybackControllerFactory
 import media.watchmy.client.model.PlaybackGateway
 import media.watchmy.client.model.PlaybackPlan
 import media.watchmy.client.model.PreferencesRepository
+import media.watchmy.client.model.userAgent
+import okhttp3.OkHttpClient
 
 /**
  * The app's player: one for the app (build it in `Application.onCreate`,
@@ -48,9 +52,15 @@ class PlaybackEngine(
     private val playerSources: (DataSource.Factory) -> DataSource.Factory = { it },
     /** Fetches the notification's and lock screen's pictures signed in to the server (the app's image loader). */
     artwork: BitmapLoader? = null,
+    /**
+     * The app's HTTP client without the API's sign-in, whose connection pool
+     * the players share ([mediaHttpClient]); asked for with the first player.
+     */
+    httpClient: () -> OkHttpClient = ::OkHttpClient,
 ) : PlaybackControllerFactory {
     private val app = context.applicationContext
-    private val userAgent = "WatchMyMedia/${client.version} (${client.platform}; Android ${Build.VERSION.RELEASE})"
+    /** What the players and the downloader say they are, as the API's requests do. */
+    val userAgent = userAgent(client, Build.VERSION.RELEASE)
 
     /**
      * This device's profile, rebuilt when the HDMI output or audio route
@@ -68,6 +78,7 @@ class PlaybackEngine(
     private val lookups: PlaybackLookups = library?.let(::LibraryLookups) ?: PlaybackLookups.None
     private val network = SystemMeteredNetwork(app)
     private val lowRam = app.getSystemService(ActivityManager::class.java)?.isLowRamDevice == true
+    private val playerHttp: OkHttpClient by lazy { mediaHttpClient(httpClient()) }
 
     override fun create(): PlaybackController = build(gateway, preferences, watchNext.bind(), lookups)
 
@@ -86,7 +97,7 @@ class PlaybackEngine(
             gateway = gateway,
             preferences = preferences,
             client = client,
-            playerFactory = { ExoMediaPlayer(app, userAgent, PlayerOptions.of(this.preferences.device.value, isTv, lowRam)) },
+            playerFactory = { ExoMediaPlayer(app, userAgent, playerHttp, PlayerOptions.of(this.preferences.device.value, isTv, lowRam)) },
             sessions = sessions,
             visibility = ProcessVisibility,
             network = network,
@@ -94,14 +105,20 @@ class PlaybackEngine(
         )
     }
 
-    fun setWatchNextAccount(account: String?) { (watchNext as? TvWatchNext)?.selectAccount(account) }
+    /** The launcher's preview channel (Recently added), on a TV. */
+    private val previewChannel: TvPreviewChannel? = if (isTv) TvPreviewChannel(app, watchNextAccount) else null
+
+    fun setWatchNextAccount(account: String?) {
+        (watchNext as? TvWatchNext)?.selectAccount(account)
+        previewChannel?.selectAccount(account)
+    }
 
     /**
      * [library] as the screens should use it: on a TV, Home's loads and the
      * marks keep the launcher's Watch Next row in step ([WatchNextLibrary]).
      */
     fun screensLibrary(library: LibraryRepository): LibraryRepository =
-        if (watchNext is TvWatchNext) WatchNextLibrary(library, watchNext) else library
+        if (watchNext is TvWatchNext) WatchNextLibrary(library, watchNext, channel = previewChannel) else library
 
     /**
      * A player that talks to the server through [gateway] with [preferences]
@@ -119,13 +136,14 @@ class PlaybackEngine(
             client = client,
             profileProvider = profiles,
             // This device's settings, even for a play cast to it, which runs as someone else.
-            playerFactory = { ExoMediaPlayer(app, userAgent, PlayerOptions.of(this.preferences.device.value, isTv, lowRam), playerSources) },
+            playerFactory = { ExoMediaPlayer(app, userAgent, playerHttp, PlayerOptions.of(this.preferences.device.value, isTv, lowRam), playerSources) },
             stillWatching = stillWatching,
             watchNext = watchNext,
             sessions = sessions,
             visibility = ProcessVisibility,
             lookups = lookups,
             network = network,
+            stopInBackground = isTv,
         )
 
     /** Plans for this device's profile at the default quality for the network in use. */

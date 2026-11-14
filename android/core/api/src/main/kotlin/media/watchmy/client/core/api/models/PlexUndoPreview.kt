@@ -34,13 +34,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param expiresAt 
- * @param id 
- * @param localKept 
- * @param runId 
- * @param willUndo 
+ * @param expiresAt
+ * @param id
+ * @param localKept
+ * @param runId
+ * @param willUndo
  */
 @Serializable
 

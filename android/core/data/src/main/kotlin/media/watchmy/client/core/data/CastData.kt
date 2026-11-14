@@ -1,8 +1,11 @@
 package media.watchmy.client.core.data
 
+import media.watchmy.client.model.ServerFeatures
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,21 +29,24 @@ import media.watchmy.client.model.SkipMode
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleSize
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import okhttp3.OkHttpClient
+import okhttp3.Call
 import java.net.URLEncoder
 
-/** How a gateway reaches the server: its base URL, and an HTTP client that signs the request in. */
+/** How a gateway reaches the server: its base URL, and calls that sign the request in. */
 internal interface ServerAccess {
-    suspend fun <T> call(block: suspend (baseUrl: String, client: OkHttpClient) -> T): T
+    suspend fun <T> call(block: suspend (baseUrl: String, client: Call.Factory) -> T): T
     fun bind(): ServerAccess = this
 
     /** The server's API level as last read, which decides what a request may carry. */
     fun apiLevel(): Int
+
+    /** What the server offers at [apiLevel]. */
+    fun features(): ServerFeatures = ServerFeatures(apiLevel())
 }
 
 /** As this device's signed-in user, on the server in use. */
 internal class SignedInAccess(private val http: Http) : ServerAccess {
-    override suspend fun <T> call(block: suspend (baseUrl: String, client: OkHttpClient) -> T): T =
+    override suspend fun <T> call(block: suspend (baseUrl: String, client: Call.Factory) -> T): T =
         http.signedIn(block)
 
     override fun bind(): ServerAccess = http.bind()
@@ -61,15 +67,15 @@ internal class CastTokenAccess(
     private val apiLevel: Int,
 ) : ServerAccess {
     private val lock = Mutex()
-    private var current = token to http.withToken(token)
+    private var current = http.calls(Credential(baseUrl, token))
     private var expiresAt = expiresAtMs
 
     /** The cast token in use: the sender's, then each renewed one. */
     @Volatile var token: String = token
         private set
 
-    override suspend fun <T> call(block: suspend (baseUrl: String, client: OkHttpClient) -> T): T {
-        val client = lock.withLock { current.second }
+    override suspend fun <T> call(block: suspend (baseUrl: String, client: Call.Factory) -> T): T {
+        val client = lock.withLock { current }
         return Http.call(signedIn = false) { block(baseUrl, client) }
     }
 
@@ -78,13 +84,13 @@ internal class CastTokenAccess(
     /** A fresh cast token, which also opens media URLs. */
     suspend fun renew(): MediaToken {
         val t = call { base, client -> AuthApi(base, client).createCastToken() }
-        val exp = epochMs(t.expiresAt) ?: (System.currentTimeMillis() + 60 * 60_000L)
+        val renewed = t.toMediaToken(baseUrl)
         lock.withLock {
-            current = t.token to http.withToken(t.token)
-            expiresAt = exp
+            current = http.calls(Credential(baseUrl, t.token))
+            expiresAt = renewed.expiresAtMs
             token = t.token
         }
-        return MediaToken(t.token, exp, t.param.ifBlank { "access_token" }, serverUrl = baseUrl)
+        return renewed
     }
 }
 
@@ -99,25 +105,28 @@ internal fun castImageUrl(baseUrl: String, token: String, path: String?, size: I
 }
 
 /** A sender's server calls: whether the server in use can cast, and a token for the TV. */
-internal class RealCastGateway(private val store: LocalStore, private val http: Http) : CastGateway {
-    override suspend fun liveAutomaticAvailable(): Boolean =
-        http.apiLevel() >= media.watchmy.client.model.LIVE_AUTOMATIC_API_LEVEL &&
-            http.signedIn { base, client -> LiveTvApi(base, client).getLiveTVCapabilities().automatic == true }
+internal class RealCastGateway(
+    private val store: LocalStore,
+    private val http: Http,
+    /** Live TV's capabilities as the screens have them ([RealLiveRepository.capabilities]). */
+    private val liveCapabilities: suspend () -> media.watchmy.client.model.LiveCapabilities,
+) : CastGateway {
+    override suspend fun liveAutomaticAvailable(): Boolean = http.features().liveAutomatic && liveCapabilities().automatic
 
     override suspend fun castServer(): CastServer? {
         val base = store.session()?.server?.baseUrl ?: return null
         val info = Http.call(signedIn = false) { SystemApi(base, http.probeClient).getServer() }
-        return CastServer(info.id, base, casting = info.apiLevel >= CAST_API_LEVEL && info.casting == true)
+        return CastServer(info.id, base, casting = ServerFeatures(info.apiLevel.toInt()).castTokens && info.casting == true)
     }
 
     override suspend fun castToken(): CastToken {
         val t = http.signedIn { base, client -> AuthApi(base, client).createCastToken() }
-        return CastToken(t.token, epochMs(t.expiresAt) ?: (System.currentTimeMillis() + 60 * 60_000L), t.urls)
+        return CastToken(t.token, tokenExpiry(t.expiresAt), t.urls)
     }
 
     companion object {
         /** The API level that brought cast tokens. */
-        const val CAST_API_LEVEL = 2
+        const val CAST_API_LEVEL = media.watchmy.client.model.CAST_API_LEVEL
     }
 }
 
@@ -175,11 +184,20 @@ internal class CastPreferences(
 /** A caster's server as this TV reached it (Cast Connect): the address that answered, and its API level. */
 data class ReachedServer(val baseUrl: String, val apiLevel: Int)
 
-/** Which of [urls] answers GET /api/server as the server [serverId], best first; null when none does. */
-internal suspend fun reachServer(http: Http, serverId: String, urls: List<String>): ReachedServer? = coroutineScope {
-    val probes = castServerUrls(urls).map { base ->
-        async {
-            try {
+/**
+ * Which of [urls] answers GET /api/server as the server [serverId], best
+ * first; null when none does. They are all asked at once. The best address
+ * that has answered wins, but once any has, earlier ones that haven't get
+ * only [graceMs] more: an unreachable first address (the home network's,
+ * away from home) no longer holds the cast for the probe's whole timeout
+ * while a later one has already answered (PLAN-ANDROID-REVIEW.md §4.2.6).
+ */
+internal suspend fun reachServer(http: Http, serverId: String, urls: List<String>, graceMs: Long = CAST_PROBE_GRACE_MS): ReachedServer? = coroutineScope {
+    val candidates = castServerUrls(urls)
+    val answers = Channel<Pair<Int, ReachedServer?>>(Channel.UNLIMITED)
+    val probes = candidates.mapIndexed { index, base ->
+        launch {
+            val reached = try {
                 Http.call(signedIn = false) { SystemApi(base, http.probeClient).getServer() }
                     .takeIf { it.id == serverId }
                     ?.let { ReachedServer(base, it.apiLevel.toInt()) }
@@ -188,12 +206,33 @@ internal suspend fun reachServer(http: Http, serverId: String, urls: List<String
             } catch (e: Exception) {
                 null
             }
+            answers.send(index to reached)
         }
     }
-    val found = probes.firstNotNullOfOrNull { it.await() }
+    val reached = arrayOfNulls<ReachedServer>(candidates.size)
+    val done = BooleanArray(candidates.size)
+    var deadline: Long? = null
+    fun best() = reached.indexOfFirst { it != null }.takeIf { it >= 0 }
+    while (true) {
+        val best = best()
+        // Nothing better can come: every address before the best has said no.
+        if (best != null && (0 until best).all { done[it] }) break
+        if (done.all { it }) break
+        val answer = if (deadline == null) {
+            answers.receive()
+        } else {
+            withTimeoutOrNull((deadline - System.nanoTime() / 1_000_000).coerceAtLeast(0)) { answers.receive() } ?: break
+        }
+        done[answer.first] = true
+        reached[answer.first] = answer.second
+        if (answer.second != null && deadline == null) deadline = System.nanoTime() / 1_000_000 + graceMs
+    }
     probes.forEach { it.cancel() }
-    found
+    best()?.let { reached[it] }
 }
+
+/** How long an earlier, better address gets once a later one has answered ([reachServer]). */
+internal const val CAST_PROBE_GRACE_MS = 300L
 
 /** How many of a sender's addresses this TV tries; it tries them all at once. */
 internal const val MAX_CAST_URLS = 8

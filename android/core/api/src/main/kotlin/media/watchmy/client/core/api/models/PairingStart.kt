@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param code Show this on screen. Six characters from A-Z and 2-9 without O or I.
- * @param expiresAt 
+ * @param expiresAt
  * @param intervalMs How often to poll.
  * @param linkPath Path of the approval page on this server, for a QR code: prefix it with the address the device used.
  * @param secret Keep this; poll /auth/pair/claim with it. Never show it.

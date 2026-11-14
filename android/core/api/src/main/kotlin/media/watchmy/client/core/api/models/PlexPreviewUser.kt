@@ -36,16 +36,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param counts 
- * @param examples 
- * @param kind 
- * @param plexUserId 
+ * @param counts
+ * @param examples
+ * @param kind
+ * @param plexUserId
  * @param status incomplete: some libraries couldn't be read, and are left out of the counts.
- * @param title 
+ * @param title
  * @param userId The local account the marks would go to.
- * @param reason 
+ * @param reason
  * @param skippedSections Linked libraries left out: not visible to this person, or changed in Plex since linking.
  */
 @Serializable
@@ -85,8 +83,6 @@ data class PlexPreviewUser (
 ) {
 
     /**
-     * 
-     *
      * Values: owner,account,managed,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

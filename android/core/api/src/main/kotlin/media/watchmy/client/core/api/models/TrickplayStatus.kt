@@ -35,8 +35,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param bytes What the thumbnails take on disk.
  * @param done Of those, files whose thumbnails are made.
  * @param enabled Seek thumbnails are made for new and changed files.
@@ -44,7 +42,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param files Files that get seek thumbnails: present, with video, a minute long or more.
  * @param pending Of those, files still to do.
  * @param running The job is working through files now, or paused in the middle.
- * @param current 
+ * @param current
  * @param freeBytes Free space on the data folder's disk, while paused for it.
  * @param paused Why the job is waiting: something is playing (it goes on 2 minutes after the last play stops), or the data folder's disk has under 5 GB free.
  */

@@ -37,11 +37,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param client 
+ * @param client
  * @param sentAt The device's clock as it sends this; the server corrects every at by the difference from its own.
- * @param downloads 
+ * @param downloads
  * @param progress Per file: the newest position, and any mark after it.
  */
 @Serializable

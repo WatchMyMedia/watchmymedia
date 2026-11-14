@@ -35,11 +35,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param name 
- * @param password 
- * @param client 
+ * @param name
+ * @param password
+ * @param client
  * @param turnstileToken The Cloudflare Turnstile widget's token, required while /auth/status reports a turnstileSiteKey. Single use: get a new one for every attempt.
  */
 @Serializable

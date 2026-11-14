@@ -35,8 +35,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param rows Rows in order. Rows left out keep their default place, shown. Unknown IDs are refused.
  */
 @Serializable
