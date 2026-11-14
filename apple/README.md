@@ -174,6 +174,20 @@ player's Next Episode card, Still watching and stop and can't-play states)
 and runs with the rest in `make apple-tv-test-sim`. XCUI does not see
 AVKit's contextual actions, so Skip is checked by hand.
 
+Sorted by title, the Apple TV grid has a letter index down its right edge
+(TvLibraryAZ.dc.html, PLAN-APPLE-REVIEW.md §6.2): right from the last column
+enters it at the poster's letter, the grid follows the letters up and down,
+Select or left lands on the letter's first title, and Menu goes back to the
+poster. It is built from the `letters` the server already sends with a
+title-sorted page (each letter's first offset in the whole filtered list);
+`LetterIndex` (WMMFeatures) turns them into the 27 places with their counts,
+and `LibraryModel(letterJump: .extend)` loads everything up to a letter
+beyond the titles held, so the grid keeps its start and its rows. Page Up and
+Page Down (`onPageKeys`, on remotes that have them) move two rows in any sort
+(`GridPaging`). `-librarySort title` starts the grids sorted by title in a
+debug build; `-fakesLargeLibrary -tab movies -librarySort title` gives the
+index most letters (`TVUITests/LetterIndexTests.swift`).
+
 ### Downloads
 
 From API level 10 an iPhone or iPad downloads movies and episodes to watch

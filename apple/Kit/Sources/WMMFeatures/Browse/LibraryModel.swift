@@ -37,6 +37,17 @@ public final class LibraryModel {
     }
 
     public static let pageSize = 100
+
+    /// How a jump to a letter beyond the titles held loads them.
+    public enum LetterJump: Sendable {
+        /// A page from the letter's first title; the grid starts there (iPhone and iPad).
+        case page
+        /// Every title up to the letter's, and a page more, after those held:
+        /// the grid keeps its start, so its rows stay where the whole list puts
+        /// them and the titles before the letter are still there to go back to
+        /// (Apple TV, TvLibraryAZ.dc.html).
+        case extend
+    }
     /// The most a quiet reload asks for at once: a grid scrolled further is
     /// asked for in pieces, so a library above the server's limit of 1,000 a
     /// request keeps every title it showed (PLAN-APPLE-REVIEW.md §3.3.2).
@@ -81,12 +92,15 @@ public final class LibraryModel {
     /// The grid's loads; a jump to a letter supersedes them too.
     @ObservationIgnored private let loads = LoadController<Grid>()
     @ObservationIgnored private let reloadPageSize: Int
+    @ObservationIgnored private let letterJump: LetterJump
 
     /// `libraryID` skips looking the library up (the Apple TV app knows it from Home).
     /// `rows` gives the screen the library's arranged rows above the grid.
+    /// `letterJump` says how a jump past the titles held loads.
     public init(library: any LibraryRepository, navigator: Navigator, type: LibraryType, libraryID: Int? = nil, rows: (any RowsRepository)? = nil, pageSize: Int = LibraryModel.pageSize, debounce: Duration = .milliseconds(300),
-                reloadPageSize: Int = LibraryModel.reloadPageSize, now: @escaping @MainActor () -> Date = { Date() }) {
+                reloadPageSize: Int = LibraryModel.reloadPageSize, letterJump: LetterJump = .page, now: @escaping @MainActor () -> Date = { Date() }) {
         changes = ScreenChanges(now: now)
+        self.letterJump = letterJump
         self.reloadPageSize = reloadPageSize
         self.library = library
         self.rowsRepository = rows
@@ -380,7 +394,15 @@ public final class LibraryModel {
         if loads.isCurrent(load) { loadingMore = false }
     }
 
-    /// Uses the server's whole-list offset, so letters outside the loaded page work too.
+    /// The letter index over the grid (Apple TV's), when there is one.
+    public var letterIndex: LetterIndex? {
+        guard let grid = state.value else { return nil }
+        return LetterIndex(letters: letters, total: grid.total)
+    }
+
+    /// Uses the server's whole-list offset, so letters outside the loaded page
+    /// work too: as a page from the letter, or (``LetterJump/extend``) by
+    /// loading the titles up to it after those held.
     public func jump(to letter: LetterOffset) async {
         guard sort == .title, let grid = state.value, let id = libraryID,
               letters.contains(letter), letter.offset >= 0, letter.offset < grid.total else { return }
@@ -396,18 +418,41 @@ public final class LibraryModel {
         }
         loadingMore = true
         do {
-            let page = try await library.items(query(id, offset: letter.offset, limit: pageSize))
-            guard loads.isCurrent(load) else { return }
-            state = .loaded(Grid(items: page.items, total: page.total, genres: page.genres, decades: page.decades,
-                                 summary: page.summary, letters: page.letters, genreCounts: page.genreCounts, offset: page.offset))
-            selectedLetter = letter.letter
-            scrollTargetID = page.items.first?.id
-            scrollRequestID += 1
+            if letterJump == .extend && letter.offset > grid.offset {
+                try await extend(grid, to: letter, libraryID: id, load: load)
+            } else {
+                let page = try await library.items(query(id, offset: letter.offset, limit: pageSize))
+                guard loads.isCurrent(load) else { return }
+                state = .loaded(Grid(items: page.items, total: page.total, genres: page.genres, decades: page.decades,
+                                     summary: page.summary, letters: page.letters, genreCounts: page.genreCounts, offset: page.offset))
+                selectedLetter = letter.letter
+                scrollTargetID = page.items.first?.id
+                scrollRequestID += 1
+            }
         } catch is CancellationError {
         } catch {
             if loads.isCurrent(load) { message = error.displayMessage }
         }
         if loads.isCurrent(load) { loadingMore = false }
+    }
+
+    /// Loads the titles after those held up to `letter`'s first and a page
+    /// more, then scrolls to it where the fresh index now puts it.
+    private func extend(_ grid: Grid, to letter: LetterOffset, libraryID id: Int, load: LoadController<Grid>.Load) async throws {
+        let start = grid.offset + grid.items.count
+        let page = try await items(id, offset: start, count: letter.offset - start + pageSize)
+        guard loads.isCurrent(load), var current = state.value else { return }
+        let known = Set(current.items.map(\.id))
+        current.items += page.items.filter { !known.contains($0.id) }
+        current.total = page.total
+        current.letters = page.letters ?? current.letters
+        current.genreCounts = page.genreCounts ?? current.genreCounts
+        state = .loaded(current)
+        let offset = current.letters?.first { $0.letter == letter.letter }?.offset ?? letter.offset
+        guard offset >= current.offset, offset < current.offset + current.items.count else { return }
+        selectedLetter = letter.letter
+        scrollTargetID = current.items[offset - current.offset].id
+        scrollRequestID += 1
     }
 
     public func retryMore() async {

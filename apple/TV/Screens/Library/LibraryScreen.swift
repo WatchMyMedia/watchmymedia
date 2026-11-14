@@ -8,13 +8,18 @@ import WMMUI
 /// Decade menu, and seven posters a row, a page at a time. Long press marks
 /// a poster watched. From API level 22 the library's rows come first, then
 /// Edit rows, then the grid as All movies or All shows (TvLibraryRows.dc.html).
+/// Sorted by title, the letter index runs down the right edge
+/// (TvLibraryAZ.dc.html): right from the last column enters it at the
+/// focused poster's letter, the grid follows the letters up and down, Select
+/// or left lands on the letter's first title, and Menu goes back to the
+/// poster. Page Up and Page Down move two rows in any sort.
 struct LibraryScreen: View {
     let type: LibraryType
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
 
     var body: some View {
-        LibraryView(model: LibraryModel(library: services.library, navigator: navigator, type: type, rows: services.rows))
+        LibraryView(model: LibraryModel(library: services.library, navigator: navigator, type: type, rows: services.rows, letterJump: .extend))
     }
 }
 
@@ -22,17 +27,45 @@ private struct LibraryView: View {
     @State var model: LibraryModel
     @Environment(AppServices.self) private var services
     @State private var editingRows = false
+    @FocusState private var focus: GridFocus?
+    /// The poster focus left for the letter index; Menu there goes back to it.
+    @State private var returnID: Int?
+    /// Focus the screen moved itself, which the index's rules leave alone.
+    @State private var placedFocus: GridFocus?
+    /// A letter's jump, waiting for focus to rest on it.
+    @State private var follow: Task<Void, Never>?
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 24, alignment: .top), count: 7)
+    private static let columnCount = 7
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 24, alignment: .top), count: LibraryView.columnCount)
 
     var body: some View {
+        ScrollViewReader { proxy in
+            page(proxy)
+                .overlay { strip(proxy) }
+                .onChange(of: model.scrollRequestID) {
+                    // The grid follows the letters: the letter's row near the top.
+                    if let target = model.scrollTargetID { withAnimation { proxy.scrollTo(target, anchor: UnitPoint(x: 0.5, y: 0.32)) } }
+                }
+                .onChange(of: focus) { old, new in focusMoved(from: old, to: new, proxy) }
+                .onPageKeys(enabled: gridFocused) { page(by: $0, proxy) }
+        }
+        #if DEBUG
+        .task {
+            if let value = ProcessInfo.processInfo.arguments.drop(while: { $0 != "-librarySort" }).dropFirst().first,
+               let sort = ItemSort(rawValue: value) { await model.setSort(sort) }
+        }
+        #endif
+    }
+
+    private func page(_ proxy: ScrollViewProxy) -> some View {
         TabPage {
             VStack(alignment: .leading, spacing: 0) {
                 if model.canEditRows {
                     arrangedTop
                 } else {
                     header
-                        .padding(.horizontal, TVLayout.gutter)
+                        .padding(.leading, TVLayout.gutter)
+                        .padding(.trailing, trailingGutter)
                         .padding(.top, 16)
                 }
                 if !model.noLibrary {
@@ -82,7 +115,8 @@ private struct LibraryView: View {
                 Spacer()
                 if !model.noLibrary { sort }
             }
-            .padding(.horizontal, TVLayout.gutter)
+            .padding(.leading, TVLayout.gutter)
+            .padding(.trailing, trailingGutter)
         }
     }
 
@@ -171,9 +205,13 @@ private struct LibraryView: View {
             }
             .padding(.vertical, 12)
         }
-        .contentMargins(.horizontal, TVLayout.gutter, for: .scrollContent)
+        .contentMargins(.leading, TVLayout.gutter, for: .scrollContent)
+        .contentMargins(.trailing, model.letterIndex == nil ? TVLayout.gutter : 0, for: .scrollContent)
         .scrollClipDisabled()
         .scrollIndicators(.hidden)
+        // Beside the letter index the chips stop where the grid does, with room above and below for the focus lift.
+        .mask { Rectangle().padding(.vertical, -40) }
+        .padding(.trailing, model.letterIndex == nil ? 0 : trailingGutter)
         .focusSection()
     }
 
@@ -195,8 +233,15 @@ private struct LibraryView: View {
                     ForEach(grid.items) { item in
                         Button { model.open(item) } label: {
                             PosterCard(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w500), width: 218)
+                                .overlay(alignment: .top) {
+                                    // Where Select on the focused letter lands (the board's `.card.land`).
+                                    if item.id == landingID {
+                                        RoundedRectangle(cornerRadius: 16).stroke(Palette.gold.opacity(0.55), lineWidth: 3).frame(height: 327)
+                                    }
+                                }
                         }
                         .buttonStyle(.borderless)
+                        .focused($focus, equals: .item(item.id))
                         .playPauseCard(.card(item)) { model.open(item) }
                         .contextMenu {
                             if item.watchTarget != nil {
@@ -206,7 +251,8 @@ private struct LibraryView: View {
                         .onAppear { Task { await model.itemAppeared(item) } }
                     }
                 }
-                .padding(.horizontal, TVLayout.gutter)
+                .padding(.leading, TVLayout.gutter)
+                .padding(.trailing, trailingGutter)
                 .padding(.top, 28)
                 .focusSection()
                 more
@@ -225,6 +271,124 @@ private struct LibraryView: View {
         } else if model.loadingMore {
             ProgressView().frame(maxWidth: .infinity).padding(30)
         }
+    }
+
+    // MARK: The letter index
+
+    /// Beside the index the page is 1,670 wide (TvLibraryAZ.dc.html), else 1,740.
+    private var trailingGutter: CGFloat { model.letterIndex == nil ? TVLayout.gutter : 160 }
+
+    private var gridFocused: Bool {
+        if case .item = focus { return true }
+        return false
+    }
+
+    private var items: [BrowseItem] { model.state.value?.items ?? [] }
+
+    /// The letter of the poster `id`, from its place in the whole list.
+    private func letter(of id: Int) -> String? {
+        guard let grid = model.state.value, let place = grid.items.firstIndex(where: { $0.id == id }) else { return nil }
+        return model.letterIndex?.letter(at: grid.offset + place)
+    }
+
+    /// The focused poster's letter.
+    private var currentLetter: String? {
+        guard case .item(let id) = focus else { return nil }
+        return letter(of: id)
+    }
+
+    /// The first title of the focused letter, when it is held: where Select lands.
+    private var landingID: Int? {
+        guard case .letter(let letter) = focus else { return nil }
+        return firstID(of: letter)
+    }
+
+    private func firstID(of letter: String) -> Int? {
+        guard let grid = model.state.value, let offset = model.letterIndex?.entry(letter)?.offset,
+              offset >= grid.offset, offset < grid.offset + grid.items.count else { return nil }
+        return grid.items[offset - grid.offset].id
+    }
+
+    @ViewBuilder private func strip(_ proxy: ScrollViewProxy) -> some View {
+        // With rows above the grid, the index shows once the grid has focus.
+        if let index = model.letterIndex, !model.noLibrary, !model.canEditRows || focus != nil {
+            LetterStrip(
+                index: index,
+                noun: model.noun,
+                current: currentLetter,
+                active: focus != nil,
+                focus: $focus,
+                select: { entry in land(on: entry, proxy) },
+                back: { goBack(proxy) }
+            )
+        }
+    }
+
+    /// Focus moved by the remote: into the index it starts at the poster's
+    /// letter, along it the grid follows, and out of it to the left it lands
+    /// on the letter's first title.
+    private func focusMoved(from old: GridFocus?, to new: GridFocus?, _ proxy: ScrollViewProxy) {
+        if let new, new == placedFocus {
+            placedFocus = nil
+            return
+        }
+        switch (old, new) {
+        case (.item(let id), .letter(let entered)):
+            returnID = id
+            if let current = letter(of: id), current != entered, model.letterIndex?.entry(current)?.isEmpty == false {
+                place(.letter(current))
+            }
+        case (.letter, .letter(let letter)):
+            follow?.cancel()
+            guard let jump = model.letterIndex?.entry(letter)?.letterOffset else { return }
+            follow = Task {
+                // Let focus rest before loading: a swipe down the index passes many letters.
+                try? await Task.sleep(for: .milliseconds(200))
+                guard !Task.isCancelled else { return }
+                await model.jump(to: jump)
+            }
+        case (.letter(let letter), .item):
+            if let entry = model.letterIndex?.entry(letter) { land(on: entry, proxy) }
+        default:
+            break
+        }
+    }
+
+    /// Select, or left, on a letter: its first title takes focus, once loaded.
+    private func land(on entry: LetterIndex.Entry, _ proxy: ScrollViewProxy) {
+        follow?.cancel()
+        Task {
+            if firstID(of: entry.letter) == nil, let jump = entry.letterOffset { await model.jump(to: jump) }
+            guard let id = firstID(of: entry.letter) else { return }
+            await focusItem(id, proxy)
+        }
+    }
+
+    /// Menu on the index: back to the poster focus came from.
+    private func goBack(_ proxy: ScrollViewProxy) {
+        follow?.cancel()
+        guard let id = returnID.flatMap({ id in items.contains { $0.id == id } ? id : nil }) ?? items.first?.id else { return }
+        Task { await focusItem(id, proxy) }
+    }
+
+    /// Page Up or Page Down: two rows back or on, in the same column.
+    private func page(by pages: Int, _ proxy: ScrollViewProxy) {
+        guard case .item(let id) = focus, let place = items.firstIndex(where: { $0.id == id }),
+              let target = GridPaging.target(from: place, pages: pages, columns: Self.columnCount, count: items.count) else { return }
+        if target >= items.count - Self.columnCount * GridPaging.rows { Task { await model.loadMore() } }
+        Task { await focusItem(items[target].id, proxy) }
+    }
+
+    /// Scrolls the poster into the grid (it may not be drawn yet), then focuses it.
+    private func focusItem(_ id: Int, _ proxy: ScrollViewProxy) async {
+        withAnimation { proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.32)) }
+        await Task.yield()
+        place(.item(id))
+    }
+
+    private func place(_ target: GridFocus) {
+        placedFocus = target
+        focus = target
     }
 
     private var empty: some View {
