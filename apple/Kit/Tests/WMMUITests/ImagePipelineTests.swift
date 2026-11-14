@@ -202,10 +202,14 @@ private func png(_ width: Int, _ height: Int) throws -> Data {
 }
 
 /// Waits for the pipeline's callers to queue, by yielding, not by the clock.
+/// Waits up to five seconds of real time. A count of yields wasn't enough on a
+/// loaded CI runner: the task under test may not have started yet.
 private func eventually(_ condition: () async -> Bool) async -> Bool {
-    for _ in 0..<5000 {
+    let deadline = ContinuousClock.now + .seconds(5)
+    while ContinuousClock.now < deadline {
         if await condition() { return true }
         await Task.yield()
+        try? await Task.sleep(for: .milliseconds(1))
     }
     return await condition()
 }

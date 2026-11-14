@@ -476,7 +476,7 @@ esac
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         tv = re.search(r'(?ms)^  apple-tv:\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
         step = re.search(r'(?ms)- name: Build and test on an Apple TV simulator\n(.*?)(?=      -)', tv).group(1)
-        self.assertIn('timeout-minutes: 20', step)
+        self.assertIn('timeout-minutes: 35', step)
         self.assertIn("make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH=\"$PATH\"", step)
         self.assertNotIn('continue-on-error', tv)
         self.assertIn('path: apple/build/TVTests.xcresult', tv)

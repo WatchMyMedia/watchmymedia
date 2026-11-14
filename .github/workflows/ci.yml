@@ -757,7 +757,9 @@ jobs:
         # One simulator: with two clones (-parallel-testing-worker-count 2)
         # GitHub's three-core Mac ran the tests about a minute faster of ten
         # and a timing-sensitive Kit test failed (run of 2026-11-12).
-        timeout-minutes: 20
+        # 35 minutes: the Apple review's UI tests (A-Z, Episodes, channel keys,
+        # diagnostics, Top Shelf) took the suite past 20 (run of 2026-11-14).
+        timeout-minutes: 35
         run: make apple-tv-test-sim APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
       # Release for devices, unsigned, as in the apple job.
       - name: Build for release
