@@ -1,5 +1,8 @@
 package media.watchmy.client.mobile.player
 
+import media.watchmy.client.model.EpisodeDetail
+import media.watchmy.client.presentation.Load
+import media.watchmy.client.presentation.player.PlayerEpisodesViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,10 +38,11 @@ import media.watchmy.client.ui.components.Artwork
 @Composable
 internal fun PortraitPlayerDetails(
     player: PlayerUiState,
-    episodes: PlayerEpisodesState,
+    episodes: PlayerEpisodesViewModel.State,
     onPicker: (PickerTab) -> Unit,
     onPlay: (PlayRequest) -> Unit,
     onRetry: () -> Unit,
+    playRequest: (EpisodeDetail) -> PlayRequest?,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier.background(WmmColors.Ground).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -67,34 +71,45 @@ internal fun PortraitPlayerDetails(
                 }
             }
         }
-        episodeItems(episodes, onPlay, onRetry)
+        episodeItems(episodes, onPlay, onRetry, playRequest)
     }
 }
 
 @Composable
-internal fun PlayerEpisodesPanel(state: PlayerEpisodesState, onPlay: (PlayRequest) -> Unit, onRetry: () -> Unit, onDismiss: () -> Unit) {
+internal fun PlayerEpisodesPanel(state: PlayerEpisodesViewModel.State, onPlay: (PlayRequest) -> Unit, onRetry: () -> Unit, playRequest: (EpisodeDetail) -> PlayRequest?, onDismiss: () -> Unit) {
     TabletPlayerPanel("Episodes", onDismiss) {
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            episodeItems(state, onPlay, onRetry, small = true)
+            episodeItems(state, onPlay, onRetry, playRequest, small = true)
         }
     }
 }
 
-private fun LazyListScope.episodeItems(state: PlayerEpisodesState, onPlay: (PlayRequest) -> Unit, onRetry: () -> Unit, small: Boolean = false) {
-    when {
-        state.loading -> item { CircularProgressIndicator(Modifier.padding(24.dp).size(28.dp), color = WmmColors.Accent) }
-        state.error != null -> item {
+/**
+ * The playing episode's season (the shared [PlayerEpisodesViewModel]; the
+ * phone shows that season alone). A file that is no episode lists nothing,
+ * though the shared state stays Loading for it.
+ */
+private fun LazyListScope.episodeItems(
+    state: PlayerEpisodesViewModel.State,
+    onPlay: (PlayRequest) -> Unit,
+    onRetry: () -> Unit,
+    playRequest: (EpisodeDetail) -> PlayRequest?,
+    small: Boolean = false,
+) {
+    when (val load = state.season) {
+        is Load.Failed -> item {
             Column(Modifier.padding(12.dp)) {
-                Text(state.error, style = PlayerType.OptionDetail)
+                Text(load.message, style = PlayerType.OptionDetail)
                 TextButton(onClick = onRetry) { Text("Try again") }
             }
         }
-        state.season != null -> {
-            val season = state.season
+        Load.Loading -> if (state.available) item { CircularProgressIndicator(Modifier.padding(24.dp).size(28.dp), color = WmmColors.Accent) }
+        is Load.Ready -> {
+            val season = load.data
             item { Text(season.season.name, style = PlayerType.Title, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)) }
             items(season.episodes, key = { it.id }) { episode ->
-                val request = season.playRequest(episode)
-                val playing = episode.versions.any { it.fileId == state.fileId }
+                val request = playRequest(episode)
+                val playing = episode.versions.any { it.fileId == state.playingFileId }
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
                         .background(if (playing) WmmColors.Accent.copy(alpha = 0.12f) else WmmColors.Ground)

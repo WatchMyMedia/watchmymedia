@@ -1,4 +1,4 @@
-package media.watchmy.client.tv.navigation
+package media.watchmy.client.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
@@ -8,7 +8,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -23,9 +27,10 @@ import org.robolectric.annotation.Config
 
 /**
  * A signed-in session's ViewModels live and end with it
- * (PLAN-ANDROID-REVIEW.md §3.3.6): kept while it shows, cleared when it
- * signs out or another account or server takes over, and never in the
- * activity's own store, where they outlived the session.
+ * (PLAN-ANDROID-REVIEW.md §3.3.6), on the phone and the TV alike: kept
+ * while it shows, cleared when it signs out or another account or server
+ * takes over, and never in the activity's own store, where they outlived
+ * the session.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -73,5 +78,17 @@ class SessionViewModelsTest {
         compose.waitForIdle()
         assertTrue("Signed out: cleared", second.cleared)
         assertSame(second, probes.last())
+    }
+
+    class Saved(val handle: SavedStateHandle) : ViewModel()
+
+    @Test fun `a session's ViewModel can ask for a SavedStateHandle, as the activity's could`() {
+        var saved: Saved? = null
+        compose.setContent {
+            SessionViewModels { saved = viewModel { Saved(createSavedStateHandle()) } }
+        }
+        compose.waitForIdle()
+        assertTrue(saved != null)
+        assertEquals(1, ViewModelProvider.create(compose.activity, viewModelFactory { initializer { SessionStores() } })[SessionStores::class].open)
     }
 }

@@ -23,6 +23,9 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import media.watchmy.client.mobile.navigation.OnTabReselected
+import media.watchmy.client.mobile.components.MobileTab
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.TextSelectionColors
@@ -114,6 +117,9 @@ fun SearchScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     // The field holds its text (§3.3.3); the model searches a moment after it changes.
     val query = rememberModelTextField(state.query, state.revision, vm::setQuery)
+    // The Search tab (the tablet's rail) tapped again takes the results back to the top.
+    val resultsGrid = rememberLazyGridState()
+    OnTabReselected(MobileTab.Search) { resultsGrid.animateScrollToItem(0) }
     val focus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     LaunchedEffect(Unit) { if (state.query.isEmpty()) focus.requestFocus() }
@@ -168,6 +174,7 @@ fun SearchScreen(
                 else -> Row(Modifier.fillMaxSize()) {
                   LazyVerticalGrid(
                     columns = if (layout.isTablet) GridCells.Adaptive(TabletLayout.posterMinimum) else GridCells.Fixed(3),
+                    state = resultsGrid,
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(start = if (layout.isTablet) 24.dp else 16.dp, end = if (layout.isTablet) 24.dp else 16.dp, top = 8.dp, bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(if (layout.isTablet) 16.dp else 8.dp),

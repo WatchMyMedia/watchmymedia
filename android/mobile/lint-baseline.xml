@@ -4,28 +4,6 @@
     <issue
         id="ComposeViewModelForwarding"
         message="Forwarding a ViewModel through multiple @Composable functions should be avoided. Consider using state hoisting.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#hoist-all-the-things for more information."
-        errorLine1="        items.take(3).forEach { ContinueRow(it, library, vm, onPlay, onOpenShow, onOpenMovie) }"
-        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/media/watchmy/client/mobile/home/HomeScreen.kt"
-            line="323"
-            column="33"/>
-    </issue>
-
-    <issue
-        id="ComposeViewModelForwarding"
-        message="Forwarding a ViewModel through multiple @Composable functions should be avoided. Consider using state hoisting.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#hoist-all-the-things for more information."
-        errorLine1="                items(items, key = { it.fileId }) { ContinueRow(it, library, vm, onPlay, onOpenShow, onOpenMovie) }"
-        errorLine2="                                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/media/watchmy/client/mobile/home/HomeScreen.kt"
-            line="334"
-            column="53"/>
-    </issue>
-
-    <issue
-        id="ComposeViewModelForwarding"
-        message="Forwarding a ViewModel through multiple @Composable functions should be avoided. Consider using state hoisting.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#hoist-all-the-things for more information."
         errorLine1="        MovieActions(movie, state, vm, onPlay)"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
@@ -152,17 +130,6 @@
         <location
             file="src/main/kotlin/media/watchmy/client/mobile/components/Bars.kt"
             line="113"
-            column="5"/>
-    </issue>
-
-    <issue
-        id="ComposeModifierMissing"
-        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
-        errorLine1="fun MobileBottomBar(selected: MobileTab?, onSelect: (MobileTab) -> Unit, settingsCount: Int = 0) {"
-        errorLine2="    ~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/media/watchmy/client/mobile/components/Bars.kt"
-            line="141"
             column="5"/>
     </issue>
 
@@ -378,17 +345,6 @@
     <issue
         id="ComposeModifierMissing"
         message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
-        errorLine1="fun ScreenStub(name: String, mockup: String) {"
-        errorLine2="    ~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/media/watchmy/client/mobile/components/ScreenStub.kt"
-            line="17"
-            column="5"/>
-    </issue>
-
-    <issue
-        id="ComposeModifierMissing"
-        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
         errorLine1="fun SearchScreen("
         errorLine2="    ~~~~~~~~~~~~">
         <location
@@ -494,17 +450,6 @@
             file="src/main/kotlin/media/watchmy/client/mobile/player/Scrubber.kt"
             line="104"
             column="5"/>
-    </issue>
-
-    <issue
-        id="ComposeModifierWithoutDefault"
-        message="This @Composable function has a modifier parameter but it doesn&apos;t have a default value.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#modifiers-should-have-default-parameters for more information."
-        errorLine1="private fun SkipButtons(mode: SkipMode, onChange: (SkipMode) -> Unit, modifier: Modifier) {"
-        errorLine2="                                                                      ~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/media/watchmy/client/mobile/settings/SettingsScreen.kt"
-            line="350"
-            column="71"/>
     </issue>
 
     <issue

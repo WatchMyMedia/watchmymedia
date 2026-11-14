@@ -57,4 +57,22 @@ class TabReselectTest {
         compose.waitForIdle()
         assertEquals(0f, scrolled())
     }
+
+    @Test fun `tapping TV Shows again scrolls the library grid to the top`() {
+        compose.setContent {
+            CompositionLocalProvider(LocalAppServices provides FakeAppServices()) {
+                MobileNavHost(onSwitchServer = {}, onSignedOut = {}, nav = rememberNavController())
+            }
+        }
+        compose.waitForIdle()
+        compose.onAllNodes(hasText("TV Shows") and hasClickAction()).onFirst().performClick()
+        compose.waitForIdle()
+        compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToIndex(12)
+        compose.waitForIdle()
+        assertTrue("scrolled down", scrolled() > 0f)
+
+        compose.onAllNodes(hasText("TV Shows") and hasClickAction()).onFirst().performClick()
+        compose.waitForIdle()
+        assertEquals(0f, scrolled())
+    }
 }
