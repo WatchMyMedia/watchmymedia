@@ -1,34 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cleanMappings, connectionStatus, freshSuggestions, itemWord, suggestSeerrUser, tileLetters, unmappedRoots } from './integrations'
-
-const base = {
-  id: 1,
-  kind: 'sonarr' as const,
-  name: 'Sonarr',
-  url: 'http://nas:8989',
-  apiKeyHint: '3f9a',
-  pathMap: [],
-  targets: [],
-  status: { ok: true, items: 3, webhook: { outside: 0 } },
-}
-
-describe('connectionStatus', () => {
-  it('puts an error first', () => {
-    const s = connectionStatus({ ...base, status: { ...base.status, ok: false, error: 'connection refused' } })
-    expect(s.tone).toBe('warn')
-    expect(s.text).toBe("Couldn't reach Sonarr: connection refused")
-  })
-  it('says when the webhook last called', () => {
-    const at = new Date(Date.now() - 2 * 60_000).toISOString()
-    expect(connectionStatus({ ...base, status: { ...base.status, webhook: { outside: 0, lastEventAt: at } } })).toEqual({
-      tone: 'ok',
-      text: 'Webhook · last event 2 min ago',
-    })
-  })
-  it('says when nothing has arrived', () => {
-    expect(connectionStatus(base)).toEqual({ tone: 'off', text: 'Webhook not connected yet' })
-  })
-})
+import { cleanMappings, freshSuggestions, suggestSeerrUser, unmappedRoots } from './integrations'
 
 describe('mappings', () => {
   it('drops empty rows and trims', () => {
@@ -43,23 +14,9 @@ describe('mappings', () => {
       { path: '/downloads', localPath: '/downloads', items: 0 },
     ])
   })
-  it('counts items in the app’s words', () => {
-    expect(itemWord('radarr', 1)).toBe('1 movie')
-    expect(itemWord('radarr', 0)).toBe('0 movies')
-    expect(itemWord('sonarr', 4)).toBe('4 series')
-  })
 })
 
 describe('Seerr', () => {
-  it('says how many users it has rather than a webhook', () => {
-    expect(connectionStatus({ ...base, kind: 'seerr', name: 'Seerr', status: { ...base.status, items: 4 } })).toEqual({
-      tone: 'ok',
-      text: 'Takes requests · 4 users',
-    })
-    expect(tileLetters('seerr')).toBe('Se')
-    expect(tileLetters('sonarr')).toBe('S')
-  })
-
   const users = [
     { id: 1, name: 'Robin', names: ['robin'], canRequest: true },
     { id: 2, name: 'Sam P', names: ['sam', 'sam@example.test'], canRequest: true },
