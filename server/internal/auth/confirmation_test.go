@@ -31,11 +31,21 @@ func TestConfirmationLifetimeAndSessionIsolation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if _, ok := s.ConfirmedUntil(u); ok {
+			t.Fatal("confirmed before the password was entered")
+		}
+		confirmedAt := time.Now()
 		if err := s.ConfirmPassword(ctx, u, "fictional-password"); err != nil {
 			t.Fatal(err)
 		}
 		if !s.Confirmed(u) || s.Confirmed(other) {
 			t.Fatal("confirmation leaked across sessions")
+		}
+		if until, ok := s.ConfirmedUntil(u); !ok || !until.Equal(confirmedAt.Add(ConfirmationTTL)) {
+			t.Fatalf("confirmed until %v, %v; want %v", until, ok, confirmedAt.Add(ConfirmationTTL))
+		}
+		if _, ok := s.ConfirmedUntil(other); ok {
+			t.Fatal("other sign-in has a confirmation time")
 		}
 		time.Sleep(ConfirmationTTL - time.Second)
 		if !s.Confirmed(u) {
@@ -44,6 +54,9 @@ func TestConfirmationLifetimeAndSessionIsolation(t *testing.T) {
 		time.Sleep(time.Second)
 		if s.Confirmed(u) || len(s.confirmed) != 0 {
 			t.Fatal("expired confirmation survived")
+		}
+		if _, ok := s.ConfirmedUntil(u); ok {
+			t.Fatal("expired confirmation has a time")
 		}
 	})
 }

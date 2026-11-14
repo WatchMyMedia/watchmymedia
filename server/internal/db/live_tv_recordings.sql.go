@@ -10,6 +10,36 @@ import (
 	"strings"
 )
 
+const countDVRSourceRecordings = `-- name: CountDVRSourceRecordings :one
+SELECT
+    CAST(COALESCE(SUM(state IN ('scheduled', 'conflict', 'gone')), 0) AS INTEGER) AS scheduled,
+    CAST(COALESCE(SUM(state = 'recording'), 0) AS INTEGER) AS recording
+FROM live_tv_recordings INDEXED BY live_tv_recording_state
+WHERE state IN ('scheduled', 'conflict', 'gone', 'recording')
+    AND source_id = ?1 AND end_at > ?2
+`
+
+type CountDVRSourceRecordingsParams struct {
+	SourceID string `json:"source_id"`
+	Now      int64  `json:"now"`
+}
+
+type CountDVRSourceRecordingsRow struct {
+	Scheduled int64 `json:"scheduled"`
+	Recording int64 `json:"recording"`
+}
+
+// A tuner's recordings that removing it would affect: those still to
+// record (scheduled, waiting on a clash, or on a channel gone from the
+// lineup) and those recording now. Read through the state index; a
+// household has few unfinished recordings.
+func (q *Queries) CountDVRSourceRecordings(ctx context.Context, arg CountDVRSourceRecordingsParams) (CountDVRSourceRecordingsRow, error) {
+	row := q.db.QueryRowContext(ctx, countDVRSourceRecordings, arg.SourceID, arg.Now)
+	var i CountDVRSourceRecordingsRow
+	err := row.Scan(&i.Scheduled, &i.Recording)
+	return i, err
+}
+
 const dVRFileAtPath = `-- name: DVRFileAtPath :one
 SELECT id FROM media_files WHERE path=? AND status='present'
 `

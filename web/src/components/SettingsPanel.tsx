@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react'
+import { settingsCrumbs } from '../lib/settingsRoutes'
+import { AwayChips, Breadcrumb } from './settings/Frame'
+import { useSettingsPage } from './settings/hooks'
 
 // The building blocks every settings page is made of: a page header, then
 // panels whose rows put a setting's label on the left and its control on
@@ -8,9 +11,19 @@ export const primaryButton = 'min-h-[40px] rounded-md btn-primary px-4 text-sm f
 export const secondaryButton = 'min-h-[40px] rounded-md border border-line-2 px-3.5 text-sm text-neutral-100 hover:bg-surface-2 disabled:opacity-50'
 export const textInput = 'min-h-[40px] rounded-md border border-line-2 bg-ground px-3 text-sm text-neutral-100 placeholder:text-neutral-500'
 
-/** A settings page's title and what it is for, with optional actions on the right. */
+/** A settings page's title and what it is for, with optional actions on the
+ * right. On a tab's hub it carries the breadcrumb and, away from home, the
+ * away chips (PLAN-ADMIN-SETTINGS.md §3.1, §3.3). */
 export function PageHeader({ title, badge, actions, children }: { title: string; badge?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
+  const page = useSettingsPage()
   return (
+    <>
+    {page?.kind === 'hub' && (
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <Breadcrumb crumbs={settingsCrumbs(page.tab)} className="pt-1" />
+        <AwayChips />
+      </div>
+    )}
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0 max-w-2xl flex-1 basis-80">
         <div className="flex flex-wrap items-center gap-3">
@@ -21,6 +34,7 @@ export function PageHeader({ title, badge, actions, children }: { title: string;
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </div>
+    </>
   )
 }
 

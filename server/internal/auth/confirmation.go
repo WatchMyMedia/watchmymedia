@@ -52,11 +52,21 @@ func (s *Service) ConfirmPassword(ctx context.Context, u User, password string) 
 }
 
 func (s *Service) Confirmed(u User) bool {
+	_, ok := s.ConfirmedUntil(u)
+	return ok
+}
+
+// ConfirmedUntil is when this sign-in's live password confirmation runs
+// out, and false when it has none.
+func (s *Service) ConfirmedUntil(u User) (time.Time, bool) {
 	s.grantMu.Lock()
 	defer s.grantMu.Unlock()
 	s.pruneConfirmations()
 	c, ok := s.confirmed[u.SignInID]
-	return ok && c.userID == u.ID
+	if !ok || c.userID != u.ID {
+		return time.Time{}, false
+	}
+	return c.expires, true
 }
 
 // Called with grantMu held. No background worker or durable secrets are needed.

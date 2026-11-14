@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { api, ApiError, UNAUTHORIZED_EVENT, unwrap } from '../api/client'
 import { ConfirmationCancelled, registerPasswordPrompt } from '../api/withConfirm'
 import { primaryButton, secondaryButton, textInput } from './SettingsPanel'
+import { noteConfirmed } from '../lib/passwordGrant'
 
 /** One shared native modal, including above another action's native dialog. */
 export function PasswordConfirmationHost({ name }: { name: string }) {
@@ -89,6 +90,7 @@ function ConfirmPasswordDialog({ name, action, returnFocus, onFinish }: { name: 
         setChecking(true); setError('')
         try {
           unwrap(await api.POST('/api/auth/confirm', { body: { password } }))
+          noteConfirmed()
           if (alive.current) onFinish(true)
         } catch (err) {
           if (!alive.current) return

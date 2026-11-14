@@ -22,7 +22,7 @@ export const addLiveSource = (address: string, name: string) => withConfirm(asyn
 export const updateLiveSource = (source: LiveSource, changes: Partial<Pick<LiveSource, 'address' | 'name' | 'enabled'>>) =>
   withConfirm(async () => api.PUT('/api/settings/live-tv/sources/{id}', { params: { path: { id: source.id } }, body: { address: source.address, name: source.name, enabled: source.enabled, ...changes } }).then(unwrap), 'move this tuner')
 export const refreshLiveSource = (id: string) => api.POST('/api/settings/live-tv/sources/{id}/refresh', { params: { path: { id } } }).then(unwrap)
-export const removeLiveSource = (id: string) => api.DELETE('/api/settings/live-tv/sources/{id}', { params: { path: { id } } }).then(unwrap)
+export const removeLiveSource = (id: string) => withConfirm(() => api.DELETE('/api/settings/live-tv/sources/{id}', { params: { path: { id } } }).then(unwrap), 'remove this tuner')
 export const enableLiveChannel = (id: string, enabled: boolean) => api.PUT('/api/settings/live-tv/channels/{id}', { params: { path: { id } }, body: { enabled } }).then(unwrap)
 export const setLiveAccess = (access: 'none' | 'admins' | 'everyone') => api.PUT('/api/settings/live-tv', { body: { access } }).then(unwrap)
 export const setLiveGuide = (enabled: boolean, tmdb: boolean, email: string) => api.PUT('/api/settings/live-tv/guide', { body: { enabled, tmdb, email } }).then(unwrap)

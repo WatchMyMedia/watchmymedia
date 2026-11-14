@@ -190,6 +190,58 @@ func TestTrim(t *testing.T) {
 	}
 }
 
+// CountOlderThan counts what Trim would delete with that retention: the
+// finished plays before the cutoff day, never a live one.
+func TestCountOlderThan(t *testing.T) {
+	tr, c, _ := newTracker(t, Config{Group: true, RetentionDays: 30})
+	ctx := context.Background()
+	play(t, tr, c, playOpts{user: 1, item: movie(1, "Heat"), length: 10 * time.Minute})
+	play(t, tr, c, playOpts{user: 2, item: movie(3, "Thief"), length: 10 * time.Minute})
+	live, err := tr.Begin(ctx, Start{UserID: 1, UserName: "ann", RecordHistory: true, Item: movie(4, "Collateral"), IP: mustAddr("192.168.1.20"), Stream: Stream{Mode: "direct"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr.Heartbeat(ctx, live, 1, 0, Report{State: StatePlaying}); err != nil {
+		t.Fatal(err)
+	}
+	c.add(40 * 24 * time.Hour)
+	play(t, tr, c, playOpts{user: 1, item: movie(2, "Ronin"), length: 10 * time.Minute})
+	for _, tc := range []struct {
+		days int
+		want int64
+	}{{0, 0}, {-1, 0}, {30, 2}, {39, 2}, {41, 0}, {1, 2}} {
+		if n, err := tr.CountOlderThan(ctx, tc.days); err != nil || n != tc.want {
+			t.Errorf("older than %d days = %d, %v; want %d", tc.days, n, err, tc.want)
+		}
+	}
+	n, err := tr.Trim(ctx)
+	if err != nil || n != 2 {
+		t.Fatalf("trim = %d, %v; the count said 2", n, err)
+	}
+	if n, err := tr.CountOlderThan(ctx, 30); err != nil || n != 0 {
+		t.Errorf("after trimming: %d, %v", n, err)
+	}
+}
+
+func TestCountLibraryPlays(t *testing.T) {
+	tr, c, _ := newTracker(t, noMin())
+	inLibrary := func(id int64, title string, library int64) Item {
+		m := movie(id, title)
+		m.LibraryID = &library
+		return m
+	}
+	play(t, tr, c, playOpts{user: 1, item: inLibrary(1, "Heat", 7), length: 3 * time.Minute})
+	c.add(time.Hour)
+	play(t, tr, c, playOpts{user: 2, item: inLibrary(1, "Heat", 7), length: 3 * time.Minute})
+	c.add(time.Hour)
+	play(t, tr, c, playOpts{user: 1, item: inLibrary(2, "Ronin", 8), length: 3 * time.Minute})
+	for library, want := range map[int64]int64{7: 2, 8: 1, 9: 0} {
+		if n, err := tr.CountLibraryPlays(context.Background(), library); err != nil || n != want {
+			t.Errorf("library %d: %d, %v; want %d", library, n, err, want)
+		}
+	}
+}
+
 func TestStats(t *testing.T) {
 	tr, c := seedSmall(t)
 	ctx := context.Background()

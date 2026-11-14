@@ -121,6 +121,9 @@ func TestEveryRemoteGuardAndConditionalChanges(t *testing.T) {
 		{"DELETE", "/integrations/1", ""},
 		{"POST", "/integrations/test", `{"kind":"radarr","url":"http://radarr.test","apiKey":"fictional-key"}`},
 		{"POST", "/integrations/1/webhook/connect", `{"address":"https://fixture.test"}`},
+		{"DELETE", "/libraries/1", ""},
+		{"DELETE", "/settings/live-tv/sources/fictional", ""},
+		{"PUT", "/settings", `{"remoteAdmin":false}`},
 	}
 	for _, tc := range cases {
 		r := doJSON(t, srv.client, tc.method, srv.URL+"/api"+tc.path, tc.body, nil, remoteHTTPS...)
@@ -220,14 +223,17 @@ func TestRemoteConfirmationThrottleAndAudit(t *testing.T) {
 	if !saw429 {
 		t.Fatal("confirmation not throttled")
 	}
-	doJSON(t, srv.client, "PUT", srv.URL+"/api/settings", `{"remoteAdmin":false}`, nil, remoteHTTPS...)
+	if r := doJSON(t, srv.client, "PUT", srv.URL+"/api/settings", `{"remoteAdmin":false}`, nil, remoteHTTPS...); r.StatusCode != 200 {
+		t.Fatalf("confirmed switch off: %d %s", r.StatusCode, r.Body)
+	}
 	out := logs.String()
 	for _, msg := range []string{"password confirmed away from home", "password confirmation failed away from home", "password confirmation throttled away from home", "remote admin turned off"} {
 		if !strings.Contains(out, msg) {
 			t.Error("missing " + msg)
 		}
 	}
-	if strings.Count(out, "admin action away from home") != 1 {
+	// Creating an admin and turning remote admin off, both away from home.
+	if strings.Count(out, "admin action away from home") != 2 || !strings.Contains(out, `"operation":"updateSettings"`) {
 		t.Fatalf("wrong action log count: %s", out)
 	}
 	for _, secret := range []string{"password1", "fictional-secret", "wrong-fictional-secret", "passwordHash"} {
@@ -268,6 +274,17 @@ func TestRemoteAdminSwitchAndOpenEvents(t *testing.T) {
 	read()
 	if r := doJSON(t, srv.client, "PUT", srv.URL+"/api/settings", `{"remoteAdmin":true}`, nil, remoteHTTPS...); r.StatusCode != 403 {
 		t.Fatal("enabled away from home")
+	}
+	// Turning it off away from home locks this browser out, so it asks for
+	// the password first.
+	r := doJSON(t, srv.client, "PUT", srv.URL+"/api/settings", `{"remoteAdmin":false}`, nil, remoteHTTPS...)
+	var problem struct{ Type string }
+	_ = json.Unmarshal(r.Body, &problem)
+	if r.StatusCode != 403 || problem.Type != confirmPasswordType {
+		t.Fatalf("unconfirmed switch off: %d %s", r.StatusCode, r.Body)
+	}
+	if r := doJSON(t, srv.client, "POST", srv.URL+"/api/auth/confirm", `{"password":"password1"}`, nil, remoteHTTPS...); r.StatusCode != 204 {
+		t.Fatalf("confirm: %s", r.Body)
 	}
 	if r := doJSON(t, srv.client, "PUT", srv.URL+"/api/settings", `{"remoteAdmin":false}`, nil, remoteHTTPS...); r.StatusCode != 200 {
 		t.Fatal(string(r.Body))

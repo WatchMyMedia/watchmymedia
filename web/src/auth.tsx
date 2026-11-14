@@ -4,6 +4,7 @@ import { api, UNAUTHORIZED_EVENT, unwrap } from './api/client'
 import { AuthContext, type AuthState } from './authContext'
 import { PasswordConfirmationHost } from './components/ConfirmPasswordDialog'
 import { changeAuthScope } from './lib/authScope'
+import { forgetGrant, grantUntil, parseGrant, setGrantUntil } from './lib/passwordGrant'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading', user: null, adminAllowed: true })
@@ -12,6 +13,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const s = unwrap(await api.GET('/api/auth/status'))
+      // Another tab may have confirmed the password; take the later end.
+      const until = parseGrant(s.adminConfirmedUntil)
+      if (until > grantUntil()) setGrantUntil(until)
       const common = { adminAllowed: s.adminAllowed, adminLimit: s.adminLimit, onAdminNetwork: s.onAdminNetwork, turnstileSiteKey: s.turnstileSiteKey }
       if (s.setupRequired) setState({ status: 'setup', user: null, ...common })
       else if (s.user) setState({ status: 'ready', user: s.user, ...common })
@@ -25,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const t = window.setTimeout(() => void refresh(), 0)
     const onUnauthorized = () => {
       changeAuthScope()
+      forgetGrant()
       setState((s) => (s.status === 'ready' ? { ...s, status: 'login', user: null } : s))
       // Sign-in may need Turnstile now, if it was turned on since.
       void refresh()
@@ -40,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (name: string, password: string, turnstileToken?: string) => {
       const user = unwrap(await api.POST('/api/auth/login', { body: { name, password, turnstileToken } }))
       changeAuthScope()
+      forgetGrant()
       qc.clear()
       setState((s) => ({ ...s, status: 'ready', user }))
       await refresh()
@@ -50,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (name: string, password: string, turnstileToken?: string) => {
       const user = unwrap(await api.POST('/api/setup', { body: { name, password, turnstileToken } }))
       changeAuthScope()
+      forgetGrant()
       qc.clear()
       setState((s) => ({ ...s, status: 'ready', user }))
       await refresh()
@@ -58,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
   const logout = useCallback(async () => {
     changeAuthScope()
+    forgetGrant()
     await api.POST('/api/auth/logout')
     qc.clear()
     setState((s) => ({ ...s, status: 'login', user: null }))

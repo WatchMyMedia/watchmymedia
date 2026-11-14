@@ -458,7 +458,7 @@ func (t *Tracker) Trim(ctx context.Context) (int64, error) {
 	if t.db == nil || cfg.RetentionDays <= 0 {
 		return 0, nil
 	}
-	cutoff, _, _ := t.localTime(t.now().AddDate(0, 0, -cfg.RetentionDays))
+	cutoff := t.trimCutoff(cfg.RetentionDays)
 	tx, err := t.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -503,6 +503,41 @@ func (t *Tracker) Trim(ctx context.Context) (int64, error) {
 		t.version.Add(1)
 	}
 	return n, nil
+}
+
+// trimCutoff is the first local day a retention of days keeps: Trim
+// deletes the finished plays that started on an earlier day.
+func (t *Tracker) trimCutoff(days int) string {
+	cutoff, _, _ := t.localTime(t.now().AddDate(0, 0, -days))
+	return cutoff
+}
+
+// CountOlderThan is how many plays Trim would delete now with a retention
+// of days, by the same rule: finished plays from before the cutoff day. 0
+// days keeps every play, so none. The day index counts without reading
+// rows; the few unfinished plays before the cutoff are taken off.
+func (t *Tracker) CountOlderThan(ctx context.Context, days int) (int64, error) {
+	if t.db == nil || days <= 0 {
+		return 0, nil
+	}
+	cutoff := t.trimCutoff(days)
+	var n int64
+	err := t.db.QueryRowContext(ctx, `SELECT
+		(SELECT COUNT(*) FROM plays INDEXED BY plays_day_idx WHERE local_day < ?) -
+		(SELECT COUNT(*) FROM plays INDEXED BY plays_open_idx WHERE stopped_at IS NULL AND local_day < ?)`, cutoff, cutoff).Scan(&n)
+	return n, err
+}
+
+// CountLibraryPlays is how many plays in history were of a library's
+// files. Removing the library keeps them: history_items holds their titles.
+// It reads plays_stats_idx, which holds library_id, rather than the rows.
+func (t *Tracker) CountLibraryPlays(ctx context.Context, libraryID int64) (int64, error) {
+	if t.db == nil {
+		return 0, nil
+	}
+	var n int64
+	err := t.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM plays INDEXED BY plays_stats_idx WHERE library_id = ?`, libraryID).Scan(&n)
+	return n, err
 }
 
 func placeholders(n int) string {

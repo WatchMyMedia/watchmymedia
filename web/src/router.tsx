@@ -10,6 +10,7 @@ import { ShowPage } from './pages/ShowPage'
 import { validateHistorySearch, validateStatsSearch } from './pages/activity/shared'
 import { episodeRedirect, validateBrowseSearch, validateEditSearch, validateGuideSearch, validateNewListSearch, validatePlaySearch, validateSeasonSearch, type BrowseSearch } from './lib/routeSearch'
 import { validateSetupSearch } from './lib/setupRules'
+import { settingsRedirect } from './lib/settingsRoutes'
 
 // Pages most visits never open load on first use, keeping the player's
 // hls.js, settings and activity out of the first download. The router
@@ -106,26 +107,45 @@ const adminRoute = createRoute({
     throw redirect({ to: '/settings', replace: true })
   },
 })
+// Pages and tasks under a tab (PLAN-ADMIN-SETTINGS.md §4) share the tab's
+// component, which reads the rest of the address; one that names no page goes
+// to the tab's hub.
+function settingsSubpageGuard({ location }: { location: { pathname: string } }) {
+  const to = settingsRedirect(location.pathname)
+  if (to) throw redirect({ href: to, replace: true })
+}
 const settingsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/settings', component: SettingsLayout })
 const settingsIndexRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/', component: PlaybackSettings })
 const settingsPlaybackRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/playback', component: PlaybackSettings })
 const settingsAccountRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/account', component: AccountSettings })
+const settingsAccountSubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/account/$', beforeLoad: settingsSubpageGuard, component: AccountSettings })
 const settingsGeneralRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/general', component: GeneralSettings })
+const settingsGeneralSubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/general/$', beforeLoad: settingsSubpageGuard, component: GeneralSettings })
 const settingsLiveTVRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/live-tv', component: LiveTVSettings })
+const settingsLiveTVSubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/live-tv/$', beforeLoad: settingsSubpageGuard, component: LiveTVSettings })
 const settingsLibrariesRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/libraries', component: LibrariesSettings })
+const settingsLibrariesSubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/libraries/$', beforeLoad: settingsSubpageGuard, component: LibrariesSettings })
 const settingsUsersRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/users', component: UsersSettings })
+const settingsUsersSubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/users/$', beforeLoad: settingsSubpageGuard, component: UsersSettings })
 const settingsHistoryRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/history', component: HistorySettings })
 const settingsTranscodingRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/transcoding', component: TranscodingSettings })
+const settingsTranscodingSubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/transcoding/$', beforeLoad: settingsSubpageGuard, component: TranscodingSettings })
 const settingsSubtitlesRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/subtitles', component: AudioSubtitlesSettings })
+const settingsSubtitlesSubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/subtitles/$', beforeLoad: settingsSubpageGuard, component: AudioSubtitlesSettings })
 const settingsSignInRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/sign-in', beforeLoad: () => { throw redirect({ to: '/settings/security', replace: true }) } })
 const settingsSecurityRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/security', component: SecuritySettings })
+const settingsSecuritySubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/security/$', beforeLoad: settingsSubpageGuard, component: SecuritySettings })
 const settingsBackupsRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/backups', component: BackupsSettings })
+const settingsBackupsSubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/backups/$', beforeLoad: settingsSubpageGuard, component: BackupsSettings })
 const settingsIntegrationsRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/integrations', component: IntegrationsSettings })
+const settingsIntegrationsSubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/integrations/$', beforeLoad: settingsSubpageGuard, component: IntegrationsSettings })
 const settingsPlexRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/plex', component: PlexSettings })
+const settingsPlexSubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/plex/$', beforeLoad: settingsSubpageGuard, component: PlexSettings })
 const settingsRequestsRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/requests', component: MyRequestsSettings })
 const settingsInboxRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/inbox', component: InboxSettings })
 const settingsListsRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/lists', component: ListsSettings })
 const settingsAboutRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/about', component: AboutSettings })
+const settingsUnknownRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/$', beforeLoad: settingsSubpageGuard })
 const setupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/setup',
@@ -367,6 +387,18 @@ const routeTree = rootRoute.addChildren([
     settingsSignInRoute,
     settingsSecurityRoute,
     settingsBackupsRoute,
+    settingsAccountSubRoute,
+    settingsGeneralSubRoute,
+    settingsLiveTVSubRoute,
+    settingsLibrariesSubRoute,
+    settingsUsersSubRoute,
+    settingsTranscodingSubRoute,
+    settingsSubtitlesSubRoute,
+    settingsSecuritySubRoute,
+    settingsBackupsSubRoute,
+    settingsIntegrationsSubRoute,
+    settingsPlexSubRoute,
+    settingsUnknownRoute,
   ]),
   setupRoute,
   searchRoute,

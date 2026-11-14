@@ -100,6 +100,10 @@ type Deps struct {
 	Net               *netguard.Guard
 	Upload            *upload.Limiter
 	RemoteAdminConfig *bool
+	// TMDBKeyFromConfig is set when config.yaml or the environment has a
+	// TMDB key (tmdb.api_key), which a saved key overrides; it is the one
+	// used again after the saved key is removed and the server restarts.
+	TMDBKeyFromConfig bool
 	// HSTS sends Strict-Transport-Security (set when served over HTTPS).
 	HSTS bool
 	// Activity records plays; nil turns Now playing, history and statistics off.
@@ -253,6 +257,7 @@ func New(deps Deps) (*chi.Mux, huma.API) {
 	registerPlans(h, deps)
 	registerActivity(h, deps)
 	registerSettings(h, r, deps)
+	registerRemovalCounts(h, deps)
 	registerUpdates(h, deps)
 	registerIntegrations(h, r, deps)
 	registerPlex(h, deps)

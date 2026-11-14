@@ -6,6 +6,8 @@ import { settingsQuery } from '../../api/settings'
 import { requestOptionsQuery } from '../../api/requests'
 import { useEventState } from '../../api/events'
 import { adminAwayWording } from '../../lib/adminAway'
+import { parseSettingsPath, settingsCrumbs, settingsHref, type SettingsTab } from '../../lib/settingsRoutes'
+import { Breadcrumb, HrefLink } from '../../components/settings/Frame'
 import { useSettingsAccess } from './shared'
 
 type SettingsPath =
@@ -33,11 +35,22 @@ type Tab = { to: SettingsPath; label: string; extra?: (current: boolean) => Reac
  * Settings: a tab per page, in a You group everyone has and a Server group
  * for admins. Phones show the tabs as a list on /settings and one page at a
  * time; wider screens keep the tabs beside the page and open on Playback.
+ *
+ * Each tab opens on its hub; pages under it keep the tabs beside them, and a
+ * task's flow takes the whole window with its own Exit
+ * (PLAN-ADMIN-SETTINGS.md §3.1, §3.2).
  */
 export function SettingsLayout() {
-  const { admin, adminLimit } = useSettingsAccess()
   const path = useRouterState({ select: (s) => s.location.pathname.replace(/\/$/, '') })
+  const page = parseSettingsPath(path)
+  if (page?.kind === 'flow') return <Outlet />
+  return <SettingsWithTabs path={path} />
+}
+
+function SettingsWithTabs({ path }: { path: string }) {
+  const { admin, adminLimit } = useSettingsAccess()
   const index = path === '/settings'
+  const page = parseSettingsPath(path)
   const libraries = useQuery({ ...librariesQuery, enabled: admin })
   const settings = useQuery({ ...settingsQuery, enabled: admin })
   const unmatched = libraries.data?.items.reduce((n, l) => n + l.unmatchedCount, 0) ?? 0
@@ -92,7 +105,9 @@ export function SettingsLayout() {
     { to: '/settings/backups', label: 'Backups' },
   ]
   // Wide screens show Playback on /settings itself, so its tab is the current one there.
-  const isCurrent = (to: SettingsPath) => path === to || (index && to === '/settings/playback')
+  const isCurrent = (to: SettingsPath) => (!index && page !== null && settingsHref(page.tab) === to) || (index && to === '/settings/playback')
+  // Phones go back one level: from a page under a tab to the tab's hub.
+  const up = page && page.kind === 'item' ? { label: page.label, href: settingsHref(page.tab) } : { label: 'Settings', href: '/settings' }
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8 md:flex-row md:items-start md:gap-12">
@@ -114,26 +129,53 @@ export function SettingsLayout() {
         <ServerCard name={settings.data ? settings.data.serverName || settings.data.serverNameDefault : undefined} />
       </aside>
       <div className={`${index ? 'hidden md:block' : ''} min-w-0 flex-1`}>
-        <Link to="/settings" className="-ml-1.5 mb-2 inline-flex min-h-[44px] items-center gap-1 pr-2 text-sm text-neutral-300 hover:text-neutral-100 md:hidden">
+        <HrefLink href={up.href} className="-ml-1.5 mb-2 inline-flex min-h-[44px] items-center gap-1 pr-2 text-sm text-neutral-300 hover:text-neutral-100 md:hidden">
           <Chevron direction="left" />
-          Settings
-        </Link>
+          {up.label}
+        </HrefLink>
         <Outlet />
       </div>
     </div>
   )
 }
 
-/** Wraps a Server page: its content for admins on an admin network, else why it is not shown. */
-export function ServerOnly({ children }: { children: ReactNode }) {
+/**
+ * Wraps a Server page: its content for admins the gate lets in, else why it
+ * is not shown (PLAN-ADMIN-SETTINGS.md §3.4): the approved away wording for
+ * an admin kept out, and one line for a member, with no form and no buttons.
+ */
+export function ServerOnly({ children, tab }: { children: ReactNode; tab?: SettingsTab }) {
   const { admin, adminLimit } = useSettingsAccess()
+  const path = useRouterState({ select: (s) => s.location.pathname })
   if (admin) return children
+  const page = parseSettingsPath(path)
+  const crumbs = settingsCrumbs(tab ?? page?.tab ?? 'general')
+  const title = crumbs[crumbs.length - 1].label
   return (
-    <p className="rounded-xl border border-line bg-surface p-5 text-neutral-300">
-      {adminLimit
-        ? `${adminAwayWording(adminLimit).long} Playback, Audio & subtitles and Account & devices work from anywhere. So does reading Activity.`
-        : 'Only the server’s admins can change these settings.'}
-    </p>
+    <div>
+      <Breadcrumb crumbs={crumbs} className="mb-3" />
+      <h2 className="mb-6 text-[22px] font-semibold tracking-tight">{title}</h2>
+      <div className="rounded-xl border border-line bg-surface p-5">
+        {adminLimit ? (
+          <>
+            <p>{adminAwayWording(adminLimit).long}</p>
+            <p className="mt-2.5 text-sm text-neutral-400">
+              Playback, Audio &amp; subtitles and Account &amp; devices work from anywhere. So does reading{' '}
+              <Link to="/activity" className="text-neutral-200 underline">Activity</Link>.
+            </p>
+          </>
+        ) : (
+          <>
+            <p>Only admins can change the server’s settings.</p>
+            <p className="mt-2 text-sm text-neutral-400">
+              Your own settings are under <Link to="/settings/playback" className="text-neutral-200 underline">Playback</Link>,{' '}
+              <Link to="/settings/subtitles" className="text-neutral-200 underline">Audio &amp; subtitles</Link> and{' '}
+              <Link to="/settings/account" className="text-neutral-200 underline">Account &amp; devices</Link>.
+            </p>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 

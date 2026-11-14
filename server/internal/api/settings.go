@@ -38,6 +38,8 @@ import (
 type Settings struct {
 	TMDBConfigured bool   `json:"tmdbConfigured"`
 	TMDBKeyHint    string `json:"tmdbKeyHint,omitempty" doc:"Last four characters of the stored key."`
+	// TMDBKeyFromConfig tells the page what removing the saved key leaves.
+	TMDBKeyFromConfig bool `json:"tmdbKeyFromConfig" required:"false" doc:"config.yaml or the environment (tmdb.api_key, WATCHMYMEDIA_TMDB_API_KEY) has a TMDB key too. A saved key overrides it; after the saved key is removed, the server uses that one again from its next restart."`
 	HWAccel        string `json:"hwaccel" enum:"auto,software,videotoolbox,nvenc,qsv,vaapi,amf"`
 	// HWDevice is the requested adapter, nil for the backend default.
 	HWDevice            *int                          `json:"hwDevice,omitempty" required:"false" doc:"Requested adapter: a CUDA index for NVENC, the render node number for QSV and VAAPI on Linux (N is /dev/dri/renderD128+N), a DirectX index for QSV/AMF on Windows; absent means backend default."`
@@ -240,17 +242,21 @@ func registerSettings(h huma.API, r *chi.Mux, deps Deps) {
 		Description: "Stored values take effect immediately. Remote admin and Turnstile configured in config.yaml or the environment cannot be changed here.",
 		Tags:        []string{"settings"},
 	}), func(ctx context.Context, in *UpdateSettingsInput) (*SettingsOutput, error) {
-		if in.Body.Turnstile != nil || in.Body.Upload != nil {
-			if err := requireConfirmed(ctx, deps, "updateSettings", nil); err != nil {
-				return nil, err
-			}
-		}
+		// A change config.yaml decides is refused before the password is
+		// asked for, since entering it would not help.
 		if in.Body.RemoteAdmin != nil {
 			if deps.RemoteAdminConfig != nil {
 				return nil, huma.Error409Conflict("remote admin is set by network.remote_admin in config.yaml or the environment; change it there")
 			}
 			if *in.Body.RemoteAdmin && !netguard.Trusted(ctx) {
 				return nil, huma.Error403Forbidden("turn remote admin on from your home network or tailnet")
+			}
+		}
+		// Turning remote admin off away from home locks this browser out of
+		// admin settings until it is back home, so it asks for the password.
+		if in.Body.Turnstile != nil || in.Body.Upload != nil || (in.Body.RemoteAdmin != nil && !*in.Body.RemoteAdmin) {
+			if err := requireConfirmed(ctx, deps, "updateSettings", nil); err != nil {
+				return nil, err
 			}
 		}
 		hardwareChanged := in.Body.HWAccel != nil || in.Body.HWDevice != nil
@@ -555,11 +561,14 @@ func registerSettings(h huma.API, r *chi.Mux, deps Deps) {
 		Method:        http.MethodDelete,
 		Path:          Prefix + "/libraries/{id}",
 		Summary:       "Remove a library and everything indexed from it (admin)",
-		Description:   "Files on disk are untouched. Watch history for its items is removed.",
+		Description:   "Files on disk are untouched. Watch history for its items is removed. Away from home it needs the password entered again (confirmPassword).",
 		Tags:          []string{"libraries"},
 		DefaultStatus: http.StatusNoContent,
 	}), func(ctx context.Context, in *LibraryIDInput) (*struct{}, error) {
 		if _, err := getLibrary(ctx, deps, in.ID); err != nil {
+			return nil, err
+		}
+		if err := requireConfirmed(ctx, deps, "deleteLibrary", in.ID); err != nil {
 			return nil, err
 		}
 		if err := deps.Queries.DeleteLibrary(ctx, in.ID); err != nil {
@@ -585,6 +594,10 @@ func registerSettings(h huma.API, r *chi.Mux, deps Deps) {
 		}
 		keep, _ := strconv.Atoi(mustGet(ctx, deps, settings.KeyBackupKeep, "7"))
 		path, err := backup.Save(ctx, deps.Conn, deps.DataDir, keep)
+		if explained := backupError(err); explained != nil {
+			deps.Log.WarnContext(ctx, "backup failed", "err", err)
+			return nil, explained
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -641,7 +654,8 @@ func mustGet(ctx context.Context, deps Deps, key, def string) string {
 }
 
 func currentSettings(ctx context.Context, deps Deps) Settings {
-	s := Settings{RemoteAdmin: &RemoteAdminSettings{Enabled: deps.Net != nil && deps.Net.RemoteAdmin(), FromConfig: deps.RemoteAdminConfig != nil}, DataDir: deps.DataDir, Backups: []backup.Info{}, HWAccel: "auto"}
+	s := Settings{RemoteAdmin: &RemoteAdminSettings{Enabled: deps.Net != nil && deps.Net.RemoteAdmin(), FromConfig: deps.RemoteAdminConfig != nil}, DataDir: deps.DataDir, Backups: []backup.Info{}, HWAccel: "auto",
+		TMDBKeyFromConfig: deps.TMDBKeyFromConfig}
 	if deps.Upload != nil {
 		snapshot := deps.Upload.Snapshot()
 		s.Upload = &snapshot

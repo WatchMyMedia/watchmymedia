@@ -9,6 +9,74 @@ import (
 	"context"
 )
 
+const countLibraryRemoval = `-- name: CountLibraryRemoval :one
+SELECT
+    (SELECT COUNT(*) FROM movies WHERE movies.library_id = ?1) AS movies,
+    (SELECT COUNT(*) FROM shows WHERE shows.library_id = ?1) AS shows,
+    (SELECT COUNT(*) FROM shows AS s CROSS JOIN episodes AS e ON e.show_id = s.id
+        WHERE s.library_id = ?1) AS episodes,
+    (SELECT COUNT(*) FROM media_files INDEXED BY media_files_library_status_idx
+        WHERE media_files.library_id = ?1 AND media_files.extra_kind IS NULL) AS files
+`
+
+type CountLibraryRemovalRow struct {
+	Movies   int64 `json:"movies"`
+	Shows    int64 `json:"shows"`
+	Episodes int64 `json:"episodes"`
+	Files    int64 `json:"files"`
+}
+
+// What removing a library takes with it: its movies, shows and episodes,
+// and its video files, present or missing (trailer files go too but are
+// not counted, as the library's own counts leave them out). Each count
+// reads an index that starts with library_id or show_id, never the rows.
+func (q *Queries) CountLibraryRemoval(ctx context.Context, libraryID int64) (CountLibraryRemovalRow, error) {
+	row := q.db.QueryRowContext(ctx, countLibraryRemoval, libraryID)
+	var i CountLibraryRemovalRow
+	err := row.Scan(
+		&i.Movies,
+		&i.Shows,
+		&i.Episodes,
+		&i.Files,
+	)
+	return i, err
+}
+
+const countLibraryWatchState = `-- name: CountLibraryWatchState :one
+SELECT
+    CAST(COALESCE(SUM(w.completed != 0), 0) AS INTEGER) AS watched,
+    CAST(COALESCE(SUM(w.completed = 0), 0) AS INTEGER) AS in_progress,
+    COUNT(DISTINCT w.user_id) AS people
+FROM (
+    SELECT ws.user_id, ws.completed
+    FROM movies AS m CROSS JOIN watch_state AS ws INDEXED BY watch_state_item_idx
+        ON ws.item_type = 'movie' AND ws.item_id = m.id
+    WHERE m.library_id = ?1
+    UNION ALL
+    SELECT ws.user_id, ws.completed
+    FROM shows AS s CROSS JOIN episodes AS e ON e.show_id = s.id
+        CROSS JOIN watch_state AS ws INDEXED BY watch_state_item_idx
+        ON ws.item_type = 'episode' AND ws.item_id = e.id
+    WHERE s.library_id = ?1
+) AS w
+`
+
+type CountLibraryWatchStateRow struct {
+	Watched    int64 `json:"watched"`
+	InProgress int64 `json:"in_progress"`
+	People     int64 `json:"people"`
+}
+
+// The watched marks and resume points removing a library deletes (by the
+// movies_delete_watch and episodes_delete_watch triggers), and how many
+// people they belong to. Each item seeks watch_state_item_idx.
+func (q *Queries) CountLibraryWatchState(ctx context.Context, libraryID int64) (CountLibraryWatchStateRow, error) {
+	row := q.db.QueryRowContext(ctx, countLibraryWatchState, libraryID)
+	var i CountLibraryWatchStateRow
+	err := row.Scan(&i.Watched, &i.InProgress, &i.People)
+	return i, err
+}
+
 const getLibrary = `-- name: GetLibrary :one
 SELECT id, type, name, path, created_at, updated_at, last_scanned_at, last_scan_error, last_scan_error_at FROM libraries WHERE id = ?
 `

@@ -69,3 +69,35 @@ body {
     width: 100%;
   }
 }
+
+/* Settings flows (PLAN-ADMIN-SETTINGS.md §6): steps slide in the direction of
+   travel and messages fade in where they appear; nothing moves for people who
+   ask for reduced motion. */
+.settings-fade {
+  animation: settings-fade 160ms ease-out;
+}
+.settings-step-forward {
+  animation: settings-step-forward 200ms ease-out;
+}
+.settings-step-back {
+  animation: settings-step-back 200ms ease-out;
+}
+@keyframes settings-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes settings-step-forward {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes settings-step-back {
+  from { opacity: 0; transform: translateX(-24px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-fade,
+  .settings-step-forward,
+  .settings-step-back {
+    animation: none;
+  }
+}

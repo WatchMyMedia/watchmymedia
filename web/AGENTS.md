@@ -83,6 +83,18 @@ the user asks in this conversation; see Authority in the root file.
   carries an `aria-label` naming the whole target. No quality badge on any
   card; quality is a fact on the hero and the detail pages. The apps keep
   PLAN-EPISODE-PAGE.md §10 (`addedEpisode` stays for them).
+- **Settings** (PLAN-ADMIN-SETTINGS.md): each tab opens on a hub, and each
+  task with more than one step is a flow at its own address under the tab.
+  `src/lib/settingsRoutes.ts` lists every address and whether it is a hub, an
+  item page or a flow (flows take the whole window, without the app bar or the
+  sidebar); a tab's component reads it with `useSettingsPage()` and keeps its
+  screens in `src/pages/settings/<tab>/`. Build them from
+  `src/components/settings/` (`HubPage`, `FlowFrame`, `ConfirmDialog`,
+  `SaveBar`, `LeaveCheck`, …) and the step rules in `src/lib/flowSteps.ts`.
+  A switch or a choice saves at once and says so in its row; typed fields are
+  drafts with the save bar. A button whose request asks for the password away
+  from home is `guarded`, so it carries a lock there, and its call goes
+  through `withConfirm`. Removes use `ConfirmDialog`, never `window.confirm`.
 - **Server features by level**: the web app is served by the same server it
   talks to, so it can rely on the current API. The receiver can't: it is
   deployed separately and loads against any server version, so it reads the
