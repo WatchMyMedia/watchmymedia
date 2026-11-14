@@ -878,8 +878,10 @@ minutes of playing a file, before and after a change.
   with no key (seen on the `android-37.0` image: `adb shell input keyevent
   KEYCODE_BACK` reaches the app through `WindowOnBackDispatcher`). `onBack`
   takes both, once a press, and the overlay enabled last takes it first;
-  `onPreviewKeyEvent` or `BackHandler` alone misses one. A `TvDialog` gets
-  Back from its own window.
+  `onPreviewKeyEvent` or `BackHandler` alone misses one. Something that
+  floats over every screen, like the reminder banner, passes
+  `overlay = true`, so it also comes before a page opened after it. A
+  `TvDialog` gets Back from its own window.
 - **TV sizes**: a 1080p Google TV is 960×540 dp, so `TvTheme` sets the
   density to make the window 1920 dp wide. Inside it, a mockup px is a dp
   on every TV and on the tablet emulator. `Dialog`, `Popup` and

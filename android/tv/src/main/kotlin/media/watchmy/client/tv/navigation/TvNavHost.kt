@@ -180,7 +180,7 @@ fun TvNavHost(
     CompositionLocalProvider(LocalRequestBadge provides badge, LocalLiveTVAvailable provides live.available) {
         // The banner never takes focus: Hold OK watches and Back dismisses, before the screen sees them.
         Box(
-            Modifier.fillMaxSize().onBack(enabled = banner != null) { dismiss() }.onPreviewKeyEvent { event ->
+            Modifier.fillMaxSize().onBack(enabled = banner != null, overlay = true) { dismiss() }.onPreviewKeyEvent { event ->
                 banner != null && bannerKeys.handle(event.nativeKeyEvent.keyCode, event.type == KeyEventType.KeyDown, event.nativeKeyEvent.repeatCount)
             }.onKeyEvent { event ->
                 // The remote's Guide opens Live TV from any screen that doesn't take it itself (the Live TV player does).

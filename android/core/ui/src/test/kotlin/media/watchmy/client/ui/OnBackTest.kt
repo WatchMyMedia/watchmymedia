@@ -30,7 +30,8 @@ import org.robolectric.annotation.Config
 /**
  * [onBack] takes Back as the remote's key and as a back callback (Android 16
  * and later send TV apps only the callback), once a press either way, and
- * the overlay enabled last takes it first.
+ * the overlay enabled last takes it first; one marked as an overlay comes
+ * before every screen.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -40,6 +41,7 @@ class OnBackTest {
 
     private val calls = mutableListOf<String>()
     private var overlay by mutableStateOf(false)
+    private var banner by mutableStateOf(false)
     private var screen by mutableStateOf(true)
     private var fallback = 0
 
@@ -55,9 +57,11 @@ class OnBackTest {
         }
         compose.setContent {
             val focus = remember { FocusRequester() }
-            Box(Modifier.onBack(enabled = overlay) { calls += "overlay" }) {
-                Box(Modifier.onBack(enabled = screen) { calls += "screen" }) {
-                    Box(Modifier.size(10.dp).testTag("item").focusRequester(focus).focusable())
+            Box(Modifier.onBack(enabled = banner, overlay = true) { calls += "banner" }) {
+                Box(Modifier.onBack(enabled = overlay) { calls += "overlay" }) {
+                    Box(Modifier.onBack(enabled = screen) { calls += "screen" }) {
+                        Box(Modifier.size(10.dp).testTag("item").focusRequester(focus).focusable())
+                    }
                 }
             }
             androidx.compose.runtime.LaunchedEffect(Unit) { focus.requestFocus() }
@@ -90,6 +94,25 @@ class OnBackTest {
         pressBackKey()
         backCallback()
         assertEquals(listOf("overlay", "overlay"), calls)
+    }
+
+    @Test
+    fun `one marked overlay comes before a screen that opened after it`() {
+        content()
+        banner = true
+        compose.waitForIdle()
+        // The screen registers again after the banner, as a page opened under it would.
+        screen = false
+        compose.waitForIdle()
+        screen = true
+        compose.waitForIdle()
+        backCallback()
+        pressBackKey()
+        assertEquals(listOf("banner", "banner"), calls)
+        banner = false
+        compose.waitForIdle()
+        backCallback()
+        assertEquals(listOf("banner", "banner", "screen"), calls)
     }
 
     @Test
