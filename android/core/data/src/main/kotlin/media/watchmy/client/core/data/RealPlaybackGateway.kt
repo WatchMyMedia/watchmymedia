@@ -35,6 +35,9 @@ import media.watchmy.client.model.SubtitleRequestMode
 import media.watchmy.client.core.api.models.AutomaticSubtitleInputBody
 import media.watchmy.client.model.Trickplay
 import java.net.URLEncoder
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 /**
  * The player's server calls. URLs come back absolute and without a token;
@@ -69,11 +72,19 @@ internal class RealPlaybackGateway(
         )
         val recordingId = request.recordingId
         if (recordingId != null && !features.liveRecordings) throw ApiException(404, "Recording playback needs a newer server.")
-        val (base, reply) = server.call { base, client ->
-            base to if (recordingId != null) LiveTvApi(base, client).startLiveTVRecordingPlayback(recordingId, body)
-            else PlaybackApi(base, client).startPlayback(request.fileId, body)
+        // A level-28 server signs a session's decision with a media token; a cast token's gets none.
+        val tokenComes = features.tokenWithDecision && server !is CastTokenAccess
+        return coroutineScope {
+            // Otherwise the token is asked for beside the decision, not after it. A failed one
+            // is left to the player, which asks again and reports that failure.
+            val token = if (request.withMediaToken && !tokenComes) async { orNull { newMediaToken() } } else null
+            val (base, reply) = server.call { base, client ->
+                base to if (recordingId != null) LiveTvApi(base, client).startLiveTVRecordingPlayback(recordingId, body)
+                else PlaybackApi(base, client).startPlayback(request.fileId, body)
+            }
+            val decision = reply.toModel(base, server.features(), sheetToken = (server as? CastTokenAccess)?.token)
+            if (decision.mediaToken != null || token == null) decision else decision.copy(mediaToken = token.await())
         }
-        return reply.toModel(base, server.features(), sheetToken = (server as? CastTokenAccess)?.token)
     }
 
     override suspend fun reportProgress(report: ProgressReport): ProgressReply {
@@ -245,7 +256,17 @@ internal class RealPlaybackGateway(
                     val end = epochMs(it.endsAt)
                     if (start != null && end != null && end > start) GrowingRecording(start, end) else null
                 },
+                mediaToken = mediaToken?.takeIf { features.tokenWithDecision && it.token.isNotBlank() }?.toModel(base),
             )
+        }
+
+        /** [block]'s result, or null when it fails; cancellation still cancels. */
+        private suspend fun <T> orNull(block: suspend () -> T): T? = try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
         }
 
         private fun ApiTrickplay.toModel(base: String, token: String?): Trickplay? {

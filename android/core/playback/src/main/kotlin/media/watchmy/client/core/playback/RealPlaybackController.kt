@@ -624,18 +624,23 @@ class RealPlaybackController(
             subtitleMode = if (v.subtitleManuallyChosen && subtitleId == null) SubtitleRequestMode.Off else SubtitleRequestMode.Auto,
             autoRecovery = quality == StreamQuality.Auto && v.request.recordingId == null,
             switchGeneration = switchGeneration,
+            withMediaToken = tokens.fresh() == null,
         )
         v.askedAt = clock.elapsedMs()
-        // The token after the decision: a downloaded item plays from the device and needs none,
-        // which the gateway knows only once it has decided (PLAN-DOWNLOADS.md §10.4).
+        // The token comes with the decision, from the server or asked for beside it. A downloaded
+        // item plays from the device and brings none: it needs none (PLAN-DOWNLOADS.md §10.4).
         var decision = withContext(io) { gateway.decide(request) }
+        decision.mediaToken?.let(tokens::accept)
         // An automatic ASS default needs the same faithful server renderer as a manual choice.
         val selected = subtitleId ?: decision.subtitleId
         val track = decision.subtitles.firstOrNull { it.option.id == selected }
         if (!decision.isOffline && !burnIn && track != null && needsBurnIn(track) && decision.burnInSubtitleId != selected) {
             val first = decision
             try {
-                decision = withContext(io) { gateway.decide(request.copy(playId = first.playId, subtitleId = selected, burnIn = true)) }
+                decision = withContext(io) {
+                    gateway.decide(request.copy(playId = first.playId, subtitleId = selected, burnIn = true, withMediaToken = tokens.fresh() == null))
+                }
+                decision.mediaToken?.let(tokens::accept)
             } catch (e: Exception) {
                 first.sessionId?.takeIf { it != v.decision?.sessionId }?.let { outbox.trySend(Outgoing.EndSession(it)) }
                 throw e
@@ -646,6 +651,7 @@ class RealPlaybackController(
         return decision
     }
 
+    /** A token for the stream when none came with the decision: an older server's failed one, or a play from the device. */
     private suspend fun ensureToken() {
         if (tokens.fresh() != null) return
         tokens.accept(withContext(io) { gateway.mediaToken() })

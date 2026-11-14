@@ -1,5 +1,7 @@
 package media.watchmy.client.core.data
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -320,6 +322,55 @@ class PlaybackGatewayTest {
         assertEquals(200L, progress["throughputAgeMs"]!!.jsonPrimitive.long)
         assertEquals(7L, progress["switchGeneration"]!!.jsonPrimitive.long)
         assertEquals(QualityChange(StreamQuality.Original, "Connection recovered", 8), reply.qualityChange)
+    }
+
+    @Test
+    fun `a level 28 decision brings its media token and none is asked for`() = runBlocking {
+        server.always("GET /api/server", json("""{"id":"srv-test","name":"Test server","version":"0.9.0","apiLevel":28,"setupRequired":false,"turnstile":false}"""))
+        h.services.servers.select(h.testServer.copy(apiLevel = 28))
+        val token = """"mediaToken":{"token":"m1.decided","expiresAt":"2026-10-29T23:09:35Z","param":"access_token"}"""
+        server.always("POST /api/files/4/playback", json(fixture("decision-hls.json").trimEnd().removeSuffix("}") + ",$token}"))
+        val d = gateway.decide(DecisionRequest(4, profile, h.services.client, withMediaToken = true))
+        assertEquals("m1.decided", d.mediaToken?.token)
+        assertEquals(epochMs("2026-10-29T23:09:35Z"), d.mediaToken?.expiresAtMs)
+        assertEquals("the token is for this server's URLs only", server.baseUrl, d.mediaToken?.serverUrl)
+        assertTrue(server.requests("POST /api/auth/media-token").isEmpty())
+        assertFalse("never sent to the server", "withMediaToken" in h.body(server.last("POST /api/files/4/playback")))
+
+        // A recording's decision brings one too.
+        server.always("POST /api/live-tv/recordings/r1/playback", json(fixture("decision-hls.json").trimEnd().removeSuffix("}") + ",$token}"))
+        assertEquals("m1.decided", gateway.decide(DecisionRequest(0, profile, h.services.client, recordingId = "r1", withMediaToken = true)).mediaToken?.token)
+        assertTrue(server.requests("POST /api/auth/media-token").isEmpty())
+
+        // An older server's reply has none to map, even if one is there.
+        server.always("GET /api/server", json("""{"id":"srv-test","name":"Test server","version":"0.9.0","apiLevel":27,"setupRequired":false,"turnstile":false}"""))
+        h.services.servers.select(h.testServer.copy(apiLevel = 27))
+        assertNull(gateway.decide(DecisionRequest(4, profile, h.services.client)).mediaToken)
+    }
+
+    @Test
+    fun `an older server's token is asked for beside the decision, and only when wanted`() = runBlocking {
+        server.always("POST /api/files/4/playback", json(fixture("decision-hls.json")))
+        server.always("POST /api/auth/media-token", json(fixture("media-token.json")))
+        assertNull(gateway.decide(DecisionRequest(4, profile, h.services.client)).mediaToken)
+        assertTrue("a player holding a fresh token asks for none", server.requests("POST /api/auth/media-token").isEmpty())
+
+        val decision = server.hold("POST /api/files/4/playback")
+        val token = server.hold("POST /api/auth/media-token")
+        val asked = async(Dispatchers.IO) { gateway.decide(DecisionRequest(4, profile, h.services.client, withMediaToken = true)) }
+        decision.awaitArrival()
+        token.awaitArrival()
+        decision.release()
+        token.release()
+        val d = asked.await()
+        assertTrue(d.mediaToken!!.token.startsWith("m1."))
+        assertEquals(server.baseUrl, d.mediaToken!!.serverUrl)
+
+        // A token that fails is left to the player, which asks again; the decision still comes.
+        server.always("POST /api/auth/media-token", problem(500, "no tokens today"))
+        val without = gateway.decide(DecisionRequest(4, profile, h.services.client, withMediaToken = true))
+        assertNull(without.mediaToken)
+        assertEquals("a75ff047261dcc3e", without.sessionId)
     }
 
     @Test
