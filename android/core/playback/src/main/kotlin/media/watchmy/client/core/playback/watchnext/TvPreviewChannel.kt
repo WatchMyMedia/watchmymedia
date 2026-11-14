@@ -8,6 +8,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
+import androidx.core.net.toUri
 import androidx.tvprovider.media.tv.PreviewChannel
 import androidx.tvprovider.media.tv.PreviewChannelHelper
 import androidx.tvprovider.media.tv.PreviewProgram
@@ -104,7 +105,7 @@ class TvPreviewChannel(
         val channel = PreviewChannel.Builder()
             .setDisplayName(CHANNEL_NAME)
             .setInternalProviderId(CHANNEL_ID)
-            .setAppLinkIntentUri(Uri.parse("watchmymedia://home"))
+            .setAppLinkIntentUri("watchmymedia://home".toUri())
             .apply { logo()?.let { setLogo(it) } }
             .build()
         val id = PreviewChannelHelper(app).publishChannel(channel)
@@ -171,7 +172,7 @@ class TvPreviewChannel(
         /** The item's page, for [account] only: watchmymedia://movies/{id} or shows/{id}. */
         fun pageLink(item: BrowseItem, account: String): Uri {
             val kind = if (item.kind == ItemKind.Movie) "movies" else "shows"
-            return Uri.parse("watchmymedia://$kind/${item.id}?source=channel&account=${URLEncoder.encode(account, "UTF-8")}")
+            return "watchmymedia://$kind/${item.id}?source=channel&account=${URLEncoder.encode(account, "UTF-8")}".toUri()
         }
     }
 }

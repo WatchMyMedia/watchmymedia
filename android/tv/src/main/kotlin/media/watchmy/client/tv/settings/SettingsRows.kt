@@ -125,6 +125,8 @@ internal fun SettingRow(
 }
 
 /** Settings' [FocusMemory], which every [SettingRow] registers with. */
+// Internal to Settings, like Cards' LocalCardRowFocus: it saves passing the memory to each of its two dozen rows.
+@Suppress("ComposeCompositionLocalUsage")
 internal val LocalSettingsFocus = staticCompositionLocalOf<FocusMemory?> { null }
 
 /** A row that TalkBack reads as a switch, on or off, and dimmed when it can't change. */

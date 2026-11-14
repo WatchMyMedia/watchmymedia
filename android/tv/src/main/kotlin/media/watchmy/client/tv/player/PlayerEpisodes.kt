@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -131,9 +132,11 @@ internal fun EpisodesPanel(
                     val playingId = state.playing?.id
                     val start = episodes.indexOfFirst { it.id == playingId }.coerceAtLeast(0)
                     val list = rememberLazyListState(initialFirstVisibleItemIndex = start)
+                    // Read through derivedStateOf: the line changes only when the first row does, not at every scroll frame.
+                    val hidden by remember(list) { derivedStateOf { list.firstVisibleItemIndex } }
                     Column {
-                        if (list.firstVisibleItemIndex > 0) {
-                            val above = episodes.take(list.firstVisibleItemIndex)
+                        if (hidden > 0) {
+                            val above = episodes.take(hidden)
                             val watched = above.all { it.watched }
                             Text(
                                 "▲ Episodes ${above.first().number} to ${above.last().number}" + if (watched) ", watched" else "",
