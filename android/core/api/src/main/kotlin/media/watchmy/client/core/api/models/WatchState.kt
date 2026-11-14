@@ -34,12 +34,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param completed 
- * @param durationMs 
- * @param positionMs 
- * @param updatedAt 
+ * @param completed
+ * @param durationMs
+ * @param positionMs
+ * @param updatedAt
  * @param fileId Version the position refers to.
  */
 @Serializable

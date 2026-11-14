@@ -36,14 +36,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param audio 
- * @param fileId 
- * @param mode 
- * @param protocol 
+ * @param audio
+ * @param fileId
+ * @param mode
+ * @param protocol
  * @param reasons Why a cheaper mode was not possible.
- * @param video 
+ * @param video
  */
 @Serializable
 
@@ -71,8 +69,6 @@ data class PlaybackPlan (
 ) {
 
     /**
-     * 
-     *
      * Values: direct,remux,audio,transcode,unknown_default_open_api
      */
     @Serializable(with = ModeSerializer::class)
@@ -98,8 +94,6 @@ data class PlaybackPlan (
         }
     }
     /**
-     * 
-     *
      * Values: file,hls,unknown_default_open_api
      */
     @Serializable(with = ProtocolSerializer::class)

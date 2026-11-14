@@ -36,12 +36,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param adapters 
- * @param diagnostics 
- * @param supported 
- * @param checking 
+ * @param adapters
+ * @param diagnostics
+ * @param supported
+ * @param checking
  */
 @Serializable
 

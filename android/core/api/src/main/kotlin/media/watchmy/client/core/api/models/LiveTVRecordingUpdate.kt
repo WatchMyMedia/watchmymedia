@@ -34,12 +34,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param over With prefer: the clashing recording (one of conflictsWith, not yet recording) that gives way instead. Without it, this recording goes ahead of every recording not yet recording.
- * @param padAfter 
- * @param padBefore 
- * @param prefer 
+ * @param padAfter
+ * @param padBefore
+ * @param prefer
  */
 @Serializable
 

@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param continuing TV: shows that have not ended or been canceled.
  * @param episodes TV: episodes with a present file.
  * @param items Matched movies or shows with a present file.

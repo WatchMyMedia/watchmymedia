@@ -36,12 +36,18 @@ import media.watchmy.client.core.api.models.GroupResult
 import media.watchmy.client.core.api.models.IgnoreFilesInputBody
 import media.watchmy.client.core.api.models.LineUp
 import media.watchmy.client.core.api.models.MatchFilesInputBody
+import media.watchmy.client.core.api.models.MatchSeasonsInputBody
 import media.watchmy.client.core.api.models.MediaFileDetail
 import media.watchmy.client.core.api.models.MediaFileList
+import media.watchmy.client.core.api.models.PreviewSeasonInputBody
 import media.watchmy.client.core.api.models.PutSegmentsInputBody
 import media.watchmy.client.core.api.models.RematchInputBody
 import media.watchmy.client.core.api.models.RematchPlan
 import media.watchmy.client.core.api.models.RematchResult
+import media.watchmy.client.core.api.models.RememberedSeasonLineUpList
+import media.watchmy.client.core.api.models.SeasonLineUpList
+import media.watchmy.client.core.api.models.SeasonPreview
+import media.watchmy.client.core.api.models.SuggestSeasonsInputBody
 import media.watchmy.client.core.api.models.UnmatchedGroupList
 
 import kotlinx.serialization.SerialName
@@ -142,6 +148,91 @@ open class FilesApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/api/files/{id}/match".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /api/libraries/{id}/season-lineups
+     * Forget a remembered season line-up
+     * Files already matched by it stay matched; new files of that season are matched by their own numbers again.
+     * @param id Library ID.
+     * @param folder The show folder, relative to the library.
+     * @param fromSeason 
+     * @param fromEpisode 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun forgetSeasonLineUp(id: kotlin.Long, folder: kotlin.String, fromSeason: kotlin.Long, fromEpisode: kotlin.Long) : Unit = withContext(Dispatchers.IO) {
+        val localVarResponse = forgetSeasonLineUpWithHttpInfo(id = id, folder = folder, fromSeason = fromSeason, fromEpisode = fromEpisode)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /api/libraries/{id}/season-lineups
+     * Forget a remembered season line-up
+     * Files already matched by it stay matched; new files of that season are matched by their own numbers again.
+     * @param id Library ID.
+     * @param folder The show folder, relative to the library.
+     * @param fromSeason 
+     * @param fromEpisode 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun forgetSeasonLineUpWithHttpInfo(id: kotlin.Long, folder: kotlin.String, fromSeason: kotlin.Long, fromEpisode: kotlin.Long) : ApiResponse<Unit?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = forgetSeasonLineUpRequestConfig(id = id, folder = folder, fromSeason = fromSeason, fromEpisode = fromEpisode)
+
+        return@withContext request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation forgetSeasonLineUp
+     *
+     * @param id Library ID.
+     * @param folder The show folder, relative to the library.
+     * @param fromSeason 
+     * @param fromEpisode 
+     * @return RequestConfig
+     */
+    fun forgetSeasonLineUpRequestConfig(id: kotlin.Long, folder: kotlin.String, fromSeason: kotlin.Long, fromEpisode: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                put("folder", listOf(folder.toString()))
+                put("fromSeason", listOf(fromSeason.toString()))
+                put("fromEpisode", listOf(fromEpisode.toString()))
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/api/libraries/{id}/season-lineups".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,
@@ -585,6 +676,79 @@ open class FilesApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * GET /api/libraries/{id}/season-lineups
+     * List the season line-ups remembered for a library&#39;s folders
+     * 
+     * @param id Library ID.
+     * @return RememberedSeasonLineUpList
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun listSeasonLineUps(id: kotlin.Long) : RememberedSeasonLineUpList = withContext(Dispatchers.IO) {
+        val localVarResponse = listSeasonLineUpsWithHttpInfo(id = id)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as RememberedSeasonLineUpList
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /api/libraries/{id}/season-lineups
+     * List the season line-ups remembered for a library&#39;s folders
+     * 
+     * @param id Library ID.
+     * @return ApiResponse<RememberedSeasonLineUpList?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun listSeasonLineUpsWithHttpInfo(id: kotlin.Long) : ApiResponse<RememberedSeasonLineUpList?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = listSeasonLineUpsRequestConfig(id = id)
+
+        return@withContext request<Unit, RememberedSeasonLineUpList>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listSeasonLineUps
+     *
+     * @param id Library ID.
+     * @return RequestConfig
+     */
+    fun listSeasonLineUpsRequestConfig(id: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/api/libraries/{id}/season-lineups".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /api/libraries/{id}/unmatched
      * List a library&#39;s unmatched files, grouped by the decision that fixes them
      * 
@@ -735,6 +899,83 @@ open class FilesApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * POST /api/libraries/{id}/match-seasons
+     * Match files by season line-ups chosen by the user
+     * Each file is linked to the episode its line-up places it on, and locked. A file with no place stays unmatched with the reason. With remember, new files of each season in the files&#39; shared folder follow its line-up.
+     * @param id Library ID.
+     * @param matchSeasonsInputBody 
+     * @return GroupResult
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun matchSeasons(id: kotlin.Long, matchSeasonsInputBody: MatchSeasonsInputBody) : GroupResult = withContext(Dispatchers.IO) {
+        val localVarResponse = matchSeasonsWithHttpInfo(id = id, matchSeasonsInputBody = matchSeasonsInputBody)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as GroupResult
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /api/libraries/{id}/match-seasons
+     * Match files by season line-ups chosen by the user
+     * Each file is linked to the episode its line-up places it on, and locked. A file with no place stays unmatched with the reason. With remember, new files of each season in the files&#39; shared folder follow its line-up.
+     * @param id Library ID.
+     * @param matchSeasonsInputBody 
+     * @return ApiResponse<GroupResult?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun matchSeasonsWithHttpInfo(id: kotlin.Long, matchSeasonsInputBody: MatchSeasonsInputBody) : ApiResponse<GroupResult?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = matchSeasonsRequestConfig(id = id, matchSeasonsInputBody = matchSeasonsInputBody)
+
+        return@withContext request<MatchSeasonsInputBody, GroupResult>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation matchSeasons
+     *
+     * @param id Library ID.
+     * @param matchSeasonsInputBody 
+     * @return RequestConfig
+     */
+    fun matchSeasonsRequestConfig(id: kotlin.Long, matchSeasonsInputBody: MatchSeasonsInputBody) : RequestConfig<MatchSeasonsInputBody> {
+        val localVariableBody = matchSeasonsInputBody
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/api/libraries/{id}/match-seasons".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /api/movies/{id}/rematch
      * Preview moving a movie&#39;s files to another TMDB movie
      * 
@@ -808,6 +1049,83 @@ open class FilesApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/api/movies/{id}/rematch".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /api/libraries/{id}/season-lineups/preview
+     * Preview where a season line-up would put each file
+     * Saves nothing. Lists the show&#39;s seasons and the chosen season&#39;s episodes too, to choose the start from.
+     * @param id Library ID.
+     * @param previewSeasonInputBody 
+     * @return SeasonPreview
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun previewSeasonLineUp(id: kotlin.Long, previewSeasonInputBody: PreviewSeasonInputBody) : SeasonPreview = withContext(Dispatchers.IO) {
+        val localVarResponse = previewSeasonLineUpWithHttpInfo(id = id, previewSeasonInputBody = previewSeasonInputBody)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as SeasonPreview
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /api/libraries/{id}/season-lineups/preview
+     * Preview where a season line-up would put each file
+     * Saves nothing. Lists the show&#39;s seasons and the chosen season&#39;s episodes too, to choose the start from.
+     * @param id Library ID.
+     * @param previewSeasonInputBody 
+     * @return ApiResponse<SeasonPreview?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun previewSeasonLineUpWithHttpInfo(id: kotlin.Long, previewSeasonInputBody: PreviewSeasonInputBody) : ApiResponse<SeasonPreview?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = previewSeasonLineUpRequestConfig(id = id, previewSeasonInputBody = previewSeasonInputBody)
+
+        return@withContext request<PreviewSeasonInputBody, SeasonPreview>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation previewSeasonLineUp
+     *
+     * @param id Library ID.
+     * @param previewSeasonInputBody 
+     * @return RequestConfig
+     */
+    fun previewSeasonLineUpRequestConfig(id: kotlin.Long, previewSeasonInputBody: PreviewSeasonInputBody) : RequestConfig<PreviewSeasonInputBody> {
+        val localVariableBody = previewSeasonInputBody
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/api/libraries/{id}/season-lineups/preview".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,
@@ -1294,6 +1612,83 @@ open class FilesApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/api/libraries/{id}/candidates".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * POST /api/libraries/{id}/season-lineups/suggest
+     * Find the seasons TMDB numbers differently from the files, and a line-up for each
+     * Saves nothing. A suggestion comes from one of TMDB&#39;s other episode orders, from numbers that run on into the next season, from the episode names in the files, from a later show TMDB lists the season as, or from a neighbouring season already lined up.
+     * @param id Library ID.
+     * @param suggestSeasonsInputBody 
+     * @return SeasonLineUpList
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun suggestSeasonLineUps(id: kotlin.Long, suggestSeasonsInputBody: SuggestSeasonsInputBody) : SeasonLineUpList = withContext(Dispatchers.IO) {
+        val localVarResponse = suggestSeasonLineUpsWithHttpInfo(id = id, suggestSeasonsInputBody = suggestSeasonsInputBody)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as SeasonLineUpList
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * POST /api/libraries/{id}/season-lineups/suggest
+     * Find the seasons TMDB numbers differently from the files, and a line-up for each
+     * Saves nothing. A suggestion comes from one of TMDB&#39;s other episode orders, from numbers that run on into the next season, from the episode names in the files, from a later show TMDB lists the season as, or from a neighbouring season already lined up.
+     * @param id Library ID.
+     * @param suggestSeasonsInputBody 
+     * @return ApiResponse<SeasonLineUpList?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun suggestSeasonLineUpsWithHttpInfo(id: kotlin.Long, suggestSeasonsInputBody: SuggestSeasonsInputBody) : ApiResponse<SeasonLineUpList?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = suggestSeasonLineUpsRequestConfig(id = id, suggestSeasonsInputBody = suggestSeasonsInputBody)
+
+        return@withContext request<SuggestSeasonsInputBody, SeasonLineUpList>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation suggestSeasonLineUps
+     *
+     * @param id Library ID.
+     * @param suggestSeasonsInputBody 
+     * @return RequestConfig
+     */
+    fun suggestSeasonLineUpsRequestConfig(id: kotlin.Long, suggestSeasonsInputBody: SuggestSeasonsInputBody) : RequestConfig<SuggestSeasonsInputBody> {
+        val localVariableBody = suggestSeasonsInputBody
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.POST,
+            path = "/api/libraries/{id}/season-lineups/suggest".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,

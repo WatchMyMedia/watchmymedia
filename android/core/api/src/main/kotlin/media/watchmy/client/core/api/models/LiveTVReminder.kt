@@ -34,20 +34,18 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param end 
- * @param id 
- * @param number 
+ * @param end
+ * @param id
+ * @param number
  * @param programmeId The listing it is for, as in the guide.
- * @param start 
+ * @param start
  * @param state set; moved, when a refresh moved the programme to start; or gone, when it is no longer in the listings and nothing should notify. Other values may follow.
- * @param title 
+ * @param title
  * @param channelId The viewer's channel with this number; absent when no such channel is available now.
- * @param channelName 
- * @param episode 
- * @param episodeTitle 
- * @param season 
+ * @param channelName
+ * @param episode
+ * @param episodeTitle
+ * @param season
  */
 @Serializable
 

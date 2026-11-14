@@ -36,19 +36,17 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param mediaType 
- * @param overview 
- * @param state 
- * @param title 
- * @param tmdbId 
+ * @param mediaType
+ * @param overview
+ * @param state
+ * @param title
+ * @param tmdbId
  * @param movieId The library's movie, when it has one.
- * @param posterPath 
- * @param request 
- * @param seasons 
+ * @param posterPath
+ * @param request
+ * @param seasons
  * @param showId The library's show, when it has one.
- * @param year 
+ * @param year
  */
 @Serializable
 
@@ -92,8 +90,6 @@ data class Requestable (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,tv,unknown_default_open_api
      */
     @Serializable(with = MediaTypeSerializer::class)
@@ -117,8 +113,6 @@ data class Requestable (
         }
     }
     /**
-     * 
-     *
      * Values: requestable,requested,downloading,available,unknown_default_open_api
      */
     @Serializable(with = StateSerializer::class)

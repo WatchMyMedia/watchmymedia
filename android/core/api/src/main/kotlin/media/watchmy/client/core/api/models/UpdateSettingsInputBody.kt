@@ -38,22 +38,20 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param activity 
- * @param backupKeep 
+ * @param activity
+ * @param backupKeep
  * @param hwDevice Adapter index for the explicit hardware backend; -1 resets to its default. Omit to keep, except a backend change clears the old index.
- * @param hwaccel 
+ * @param hwaccel
  * @param listsMdblistKey New MDBList API key, checked with MDBList before it is kept; empty string clears it; omit to keep (API level 22).
- * @param remoteAdmin 
- * @param scanIntervalMinutes 
+ * @param remoteAdmin
+ * @param scanIntervalMinutes
  * @param serverName Empty string goes back to the host name.
- * @param subtitles 
+ * @param subtitles
  * @param tmdbApiKey New key; empty string clears it; omit to keep.
  * @param trailersYouTube List movies' TMDB trailers, which play from YouTube, and let the web app show YouTube's player (on by default).
  * @param trickplayEnabled Make seek thumbnails for every file (on by default).
- * @param turnstile 
- * @param upload 
+ * @param turnstile
+ * @param upload
  */
 @Serializable
 
@@ -110,8 +108,6 @@ data class UpdateSettingsInputBody (
 ) {
 
     /**
-     * 
-     *
      * Values: auto,software,videotoolbox,nvenc,qsv,vaapi,amf,unknown_default_open_api
      */
     @Serializable(with = HwaccelSerializer::class)

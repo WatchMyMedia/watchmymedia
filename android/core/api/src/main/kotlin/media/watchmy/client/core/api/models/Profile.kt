@@ -34,21 +34,19 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param audioCodecs 
- * @param containers 
+ * @param audioCodecs
+ * @param containers
  * @param hdr True when the client can display HDR. Without hdrTypes, HDR video is copied only when this is true; otherwise transcodes tone-map to SDR.
  * @param hdrTypes The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means the profile follows PLAN-HDR-PROFILE: HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it.
  * @param maxAudioChannels 0 means any.
  * @param maxBitrate Bits per second; 0 means unlimited.
- * @param maxHeight 
- * @param maxWidth 
- * @param name 
+ * @param maxHeight
+ * @param maxWidth
+ * @param name
  * @param selectsAudioTrack The player chooses among a direct-play file's audio tracks itself and starts on audio.index, so a track other than the file's default stays direct play instead of a remux. From apiLevel 21; older servers reject it.
  * @param separateAudio VOD playlists carry the audio as its own rendition (EXT-X-MEDIA TYPE=AUDIO, audio.m3u8) instead of muxed with the video. Cast receivers ask for it: they take AC-3 and E-AC-3 only in an audio SourceBuffer of their own. From apiLevel 4.
- * @param subtitleFormats 
- * @param videoCodecs 
+ * @param subtitleFormats
+ * @param videoCodecs
  */
 @Serializable
 

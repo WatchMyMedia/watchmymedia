@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param backend Who carries requests out: none, arr (Radarr and Sonarr) or seerr. movies and shows say whether to offer requests; this only changes the wording, so word a value you don't know as arr. With seerr, a user not linked to a Seerr user can't request.
  * @param inbox Admins: requests waiting for approval plus open problems.
  * @param manage This user can search, monitor and approve (an admin, with Radarr or Sonarr connected).

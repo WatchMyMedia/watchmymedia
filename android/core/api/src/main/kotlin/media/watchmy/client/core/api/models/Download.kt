@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param url 
- * @param propertySize 
+ * @param url
+ * @param propertySize
  */
 @Serializable
 

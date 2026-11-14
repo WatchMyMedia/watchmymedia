@@ -34,13 +34,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param firmware 
- * @param id 
- * @param model 
- * @param name 
- * @param tuners 
+ * @param firmware
+ * @param id
+ * @param model
+ * @param name
+ * @param tuners
  */
 @Serializable
 

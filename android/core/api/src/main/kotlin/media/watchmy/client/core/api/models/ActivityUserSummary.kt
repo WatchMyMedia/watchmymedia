@@ -36,17 +36,15 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param devices 
- * @param isAdmin 
+ * @param devices
+ * @param isAdmin
  * @param playedMs All time.
  * @param playing Plays running now.
  * @param plays All time.
- * @param recordHistory 
- * @param user 
- * @param lastPlayed 
- * @param lastSeenAt 
+ * @param recordHistory
+ * @param user
+ * @param lastPlayed
+ * @param lastSeenAt
  */
 @Serializable
 

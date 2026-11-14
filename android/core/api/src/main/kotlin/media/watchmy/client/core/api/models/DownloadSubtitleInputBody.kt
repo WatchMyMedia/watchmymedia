@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param resultId A search result's id.
  */
 @Serializable

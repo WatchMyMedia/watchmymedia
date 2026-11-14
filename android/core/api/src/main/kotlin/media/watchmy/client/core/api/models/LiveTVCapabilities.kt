@@ -34,17 +34,15 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param allowed This account may watch live television.
  * @param enabled At least one tuner is configured and enabled.
  * @param guide Programme listings are on and at least one channel has them (API level 13).
  * @param playback Live HLS playback is available.
  * @param automatic API level 26: shared-source live Automatic and output generations are available.
- * @param bufferSeconds 
+ * @param bufferSeconds
  * @param canRecord This person may manage household recordings (API level 19).
  * @param cast This account may cast a channel: the server issues cast tokens and a cast token may play Live TV (API level 14).
- * @param pauseSeconds 
+ * @param pauseSeconds
  * @param recording The server has recording enabled and an output folder (API level 19).
  * @param setupComplete A tuner has been added; a library-free server need not return to first-run setup.
  */

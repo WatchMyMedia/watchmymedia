@@ -35,13 +35,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param device 
- * @param firstSeenAt 
- * @param lastIp 
- * @param lastSeenAt 
- * @param plays 
+ * @param device
+ * @param firstSeenAt
+ * @param lastIp
+ * @param lastSeenAt
+ * @param plays
  */
 @Serializable
 

@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param playId An active play started by this sign-in with subtitleMode auto, with automatic download enabled.
  * @param cancel Cancel this play's pending automatic attempt after a manual subtitle choice. Does not restart the video or contact the provider.
  */

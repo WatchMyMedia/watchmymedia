@@ -34,9 +34,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param recordHistory 
+ * @param recordHistory
  * @param seerrUserId Link this person to a Seerr user (from listSeerrUsers) to request through Seerr; 0 unlinks.
  */
 @Serializable

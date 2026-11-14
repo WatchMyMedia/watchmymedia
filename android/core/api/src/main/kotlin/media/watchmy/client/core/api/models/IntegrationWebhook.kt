@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param outside Events for folders outside every library: the path mappings need a look.
- * @param lastEventAt 
- * @param lastTestAt 
+ * @param lastEventAt
+ * @param lastTestAt
  */
 @Serializable
 

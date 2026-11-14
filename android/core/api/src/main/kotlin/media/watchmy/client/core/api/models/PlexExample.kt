@@ -34,16 +34,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param category 
- * @param itemType 
- * @param title 
- * @param episode 
+ * @param category
+ * @param itemType
+ * @param title
+ * @param episode
  * @param itemId The local movie or episode, when matched.
  * @param reason Why it is unmatched or ambiguous, as a reason code.
- * @param season 
- * @param show 
+ * @param season
+ * @param show
  */
 @Serializable
 
@@ -78,8 +76,6 @@ data class PlexExample (
 ) {
 
     /**
-     * 
-     *
      * Values: willMark,alreadyWatched,localKept,unmatched,ambiguous,unavailable,unknown_default_open_api
      */
     @Serializable(with = CategorySerializer::class)
@@ -107,8 +103,6 @@ data class PlexExample (
         }
     }
     /**
-     * 
-     *
      * Values: movie,episode,unknown_default_open_api
      */
     @Serializable(with = ItemTypeSerializer::class)

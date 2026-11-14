@@ -34,21 +34,19 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param burnInOnly 
- * @param codec 
- * @param default 
+ * @param burnInOnly
+ * @param codec
+ * @param default
  * @param `external` Not inside the video: a sidecar file next to it, or a download.
- * @param forced 
- * @param format 
- * @param id 
- * @param hearingImpaired 
- * @param language 
+ * @param forced
+ * @param format
+ * @param id
+ * @param hearingImpaired
+ * @param language
  * @param release A download's release name.
- * @param source 
- * @param title 
- * @param url 
+ * @param source
+ * @param title
+ * @param url
  */
 @Serializable
 
@@ -98,8 +96,6 @@ data class SubtitleTrack (
 ) {
 
     /**
-     * 
-     *
      * Values: webvtt,ass,image,unknown_default_open_api
      */
     @Serializable(with = FormatSerializer::class)
@@ -124,8 +120,6 @@ data class SubtitleTrack (
         }
     }
     /**
-     * 
-     *
      * Values: embedded,sidecar,opensubtitles,unknown_default_open_api
      */
     @Serializable(with = SourceSerializer::class)

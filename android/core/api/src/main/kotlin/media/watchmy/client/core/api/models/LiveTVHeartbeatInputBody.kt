@@ -34,17 +34,18 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param paused 
- * @param bufferedMs 
+ * @param paused
+ * @param adaptiveFailed
+ * @param bufferedMs
  * @param interacted True only after viewer input, not playback progress; releases unattended viewing after four hours and one minute.
- * @param stalls 
+ * @param renditionBitrate
+ * @param renditionHeight
+ * @param stalls
  * @param state API level 26: current live player state for Automatic.
  * @param switchFailedGeneration Reject a prepared live output that failed to play.
  * @param switchGeneration Acknowledge a prepared live output after its first frame.
- * @param throughputAgeMs 
- * @param throughputBps 
+ * @param throughputAgeMs
+ * @param throughputBps
  */
 @Serializable
 
@@ -53,12 +54,21 @@ data class LiveTVHeartbeatInputBody (
     @SerialName(value = "paused")
     val paused: kotlin.Boolean,
 
+    @SerialName(value = "adaptiveFailed")
+    val adaptiveFailed: kotlin.Boolean? = null,
+
     @SerialName(value = "bufferedMs")
     val bufferedMs: kotlin.Long? = null,
 
     /* True only after viewer input, not playback progress; releases unattended viewing after four hours and one minute. */
     @SerialName(value = "interacted")
     val interacted: kotlin.Boolean? = null,
+
+    @SerialName(value = "renditionBitrate")
+    val renditionBitrate: kotlin.Long? = null,
+
+    @SerialName(value = "renditionHeight")
+    val renditionHeight: kotlin.Long? = null,
 
     @SerialName(value = "stalls")
     val stalls: kotlin.Long? = null,

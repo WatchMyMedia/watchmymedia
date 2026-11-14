@@ -38,12 +38,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param plays 
- * @param summary 
- * @param transcoder 
- * @param upload 
+ * @param plays
+ * @param summary
+ * @param transcoder
+ * @param upload
  */
 @Serializable
 

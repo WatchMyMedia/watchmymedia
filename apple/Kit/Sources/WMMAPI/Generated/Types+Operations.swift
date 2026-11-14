@@ -9791,6 +9791,21 @@ public enum Operations {
                 }
             }
             public var path: Operations.GetLiveTVSession.Input.Path
+            /// - Remark: Generated from `#/paths/api/live-tv/sessions/{id}/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// API level 28: while the session is starting, wait up to this many milliseconds (at most 10000; more counts as 10000) for it to play, fail or stop, and reply then. Absent or 0 replies at once, as older servers do, which ignore it.
+                ///
+                /// - Remark: Generated from `#/paths/api/live-tv/sessions/{id}/GET/query/waitMs`.
+                public var waitMs: Swift.Int64?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - waitMs: API level 28: while the session is starting, wait up to this many milliseconds (at most 10000; more counts as 10000) for it to play, fail or stop, and reply then. Absent or 0 replies at once, as older servers do, which ignore it.
+                public init(waitMs: Swift.Int64? = nil) {
+                    self.waitMs = waitMs
+                }
+            }
+            public var query: Operations.GetLiveTVSession.Input.Query
             /// - Remark: Generated from `#/paths/api/live-tv/sessions/{id}/GET/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetLiveTVSession.AcceptableContentType>]
@@ -9807,12 +9822,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.GetLiveTVSession.Input.Path,
+                query: Operations.GetLiveTVSession.Input.Query = .init(),
                 headers: Operations.GetLiveTVSession.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }

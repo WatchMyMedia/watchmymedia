@@ -23,6 +23,7 @@
 
 package media.watchmy.client.core.api.models
 
+import media.watchmy.client.core.api.models.AdaptiveStream
 import media.watchmy.client.core.api.models.LiveTVChannel
 import media.watchmy.client.core.api.models.LiveTVLiveDirective
 
@@ -36,35 +37,36 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param bufferBytes 
- * @param bufferSeconds 
- * @param channel 
- * @param clientName 
- * @param id 
- * @param lastSeenAt 
- * @param pauseRemainingSeconds 
- * @param paused 
- * @param quality 
- * @param startedAt 
+ * @param bufferBytes
+ * @param bufferSeconds
+ * @param channel
+ * @param clientName
+ * @param id
+ * @param lastSeenAt
+ * @param pauseRemainingSeconds
+ * @param paused
+ * @param quality
+ * @param startedAt
  * @param state starting, playing, stopping, stopped or failed. Unknown states are not playable.
  * @param url Same-server rolling HLS playlist; send the original sign-in or its media token.
- * @param userId 
- * @param userName 
+ * @param userId
+ * @param userName
  * @param actualQuality Current live output step while Automatic is selected.
+ * @param adaptive
  * @param automatic API level 26: this logical live session may switch output generations.
- * @param directive 
+ * @param directive
  * @param mode Live output mode: original, remux, audio or video; absent on older servers.
  * @param modeReason Why that mode was selected; absent on older servers.
  * @param outputGeneration Current acknowledged output generation; the session ID and tuner stay stable.
- * @param readyAt 
- * @param reason 
+ * @param readyAt
+ * @param reason
+ * @param renditionBitrate
+ * @param renditionHeight
  * @param switchStatus Why a live Automatic switch is waiting or failed.
- * @param takeoverAt 
- * @param takeoverCanCancel 
- * @param takeoverRecordingId 
- * @param takeoverTitle 
+ * @param takeoverAt
+ * @param takeoverCanCancel
+ * @param takeoverRecordingId
+ * @param takeoverTitle
  */
 @Serializable
 
@@ -118,6 +120,9 @@ data class LiveTVSessionView (
     @SerialName(value = "actualQuality")
     val actualQuality: kotlin.String? = null,
 
+    @SerialName(value = "adaptive")
+    val adaptive: AdaptiveStream? = null,
+
     /* API level 26: this logical live session may switch output generations. */
     @SerialName(value = "automatic")
     val automatic: kotlin.Boolean? = null,
@@ -142,6 +147,12 @@ data class LiveTVSessionView (
 
     @SerialName(value = "reason")
     val reason: kotlin.String? = null,
+
+    @SerialName(value = "renditionBitrate")
+    val renditionBitrate: kotlin.Long? = null,
+
+    @SerialName(value = "renditionHeight")
+    val renditionHeight: kotlin.Long? = null,
 
     /* Why a live Automatic switch is waiting or failed. */
     @SerialName(value = "switchStatus")

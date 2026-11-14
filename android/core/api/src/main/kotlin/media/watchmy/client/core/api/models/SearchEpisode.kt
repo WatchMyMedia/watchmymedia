@@ -34,18 +34,16 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param fileId 
- * @param id 
- * @param number 
- * @param seasonNumber 
- * @param showId 
- * @param showTitle 
- * @param title 
- * @param airDate 
- * @param showPosterPath 
- * @param stillPath 
+ * @param fileId
+ * @param id
+ * @param number
+ * @param seasonNumber
+ * @param showId
+ * @param showTitle
+ * @param title
+ * @param airDate
+ * @param showPosterPath
+ * @param stillPath
  * @param watched The signed-in user has watched it.
  */
 @Serializable

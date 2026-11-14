@@ -34,9 +34,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param approve 
+ * @param approve
  * @param note Shown to the person who asked when declined.
  */
 @Serializable

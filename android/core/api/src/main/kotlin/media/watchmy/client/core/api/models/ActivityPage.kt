@@ -35,12 +35,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param items 
+ * @param items
  * @param playedMs Time played across the matching rows; 0 when the total is capped.
  * @param total Matching rows, counted up to 10,000.
- * @param totalCapped 
+ * @param totalCapped
  * @param nextCursor Pass back as cursor for the next page; absent on the last page.
  */
 @Serializable

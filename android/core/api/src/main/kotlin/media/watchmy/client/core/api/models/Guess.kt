@@ -34,24 +34,22 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param kind 
- * @param title 
- * @param airDate 
- * @param airDateAlt 
- * @param episodeTitle 
- * @param episodes 
- * @param fileTitle 
- * @param fileYear 
- * @param imdbId 
- * @param resolution 
- * @param season 
- * @param source 
- * @param tags 
- * @param tmdbId 
- * @param tvdbId 
- * @param year 
+ * @param kind
+ * @param title
+ * @param airDate
+ * @param airDateAlt
+ * @param episodeTitle
+ * @param episodes
+ * @param fileTitle
+ * @param fileYear
+ * @param imdbId
+ * @param resolution
+ * @param season
+ * @param source
+ * @param tags
+ * @param tmdbId
+ * @param tvdbId
+ * @param year
  */
 @Serializable
 
@@ -108,8 +106,6 @@ data class Guess (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,episode,unknown,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

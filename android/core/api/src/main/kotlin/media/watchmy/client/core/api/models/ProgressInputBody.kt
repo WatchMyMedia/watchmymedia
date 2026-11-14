@@ -34,12 +34,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param positionMs 
+ * @param positionMs
  * @param bufferedMs How far ahead of the position the player has buffered.
- * @param durationMs 
+ * @param durationMs
  * @param playId The playId the playback decision returned.
+ * @param renditionBitrate
+ * @param renditionHeight
  * @param stallMs Time those rebuffers took.
  * @param stalls Rebuffers since this playback decision: buffering after the first frame that no seek, reload or resume caused. Omit when the player does not count them.
  * @param startupMs From asking for this decision to its first frame.
@@ -66,6 +66,12 @@ data class ProgressInputBody (
     /* The playId the playback decision returned. */
     @SerialName(value = "playId")
     val playId: kotlin.String? = null,
+
+    @SerialName(value = "renditionBitrate")
+    val renditionBitrate: kotlin.Long? = null,
+
+    @SerialName(value = "renditionHeight")
+    val renditionHeight: kotlin.Long? = null,
 
     /* Time those rebuffers took. */
     @SerialName(value = "stallMs")

@@ -34,14 +34,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param kind library (the library's grid with these options) or list (the list's page). A plain string: hide See all for a kind you don't know.
- * @param decade 
+ * @param decade
  * @param filter Library: as listLibraryItems' filter.
- * @param genre 
- * @param libraryId 
- * @param listId 
+ * @param genre
+ * @param libraryId
+ * @param listId
  * @param sort Library: as listLibraryItems' sort.
  */
 @Serializable

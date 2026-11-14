@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param modTime 
- * @param name 
- * @param propertySize 
+ * @param modTime
+ * @param name
+ * @param propertySize
  */
 @Serializable
 

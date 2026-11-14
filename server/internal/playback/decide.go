@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"watchmymedia/server/internal/auth"
 	"watchmymedia/server/internal/probe"
 )
 
@@ -209,6 +210,8 @@ type Decision struct {
 	NextEpisode *UpNext `json:"nextEpisode,omitempty"`
 	// Trickplay is the file's seek thumbnails, once they are made.
 	Trickplay *Trickplay `json:"trickplay,omitempty" required:"false" doc:"The file's seek thumbnails; absent until the server has made them."`
+	// MediaToken saves the player asking for one after the decision.
+	MediaToken *auth.MediaToken `json:"mediaToken,omitempty" required:"false" doc:"API level 28: the media token createMediaToken would give this request, for players that send ?access_token= on this decision's URLs. Present when the request signed in with a session; absent for cast tokens, on offline downloads' decisions and from older servers, where clients call createMediaToken as before."`
 }
 
 type Growing struct {

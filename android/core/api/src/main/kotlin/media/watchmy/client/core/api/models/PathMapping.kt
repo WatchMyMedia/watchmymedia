@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param from The start of the path as the app sees it.
  * @param to The same folder as this server sees it.
  */

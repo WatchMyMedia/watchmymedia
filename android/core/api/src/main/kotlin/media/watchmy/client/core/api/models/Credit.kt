@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param name 
- * @param character 
- * @param profilePath 
+ * @param name
+ * @param character
+ * @param profilePath
  */
 @Serializable
 

@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param itemIds The movies or episodes that changed.
- * @param itemType 
+ * @param itemType
  */
 @Serializable
 
@@ -53,8 +51,6 @@ data class WatchChanged (
 ) {
 
     /**
-     * 
-     *
      * Values: movie,episode,unknown_default_open_api
      */
     @Serializable(with = ItemTypeSerializer::class)

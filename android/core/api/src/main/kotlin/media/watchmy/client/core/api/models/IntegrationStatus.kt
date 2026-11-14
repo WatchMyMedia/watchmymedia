@@ -35,15 +35,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param items Movies or series the app has; for Seerr, its users.
  * @param ok The last call to the app worked.
- * @param webhook 
- * @param appName 
- * @param checkedAt 
+ * @param webhook
+ * @param appName
+ * @param checkedAt
  * @param error Why the last call failed.
- * @param version 
+ * @param version
  */
 @Serializable
 

@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param id 
- * @param isAdmin 
- * @param name 
+ * @param id
+ * @param isAdmin
+ * @param name
  * @param recordHistory Plays are kept in history; off, they show only in Now playing.
  * @param seerrUserId The Seerr user this person requests as; absent when not linked.
  */

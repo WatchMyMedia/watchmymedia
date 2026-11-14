@@ -34,15 +34,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param codec 
- * @param default 
- * @param forced 
- * @param image 
- * @param index 
- * @param language 
- * @param title 
+ * @param codec
+ * @param default
+ * @param forced
+ * @param image
+ * @param index
+ * @param language
+ * @param title
  */
 @Serializable
 

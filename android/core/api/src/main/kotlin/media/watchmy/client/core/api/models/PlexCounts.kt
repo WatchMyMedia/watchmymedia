@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param alreadyWatched Watched in Plex and already watched here.
  * @param ambiguous Watched in Plex, but the IDs conflict, name several local items, or the episode order or edition can't be trusted.
  * @param localKept Watched in Plex, but the person's own activity here decides it (a play in progress, a rewatch, an unwatch).

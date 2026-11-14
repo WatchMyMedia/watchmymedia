@@ -34,15 +34,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param id 
+ * @param id
  * @param listings The admin's switch for this channel's listings.
  * @param match pending (no fetch yet), number (matched by number; the tuner gave no name to check), name (the names agree too), differs (the names disagree) or missing (the feed doesn't list it). Other values may follow.
- * @param name 
- * @param number 
+ * @param name
+ * @param number
  * @param feedName The feed's name for the channel.
- * @param logoUrl 
+ * @param logoUrl
  */
 @Serializable
 

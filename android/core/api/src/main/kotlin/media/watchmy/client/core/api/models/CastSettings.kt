@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param enabled cast.enabled: the server issues cast tokens.
- * @param receiverOrigins 
+ * @param receiverOrigins
  * @param urls The addresses a cast from this browser would offer the TV, best first.
  * @param appId cast.app_id: the receiver the web UI launches; empty shows no Cast button in the browser.
  * @param url cast.url: offered to TVs first.

@@ -35,14 +35,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param available This build has an OpenSubtitles API key.
  * @param downloads Who may download.
- * @param languages 
- * @param account 
- * @param error 
- * @param username 
+ * @param languages
+ * @param account
+ * @param error
+ * @param username
  */
 @Serializable
 

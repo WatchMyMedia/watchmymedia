@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param automaticDownload Allow exact-file automatic downloads, off by default.
  * @param foreignAudio With mode forced, subtitles as on does when the audio isn't in the person's languages. From API level 21; older servers reject it.
  * @param languages Ordered BCP 47 languages. An empty list clears them.

@@ -34,14 +34,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param encoder 
- * @param ok 
- * @param stage 
- * @param detail 
- * @param device 
- * @param fps 
+ * @param encoder
+ * @param ok
+ * @param stage
+ * @param detail
+ * @param device
+ * @param fps
  */
 @Serializable
 

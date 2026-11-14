@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param siteKey The widget's site key; empty turns Turnstile off and forgets both keys.
  * @param secretKey The widget's secret key, checked with Cloudflare before it is saved. Omit to keep the saved one.
  */

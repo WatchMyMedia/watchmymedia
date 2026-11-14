@@ -37,9 +37,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param recentlyAdded 
+ * @param recentlyAdded
  * @param recentlyAired TV libraries only.
  * @param recentlyReleased Movie libraries only.
  * @param rows With arranged=true: the library screen's rows in the person's order, and the three arrays above are empty. From API level 22.

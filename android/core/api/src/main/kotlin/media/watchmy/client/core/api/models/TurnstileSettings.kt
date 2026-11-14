@@ -34,13 +34,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param disabled auth.turnstile.disabled (WATCHMYMEDIA_AUTH_TURNSTILE_DISABLED) turns it off whatever keys are set.
  * @param enabled Password sign-in and setup need the check now.
  * @param fromConfig The keys come from config.yaml or the environment (auth.turnstile) and cannot be changed here.
  * @param secretKeyHint Last four characters of the secret key.
- * @param siteKey 
+ * @param siteKey
  */
 @Serializable
 

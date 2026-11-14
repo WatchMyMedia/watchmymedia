@@ -35,19 +35,17 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param available 
- * @param enabled 
- * @param id 
- * @param name 
- * @param number 
- * @param sourceId 
+ * @param available
+ * @param enabled
+ * @param id
+ * @param name
+ * @param number
+ * @param sourceId
  * @param favourite The viewer starred this channel (API level 15).
  * @param logoUrl The channel's logo from the listings provider: a path on this server.
- * @param next 
- * @param now 
- * @param reason 
+ * @param next
+ * @param now
+ * @param reason
  */
 @Serializable
 

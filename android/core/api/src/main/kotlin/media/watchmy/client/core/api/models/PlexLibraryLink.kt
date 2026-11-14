@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param libraryId A local library of the same type: movies to movies, shows to TV.
- * @param sectionId 
+ * @param sectionId
  */
 @Serializable
 

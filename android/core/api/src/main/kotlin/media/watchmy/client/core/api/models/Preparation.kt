@@ -35,14 +35,12 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param paused 
- * @param playlist 
- * @param progressSeen 
- * @param ranges 
- * @param leadMs 
- * @param requestedEndMs 
+ * @param paused
+ * @param playlist
+ * @param progressSeen
+ * @param ranges
+ * @param leadMs
+ * @param requestedEndMs
  */
 @Serializable
 

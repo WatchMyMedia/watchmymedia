@@ -36,13 +36,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param kind One Seerr at most; it takes no path mappings or targets.
  * @param apiKey Settings → General → API Key in the app. Omit to keep the saved one.
- * @param name 
- * @param pathMap 
- * @param targets 
+ * @param name
+ * @param pathMap
+ * @param targets
  * @param url The app's address, with any URL base: http://nas:7878/radarr.
  */
 @Serializable

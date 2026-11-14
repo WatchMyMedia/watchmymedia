@@ -36,11 +36,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param apps 
+ * @param apps
  * @param requests Open requests for the item that were closed, so it can be asked for again.
- * @param seerr 
+ * @param seerr
  * @param trailers Movies: the trailer files that went with the movie, with its folder or deleted by the server.
  */
 @Serializable

@@ -34,12 +34,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param at When it happened, by the device's clock.
- * @param fileId 
- * @param downloadId 
- * @param durationMs 
+ * @param fileId
+ * @param downloadId
+ * @param durationMs
  * @param positionMs A position report; omit for a mark.
  * @param watched Mark watched (true) or unwatched (false); omit for a position.
  */

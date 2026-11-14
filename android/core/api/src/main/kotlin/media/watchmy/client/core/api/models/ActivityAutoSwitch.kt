@@ -34,13 +34,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param at 
- * @param from 
- * @param reason 
+ * @param at
+ * @param from
+ * @param reason
  * @param server The transcoder, not the network, could not keep up.
- * @param to 
+ * @param to
  * @param generation Negotiated switch generation; absent for older players.
  * @param outcome Negotiated switch state: proposed, applied, failed or canceled.
  */

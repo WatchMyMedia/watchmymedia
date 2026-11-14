@@ -34,16 +34,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param connection The connection's name: Radarr 4K.
- * @param connectionId 
+ * @param connectionId
  * @param extra Movies and shows: files in the folder the app doesn't list. They go too when the item is removed from the app.
  * @param files Files the app lists and deletes.
  * @param folder The movie's or series' folder as the app sees it; for a season or an episode, the folder of its files.
- * @param kind 
+ * @param kind
  * @param localFolder The same folder as this server sees it.
- * @param propertySize 
+ * @param propertySize
  * @param error Why the app could not be asked. It can't delete until it answers.
  * @param otherEpisodes An episode's file also holds these episodes of the season, which go too.
  * @param quality A movie's best version in this app's folder: 4K Dolby Vision.
@@ -106,8 +104,6 @@ data class DeleteApp (
 ) {
 
     /**
-     * 
-     *
      * Values: radarr,sonarr,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)

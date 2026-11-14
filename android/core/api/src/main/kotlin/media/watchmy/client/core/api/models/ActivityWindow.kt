@@ -34,12 +34,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param days 0 is all time.
- * @param label 
- * @param playedMs 
- * @param plays 
+ * @param label
+ * @param playedMs
+ * @param plays
  */
 @Serializable
 

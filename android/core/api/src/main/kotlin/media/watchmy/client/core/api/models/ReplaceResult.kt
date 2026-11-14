@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param blocklisted The release that brought the file in is marked failed, so the app won't grab it again.
- * @param connection 
+ * @param connection
  * @param note Why the release could not be blocklisted. The file was replaced all the same.
  */
 @Serializable

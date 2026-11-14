@@ -35,15 +35,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param mode 
- * @param reasons 
- * @param source 
- * @param stream 
- * @param encoder 
- * @param quality 
- * @param step 
+ * @param mode
+ * @param reasons
+ * @param source
+ * @param stream
+ * @param encoder
+ * @param quality
+ * @param step
  */
 @Serializable
 
@@ -73,8 +71,6 @@ data class ActivityStream (
 ) {
 
     /**
-     * 
-     *
      * Values: direct,remux,audio,transcode,unknown_default_open_api
      */
     @Serializable(with = ModeSerializer::class)
@@ -100,8 +96,6 @@ data class ActivityStream (
         }
     }
     /**
-     * 
-     *
      * Values: none,original,_2160,_1080,_720,_480,_360,unknown_default_open_api
      */
     @Serializable(with = StepSerializer::class)

@@ -34,11 +34,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param address 
- * @param enabled 
- * @param name 
+ * @param address
+ * @param enabled
+ * @param name
  */
 @Serializable
 

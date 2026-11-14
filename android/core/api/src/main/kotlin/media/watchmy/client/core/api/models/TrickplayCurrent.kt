@@ -34,15 +34,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param fileId 
+ * @param fileId
  * @param sheet The sheet being made, from 1.
- * @param sheets 
+ * @param sheets
  * @param title The movie's or episode's title, else the file's name.
- * @param episodeNumber 
- * @param seasonNumber 
- * @param showTitle 
+ * @param episodeNumber
+ * @param seasonNumber
+ * @param showTitle
  */
 @Serializable
 

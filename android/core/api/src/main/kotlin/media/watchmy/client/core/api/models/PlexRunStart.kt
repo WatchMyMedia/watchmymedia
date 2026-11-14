@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param enableSync 
- * @param previewId 
+ * @param enableSync
+ * @param previewId
  */
 @Serializable
 

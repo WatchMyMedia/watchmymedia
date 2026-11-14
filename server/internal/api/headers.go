@@ -123,12 +123,17 @@ func compress(next http.Handler) http.Handler {
 	})
 }
 
-// etagged lists the reads of library data that clients fetch again and
-// again: home, the libraries and what is in them, a movie, show or
-// season, Continue watching and search. Every route under these is JSON.
+// etagged lists the reads that clients fetch again and again: home, the
+// libraries and what is in them, a movie, show or season, Continue
+// watching and search, and Live TV's capabilities and channel list (API
+// level 28). Every route under these is JSON. Each body is made from the
+// server's state and who asks (their marks, favourites and recordings,
+// and for an admin whether they ask from the admin network), never from a
+// token or the request's own ID, so the same body always hashes the same.
 func etagged(p string) bool {
 	switch p {
-	case Prefix + "/home", Prefix + "/libraries", Prefix + "/watch/continue", Prefix + "/search":
+	case Prefix + "/home", Prefix + "/libraries", Prefix + "/watch/continue", Prefix + "/search",
+		Prefix + "/live-tv/capabilities", Prefix + "/live-tv/channels":
 		return true
 	}
 	return strings.HasPrefix(p, Prefix+"/libraries/") || strings.HasPrefix(p, Prefix+"/movies/") || strings.HasPrefix(p, Prefix+"/shows/")

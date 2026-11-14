@@ -34,15 +34,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param confidence 
- * @param `final` 
- * @param id 
- * @param kind 
- * @param source 
- * @param startMs 
- * @param state 
+ * @param confidence
+ * @param `final`
+ * @param id
+ * @param kind
+ * @param source
+ * @param startMs
+ * @param state
  * @param endMs 0 means to the end of the file.
  */
 @Serializable
@@ -77,8 +75,6 @@ data class StoredSegment (
 ) {
 
     /**
-     * 
-     *
      * Values: intro,recap,credits,preview,commercial,unknown_default_open_api
      */
     @Serializable(with = KindSerializer::class)
@@ -105,8 +101,6 @@ data class StoredSegment (
         }
     }
     /**
-     * 
-     *
      * Values: manual,chapter,fingerprint,blackframe,subtitle,`external`,unknown_default_open_api
      */
     @Serializable(with = SourceSerializer::class)
@@ -134,8 +128,6 @@ data class StoredSegment (
         }
     }
     /**
-     * 
-     *
      * Values: active,suppressed,unknown_default_open_api
      */
     @Serializable(with = StateSerializer::class)

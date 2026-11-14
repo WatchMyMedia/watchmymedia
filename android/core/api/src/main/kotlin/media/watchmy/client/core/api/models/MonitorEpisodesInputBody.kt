@@ -34,10 +34,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param monitored 
- * @param season 
+ * @param monitored
+ * @param season
  * @param episodes Episode numbers; empty for the whole season.
  */
 @Serializable

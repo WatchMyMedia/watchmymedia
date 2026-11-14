@@ -34,19 +34,17 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param lastAt 
- * @param playedMs 
- * @param plays 
- * @param title 
+ * @param lastAt
+ * @param playedMs
+ * @param plays
+ * @param title
  * @param users Different people who watched.
- * @param deviceId 
- * @param movieId 
- * @param posterPath 
- * @param showId 
- * @param subtitle 
- * @param userId 
+ * @param deviceId
+ * @param movieId
+ * @param posterPath
+ * @param showId
+ * @param subtitle
+ * @param userId
  */
 @Serializable
 

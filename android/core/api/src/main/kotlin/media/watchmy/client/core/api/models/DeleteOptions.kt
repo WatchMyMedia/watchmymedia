@@ -34,8 +34,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
  * @param connections The connections to delete from; every one that holds the item when empty.
  * @param exclude Movies and shows removed from the app: don't add them again from import lists.
  * @param keep Movies and shows: keep it in the app, unmonitored, and delete only the files it lists.

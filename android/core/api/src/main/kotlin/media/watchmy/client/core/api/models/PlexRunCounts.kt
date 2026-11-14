@@ -34,16 +34,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param alreadyWatched 
- * @param ambiguous 
- * @param historyImported 
- * @param historySkipped 
- * @param localKept 
- * @param marked 
- * @param unavailable 
- * @param unmatched 
+ * @param alreadyWatched
+ * @param ambiguous
+ * @param historyImported
+ * @param historySkipped
+ * @param localKept
+ * @param marked
+ * @param unavailable
+ * @param unmatched
  */
 @Serializable
 

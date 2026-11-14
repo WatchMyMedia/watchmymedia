@@ -34,9 +34,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * 
- *
- * @param libraryId 
+ * @param libraryId
  * @param total Video files found in the library tree.
  */
 @Serializable
