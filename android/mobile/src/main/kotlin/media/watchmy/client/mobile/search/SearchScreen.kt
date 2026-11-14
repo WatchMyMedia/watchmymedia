@@ -89,6 +89,7 @@ import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.open
 import media.watchmy.client.ui.rememberNotMatchedNotice
+import media.watchmy.client.presentation.search.SearchViewModel
 
 /**
  * Search (no mockup; the Library grid's style): a search field in the top

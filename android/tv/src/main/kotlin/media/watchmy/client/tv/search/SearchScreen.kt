@@ -48,7 +48,6 @@ import media.watchmy.client.model.besides
 import media.watchmy.client.model.codeBadge
 import media.watchmy.client.model.playRequest
 import media.watchmy.client.model.subtitle
-import media.watchmy.client.presentation.Load
 import media.watchmy.client.tv.components.ArtBadge
 import media.watchmy.client.tv.components.ArtProgress
 import media.watchmy.client.tv.components.ArtWatched
@@ -83,6 +82,8 @@ import media.watchmy.client.model.LiveSearchHit
 import media.watchmy.client.presentation.live.LiveSearchViewModel
 import media.watchmy.client.tv.components.LocalLiveTVAvailable
 import media.watchmy.client.tv.live.TvLiveSearchRow
+import media.watchmy.client.presentation.search.SearchViewModel
+import media.watchmy.client.presentation.search.isEmpty
 
 /** Where the results start: right of the keyboard (154 + 712 + 60). */
 private val ResultsStart = 926.dp
@@ -104,7 +105,7 @@ fun SearchScreen(
     onOpenLive: (LiveSearchHit) -> Unit = {},
 ) {
     val services = LocalAppServices.current
-    val vm = viewModel { SearchViewModel(services.library, requests = services.requests, saved = createSavedStateHandle()) }
+    val vm = viewModel { SearchViewModel(services.library, auth = services.auth, requests = services.requests, saved = createSavedStateHandle()) }
     val state by vm.state.collectAsStateWithLifecycle()
     // On Live TV (android-tv/LiveSearch): the listings' titles too, from API level 15 with Live TV.
     val liveTv = LocalLiveTVAvailable.current
@@ -124,26 +125,25 @@ fun SearchScreen(
             Text("Search", style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
             KeyboardField(state.query, placeholder = if (withLive) "Titles of shows, movies, episodes or Live TV programmes" else "Titles of shows, movies or episodes", active = true)
             OnScreenKeyboard(
-                onText = vm::type,
-                onBackspace = vm::backspace,
+                onText = { vm.setQuery(state.query + it) },
+                onBackspace = { vm.setQuery(state.query.dropLast(1)) },
                 onDone = vm::clear,
                 doneLabel = "Clear",
                 firstKey = firstKey,
             )
         }
         Box(Modifier.fillMaxSize().padding(start = ResultsStart - ContentStart)) {
-            when (val r = state.results) {
-                null -> Hint("Find anything in your library", "Type part of a title. Shows, movies and episodes appear here as you type.")
-                Load.Loading -> LoadingState()
-                is Load.Failed -> ErrorState(r.message, vm::retry, title = "Search didn't work")
-                is Load.Ready -> if (r.data.isEmpty() && state.requestable.isEmpty() && (liveRow == null || live.results.isEmpty())) {
-                    Hint("Nothing matches", "No titles in your library match “${state.query.trim()}”.")
-                } else {
-                    Results(r.data, state.requestable, services.library, memory, onOpenShow, onOpenMovie, onPlay, onAsk = { asking = it }, viaSeerr = state.options.viaSeerr, onOpenEpisode = onOpenEpisode, liveRow = liveRow)
-                }
+            val results = state.results
+            when {
+                state.error != null -> ErrorState(state.error!!, vm::retry, title = "Search didn't work")
+                state.query.isBlank() -> Hint("Find anything in your library", "Type part of a title. Shows, movies and episodes appear here as you type.")
+                results == null -> LoadingState()
+                results.isEmpty() && state.requestable.isEmpty() && (liveRow == null || live.results.isEmpty()) ->
+                    Hint("Nothing matches", "No titles in your library match “${state.resultsFor}”.")
+                else -> Results(results, state.requestable, services.library, memory, onOpenShow, onOpenMovie, onPlay, onAsk = { asking = it }, viaSeerr = state.options.viaSeerr, onOpenEpisode = onOpenEpisode, liveRow = liveRow)
             }
         }
-        Notice(state.notice, vm::noticeShown)
+        Notice(state.message, vm::messageShown)
     }
     InitialFocus(firstKey)
 

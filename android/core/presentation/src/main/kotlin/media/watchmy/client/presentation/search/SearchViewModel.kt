@@ -1,4 +1,4 @@
-package media.watchmy.client.mobile.search
+package media.watchmy.client.presentation.search
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -24,11 +24,12 @@ import media.watchmy.client.model.markWatched
 import media.watchmy.client.model.watchTarget
 
 /**
- * Search by title as the viewer types, a moment after they stop. Beside the
- * library, what can be requested (Not in your library, PLAN-ARR.md §7.1) is
- * looked up on its own, so the library's results never wait for it. The
- * query outlives the process ([saved]) and is searched again when the page
- * comes back; the recent searches don't.
+ * Search by title as the viewer types, a moment after they stop, on the
+ * phone, the tablet and the TV. Beside the library, what can be requested
+ * (Not in your library, PLAN-ARR.md §7.1) is looked up on its own, so the
+ * library's results never wait for it. The query outlives the process
+ * ([saved]) and is searched again when the page comes back; the recent
+ * searches don't. A new account starts it over.
  */
 class SearchViewModel(
     private val library: LibraryRepository,
@@ -192,3 +193,6 @@ class SearchViewModel(
         private const val QUERY = "query"
     }
 }
+
+/** Nothing matched in any group of the library's. */
+fun SearchResults.isEmpty(): Boolean = movies.isEmpty() && shows.isEmpty() && episodes.isEmpty()
