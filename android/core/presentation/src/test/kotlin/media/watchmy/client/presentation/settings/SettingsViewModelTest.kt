@@ -237,4 +237,26 @@ class SettingsViewModelTest {
         assertTrue(vm.state.value.playback.subtitles.automaticDownload)
         assertFalse(vm.state.value.subtitleSaving)
     }
+
+    @Test
+    fun `a language list's options move and remove its languages, for either list`() = runTest(main.dispatcher) {
+        val vm = vm()
+        advanceUntilIdle()
+        for (list in LanguageList.entries) {
+            vm.addLanguage(list, "en")
+            vm.addLanguage(list, "fr")
+            vm.addLanguage(list, "de")
+            advanceUntilIdle()
+            assertEquals(listOf("en", "fr", "de"), vm.languages(list))
+            assertEquals(listOf(LanguageAction.MoveDown, LanguageAction.Remove), vm.languageActions(list, "en"))
+            assertEquals(LanguageAction.entries, vm.languageActions(list, "fr"))
+            assertEquals(listOf(LanguageAction.MoveUp, LanguageAction.Remove), vm.languageActions(list, "de"))
+            vm.act(list, "de", LanguageAction.MoveUp)
+            advanceUntilIdle()
+            assertEquals(listOf("en", "de", "fr"), vm.languages(list))
+            vm.act(list, "en", LanguageAction.Remove)
+            advanceUntilIdle()
+            assertEquals(listOf("de", "fr"), vm.languages(list))
+        }
+    }
 }

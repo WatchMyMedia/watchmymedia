@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.key.KeyEventType
@@ -16,11 +15,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import media.watchmy.client.model.ShowArrival
-import media.watchmy.client.model.LIVE_REMINDER_DEFAULT_LEAD
 import media.watchmy.client.model.LivePersonalChange
 import media.watchmy.client.model.attempt
 import media.watchmy.client.model.comeKey
-import media.watchmy.client.model.due
 import media.watchmy.client.presentation.live.LiveGuideViewModel
 import media.watchmy.client.tv.live.BannerKeys
 import media.watchmy.client.tv.live.LiveRemindersScreenTv
@@ -38,7 +35,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.model.LiveTarget
@@ -64,6 +60,7 @@ import media.watchmy.client.tv.search.SearchScreen
 import media.watchmy.client.tv.settings.SettingsScreen
 import media.watchmy.client.tv.rows.ListPageTv
 import media.watchmy.client.ui.rememberRequestBadge
+import media.watchmy.client.presentation.live.ReminderBannerViewModel
 import media.watchmy.client.ui.LocalLiveChannelsShown
 
 /** Opens the player for [request]. */
@@ -134,27 +131,13 @@ fun TvNavHost(
         }
     }
     val format = rememberLiveClockFormat()
-    val reminders by services.live.reminders.collectAsStateWithLifecycle()
-    // Every 15 s while there are reminders to come: when the next one is due.
-    val clock by produceState(System.currentTimeMillis(), reminders) {
-        while (reminders?.items?.isNotEmpty() == true) {
-            value = System.currentTimeMillis()
-            delay(15_000)
-        }
-    }
-    var shown by remember { mutableStateOf(setOf<String>()) }
-    val banner = reminders?.due(clock)?.firstOrNull { it.comeKey() !in shown }
-    val dismiss = { banner?.let { shown = shown + it.comeKey() } }
+    val bannerModel = viewModel { ReminderBannerViewModel(services.live) }
+    val banner by bannerModel.banner.collectAsStateWithLifecycle()
+    val dismiss = bannerModel::dismiss
     val bannerKeys = remember(banner?.comeKey()) {
         BannerKeys(
-            onWatch = {
-                val b = banner
-                if (b != null) {
-                    shown = shown + b.comeKey()
-                    live.channels.firstOrNull { it.id == b.channelId }?.takeIf { it.available }?.let(watchLive)
-                }
-            },
-            onDismiss = { dismiss() },
+            onWatch = { bannerModel.watch()?.let { b -> live.channels.firstOrNull { it.id == b.channelId }?.takeIf { it.available }?.let(watchLive) } },
+            onDismiss = dismiss,
         )
     }
     LaunchedEffect(deepLink) {
@@ -309,8 +292,8 @@ fun TvNavHost(
             }
             banner?.let { b ->
                 TvReminderBanner(
-                    b, reminders?.leadMinutes ?: LIVE_REMINDER_DEFAULT_LEAD, live.channels.firstOrNull { it.id == b.channelId }, format,
-                    onDismiss = { dismiss() },
+                    b, bannerModel.leadMinutes, live.channels.firstOrNull { it.id == b.channelId }, format,
+                    onDismiss = dismiss,
                     modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 58.dp),
                 )
             }
