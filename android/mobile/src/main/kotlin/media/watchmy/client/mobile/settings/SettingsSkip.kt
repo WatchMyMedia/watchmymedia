@@ -54,7 +54,7 @@ internal fun SkipRow(label: String, mode: SkipMode, onChange: (SkipMode) -> Unit
 }
 
 @Composable
-private fun SkipButtons(mode: SkipMode, onChange: (SkipMode) -> Unit, modifier: Modifier) {
+private fun SkipButtons(mode: SkipMode, onChange: (SkipMode) -> Unit, modifier: Modifier = Modifier) {
     val modes = SkipMode.entries.map { it to it.shortLabel }
     SingleChoiceSegmentedButtonRow(modifier) {
         modes.forEachIndexed { i, (m, text) ->
