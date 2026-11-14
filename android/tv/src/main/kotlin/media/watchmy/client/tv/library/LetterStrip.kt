@@ -2,6 +2,8 @@ package media.watchmy.client.tv.library
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableIntStateOf
@@ -44,6 +46,7 @@ import media.watchmy.client.presentation.library.LibraryViewModel
 import media.watchmy.client.tv.components.FocusMemory
 import media.watchmy.client.model.LetterOffset
 import media.watchmy.client.model.plural
+import media.watchmy.client.tv.components.ContentStart
 import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.WmmColors
@@ -84,6 +87,7 @@ internal fun LetterStrip(
     onPick: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    entryRequester: FocusRequester? = null,
 ) {
     val counts = remember(letters, total) { letterCounts(letters, total) }
     val requesters = remember { Alphabet.associateWith { FocusRequester() } }
@@ -133,6 +137,7 @@ internal fun LetterStrip(
                     modifier = Modifier
                         .size(52.dp, 27.dp)
                         .focusRequester(requesters.getValue(letter))
+                        .then(if (letter == entry && entryRequester != null) Modifier.focusRequester(entryRequester) else Modifier)
                         .onFocusChanged {
                             if (it.isFocused) {
                                 focused = letter
@@ -193,8 +198,14 @@ internal class GridJumps(
 ) {
     var header by mutableIntStateOf(0)
 
+    /** The strip's way in: ▶ from the grid's last column goes here, to the focused show's letter. */
+    val strip = FocusRequester()
+
     /** The poster focused last, as an index of the loaded items. */
     var focusedIndex by mutableIntStateOf(-1)
+
+    /** The letter focused on the strip, for the hints. */
+    var stripLetter by mutableStateOf<String?>(null)
 
     /** The card focus came to the strip from, for Back. */
     private var cameFrom: String? = null
@@ -213,6 +224,7 @@ internal class GridJumps(
 
     /** ▲ ▼ on the strip: the grid follows a moment after focus stops on a letter. */
     fun preview(letter: String) {
+        stripLetter = letter
         preview?.cancel()
         preview = scope.launch {
             delay(PREVIEW_DELAY_MS)
@@ -272,10 +284,17 @@ internal class GridJumps(
         return true
     }
 
+    /**
+     * Focuses the poster [key]. Coming from the strip, the grid's focus
+     * restorer may hand focus to the poster it had before, so this asks
+     * again until the poster asked for has it.
+     */
     private suspend fun focus(key: String) {
-        repeat(5) {
+        repeat(8) {
             withFrameNanos { }
-            if (runCatching { memory.requester(key).requestFocus() }.getOrDefault(false)) return
+            runCatching { memory.requester(key).requestFocus() }
+            withFrameNanos { }
+            if (memory.key == key) return
         }
     }
 
@@ -311,5 +330,13 @@ internal fun JumpHints(onStrip: Boolean, letter: String?, byTitle: Boolean, modi
         byTitle -> "▶ From the last column: A–Z    CH+ CH−  A screen up or down    PgUp PgDn  The same on a keyboard"
         else -> "CH+ CH−  A screen up or down    A–Z appears when the list is sorted by title"
     }
-    Text(text, style = inter(19.sp), color = WmmColors.TextSoft, modifier = modifier)
+    // Over the grid's foot, on a fade to the page's ground, as drawn.
+    Box(
+        modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(WmmColors.Ground.copy(alpha = 0f), WmmColors.Ground.copy(alpha = 0.94f), WmmColors.Ground)))
+            .padding(start = ContentStart, top = 48.dp, bottom = 24.dp),
+    ) {
+        Text(text, style = inter(19.sp), color = WmmColors.TextSoft)
+    }
 }

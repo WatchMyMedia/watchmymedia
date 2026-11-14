@@ -88,6 +88,7 @@ import media.watchmy.client.tv.rows.cardKey
 import media.watchmy.client.ui.ReportShown
 import androidx.compose.runtime.derivedStateOf
 import media.watchmy.client.model.ItemSort
+import androidx.compose.ui.focus.focusProperties
 
 private enum class Picker { Sort, Decade }
 
@@ -188,6 +189,7 @@ fun LibraryScreen(
                                         narrow = byTitle,
                                         modifier = Modifier
                                             .focusMemory(memory, "item:${item.id}")
+                                            .toStrip(jumps, byTitle && i % COLUMNS == COLUMNS - 1)
                                             .onFocusChanged {
                                                 if (it.isFocused) {
                                                     jumps.focusedIndex = i
@@ -214,7 +216,7 @@ fun LibraryScreen(
                         if (byTitle) {
                             Strip(state, type, jumps, { onStrip = it }, Modifier.align(Alignment.TopEnd).padding(top = 22.dp, end = ContentEnd - 16.dp))
                         }
-                        JumpHints(onStrip, jumps.currentLetter(state), byTitle, Modifier.align(Alignment.BottomStart).padding(start = ContentStart, bottom = 20.dp))
+                        JumpHints(onStrip, jumps.stripLetter, byTitle, Modifier.align(Alignment.BottomStart))
                         // Once, when the grid first shows (or comes back after Back): a filter
                         // chosen on the chips leaves focus on its chip (§3.2.2).
                         LaunchedEffect(Unit) {
@@ -339,7 +341,7 @@ private fun ArrangedLibrary(
                             onClick = { onOpen(item) },
                             onLongClick = if (item.kind == ItemKind.Movie) ({ actions.onToggleWatched(item) }) else null,
                             narrow = byTitle,
-                            modifier = Modifier.focusMemory(memory, "item:${item.id}").onFocusChanged {
+                            modifier = Modifier.focusMemory(memory, "item:${item.id}").toStrip(jumps, byTitle && i % COLUMNS == COLUMNS - 1).onFocusChanged {
                                 if (it.isFocused) {
                                     jumps.focusedIndex = i
                                     onVisible(i)
@@ -355,12 +357,12 @@ private fun ArrangedLibrary(
                 }
             }
         }
-        // The strip shows once the grid is on screen, below the rows.
-        val gridInView by remember { derivedStateOf { gridState.firstVisibleItemIndex >= jumps.header - 2 } }
+        // The strip shows once the grid's posters are on screen, below the rows.
+        val gridInView by remember { derivedStateOf { gridState.layoutInfo.visibleItemsInfo.any { it.index >= jumps.header } } }
         if (byTitle && gridInView) {
             Strip(state, type, jumps, { onStrip = it }, Modifier.align(Alignment.TopEnd).padding(top = 56.dp, end = ContentEnd))
         }
-        if (gridInView) JumpHints(onStrip, jumps.currentLetter(state), byTitle, Modifier.align(Alignment.BottomStart).padding(start = ContentStart, bottom = 20.dp))
+        if (gridInView) JumpHints(onStrip, jumps.stripLetter, byTitle, Modifier.align(Alignment.BottomStart))
     } }
     LaunchedEffect(gridState) {
         snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }.collect { onVisible((it - drawn.size - 4).coerceAtLeast(0)) }
@@ -456,9 +458,14 @@ private fun Strip(state: LibraryViewModel.State, type: LibraryType, jumps: GridJ
         onPreview = jumps::preview,
         onPick = jumps::pick,
         onBack = jumps::back,
+        entryRequester = jumps.strip,
         modifier = modifier.onFocusChanged {
             if (it.hasFocus) jumps.enteredStrip()
             onStrip(it.hasFocus)
         },
     )
 }
+
+/** ▶ from a poster in the grid's last column goes to the A–Z strip ([on]), not wherever is nearest. */
+private fun Modifier.toStrip(jumps: GridJumps, on: Boolean): Modifier =
+    if (on) focusProperties { right = jumps.strip } else this
