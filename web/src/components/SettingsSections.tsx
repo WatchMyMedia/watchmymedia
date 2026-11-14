@@ -1,13 +1,9 @@
 import { visibleConfirmationError } from '../api/withConfirm'
 import { useId, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { settingsQuery, testTMDB, trickplayQuery, useCreateBackup, useDownloadBackup, useDeleteTrickplay, useUpdateSettings, type ActivitySettings } from '../api/settings'
-import { mediaListSourcesQuery, mediaListsQuery } from '../api/queries'
-import { sentence } from '../lib/mediaLists'
-import { formatBytes, plural, relativeTime } from '../lib/format'
-import { currentTitle, deleteHint, filesLine, percentDone, pollInterval, thumbnailCopy, thumbnailState } from '../lib/trickplay'
+import { settingsQuery, testTMDB, useCreateBackup, useDownloadBackup, useUpdateSettings } from '../api/settings'
+import { formatBytes, relativeTime } from '../lib/format'
 import { CheckRow, Fact, Panel, Row, StatusPill, primaryButton, secondaryButton, textInput } from './SettingsPanel'
-import { HardwareSettings } from './HardwareSettings'
 
 const link = 'text-neutral-200 underline'
 
@@ -209,93 +205,6 @@ export function OpenSubtitlesSection({ onSaved }: { onSaved?: () => void }) {
   )
 }
 
-/**
- * The admin's own MDBList key, for lists that follow IMDb's, Rotten
- * Tomatoes' and Letterboxd's charts (PLAN-ROWS.md §3,
- * design/mockups/web/SettingsLists). Write-only, like the TMDB key: the
- * server checks it with MDBList before keeping it. A stored key MDBList
- * has since refused shows as the source not being ready.
- */
-export function MDBListSection() {
-  const settings = useQuery(settingsQuery)
-  const sources = useQuery(mediaListSourcesQuery)
-  const lists = useQuery(mediaListsQuery)
-  const update = useUpdateSettings()
-  const [key, setKey] = useState('')
-  const s = settings.data
-  const on = !!s?.listsMdblistConfigured
-  const mdblist = sources.data?.sources.find((x) => x.kind === 'mdblist')
-  const refused = on && !!mdblist && !mdblist.ready
-  const using = (lists.data?.items ?? []).filter((l) => l.source.kind === 'mdblist')
-  const household = using.filter((l) => l.owner === 'everyone').length
-  return (
-    <Panel
-      title="MDBList"
-      description="MDBList publishes lists that follow IMDb’s, Rotten Tomatoes’ and Letterboxd’s charts, and lists people make there. The server reads them with your own MDBList account’s key, one for the household. Accounts are free, with a daily limit. Rows made from it say From MDBList."
-      actions={
-        s &&
-        (refused ? (
-          <StatusPill tone="warn">Key refused</StatusPill>
-        ) : on ? (
-          <StatusPill tone="ok">{s.listsMdblistKeyHint ? `Key ${s.listsMdblistKeyHint}` : 'Key saved'}</StatusPill>
-        ) : (
-          <StatusPill tone="off">No key</StatusPill>
-        ))
-      }
-    >
-      {s && (
-        <HowTo summary="How to get an MDBList key" open={!on}>
-          <li>
-            Make a free account at{' '}
-            <a href="https://mdblist.com" target="_blank" rel="noreferrer" className={link}>
-              mdblist.com
-            </a>{' '}
-            and sign in.
-          </li>
-          <li>Open your preferences there and copy your API key.</li>
-          <li>Paste it below, then Save. The server checks it with MDBList first.</li>
-        </HowTo>
-      )}
-      <form
-        className="flex flex-wrap items-center gap-2 px-5 pb-5"
-        onSubmit={(e) => {
-          e.preventDefault()
-          update.mutate({ listsMdblistKey: key.trim() }, { onSuccess: () => setKey('') })
-        }}
-      >
-        <input
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          placeholder={on ? 'Paste a new key to replace it' : 'API key'}
-          aria-label="MDBList API key"
-          autoComplete="off"
-          maxLength={200}
-          className={`${textInput} min-w-0 flex-1 basis-64 font-mono`}
-        />
-        <button type="submit" disabled={!key.trim() || update.isPending} className={primaryButton}>
-          {update.isPending ? 'Checking…' : 'Save'}
-        </button>
-        {on && (
-          <button type="button" disabled={update.isPending} onClick={() => update.mutate({ listsMdblistKey: '' })} className="min-h-[40px] px-2 text-sm text-neutral-400 hover:text-red-400">
-            Remove key
-          </button>
-        )}
-      </form>
-      {update.isError && visibleConfirmationError(update.error) && <p className="px-5 pb-4 text-sm text-red-400">{update.error.message}</p>}
-      {refused && (
-        <p role="status" className="border-t border-line px-5 py-3 text-sm leading-normal text-orange-300">
-          {sentence(mdblist?.reason) || 'MDBList refused the key.'} Lists from MDBList keep the titles they had until it accepts a key again: paste a new one above.
-        </p>
-      )}
-      <p className="border-t border-line px-5 py-3 text-[13px] text-neutral-400">
-        {on
-          ? `${using.length} ${using.length === 1 ? 'list' : 'lists'} you can see ${using.length === 1 ? 'uses' : 'use'} MDBList, ${household} of them the household’s. Each is fetched once a day.`
-          : 'Without a key, Make a list doesn’t offer MDBList, and says an admin can add a key here.'}
-      </p>
-    </Panel>
-  )
-}
-
 /** The name TV and phone apps show for this server, in their server list and on the network. */
 export function ServerNameSection() {
   const settings = useQuery(settingsQuery)
@@ -326,94 +235,6 @@ export function ServerNameSection() {
         {update.isSuccess && name === null && <span className="text-sm text-emerald-400">Saved.</span>}
       </form>
       {update.isError && visibleConfirmationError(update.error) && <p className="px-5 pb-4 text-sm text-red-400">{update.error.message}</p>}
-    </Panel>
-  )
-}
-
-export function TranscodeSection() {
-  return <div className="space-y-6"><HardwareSettings /><SeekThumbnailsPanel /></div>
-}
-
-/** Seek thumbnails: the switch, how far the job has got, what it takes on disk, and Delete thumbnails (the SettingsThumbnails board). */
-function SeekThumbnailsPanel() {
-  const status = useQuery({ ...trickplayQuery, refetchInterval: (q) => pollInterval(q.state.data) })
-  const update = useUpdateSettings()
-  const remove = useDeleteTrickplay()
-  const switchId = useId()
-  const s = status.data
-  const state = s ? thumbnailState(s) : undefined
-  const copy = s && state ? thumbnailCopy(state, s) : undefined
-  const error = update.error ?? remove.error ?? status.error
-  return (
-    <Panel
-      title="Seek thumbnails"
-      description="A small picture of the video shows above the scrubber while someone seeks. The server makes them in the background, newest files first."
-    >
-      <Row label={<span id={switchId}>Make seek thumbnails</span>} hint="For every file, at low priority. Paused while anything is playing.">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={s?.enabled ?? false}
-          aria-labelledby={switchId}
-          disabled={!s || update.isPending}
-          onClick={() => s && update.mutate({ trickplayEnabled: !s.enabled })}
-          className={`relative my-1.5 h-8 w-[52px] shrink-0 rounded-full disabled:opacity-60 ${s?.enabled ? 'bg-accent' : 'bg-line-2 ring-1 ring-inset ring-neutral-700'}`}
-        >
-          <span aria-hidden="true" className={`absolute top-1 h-6 w-6 rounded-full ${s?.enabled ? 'left-6 bg-ground' : 'left-1 bg-neutral-400'}`} />
-        </button>
-      </Row>
-      {s && state && copy && (
-        <>
-          <div className="flex flex-col gap-2.5 border-t border-line px-5 py-4">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <StatusPill tone={copy.tone}>{copy.pill}</StatusPill>
-              <span className="text-sm tabular-nums text-neutral-200">{filesLine(s)}</span>
-            </div>
-            {state !== 'done' && (
-              <div
-                className="relative h-1.5 overflow-hidden rounded-full bg-white/10"
-                role="progressbar"
-                aria-label="Files with seek thumbnails"
-                aria-valuemin={0}
-                aria-valuemax={s.files}
-                aria-valuenow={s.done}
-              >
-                <span className={`absolute inset-y-0 left-0 rounded-full ${state === 'working' ? 'bg-accent' : 'bg-neutral-600'}`} style={{ width: `${percentDone(s)}%` }} />
-              </div>
-            )}
-            {state === 'working' && s.current && (
-              <p className="text-sm text-neutral-400">
-                Now: <span className="text-neutral-200">{currentTitle(s.current)}</span> · sheet {s.current.sheet} of {s.current.sheets}
-              </p>
-            )}
-            {copy.note && <p className="text-sm text-neutral-400">{copy.note}</p>}
-          </div>
-          <dl>
-            <Fact label="On disk">
-              {formatBytes(s.bytes)} <span className="text-neutral-400">· about 2 MB an hour of video</span>
-            </Fact>
-            {s.failed > 0 && (
-              <Fact label="Couldn’t be made">
-                {plural(s.failed, 'file')} <span className="text-neutral-400">· tried again when the file changes</span>
-              </Fact>
-            )}
-            <Fact label="Kept in">
-              <code className="text-[13px]">trickplay</code> in the data folder <span className="text-neutral-400">· not in backups, as they can be made again</span>
-            </Fact>
-          </dl>
-          <Row label="Delete thumbnails" hint={deleteHint(s.enabled)}>
-            <button
-              type="button"
-              disabled={remove.isPending || s.bytes === 0}
-              onClick={() => remove.mutate()}
-              className="min-h-[44px] rounded-md border border-line-2 bg-surface px-[18px] text-sm font-medium text-red-400 hover:bg-surface-2 disabled:opacity-50"
-            >
-              Delete thumbnails
-            </button>
-          </Row>
-        </>
-      )}
-      {error && <p className="border-t border-line px-5 py-3 text-sm text-red-400">{error.message}</p>}
     </Panel>
   )
 }
@@ -477,45 +298,6 @@ export function BackupSection() {
           <li>Start the server again. Artwork is fetched again as it is needed.</li>
         </ol>
       </Panel>
-    </div>
-  )
-}
-
-export function ActivitySection() {
-  const settings = useQuery(settingsQuery)
-  const update = useUpdateSettings()
-  const a = settings.data?.activity
-  if (!a) return null
-  const save = (patch: Partial<ActivitySettings>) => update.mutate({ activity: { ...a, ...patch } })
-  return (
-    <div className="space-y-6">
-      <Panel title="What is kept">
-        <NumberSetting
-          label="Keep plays longer than"
-          unit="seconds"
-          hint="Shorter plays are dropped unless they reach the credits; 0 keeps every play."
-          value={a.minPlaySeconds}
-          max={3600}
-          onSave={(v) => save({ minPlaySeconds: v })}
-        />
-        <NumberSetting label="Keep history for" unit="days" hint="0 keeps it forever." value={a.retentionDays} max={36500} onSave={(v) => save({ retentionDays: v })} />
-        <CheckRow
-          label="Group resumed plays"
-          hint="A play that picks up where an unfinished one stopped joins its history row."
-          checked={a.groupPlays}
-          onChange={(on) => save({ groupPlays: on })}
-        />
-        <CheckRow label="Trim statistics with history" hint="Off, daily totals stay when old plays are deleted." checked={a.trimStats} onChange={(on) => save({ trimStats: on })} />
-      </Panel>
-      <Panel title="Who sees what">
-        <CheckRow
-          label="Let everyone see what is playing now"
-          hint="Titles and names only, without addresses. History and statistics stay private."
-          checked={a.household}
-          onChange={(on) => save({ household: on })}
-        />
-      </Panel>
-      {update.isError && visibleConfirmationError(update.error) && <p className="text-sm text-red-400">{update.error.message}</p>}
     </div>
   )
 }
