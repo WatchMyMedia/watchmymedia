@@ -716,7 +716,9 @@ public final class RealPlaybackController: PlaybackController {
             subtitle: "\(episodeCode(season: next.season, episode: next.episode)) · \(next.title)",
             backdropPath: v.request.backdropPath,
             stillPath: next.stillPath,
-            posterPath: v.request.posterPath
+            posterPath: v.request.posterPath,
+            // The show's own details carry over; the description is the last episode's, so it doesn't.
+            year: v.request.year, contentRating: v.request.contentRating, genres: v.request.genres
         ))
     }
 
