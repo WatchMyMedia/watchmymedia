@@ -1,13 +1,12 @@
 import { visibleConfirmationError } from '../api/withConfirm'
 import { useId, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { checkTurnstile, settingsQuery, testTMDB, trickplayQuery, useCreateBackup, useDownloadBackup, useDeleteTrickplay, useUpdateSettings, type ActivitySettings } from '../api/settings'
+import { settingsQuery, testTMDB, trickplayQuery, useCreateBackup, useDownloadBackup, useDeleteTrickplay, useUpdateSettings, type ActivitySettings } from '../api/settings'
 import { mediaListSourcesQuery, mediaListsQuery } from '../api/queries'
 import { sentence } from '../lib/mediaLists'
 import { formatBytes, plural, relativeTime } from '../lib/format'
 import { currentTitle, deleteHint, filesLine, percentDone, pollInterval, thumbnailCopy, thumbnailState } from '../lib/trickplay'
 import { CheckRow, Fact, Panel, Row, StatusPill, primaryButton, secondaryButton, textInput } from './SettingsPanel'
-import { Turnstile } from './Turnstile'
 import { HardwareSettings } from './HardwareSettings'
 
 const link = 'text-neutral-200 underline'
@@ -546,150 +545,5 @@ function NumberSetting({ label, unit, hint, value, max, onSave }: { label: strin
       />
       {unit && <span className="w-14 text-sm text-neutral-400">{unit}</span>}
     </Row>
-  )
-}
-
-/**
- * Cloudflare Turnstile on the sign-in and setup pages. The server checks the
- * secret key with Cloudflare before saving it; the site key can only be
- * checked by trying the widget, which needs a reload once it is on.
- */
-export function SignInProtectionSection() {
-  const settings = useQuery(settingsQuery)
-  const update = useUpdateSettings()
-  const ts = settings.data?.turnstile
-  const [site, setSite] = useState<string | null>(null)
-  const [secret, setSecret] = useState('')
-  const [trying, setTrying] = useState(false)
-  const [check, setCheck] = useState<{ ok: boolean; message: string } | null>(null)
-  const siteValue = site ?? ts?.siteKey ?? ''
-  const status = !ts ? null : ts.disabled ? (
-    <StatusPill tone="warn">Off in config</StatusPill>
-  ) : ts.enabled ? (
-    <StatusPill tone="ok">On</StatusPill>
-  ) : (
-    <StatusPill tone="off">Off</StatusPill>
-  )
-  return (
-    <div className="space-y-6">
-      <Panel
-        title="Turnstile keys"
-        actions={status}
-        description={
-          <>
-            It&rsquo;s free: in the{' '}
-            <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noreferrer" className="text-neutral-200 underline">
-              Cloudflare dashboard
-            </a>{' '}
-            add a Turnstile widget for the host names you open this server at (for example <code className="text-neutral-200">{window.location.hostname}</code>), then paste its site key and secret key here.
-          </>
-        }
-      >
-        {ts?.disabled && (
-          <p className="px-5 pb-3 text-sm text-warn">
-            <code>auth.turnstile.disabled</code> is set in config or the environment, so it stays off whatever keys are saved.
-          </p>
-        )}
-        {ts?.fromConfig ? (
-          <p className="px-5 pb-5 text-sm text-neutral-400">
-            {ts.enabled ? 'On, with keys' : 'The keys come'} from <code>auth.turnstile</code> in config.yaml or <code>WATCHMYMEDIA_AUTH_TURNSTILE_*</code> in the environment; change them there.
-          </p>
-        ) : (
-          <form
-            className="flex flex-wrap items-end gap-3 px-5 pb-5"
-            onSubmit={(e) => {
-              e.preventDefault()
-              update.mutate(
-                { turnstile: { siteKey: siteValue.trim(), secretKey: secret.trim() || undefined } },
-                {
-                  onSuccess: () => {
-                    setSite(null)
-                    setSecret('')
-                    setCheck(null)
-                  },
-                },
-              )
-            }}
-          >
-            <label className="min-w-0 flex-1 basis-60">
-              <span className="mb-1.5 block text-sm text-neutral-400">Site key</span>
-              <input value={siteValue} onChange={(e) => setSite(e.target.value)} autoComplete="off" required className={`${textInput} w-full font-mono`} />
-            </label>
-            <label className="min-w-0 flex-1 basis-60">
-              <span className="mb-1.5 block text-sm text-neutral-400">Secret key</span>
-              <input
-                type="password"
-                value={secret}
-                onChange={(e) => setSecret(e.target.value)}
-                placeholder={ts?.secretKeyHint ? `Leave empty to keep ${ts.secretKeyHint}` : ''}
-                autoComplete="off"
-                required={!ts?.secretKeyHint}
-                className={`${textInput} w-full font-mono`}
-              />
-            </label>
-            <button type="submit" disabled={update.isPending || !siteValue.trim()} className={primaryButton}>
-              {update.isPending ? 'Checking…' : ts?.siteKey ? 'Save' : 'Turn on'}
-            </button>
-          </form>
-        )}
-        {update.isError && visibleConfirmationError(update.error) && <p className="px-5 pb-4 text-sm text-red-400">{update.error.message}</p>}
-      </Panel>
-
-      {ts?.enabled && (
-        <Panel tone="warn">
-          <div className="flex flex-wrap items-center gap-4 px-5 py-4">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-warn">
-              <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
-              <path d="M12 9v4" />
-              <path d="M12 17h.01" />
-            </svg>
-            <div className="min-w-0 flex-1 basis-80">
-              <div className="font-medium">Try the widget before you sign out</div>
-              <p className="mt-0.5 text-sm text-neutral-300">
-                If its site key doesn&rsquo;t allow this host name, nobody can sign in: turn it off here, or set <code>WATCHMYMEDIA_AUTH_TURNSTILE_DISABLED=true</code> and restart the server.
-              </p>
-            </div>
-            {!trying && (
-              <button type="button" onClick={() => setTrying(true)} className="min-h-[40px] rounded-md border border-warn px-4 text-sm font-medium text-orange-300 hover:bg-orange-950/40">
-                Try it
-              </button>
-            )}
-          </div>
-          {trying && (
-            <div className="px-5 pb-4">
-              <Turnstile
-                siteKey={ts.siteKey ?? ''}
-                action="settings"
-                onToken={(token) => {
-                  if (token) void checkTurnstile(token).then(setCheck).catch((e: Error) => setCheck({ ok: false, message: e.message }))
-                }}
-                onError={(code) =>
-                  setCheck({
-                    ok: false,
-                    message: `The widget failed (Cloudflare error ${code}). Check the site key, and that its widget in Cloudflare lists ${window.location.hostname} as a host name.`,
-                  })
-                }
-              />
-            </div>
-          )}
-          {check && <p className={`px-5 pb-4 text-sm ${check.ok ? 'text-emerald-400' : 'text-red-400'}`}>{check.message}</p>}
-        </Panel>
-      )}
-
-      {ts?.siteKey && !ts.fromConfig && (
-        <Panel>
-          <Row label="Turn off sign-in protection" hint="Removes the keys. TV and phone apps can sign in with a password again.">
-            <button
-              type="button"
-              disabled={update.isPending}
-              onClick={() => update.mutate({ turnstile: { siteKey: '' } }, { onSuccess: () => { setSite(null); setTrying(false); setCheck(null) } })}
-              className="min-h-[40px] rounded-md border border-red-900 px-4 text-sm font-medium text-red-300 hover:bg-red-950/40 disabled:opacity-50"
-            >
-              Turn off
-            </button>
-          </Row>
-        </Panel>
-      )}
-    </div>
   )
 }
