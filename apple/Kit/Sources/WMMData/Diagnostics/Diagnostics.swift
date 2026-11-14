@@ -6,7 +6,8 @@ import MetricKit
 #endif
 
 /// Diagnostics a person can copy (PLAN-APPLE-REVIEW.md §6.4): MetricKit's
-/// launch, hang and crash reports on iPhone and iPad, kept as summaries in
+/// launch, hang and crash reports and its daily count of background exits on
+/// iPhone and iPad, kept as summaries in
 /// `DiagnosticsStore`, and the text a "Copy diagnostics" row copies. Nothing
 /// is sent anywhere and no SDK is added. MetricKit is not on tvOS, so on
 /// Apple TV `start()` does nothing and the text has no system reports.
@@ -29,6 +30,7 @@ public enum Diagnostics {
         let manager = MXMetricManager.shared
         manager.add(subscriber)
         subscriber.didReceive(manager.pastDiagnosticPayloads)
+        subscriber.didReceive(manager.pastPayloads)
         #endif
     }
 
@@ -94,8 +96,9 @@ public enum Diagnostics {
         return Array(lines.suffix(limit))
     }
 
-    static func logLine(date: Date, level: OSLogEntryLog.Level, category: String, message: String) -> String {
-        let time = date.formatted(.iso8601.time(includingFractionalSeconds: false))
+    static func logLine(date: Date, level: OSLogEntryLog.Level, category: String, message: String, timeZone: TimeZone = .current) -> String {
+        // The device's own clock, as the Diagnostics page shows the reports' times.
+        let time = date.formatted(Date.ISO8601FormatStyle(timeZone: timeZone).time(includingFractionalSeconds: false))
         let word: String
         switch level {
         case .debug: word = "debug"
@@ -146,6 +149,27 @@ private final class MetricKitSubscriber: NSObject, MXMetricManagerSubscriber, Se
     func didReceive(_ payloads: [MXDiagnosticPayload]) {
         let now = Date()
         store.record(payloads.flatMap { MetricKitSummaries.summaries(json: $0.jsonRepresentation(), receivedAt: now) })
+    }
+
+    /// The daily metrics: only the background exits are kept, the newest day's.
+    func didReceive(_ payloads: [MXMetricPayload]) {
+        let summaries = payloads.sorted { $0.timeStampEnd < $1.timeStampEnd }.compactMap { payload -> DiagnosticSummary? in
+            guard let exits = payload.applicationExitMetrics?.backgroundExitData else { return nil }
+            let counts: [MetricKitSummaries.ExitReason: Int] = [
+                .memoryLimit: exits.cumulativeMemoryResourceLimitExitCount,
+                .memoryPressure: exits.cumulativeMemoryPressureExitCount,
+                .cpuLimit: exits.cumulativeCPUResourceLimitExitCount,
+                .watchdog: exits.cumulativeAppWatchdogExitCount,
+                .badAccess: exits.cumulativeBadAccessExitCount,
+                .illegalInstruction: exits.cumulativeIllegalInstructionExitCount,
+                .abnormal: exits.cumulativeAbnormalExitCount,
+                .lockedFile: exits.cumulativeSuspendedWithLockedFileExitCount,
+                .taskTimeout: exits.cumulativeBackgroundTaskAssertionTimeoutExitCount,
+            ]
+            return MetricKitSummaries.exits(counts, receivedAt: payload.timeStampEnd,
+                                            appVersion: payload.latestApplicationVersion, osVersion: payload.metaData?.osVersion)
+        }
+        store.record(summaries)
     }
 }
 #endif

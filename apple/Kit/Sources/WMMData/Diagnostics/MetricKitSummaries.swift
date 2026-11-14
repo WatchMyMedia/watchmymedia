@@ -24,6 +24,8 @@ enum MetricKitSummaries {
                     lines.append("Hang \(string(meta["hangDuration"]) ?? "?")")
                 case .crash:
                     lines.append(crashLine(meta))
+                case .exits:
+                    continue // daily metrics, not a diagnostic (exits(_:receivedAt:))
                 }
                 lines.append(contentsOf: frames(diagnostic["callStackTree"] as? [String: Any]))
                 let app = [string(meta["appVersion"]), string(meta["appBuildVersion"]).map { "(\($0))" }].compactMap { $0 }.joined(separator: " ")
@@ -32,6 +34,37 @@ enum MetricKitSummaries {
             }
         }
         return out
+    }
+
+    /// Why the system ended the app in the background, as MetricKit counts
+    /// it per day (`MXBackgroundExitData`), with what the page calls each.
+    /// Normal exits are left out.
+    enum ExitReason: CaseIterable {
+        case memoryLimit, memoryPressure, cpuLimit, watchdog, badAccess, illegalInstruction, abnormal, lockedFile, taskTimeout
+
+        var words: String {
+            switch self {
+            case .memoryLimit: "for memory"
+            case .memoryPressure: "to free memory"
+            case .cpuLimit: "for CPU use"
+            case .watchdog: "by the watchdog"
+            case .badAccess: "for a bad access"
+            case .illegalInstruction: "for an illegal instruction"
+            case .abnormal: "abnormally"
+            case .lockedFile: "holding a locked file"
+            case .taskTimeout: "for a background task that ran over"
+            }
+        }
+    }
+
+    /// One summary of a day's background exits ("1 for memory"), or none when
+    /// every exit was normal.
+    static func exits(_ counts: [ExitReason: Int], receivedAt: Date, appVersion: String? = nil, osVersion: String? = nil) -> DiagnosticSummary? {
+        let lines = ExitReason.allCases.compactMap { reason in
+            counts[reason].flatMap { $0 > 0 ? "\($0) \(reason.words)" : nil }
+        }
+        guard !lines.isEmpty else { return nil }
+        return DiagnosticSummary(kind: .exits, receivedAt: receivedAt, appVersion: appVersion, osVersion: osVersion, lines: lines)
     }
 
     /// "EXC_BAD_ACCESS (SIGSEGV), Objective-C NSInvalidArgumentException, Namespace SPRINGBOARD, Code 0x8badf00d".

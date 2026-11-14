@@ -91,7 +91,8 @@ struct ServerSettingsPage: View {
 }
 
 /// Settings › About this app (SettingsAbout.dc.html): the version, the
-/// privacy policy and the credits the data sources ask for.
+/// privacy policy, Diagnostics under Help (Diagnostics.dc.html) and the
+/// credits the data sources ask for.
 struct AboutSettingsPage: View {
     let model: SettingsModel
 
@@ -114,6 +115,8 @@ struct AboutSettingsPage: View {
                 webLink("Privacy policy", privacyPolicyURL)
                 webLink("watchmy.media", projectSiteURL)
             }
+
+            DiagnosticsAboutSection(settings: model)
 
             Section {
                 credit(openSubtitlesCredit)

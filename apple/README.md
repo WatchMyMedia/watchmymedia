@@ -828,11 +828,12 @@ simulator the scrolling measure reports only the fling's duration (hitches
 need a device), and on the tvOS simulator the launch metric reports nothing,
 so the Apple TV test also times `launch()` with a clock.
 
-**Diagnostics** (PLAN-APPLE-REVIEW.md §6.4; the Settings row is still to be
-designed). `Diagnostics.start()` (WMMData) subscribes to MetricKit on iPhone
-and iPad and keeps the last launch, hang and crash summaries in
-Application Support/Diagnostics, excluded from backups; MetricKit isn't on
-tvOS, so on Apple TV it does nothing. `Diagnostics.text(server:servers:names:)`
+**Diagnostics** (PLAN-APPLE-REVIEW.md §6.4, `design/mockups/ios/Diagnostics.dc.html`).
+`Diagnostics.start()` (WMMData) subscribes to MetricKit on iPhone
+and iPad and keeps the last launch, hang and crash summaries, and the last
+day's count of exits in the background other than normal ones ("1 for
+memory"), in Application Support/Diagnostics, excluded from backups; MetricKit
+isn't on tvOS, so on Apple TV it does nothing. `Diagnostics.text(server:servers:names:)`
 builds what a Copy diagnostics row copies: the app version and build, the
 hardware model and OS, the server's version and API level, the summaries and
 this run's log lines from the app's own subsystem (a process can read only its
@@ -845,12 +846,29 @@ be in it:
   never an exception's message.
 - Every line passes `DiagnosticsRedactor`: known names (the remembered
   servers' names, hosts and accounts, plus any the caller passes) become
-  `<name>`; quoted text `"<text>"`; URLs, e-mail, IP addresses and host names
+  `<name>` as whole words, taking a host's port with them; quoted text `"<text>"`; URLs, e-mail, IP addresses and host names
   `<address>`; file paths `<path>`; the value after `token`, `password`,
   `authorization` and the like, UUIDs and long opaque strings `<redacted>`.
   `Kit/Tests/WMMModelTests/DiagnosticsTests.swift` holds the cases.
 - No disk space or system uptime: their required reasons don't allow them in
   a report without a reason the manifests don't declare.
+
+On iPhone and iPad, Settings › About has a Diagnostics row under Help, with how
+many reports are kept, and its page (`App/Screens/Settings/DiagnosticsSettingsPage.swift`)
+shows what Copy puts on the clipboard, in groups: the app, this device and the
+server; iOS's last reports; and the last 200 log lines. Every value on the page
+went through the same redactor as the copy (`DiagnosticsPage` in WMMModel, made
+once as the page opens), which also knows this device's name, the account's,
+the servers found on the network and the titles downloaded here. Copy turns
+into Copied and a short Copied note shows (`DiagnosticsModel`); there is no
+Share. `DiagnosticsPageTests` and `DiagnosticsModelTests` hold the page's
+rules, including that nothing on it or in the copy names the server, the
+account or a title. `-diagnosticsReports` keeps a fictional hang, launch and
+exits report (the simulator gets none from MetricKit), `-diagnosticsNoReports`
+forgets them, and `-diagnosticsLog` logs a line naming the fake server, which
+the page must show redacted (`UITests/DiagnosticsTests.swift`, run with the
+WatchMyMediaE2E scheme and `-only-testing`). Log lines carry the device's own
+time, as the reports do.
 
 On Apple TV, which has no clipboard to paste from, Settings › About's Help
 group has a Diagnostics row (TvDiagnostics.dc.html): it shows the redacted

@@ -4,6 +4,19 @@ import Foundation
 /// iPhone and iPad; PLAN-APPLE-REVIEW.md §6.4).
 public enum DiagnosticKind: String, Codable, Sendable, CaseIterable {
     case launch, hang, crash
+    /// Times the system ended the app in the background other than normally
+    /// (MetricKit's daily metrics, not a diagnostic).
+    case exits
+
+    /// "Hang", "Exits in the background", as the report and the Diagnostics page name it.
+    public var title: String {
+        switch self {
+        case .launch: "Launch"
+        case .hang: "Hang"
+        case .crash: "Crash"
+        case .exits: "Exits in the background"
+        }
+    }
 }
 
 /// A short, private summary of one system diagnostic: what happened and
@@ -17,7 +30,17 @@ public struct DiagnosticSummary: Codable, Sendable, Equatable {
     public var osVersion: String?
     /// "Hang 3.2 sec", "EXC_BAD_ACCESS (SIGSEGV)", then the top frames as
     /// "WatchMyMedia +0x1a2b3c": a binary and an offset, for symbolication.
+    /// For exits, one line per reason: "1 for memory".
     public var lines: [String]
+
+    /// What happened, in a few words, for the Diagnostics page: "3.2 sec",
+    /// "EXC_BAD_ACCESS (SIGSEGV)", "1 for memory, 2 to free memory".
+    public var headline: String {
+        if kind == .exits { return lines.joined(separator: ", ") }
+        guard let first = lines.first else { return "" }
+        for prefix in ["Launch took ", "Hang "] where first.hasPrefix(prefix) { return String(first.dropFirst(prefix.count)) }
+        return first
+    }
 
     public init(kind: DiagnosticKind, receivedAt: Date, appVersion: String? = nil, osVersion: String? = nil, lines: [String]) {
         self.kind = kind
@@ -80,7 +103,7 @@ public struct DiagnosticsReport: Sendable {
         if latest.isEmpty { out.append("  none") }
         for summary in latest {
             let from = [summary.appVersion.map { "app \($0)" }, summary.osVersion].compactMap { $0 }.joined(separator: ", ")
-            out.append("  \(summary.kind.rawValue.capitalized), \(stamp.string(from: summary.receivedAt))" + (from.isEmpty ? "" : " (\(from))"))
+            out.append("  \(summary.kind.title), \(stamp.string(from: summary.receivedAt))" + (from.isEmpty ? "" : " (\(from))"))
             out.append(contentsOf: summary.lines.map { "    \($0)" })
         }
         out.append("")
@@ -95,7 +118,8 @@ public struct DiagnosticsReport: Sendable {
 /// (apple/README.md, "Diagnostics"). Every line is redacted, in this order:
 ///
 /// 1. Known names (the server's, the accounts', this device's, any titles the
-///    caller knows of) become `<name>`, ignoring case.
+///    caller knows of) become `<name>`, ignoring case, as whole words (so
+///    "Sam" leaves "sample"); a port after one goes too.
 /// 2. Text in quotes (`"…"`, `“…”`, `‘…’`, `'…'`) becomes `"<text>"`: error
 ///    messages quote file and item names.
 /// 3. Addresses become `<address>`: anything with a scheme (`http://…`,
@@ -163,8 +187,12 @@ public struct DiagnosticsRedactor: Sendable {
     public func redact(_ line: String) -> String {
         var s = line
         for name in names {
-            s = s.replacingOccurrences(of: name, with: Self.namePlaceholder, options: [.caseInsensitive])
+            // Whole words only, so "Sam" leaves "sample" alone but not "Sam’s".
+            let pattern = #"(?<![\p{L}\p{N}])"# + NSRegularExpression.escapedPattern(for: name) + #"(?![\p{L}\p{N}])"#
+            s = s.replacingOccurrences(of: pattern, with: Self.namePlaceholder, options: [.caseInsensitive, .regularExpression])
         }
+        // A known host's port goes with it: "nas.local:27587" is all address.
+        s = s.replacingOccurrences(of: Self.namePlaceholder + #":\d{1,5}\b"#, with: Self.namePlaceholder, options: [.regularExpression])
         for (rule, template) in Self.rules.list {
             s = rule.stringByReplacingMatches(in: s, range: NSRange(s.startIndex..., in: s), withTemplate: template)
         }
