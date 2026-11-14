@@ -58,6 +58,7 @@ import media.watchmy.client.ui.components.BrandLockup
 import media.watchmy.client.presentation.signin.SignInViewModel
 import media.watchmy.client.presentation.signin.countdownLabel
 import media.watchmy.client.model.PairingState
+import media.watchmy.client.ui.rememberModelTextField
 
 /**
  * Sign in on the TV (mockup: design/mockups/android-tv/Main.dc.html): a
@@ -195,6 +196,14 @@ private enum class Field { Name, Password }
 @Composable
 private fun PasswordSignIn(vm: SignInViewModel, state: SignInViewModel.State, serverName: String, onUseCode: () -> Unit) {
     val form = state
+    // The fields hold their text (§3.3.3), which the keyboard edits; the model hears it as it is typed.
+    val nameField = rememberModelTextField(state.name, state.revision, vm::setName)
+    val passwordField = rememberModelTextField(state.password, state.revision, vm::setPassword)
+    val submit = {
+        vm.setName(nameField.text.toString())
+        vm.setPassword(passwordField.text.toString())
+        vm.signIn()
+    }
     var target by rememberSaveable { mutableStateOf(if (form.name.isBlank()) Field.Name else Field.Password) }
     val firstKey = remember { FocusRequester() }
 
@@ -203,26 +212,25 @@ private fun PasswordSignIn(vm: SignInViewModel, state: SignInViewModel.State, se
         Text("Sign in to\n$serverName", style = inter(60.sp, FontWeight.Bold, lineHeight = 65.sp, tracking = -0.02f), color = WmmColors.Text)
         Text("Use the name and password you sign in with on the web app.", style = inter(24.sp, lineHeight = 34.sp), color = WmmColors.TextMuted)
         Spacer(Modifier.height(4.dp))
-        FormField("Name", form.name, masked = false, active = target == Field.Name) {
+        FormField("Name", nameField.text.toString(), masked = false, active = target == Field.Name) {
             target = Field.Name
             firstKey.requestFocus()
         }
-        FormField("Password", form.password, masked = true, active = target == Field.Password) {
+        FormField("Password", passwordField.text.toString(), masked = true, active = target == Field.Password) {
             target = Field.Password
             firstKey.requestFocus()
         }
         Text(form.error ?: " ", style = inter(20.sp), color = WmmColors.Error)
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            TvButton(if (form.busy) "Signing in…" else "Sign in", vm::signIn, style = TvButtonStyle.Primary, enabled = !form.busy)
+            TvButton(if (form.busy) "Signing in…" else "Sign in", submit, style = TvButtonStyle.Primary, enabled = !form.busy)
             TvButton("Use a code instead", onUseCode)
         }
     }
 
     Box(Modifier.fillMaxSize().padding(end = 160.dp, top = 330.dp), contentAlignment = Alignment.TopEnd) {
         OnScreenKeyboard(
-            onText = { t -> if (target == Field.Name) vm.setName(form.name + t) else vm.setPassword(form.password + t) },
-            onBackspace = { if (target == Field.Name) vm.setName(form.name.dropLast(1)) else vm.setPassword(form.password.dropLast(1)) },
-            onDone = { if (target == Field.Name) target = Field.Password else vm.signIn() },
+            field = if (target == Field.Name) nameField else passwordField,
+            onDone = { if (target == Field.Name) target = Field.Password else submit() },
             doneLabel = if (target == Field.Name) "Next" else "Sign in",
             firstKey = firstKey,
         )

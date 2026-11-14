@@ -85,6 +85,7 @@ import media.watchmy.client.tv.live.TvLiveSearchRow
 import media.watchmy.client.presentation.search.SearchViewModel
 import media.watchmy.client.presentation.search.isEmpty
 import androidx.compose.runtime.withFrameNanos
+import media.watchmy.client.ui.rememberModelTextField
 
 /** Where the results start: right of the keyboard (154 + 712 + 60). */
 private val ResultsStart = 926.dp
@@ -108,6 +109,8 @@ fun SearchScreen(
     val services = LocalAppServices.current
     val vm = viewModel { SearchViewModel(services.library, auth = services.auth, requests = services.requests, saved = createSavedStateHandle()) }
     val state by vm.state.collectAsStateWithLifecycle()
+    // The field holds its text (§3.3.3), which the keyboard edits; the model searches a moment after it changes.
+    val query = rememberModelTextField(state.query, state.revision, vm::setQuery)
     // On Live TV (android-tv/LiveSearch): the listings' titles too, from API level 15 with Live TV.
     val liveTv = LocalLiveTVAvailable.current
     val liveSearch = viewModel(key = "tv-live-search") { LiveSearchViewModel(createSavedStateHandle(), services.live, services.servers) }
@@ -124,10 +127,9 @@ fun SearchScreen(
     TvScaffold(RailSection.Search, onNavigate) {
         Column(Modifier.padding(start = ContentStart, top = 56.dp).width(712.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
             Text("Search", style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
-            KeyboardField(state.query, placeholder = if (withLive) "Titles of shows, movies, episodes or Live TV programmes" else "Titles of shows, movies or episodes", active = true)
+            KeyboardField(query.text.toString(), placeholder = if (withLive) "Titles of shows, movies, episodes or Live TV programmes" else "Titles of shows, movies or episodes", active = true)
             OnScreenKeyboard(
-                onText = { vm.setQuery(state.query + it) },
-                onBackspace = { vm.setQuery(state.query.dropLast(1)) },
+                field = query,
                 onDone = vm::clear,
                 doneLabel = "Clear",
                 firstKey = firstKey,

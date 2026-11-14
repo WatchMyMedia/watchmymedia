@@ -53,6 +53,8 @@ class SearchViewModel(
         val options: RequestOptions = RequestOptions.None,
         /** Movies and shows not in the library that this user can ask for; empty when there are none or it failed. */
         val requestable: List<Requestable> = emptyList(),
+        /** Moves on when the model sets [query] itself (cleared, a recent search, another account), for the screen's field to take it. */
+        val revision: Int = 0,
     ) {
         val noResults: Boolean get() = results != null && results.movies.isEmpty() && results.shows.isEmpty() && results.episodes.isEmpty() && requestable.isEmpty()
     }
@@ -78,7 +80,7 @@ class SearchViewModel(
                         searchRevision++
                         requestRevision++
                         accountRevision++
-                        _state.value = State()
+                        _state.value = State(revision = _state.value.revision + 1)
                         saved.remove<String>(QUERY)
                     }
                 }
@@ -106,12 +108,17 @@ class SearchViewModel(
         search(debounce = true)
     }
 
-    fun clear() = setQuery("")
+    fun clear() {
+        if (_state.value.query.isEmpty()) return
+        _state.update { it.copy(query = "", revision = it.revision + 1) }
+        saved[QUERY] = ""
+        search(debounce = true)
+    }
 
     fun clearRecentQueries() = _state.update { it.copy(recentQueries = emptyList()) }
 
     fun selectRecentQuery(query: String) {
-        _state.update { it.copy(query = query) }
+        _state.update { it.copy(query = query, revision = it.revision + 1) }
         saved[QUERY] = query
         search(debounce = false)
     }

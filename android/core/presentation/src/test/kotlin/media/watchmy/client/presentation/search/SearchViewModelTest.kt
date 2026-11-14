@@ -201,4 +201,17 @@ class SearchViewModelTest {
         restored.clear()
         assertEquals("", saved.get<String>("query"))
     }
+
+    @Test fun `clearing or choosing a recent search moves the revision on, and typing doesn't`() = runTest {
+        vm.setQuery("harbor")
+        val typed = vm.state.value.revision
+        advanceUntilIdle()
+        vm.clear()
+        assertEquals("", vm.state.value.query)
+        assertTrue(vm.state.value.revision > typed)
+        val cleared = vm.state.value.revision
+        vm.selectRecentQuery("harbor")
+        assertEquals("harbor", vm.state.value.query)
+        assertTrue(vm.state.value.revision > cleared)
+    }
 }

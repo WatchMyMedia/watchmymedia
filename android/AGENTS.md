@@ -57,6 +57,13 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   screen calls `ReportShown(vm::setShown)` (core:ui) once, so a page under
   another one, or with the app in the background, reloads when next shown
   rather than with every event. Tests drive `libraryChanges`, not `changes`.
+- **Text fields.** A field holds its own text in a `TextFieldState`
+  (`rememberModelTextField` in core:ui) and tells the ViewModel what is
+  typed; a ViewModel that sets the text itself (cleared, a recent search,
+  the form started over) moves its state's `revision` on. Driving a field
+  through a StateFlow lost characters to fast typing and paste. The TV's
+  `OnScreenKeyboard(field = …)` edits the same state and offers "Use the
+  TV's keyboard".
 - **Live TV polling.** The channel list is polled only while a screen that
   shows channels is on screen: such a screen or row calls
   `ShowsLiveChannels()` (core:ui) once. Nothing else polls it.

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -67,6 +66,8 @@ import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.presentation.servers.ServerPickerViewModel
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import media.watchmy.client.ui.rememberModelTextField
 
 /**
  * Choosing a server (ServerPicker.dc.html): on this network, remembered, or
@@ -79,6 +80,12 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
     val vm = viewModel { ServerPickerViewModel(services.servers) }
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.chosen.collect { onServerChosen() } }
+    // The field holds its text (§3.3.3); the model hears it as it is typed.
+    val address = rememberModelTextField(state.address, state.revision, vm::setAddress)
+    val connect = {
+        vm.setAddress(address.text.toString())
+        vm.connectToAddress()
+    }
     if (onBack != null) BackHandler(onBack = onBack)
 
     Box(Modifier.fillMaxSize().background(WmmColors.Ground), contentAlignment = Alignment.TopCenter) {
@@ -109,14 +116,13 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                     SectionLabel("Enter an address", Modifier.padding(top = 12.dp))
                     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         OutlinedTextField(
-                            value = state.address,
-                            onValueChange = vm::setAddress,
+                            state = address,
                             label = { Text("Server address") },
                             placeholder = { Text("192.168.1.20 or https://home.example.net") },
-                            singleLine = true,
+                            lineLimits = TextFieldLineLimits.SingleLine,
                             isError = state.addressError != null,
                             supportingText = state.addressError?.let { e -> { Text(e) } }
-                                ?: if (needsHttpsNudge(state.address)) {
+                                ?: if (needsHttpsNudge(address.text.toString())) {
                                     { Text("Plain http sends your password unencrypted. Use https for a hostname.", color = WmmColors.Warn) }
                                 } else {
                                     null
@@ -124,7 +130,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                             textStyle = FieldText,
                             colors = fieldColors(),
                             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-                            keyboardActions = KeyboardActions(onGo = { vm.connectToAddress() }),
+                            onKeyboardAction = { connect() },
                             modifier = Modifier.fillMaxWidth().testTag(TestTags.SERVER_ADDRESS),
                         )
                         Text(
@@ -133,7 +139,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                         )
                         FilledButton(
                             "Connect",
-                            onClick = vm::connectToAddress,
+                            onClick = connect,
                             busy = state.connecting == ServerPickerViewModel.ADDRESS,
                             modifier = Modifier.align(Alignment.End).testTag(TestTags.SERVER_CONNECT),
                         )

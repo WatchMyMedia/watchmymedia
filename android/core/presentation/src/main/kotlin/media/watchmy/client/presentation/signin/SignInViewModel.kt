@@ -59,6 +59,8 @@ class SignInViewModel(
         val setupRequired: Boolean = false,
         /** Asking the server again whether it is set up. */
         val checking: Boolean = false,
+        /** Moves on when the model sets [name] and [password] itself, for the screen's fields to take them. */
+        val revision: Int = 0,
     ) {
         val canSubmit: Boolean get() = name.isNotBlank() && password.isNotEmpty() && !busy && !codeSignIn && !setupRequired
     }
@@ -88,7 +90,7 @@ class SignInViewModel(
                     pairing?.cancel()
                     return@collect
                 }
-                _state.value = State(setupRequired = s?.third == true)
+                _state.value = State(setupRequired = s?.third == true, revision = _state.value.revision + 1)
                 setCode(codeFirst || s?.second == true && !_state.value.setupRequired)
             }
         }
@@ -195,7 +197,7 @@ class SignInViewModel(
         _state.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             attempt { auth.signIn(s.name.trim(), s.password) }
-                .onSuccess { _state.update { it.copy(busy = false, password = "", showPassword = false) } }
+                .onSuccess { _state.update { it.copy(busy = false, password = "", showPassword = false, revision = it.revision + 1) } }
                 .onFailure { e ->
                     _state.update { it.copy(busy = false, error = signInMessage(e)) }
                     // Turnstile was turned on since the server was chosen: sign in with a code.

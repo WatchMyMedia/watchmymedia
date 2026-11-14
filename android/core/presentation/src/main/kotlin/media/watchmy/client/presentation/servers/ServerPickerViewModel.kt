@@ -64,12 +64,14 @@ class ServerPickerViewModel(
         val error: String? = null,
         /** Why connecting to the typed address failed. */
         val addressError: String? = null,
+        /** Moves on when the model clears [address] itself, for the screen's field to take it. */
+        val revision: Int = 0,
     ) {
         /** An address typed with http:// is a host name, which needs https. */
         val addressNeedsHttps: Boolean get() = needsHttpsNudge(address)
     }
 
-    private data class Local(val address: String = "", val connecting: String? = null, val error: String? = null, val addressError: String? = null)
+    private data class Local(val address: String = "", val connecting: String? = null, val error: String? = null, val addressError: String? = null, val revision: Int = 0)
 
     private val local = MutableStateFlow(Local())
     private val chosenEvents = Channel<Unit>(Channel.BUFFERED)
@@ -107,6 +109,7 @@ class ServerPickerViewModel(
             connecting = l.connecting,
             error = l.error,
             addressError = l.addressError,
+            revision = l.revision,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), State())
 
@@ -156,7 +159,7 @@ class ServerPickerViewModel(
                 servers.select(server)
             }
             result.onSuccess {
-                local.update { it.copy(connecting = null, address = if (key == ADDRESS) "" else it.address) }
+                local.update { if (key == ADDRESS) it.copy(connecting = null, address = "", revision = it.revision + 1) else it.copy(connecting = null) }
                 chosenEvents.send(Unit)
             }.onFailure { e ->
                 val message = connectMessage(e, label)

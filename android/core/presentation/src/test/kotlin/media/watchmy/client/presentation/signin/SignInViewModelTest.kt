@@ -86,7 +86,7 @@ class SignInViewModelTest {
         vm.signIn()
         assertEquals("sam", auth.user.value?.name)
         auth.signOut()
-        assertEquals(SignInViewModel.State(), vm.state.value)
+        assertEquals(SignInViewModel.State(), vm.state.value.copy(revision = 0))
     }
 
     @Test fun `a server that turned the browser check on since turns to a code`() = runTest {
@@ -172,6 +172,18 @@ class SignInViewModelTest {
         assertFalse(vm.state.value.checking)
         assertFalse("the saved server knows too", servers.current.value!!.server.setupRequired)
     }
+
+    @Test fun `starting the form over moves the revision on, so the screen's fields take the new text`() = runTest {
+        val servers = FakeServerRepository(signedIn = false)
+        val vm = SignInViewModel(auth, servers)
+        val first = vm.state.value.revision
+        vm.setName("sam")
+        vm.setPassword("password")
+        assertEquals("typing doesn't", first, vm.state.value.revision)
+        vm.signIn()
+        assertEquals("", vm.state.value.password)
+        assertTrue("a sign-in clears the password", vm.state.value.revision > first)
+    }
 }
 
 /** One server with no accounts until [setUp]. */
@@ -186,4 +198,5 @@ private class NewServer : ServerRepository {
         current.value = SavedServer(server, null, false, 0)
     }
     override suspend fun forget(serverId: String) = Unit
+
 }
