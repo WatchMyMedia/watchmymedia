@@ -48,6 +48,10 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.runtime.LaunchedEffect
 
 private val Digits = "1234567890".map { it.toString() }
 private val Letters = listOf("qwertyuiop", "asdfghjkl'", "zxcvbnm,.-").map { row -> row.map { it.toString() } }
@@ -148,6 +152,7 @@ fun OnScreenKeyboard(
  * voice key; its Done, or Back, comes back to that key. [masked] fields
  * (passwords) ask it for a password keyboard. [note] goes under the key.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun OnScreenKeyboard(
     field: TextFieldState,
@@ -201,7 +206,17 @@ fun OnScreenKeyboard(
             },
         )
     }
-    // Back with the TV's keyboard put away: back to the key, not out of the screen.
+    // The TV's keyboard put away (its own Back hides it first): focus comes back to the key.
+    val imeVisible = WindowInsets.isImeVisible
+    var imeShown by remember { mutableStateOf(false) }
+    LaunchedEffect(imeVisible, onTvKeyboard) {
+        if (onTvKeyboard && imeVisible) imeShown = true
+        if (onTvKeyboard && imeShown && !imeVisible) {
+            imeShown = false
+            tvKey.requestFocus()
+        }
+    }
+    // Back with the TV's keyboard already hidden: back to the key, not out of the screen.
     BackHandler(enabled = onTvKeyboard) {
         ime?.hide()
         tvKey.requestFocus()
