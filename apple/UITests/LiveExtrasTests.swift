@@ -165,16 +165,14 @@ final class LiveExtrasTests: XCTestCase {
         XCTAssertTrue(app.buttons["Watch 20.1"].exists, "What is on has Watch")
         snap("guide-search")
 
-        // The keyboard covers the tab bar: a tap on the tab could land on a key
-        // and the guide's field stay on screen. Put it away first.
-        let keyboard = app.keyboards.firstMatch
-        if keyboard.exists {
-            app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] %@", "search")).firstMatch.tap()
-            XCTAssertTrue(gone(keyboard), "the keyboard went away")
-        }
+        // The Search tab, from a launch straight onto it. Reaching it by the tab bar
+        // meant putting the guide's keyboard away first, and no key or button
+        // did that on every iPhone (an iPhone 18 Pro kept it up, 2026-11-13).
+        app.terminate()
+        app.launchArguments = ["-fakes", "-fakesLiveGuide", "-tab", "search"]
+        app.launch()
         let searchTab = app.tabBars.buttons["Search"]
-        XCTAssertTrue(searchTab.waitForExistence(timeout: 10))
-        searchTab.tap()
+        XCTAssertTrue(searchTab.waitForExistence(timeout: 20))
         XCTAssertTrue(becomes(searchTab, "isSelected == true"), "the Search tab is chosen")
         // The Search tab's own field, by its prompt: the guide's may still be in the tree.
         let tabField = app.searchFields.matching(NSPredicate(format: "placeholderValue == %@", "Shows, movies, episodes, Live TV")).firstMatch
