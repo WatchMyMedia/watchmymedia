@@ -62,6 +62,8 @@ import media.watchmy.client.model.RowLink
 import media.watchmy.client.model.RowStyle
 import media.watchmy.client.model.drawn
 import media.watchmy.client.model.formatCount
+import media.watchmy.client.presentation.library.LibraryViewModel
+import media.watchmy.client.presentation.library.gridSubtitle
 import media.watchmy.client.presentation.rows.LibraryRowsViewModel
 import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.Inter
@@ -98,7 +100,7 @@ internal fun ArrangedLibraryScreen(
     val drawn = rows.rows.drawn(live = false)
     // A new sort or filter from deep in the grid goes back up to its heading; with the heading or
     // the rows in view nothing moves, and coming back from a show keeps the place.
-    val queryKey = "${state.sort} ${state.filter} ${state.genre} ${state.decade} ${state.text} ${state.offset}"
+    val queryKey = "${state.choices} ${state.offset}"
     var shownKey by rememberSaveable { mutableStateOf(queryKey) }
     LaunchedEffect(queryKey) {
         if (queryKey != shownKey) {
@@ -201,7 +203,7 @@ private fun LazyGridScope.gridItems(
         state.items.isEmpty() && state.loading -> item(key = "loading", span = full) {
             Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(28.dp), color = WmmColors.Accent, strokeWidth = 2.dp) }
         }
-        state.items.isEmpty() && state.error != null -> item(key = "error", span = full) { ErrorState(state.error, vm::retry, Modifier.height(240.dp)) }
+        state.items.isEmpty() && state.error != null -> item(key = "error", span = full) { ErrorState(state.error!!, vm::retry, Modifier.height(240.dp)) }
         state.noLibrary -> item(key = "none", span = full) { EmptyState("No $noun library", "Add one in the web app.", Modifier.height(240.dp)) }
         state.items.isEmpty() && state.filtered -> item(key = "nothing", span = full) {
             EmptyState("Nothing matches", "No ${noun}s match these filters.", Modifier.height(240.dp), action = "Clear filters", onAction = vm::clearFilters)
@@ -214,7 +216,7 @@ private fun LazyGridScope.gridItems(
                 PosterCard(
                     item = item,
                     imageUrl = library.imageUrl(item.posterPath, ImageSize.W342),
-                    subtitle = gridSubtitle(item),
+                    subtitle = item.gridSubtitle(),
                     onClick = { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched) },
                     onSetWatched = { vm.setWatched(item, it) },
                     titleSize = 13.sp,

@@ -77,12 +77,15 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.model.drawn
 import media.watchmy.client.model.formatCount
 import media.watchmy.client.model.plural
+import media.watchmy.client.presentation.library.LibraryViewModel
+import media.watchmy.client.presentation.library.gridSubtitle
 import media.watchmy.client.presentation.rows.LibraryRowsViewModel
 import media.watchmy.client.tv.navigation.TvRoutes
 import media.watchmy.client.tv.rows.TvArrangedRow
 import media.watchmy.client.tv.rows.TvRowActions
 import media.watchmy.client.tv.rows.bleed
 import media.watchmy.client.tv.rows.cardKey
+import media.watchmy.client.ui.ReportShown
 
 private enum class Picker { Sort, Decade }
 
@@ -102,7 +105,8 @@ fun LibraryScreen(
 ) {
     val services = LocalAppServices.current
     val notMatched = rememberNotMatchedNotice()
-    val vm = viewModel(key = "library-$type") { LibraryViewModel(services.library, type, saved = createSavedStateHandle()) }
+    val vm = viewModel(key = "library-$type") { LibraryViewModel(services.library, type, createSavedStateHandle(), pageSize = PAGE_SIZE, columns = COLUMNS, countsLine = true) }
+    ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     var picker by rememberSaveable { mutableStateOf<Picker?>(null) }
     val memory = rememberFocusMemory()
@@ -110,12 +114,13 @@ fun LibraryScreen(
     val title = if (type == LibraryType.Tv) "TV Shows" else "Movies"
     // The library's rows above the grid, from servers that arrange them (PLAN-ROWS.md Decision 11).
     val rowsVm = viewModel(key = "tv-library-rows-$type") { LibraryRowsViewModel(services.library, services.rows) }
+    ReportShown(rowsVm::setShown)
     val rows by rowsVm.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.libraryId) { rowsVm.show(state.libraryId) }
 
     TvScaffold(if (type == LibraryType.Tv) RailSection.Shows else RailSection.Movies, onNavigate) {
         if (rowsVm.arranges && state.libraryId != null) {
-            val actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, { show, season, episode -> onNavigate(TvRoutes.Episode(show, season, episode)) }, notMatched, vm::toggleWatched) { id -> onNavigate(TvRoutes.MediaList(id)) }
+            val actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, { show, season, episode -> onNavigate(TvRoutes.Episode(show, season, episode)) }, notMatched, { vm.setWatched(it, !it.watched) }) { id -> onNavigate(TvRoutes.MediaList(id)) }
             ArrangedLibrary(
                 type, title, state, rows, actions, memory, gridState,
                 chips = { m -> ChipRow(vm, state, { picker = Picker.Decade }, m, top = 0.dp) },
@@ -132,7 +137,7 @@ fun LibraryScreen(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(title, style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
-                    Text(state.summary ?: " ", style = inter(20.sp), color = WmmColors.TextMuted)
+                    Text(state.countsLine ?: " ", style = inter(20.sp), color = WmmColors.TextMuted)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("Sort", style = inter(19.sp), color = WmmColors.TextMuted)
@@ -142,12 +147,13 @@ fun LibraryScreen(
             ChipRow(vm, state, onDecade = { picker = Picker.Decade })
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 when {
-                    state.loading -> LoadingState()
-                    state.error != null -> ErrorState(state.error!!, vm::reload, title = "Couldn't load $title")
+                    state.loading && state.items.isEmpty() -> LoadingState()
+                    state.error != null -> ErrorState(state.error!!, vm::retry, title = "Couldn't load $title")
+                    state.noLibrary -> EmptyState("No ${title.lowercase()} library", noLibrary(type))
                     state.items.isEmpty() && state.choices.narrowed -> EmptyState(
                         "Nothing matches",
                         "No ${title.lowercase()} match these filters.",
-                    ) { TvButton("Clear filters", vm::clearChoices, style = TvButtonStyle.Primary) }
+                    ) { TvButton("Clear filters", vm::clearFilters, style = TvButtonStyle.Primary) }
                     state.items.isEmpty() -> EmptyState(
                         "No ${title.lowercase()} yet",
                         "Add them to the library in the web app and scan it; they appear here.",
@@ -169,7 +175,7 @@ fun LibraryScreen(
                                         item = item,
                                         imageUrl = services.library.imageUrl(item.posterPath, ImageSize.W342),
                                         onClick = { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) },
-                                        onLongClick = if (item.kind == ItemKind.Movie) ({ vm.toggleWatched(item) }) else null,
+                                        onLongClick = if (item.kind == ItemKind.Movie) ({ vm.setWatched(item, !item.watched) }) else null,
                                         modifier = Modifier
                                             .focusMemory(memory, "item:${item.id}")
                                             .onFocusChanged { if (it.isFocused) vm.onVisible(i) },
@@ -198,7 +204,7 @@ fun LibraryScreen(
                 }
             }
         }
-        Notice(state.notice ?: rows.message, { vm.noticeShown(); rowsVm.messageShown() })
+        Notice(state.message ?: rows.message, { vm.messageShown(); rowsVm.messageShown() })
     }
 
     when (picker) {
@@ -239,7 +245,7 @@ fun LibraryScreen(
 private fun ArrangedLibrary(
     type: LibraryType,
     title: String,
-    state: LibraryViewModel.UiState,
+    state: LibraryViewModel.State,
     rows: LibraryRowsViewModel.State,
     actions: TvRowActions,
     memory: media.watchmy.client.tv.components.FocusMemory,
@@ -269,7 +275,7 @@ private fun ArrangedLibrary(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(title, style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
                     val lists = drawn.count { it.listId != null }
-                    Text(listOfNotNull(state.summary, lists.takeIf { it > 0 }?.let { plural(it, "list") }).joinToString(" · ").ifEmpty { " " }, style = inter(20.sp), color = WmmColors.TextMuted)
+                    Text(listOfNotNull(state.countsLine, lists.takeIf { it > 0 }?.let { plural(it, "list") }).joinToString(" · ").ifEmpty { " " }, style = inter(20.sp), color = WmmColors.TextMuted)
                 }
             }
             drawn.forEach { row ->
@@ -282,7 +288,7 @@ private fun ArrangedLibrary(
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text("All $noun", style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.alignByBaseline())
-                        if (!state.loading) Text(formatCount(state.total), style = inter(19.sp, FontWeight.Medium), color = WmmColors.TextMuted, modifier = Modifier.alignByBaseline())
+                        if (!state.loading || state.items.isNotEmpty()) Text(formatCount(state.total), style = inter(19.sp, FontWeight.Medium), color = WmmColors.TextMuted, modifier = Modifier.alignByBaseline())
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Text("Sort", style = inter(19.sp), color = WmmColors.TextMuted)
@@ -292,8 +298,9 @@ private fun ArrangedLibrary(
             }
             item("chips", span = full) { chips(Modifier.bleed(ContentStart, ContentEnd)) }
             when {
-                state.loading -> item("loading", span = full) { Box(Modifier.fillMaxWidth().height(300.dp)) { LoadingState() } }
+                state.loading && state.items.isEmpty() -> item("loading", span = full) { Box(Modifier.fillMaxWidth().height(300.dp)) { LoadingState() } }
                 state.error != null -> item("error", span = full) { Text(state.error.orEmpty(), style = inter(22.sp), color = WmmColors.Error) }
+                state.noLibrary -> item("none", span = full) { Text(noLibrary(type), style = inter(22.sp), color = WmmColors.TextMuted) }
                 state.items.isEmpty() -> item("empty", span = full) {
                     Text(if (state.choices.narrowed) "No ${title.lowercase()} match these filters." else "No ${title.lowercase()} yet.", style = inter(22.sp), color = WmmColors.TextMuted)
                 }
@@ -338,7 +345,7 @@ private fun ArrangedLibrary(
 
 /** Filters, a divider, then genres and Decade; scrolls sideways when the library has many genres. */
 @Composable
-private fun ChipRow(vm: LibraryViewModel, state: LibraryViewModel.UiState, onDecade: () -> Unit, modifier: Modifier = Modifier, top: androidx.compose.ui.unit.Dp = 22.dp) {
+private fun ChipRow(vm: LibraryViewModel, state: LibraryViewModel.State, onDecade: () -> Unit, modifier: Modifier = Modifier, top: androidx.compose.ui.unit.Dp = 22.dp) {
     val c = state.choices
     LazyRow(
         modifier.fillMaxWidth().padding(top = top, start = ContentStart - 12.dp).focusRestorer(),
@@ -350,7 +357,7 @@ private fun ChipRow(vm: LibraryViewModel, state: LibraryViewModel.UiState, onDec
         if (state.genres.isNotEmpty() || state.decades.isNotEmpty()) {
             item("divider") { Box(Modifier.padding(horizontal = 8.dp).width(1.dp).height(32.dp).background(WmmColors.Line2)) }
         }
-        items(state.genres, key = { "g-$it" }) { g -> TvChip(g, selected = c.genre == g, onClick = { vm.toggleGenre(g) }) }
+        items(state.genres, key = { "g-$it" }) { g -> TvChip(g, selected = c.genre == g, onClick = { vm.setGenre(g) }) }
         if (state.decades.isNotEmpty()) {
             item("decade") {
                 TvChip(c.decade?.let { "${it}s" } ?: "Decade", selected = c.decade != null, onClick = onDecade, trailingIcon = WmmIcons.ChevronDown)
@@ -378,3 +385,10 @@ private fun GridCard(item: BrowseItem, imageUrl: String?, onClick: () -> Unit, o
         ArtProgress(item.progress)
     }
 }
+
+/** The TV grid's columns, and a page of six rows of them. */
+private const val COLUMNS = 8
+private const val PAGE_SIZE = COLUMNS * 6
+
+private fun noLibrary(type: LibraryType) =
+    if (type == LibraryType.Tv) "This server has no TV library yet. Add one in the web app." else "This server has no movie library yet. Add one in the web app."

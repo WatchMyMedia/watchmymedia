@@ -64,7 +64,7 @@ import media.watchmy.client.mobile.components.PosterCard
 import media.watchmy.client.mobile.components.PressableCard
 import media.watchmy.client.mobile.components.TonalButton
 import media.watchmy.client.mobile.components.watchToggle
-import media.watchmy.client.mobile.library.gridSubtitle
+import media.watchmy.client.presentation.library.gridSubtitle
 import media.watchmy.client.mobile.requests.RequestSheet
 import media.watchmy.client.mobile.requests.RequestableRow
 import media.watchmy.client.mobile.requests.StateChip
@@ -173,13 +173,13 @@ fun SearchScreen(
                     if (results.shows.isNotEmpty()) {
                         heading("TV Shows", results.shows.size)
                         items(results.shows, key = { "s${it.id}" }, contentType = { "poster" }) { item ->
-                            PosterCard(item, services.library.imageUrl(item.posterPath, ImageSize.W342), gridSubtitle(item), { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) }, { vm.setWatched(item, it) }, titleSize = 13.sp, subtitleSize = 11.sp)
+                            PosterCard(item, services.library.imageUrl(item.posterPath, ImageSize.W342), item.gridSubtitle(), { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) }, { vm.setWatched(item, it) }, titleSize = 13.sp, subtitleSize = 11.sp)
                         }
                     }
                     if (results.movies.isNotEmpty()) {
                         heading("Movies", results.movies.size)
                         items(results.movies, key = { "m${it.id}" }, contentType = { "poster" }) { item ->
-                            PosterCard(item, services.library.imageUrl(item.posterPath, ImageSize.W342), gridSubtitle(item), { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) }, { vm.setWatched(item, it) }, titleSize = 13.sp, subtitleSize = 11.sp)
+                            PosterCard(item, services.library.imageUrl(item.posterPath, ImageSize.W342), item.gridSubtitle(), { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) }, { vm.setWatched(item, it) }, titleSize = 13.sp, subtitleSize = 11.sp)
                         }
                     }
                     val notInLibrary = state.requestable.besides(results)

@@ -60,6 +60,9 @@ import media.watchmy.client.mobile.navigation.MobileRoutes
 import media.watchmy.client.mobile.rows.EditRowsButton
 import media.watchmy.client.mobile.rows.rowEditorRoute
 import media.watchmy.client.model.drawn
+import media.watchmy.client.presentation.library.LibraryViewModel
+import media.watchmy.client.presentation.library.countLine
+import media.watchmy.client.presentation.library.gridSubtitle
 import media.watchmy.client.presentation.rows.LibraryRowsViewModel
 import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.ItemFilter
@@ -101,28 +104,30 @@ internal fun TabletLibraryScreen(
     var filtersVisible by rememberSaveable { mutableStateOf(true) }
     var filtersSheet by remember { mutableStateOf(false) }
     val noun = if (type == LibraryType.Tv) "show" else "movie"
-    val query = "${state.sort}/${state.filter}/${state.genre}/${state.decade}/${state.text}/${state.offset}/${state.jumpRevision}"
+    val query = "${state.choices}/${state.offset}"
     var shownQuery by rememberSaveable { mutableStateOf(query) }
     LaunchedEffect(query) { if (query != shownQuery) { shownQuery = query; grid.scrollToItem(0) } }
+    // A letter jumped to: its first title, under the rows when there are any.
+    LaunchedEffect(state.jump?.revision) { state.jump?.let { grid.scrollToItem((if (arranged) drawn.size + 2 else 0) + it.index) } }
     val nearEnd by remember { derivedStateOf { (grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= grid.layoutInfo.totalItemsCount - 12 } }
     LaunchedEffect(state.items.size, state.offset, state.loading, state.refreshing) { snapshotFlow { nearEnd }.collect { if (it) vm.loadMore() } }
 
     Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
         MainTopBar(if (type == LibraryType.Tv) "TV Shows" else "Movies", userName, { onNavigate(MobileRoutes.Search) }, { onNavigate(MobileRoutes.Settings) })
         Row(Modifier.fillMaxWidth().padding(horizontal = TabletLayout.margin), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(countLine(state, noun), color = WmmColors.TextMuted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Text(state.countLine(type), color = WmmColors.TextMuted, fontSize = 13.sp, modifier = Modifier.weight(1f))
             TextButton(onClick = { if (twoPane) filtersVisible = !filtersVisible else filtersSheet = true }) {
-                Text("Filters${if (state.filterCount > 0) " · ${state.filterCount}" else ""}", color = WmmColors.Accent)
+                Text("Filters${if (state.choices.filterCount > 0) " · ${state.choices.filterCount}" else ""}", color = WmmColors.Accent)
             }
             var sortOpen by remember { mutableStateOf(false) }
             Box {
-                TextButton(onClick = { sortOpen = true }) { Text("${state.sort.label} ▾", color = WmmColors.Accent) }
+                TextButton(onClick = { sortOpen = true }) { Text("${state.choices.sort.label} ▾", color = WmmColors.Accent) }
                 DropdownMenu(sortOpen, { sortOpen = false }, containerColor = WmmColors.Surface3) {
-                    sortOptions(type).forEach { sort -> MenuChoice(sort.label, state.sort == sort) { sortOpen = false; vm.setSort(sort) } }
+                    sortOptions(type).forEach { sort -> MenuChoice(sort.label, state.choices.sort == sort) { sortOpen = false; vm.setSort(sort) } }
                 }
             }
         }
-        OutlinedTextField(state.text, vm::setText, singleLine = true, placeholder = { Text("Filter ${noun}s") }, colors = fieldColors(), modifier = Modifier.padding(horizontal = TabletLayout.margin).fillMaxWidth().padding(bottom = 16.dp))
+        OutlinedTextField(state.choices.text, vm::setText, singleLine = true, placeholder = { Text("Filter ${noun}s") }, colors = fieldColors(), modifier = Modifier.padding(horizontal = TabletLayout.margin).fillMaxWidth().padding(bottom = 16.dp))
         Row(Modifier.weight(1f).padding(horizontal = TabletLayout.margin), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             if (twoPane && filtersVisible) {
                 FilterPanel(state, vm, type, Modifier.width(220.dp).fillMaxHeight()) { filtersVisible = false }
@@ -130,7 +135,7 @@ internal fun TabletLibraryScreen(
             Box(Modifier.weight(1f).fillMaxHeight()) {
                 when {
                     state.loading && state.items.isEmpty() -> LoadingState()
-                    state.error != null && state.items.isEmpty() -> ErrorState(state.error, vm::retry)
+                    state.error != null && state.items.isEmpty() -> ErrorState(state.error!!, vm::retry)
                     state.noLibrary -> EmptyState("No ${noun} library", "Add a library in the web app.")
                     state.items.isEmpty() && state.filtered -> EmptyState("Nothing matches", "No ${noun}s match these filters.", action = "Clear filters", onAction = vm::clearFilters)
                     state.items.isEmpty() -> EmptyState("No ${noun}s yet", "Pull down to check again.", action = "Check again", onAction = vm::retry)
@@ -150,10 +155,10 @@ internal fun TabletLibraryScreen(
                                 }
                             }
                             items(state.items, key = { it.id }) { item ->
-                                PosterCard(item, library.imageUrl(item.posterPath, ImageSize.W342), gridSubtitle(item), { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched) }, { vm.setWatched(item, it) })
+                                PosterCard(item, library.imageUrl(item.posterPath, ImageSize.W342), item.gridSubtitle(), { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched) }, { vm.setWatched(item, it) })
                             }
                             if (state.loadingMore || state.moreError != null) item(span = { GridItemSpan(maxLineSpan) }) {
-                                if (state.moreError != null) InlineError(state.moreError, vm::retryMore)
+                                if (state.moreError != null) InlineError(state.moreError!!, vm::retryMore)
                                 else Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = WmmColors.Accent) }
                             }
                         }
@@ -163,7 +168,7 @@ internal fun TabletLibraryScreen(
                 MessageHost(state.message, vm::messageShown, Modifier.align(Alignment.BottomCenter))
             }
             val letters = state.letters
-            if (state.sort == ItemSort.Title && !letters.isNullOrEmpty()) {
+            if (state.choices.sort == ItemSort.Title && !letters.isNullOrEmpty()) {
                 LazyColumn(Modifier.width(48.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
                     items(letters, key = { it.letter }) { entry ->
                         TextButton(onClick = { vm.jumpToLetter(entry.letter) }, modifier = Modifier.size(48.dp), contentPadding = PaddingValues(0.dp)) {
@@ -189,19 +194,19 @@ private fun FilterPanel(state: LibraryViewModel.State, vm: LibraryViewModel, typ
                 Text("Show", color = WmmColors.TextMuted, fontWeight = FontWeight.Bold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     filterOptions(type).filter { it != ItemFilter.FourK && it != ItemFilter.Hdr }.forEach { filter ->
-                        GoldChip(filter.label, state.filter == filter, { vm.setFilter(filter) })
+                        GoldChip(filter.label, state.choices.filter == filter, { vm.setFilter(filter) })
                     }
                 }
                 Text("Quality", color = WmmColors.TextMuted, fontWeight = FontWeight.Bold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(ItemFilter.FourK, ItemFilter.Hdr).forEach { filter -> GoldChip(filter.label, state.filter == filter, { vm.setFilter(if (state.filter == filter) ItemFilter.All else filter) }) }
+                    listOf(ItemFilter.FourK, ItemFilter.Hdr).forEach { filter -> GoldChip(filter.label, state.choices.filter == filter, { vm.setFilter(if (state.choices.filter == filter) ItemFilter.All else filter) }) }
                 }
                 Text("Genre", color = WmmColors.TextMuted, fontWeight = FontWeight.Bold)
             }
         }
         items(state.genres, key = { it }) { genre ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = state.genre == genre, onCheckedChange = { vm.setGenre(genre) })
+                Checkbox(checked = state.choices.genre == genre, onCheckedChange = { vm.setGenre(genre) })
                 TextButton(onClick = { vm.setGenre(genre) }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(0.dp)) { Text(genre, color = WmmColors.Text, modifier = Modifier.fillMaxWidth()) }
                 state.genreCounts[genre]?.let { Text(it.toString(), color = WmmColors.TextMuted, fontSize = 12.sp) }
             }
@@ -210,7 +215,7 @@ private fun FilterPanel(state: LibraryViewModel.State, vm: LibraryViewModel, typ
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Decade", color = WmmColors.TextMuted, fontWeight = FontWeight.Bold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.decades.forEach { decade -> GoldChip("${decade}s", state.decade == decade, { vm.setDecade(if (state.decade == decade) null else decade) }) }
+                    state.decades.forEach { decade -> GoldChip("${decade}s", state.choices.decade == decade, { vm.setDecade(if (state.choices.decade == decade) null else decade) }) }
                 }
                 TextButton(onClick = vm::clearFilters) { Text("Clear filters", color = WmmColors.Accent) }
                 TextButton(onClick = onClose) { Text("Hide filters", color = WmmColors.TextSoft) }

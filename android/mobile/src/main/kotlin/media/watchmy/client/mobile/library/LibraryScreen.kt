@@ -64,14 +64,14 @@ import media.watchmy.client.mobile.components.MainTopBar
 import media.watchmy.client.mobile.components.MessageHost
 import media.watchmy.client.mobile.components.PosterCard
 import media.watchmy.client.mobile.navigation.MobileRoutes
+import media.watchmy.client.presentation.library.LibraryViewModel
+import media.watchmy.client.presentation.library.countLine
+import media.watchmy.client.presentation.library.gridSubtitle
 import media.watchmy.client.presentation.rows.LibraryRowsViewModel
-import media.watchmy.client.model.BrowseItem
 import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.filterOptions
-import media.watchmy.client.model.formatDuration
 import media.watchmy.client.model.label
-import media.watchmy.client.model.plural
 import media.watchmy.client.model.sortOptions
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.LocalAppServices
@@ -84,6 +84,7 @@ import media.watchmy.client.ui.components.Sheen
 import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.components.rememberSheen
 import media.watchmy.client.ui.components.skeletonLine
+import media.watchmy.client.ui.ReportShown
 
 /**
  * The TV Shows or Movies grid (Library.dc.html): the count and sort menu,
@@ -101,11 +102,13 @@ fun LibraryScreen(
 ) {
     val services = LocalAppServices.current
     val notMatched = rememberNotMatchedNotice()
-    val vm = viewModel(key = "library-$type") { LibraryViewModel(services.library, services.auth, type, saved = createSavedStateHandle()) }
+    val vm = viewModel(key = "library-$type") { LibraryViewModel(services.library, type, saved = createSavedStateHandle()) }
+    ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
-    val user by vm.user.collectAsStateWithLifecycle()
+    val user by services.auth.user.collectAsStateWithLifecycle()
     // The library's rows above the grid, from servers that arrange them (PLAN-ROWS.md Decision 11).
     val rowsVm = viewModel(key = "library-rows-$type") { LibraryRowsViewModel(services.library, services.rows) }
+    ReportShown(rowsVm::setShown)
     val rows by rowsVm.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.libraryId) { rowsVm.show(state.libraryId) }
     val layout = media.watchmy.client.ui.rememberTabletLayout()
@@ -125,7 +128,7 @@ fun LibraryScreen(
     val noun = if (type == LibraryType.Tv) "show" else "movie"
 
     // A new sort or filter starts at the top; coming back from a show keeps the place.
-    val queryKey = "${state.sort} ${state.filter} ${state.genre} ${state.decade} ${state.text} ${state.offset}"
+    val queryKey = "${state.choices} ${state.offset}"
     var shownKey by rememberSaveable { mutableStateOf(queryKey) }
     LaunchedEffect(queryKey) {
         if (queryKey != shownKey) {
@@ -149,7 +152,7 @@ fun LibraryScreen(
                 Box(Modifier.weight(1f)) { Box(Modifier.skeletonLine(sheen, 160.dp, 11.dp).clearAndSetSemantics {}) }
             } else {
                 Text(
-                    if (state.loading && state.items.isEmpty()) "" else countLine(state, noun),
+                    if (state.loading && state.items.isEmpty()) "" else state.countLine(type),
                     style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = WmmColors.TextMuted),
                     modifier = Modifier.weight(1f),
                 )
@@ -191,7 +194,7 @@ fun LibraryScreen(
                                 PosterCard(
                                     item = item,
                                     imageUrl = services.library.imageUrl(item.posterPath, ImageSize.W342),
-                                    subtitle = gridSubtitle(item),
+                                    subtitle = item.gridSubtitle(),
                                     onClick = { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) },
                                     onSetWatched = { vm.setWatched(item, it) },
                                     titleSize = 13.sp,
@@ -232,13 +235,13 @@ internal fun SortMenu(state: LibraryViewModel.State, vm: LibraryViewModel, type:
         ) {
             Icon(WmmIcons.Sort, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text(state.sort.label, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp))
+            Text(state.choices.sort.label, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp))
             Spacer(Modifier.width(6.dp))
             Icon(WmmIcons.ChevronDown, contentDescription = "Sort by", modifier = Modifier.size(18.dp))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = WmmColors.Surface3) {
             sortOptions(type).forEach { sort ->
-                MenuChoice(sort.label, selected = sort == state.sort) {
+                MenuChoice(sort.label, selected = sort == state.choices.sort) {
                     open = false
                     vm.setSort(sort)
                 }
@@ -253,34 +256,34 @@ internal fun ChipRow(state: LibraryViewModel.State, vm: LibraryViewModel, type: 
     var decadeMenu by remember { mutableStateOf(false) }
     LazyRow(Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         // A resized tablet can carry a title query or a later A–Z window into the phone layout.
-        if (state.text.isNotBlank()) item(key = "text") { GoldChip("${state.text} ×", selected = true, onClick = { vm.setText("") }) }
+        if (state.choices.text.isNotBlank()) item(key = "text") { GoldChip("${state.choices.text} ×", selected = true, onClick = { vm.setText("") }) }
         if (state.offset > 0) item(key = "start") { GoldChip("Back to start", selected = false, onClick = vm::returnToStart) }
         items(filterOptions(type), key = { "f$it" }) { filter ->
-            GoldChip(filter.label, selected = state.filter == filter, onClick = { vm.setFilter(filter) })
+            GoldChip(filter.label, selected = state.choices.filter == filter, onClick = { vm.setFilter(filter) })
         }
         if (state.genres.isNotEmpty()) {
             item(key = "divider") { VerticalDivider(Modifier.height(24.dp).padding(horizontal = 4.dp), color = WmmColors.Line2) }
             items(state.genres, key = { "g$it" }) { genre ->
-                GoldChip(genre, selected = state.genre == genre, onClick = { vm.setGenre(genre) })
+                GoldChip(genre, selected = state.choices.genre == genre, onClick = { vm.setGenre(genre) })
             }
         }
         if (state.decades.isNotEmpty()) {
             item(key = "decade") {
                 Box {
                     GoldChip(
-                        state.decade?.let { "${it}s" } ?: "Decade",
-                        selected = state.decade != null,
+                        state.choices.decade?.let { "${it}s" } ?: "Decade",
+                        selected = state.choices.decade != null,
                         onClick = { decadeMenu = true },
                         trailingIcon = WmmIcons.ChevronDown,
                     )
                     DropdownMenu(expanded = decadeMenu, onDismissRequest = { decadeMenu = false }, containerColor = WmmColors.Surface3) {
-                        MenuChoice("Any decade", selected = state.decade == null) {
+                        MenuChoice("Any decade", selected = state.choices.decade == null) {
                             decadeMenu = false
                             vm.setDecade(null)
                         }
                         HorizontalDivider(color = WmmColors.Line2)
                         state.decades.forEach { decade ->
-                            MenuChoice("${decade}s", selected = state.decade == decade) {
+                            MenuChoice("${decade}s", selected = state.choices.decade == decade) {
                                 decadeMenu = false
                                 vm.setDecade(decade)
                             }
@@ -305,18 +308,3 @@ internal fun MenuChoice(label: String, selected: Boolean, onClick: () -> Unit) {
         onClick = onClick,
     )
 }
-
-/**
- * "142 shows · 3,418 episodes" for the whole library, from the server's
- * counts; with a filter on (or from servers without counts), what the grid
- * holds: "12 shows".
- */
-internal fun countLine(state: LibraryViewModel.State, noun: String): String {
-    val summary = state.summary
-    if (state.filtered || summary == null) return plural(state.total, noun)
-    return listOfNotNull(plural(summary.items, noun), summary.episodes.takeIf { it > 0 }?.let { plural(it, "episode") }).joinToString(" · ")
-}
-
-/** "2022 · 3 seasons" for shows (the server's line), "2026 · 1 h 52 min" for movies. */
-internal fun gridSubtitle(item: BrowseItem): String? =
-    item.subtitle ?: listOfNotNull(item.year?.toString(), item.runtimeMin?.let { formatDuration(it * 60_000L) }).joinToString(" · ").ifEmpty { null }

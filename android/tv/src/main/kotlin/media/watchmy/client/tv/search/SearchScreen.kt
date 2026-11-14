@@ -70,7 +70,7 @@ import media.watchmy.client.tv.components.TvScaffold
 import media.watchmy.client.tv.components.focusMemory
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.tv.components.rememberFocusMemory
-import media.watchmy.client.tv.library.gridSubtitle
+import media.watchmy.client.presentation.library.gridSubtitle
 import media.watchmy.client.tv.requests.RequestDialog
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
