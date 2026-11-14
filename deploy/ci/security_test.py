@@ -476,7 +476,7 @@ esac
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         tv = re.search(r'(?ms)^  apple-tv:\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
         step = re.search(r'(?ms)- name: Build and test on an Apple TV simulator\n(.*?)(?=      -)', tv).group(1)
-        self.assertIn('timeout-minutes: 30', step)
+        self.assertIn('timeout-minutes: 40', step)
         self.assertIn("make apple-tv-test-sim-ci APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH=\"$PATH\"", step)
         self.assertNotIn('continue-on-error', tv)
         self.assertIn('apple/build/TVTests.xcresult', tv)
@@ -563,7 +563,12 @@ esac
             self.assertTrue(ui.endswith('test-without-building'), ui)
             self.assertIn('-only-testing:WatchMyMediaTVUITests', ui)
             self.assertIn('-resultBundlePath apple/build/TVUITests.xcresult', ui)
+            self.assertNotIn('-parallel-testing', ui, 'one simulator on CI by default')
+            capture.unlink()
+            subprocess.run(command + ['TV_UI_WORKERS=2'], cwd=tmp, env=env, check=True, capture_output=True)
+            ui = capture.read_text().splitlines()[2]
             self.assertIn('-parallel-testing-enabled YES -parallel-testing-worker-count 2', ui)
+            self.assertNotIn('-parallel-testing', capture.read_text().splitlines()[1], 'never the Kit tests')
             for failing in ('-skip-testing:WatchMyMediaTVUITests', '-only-testing:WatchMyMediaTVUITests'):
                 with self.subTest(failing=failing):
                     capture.unlink()

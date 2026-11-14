@@ -89,13 +89,15 @@ apple-tv-test-sim: apple-gen ## Build the Apple TV app and run every test on the
 	  $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) test
 
 # CI's way to run the same tests (PLAN-CI-SPEED.md C5): build once, run the
-# Kit's tests on the one simulator, then the remote UI tests on $(TV_UI_WORKERS)
-# clones of it. Run apart, the Kit's timing-sensitive tests don't share the
-# machine with the UI tests' simulators, as they did when the whole scheme ran
-# on two clones (run of 2026-11-12). Both runs go ahead, and either failing
-# fails the target. Results: TVTests.xcresult (Kit), TVUITests.xcresult (UI).
-TV_UI_WORKERS ?= 2
-apple-tv-test-sim-ci: apple-gen ## Build once, then the Kit tests and the UI tests on $(TV_UI_WORKERS) Apple TV simulator clones
+# Kit's tests, then the remote UI tests on their own. Both runs go ahead, and
+# either failing fails the target. Results: TVTests.xcresult (Kit),
+# TVUITests.xcresult (UI). TV_UI_WORKERS above 1 runs the UI tests on that many
+# clones of the simulator. That helps on a Mac with cores to spare, not on
+# GitHub's three-core runner: there two clones made every test two to three
+# times slower, and the UI tests took no less time (runs of 2026-11-12 and
+# 2026-11-14), so CI keeps one.
+TV_UI_WORKERS ?= 1
+apple-tv-test-sim-ci: apple-gen ## Build once, then the Kit tests and the UI tests apart on the $(TV_SIM) simulator (TV_UI_WORKERS=2 for clones)
 	id=$$(apple/scripts/simulator.sh "$(TV_SIM)" appletv) && \
 	{ xcrun simctl boot "$$id" 2>/dev/null || true; } && \
 	rm -rf apple/build/TVTests.xcresult apple/build/TVUITests.xcresult && \
@@ -109,7 +111,8 @@ apple-tv-test-sim-ci: apple-gen ## Build once, then the Kit tests and the UI tes
 	  xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
 	    -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVUITests.xcresult $(APPLE_TEST_FLAGS) \
 	    $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) \
-	    -only-testing:WatchMyMediaTVUITests -parallel-testing-enabled YES -parallel-testing-worker-count $(TV_UI_WORKERS) \
+	    -only-testing:WatchMyMediaTVUITests \
+	    $(if $(filter-out 1,$(TV_UI_WORKERS)),-parallel-testing-enabled YES -parallel-testing-worker-count $(TV_UI_WORKERS)) \
 	    test-without-building || ui=$$?; \
 	  echo "Kit tests: exit $$kit; UI tests: exit $$ui"; \
 	  [ $$kit -eq 0 ] && [ $$ui -eq 0 ]; }

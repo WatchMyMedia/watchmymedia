@@ -754,14 +754,13 @@ jobs:
       - name: Build and test on an Apple TV simulator
         # Two Studio runners stalled after all tests passed. Avoid verbose
         # sysdiagnose collection, a possible cause; keep results and failures.
-        # Built once; the Kit's tests on one simulator, then the remote UI
-        # tests on two clones of it. The whole scheme on two clones made a
-        # timing-sensitive Kit test fail beside the UI tests (run of
-        # 2026-11-12), so the Kit's tests run on their own first.
-        # The Apple review's UI tests (A-Z, Episodes, channel keys,
-        # diagnostics, Top Shelf) took one simulator past 20 minutes (run of
-        # 2026-11-14).
-        timeout-minutes: 30
+        # Built once; the Kit's tests, then the remote UI tests, on one
+        # simulator. Two clones on this three-core runner made each test two
+        # to three times slower and saved nothing (runs of 2026-11-12 and
+        # 2026-11-14), and a Kit timing test failed beside them. The Apple
+        # review's UI tests (A-Z, Episodes, channel keys, diagnostics, Top
+        # Shelf) took the step past 20 and then 30 minutes (2026-11-14).
+        timeout-minutes: 40
         run: make apple-tv-test-sim-ci APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
       # Release for devices, unsigned, as in the apple job.
       - name: Build for release
