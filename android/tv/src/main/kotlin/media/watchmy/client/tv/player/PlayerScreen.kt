@@ -230,7 +230,8 @@ private fun PlayerContent(
     }
 
     fun openEpisodes() {
-        if (episodeList?.available != true) return
+        // The list as it is now: the controls' actions are made once, before it has loaded.
+        if (episodes?.state?.value?.available != true) return
         episodesOpenedFromControls = controlsVisible && area == FocusArea.Buttons
         episodesOpen = true
         shell.wanted = episodesFocus.panel

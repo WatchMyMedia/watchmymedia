@@ -93,6 +93,18 @@ class PlayerEpisodesTest {
         assertEquals("Episodes", focused())
     }
 
+    @Test fun `Episodes opens a list that arrived after the player`() {
+        val episode = runBlocking { FakeLibraryRepository().season(HARBOR_LIGHTS, 3).episodes.first { it.versions.isNotEmpty() } }
+        // Only the file: the player asks the server for the show, so the list comes a moment after the first frame.
+        val request = PlayRequest(episode.versions.first().fileId, title = "Harbor Lights")
+        fakeLatencyMs = 200
+        compose.setContent { ProvideAppServices(FakeAppServices(tv = true)) { TvTheme { PlayerScreen(request, onExit = {}) } } }
+        compose.waitUntil(10_000) { compose.onAllNodes(hasText(episodeCode(3, episode.number))).fetchSemanticsNodes().isNotEmpty() }
+
+        compose.onNode(hasText("Episodes") and hasClickAction()).performClick()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasText("PLAYING")).fetchSemanticsNodes().isNotEmpty() }
+    }
+
     private fun focused(): String {
         val node = compose.onNode(isFocused()).fetchSemanticsNode()
         return node.config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull()
