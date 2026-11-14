@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -153,7 +154,8 @@ private fun BoxScope.TopBar(title: String, subtitle: String?, chip: String?, rot
 private fun StreamChip(text: String, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(14.dp)
     Box(
-        modifier.height(28.dp).background(Color.Black.copy(alpha = 0.45f), shape).border(1.dp, Color.White.copy(alpha = 0.14f), shape).padding(horizontal = 10.dp),
+        // At least 28 dp, and taller at a large font size: at 200% its line alone is about that.
+        modifier.heightIn(min = 28.dp).background(Color.Black.copy(alpha = 0.45f), shape).border(1.dp, Color.White.copy(alpha = 0.14f), shape).padding(horizontal = 10.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = PlayerType.Chip, maxLines = 1)
@@ -217,7 +219,7 @@ private fun BoxScope.BottomBar(state: PlayerUiState, actions: ControlsActions) {
 @Composable
 private fun BarButton(icon: ImageVector, label: String, detail: String?, onClick: () -> Unit) {
     Row(
-        Modifier.height(if (LocalConfiguration.current.smallestScreenWidthDp >= 600) 48.dp else 40.dp).clip(RoundedCornerShape(24.dp)).clickable(role = Role.Button, onClick = onClick).padding(horizontal = 12.dp),
+        Modifier.heightIn(min = if (LocalConfiguration.current.smallestScreenWidthDp >= 600) 48.dp else 40.dp).clip(RoundedCornerShape(24.dp)).clickable(role = Role.Button, onClick = onClick).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {

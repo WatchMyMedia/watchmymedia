@@ -1,5 +1,6 @@
 package media.watchmy.client.ui.components
 
+import androidx.compose.foundation.layout.heightIn
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -31,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
 import coil3.compose.AsyncImage
@@ -107,9 +110,11 @@ fun ChannelLogo(channel: LiveChannel, modifier: Modifier = Modifier) {
 private fun Wordmark(channel: LiveChannel, width: Dp) {
     val mark = channel.wordmark()
     val color = WordmarkColors[channel.name.hashCode().absoluteValue % WordmarkColors.size]
-    val size = (width.value * when (mark.length) { 1, 2 -> .34f; 3 -> .28f; 4 -> .22f; else -> .18f }).sp
+    // A logo, not text to read: it keeps to the logo's box whatever the font size (dp to sp takes the scale out).
+    val size = with(LocalDensity.current) { (width * when (mark.length) { 1, 2 -> .34f; 3 -> .28f; 4 -> .22f; else -> .18f }).toSp() }
     Text(
-        mark, color = color, fontFamily = Inter, fontWeight = FontWeight.ExtraBold, fontSize = size, maxLines = 1, textAlign = TextAlign.Center,
+        // Its own line height: the theme's, in sp, doubled with the font size and burst the logo's box.
+        mark, color = color, fontFamily = Inter, fontWeight = FontWeight.ExtraBold, fontSize = size, lineHeight = 1.15.em, maxLines = 1, textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth().border((width.value / 26).coerceAtLeast(1f).dp, color, RoundedCornerShape(width * .08f)).padding(vertical = width * .06f),
     )
 }
@@ -186,8 +191,9 @@ fun ProgrammeTag(text: String, modifier: Modifier = Modifier, fontSize: TextUnit
         "Live" -> Color(0xFFFCA5A5).copy(alpha = .6f)
         else -> Color(0xFF5A5A60)
     }
-    Box(modifier.height(height).border(1.dp, border, RoundedCornerShape(50)).padding(horizontal = height / 3), contentAlignment = Alignment.Center) {
-        Text(text, color = color, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fontSize, maxLines = 1)
+    // At least [height], and taller with a larger font size; a line height of its own, as the theme's is for body text.
+    Box(modifier.heightIn(min = height).border(1.dp, border, RoundedCornerShape(50)).padding(horizontal = height / 3), contentAlignment = Alignment.Center) {
+        Text(text, color = color, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fontSize, lineHeight = 1.15.em, maxLines = 1)
     }
 }
 

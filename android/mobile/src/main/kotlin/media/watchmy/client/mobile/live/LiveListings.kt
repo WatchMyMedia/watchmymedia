@@ -1,5 +1,7 @@
 package media.watchmy.client.mobile.live
 
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -104,11 +106,11 @@ internal fun ChannelCell(channel: LiveChannel, modifier: Modifier = Modifier, lo
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)) {
         if (channel.logo != null) {
             ChannelLogo(channel, Modifier.width(logoWidth))
-            Text(channel.number, color = if (channel.available) WmmColors.TextSoft else WmmColors.TextFaint, fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(channel.number, color = if (channel.available) WmmColors.TextSoft else WmmColors.TextFaint, fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 12.sp, lineHeight = GuideLine)
         } else {
             Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(channel.number, color = if (channel.available) WmmColors.Text else WmmColors.TextFaint, fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(channel.name, color = if (channel.available) WmmColors.TextMuted else WmmColors.TextFaint, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(channel.number, color = if (channel.available) WmmColors.Text else WmmColors.TextFaint, fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 16.sp, lineHeight = GuideLine)
+                Text(channel.name, color = if (channel.available) WmmColors.TextMuted else WmmColors.TextFaint, fontSize = 11.sp, lineHeight = GuideLine, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -411,7 +413,7 @@ internal fun GuideRow(
 ) {
     val channel = row.channel
     val favourite = extras != null && state.isFavourite(channel)
-    Row(modifier.fillMaxWidth().height(height).border(0.5.dp, WmmColors.Line)) {
+    Row(modifier.fillMaxWidth().height(guideRowHeight(height)).border(0.5.dp, WmmColors.Line)) {
         // The star column: the channel's column grows by its width (the boards' choice).
         if (extras != null) {
             if (channel.available || row.listings) StarCell(channel, favourite, extras.onStar) else StarCellNone()
@@ -454,6 +456,23 @@ internal fun GuideRow(
     }
 }
 
+/** A guide cell's title and its second line, and their line height: the theme's (for body text) doubled at a large font size. */
+private val GuideTitleSize = 13.sp
+private val GuideDetailSize = 11.sp
+private val GuideLine = 1.25.em
+
+/**
+ * A guide row's height: [base], or more when a larger font size needs it for
+ * a cell's two lines: their height, the cell's padding and gap (15 dp), and
+ * 9 dp for the title line's tags and marks, which stand a little taller than
+ * its text. At 200% the two lines alone are taller than the 64 dp row.
+ */
+@Composable
+internal fun guideRowHeight(base: Dp): Dp {
+    val lines = with(LocalDensity.current) { (GuideTitleSize * GuideLine.value).toDp() + (GuideDetailSize * GuideLine.value).toDp() }
+    return maxOf(base, lines + 24.dp)
+}
+
 @Composable
 private fun GuideCell(programme: LiveProgramme, now: Long, format: LiveClockFormat, selected: Boolean, clippedStart: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, reminded: Boolean = false) {
     val airing = programme.airingAt(now)
@@ -466,11 +485,11 @@ private fun GuideCell(programme: LiveProgramme, now: Long, format: LiveClockForm
         Column(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically)) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 programme.recording?.let { RecordingMarkBadge(it) }
-                Text((if (clippedStart) "‹ " else "") + programme.title, color = WmmColors.Text, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text((if (clippedStart) "‹ " else "") + programme.title, color = WmmColors.Text, fontWeight = FontWeight.SemiBold, fontSize = GuideTitleSize, lineHeight = GuideLine, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 ProgrammeTags(programme, small = true)
                 if (reminded) ReminderBell(size = 12.dp)
             }
-            Text(programme.episodeLine() ?: "${format.shortTime(programme.startMs)}–${format.shortTime(programme.endMs)}", color = WmmColors.TextMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(programme.episodeLine() ?: "${format.shortTime(programme.startMs)}–${format.shortTime(programme.endMs)}", color = WmmColors.TextMuted, fontSize = GuideDetailSize, lineHeight = GuideLine, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (airing) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(programme.progressAt(now)).height(3.dp).background(WmmColors.Accent))
     }
@@ -479,8 +498,8 @@ private fun GuideCell(programme: LiveProgramme, now: Long, format: LiveClockForm
 @Composable
 private fun GuideCellText(title: String, subtitle: String?, modifier: Modifier = Modifier) {
     Column(modifier.border(0.5.dp, WmmColors.Line).padding(horizontal = 10.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically)) {
-        Text(title, color = WmmColors.TextMuted, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        subtitle?.let { Text(it, color = WmmColors.TextFaint, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        Text(title, color = WmmColors.TextMuted, fontWeight = FontWeight.SemiBold, fontSize = GuideTitleSize, lineHeight = GuideLine, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        subtitle?.let { Text(it, color = WmmColors.TextFaint, fontSize = GuideDetailSize, lineHeight = GuideLine, maxLines = 1, overflow = TextOverflow.Ellipsis) }
     }
 }
 
