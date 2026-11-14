@@ -71,15 +71,6 @@ export function plexAuthorizationURL(value?: string): string | null {
   }
 }
 
-export const PLEX_COUNT_LABELS: [keyof PlexCounts, string][] = [
-  ['willMark', 'Will mark watched'],
-  ['alreadyWatched', 'Already watched here'],
-  ['localKept', 'Your WatchMyMedia choices kept'],
-  ['unmatched', 'Not found here'],
-  ['ambiguous', 'Needs a closer match'],
-  ['unavailable', 'Not available'],
-]
-
 export function plexPreviewCounts(preview: PlexPreview): PlexCounts {
   const counts: PlexCounts = { willMark: 0, alreadyWatched: 0, localKept: 0, unmatched: 0, ambiguous: 0, unavailable: 0, notWatched: 0, unknownState: 0 }
   for (const person of preview.users ?? []) for (const key of Object.keys(counts) as (keyof PlexCounts)[]) counts[key] += person.counts[key]
