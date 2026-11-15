@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -462,8 +463,10 @@ fun MobileNavHost(
                         composable<MobileRoutes.SettingsAbout> { settings(it, SettingsGroup.About) }
                         composable<MobileRoutes.ChangePassword> { ChangePasswordRoute(nav, it, asDialog = false) }
                         // Not put away by a tap beside it: what was typed would go (§5.3). Back is the screen's.
-                        dialog<MobileRoutes.ChangePasswordDialog>(dialogProperties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
-                            Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
+                        // The window draws under the keyboard and pads for it: on a tablet held sideways the
+                        // keyboard takes half the screen, and the surface's middle scrolls with its buttons above it.
+                        dialog<MobileRoutes.ChangePasswordDialog>(dialogProperties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
+                            Box(Modifier.fillMaxSize().safeDrawingPadding().padding(20.dp), contentAlignment = Alignment.Center) {
                                 ChangePasswordRoute(nav, it, asDialog = true)
                             }
                         }
