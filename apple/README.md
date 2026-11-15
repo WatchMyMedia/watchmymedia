@@ -414,13 +414,13 @@ On iPhone and iPad (`App/Screens/Settings/`; `Settings2*` and `Pad2Settings2*` b
 `thisDevice` and `devices`, which open the page they moved into);
 `-open 'watchmymedia://link?code=K7M4PQ'` opens Link a TV at its second step,
 `-linkTVApprove` at its last; `-settingsPage server -switchServer` starts
-Switch server. In a debug build `-fakesSaveFails recap` (a Skipping part,
-`autoplay` or `languages`) has the fakes refuse that change, to see a row's
-failed line, and `-fakesPasswordFails 429` (or `offline`) the next Change
-password. `UITests/SettingsTasksTests.swift` runs both tasks through every
-step on the fakes, with Back and Cancel, a row that saves and one that fails,
-Rename, Change password and its errors, and both sign-outs; on an iPad, a
-task across a window resize.
+Switch server, whose Sign in offers a code from a signed-in device in place
+of the password (the fakes approve it after a few seconds). The refusals
+above reach a row's failed line and Change password's errors.
+`UITests/SettingsTasksTests.swift` runs both tasks through every step on the
+fakes, with Back and Cancel, a row that saves and one that fails, Rename,
+Change password and its errors, and both sign-outs; on an iPad, a task
+across a window resize and the pages' two columns in landscape.
 
 ## First run, audio languages and subtitles
 
