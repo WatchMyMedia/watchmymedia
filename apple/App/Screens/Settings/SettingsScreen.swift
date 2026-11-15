@@ -68,7 +68,8 @@ private struct SettingsTasks: ViewModifier {
         content
             .sheet(isPresented: Binding(get: { flow.serverSwitch == nil && navigator.pendingLinkTV != nil },
                                         set: { if !$0 { closeLinkTV() } })) {
-                LinkTVSheet(model: flow.linkTVModel(auth: services.auth, code: navigator.pendingLinkTV?.code), close: closeLinkTV)
+                LinkTVSheet(model: flow.linkTVModel(auth: services.auth, code: navigator.pendingLinkTV?.code,
+                                                    serverName: services.servers.current?.server.name), close: closeLinkTV)
             }
             .sheet(isPresented: Binding(get: { !sizeClass.isWide && flow.serverSwitch != nil },
                                         set: { if !$0 { flow.closeServerSwitchSheet() } })) {

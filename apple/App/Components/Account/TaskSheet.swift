@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import WMMFeatures
 import WMMUI
 
 // The frame every Settings task shares (Settings2LinkTv*, Settings2Switch*,
@@ -8,39 +9,18 @@ import WMMUI
 // pinned at the bottom, and a last step that says what changed and what
 // happens next, closed with Done.
 
-/// A task's steps by name, and the one showing. The last name is the
-/// finished step's ("Linked"), so a task of three has two to do.
-struct TaskSteps: Equatable {
-    let names: [String]
-    let index: Int
-
-    var count: Int { names.count }
-    var finished: Bool { index >= names.count - 1 }
-
-    /// "Step 2 of 3 · Check it’s yours · next: Linked", or "Linked" once done.
-    var line: String {
-        guard names.indices.contains(index) else { return "" }
-        if finished { return names[index] }
-        return "Step \(index + 1) of \(count) · \(names[index]) · next: \(names[index + 1])"
-    }
-
-    /// "Step 2 of 3, Check it’s yours", as VoiceOver reads the bar.
-    var spoken: String {
-        guard names.indices.contains(index) else { return "" }
-        return finished ? names[index] : "Step \(index + 1) of \(count), \(names[index])"
-    }
-}
-
 /// The bar of steps under the sheet's title, and its line.
+/// The steps are the Kit's (``FlowStep``): "Step 2 of 3 · Check it’s yours ·
+/// next: Linked", or the last step's name once done.
 struct TaskStepsBar: View {
-    let steps: TaskSteps
+    let steps: FlowStep
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
-                ForEach(0..<steps.count, id: \.self) { i in
+                ForEach(1...steps.count, id: \.self) { n in
                     Capsule()
-                        .fill(i <= steps.index ? Palette.gold : Palette.outlineStrong)
+                        .fill(n <= steps.number || steps.done.contains(n) ? Palette.gold : Palette.outlineStrong)
                         .frame(height: 4)
                 }
             }
@@ -50,7 +30,7 @@ struct TaskStepsBar: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(steps.spoken)
+        .accessibilityLabel(steps.accessibilityLabel)
         .accessibilityIdentifier("task-steps")
     }
 }
@@ -74,7 +54,7 @@ struct TaskBack {
 /// its own inside a ``TaskStepSwitcher``, which slides them.
 struct TaskFrame<Content: View, Actions: View>: View {
     let title: String
-    var steps: TaskSteps?
+    var steps: FlowStep?
     var heading: String?
     var lede: String?
     var back: TaskBack?
@@ -173,7 +153,7 @@ struct TaskFrame<Content: View, Actions: View>: View {
             }
         }
         .sensoryFeedback(.error, trigger: problem) { _, new in new != nil }
-        .sensoryFeedback(.success, trigger: steps?.finished == true) { _, new in new }
+        .sensoryFeedback(.success, trigger: steps?.isLast == true) { _, new in new }
     }
 
 }
@@ -204,19 +184,39 @@ struct TaskStepSwitcher<Content: View>: View {
     }
 }
 
-/// The finished step's body: what changed and what happens next, each in a box.
-struct TaskDone<Next: View>: View {
-    let changed: [String]
-    @ViewBuilder let next: Next
+/// The finished step's body (the Kit's ``FinishedWords``): the tick, its
+/// title and line, then what changed and what happens next, each in a box,
+/// and anything the task adds after them (Link another TV).
+struct TaskDone<More: View>: View {
+    let words: FinishedWords
+    @ViewBuilder var more: More
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            TaskBox(title: "What changed") {
-                ForEach(changed, id: \.self) { Text($0) }
+            VStack(alignment: .leading, spacing: 10) {
+                TaskDoneMark()
+                Text(words.title)
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(Palette.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                if !words.lede.isEmpty {
+                    Text(words.lede).font(.subheadline).foregroundStyle(Palette.muted)
+                }
             }
-            TaskBox(title: "What happens next") { next }
+            TaskBox(title: FinishedWords.whatChangedHeading) {
+                ForEach(words.whatChanged, id: \.self) { Text($0) }
+            }
+            TaskBox(title: FinishedWords.whatHappensNextHeading) {
+                ForEach(words.whatHappensNext, id: \.self) { Text($0) }
+                more
+            }
         }
     }
+}
+
+extension TaskDone where More == EmptyView {
+    init(words: FinishedWords) { self.init(words: words, more: { EmptyView() }) }
 }
 
 /// A box with an uppercase heading and lines of text.

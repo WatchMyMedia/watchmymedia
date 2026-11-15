@@ -36,9 +36,9 @@ final class AppFlow {
     func forgetSignIn() { signIn.forget() }
 
     /// Link a TV's model while its sheet is up, the same one each time it is asked for.
-    func linkTVModel(auth: any AuthRepository, code: String?) -> LinkTVModel {
+    func linkTVModel(auth: any AuthRepository, code: String?, serverName: String?) -> LinkTVModel {
         if let linkTV { return linkTV }
-        let model = LinkTVModel(auth: auth, code: code)
+        let model = LinkTVModel(auth: auth, code: code, serverName: serverName)
         linkTV = model
         return model
     }

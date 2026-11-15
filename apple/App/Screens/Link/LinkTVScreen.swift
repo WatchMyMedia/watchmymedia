@@ -11,43 +11,28 @@ import WMMUI
 /// in a sheet: Enter the code, Check it's yours, Linked. The first button is
 /// off until six characters are in and says so; the second names the TV;
 /// the last screen has no way back, since the TV is signed in, and Done
-/// closes it. The model is ``AppFlow``'s, so a resized window keeps the step.
+/// closes it. A code nobody is waiting on, too many wrong codes and a server
+/// that can't be reached each say that nothing was linked. The steps and
+/// words are the Kit's (`LinkTVModel`, `FlowSteps.swift`); the model is
+/// ``AppFlow``'s, so a resized window keeps the step.
 struct LinkTVSheet: View {
-    @State private var model: LinkTVModel
+    let model: LinkTVModel
     let close: () -> Void
-    @Environment(AppFlow.self) private var flow
-    @Environment(AppServices.self) private var services
     @State private var askingToStop = false
-
-    init(model: LinkTVModel, close: @escaping () -> Void) {
-        _model = State(initialValue: model)
-        self.close = close
-    }
 
     var body: some View {
         NavigationStack {
-            LinkTVSteps(model: model, close: close, another: linkAnother)
+            LinkTVSteps(model: model, close: close)
         }
         .taskSheet()
         .asksBeforeDismissing(when: typed) { askingToStop = true }
-        .confirmationDialog("Stop linking this TV?", isPresented: $askingToStop, titleVisibility: .visible) {
-            Button("Stop linking", role: .destructive, action: close)
-            Button("Keep linking", role: .cancel) {}
-        } message: {
-            Text("Nothing is linked yet. The TV keeps showing its code.")
-        }
+        .discardDialog(SettingsWords.discardTyped(stays: "Nothing is linked yet. The TV keeps showing its code."), isPresented: $askingToStop, discard: close)
     }
 
     /// A code is typed and the TV isn't linked yet: swiping the sheet away asks first.
     private var typed: Bool {
         if case .approved = model.step { return false }
-        return !model.code.isEmpty
-    }
-
-    /// Link another TV, from the last step: the first step again, empty.
-    private func linkAnother() {
-        flow.forgetLinkTV()
-        model = flow.linkTVModel(auth: services.auth, code: nil)
+        return !model.code.isEmpty || model.busy
     }
 }
 
@@ -55,25 +40,14 @@ struct LinkTVSheet: View {
 private struct LinkTVSteps: View {
     let model: LinkTVModel
     let close: () -> Void
-    let another: () -> Void
     @FocusState private var codeFocused: Bool
 
-    private static let names = ["Enter the code", "Check it’s yours", "Linked"]
-
-    private var index: Int {
-        switch model.step {
-        case .enter: 0
-        case .found: 1
-        case .approved: 2
-        }
-    }
-
     var body: some View {
-        TaskStepSwitcher(index: index) {
+        TaskStepSwitcher(index: model.flowStep.number) {
             switch model.step {
             case .enter: enter
             case .found(let device): check(device)
-            case .approved(let device): linked(device)
+            case .approved: linked
             }
         }
         .task {
@@ -84,27 +58,26 @@ private struct LinkTVSteps: View {
         }
     }
 
+    private var title: String { SettingsWords.linkATV }
+
     // MARK: Step 1, Enter the code
 
     private var enter: some View {
-        TaskFrame(title: "Link a TV", steps: TaskSteps(names: Self.names, index: 0),
-                  heading: "Enter the code on the TV",
-                  lede: "The TV shows a six-character code on its sign-in screen. Scanning the TV’s QR code opens this step with the code filled in.",
+        TaskFrame(title: title, steps: model.flowStep, heading: model.title, lede: model.lede,
                   cancel: close, problem: problem, busy: model.busy) {
             CodeField(code: model.code, onChange: model.setCode, onSubmit: lookUp, focused: $codeFocused)
                 .disabled(model.busy)
                 .accessibilityIdentifier("link-code")
-            GroupFootnote("Codes last 10 minutes. A wrong code counts like a failed sign-in.")
+            GroupFootnote(LinkTVModel.codeNote)
         } actions: {
-            Button(action: lookUp) { BusyLabel(title: "Check this code", busy: model.busy) }
+            Button(action: lookUp) { BusyLabel(title: model.primaryTitle, busy: model.busy) }
                 .buttonStyle(PrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
-                .disabled(model.busy || !model.complete)
+                .disabled(model.busy || model.primaryOffReason != nil)
+                .accessibilityHint(model.primaryOffReason ?? "")
                 .accessibilityIdentifier("link-check")
-            if !model.complete {
-                Text("Check is off until all six characters are in.")
-                    .font(.footnote)
-                    .foregroundStyle(Palette.faint)
+            if let reason = model.primaryOffReason {
+                Text(reason).font(.footnote).foregroundStyle(Palette.faint)
             }
         }
     }
@@ -112,17 +85,15 @@ private struct LinkTVSteps: View {
     // MARK: Step 2, Check it's yours
 
     private func check(_ device: PendingDevice) -> some View {
-        TaskFrame(title: "Link a TV", steps: TaskSteps(names: Self.names, index: 1),
-                  heading: "Is this your TV?", lede: "Approve only a TV that is showing this code right now.",
-                  back: TaskBack(title: "Code", action: backToCode), cancel: close, problem: problem, busy: model.busy) {
+        TaskFrame(title: title, steps: model.flowStep, heading: model.title, lede: model.lede,
+                  back: TaskBack(title: LinkTVModel.backToCodeTitle, action: backToCode), cancel: close,
+                  problem: problem, busy: model.busy) {
             CodeBoxes(code: device.code, size: .large, dim: true, boxBackground: Palette.surface)
-            SettingsSection(title: "This TV") {
-                FactRow(label: "Name", value: device.name)
-                if let app = device.appLabel { FactRow(label: "App", value: app) }
-                FactRow(label: "Address", value: device.ip ?? "Unknown")
-                if let asked = device.askedAt { FactRow(label: "Asked", value: formatAgo(asked)) }
+                .accessibilityLabel(model.codeAccessibilityLabel)
+            SettingsSection(title: LinkTVModel.thisTV) {
+                ForEach(model.deviceRows(), id: \.label) { row in FactRow(label: row.label, value: row.value) }
             }
-            Text("Approving signs this TV in as \(Text(model.userName).bold()). Anyone with its remote can watch as you until you sign it out under Signed-in devices.")
+            Text(model.approveNote)
                 .font(.subheadline)
                 .foregroundStyle(Palette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -130,19 +101,19 @@ private struct LinkTVSteps: View {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 10) {
                     notMine.frame(maxWidth: 200)
-                    approve(device)
+                    approve
                 }
                 .frame(minWidth: 480)
                 VStack(spacing: 10) {
-                    approve(device)
+                    approve
                     notMine
                 }
             }
         }
     }
 
-    private func approve(_ device: PendingDevice) -> some View {
-        Button { Task { await model.approve() } } label: { BusyLabel(title: "Approve \(device.name)", busy: model.busy) }
+    private var approve: some View {
+        Button { Task { await model.approve() } } label: { BusyLabel(title: model.primaryTitle, busy: model.busy) }
             .buttonStyle(PrimaryButtonStyle())
             .keyboardShortcut(.defaultAction)
             .disabled(model.busy)
@@ -150,7 +121,7 @@ private struct LinkTVSteps: View {
     }
 
     private var notMine: some View {
-        Button("Not my TV", action: close)
+        Button(LinkTVModel.notMyTV, action: close)
             .buttonStyle(GhostButtonStyle(height: 50))
             .disabled(model.busy)
             .accessibilityIdentifier("link-not-mine")
@@ -158,26 +129,17 @@ private struct LinkTVSteps: View {
 
     // MARK: Step 3, Linked
 
-    private func linked(_ device: PendingDevice) -> some View {
-        TaskFrame(title: "Link a TV", steps: TaskSteps(names: Self.names, index: 2)) {
-            VStack(alignment: .leading, spacing: 10) {
-                TaskDoneMark()
-                Text("\(device.name) is signed in")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(Palette.text)
-                    .accessibilityAddTraits(.isHeader)
-                Text("It shows Home in a moment, signed in as \(model.userName).")
-                    .font(.subheadline)
-                    .foregroundStyle(Palette.muted)
-            }
-            TaskDone(changed: ["\(device.name) is signed in as \(model.userName).", "It is listed under Signed-in devices."]) {
-                Text("It stays signed in until you sign it out there, or change your password.")
-                Button("Link another TV", action: another)
-                    .buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
-                    .accessibilityIdentifier("link-another")
+    @ViewBuilder private var linked: some View {
+        TaskFrame(title: title, steps: model.flowStep) {
+            if let words = model.finished {
+                TaskDone(words: words) {
+                    Button(LinkTVModel.linkAnother) { model.startAgain(); codeFocused = true }
+                        .buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
+                        .accessibilityIdentifier("link-another")
+                }
             }
         } actions: {
-            Button("Done", action: close)
+            Button(model.primaryTitle, action: close)
                 .buttonStyle(PrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("link-done")
@@ -186,9 +148,9 @@ private struct LinkTVSteps: View {
 
     // MARK: Actions
 
-    /// Why the last step was refused: nothing was linked, and why.
+    /// Why the last step was refused, ending in "Nothing was linked."
     private var problem: TaskProblem? {
-        model.error.map { TaskProblem(title: "Nothing was linked", message: $0) }
+        model.problem.map { TaskProblem(title: $0.title, message: $0.body) }
     }
 
     private func lookUp() {
@@ -196,11 +158,8 @@ private struct LinkTVSteps: View {
         Task { await model.lookUp() }
     }
 
-    /// Back to the code, as typed: a change of code is what takes the model back a step.
     private func backToCode() {
-        let code = model.code
-        model.setCode("")
-        model.setCode(code)
+        model.backToCode()
         codeFocused = true
     }
 }

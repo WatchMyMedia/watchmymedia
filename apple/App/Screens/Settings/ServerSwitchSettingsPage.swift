@@ -20,12 +20,7 @@ struct ServerSwitchSheet: View {
         }
         .taskSheet()
         .asksBeforeDismissing(when: model.busy || typed) { if !model.busy { askingToStop = true } }
-        .confirmationDialog("Stop switching server?", isPresented: $askingToStop, titleVisibility: .visible) {
-            Button("Stop switching", role: .destructive) { Task { await model.cancel() } }
-            Button("Keep going", role: .cancel) {}
-        } message: {
-            Text("You’re still on \(model.originalServer.name).")
-        }
+        .discardDialog(SettingsWords.discardTyped(stays: model.stillOn), isPresented: $askingToStop) { Task { await model.cancel() } }
     }
 
     /// An address or a password is typed and nothing is switched yet.
@@ -46,27 +41,20 @@ struct ServerSwitchSettingsPage: View {
     }
 }
 
-/// The step showing.
+/// The step showing. The steps and words are the Kit's (`ServerSwitchModel`, `FlowSteps.swift`).
 private struct ServerSwitchSteps: View {
     let model: ServerSwitchModel
     @Environment(AppFlow.self) private var flow
     @Environment(AppServices.self) private var services
 
-    private static let names = ["Choose a server", "Sign in", "Switched"]
-
-    private var index: Int {
-        if model.outcome == .switched { return 2 }
-        return model.signIn == nil ? 0 : 1
-    }
-
     var body: some View {
-        TaskStepSwitcher(index: index) {
+        TaskStepSwitcher(index: model.flowStep.number) {
             if model.outcome == .switched {
                 switched
             } else if let signIn = model.signIn {
-                SwitchSignInStep(model: model, signIn: signIn, steps: TaskSteps(names: Self.names, index: 1))
+                SwitchSignInStep(model: model, signIn: signIn)
             } else {
-                SwitchChooseStep(model: model, steps: TaskSteps(names: Self.names, index: 0))
+                SwitchChooseStep(model: model)
             }
         }
     }
@@ -74,38 +62,18 @@ private struct ServerSwitchSteps: View {
     // MARK: Step 3, Switched
 
     private var switched: some View {
-        let server = services.servers.current?.server.name ?? "the new server"
-        let user = services.auth.user?.name ?? "you"
-        let keptDownloads = !services.downloads.downloads.isEmpty
-        return TaskFrame(title: switchServerTitle, steps: TaskSteps(names: Self.names, index: 2)) {
-            VStack(alignment: .leading, spacing: 10) {
-                TaskDoneMark()
-                Text("You’re on \(server)")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(Palette.text)
-                    .accessibilityAddTraits(.isHeader)
-                Text("Signed in as \(user).")
-                    .font(.subheadline)
-                    .foregroundStyle(Palette.muted)
-            }
-            TaskDone(changed: [
-                "This \(deviceNoun) now shows \(server)’s library, Home and settings.",
-                keptDownloads
-                    ? "You’re still signed in on \(model.originalServer.name), and its downloads stay on this \(deviceNoun)."
-                    : "You’re still signed in on \(model.originalServer.name).",
-            ]) {
-                Text("Switch back any time under Settings › Server. It needs no password.")
-                Text("Playback and Audio & subtitles are your choices on \(server), kept there.")
+        TaskFrame(title: switchServerTitle, steps: model.flowStep) {
+            if let words = model.finished(device: deviceFamily(model: services.client.model),
+                                          downloadsKept: !services.downloads.downloads.isEmpty) {
+                TaskDone(words: words)
             }
         } actions: {
-            Button("Done") { flow.serverSwitchDone = true }
+            Button(SettingsWords.done) { flow.serverSwitchDone = true }
                 .buttonStyle(PrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("switch-done")
         }
     }
-
-    private var deviceNoun: String { deviceFamily(model: services.client.model) }
 }
 
 // MARK: Step 1, Choose a server
@@ -115,7 +83,6 @@ private struct ServerSwitchSteps: View {
 /// address to type.
 private struct SwitchChooseStep: View {
     let model: ServerSwitchModel
-    let steps: TaskSteps
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
     @FocusState private var addressFocused: Bool
@@ -124,7 +91,7 @@ private struct SwitchChooseStep: View {
     private var picker: ServerPickerModel { model.picker }
 
     var body: some View {
-        TaskFrame(title: switchServerTitle, steps: steps, heading: "Which server?",
+        TaskFrame(title: switchServerTitle, steps: model.flowStep, heading: ServerSwitchModel.chooseTitle,
                   cancel: { Task { await model.cancel() } }, problem: problem, busy: model.busy) {
             current
             if model.phase == .restoring {
@@ -189,10 +156,11 @@ private struct SwitchChooseStep: View {
             }
         } actions: {
             Button(action: connect) {
-                BusyLabel(title: "Connect to this address", busy: picker.connecting == ServerPickerModel.addressKey)
+                BusyLabel(title: ServerSwitchModel.connectTitle, busy: picker.connecting == ServerPickerModel.addressKey)
             }
             .buttonStyle(GhostButtonStyle(height: 50))
-            .disabled(model.busy || picker.address.trimmingCharacters(in: .whitespaces).isEmpty)
+            .disabled(model.busy || model.connectOffReason != nil)
+            .accessibilityHint(model.connectOffReason ?? "")
             .accessibilityIdentifier("switch-connect")
         }
         .onAppear { picker.startDiscovery(owner: discoveryOwner) }
@@ -206,20 +174,18 @@ private struct SwitchChooseStep: View {
     private var found: [ServerPickerModel.Row] { picker.found.filter { $0.id != model.originalServer.id } }
     private var remembered: [ServerPickerModel.Row] { picker.remembered.filter { $0.id != model.originalServer.id } }
 
+    /// Under the address: it needs https. Why it couldn't connect is the step's problem, above the button.
     private var addressWarning: String? {
-        if let error = picker.addressError { return error }
-        return picker.showsHTTPSNudge ? httpsNudge : nil
+        picker.showsHTTPSNudge ? httpsNudge : (model.chooseProblem == nil ? picker.addressError : nil)
     }
 
     private var fieldBorder: Color {
         addressWarning != nil ? Palette.warning : addressFocused ? Palette.gold : Palette.outlineStrong
     }
 
-    /// Why connecting to a listed server failed, or the switch couldn't go
-    /// back: always with where you still are.
+    /// Why connecting failed, ending in where you still are.
     private var problem: TaskProblem? {
-        guard let message = model.error ?? picker.error else { return nil }
-        return TaskProblem(title: "Nothing was switched", message: "\(message) You’re still on \(model.originalServer.name).")
+        model.chooseProblem.map { TaskProblem(title: $0.title, message: $0.body) }
     }
 
     private var current: some View {
@@ -227,7 +193,7 @@ private struct SwitchChooseStep: View {
             RowIcon(systemImage: "server.rack", style: .gold, size: 30)
             RowTitle(title: model.originalServer.name,
                      line: .plain("\(model.originalServer.displayAddress) · \(model.originalServer.versionLabel) · signed in as \(model.originalUser.name)"))
-            Badge("Current", style: .gold)
+            Badge(ServerSwitchModel.current, style: .gold)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -244,7 +210,7 @@ private struct SwitchChooseStep: View {
             AdaptiveRow {
                 HStack(spacing: 12) {
                     RowIcon(systemImage: row.kind == .found ? "server.rack" : "globe", style: .neutral, size: 30)
-                    RowTitle(title: row.name, line: row.tooOld ? .failed(row.detail) : .plain(row.detail))
+                    RowTitle(title: row.name, line: row.tooOld ? .failed(row.detail) : .plain(model.detail(for: row)))
                 }
             } trailing: {
                 if picker.connecting == row.id { ProgressView().tint(Palette.gold) } else { RowChevron() }
@@ -272,16 +238,13 @@ private struct SwitchSignInStep: View {
 
     let model: ServerSwitchModel
     @Bindable var signIn: SignInModel
-    let steps: TaskSteps
     @Environment(AppServices.self) private var services
     @FocusState private var focus: Field?
 
     var body: some View {
-        let server = signIn.server
-        TaskFrame(title: switchServerTitle, steps: steps,
-                  heading: "Sign in to \(server?.name ?? "the server")",
-                  lede: server.map { "\($0.displayAddress) · \($0.versionLabel). Signing in here keeps you signed in on \(model.originalServer.name) too." },
-                  back: TaskBack(title: "Servers") { Task { await model.backToPicker() } },
+        TaskFrame(title: switchServerTitle, steps: model.flowStep,
+                  heading: model.signInTitle, lede: model.signInLede,
+                  back: TaskBack(title: ServerSwitchModel.backToServersTitle) { Task { await model.backToPicker() } },
                   cancel: { Task { await model.cancel() } },
                   problem: problem, busy: model.busy) {
             if signIn.setupRequired {
@@ -311,31 +274,27 @@ private struct SwitchSignInStep: View {
         } actions: {
             if !signIn.setupRequired && !signIn.codeSignIn {
                 Button(action: submit) {
-                    BusyLabel(title: "Sign in to \(server?.name ?? "the server")", busy: signIn.busy)
+                    BusyLabel(title: model.signInTitle, busy: signIn.busy)
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
-                .disabled(model.busy || tooManyTries)
+                .disabled(model.busy || signIn.errorStatus == 429)
                 .accessibilityIdentifier("switch-sign-in")
+                if let reason = model.signInOffReason {
+                    Text(reason).font(.footnote).foregroundStyle(Palette.faint)
+                }
             }
         }
         .task(id: signIn.codeSignIn ? signIn.pairingRun : -1) { await signIn.pair() }
         .onAppear { if !signIn.codeSignIn && !signIn.setupRequired { focus = signIn.name.isEmpty ? .name : .password } }
     }
 
-    private var tooManyTries: Bool { (signIn.error ?? "").hasPrefix("Too many tries") }
-
     /// A wrong name or password, under the field.
-    private var fieldError: String? {
-        guard let error = signIn.error, !tooManyTries else { return nil }
-        return "\(error) You’re still on \(model.originalServer.name)."
-    }
+    private var fieldError: String? { model.passwordProblem }
 
-    /// Too many tries, or the way back failing, above the button.
+    /// Too many tries, another refusal, or the way back failing, above the button.
     private var problem: TaskProblem? {
-        if let error = model.error { return TaskProblem(title: "Nothing was switched", message: error) }
-        guard tooManyTries, let error = signIn.error else { return nil }
-        return TaskProblem(title: "Too many tries", message: "\(error.replacingOccurrences(of: "Too many tries. ", with: "")) You’re still on \(model.originalServer.name).")
+        model.signInProblem.map { TaskProblem(title: $0.title, message: $0.body) }
     }
 
     private func field(_ label: String, warning: String? = nil, @ViewBuilder input: () -> some View) -> some View {
