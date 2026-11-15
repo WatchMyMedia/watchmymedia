@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { components } from '../api/schema'
 import {
-  attribution, drawable, homeRows, isListRow, libraryRows, libraryScreen, posterSubtitle, screenLibraryId, screenTarget, seeAllTarget, titleParts, webLink,
+  attribution, drawable, homeRows, isListRow, libraryRows, libraryScreen, posterSubtitle, screenLibraryId, screenTarget, seeAllTarget, seeAllWords, titleParts, webLink,
   type ScreenRow,
 } from './screenRows'
 
@@ -55,7 +55,7 @@ describe('rows from a reply', () => {
     const rows = homeRows(home({ recentlyAddedMovies: [item()], recentlyAired: [{} as never], movieLibraryId: 2 }))
     expect(rows.map((r) => r.id)).toEqual(['continue', 'recentlyAddedShows', 'recentlyAired', 'recentlyAddedMovies', 'recentlyReleased'])
     expect(rows.filter(drawable).map((r) => r.id)).toEqual(['recentlyAired', 'recentlyAddedMovies'])
-    expect(rows[3].seeAll).toEqual({ kind: 'library', libraryId: 2 })
+    expect(rows[3].seeAll).toEqual({ kind: 'library', libraryId: 2, sort: 'added' })
     expect(libraryRows({ recentlyAdded: [], recentlyAired: [], recentlyReleased: [] }, 'tv').map((r) => r.id)).toEqual(['recentlyAdded', 'recentlyAired'])
     expect(libraryRows({ recentlyAdded: [], recentlyAired: [], recentlyReleased: [] }, 'movie').map((r) => r.style)).toEqual(['poster', 'wide'])
   })
@@ -124,11 +124,38 @@ describe('See all', () => {
     expect(seeAllTarget({ seeAll: { kind: 'library' }, items: [item({ libraryId: 3 })] }, libraries)).toMatchObject({ type: 'tv' })
   })
 
+  it('links an unarranged reply’s rows to their library sorted the row’s way', () => {
+    const rows = homeRows(home({ tvLibraryId: 3, movieLibraryId: 2 }))
+    expect(rows.map((r) => r.seeAll?.sort)).toEqual([undefined, 'added', 'aired', 'added', 'released'])
+    expect(seeAllTarget(rows[2], libraries)).toEqual({ kind: 'library', type: 'tv', search: { view: 'all', sort: 'aired', filter: undefined, genre: undefined, decade: undefined, library: undefined } })
+    expect(homeRows(home()).map((r) => r.seeAll)).toEqual([undefined, undefined, undefined, undefined, undefined])
+  })
+
   it('drops options the grid doesn’t know, and hides a link it can’t follow', () => {
     expect(seeAllTarget({ seeAll: { kind: 'library', libraryId: 2, sort: 'shuffle', filter: 'all' } }, libraries)).toMatchObject({ search: { view: undefined, sort: undefined, filter: undefined } })
     expect(seeAllTarget({ seeAll: { kind: 'library', libraryId: 99 } }, libraries)).toBeUndefined()
     expect(seeAllTarget({ seeAll: { kind: 'collection', listId: 1 } }, libraries)).toBeUndefined()
     expect(seeAllTarget({}, libraries)).toBeUndefined()
+  })
+})
+
+describe('See all’s words', () => {
+  const library = (libraryId: number, sort?: string) => seeAllTarget({ seeAll: { kind: 'library', libraryId, sort } }, libraries)!
+
+  it('names the library and says the row’s sort in the grid’s own words', () => {
+    expect(seeAllWords(library(3, 'aired'), 'Recently aired · Episodes')).toEqual({ title: 'See all TV shows', detail: 'By last aired', label: 'See all TV shows, by last aired' })
+    expect(seeAllWords(library(3, 'added'), 'Recently added · TV Shows')).toEqual({ title: 'See all TV shows', detail: 'By date added', label: 'See all TV shows, by date added' })
+    expect(seeAllWords(library(2, 'added'), 'Recently added · Movies')).toEqual({ title: 'See all movies', detail: 'By date added', label: 'See all movies, by date added' })
+    expect(seeAllWords(library(2, 'released'), 'Recently released · Movies')).toEqual({ title: 'See all movies', detail: 'By release date', label: 'See all movies, by release date' })
+  })
+
+  it('has no second line without a sort, or with one the library’s grid doesn’t offer', () => {
+    expect(seeAllWords(library(2), 'Comedies')).toEqual({ title: 'See all movies', label: 'See all movies' })
+    expect(seeAllWords(library(2, 'aired'), 'Odd')).toEqual({ title: 'See all movies', label: 'See all movies' })
+  })
+
+  it('says a list’s See all as the TVs do, naming the list aloud', () => {
+    expect(seeAllWords({ kind: 'list', listId: 9 }, 'Top rated')).toEqual({ title: 'See all', detail: 'With the ones you don’t have', label: 'See all of Top rated' })
   })
 })
 

@@ -1,10 +1,11 @@
 import type { LinkProps } from '@tanstack/react-router'
-import { attribution, drawable, posterSubtitle, seeAllTarget, titleParts, type ScreenRow } from '../../lib/screenRows'
+import { attribution, drawable, posterSubtitle, seeAllTarget, seeAllWords, titleParts, type ScreenRow, type SeeAllTarget } from '../../lib/screenRows'
 import { ContinueCard } from '../ContinueCard'
 import { EpisodeCard } from '../EpisodeCard'
 import { PosterCard } from '../PosterCard'
 import { ReleasedCard } from '../ReleasedCard'
 import { Row } from '../Row'
+import { SeeAllCard } from './SeeAllCard'
 
 type LibraryRef = { id: number; type: string }
 
@@ -23,15 +24,25 @@ export function ScreenRows({ rows, libraries }: { rows: readonly ScreenRow[]; li
   )
 }
 
+/**
+ * One row, ending in a See all card when it has a link the web can follow
+ * (PLAN-SEE-ALL.md decision 4): poster-shaped in a poster row, 16:9 in an
+ * episode or wide row. Continue watching has no link, so no card.
+ */
 function ScreenRowView({ row, libraries }: { row: ScreenRow; libraries: readonly LibraryRef[] }) {
   const [title, muted] = titleParts(row)
   const line = row.source || row.subtitle ? <RowLine row={row} /> : muted
+  const target = seeAllTarget(row, libraries)
+  const link = target && seeAllLink(target)
+  const words = target && seeAllWords(target, row.title)
+  const shape = row.style === 'poster' ? 'poster' : row.style === 'episode' || row.style === 'wide' ? 'wide' : undefined
   return (
-    <Row title={title} subtitle={line} seeAll={seeAllLink(row, libraries)}>
+    <Row title={title} subtitle={line} seeAll={link} seeAllLabel={words?.label}>
       {row.style === 'continue' && row.continue?.map((c) => <ContinueCard key={`${c.kind}-${c.fileId}`} item={c} />)}
       {row.style === 'episode' && row.episodes?.map((ep) => <EpisodeCard key={ep.episodeId} ep={ep} />)}
       {row.style === 'wide' && row.items?.map((it) => <ReleasedCard key={`${it.kind}-${it.id}`} item={it} />)}
       {row.style === 'poster' && row.items?.map((it) => <PosterCard key={`${it.kind}-${it.id}`} item={it} inRow subtitle={posterSubtitle(row, it)} />)}
+      {link && words && shape && <SeeAllCard key="see-all" link={link} words={words} shape={shape} list={target.kind === 'list'} />}
     </Row>
   )
 }
@@ -53,9 +64,7 @@ function RowLine({ row }: { row: ScreenRow }) {
   )
 }
 
-function seeAllLink(row: ScreenRow, libraries: readonly LibraryRef[]): LinkProps | undefined {
-  const target = seeAllTarget(row, libraries)
-  if (!target) return undefined
+function seeAllLink(target: SeeAllTarget): LinkProps {
   if (target.kind === 'list') return { to: '/lists/$listId', params: { listId: String(target.listId) } }
   return { to: target.type === 'tv' ? '/tv' : '/movies', search: target.search }
 }
