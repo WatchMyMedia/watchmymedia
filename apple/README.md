@@ -148,7 +148,7 @@ filter panel, and Show/Movie details and Search use two panes. Title-sorted
 libraries offer an A–Z index when the server supplies it. In portrait the
 player shows the season below the video; in landscape it fills the screen.
 Audio, Subtitles and Quality open a side panel and keep the video playing.
-Settings keeps server selection and sign-in inside its split view.
+Settings keeps Switch server's steps inside its split view.
 
 The Apple TV app takes the same `-fakes`, `-fakesMember`, `-fakesSignedOut`,
 `-fakesNoServer`, `-tab` and `-open` arguments (`watchmymedia://link` is the
@@ -323,6 +323,55 @@ rows. Add `-fakesMember` for a member, who can't delete or refresh the
 household's lists, and `-fakesTwoMovieLibraries` for a server with two movie
 libraries, whose Home movie rows have no See all.
 
+## Settings
+
+Settings follows the web's groups, names and words on iPhone, iPad and Apple TV
+([PLAN-APPLE-SETTINGS.md](../PLAN-APPLE-SETTINGS.md); `Settings2*`,
+`Pad2Settings2*` and `TvSettings2*` boards). On iPhone and iPad:
+
+- **The root is the hub** (`App/Screens/Settings/SettingsScreen.swift`): the
+  account opens Account & devices, then You (Playback, Audio & subtitles, Home
+  rows, Account & devices, Your requests), This iPhone (Downloads), Server (the
+  server, and the Inbox for admins) and About WatchMyMedia, each row with how
+  things stand at its right. On iPad it is the sidebar of a split view and the
+  page stands beside it, in two columns where the page is 680 pt or wider; a
+  compact width shows the iPhone's. There is no Sign out on the root.
+- **Pages** share `Components/Account/SettingsParts.swift`: a line under the
+  title, groups with a note, rows whose own line says how a change went, choices
+  as menus from their row (each choice a `Toggle`, so the menu ticks the chosen
+  one and shows its line), and a red row apart at the bottom for what signs out.
+  A row keeps its value whole at its right and puts it under the title when it
+  can't share the line, and always at the accessibility text sizes.
+- **Playback** holds Quality (this device's), Skipping (a menu per part), Next
+  episode and Live TV reminders, which were pages of their own. **Account &
+  devices** holds this device's name (Rename is a sheet), Signed-in devices,
+  Link a TV and Sign out of this iPhone. **Server** offers Switch server, and
+  Server settings to admins only. **Audio & subtitles'** Add language is a sheet
+  of every language by name, to search.
+- **Tasks are sheets** (`Components/Account/TaskSheet.swift`): Cancel, the
+  task's name, the steps bar ("Step 2 of 3"), one filled button at the bottom
+  (Return presses it on a hardware keyboard, Escape is Cancel) and a last step
+  that says what changed and what happens next, closed with Done. Link a TV and
+  Switch server are the two; on iPad Switch server stays in the detail column.
+  Their models live in `AppFlow` (`Shell/RootView.swift`), as the sign-in form
+  does, so a window resized mid-task keeps its step. A sheet with something
+  typed asks before a swipe throws it away (`asksBeforeDismissing`).
+- **Removes ask first** in a dialog from the button that asked (a popover on
+  iPad): signing out another device names it and whose it is, signing out of
+  this one names the downloads it deletes, and Cancel request and Remove all
+  downloads ask too.
+- **A page that isn't offered says why** (`KeptOutPage`): Your requests,
+  Downloads and Audio & subtitles opened by a link or `-settingsPage` when the
+  server or the account keeps them out.
+
+`-settingsPage` takes `playback`, `subtitles`, `account`, `requests`,
+`downloads`, `server`, `inbox` and `about` (and the old `skip`, `liveTV`,
+`thisDevice` and `devices`, which open the page they moved into);
+`-open 'watchmymedia://link?code=K7M4PQ'` opens Link a TV at its second step,
+`-linkTVApprove` at its last; `-settingsPage server -switchServer` starts
+Switch server. `UITests/SettingsTasksTests.swift` runs both tasks through
+every step on the fakes, with Back and Cancel, Rename and both sign-outs.
+
 ## First run, audio languages and subtitles
 
 Empty Home explains whether the server has no libraries, is scanning, could not
@@ -343,7 +392,8 @@ Each change saves at once and sends only what changed: the server gives
 someone who saves their first audio language without ever choosing how
 subtitles start the foreign-audio choice, and the page then says so once. An
 empty list offers the device's language; it is never saved without choosing
-it. A language's Move up, Move down and Remove are in a dialog from its row
+it. Add language opens every language the system can name, to search; a list
+holds 16 and says so when full. A language's Move up, Move down and Remove are in a dialog from its row
 (Apple TV: buttons on its card). Automatic download needs On or the
 foreign-audio choice and a subtitle language; when no local track matches, it
 can download one exact-file hash match in the first subtitle language, subject
@@ -715,6 +765,8 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
   reached the app there, so Escape needs a real keyboard.
 - **A pointer on iPad.** Cards (`CardButtonStyle`) lift and Search's and
   Settings' rows highlight under the pointer, as the system draws it.
+- **Settings' tasks** take Return for their filled button and Escape for
+  Cancel (`keyboardShortcut(.defaultAction)` and `.cancelAction`).
 - **Quick actions and App Shortcuts** (`App/Shell/QuickActions.swift`):
   Continue watching (Home at its top), Search, Live TV when the server offers
   it and Downloads when they are on. Each opens a link published for the

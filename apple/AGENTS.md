@@ -161,6 +161,21 @@ server, and on iPad in both a regular and a compact width.
   - On iPad the toolbar beside the tab bar holds little: a third trailing
     item sends the rest into a ⋯ menu. Put a page's own buttons in its title
     row (the Live TV guide's search, Reminders and Guide/Channels switch).
+- **Settings** (README, Settings; PLAN-APPLE-SETTINGS.md). A task with steps
+  is a sheet in `TaskFrame`, presented from `SettingsTasks` in
+  `SettingsScreen.swift` so both widths share it, with its model kept in
+  `AppFlow` so a resized iPad window keeps the step. `.linkTV` in the
+  Settings tab's path is that sheet, never a pushed page: `MainTabView`
+  leaves it out of the stack's path (`[Route].pushed`) and keeps it when the
+  stack changes the path. A finished Switch server shows its last step until
+  Done (`AppFlow.serverSwitchDone`); only then does `RootView` rebuild the
+  tabs. A sheet that must ask before a swipe throws away what was typed uses
+  `asksBeforeDismissing`: `interactiveDismissDisabled` alone refuses the swipe
+  without saying so, and the helper hears UIKit's attempt through a proxy in
+  front of SwiftUI's own presentation delegate. A choice from a row's menu is
+  a `Toggle` per choice in a `Menu`: it ticks the chosen one and a second
+  `Text` is its line. A page's two columns hold groups in another order than
+  the phone's single column, so a page gives each its own (`SettingsAdaptive`).
 - **Accessibility identifiers.** An `.accessibilityIdentifier` on a container
   that isn't an element (a `VStack`, a `TimelineView`) is given to every
   child, over their own: add `.accessibilityElement(children: .contain)`
@@ -224,6 +239,12 @@ didn't start.
 - YouTube's player (the movie trailer screen) needs the network. No video is
   known to refuse embedding reliably, so reach the refused screen with
   `-trailerError 150` in a debug build.
+- On iOS 27 a `.confirmationDialog` is a popover from the view it is
+  attached to, on iPhone as on iPad, and shows no `.cancel` button: tapping
+  outside is the answer that keeps things. A test finds the dialog's buttons
+  inside `app.popovers` (a row's own button can carry the same label) and
+  keeps things with a tap on `app.otherElements["PopoverDismissRegion"]`
+  (`UITests/SettingsTasksTests.swift`).
 - `typeKey` drives a hardware keyboard on the iOS simulator (space, arrows,
   ⌘F: `UITests/KeyboardTests.swift`, on an iPad), but its Escape reached
   neither `onKeyPress`, a cancel action nor a `UIKeyCommand` on iPadOS 27.2:
