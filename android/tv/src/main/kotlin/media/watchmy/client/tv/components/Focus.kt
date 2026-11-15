@@ -133,10 +133,20 @@ class FocusMemory internal constructor(private val saved: MutableState<String?>)
 
     /** Focuses the remembered item, else [fallback]. False when neither is on screen. */
     fun restore(fallback: String?): Boolean {
-        saved.value?.let { k -> if (requesters[k]?.requestFocus() == true) return true }
-        return fallback?.let { requesters[it]?.requestFocus() } == true
+        saved.value?.let { k -> if (requesters[k]?.tryFocus() == true) return true }
+        return fallback?.let { requesters[it]?.tryFocus() } == true
     }
+
+    /** Focuses the item registered as [key]; false when it isn't on screen (never registered, or gone with its page). */
+    fun focus(key: String): Boolean = requesters[key]?.tryFocus() == true
 }
+
+/**
+ * Requests focus, false where nothing on screen has this requester: a
+ * requester whose element left the composition (a row of a pane that was
+ * swapped, a device that was signed out) throws on requestFocus.
+ */
+fun FocusRequester.tryFocus(): Boolean = runCatching { requestFocus() }.getOrDefault(false)
 
 @Composable
 fun rememberFocusMemory(): FocusMemory {
