@@ -22,6 +22,8 @@ public final class ServerPickerModel {
         public var tooOld: Bool
         /// The server in use now.
         public var current: Bool
+        /// This device is signed in there, so choosing it needs no password.
+        public var signedIn: Bool = false
     }
 
     /// What the connecting spinner sits on: a row's ID, or ``addressKey``.
@@ -33,8 +35,16 @@ public final class ServerPickerModel {
 
     /// The address typed under Enter an address.
     public var address = "" {
-        didSet { if address != oldValue { addressError = nil } }
+        didSet {
+            guard address != oldValue else { return }
+            addressError = nil
+            if failure?.key == Self.addressKey { failure = nil }
+        }
     }
+
+    /// The last failure to connect, by kind, for Switch server's first step
+    /// (``ConnectFailure/notice(after:)``); ``error`` and ``addressError`` say it as today.
+    public private(set) var failure: ConnectFailure?
 
     /// The row (or ``addressKey``) being connected to.
     public private(set) var connecting: String?
@@ -59,7 +69,7 @@ public final class ServerPickerModel {
             return Row(
                 id: d.id, kind: .found, name: d.name, address: d.baseURL.absoluteString,
                 detail: [d.displayAddress, versionLabel(d.version), tooOld ? "too old for this app" : accountLabel(saved[d.id])].joined(separator: " · "),
-                tooOld: tooOld, current: servers.current?.server.id == d.id
+                tooOld: tooOld, current: servers.current?.server.id == d.id, signedIn: saved[d.id]?.signedIn == true
             )
         }
     }
@@ -74,7 +84,7 @@ public final class ServerPickerModel {
                 : "Last used \(formatAgo(s.lastUsedAt, now: now())) · \(accountLabel(s))"
             return Row(
                 id: s.server.id, kind: .remembered, name: s.server.name, address: s.server.baseURL.absoluteString,
-                detail: detail, tooOld: s.server.tooOld, current: servers.current?.server.id == s.server.id
+                detail: detail, tooOld: s.server.tooOld, current: servers.current?.server.id == s.server.id, signedIn: s.signedIn
             )
         }
     }
@@ -135,13 +145,17 @@ public final class ServerPickerModel {
         await servers.forget(serverID: row.id)
     }
 
-    public func dismissError() { error = nil }
+    public func dismissError() {
+        error = nil
+        failure = nil
+    }
 
     private func connect(to address: String, key: String, label: String) async -> Bool {
         guard connecting == nil else { return false }
         connecting = key
         error = nil
         addressError = nil
+        failure = nil
         defer { connecting = nil }
         do {
             let server = try await servers.probe(address)
@@ -159,6 +173,7 @@ public final class ServerPickerModel {
         } catch {
             let text = connectMessage(error, label: label)
             if key == Self.addressKey { addressError = text } else { self.error = text }
+            failure = ConnectFailure(key: key, label: label, error: error)
             return false
         }
     }

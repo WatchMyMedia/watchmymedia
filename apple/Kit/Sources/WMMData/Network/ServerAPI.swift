@@ -127,8 +127,9 @@ public struct ServerAPI: Sendable {
         await onSignedOut()
     }
 
-    /// Where 401 means wrong credentials or a code not yet approved, not a lost sign-in.
-    static let credentialOperations: Set<String> = ["login", "claimPairing", "getServer", "getAuthStatus", "startPairing"]
+    /// Where 401 means wrong credentials or a code not yet approved, not a
+    /// lost sign-in. changePassword's 401 is a wrong current password.
+    static let credentialOperations: Set<String> = ["login", "claimPairing", "getServer", "getAuthStatus", "startPairing", "changePassword"]
 
     /// Whether a refusal means the sign-in is gone (revoked or run out): a 401
     /// to a request that carried the token, other than one of the

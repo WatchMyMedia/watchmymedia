@@ -347,6 +347,44 @@ rows. Add `-fakesMember` for a member, who can't delete or refresh the
 household's lists, and `-fakesTwoMovieLibraries` for a server with two movie
 libraries, whose Home movie rows have no See all.
 
+## Settings
+
+Settings follows the web's (PLAN-APPLE-SETTINGS.md): the same groups, names
+and words, a root that is a hub, and one rule for saving. What the views draw
+comes from the Kit (`WMMFeatures/Account/`), so the iPhone, iPad and Apple TV
+apps word and decide alike:
+
+- **The hub.** `settingsHub(model.hubFacts(…))` gives the iPhone and iPad
+  root's groups in the web's order (You, This iPhone, Server, About) with each
+  row's value; rows the server or account doesn't offer are left out.
+  `tvSettingsGroups(_:)` is Apple TV's list beside the page, with the line
+  under each group and its panel. `settingsNextStep(_:)` picks at most one
+  Next step (a language to watch in, then notifications off while reminders
+  are set, which the app passes in); `banner` says the server can't be reached.
+- **Saving.** A switch or a choice kept on the server saves at once and says
+  so in its own row: `SettingsModel.saveState(.skip(.credits))` (and
+  `LiveExtrasStore.leadSave` for Remind me) is rest, saving, saved with what
+  the change did, or failed with the control back at the saved value and
+  named. Saved goes back to rest after four seconds through the sleep the
+  model was given. Anything typed (Rename, Change password) is a sheet with
+  its own model (`RenameModel`, `ChangePasswordModel`).
+- **Words.** `SettingsWords` holds every page's names, ledes, Saved lines,
+  dialogs (`ConfirmWords`, with the person and the numbers) and the pages that
+  aren't offered (`KeptOutWords`, from `keptOutReason(_:server:…)`). Skip's
+  modes are the web's (`SkipMode.label`, in the web's order).
+- **Languages by name.** `LanguageCatalog` (`WMMModel`) is every language the
+  system has locale data for, with the ISO 639-1 ones and pt-BR, pt-PT,
+  zh-Hans, zh-Hant and es-419; `LanguagePicker` searches it, marks what a list
+  holds and says why Add is off at 16. No code is typed.
+- **Tasks with steps.** `LinkTVModel` and `ServerSwitchModel` give each step
+  (`flowStep`: number, name, next), each button's title and why it is off,
+  failures that end in what was or wasn't done (`problem`, `chooseProblem`,
+  `signInProblem`), and the finished screen (`finished`).
+- **Server settings** are the web app's, for admins only:
+  `SettingsModel.loadAdminAccess()` asks GET /api/auth/status and
+  `serverSettingsRow` says whether they open from here. **Change password**
+  calls PUT /api/auth/password; Apple TV shows `changePasswordURL(_:)` as a code.
+
 ## First run, audio languages and subtitles
 
 Empty Home explains whether the server has no libraries, is scanning, could not
@@ -937,7 +975,7 @@ lines, enough to fill the code and turn pages (`TVUITests/DiagnosticsTests.swift
 | `Kit/Sources/WMMFakes` | In-memory fakes of every protocol, with the mockups' library and a pretend player (`AppServices.fake()`) |
 | `Kit/Sources/WMMUI` | Brand tokens (`Palette`), `Artwork`, `Badge`, `Tag`, `ProgressStrip`, `WatchedCheck`, `BrandMark`, button styles, `Chip`, `LoadableView` and the empty and error states |
 | `Kit/Sources/WMMTopShelf` | The Apple TV Top Shelf's snapshot in the App Group: its format, what it may hold (`TopShelfRules`), the store, and the sections the system draws. Foundation and TVServices only, so the extension links nothing else |
-| `Kit/Sources/WMMFeatures` | Screen models and navigation, shared with the Apple TV app: `Navigation/` (`Navigator`, `Route`, `AppTab`, `DeepLink`), `Browse/` (Home, Library, Show, Movie, Search), `Account/` (server picker, sign-in and pairing, Settings, Link a TV), `Player/` (the controls' timing, double-tap seek, the scrubber, the picker's wording, and `TVPlayerModel` for the Apple TV's system player) |
+| `Kit/Sources/WMMFeatures` | Screen models and navigation, shared with the Apple TV app: `Navigation/` (`Navigator`, `Route`, `AppTab`, `DeepLink`), `Browse/` (Home, Library, Show, Movie, Search), `Account/` (server picker, sign-in and pairing, Settings with its hub, words and saving states, Link a TV, Switch server, Change password), `Player/` (the controls' timing, double-tap seek, the scrubber, the picker's wording, and `TVPlayerModel` for the Apple TV's system player) |
 | `App/` | The iPhone and iPad app: `Shell/` (app, root flow, tabs, `ServicesFactory`), `Screens/<feature>/` (SwiftUI views; a screen lays itself out for a regular width with `PadLayout` from `Components/Layout.swift`), `Components/Browse` and `Components/Account` (views those screens share) |
 | `TV/` | The Apple TV app, target "WatchMyMedia TV" (tvOS 18+, the same bundle ID for the universal purchase): `Shell/` (app, root flow, the tab bar, `TabPage`, its own `ServicesFactory` with the TV profile), `Screens/<feature>/`, `Components/` (focus, buttons, chips, cards, rows), `Resources/` (the layered icon and Top Shelf images from `brand/`) |
 | `TopShelf/` | The Apple TV app's Top Shelf extension, target "WatchMyMedia TopShelf": `ContentProvider` reads the snapshot (see Top Shelf), its privacy manifest and entitlements |

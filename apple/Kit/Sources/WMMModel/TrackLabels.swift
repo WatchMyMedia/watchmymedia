@@ -83,9 +83,15 @@ public func languageName(_ code: String?, locale: Locale = .current) -> String? 
 }
 
 /// A preferred language's name in a settings list: "Spanish",
-/// "Portuguese (Brazil)", "Chinese, Simplified"; the tag when unknown.
+/// "Portuguese (Brazil)", "Chinese (Simplified)"; the tag when unknown. A
+/// variant the system names "Chinese, Simplified" is put the way the region
+/// variants read, as the Add language boards name it.
 public func languageTagName(_ tag: String, locale: Locale = .current) -> String {
-    guard let name = locale.localizedString(forIdentifier: tag), !name.isEmpty else { return tag }
+    guard var name = locale.localizedString(forIdentifier: tag), !name.isEmpty else { return tag }
+    if tag.contains("-"), let base = locale.localizedString(forLanguageCode: String(tag.prefix { $0 != "-" })),
+       name.hasPrefix(base + ", ") {
+        name = "\(base) (\(name.dropFirst(base.count + 2)))"
+    }
     return name.prefix(1).uppercased() + name.dropFirst()
 }
 
