@@ -81,6 +81,12 @@ public final class SettingsModel {
     public var server: Server? { servers.current?.server }
     public var deviceName: String { auth.deviceName }
 
+    /// Whether the server answered its last check (``ServerRepository/reachable``).
+    var reachable: Bool? { servers.reachable }
+
+    /// Asks the server who it is again, quietly.
+    func refreshServer() async { await servers.refreshCurrent() }
+
     /// "Admin · Living room server".
     public var accountLine: String { accountCardLine(user: user, serverName: server?.name) }
 
