@@ -18,7 +18,8 @@ final class AppFlow {
     /// Starts Switch server, or the server picker when nobody is signed in to come back to.
     func startSwitch(_ services: AppServices) {
         guard serverSwitch == nil else { return }
-        serverSwitch = ServerSwitchModel(servers: services.servers, auth: services.auth)
+        // Sign in starts on the pairing code, as Apple TV's own sign-in does.
+        serverSwitch = ServerSwitchModel(servers: services.servers, auth: services.auth, pairsByDefault: true)
         if serverSwitch == nil { choosingServer = true }
     }
 

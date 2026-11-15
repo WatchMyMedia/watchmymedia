@@ -15,8 +15,6 @@ struct SwitchServerScreen: View {
     let model: ServerSwitchModel
     @Environment(AppFlow.self) private var flow
     @Environment(AppServices.self) private var services
-    /// Signing in on Apple TV pairs first, as the sign-in screen does.
-    @State private var signIn: SignInModel?
     @State private var typing = false
     @State private var address = ""
 
@@ -39,13 +37,6 @@ struct SwitchServerScreen: View {
         }
         .onAppear { model.picker.startDiscovery() }
         .onDisappear { model.picker.stopDiscovery() }
-        .onChange(of: model.phase, initial: true) { _, phase in
-            if phase == .signingIn {
-                if signIn == nil { signIn = SignInModel(servers: services.servers, auth: services.auth, pairsByDefault: true) }
-            } else {
-                signIn = nil
-            }
-        }
         .onExitCommand(perform: back)
     }
 
@@ -56,7 +47,7 @@ struct SwitchServerScreen: View {
         switch step {
         case 0: Task { await model.cancel() }
         case 1:
-            guard signIn?.busy != true else { return }
+            guard !model.busy else { return }
             Task { await model.backToPicker() }
         default: flow.endSwitch(goingTo: .home)
         }
@@ -176,8 +167,10 @@ struct SwitchServerScreen: View {
             if let problem = model.signInProblem {
                 TVMessage(title: problem.title, message: problem.body).accessibilityIdentifier("switch-message")
             }
-            if let signIn {
-                SwitchSignIn(model: signIn).padding(.top, 12)
+            if let signIn = model.signIn {
+                SwitchSignIn(model: model, signIn: signIn)
+                    .id(ObjectIdentifier(signIn))
+                    .padding(.top, 12)
             } else {
                 ProgressView("Returning to \(original)…").frame(maxWidth: .infinity, minHeight: 300)
             }
@@ -254,21 +247,35 @@ private struct SwitchedButtons: View {
     }
 }
 
-/// Switch server's sign-in: the pairing code and its QR code, or a name and
-/// password while the server allows them.
+/// Switch server's sign-in (the Kit's ``ServerSwitchModel/signIn``, which
+/// on Apple TV starts on the pairing code): the code with what to do with it
+/// and its QR code, or a name and password while the server allows them,
+/// with the other way under each. Code and form are built in this one body,
+/// so focus finds the form's name field when it replaces the code
+/// (apple/AGENTS.md).
 private struct SwitchSignIn: View {
-    @Bindable var model: SignInModel
+    let model: ServerSwitchModel
+    @Bindable var signIn: SignInModel
+    @FocusState private var field: Field?
+
+    private enum Field: Hashable { case name, password }
 
     var body: some View {
         HStack(alignment: .top, spacing: 80) {
             VStack(alignment: .leading, spacing: 26) {
-                if model.codeSignIn {
-                    pairingInstructions(model)
-                    pairingCodeArea(model)
-                    if model.passwordAllowed {
-                        Button("Sign in with a password instead") { model.usePassword() }
+                if signIn.codeSignIn {
+                    Text(model.codeLede)
+                        .font(.system(size: 26))
+                        .lineSpacing(8)
+                        .foregroundStyle(Palette.textSecondary)
+                        .frame(maxWidth: 820, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    pairingCodeArea(signIn)
+                    if let other = model.otherWayTitle {
+                        Button(other) { model.usePassword() }
                             .buttonStyle(TVButtonStyle())
                             .padding(.top, 10)
+                            .accessibilityIdentifier("switch-other-way")
                     }
                 } else {
                     password
@@ -276,36 +283,47 @@ private struct SwitchSignIn: View {
             }
             .frame(width: 960, alignment: .leading)
             .focusSection()
-            if model.codeSignIn { pairingQR(model, size: 340) }
+            if signIn.codeSignIn { pairingQR(signIn, size: 340) }
         }
-        .task(id: model.codeSignIn ? model.pairingRun : -1) { await model.pair() }
+        // The code is followed until it is approved, runs out or the form takes its place.
+        .task(id: signIn.codeSignIn ? signIn.pairingRun : -1) { await signIn.pair() }
     }
 
     private var password: some View {
         VStack(alignment: .leading, spacing: 22) {
-            TextField("Username", text: $model.name)
+            TextField("Username", text: $signIn.name)
                 .textContentType(.username)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .font(.system(size: 28))
                 .frame(width: 760)
-            SecureField("Password", text: $model.password)
+                .focused($field, equals: .name)
+                .onSubmit { field = .password }
+            SecureField("Password", text: $signIn.password)
                 .textContentType(.password)
                 .font(.system(size: 28))
                 .frame(width: 760)
-                .onSubmit { Task { await model.signIn() } }
-            if let error = model.error { WarningLine(text: error) }
+                .focused($field, equals: .password)
+                .onSubmit { Task { await signIn.signIn() } }
+            if let problem = model.passwordProblem { WarningLine(text: problem) }
+            if let reason = model.signInOffReason {
+                Text(reason).font(.system(size: 18)).foregroundStyle(Palette.faint)
+            }
             HStack(spacing: 24) {
-                Button { Task { await model.signIn() } } label: {
-                    if model.busy { ProgressView() } else { Text("Sign in") }
+                Button { Task { await signIn.signIn() } } label: {
+                    if signIn.busy { ProgressView() } else { Text("Sign in") }
                 }
                 .buttonStyle(TVButtonStyle(kind: .primary))
-                .disabled(model.busy)
-                Button("Use a pairing code instead") { model.usePairingCode() }
-                    .buttonStyle(TVButtonStyle())
+                .disabled(signIn.busy)
+                if let other = model.otherWayTitle {
+                    Button(other) { model.useCode() }
+                        .buttonStyle(TVButtonStyle())
+                        .accessibilityIdentifier("switch-other-way")
+                }
             }
             .focusSection()
         }
-        .disabled(model.busy)
+        .disabled(signIn.busy)
+        .defaultFocus($field, .name)
     }
 }
