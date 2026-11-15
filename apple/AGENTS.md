@@ -148,6 +148,27 @@ server, and on iPad in both a regular and a compact width.
     (measured 2026-11-13: one `TabPage` content build per owner redraw, none
     besides), and the model reads in the content would then redraw the owner
     rather than `TabPage` alone.
+  - Apple TV's Settings (`TV/Screens/Settings/SettingsScreen.swift`, the
+    groups beside their page) moves focus the focus engine puts elsewhere:
+    Right from the list lands on the row level with the group, so it goes
+    to the page's remembered row; Left from a page lands on whichever group
+    is level with the row, which would change the page, so it goes to the
+    page's own group; and focus coming back from nil goes to where it was.
+    The view's `@FocusState` is nil while the top bar has focus and while a
+    `Menu`'s choices, a full-screen cover or a question is up, so "from nil"
+    covers all of them. A press made before the move lands goes from where
+    focus was, so a test waits for focus after each press. `MainTabs`
+    leaves Menu at Settings' root to the system (the top bar); the page has
+    its own `onExitCommand` back to the list.
+  - In a SwiftUI `Menu` on Apple TV a `Label { Text; Text } icon:` item
+    drops its second `Text`, so a ticked choice lost its line. A `Toggle`
+    per choice keeps the title and the line and is ticked when on
+    (Settings' `menuRow`). The menu opens with focus on its first choice,
+    not the ticked one. XCUI sees each toggle as an `Other` inside a cell,
+    labelled "title, line", `isSelected` when ticked, and without its
+    identifier: find a choice by its label (`TVUITests/SettingsTests.swift`).
+    A `Menu`'s own label isn't read out either, so a row that is a `Menu`
+    sets its `accessibilityLabel` and `accessibilityValue`.
   - On Apple TV a focused button that becomes disabled keeps focus, dimmed,
     until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
     up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable

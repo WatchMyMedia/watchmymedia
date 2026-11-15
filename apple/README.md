@@ -191,6 +191,30 @@ and runs with the rest in `make apple-tv-test-sim`. Its waits are in
 over a test of many presses. XCUI does not see AVKit's contextual actions,
 so Skip is checked by hand.
 
+Settings on Apple TV (TvSettings2*.dc.html, PLAN-APPLE-SETTINGS.md §3.3 and
+§5.9; `TV/Screens/Settings/`) shows one group at a time: the web's groups in
+its order at the left (Playback, Audio & subtitles, Home rows, Account &
+devices, Your requests, Server, About), each with how things stand under its
+name; the chosen group's page beside them, which scrolls in its own column;
+and at the right a panel that says what the focused setting does. Moving
+along the list chooses a group; Right or Select moves into its page on the
+row it had last, Menu comes back to the list, and Menu again goes to the top
+bar. A choice is a row that opens a menu (Quality, each part of Skipping,
+Remind me), each choice with its line; it saves when it is made and the row
+says Saving, then Saved and what it did, or why it couldn't and what it still
+is. What takes the screen has the path across its top and what the remote
+does along its bottom: Name this Apple TV (room names, and Type another name
+for the keyboard), Add a language (names in a grid), the codes to scan for
+Change password and Server settings, and Switch server's three steps, which
+`RootView` keeps above the tabs because a switch rebuilds them. Sign-out
+questions open on the button that keeps things, and Menu is that button.
+`-settingsGroup playback|languages|homeRows|account|requests|server|about`
+shows a group with focus on it at launch; `-renameDevice`, `-changePassword`,
+`-serverSettingsCode`, `-signOutQuestion`, `-switchServer`,
+`-subtitlesSettings` (with `-addLanguage audio|subtitles`) and
+`-homeRowsSettings` open the rest, in debug builds.
+`TVUITests/SettingsTests.swift` drives them with the remote.
+
 Sorted by title, the Apple TV grid has a letter index down its right edge
 (TvLibraryAZ.dc.html, PLAN-APPLE-REVIEW.md §6.2): right from the last column
 enters it at the poster's letter, the grid follows the letters up and down,
