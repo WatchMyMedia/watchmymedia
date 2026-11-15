@@ -34,6 +34,10 @@ private struct HomeView: View {
     /// top and Menu can move focus to the first screen.
     @FocusState private var focusedPage: HomePage?
     @State private var editingRows = false
+    /// The row screen a See all left for its library's tab, and the count of
+    /// Menu's returns to Home then (``Navigator/exitsToHome``): Menu back from
+    /// that grid brings focus back to the row's See all (PLAN-SEE-ALL.md §3).
+    @State private var seeAllLeft: (page: HomePage, exits: Int)?
 
     private var liveAvailable: Bool { services.liveTV.capabilities?.available == true }
 
@@ -56,6 +60,8 @@ private struct HomeView: View {
             }
         }
         .task { await model.run() }
+        .onAppear(perform: backFromSeeAll)
+        .onChange(of: navigator.exitsToHome) { backFromSeeAll() }
         .publishesTopShelf(model.state.value)
         .messagePill($model.message)
         .noticeAlert($model.notice)
@@ -116,6 +122,21 @@ private struct HomeView: View {
         focusedPage = .start
     }
 
+    /// Home shows again: after Menu from the grid a row's See all opened, its
+    /// screen comes back with focus in the row, which lands on See all (the
+    /// card it had). Choosing Home in the tab bar leaves focus there, as the
+    /// system does; either way the row is remembered once.
+    private func backFromSeeAll() {
+        guard navigator.tab == .home, let left = seeAllLeft else { return }
+        seeAllLeft = nil
+        guard navigator.exitsToHome > left.exits else { return }
+        Task { @MainActor in
+            await Task.yield()
+            page = left.page
+            focusedPage = left.page
+        }
+    }
+
     /// Screen 1: the hero and the first row (TvHomeStart.dc.html).
     private func startScreen(_ home: HomeData, rows: [ScreenRow]) -> some View {
         ZStack(alignment: .topTrailing) {
@@ -156,7 +177,8 @@ private struct HomeView: View {
             row: row, index: index,
             counter: rowCounter(index: index, of: rows.count),
             nextName: rows.indices.contains(index + 1) ? rows[index + 1].screenName : HomeEndScreen.name,
-            model: model, page: page, focusedPage: $focusedPage
+            model: model, page: page, focusedPage: $focusedPage,
+            leaving: { seeAllLeft = (page, navigator.exitsToHome) }
         )
         .id(page)
     }
@@ -291,8 +313,10 @@ private enum HomePage: Hashable {
 }
 
 private extension TVRowActions {
-    /// Home's card actions.
-    @MainActor init(_ model: HomeModel) {
+    /// Home's card actions. A row's See all opens a list's page, or the
+    /// library's tab at its grid sorted the row's way (PLAN-SEE-ALL.md §4.3),
+    /// for a link Home can open; `leaving` hears of the second first.
+    @MainActor init(_ model: HomeModel, leaving: @escaping () -> Void = {}) {
         self.init(
             open: { model.open($0) },
             openEpisode: { model.open($0) },
@@ -300,7 +324,13 @@ private extension TVRowActions {
             resume: { model.resume($0) },
             openPage: { model.openPage(of: $0) },
             setWatched: { await model.setWatched($0, $1) },
-            openList: { model.open(.list(id: $0)) }
+            seeAll: { row in
+                guard let link = row.seeAll, let words = model.seeAll(row) else { return nil }
+                return TVRowSeeAll(words: words) {
+                    if case .library = link { leaving() }
+                    model.open(link)
+                }
+            }
         )
     }
 }
@@ -317,6 +347,8 @@ private struct HomeRowScreen: View {
     let model: HomeModel
     let page: HomePage
     var focusedPage: FocusState<HomePage?>.Binding
+    /// The row's See all is leaving Home for its library's tab.
+    let leaving: () -> Void
     /// The focused card's key (``BrowseItem/cardID``, ``EpisodeCard/cardKey``, ``ContinueItem/cardKey``).
     @State private var focusedCard: String?
     /// The Live TV row's focused channel, or ``TVLiveHomeRow/guideKey``.
@@ -336,7 +368,7 @@ private struct HomeRowScreen: View {
                         .accessibilityIdentifier("homeFocusPanel-\(row.id)")
                 }
                 Spacer(minLength: 0)
-                TVArrangedRow(row: row, actions: TVRowActions(model), counter: counter, focusedCard: $focusedCard, focusedChannel: $focusedChannel)
+                TVArrangedRow(row: row, actions: TVRowActions(model, leaving: leaving), counter: counter, focusedCard: $focusedCard, focusedChannel: $focusedChannel)
                     // Its own height: a horizontal scroll view would take all the screen left over the panel.
                     .fixedSize(horizontal: false, vertical: true)
                 NextRowLine(name: nextName, index: index)

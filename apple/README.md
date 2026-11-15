@@ -291,8 +291,13 @@ tab and the tab's `LibraryModel` takes it once (`takeBrowseLink(for:)`), so
 selecting the tab again later leaves the grid as the person has it. Continue
 watching and Live TV have no See all, nor do Home's rows that mix two
 libraries of one type, which the server sends without a link. On iPad's Home
-screens the card never leads its row. Older servers keep today's fixed rows,
-and their library screens have none.
+screens the card never leads its row. On Apple TV (S5) the card is the list
+card's size and look, with the library over the sort; with it focused the
+panel stays on the row's last card, Select opens the tab with focus on the
+grid's first poster, and Menu from there brings Home back to the row with
+focus on See all (`Navigator.exitsToHome`: selecting the tab scrolls Home to
+its top). Older servers keep today's fixed rows, and their library screens
+have none.
 
 Home rows (Edit Home at the end of Home, Settings › Home rows, and Edit rows
 on a library) is one sheet on iPhone and iPad: drag handles, Hide and Show in
@@ -303,8 +308,7 @@ Move up, Move down and Hide, an Add a row menu and Reset, saving each change.
 `RowEditorModel` holds the rules. A list row's See all opens the list's page
 (`MediaListModel`; `watchmymedia://lists/{id}`): every title in rank order,
 missing ones dimmed with Request through the request sheet, Requested or
-Downloading, and Not found for an imported title TMDB couldn't find. Apple TV
-list rows end in a See all card. `rows.changed` and `lists.changed` refetch
+Downloading, and Not found for an imported title TMDB couldn't find. `rows.changed` and `lists.changed` refetch
 Home, the library screens and the list page. There is no list builder: lists
 are made on the web (Decision 10).
 

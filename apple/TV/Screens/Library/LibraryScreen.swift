@@ -12,7 +12,9 @@ import WMMUI
 /// (TvLibraryAZ.dc.html): right from the last column enters it at the
 /// focused poster's letter, the grid follows the letters up and down, Select
 /// or left lands on the letter's first title, and Menu goes back to the
-/// poster. Page Up and Page Down move two rows in any sort.
+/// poster. Page Up and Page Down move two rows in any sort. A row's See all
+/// (PLAN-SEE-ALL.md §4.3), on Home or in the rows above, opens the grid
+/// sorted the row's way, with focus on its first poster.
 struct LibraryScreen: View {
     let type: LibraryType
     @Environment(AppServices.self) private var services
@@ -47,6 +49,9 @@ private struct LibraryView: View {
                     if let target = model.scrollTargetID { withAnimation { proxy.scrollTo(target, anchor: UnitPoint(x: 0.5, y: 0.32)) } }
                 }
                 .onChange(of: focus) { old, new in focusMoved(from: old, to: new, proxy) }
+                // Home's See all opened the tab: the grid has loaded sorted the row's way, so focus goes to
+                // its first poster, below the tab's own rows (PLAN-SEE-ALL.md §11.2).
+                .onChange(of: model.gridJump) { Task { await focusFirstItem(proxy) } }
                 .onPageKeys(enabled: gridFocused) { page(by: $0, proxy) }
         }
         #if DEBUG
@@ -61,7 +66,7 @@ private struct LibraryView: View {
         TabPage {
             VStack(alignment: .leading, spacing: 0) {
                 if model.canEditRows {
-                    arrangedTop
+                    arrangedTop(proxy)
                 } else {
                     header
                         .padding(.leading, TVLayout.gutter)
@@ -84,7 +89,7 @@ private struct LibraryView: View {
     }
 
     /// From API level 22: the title and count, the rows, Edit rows, then All movies with Sort.
-    private var arrangedTop: some View {
+    private func arrangedTop(_ proxy: ScrollViewProxy) -> some View {
         VStack(alignment: .leading, spacing: 34) {
             HStack(alignment: .firstTextBaseline, spacing: 20) {
                 Text(model.title)
@@ -97,7 +102,7 @@ private struct LibraryView: View {
             .padding(.horizontal, TVLayout.gutter)
             .padding(.top, 16)
             ForEach(model.shownRows) { row in
-                TVArrangedRow(row: row, actions: rowActions)
+                TVArrangedRow(row: row, actions: rowActions(proxy))
             }
             TVEditRowsButton { editingRows = true }
                 .padding(.horizontal, TVLayout.gutter)
@@ -120,14 +125,24 @@ private struct LibraryView: View {
         }
     }
 
-    private var rowActions: TVRowActions {
+    /// The rows' card actions. A row's See all opens a list's page, or sets
+    /// the grid below the row's way and moves focus to its first poster.
+    private func rowActions(_ proxy: ScrollViewProxy) -> TVRowActions {
         TVRowActions(
             open: { model.open($0) },
             openEpisode: { model.open($0) },
             playEpisode: { model.play($0) },
             resume: { model.resume($0) },
             setWatched: { await model.setWatched($0, $1) },
-            openList: { id in Task { await model.open(.list(id: id)) } }
+            seeAll: { row in
+                guard let link = row.seeAll, let words = model.seeAll(row) else { return nil }
+                return TVRowSeeAll(words: words) {
+                    Task {
+                        await model.open(link)
+                        if case .library = link { await focusFirstItem(proxy) }
+                    }
+                }
+            }
         )
     }
 
@@ -377,6 +392,12 @@ private struct LibraryView: View {
               let target = GridPaging.target(from: place, pages: pages, columns: Self.columnCount, count: items.count) else { return }
         if target >= items.count - Self.columnCount * GridPaging.rows { Task { await model.loadMore() } }
         Task { await focusItem(items[target].id, proxy) }
+    }
+
+    /// The grid's first poster takes focus, once the grid has one.
+    private func focusFirstItem(_ proxy: ScrollViewProxy) async {
+        guard let id = items.first?.id else { return }
+        await focusItem(id, proxy)
     }
 
     /// Scrolls the poster into the grid (it may not be drawn yet), then focuses it.
