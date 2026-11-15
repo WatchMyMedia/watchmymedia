@@ -3,7 +3,6 @@ package media.watchmy.client.mobile.settings
 import androidx.compose.runtime.Immutable
 import media.watchmy.client.mobile.downloads.usedSize
 import media.watchmy.client.model.MediaRequest
-import media.watchmy.client.model.RequestStatus
 import media.watchmy.client.model.RowLayoutEntry
 import media.watchmy.client.model.SettingsGroup
 import media.watchmy.client.model.StreamQuality
@@ -11,6 +10,8 @@ import media.watchmy.client.model.aboutSummary
 import media.watchmy.client.model.accountSummary
 import media.watchmy.client.model.playbackSummary
 import media.watchmy.client.model.plural
+import media.watchmy.client.model.requestsSummary
+import media.watchmy.client.model.rowsSummary
 import media.watchmy.client.model.shortLabel
 import media.watchmy.client.presentation.Load
 import media.watchmy.client.presentation.settings.AccountLoad
@@ -74,8 +75,7 @@ internal fun groupLines(facts: OverviewFacts): Map<SettingsGroup, GroupLine> {
             is Load.Ready -> {
                 val shown = rows.data.count { !it.hidden }
                 val hidden = rows.data.count { it.hidden }
-                val long = plural(shown, "row") + " on Home" + if (hidden > 0) " · $hidden hidden" else ""
-                GroupLine(long, plural(shown, "row") + if (hidden > 0) " · $hidden hidden" else "")
+                GroupLine(rowsSummary(shown, hidden), rowsSummary(shown, hidden, onHome = false))
             }
             is Load.Failed -> GroupLine(gone, gone)
             Load.Loading -> GroupLine(if (failed) gone else "Order, hide and add the rows on Home", null)
@@ -87,7 +87,7 @@ internal fun groupLines(facts: OverviewFacts): Map<SettingsGroup, GroupLine> {
     }
     facts.requests?.let { requests ->
         lines[SettingsGroup.Requests] = when (requests) {
-            is Load.Ready -> requestsLine(requests.data).let { GroupLine(it.first, it.second) }
+            is Load.Ready -> GroupLine(requestsSummary(requests.data), requestsSummary(requests.data, short = true))
             is Load.Failed -> if (!facts.online) GroupLine(gone, gone) else GroupLine("What you asked for, and where it stands", null)
             Load.Loading -> GroupLine("What you asked for, and where it stands", null)
         }
@@ -100,12 +100,3 @@ internal fun groupLines(facts: OverviewFacts): Map<SettingsGroup, GroupLine> {
     return lines
 }
 
-/** "2 waiting · 1 downloading" under Your requests, and "2 waiting" beside it on a tablet. */
-private fun requestsLine(requests: List<MediaRequest>): Pair<String, String> {
-    if (requests.isEmpty()) return "Nothing asked for yet" to "None"
-    val waiting = requests.count { it.status == RequestStatus.Pending }
-    val downloading = requests.count { it.download != null && it.status != RequestStatus.Available }
-    val parts = listOfNotNull("$waiting waiting".takeIf { waiting > 0 }, "$downloading downloading".takeIf { downloading > 0 })
-    if (parts.isEmpty()) return plural(requests.size, "request") + " · nothing waiting" to plural(requests.size, "request")
-    return parts.joinToString(" · ") to parts.first()
-}

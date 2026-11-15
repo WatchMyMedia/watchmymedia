@@ -60,7 +60,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Text
-import media.watchmy.client.model.AUDIO_LANGUAGES_API_LEVEL
 import media.watchmy.client.model.AudioPassthrough
 import media.watchmy.client.model.DeviceSession
 import media.watchmy.client.model.LIVE_REMINDERS_NOTE_TV
@@ -70,23 +69,28 @@ import media.watchmy.client.model.REVOKE_BODY
 import media.watchmy.client.model.ROWS_API_LEVEL
 import media.watchmy.client.model.RowScreens
 import media.watchmy.client.model.SKIP_SEEK_NOTE
-import media.watchmy.client.model.SUBTITLE_PREFERENCES_API_LEVEL
 import media.watchmy.client.model.SegmentKind
+import media.watchmy.client.model.ServerFeatures
 import media.watchmy.client.model.SettingsGroup
 import media.watchmy.client.model.SkipMode
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleSize
-import media.watchmy.client.model.accountSettingsUrl
 import media.watchmy.client.model.aboutSummary
+import media.watchmy.client.model.accountSettingsUrl
 import media.watchmy.client.model.accountSummary
 import media.watchmy.client.model.displayAddress
 import media.watchmy.client.model.explanation
 import media.watchmy.client.model.label
+import media.watchmy.client.model.languagesSummary
 import media.watchmy.client.model.liveLeadBefore
 import media.watchmy.client.model.liveLeadNote
+import media.watchmy.client.model.olderServerNotice
 import media.watchmy.client.model.playbackSummary
+import media.watchmy.client.model.requestsSummary
 import media.watchmy.client.model.revokeTitle
+import media.watchmy.client.model.rowsSummary
 import media.watchmy.client.model.serverSettingsUrl
+import media.watchmy.client.model.settingsTheServerLacks
 import media.watchmy.client.model.signOutStays
 import media.watchmy.client.model.signOutTitle
 import media.watchmy.client.model.skipRowLabel
@@ -223,6 +227,8 @@ fun SettingsScreen(
     val myRequests = if (badge.requests) viewModel(key = "tv-settings-requests") { MyRequestsViewModel(services.requests) } else null
     val myRequestsState = myRequests?.state?.collectAsStateWithLifecycle()?.value
 
+    // Your requests' line, in the group and on its pane; "Where each one stands" until they have loaded.
+    val requestsLine = (myRequestsState?.mine as? Load.Ready)?.data?.let { requestsSummary(it) } ?: "Where each one stands"
     val lines = buildList {
         add(GroupLine(SettingsGroup.Playback, SettingsGroup.Playback.title, playbackSummary(state.quality, state.playback.autoplayNext)))
         if (state.subtitlePreferencesAvailable) {
@@ -230,11 +236,11 @@ fun SettingsScreen(
         }
         if (rowsAvailable) {
             val rows = homeRowsState?.takeIf { it.layout is Load.Ready }?.entries
-            add(GroupLine(SettingsGroup.HomeRows, SettingsGroup.HomeRows.title, rows?.let(::rowsSummary) ?: "The rows on Home"))
+            add(GroupLine(SettingsGroup.HomeRows, SettingsGroup.HomeRows.title, rows?.let { r -> rowsSummary(r.count { !it.hidden }, r.count { it.hidden }, onHome = false) } ?: "The rows on Home"))
         }
         add(GroupLine(SettingsGroup.Account, SettingsGroup.Account.title, accountSummary(user?.name.orEmpty(), (state.sessions as? Load.Ready)?.data?.size)))
         if (badge.requests) {
-            add(GroupLine(SettingsGroup.Requests, SettingsGroup.Requests.title, requestsSummary((myRequestsState?.mine as? Load.Ready)?.data)))
+            add(GroupLine(SettingsGroup.Requests, SettingsGroup.Requests.title, requestsLine))
         }
         add(GroupLine(SettingsGroup.About, SettingsGroup.About.title, aboutSummary(services.client.version, server?.name, server?.version?.removePrefix("v"))))
         if (badge.inbox != null) add(GroupLine(SettingsGroup.Inbox, SettingsGroup.Inbox.title, inboxSummary(badge.inbox)))
@@ -370,13 +376,14 @@ fun SettingsScreen(
                     SettingsGroup.Languages -> LanguagesPane(state, displayLocale, languageFocus, notLoadedDetail, retryingAccount, panes.first, calls)
                     SettingsGroup.HomeRows -> HomeRowsSettings(rowsScreen, rowsFocus, panes.first)
                     SettingsGroup.Account -> AccountPane(state, server?.let { "${it.name} · ${displayAddress(it.baseUrl)}" }, panes.first, calls)
-                    SettingsGroup.Requests -> RequestsPane(requestsSummary((myRequestsState?.mine as? Load.Ready)?.data), panes.first, calls)
+                    SettingsGroup.Requests -> RequestsPane(requestsLine, panes.first, calls)
                     SettingsGroup.About -> AboutPane(
                         serverLine = server?.let { "${it.name} · ${versionLabel(it.version)} · ${displayAddress(it.baseUrl)}" } ?: "Not chosen",
                         appLine = "${services.client.product} ${services.client.version}",
-                        olderServer = server?.takeIf { it.apiLevel < NEWEST_SETTINGS_LEVEL }?.let {
-                            "${it.name} is on ${versionLabel(it.version)}, and some settings need a newer version. " +
-                                if (user?.isAdmin == true) "You can update it where the server runs." else "Whoever runs ${it.name} can update it."
+                        olderServer = server?.let { s ->
+                            settingsTheServerLacks(ServerFeatures(s.apiLevel)).takeIf { it.isNotEmpty() }?.let { missing ->
+                                olderServerNotice(s.name, versionLabel(s.version), missing, admin = user?.isAdmin == true).let { "${it.title}. ${it.body}" }
+                            }
                         },
                         first = panes.first,
                         calls = calls,
@@ -573,9 +580,6 @@ fun SettingsScreen(
         null -> Unit
     }
 }
-
-/** The newest server level a TV setting needs; About says when the server is older. */
-private val NEWEST_SETTINGS_LEVEL = maxOf(ROWS_API_LEVEL, AUDIO_LANGUAGES_API_LEVEL, SUBTITLE_PREFERENCES_API_LEVEL)
 
 /** `.grp.open`: the open group while focus is in its pane. */
 private val OpenFill = Color(0xFF17171A)

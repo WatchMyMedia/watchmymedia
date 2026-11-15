@@ -28,6 +28,28 @@ class SettingsWordsTest {
     }
 
     @Test
+    fun `rows and requests say how many`() {
+        assertEquals("8 rows on Home · 2 hidden", rowsSummary(8, 2))
+        assertEquals("1 row", rowsSummary(1, 0, onHome = false))
+        assertEquals("Nothing asked for yet", requestsSummary(emptyList()))
+        assertEquals("None", requestsSummary(emptyList(), short = true))
+    }
+
+    @Test
+    fun `an older server's notice names what this app leaves out`() {
+        assertEquals(listOf("Audio languages", "Home rows"), settingsTheServerLacks(ServerFeatures(20)))
+        assertEquals(listOf("Audio & subtitles", "Home rows"), settingsTheServerLacks(ServerFeatures(17)))
+        assertTrue(settingsTheServerLacks(ServerFeatures(99)).isEmpty())
+        val notice = olderServerNotice("Living room", "1.3.2", listOf("Audio languages", "Home rows"), admin = false)
+        assertEquals("Living room is on an older version", notice.title)
+        assertEquals("It is on 1.3.2. Audio languages and Home rows need a newer server, so this app doesn’t show them. Whoever runs Living room can update it.", notice.body)
+        assertEquals(
+            "It is on 1.3.2. Home rows needs a newer server, so this app doesn’t show it. You can update it where it runs.",
+            olderServerNotice("Living room", "1.3.2", listOf("Home rows"), admin = true).body,
+        )
+    }
+
+    @Test
     fun `each skip mode says what it does to its part`() {
         assertEquals("Skip intro", SegmentKind.Intro.skipRowLabel)
         assertEquals("Skip ads", SegmentKind.Commercial.skipRowLabel)

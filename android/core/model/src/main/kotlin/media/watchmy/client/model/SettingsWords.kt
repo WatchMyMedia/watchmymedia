@@ -52,6 +52,44 @@ fun accountSummary(name: String, devices: Int?): String = when (devices) {
 fun aboutSummary(appVersion: String, serverName: String?, serverVersion: String?): String =
     listOfNotNull("App $appVersion", serverName?.let { name -> listOfNotNull(name, serverVersion).joinToString(" ") }).joinToString(" · ")
 
+/** Home rows' state line: "8 rows on Home · 2 hidden"; without "on Home" where the group's name says it ([onHome] false). */
+fun rowsSummary(shown: Int, hidden: Int, onHome: Boolean = true): String =
+    (if (shown == 1) "1 row" else "$shown rows") + (if (onHome) " on Home" else "") + (if (hidden > 0) " · $hidden hidden" else "")
+
+/** Your requests' state line: "2 waiting · 1 downloading"; [short] keeps its first part, "2 waiting", where there is little room. */
+fun requestsSummary(requests: List<MediaRequest>, short: Boolean = false): String {
+    if (requests.isEmpty()) return if (short) "None" else "Nothing asked for yet"
+    val waiting = requests.count { it.status == RequestStatus.Pending }
+    val downloading = requests.count { it.download != null && it.status != RequestStatus.Available }
+    val parts = listOfNotNull("$waiting waiting".takeIf { waiting > 0 }, "$downloading downloading".takeIf { downloading > 0 })
+    val count = if (requests.size == 1) "1 request" else "${requests.size} requests"
+    return when {
+        parts.isEmpty() -> if (short) count else "$count · nothing waiting"
+        short -> parts.first()
+        else -> parts.joinToString(" · ")
+    }
+}
+
+/** The settings a server with [features] is too old for, by the names people know them by; they are hidden, so About says so. */
+fun settingsTheServerLacks(features: ServerFeatures): List<String> = listOfNotNull(
+    "Audio & subtitles".takeIf { !features.subtitlePreferences },
+    "Audio languages".takeIf { features.subtitlePreferences && !features.audioLanguages },
+    "Home rows".takeIf { !features.rows },
+)
+
+/**
+ * About's notice when the server is older than [missing] need (PLAN-ANDROID-SETTINGS.md §4.7):
+ * which version it is on, what this app leaves out, and who can update it.
+ */
+fun olderServerNotice(serverName: String, version: String, missing: List<String>, admin: Boolean): SettingsNotice {
+    val names = if (missing.size == 1) missing[0] else missing.dropLast(1).joinToString(", ") + " and " + missing.last()
+    val who = if (admin) "You can update it where it runs." else "Whoever runs $serverName can update it."
+    return SettingsNotice(
+        "$serverName is on an older version",
+        "It is on $version. $names need${if (missing.size == 1) "s" else ""} a newer server, so this app doesn’t show ${if (missing.size == 1) "it" else "them"}. $who",
+    )
+}
+
 /** A skip row's name where each part is a row of its own (the TV): "Skip intro", "Skip ads". */
 val SegmentKind.skipRowLabel: String get() = "Skip " + settingsLabel.lowercase()
 

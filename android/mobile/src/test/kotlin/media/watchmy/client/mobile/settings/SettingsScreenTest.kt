@@ -18,7 +18,9 @@ import media.watchmy.client.fake.fakeLatencyMs
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.AppServices
 import media.watchmy.client.model.PreferencesRepository
+import media.watchmy.client.model.ServerFeatures
 import media.watchmy.client.model.SettingsGroup
+import media.watchmy.client.model.settingsTheServerLacks
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WatchMyMediaPhoneTheme
 import org.junit.After
@@ -153,7 +155,7 @@ class SettingsScreenTest {
     }
 
     @Test fun `About says which settings an older server is too old for`() {
-        assertEquals(listOf("Audio languages", "Home rows"), missingSettings(20))
-        assertTrue(missingSettings(99).isEmpty())
+        assertEquals(listOf("Audio languages", "Home rows"), settingsTheServerLacks(ServerFeatures(20)))
+        assertTrue(settingsTheServerLacks(ServerFeatures(99)).isEmpty())
     }
 }

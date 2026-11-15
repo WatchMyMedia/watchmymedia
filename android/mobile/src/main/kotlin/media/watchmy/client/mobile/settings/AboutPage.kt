@@ -17,6 +17,8 @@ import media.watchmy.client.mobile.components.RowValue
 import media.watchmy.client.model.ServerFeatures
 import media.watchmy.client.model.TMDB_NOTICE
 import media.watchmy.client.model.displayAddress
+import media.watchmy.client.model.olderServerNotice
+import media.watchmy.client.model.settingsTheServerLacks
 import media.watchmy.client.model.versionLabel
 import media.watchmy.client.ui.LocalAppServices
 
@@ -38,15 +40,10 @@ internal fun AboutPage(tablet: Boolean, onOpenWeb: (String) -> Unit, modifier: M
 
     Column(modifier) {
         if (server != null) {
-            val missing = missingSettings(server.apiLevel)
+            val missing = settingsTheServerLacks(ServerFeatures(server.apiLevel))
             if (missing.isNotEmpty()) {
-                val who = if (state.user?.isAdmin == true) "You can update it from Server settings." else "An admin can update it."
-                StatusCard(
-                    "${server.name} is on an older version",
-                    "It is on ${server.version}. ${sentence(missing)} need a newer server, so this app doesn’t show ${if (missing.size == 1) "it" else "them"}. $who",
-                    NoteTone.Info,
-                    Modifier.cardInset(tablet),
-                )
+                val notice = olderServerNotice(server.name, versionLabel(server.version), missing, admin = state.user?.isAdmin == true)
+                StatusCard(notice.title, notice.body, NoteTone.Info, Modifier.cardInset(tablet))
             }
         }
         SettingsRows(tablet, Modifier.padding(top = if (tablet) 12.dp else 0.dp)) {
@@ -79,22 +76,6 @@ internal fun AboutPage(tablet: Boolean, onOpenWeb: (String) -> Unit, modifier: M
         DIALOG_LICENCES -> LicencesDialog { dialog = null }
         DIALOG_DIAGNOSTICS -> DiagnosticsDialog { dialog = null }
     }
-}
-
-/** The phone's settings a server at [apiLevel] is too old for, by the name people know them by. */
-internal fun missingSettings(apiLevel: Int): List<String> {
-    val server = ServerFeatures(apiLevel)
-    return listOfNotNull(
-        "Audio & subtitles".takeIf { !server.subtitlePreferences },
-        "Audio languages".takeIf { server.subtitlePreferences && !server.audioLanguages },
-        "Home rows".takeIf { !server.rows },
-    )
-}
-
-/** "A", "A and B", "A, B and C". */
-private fun sentence(parts: List<String>): String = when (parts.size) {
-    1 -> parts[0]
-    else -> parts.dropLast(1).joinToString(", ") + " and " + parts.last()
 }
 
 private const val DIALOG_LICENCES = "licences"
