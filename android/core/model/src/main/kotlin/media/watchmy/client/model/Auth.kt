@@ -108,4 +108,16 @@ interface AuthRepository {
 
     /** Phone side of pairing: signs the device behind [code] in as the current user. */
     suspend fun approvePairing(code: String): PendingDevice
+
+    /**
+     * Changes the signed-in user's password (PUT /api/auth/password). This
+     * device stays signed in; the server signs the account's other devices
+     * out. A wrong [current] password is an ApiException with status 401 that
+     * leaves this device signed in; 429 is too many tries; 422 a [new]
+     * password outside [PASSWORD_LENGTH].
+     */
+    suspend fun changePassword(current: String, new: String)
 }
+
+/** The lengths a new password may have, as the server takes them. */
+val PASSWORD_LENGTH = 8..256
