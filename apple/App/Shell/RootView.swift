@@ -12,6 +12,12 @@ final class AppFlow {
     /// the original account needed by Cancel.
     var serverSwitch: ServerSwitchModel?
     var appliedSwitchLaunch = false
+    /// The name typed in Rename this iPhone while its sheet is up.
+    var renameDraft: String?
+    /// Done on Switch server's last step: the root then shows the new server's Home.
+    var serverSwitchDone = false
+    /// Link a TV's steps, kept here for the same reason as the server switch.
+    @ObservationIgnored private var linkTV: LinkTVModel?
     /// The sign-in form, kept here like the server switch, so an iPad window
     /// resized during sign-in (which swaps the iPhone and iPad screens) keeps
     /// what was typed (PLAN-APPLE-REVIEW.md §3.3.4).
@@ -23,6 +29,24 @@ final class AppFlow {
 
     /// A sign-in or sign-out: the next form starts afresh.
     func forgetSignIn() { signIn.forget() }
+
+    /// Link a TV's model while its sheet is up, the same one each time it is asked for.
+    func linkTVModel(auth: any AuthRepository, code: String?) -> LinkTVModel {
+        if let linkTV { return linkTV }
+        let model = LinkTVModel(auth: auth, code: code)
+        linkTV = model
+        return model
+    }
+
+    /// Link a TV's sheet closed: the next one starts afresh.
+    func forgetLinkTV() { linkTV = nil }
+
+    /// Switch server's sheet went away: swiped down, it is Cancel, unless the
+    /// switch finished, when it is Done.
+    func closeServerSwitchSheet() {
+        guard let switching = serverSwitch else { return }
+        if switching.outcome == .switched { serverSwitchDone = true } else { Task { await switching.cancel() } }
+    }
 }
 
 /// Server picker until a server is chosen, sign-in until someone is signed
@@ -67,12 +91,16 @@ struct RootView: View {
                 resetAccountViews(preservingLink: old.user == nil)
             }
         }
+        // A switch that finished shows what changed until Done
+        // (Settings2SwitchDone.dc.html); cancelled or overtaken, it ends at once.
         .onChange(of: flow.serverSwitch?.outcome) { _, outcome in
-            guard let outcome else { return }
-            flow.serverSwitch = nil
-            flow.choosingServer = false
-            resetAccountViews(rebuild: outcome != .cancelled)
-            navigator.tab = outcome == .cancelled ? .settings : .home
+            guard let outcome, outcome != .switched else { return }
+            endServerSwitch(outcome)
+        }
+        .onChange(of: flow.serverSwitchDone) { _, done in
+            guard done else { return }
+            flow.serverSwitchDone = false
+            endServerSwitch(.switched)
         }
         // At launch, on every return to the app and on every sign-in (which
         // doesn't change scenePhase): one task, so launch asks once. A server
@@ -144,6 +172,13 @@ struct RootView: View {
     private var account: Account {
         Account(id: services.servers.current?.server.id, address: services.servers.current?.server.baseURL,
                 user: services.auth.user, signedIn: services.servers.current?.signedIn == true)
+    }
+
+    private func endServerSwitch(_ outcome: ServerSwitchModel.Outcome) {
+        flow.serverSwitch = nil
+        flow.choosingServer = false
+        resetAccountViews(rebuild: outcome != .cancelled)
+        navigator.tab = outcome == .cancelled ? .settings : .home
     }
 
     private func resetAccountViews(preservingLink: Bool = false, rebuild: Bool = true) {

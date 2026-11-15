@@ -36,8 +36,8 @@ struct MainTabView: View {
                         // Its root beside the page it shows, with Link a TV as a sheet (PadSettings.dc.html).
                         SettingsScreen()
                     } else {
-                        NavigationStack(path: Binding(get: { flow.serverSwitch == nil ? navigator.path(for: tab) : [] }, set: {
-                            if flow.serverSwitch == nil { navigator.setPath($0, for: tab) }
+                        NavigationStack(path: Binding(get: { flow.serverSwitch == nil ? navigator.path(for: tab).pushed : [] }, set: {
+                            if flow.serverSwitch == nil { navigator.setPath($0.keepingTask(of: navigator.path(for: tab)), for: tab) }
                         })) {
                             root(tab)
                                 .safeAreaInset(edge: .bottom) { CastMiniController() }
@@ -110,10 +110,11 @@ struct MainTabView: View {
         case .show(let id, let season, let episode): ShowScreen(id: id, season: season, episode: episode)
         case .episode(let showID, let season, let id): ShowScreen(id: showID, season: season, episode: id)
         case .movie(let id): MovieScreen(id: id)
-        case .linkTV(let code): LinkTVScreen(code: code)
-        case .myRequests: MyRequestsScreen()
+        // Link a TV is a sheet over Settings (SettingsTasks), never pushed.
+        case .linkTV: EmptyView()
+        case .myRequests: RequestsPage()
         case .inbox: InboxScreen()
-        case .downloads: DownloadsScreen()
+        case .downloads: DownloadsPage()
         case .liveRecordings: LiveRecordingsScreen()
         case .liveReminders: LiveRemindersScreen()
         case .liveSearch: LiveListingsSearchScreen()
@@ -173,9 +174,20 @@ private struct SettingsSheet<Destination: View>: View {
         if sizeClass.isWide {
             SettingsScreen()
         } else {
-            NavigationStack(path: Binding(get: { navigator.path(for: .settings) }, set: { navigator.setPath($0, for: .settings) })) {
+            NavigationStack(path: Binding(get: { navigator.path(for: .settings).pushed }, set: { navigator.setPath($0.keepingTask(of: navigator.path(for: .settings)), for: .settings) })) {
                 SettingsScreen().navigationDestination(for: Route.self, destination: destination)
             }
         }
+    }
+}
+
+extension [Route] {
+    /// The pages a stack pushes: Link a TV in the path is a sheet, not a page.
+    var pushed: [Route] { filter { if case .linkTV = $0 { false } else { true } } }
+
+    /// A stack's new pages, with the Link a TV that `path` asked for kept at the end.
+    func keepingTask(of path: [Route]) -> [Route] {
+        guard let last = path.last, case .linkTV = last else { return self }
+        return self + [last]
     }
 }

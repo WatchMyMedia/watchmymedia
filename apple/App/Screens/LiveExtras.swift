@@ -357,7 +357,7 @@ struct LiveReminderPicture: View {
 }
 
 /// Live TV › Reminders on iPhone (and a narrow iPad): pushed from the guide's
-/// bell or Settings › Live TV. A reminder opens the guide at it; a gone one
+/// bell or Settings › Playback. A reminder opens the guide at it; a gone one
 /// shows as it was kept.
 struct LiveRemindersScreen: View {
     @Environment(LiveExtrasStore.self) private var extras
@@ -610,94 +610,3 @@ private struct LiveListingsSearchContent: View {
     }
 }
 
-// MARK: Settings › Live TV
-
-/// Settings › Live TV (LiveReminders' `settings`): the lead time, kept on the
-/// server, then this device's reminders and whether iOS lets it notify.
-struct LiveTVSettingsPage: View {
-    @Environment(LiveExtrasStore.self) private var extras
-    @Environment(LiveReminderNotifier.self) private var notifier
-    @Environment(\.openURL) private var openURL
-
-    var body: some View {
-        List {
-            Section {
-                ForEach(LiveReminderLead.choices, id: \.self) { minutes in
-                    let selected = extras.leadMinutes == minutes
-                    Button { Task { await extras.setLead(minutes) } } label: {
-                        HStack {
-                            Text(liveLeadChoice(minutes)).font(.body.weight(.medium)).foregroundStyle(Palette.text)
-                            Spacer(minLength: 8)
-                            if selected {
-                                Image(systemName: "checkmark").font(.caption.weight(.heavy)).foregroundStyle(Palette.ground)
-                                    .frame(width: 22, height: 22).background(Palette.gold, in: Circle()).accessibilityHidden(true)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-                    .accessibilityIdentifier("live-lead-\(minutes)")
-                    .accountRow()
-                }
-            } header: {
-                GroupHeading(liveRemindMe)
-            } footer: {
-                GroupFootnote(liveLeadSettingsNote)
-            }
-
-            Section {
-                NavigationLink { LiveRemindersScreen() } label: {
-                    HStack {
-                        Text(liveRemindersTitle).font(.body.weight(.medium)).foregroundStyle(Palette.text)
-                        Spacer()
-                        Text(liveRemindersComingUp(extras.reminders.count)).foregroundStyle(Palette.muted)
-                    }
-                }
-                .accountRow()
-                Button { notificationsTapped() } label: {
-                    HStack {
-                        TitleAndDetail(title: "Notifications", detail: notificationsDetail)
-                        Spacer()
-                        Text(notificationsOn ? "On" : "Off").foregroundStyle(Palette.muted)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .accountRow()
-            } header: {
-                GroupHeading("On this \(liveDeviceNoun)")
-            } footer: {
-                VStack(alignment: .leading, spacing: 8) {
-                    if let message = extras.message { ErrorLine(message: message) { extras.message = nil } }
-                    GroupFootnote(liveDeviceNotifiesNote(device: liveDeviceNoun))
-                }
-            }
-        }
-        .accountList()
-        .navigationTitle("Live TV")
-        .task { await notifier.refreshStatus() }
-        .task { await extras.refresh() }
-    }
-
-    private var notificationsOn: Bool {
-        switch notifier.status {
-        case .authorized?, .provisional?, .ephemeral?: true
-        default: false
-        }
-    }
-
-    private var notificationsDetail: String {
-        switch notifier.status {
-        case .denied?: "Turn on in iOS Settings"
-        case .notDetermined?: "iOS asks at your first reminder"
-        default: notificationsOn ? "Allowed in iOS Settings" : ""
-        }
-    }
-
-    private func notificationsTapped() {
-        switch notifier.status {
-        case .notDetermined?: Task { await notifier.requestAuthorization() }
-        default:
-            if let url = URL(string: UIApplication.openNotificationSettingsURLString) { openURL(url) }
-        }
-    }
-}
