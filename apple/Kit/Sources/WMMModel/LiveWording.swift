@@ -270,11 +270,12 @@ public func liveRemoveReminderLabel(_ title: String) -> String { "Remove the rem
 public func liveRemindersComingUp(_ count: Int) -> String { count == 0 ? "None" : "\(count) coming up" }
 
 /// The Reminders list's note on iPhone: "Each comes 5 min before it starts, on
-/// every device you’re signed in to; change it in Settings › Live TV. One set
-/// on another device reaches this iPhone the next time the app opens."
+/// every device you’re signed in to; change it in Settings › Playback. One set
+/// on another device reaches this iPhone the next time the app opens." Remind
+/// me moved to Playback with the Settings redesign (PLAN-APPLE-SETTINGS.md §5.2).
 public func liveRemindersNote(leadMinutes: Int, device: String) -> String {
     let when = leadMinutes <= 0 ? "when it starts" : "\(leadMinutes) min before it starts"
-    return "Each comes \(when), on every device you’re signed in to; change it in Settings › Live TV. One set on another device reaches this \(device) the next time the app opens."
+    return "Each comes \(when), on every device you’re signed in to; change it in Settings › Playback. One set on another device reaches this \(device) the next time the app opens."
 }
 
 /// The iPad panel's: "Each comes 5 min before, on every device you’re signed
@@ -291,7 +292,7 @@ public func liveRemindersTVNote(leadMinutes: Int) -> String {
     return "A banner comes \(when), while WatchMyMedia is open on this Apple TV. One set on another device shows up here the next time the app opens."
 }
 
-/// Settings › Live TV's choices on iPhone and iPad: "When it starts", "1 minute before", "5 minutes before".
+/// Remind me's choices (Settings › Playback): "When it starts", "1 minute before", "5 minutes before".
 public func liveLeadChoice(_ minutes: Int) -> String {
     switch minutes {
     case ...0: "When it starts"
@@ -420,7 +421,7 @@ public func liveReminderCardLine(_ reminder: LiveReminder, now: Date) -> String 
 /// The note in the player's Channels panel while a reminder is due.
 public let liveReminderPanelNote = "Your reminder comes first while it’s due. Click a channel to watch it. Swipe up or press Back to close."
 
-/// Settings › Live TV on iPhone and iPad.
+/// Under Remind me on iPhone and iPad.
 public let liveLeadSettingsNote = "Kept on the server, so every app you sign in to reminds you at the same time. Reminders go once their programme ends."
 
 /// "This iPhone notifies you even when the app is closed. A reminder set on another device reaches it the next time WatchMyMedia opens here."
