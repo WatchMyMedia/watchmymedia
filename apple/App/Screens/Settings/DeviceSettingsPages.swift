@@ -60,10 +60,11 @@ struct AccountSettingsPage: View {
     private var thisDevice: some View {
         SettingsSection(title: SettingsWords.thisDevice(model.facts.family)) {
             Button { flow.rename = model.renameTask() } label: {
-                LinkRowLabel(title: SettingsWords.name, value: model.deviceName)
+                // After Rename: "Saved. This iPhone now shows as Den iPhone in Signed-in devices…"
+                LinkRowLabel(title: SettingsWords.name, line: model.deviceNameSave.rowLine(rest: nil), value: model.deviceName)
             }
             .buttonStyle(SettingsRowStyle())
-            .accessibilityLabel("\(SettingsWords.name), \(model.deviceName)")
+            .accessibilityLabel([SettingsWords.name, model.deviceName, model.deviceNameSave.line].compactMap(\.self).joined(separator: ", "))
             .accessibilityHint(SettingsWords.renameTitle(device: model.facts.family))
             .accessibilityIdentifier("account-rename")
         } note: {

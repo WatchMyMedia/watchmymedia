@@ -45,7 +45,8 @@ struct PlaybackSettingsPage: View {
 
     private var quality: some View {
         SettingsSection(title: SettingsWords.qualityHeading(device: model.facts.family)) {
-            MenuRow(title: SettingsWords.quality, line: .plain(model.quality.checklistDetail),
+            // Kept on this device, so it can't fail; it still says Saved and what it plays now.
+            MenuRow(title: SettingsWords.quality, line: model.qualitySave.rowLine(rest: model.quality.checklistDetail),
                     choices: model.qualities.map { .init(value: $0, title: $0.checklistTitle, line: $0.checklistDetail) },
                     selection: model.quality) { model.setQuality($0) }
                 .accessibilityIdentifier("playback-quality")
