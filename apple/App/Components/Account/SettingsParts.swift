@@ -226,6 +226,9 @@ struct MenuRow<Value: Hashable>: View {
             }
         }
         .buttonStyle(SettingsRowStyle())
+        // A menu can keep the height its label had before its column settled
+        // (an iPad's split view in landscape): take the full height for the width.
+        .fixedSize(horizontal: false, vertical: true)
         .disabled(disabled)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
