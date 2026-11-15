@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import WMMFeatures
 import WMMUI
 
 // The pieces every Settings page shares (Settings2*.dc.html,
@@ -23,6 +24,19 @@ enum RowLine: Equatable {
     }
 }
 
+extension SaveState {
+    /// A row's or section's line for this state: its usual line at rest
+    /// (`rest`), Saving, the Saved line, or why it failed.
+    func rowLine(rest: String?) -> RowLine? {
+        switch self {
+        case .rest: rest.map(RowLine.plain)
+        case .saving: .saving
+        case .saved(let line): .saved(line)
+        case .failed(let line): .failed(line)
+        }
+    }
+}
+
 /// A row's title and the line under it. A Saved line has a gold tick, a
 /// failed one the warning colour, and Saving a small spinner.
 struct RowTitle: View {
@@ -40,6 +54,7 @@ struct RowTitle: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .multilineTextAlignment(.leading)
+        .speaksSaving(line)
     }
 
     @ViewBuilder private func lineView(_ line: RowLine) -> some View {
@@ -308,6 +323,10 @@ struct SectionNote: View {
     init(_ text: String) { line = .plain(text) }
 
     var body: some View {
+        content.speaksSaving(line)
+    }
+
+    @ViewBuilder private var content: some View {
         switch line {
         case .plain(let text): GroupFootnote(text)
         case .saving:
@@ -452,6 +471,24 @@ struct DangerRowLabel: View {
 }
 
 extension View {
+    /// A Saved or a failed line is said to VoiceOver as it appears, with the
+    /// system's success tap or error tap (PLAN-APPLE-SETTINGS.md §3.2).
+    func speaksSaving(_ line: RowLine?) -> some View {
+        onChange(of: line) { _, line in
+            switch line {
+            case .saved(let text)?, .failed(let text)?: AccessibilityNotification.Announcement(text).post()
+            default: break
+            }
+        }
+        .sensoryFeedback(trigger: line) { _, line in
+            switch line {
+            case .saved?: .success
+            case .failed?: .error
+            default: nil
+            }
+        }
+    }
+
     /// Says `text` to VoiceOver, as a Saved or a failed line appears.
     func announces(_ text: String?) -> some View {
         onChange(of: text) { _, text in

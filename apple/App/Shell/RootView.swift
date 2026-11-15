@@ -16,6 +16,8 @@ final class AppFlow {
     /// since a field writes its text back as it loses focus while closing.
     var renaming = false
     var renameDraft = ""
+    /// Next step cards answered Not now, until the app is next launched.
+    var dismissedSteps: Set<SettingsNextStep.Kind> = []
     /// Done on Switch server's last step: the root then shows the new server's Home.
     var serverSwitchDone = false
     /// Link a TV's steps, kept here for the same reason as the server switch.
