@@ -309,6 +309,8 @@ private fun CardPanel.primaryAction(row: ScreenRow, index: Int, channels: List<L
     CardTarget.Channel -> channels.getOrNull(index)?.let { ch -> PanelAction("Watch ${ch.number}") { onWatchLive(ch) } }
     CardTarget.Guide -> PanelAction("Full guide") { onNavigate(MobileRoutes.LiveTV) }
     CardTarget.List -> row.listId?.let { id -> PanelAction("See all") { onNavigate(MobileRoutes.MediaList(id)) } }
+    // The TV's: the tablet's panel stays on the row's last real card (PLAN-SEE-ALL.md §11).
+    CardTarget.Library -> null
     CardTarget.File -> PanelAction("Open") { actions.onNotMatched() }
 }
 

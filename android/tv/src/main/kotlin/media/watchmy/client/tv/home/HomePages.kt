@@ -106,6 +106,7 @@ private val CardTarget.hint: String
         CardTarget.Channel -> "watches the channel"
         CardTarget.Guide -> "opens the guide"
         CardTarget.List -> "opens the list"
+        CardTarget.Library -> "opens the library"
         CardTarget.File -> "shows the file"
     }
 

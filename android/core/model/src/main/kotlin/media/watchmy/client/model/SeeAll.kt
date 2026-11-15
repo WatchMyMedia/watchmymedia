@@ -5,8 +5,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 // A row's See all (PLAN-SEE-ALL.md): what its card says, and the library
-// link handed to that library's grid once. The phone and the tablet use these
-// now; the TV's card is to use the same.
+// link handed to that library's grid once. The phone, the tablet and the TV
+// use these.
 
 /** What a row's See all says: [title] over [detail], read aloud as [spoken]. */
 data class SeeAllWords(val title: String, val detail: String?, val spoken: String)
@@ -55,6 +55,9 @@ fun HomeData.libraryType(link: RowLink.Library): LibraryType? = when (link.libra
     movieLibraryId -> LibraryType.Movie
     else -> null
 }
+
+/** The library type behind [row]'s See all on Home ([libraryType]); null for a list's, or for no link. */
+fun HomeData.seeAllType(row: ScreenRow): LibraryType? = (row.seeAll as? RowLink.Library)?.let(::libraryType)
 
 /**
  * A row's See all on its way to its library's grid (PLAN-SEE-ALL.md §4.4).

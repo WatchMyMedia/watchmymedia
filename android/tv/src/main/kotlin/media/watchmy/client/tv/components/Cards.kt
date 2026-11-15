@@ -143,6 +143,29 @@ fun MediaCard(
 }
 
 /**
+ * A card in a [CardRow] that is all artwork, with no title under it (a
+ * row's See all card): [width]×[height] as the row's artwork is, growing
+ * with the row and held in place while it grows as a [MediaCard] is, so it
+ * stays the size of the cards beside it. [content] fills it.
+ */
+@Composable
+fun RowArtCard(width: Dp, height: Dp, onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable BoxScope.(focused: Boolean) -> Unit) {
+    val row = LocalCardRowFocus.current
+    val landscape = width > height
+    val scale: () -> Float = { row?.scale(landscape) ?: 1f }
+    val density = LocalDensity.current
+    val placed = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val inRow = if (row == null) {
+        Modifier
+    } else {
+        Modifier
+            .onPlaced { placed[0] = it }
+            .onFocusChanged { if (it.isFocused) row.cardFocused(placed[0], with(density) { width.toPx() }, landscape) }
+    }
+    FocusableBox(onClick = onClick, modifier = modifier.then(inRow).scaledSize(width, height, scale), cornerRadius = 12.dp, content = content)
+}
+
+/**
  * Lays the content out [width] wide (and [height] tall, if given) times
  * [scale], read while laying out, so a growing row re-lays its cards out
  * each frame without composing them again.

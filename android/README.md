@@ -249,6 +249,13 @@ first row's first card. Movies and TV get their rows above the grid.
   chosen the sort, and the screen scrolls to the grid's heading
   (`State.toGrid`). The rows above the Movies and TV grids call `open`
   directly. Continue watching and Live TV have none.
+- **See all on the TV** (PLAN-SEE-ALL.md S4): the list row's card, now on
+  every row with a `seeAll` link (`TvSeeAll`, `tvHomeSeeAll`,
+  `tvLibrarySeeAll` in `tv/rows/TvRows.kt`), as large as the row's artwork
+  as it grows (`RowArtCard`). Home's one row a screen shows its panel
+  ("See all TV shows", "By last aired", `CardTarget.Library`). OK opens TV
+  Shows or Movies through the same request, and the screen puts focus on
+  the grid's first card under All shows; Back comes back to the card.
 - `rows.changed` and `lists.changed` read the screens again
   (`RowsRepository.changes`). The TV's Watch Next row follows the Continue
   row, or Continue watching asked for alone when Home has none.

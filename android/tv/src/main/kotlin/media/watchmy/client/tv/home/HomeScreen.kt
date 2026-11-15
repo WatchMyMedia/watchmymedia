@@ -40,6 +40,7 @@ import media.watchmy.client.model.ContinueItem
 import media.watchmy.client.model.Hero
 import media.watchmy.client.model.HomeData
 import media.watchmy.client.model.ImageSize
+import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.tv.live.LiveChannelCard
 import media.watchmy.client.model.RowScreens
@@ -156,6 +157,7 @@ fun HomeScreen(
                             liveListings = liveListings,
                             onLiveGuide = { onNavigate(RailSection.LiveTV.route) },
                             onEditRows = { onNavigate(TvRoutes.RowSettings(RowScreens.HOME)) },
+                            onOpenLibrary = { type -> onNavigate(if (type == LibraryType.Tv) RailSection.Shows.route else RailSection.Movies.route) },
                         )
                     } else HomeContent(
                         home = home,
