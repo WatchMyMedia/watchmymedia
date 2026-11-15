@@ -478,8 +478,9 @@ private struct HomeView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// What the arranged rows' cards do. A built-in row's See all is the
-    /// iPad's, as before; a list's is everywhere, since only it reaches the list's page.
+    /// What the arranged rows' cards do. Every row with a link Home can open
+    /// has See all, on iPhone as on iPad (PLAN-SEE-ALL.md decision 5): a
+    /// list's page, or the library's tab at its grid, sorted the row's way.
     private var rowActions: RowActions {
         RowActions(
             open: { model.open($0) },
@@ -489,8 +490,8 @@ private struct HomeView: View {
             openPage: { model.openPage(of: $0) },
             setWatched: { await model.setWatched($0, $1) },
             seeAll: { row in
-                guard let link = row.seeAll, model.canOpen(link), wide || row.isList else { return nil }
-                return { model.open(link) }
+                guard let link = row.seeAll, let words = model.seeAll(row) else { return nil }
+                return RowSeeAll(words: words) { model.open(link) }
             }
         )
     }
@@ -542,7 +543,8 @@ private struct HomeView: View {
         .accessibilityIdentifier("row-continue")
     }
 
-    /// See all, on iPad: the row's library, which lists by date added.
+    /// See all on older servers' fixed rows, on iPad only, as before (PLAN-SEE-ALL.md
+    /// decision 8): the row's library, which lists by date added.
     private func seeAll(_ tab: AppTab) -> (() -> Void)? {
         wide ? { navigator.select(tab) } : nil
     }

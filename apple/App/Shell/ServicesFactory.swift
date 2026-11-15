@@ -78,6 +78,7 @@ enum ServicesFactory {
             (services.preferences as? FakePreferencesRepository)?.seedLanguages(arguments[i + 1].split(separator: ",").map(String.init))
         }
         (services.library as? FakeLibraryRepository)?.offline = arguments.contains("-fakesOffline")
+        (services.rows as? FakeRowsRepository)?.twoMovieLibraries = arguments.contains("-fakesTwoMovieLibraries")
         if let i = arguments.firstIndex(of: "-fakesTrailerKeys"), arguments.indices.contains(i + 1) {
             (services.library as? FakeLibraryRepository)?.trailerKeys = arguments[i + 1].split(separator: ",").map(String.init)
         }

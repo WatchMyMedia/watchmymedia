@@ -102,7 +102,7 @@ struct WideCard<Overlay: View>: View {
 
 /// A titled row of cards that scrolls sideways and snaps to them, inset by
 /// the iPhone's margin or the iPad's. `seeAll` adds See all at the right of
-/// the heading (the iPad's Home). On the iPad's Home screens (PLAN-HOME.md
+/// the heading. On the iPad's Home screens (PLAN-HOME.md
 /// §7.6) `counter` is "Row 2 of 7" after the heading and `leading` is the
 /// card at the row's start once a swipe has snapped (the cards' identities
 /// are their keys: ``BrowseItem/cardID``, ``EpisodeCard/cardKey``,
@@ -115,18 +115,22 @@ struct CardRow<Content: View>: View {
     var spacing: CGFloat = 12
     var seeAll: (() -> Void)?
     var seeAllTitle = "See all"
+    /// What VoiceOver says for See all: "See all TV shows, by last aired"; by
+    /// default "See all" and the heading's detail.
+    var seeAllLabel: String?
     var counter: String?
     var leading: Binding<String?>?
     @ViewBuilder var content: () -> Content
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    init(_ title: String, detail: String? = nil, subtitle: String? = nil, spacing: CGFloat = 12, seeAll: (() -> Void)? = nil, seeAllTitle: String = "See all", counter: String? = nil, leading: Binding<String?>? = nil, @ViewBuilder content: @escaping () -> Content) {
+    init(_ title: String, detail: String? = nil, subtitle: String? = nil, spacing: CGFloat = 12, seeAll: (() -> Void)? = nil, seeAllTitle: String = "See all", seeAllLabel: String? = nil, counter: String? = nil, leading: Binding<String?>? = nil, @ViewBuilder content: @escaping () -> Content) {
         self.title = title
         self.detail = detail
         self.subtitle = subtitle
         self.spacing = spacing
         self.seeAll = seeAll
         self.seeAllTitle = seeAllTitle
+        self.seeAllLabel = seeAllLabel
         self.counter = counter
         self.leading = leading
         self.content = content
@@ -148,7 +152,7 @@ struct CardRow<Content: View>: View {
                             if seeAllTitle == "See all" { Text(seeAllTitle) } else { Text("\(seeAllTitle) \(Image(systemName: "chevron.right"))") }
                         }
                             .buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
-                            .accessibilityLabel(seeAllTitle == "See all" ? "See all \(detail ?? title)" : seeAllTitle)
+                            .accessibilityLabel(seeAllLabel ?? (seeAllTitle == "See all" ? "See all \(detail ?? title)" : seeAllTitle))
                             .padding(.vertical, -10)
                     }
                 }
