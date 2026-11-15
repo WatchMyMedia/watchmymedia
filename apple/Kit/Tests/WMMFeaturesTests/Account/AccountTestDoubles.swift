@@ -134,6 +134,16 @@ final class ScriptedAuth: AuthRepository {
         device.approved = true
         return device
     }
+
+    var changePasswordError: (any Error)?
+    private(set) var passwordChanges: [(current: String, new: String)] = []
+
+    /// Signs the account's other devices out, as the server does.
+    func changePassword(current: String, new: String) async throws {
+        passwordChanges.append((current, new))
+        if let changePasswordError { throw changePasswordError }
+        sessionList.removeAll { !$0.current && $0.userName == user?.name }
+    }
 }
 
 /// Preferences that refuse to save (or load), optionally holding each save

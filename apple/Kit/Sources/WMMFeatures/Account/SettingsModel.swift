@@ -48,7 +48,7 @@ public final class SettingsModel {
     }
 
     private let servers: any ServerRepository
-    private let auth: any AuthRepository
+    let auth: any AuthRepository
     private let preferences: any PreferencesRepository
     public let facts: DeviceFacts
     /// The language the device is set to, offered for an empty list ("Use English").
@@ -446,6 +446,16 @@ public final class SettingsModel {
             saves.failed(.signedInDevices, token, line)
         }
     }
+
+    // MARK: Change password
+
+    /// The banner a finished task left on Account & devices ("Password
+    /// changed"), until the page is left or it is closed.
+    public private(set) var accountBanner: SettingsNotice?
+
+    func showAccountBanner(_ banner: SettingsNotice) { accountBanner = banner }
+
+    public func dismissAccountBanner() { accountBanner = nil }
 
     // MARK: Server settings
 

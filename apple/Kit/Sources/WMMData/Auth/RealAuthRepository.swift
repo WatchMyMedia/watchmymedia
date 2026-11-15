@@ -152,6 +152,14 @@ final class RealAuthRepository: AuthRepository {
         return try await store.call { try await $0.approvePairing(path: .init(code: code)).ok.body.json }.pendingDevice
     }
 
+    /// PUT /api/auth/password. Its 401 means the current password is wrong,
+    /// not a lost sign-in (``ServerAPI/credentialOperations``); the server
+    /// keeps this device's session and ends the account's others.
+    func changePassword(current: String, new: String) async throws {
+        let body = Components.Schemas.ChangePasswordInputBody(current: current, new: new)
+        _ = try await store.call { try await $0.changePassword(body: .json(body)).noContent }
+    }
+
     /// Server settings' state from GET /api/auth/status, which also says
     /// who is signed in; nil offline or when the reply has no user.
     func adminAccess() async -> AdminAccess? {

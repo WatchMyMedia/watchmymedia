@@ -209,11 +209,22 @@ public protocol AuthRepository: AnyObject, Observable {
     /// here (GET /api/auth/status); nil when nobody is signed in or the
     /// server couldn't be asked.
     func adminAccess() async -> AdminAccess?
+
+    /// Changes the signed-in account's password (PUT /api/auth/password).
+    /// The server signs out every other device of the account and keeps
+    /// this one. Throws ``APIError``: 401 when `current` is wrong, 429 after
+    /// too many tries, 422 when `new` isn't 8 to 256 characters.
+    func changePassword(current: String, new: String) async throws
 }
 
 extension AuthRepository {
     /// From the account alone, for repositories that can't ask the server.
     public func adminAccess() async -> AdminAccess? {
         user.map { $0.isAdmin ? .home : .member }
+    }
+
+    /// Refuses, for repositories that can't change a password.
+    public func changePassword(current: String, new: String) async throws {
+        throw APIError(status: 501, message: "This app can’t change your password here. Change it in the web app.")
     }
 }

@@ -266,6 +266,23 @@ public final class FakeAuthRepository: AuthRepository {
     /// Server settings' state as the fake server says it; an admin is at home unless set.
     public var access: AdminAccess?
 
+    /// Makes the next Change password fail with this, once.
+    public var passwordFailure: (any Error)?
+
+    /// The current password is "password", as for signing in; the account's
+    /// other devices are signed out, this one stays.
+    public func changePassword(current: String, new: String) async throws {
+        await FakeLatency.wait()
+        if let failure = passwordFailure {
+            passwordFailure = nil
+            throw failure
+        }
+        guard let user else { throw SignedOutError() }
+        guard current == "password" else { throw APIError(status: 401, message: "Current password is wrong.") }
+        guard (8...256).contains(new.count) else { throw APIError(status: 422, message: "A password has 8 to 256 characters.") }
+        sessionList.removeAll { !$0.current && $0.userName == user.name }
+    }
+
     public func adminAccess() async -> AdminAccess? {
         await FakeLatency.wait()
         guard let user else { return nil }
