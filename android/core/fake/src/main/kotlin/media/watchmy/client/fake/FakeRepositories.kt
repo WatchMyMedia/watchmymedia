@@ -41,6 +41,7 @@ import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.PairingCode
 import media.watchmy.client.model.PairingState
+import media.watchmy.client.model.PASSWORD_LENGTH
 import media.watchmy.client.model.PendingDevice
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.PlaybackPreferences
@@ -172,6 +173,14 @@ class FakeAuthRepository(signedIn: Boolean = true) : AuthRepository {
     }
 
     override suspend fun approvePairing(code: String): PendingDevice = lookUpPairing(code).copy(approved = true)
+
+    /** "password" is the current password, as for signing in; the other devices are signed out. */
+    override suspend fun changePassword(current: String, new: String) {
+        latency()
+        if (current != "password") throw ApiException(401, "Current password is wrong.")
+        if (new.length !in PASSWORD_LENGTH) throw ApiException(422, "Expected length >= 8.")
+        sessionList.value = sessionList.value.filter { it.current }
+    }
 
     private fun now(days: Int) = System.currentTimeMillis() + days * 86_400_000L
 }

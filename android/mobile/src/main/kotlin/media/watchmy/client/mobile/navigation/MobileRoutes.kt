@@ -26,7 +26,21 @@ object MobileRoutes {
     /** The person's Live TV reminders, from the Live TV top bar's More. */
     @Serializable data object LiveRecordings
     @Serializable data object LiveReminders
+    /**
+     * Settings' overview (PLAN-ANDROID-SETTINGS.md §4.1): a row per group. On
+     * a tablet it is the list beside Playback's page.
+     */
     @Serializable data object Settings
+    // A page per group (§7), under Settings so system Back is Up; a tablet shows each beside the list.
+    @Serializable data object SettingsPlayback
+    @Serializable data object SettingsLanguages
+    @Serializable data object SettingsDownloads
+    @Serializable data object SettingsAccount
+    @Serializable data object SettingsAbout
+    /** Change password (§5.3): full screen on a phone. */
+    @Serializable data object ChangePassword
+    /** The same, as a centred surface over Settings on a tablet (TabSettingsPassword.dc.html). */
+    @Serializable data object ChangePasswordDialog
     /** Your requests, from Settings. */
     @Serializable data object MyRequests
     /** The admins' Inbox, from Settings. */
