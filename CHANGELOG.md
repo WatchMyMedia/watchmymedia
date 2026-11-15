@@ -5,6 +5,47 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 1.4.5
+
+Settings on the web, redesigned. Each tab opens on a page that says how things stand and what
+to do next, and each task with more than one step takes you through it one step at a time,
+with Back, Next and a last screen that says what changed.
+
+- The server's database is the same as 1.4.2's through 1.4.4's, so updating needs no backup to
+  go back.
+- Every Settings tab opens on a summary with one next step. Connecting Plex, adding Radarr,
+  Sonarr or Seerr, adding a library or a tuner, setting up recordings and adding a person each
+  have their own page, with a trail that shows where you are in Settings, numbered steps, and
+  Back and Next. Links and bookmarks to the old Settings addresses still work.
+- Away from home, a button that will ask for your password shows a lock before you press it.
+  Once you've entered the password, a chip shows how long it stays confirmed.
+- Removing a library asks you to type its name, and says what is removed with it and what
+  stays. Away from home, removing a library, removing a tuner and turning off remote admin now
+  ask for the password too, as adding a library or a tuner already did.
+- Live TV takes more than one tuner: Add another tuner is on the Live TV page, and first-run
+  setup uses the same steps. Removing a tuner names the recordings that use it.
+- Some errors that never showed now do, next to what you pressed: a library's Scan and Match,
+  the Inbox's buttons, and a backup that failed for lack of space or permission.
+- Unmatched files are reviewed under Settings › Libraries, and the Movies and TV pages link
+  there.
+- Your own settings save as you change them, each in its own row, and Audio & subtitles keeps
+  its Save button. Changing your password lists the devices it signs out, and signing a device
+  out asks first. Link a TV is now under Settings › Account & devices; the link page TVs show as
+  a QR code still works.
+- Removing the TMDB key says when config.yaml or the environment will bring it back at the next
+  restart.
+- In the web player, a subtitle set to start "When the audio isn't in my languages" is now
+  downloaded automatically when Automatic download is on, as one set to "On" already was.
+- The server's API is unchanged for the apps: it only gained optional fields, so every app
+  version works with it.
+- The server, the Docker image, the Mac app and the Windows app are 1.4.5. The Mac app and the
+  Windows app of 1.4.4 offer the update under Check for updates. The Android app has no changes
+  and stays at 1.4.4 on Google Play, and the iPhone, iPad and Apple TV apps stay at 1.8.4 in the
+  App Store.
+- The new Settings have been tried in tests and in a browser against a test server, at home and
+  through a stand-in for a visit from away, not yet against real Plex, Radarr, Sonarr, Seerr or
+  OpenSubtitles accounts, a real tuner, or Cloudflare's sign-in check on a real address.
+
 ## 1.4.4
 
 The Android app's second review: a quicker app that asks the server for less, fixes for
