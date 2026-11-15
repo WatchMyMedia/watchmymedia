@@ -198,6 +198,30 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(autoplay.hasFocus)
     }
 
+    /// `-fakesSaveFails recap` (the Kit's fakes) refuses Recap's saves, unanswered.
+    @MainActor
+    func testARefusedChoiceSaysWhyInItsRowAndGoesBack() {
+        let app = launch(["-settingsGroup", "playback", "-fakesSaveFails", "recap"])
+        let playback = app.buttons["settings-group-playback"]
+        XCTAssertTrue(playback.waitUntilExists(timeout: 20))
+        XCTAssertTrue(focused(playback))
+        remote.press(.right)
+        let recap = app.descendants(matching: .any)["settings-row-skip-recap"]
+        XCTAssertTrue(move(.down, to: recap, in: app))
+        XCTAssertEqual(recap.value as? String, "Show a Skip button")
+        remote.press(.select)
+        let choice = app.otherElements.matching(NSPredicate(format: "label BEGINSWITH %@", "Skip right away, ")).firstMatch
+        XCTAssertTrue(choice.waitUntilExists(timeout: 5), "Select opens the row's menu")
+        XCTAssertTrue(move(.down, to: choice, in: app, presses: 5))
+        remote.press(.select)
+        XCTAssertTrue(choice.waitUntilGone(timeout: 5))
+        XCTAssertTrue(recap.wait(until: NSPredicate(format: "value CONTAINS %@", "Couldn’t save, so it’s still Show a Skip button"), timeout: 10),
+                      "the row says it couldn't save and what it still is: \(String(describing: recap.value))")
+        XCTAssertTrue((recap.value as? String)?.hasPrefix("Show a Skip button") == true, "and the choice is back: \(String(describing: recap.value))")
+        XCTAssertTrue(eventually(timeout: 3) { holds(recap, in: app) }, "the row keeps focus")
+        shot("Recap couldn't save")
+    }
+
     @MainActor
     func testSwitchServerFromTheFirstStepToTheLast() {
         let app = launch(["-settingsGroup", "server"])
@@ -227,7 +251,24 @@ final class SettingsTests: XCTestCase {
         remote.press(.select)
         XCTAssertTrue(app.staticTexts["Sign in to Office Mac mini"].waitUntilExists(timeout: 10), "a server not signed in to asks to sign in")
         XCTAssertEqual(steps.label, "Step 2 of 3, Sign in")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "On a phone or computer signed in to Office Mac mini")).firstMatch.exists,
+                      "Sign in starts on the code")
+        // The password form, with focus on its name, and back to the code.
+        let otherWay = app.buttons["switch-other-way"]
+        XCTAssertTrue(focused(otherWay), "the other way in has focus under the code")
+        XCTAssertEqual(otherWay.label, "Sign in with a password instead")
         shot("Switch server, step 2")
+        remote.press(.select)
+        XCTAssertTrue(focused(app.textFields["Username"]), "the form starts on the name")
+        XCTAssertTrue(otherWay.waitForLabel(containing: "Use a code"), otherWay.label)
+        // Down past the password to the buttons, landing on whichever is nearest, then right to the other way.
+        let signIn = app.buttons["Sign in"]
+        for _ in 0..<4 where !(otherWay.hasFocus || signIn.hasFocus) {
+            app.press(.down, thenWaitForFocusToMove: 2)
+        }
+        XCTAssertTrue(move(.right, to: otherWay, in: app, presses: 3))
+        remote.press(.select)
+        XCTAssertTrue(otherWay.waitForLabel(containing: "with a password"), "back to the code: \(otherWay.label)")
         // The fakes approve the pairing code by themselves after a few seconds.
         XCTAssertTrue(app.staticTexts["You’re on Office Mac mini"].waitUntilExists(timeout: 30), "the last step says where this Apple TV is now")
         XCTAssertEqual(steps.label, "Switched", "the last step is named alone")
