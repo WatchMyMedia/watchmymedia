@@ -15,31 +15,48 @@ struct ServerSettingsPage: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        SettingsScroll(lede: lede) {
+        SettingsScroll(lede: model.serverLede) {
             if let server = model.server {
-                SettingsSection(title: "This server") {
-                    FactRow(label: "Name", value: server.name)
-                    FactRow(label: "Address", value: server.displayAddress)
-                    FactRow(label: "Version", value: server.versionAndAPI)
-                    FactRow(label: "Signed in as", value: signedInAs(model.user))
+                SettingsSection(title: SettingsWords.thisServer) {
+                    FactRow(label: SettingsWords.name, value: server.name)
+                    FactRow(label: SettingsWords.address, value: server.displayAddress)
+                    FactRow(label: SettingsWords.version, value: server.versionAndAPI)
+                    FactRow(label: SettingsWords.signedInAs, value: signedInAs(model.user))
                 }
             }
 
-            SettingsSection(title: "Another server") {
+            SettingsSection(title: SettingsWords.anotherServer) {
                 Button { startSwitch() } label: {
                     LinkRowLabel(title: switchServerTitle)
                 }
                 .buttonStyle(SettingsRowStyle())
                 .accessibilityIdentifier("server-switch")
             } note: {
-                SectionNote("Three steps: choose it, sign in, done. You stay signed in here, and switching back needs no password.")
+                SectionNote(SettingsWords.switchServerLine)
             }
 
-            if model.user?.isAdmin == true, let server = model.server {
-                serverSettings(server)
+            // Server settings: admins only, once the server has said where they stand (§5.6).
+            if let row = model.serverSettingsRow, let server = model.server {
+                SettingsSection(title: SettingsWords.serverSettings) {
+                    Button { openURL(serverSettingsURL(server)) } label: {
+                        AdaptiveRow {
+                            RowTitle(title: row.title, line: .plain(row.detail))
+                        } trailing: {
+                            ExternalMark()
+                        }
+                        .opacity(row.enabled ? 1 : 0.45)
+                    }
+                    .buttonStyle(SettingsRowStyle())
+                    .disabled(!row.enabled)
+                    .accessibilityHint(row.enabled ? "Opens the web app in Safari" : row.note)
+                    .accessibilityIdentifier("server-settings")
+                } note: {
+                    SectionNote(row.noteIsProblem ? .failed(row.note) : .plain(row.note))
+                }
             }
         }
-        .navigationTitle("Server")
+        .navigationTitle(SettingsWords.server)
+        .task { await model.loadAdminAccess() }
         .task {
             guard ScreenshotLaunch.has("-switchServer"), !flow.appliedSwitchLaunch else { return }
             flow.appliedSwitchLaunch = true
@@ -51,46 +68,6 @@ struct ServerSettingsPage: View {
                     switching.picker.address = address
                     await switching.connectToAddress()
                 }
-            }
-        }
-    }
-
-    /// "Living room server, v1.4.5. You’re signed in as Sam, an admin."
-    private var lede: String? {
-        guard let server = model.server else { return nil }
-        let who = model.user.map { $0.isAdmin ? "\($0.name), an admin" : $0.name } ?? "nobody"
-        return "\(server.name), \(server.versionLabel). You’re signed in as \(who)."
-    }
-
-    /// Where an admin stands with Server settings on this network.
-    private enum Access { case home, away, keptOut }
-
-    private func access(_ server: Server) -> Access {
-        let options = services.requests.options
-        if options.supported && !options.inboxAllowed { return .keptOut }
-        return isLANHost(server.baseURL.host() ?? "") ? .home : .away
-    }
-
-    private func serverSettings(_ server: Server) -> some View {
-        let access = access(server)
-        return SettingsSection(title: "Server settings") {
-            Button { openURL(server.baseURL) } label: {
-                AdaptiveRow {
-                    RowTitle(title: "Open Server settings", line: .plain("Libraries, people, Live TV, Plex and the rest"))
-                } trailing: {
-                    ExternalMark()
-                }
-                .opacity(access == .keptOut ? 0.45 : 1)
-            }
-            .buttonStyle(SettingsRowStyle())
-            .disabled(access == .keptOut)
-            .accessibilityHint("Opens the web app in Safari")
-            .accessibilityIdentifier("server-settings")
-        } note: {
-            switch access {
-            case .home: SectionNote("Opens the web app in Safari. Managing the server stays there; this app is for watching.")
-            case .away: SectionNote("Opens the web app in Safari. You’re away from home, so it asks for your password before risky changes.")
-            case .keptOut: SectionNote(.failed("Off away from home on this server. Open them on your home network, or turn on Admin settings away from home under Security there."))
             }
         }
     }
@@ -137,7 +114,7 @@ struct AboutSettingsPage: View {
             }
         }
         .accountList()
-        .navigationTitle("About WatchMyMedia")
+        .navigationTitle(SettingsWords.aboutApp)
     }
 
     private func webLink(_ title: String, _ url: URL) -> some View {
