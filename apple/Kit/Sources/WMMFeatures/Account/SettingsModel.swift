@@ -69,11 +69,22 @@ public final class SettingsModel {
         self.facts = facts
         self.deviceLanguage = deviceLanguage
         saves = SaveStates(linger: savedLinger, sleep: sleep)
+        deviceSaves = SaveStates(linger: savedLinger, sleep: sleep)
     }
 
     /// Where a control kept on the server stands: at rest, saving, saved with
     /// what the change did, or failed with what it is still.
     public func saveState(_ key: SettingKey) -> SaveState { saves[key] }
+
+    /// The two settings kept on this device, which save at once and can't fail.
+    enum DeviceSetting: Hashable, Sendable { case quality, name }
+    @ObservationIgnored let deviceSaves: SaveStates<DeviceSetting>
+
+    /// Quality's row: Saved with what this device now plays, then back to rest.
+    public var qualitySave: SaveState { deviceSaves[.quality] }
+
+    /// This device's name: Saved with where it now shows, then back to rest.
+    public var deviceNameSave: SaveState { deviceSaves[.name] }
 
     // MARK: Account
 
@@ -149,7 +160,11 @@ public final class SettingsModel {
 
     /// Kept on this device, so it cannot fail.
     public func setQuality(_ quality: StreamQuality) {
+        let changed = quality != preferences.quality
         preferences.setQuality(quality)
+        guard changed else { return }
+        let token = deviceSaves.begin(.quality)
+        deviceSaves.saved(.quality, token, SettingsWords.qualitySaved(self.quality, device: facts.family))
     }
 
     /// Shows the change at once; puts it back with the reason if the server
@@ -358,7 +373,9 @@ public final class SettingsModel {
     public func rename(_ name: String) async {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != deviceName else { return }
+        let token = deviceSaves.begin(.name)
         await auth.setDeviceName(trimmed)
+        deviceSaves.saved(.name, token, SettingsWords.deviceNameSaved(deviceName, device: facts.family))
     }
 
     // MARK: Signed-in devices
