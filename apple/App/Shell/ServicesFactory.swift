@@ -82,70 +82,7 @@ enum ServicesFactory {
         if let i = arguments.firstIndex(of: "-fakesTrailerKeys"), arguments.indices.contains(i + 1) {
             (services.library as? FakeLibraryRepository)?.trailerKeys = arguments[i + 1].split(separator: ",").map(String.init)
         }
-        // `-fakesPasswordFails 429` (or 500, or `offline`): the next Change password fails so.
-        if let i = arguments.firstIndex(of: "-fakesPasswordFails"), arguments.indices.contains(i + 1) {
-            let status = Int(arguments[i + 1])
-            (services.auth as? FakeAuthRepository)?.passwordFailure = APIError(status: status, message: status == nil ? "The server didn’t answer." : "Refused.")
-        }
-        // `-fakesSaveFails recap` (or `autoplay`, `languages`): the server refuses that change, as a setting saved on another server would.
-        if let i = arguments.firstIndex(of: "-fakesSaveFails"), arguments.indices.contains(i + 1) {
-            return services.replacingPreferences(RefusingPreferences(services.preferences, refusing: arguments[i + 1]))
-        }
         return services
     }
     #endif
 }
-
-#if DEBUG
-extension AppServices {
-    /// The same services with other preferences (the fakes' refusing ones).
-    func replacingPreferences(_ preferences: any PreferencesRepository) -> AppServices {
-        AppServices(servers: servers, auth: auth, library: library, requests: requests, preferences: preferences,
-                    playback: playback, images: images, client: client, liveTV: liveTV, livePlayback: livePlayback,
-                    downloads: downloads, casting: casting, rows: rows)
-    }
-}
-
-/// The fakes' preferences, refusing one kind of change as a server without
-/// a connection would (`-fakesSaveFails`), so a row's failed line can be
-/// seen and tested: a Skipping part by name (`recap`), `autoplay`, or `languages`.
-@MainActor
-@Observable
-final class RefusingPreferences: PreferencesRepository {
-    private let base: any PreferencesRepository
-    private let refusing: String
-
-    init(_ base: any PreferencesRepository, refusing: String) {
-        self.base = base
-        self.refusing = refusing
-    }
-
-    var playback: PlaybackPreferences { base.playback }
-    var quality: StreamQuality { base.quality }
-    func refresh() async throws { try await base.refresh() }
-    func setQuality(_ quality: StreamQuality) { base.setQuality(quality) }
-    func showsMissing(showID: Int) -> Bool { base.showsMissing(showID: showID) }
-    func setShowsMissing(_ on: Bool, showID: Int) { base.setShowsMissing(on, showID: showID) }
-
-    func setSkip(_ kind: SegmentKind, mode: SkipMode) async throws {
-        try await refuse(kind.rawValue)
-        try await base.setSkip(kind, mode: mode)
-    }
-
-    func setAutoplayNext(_ enabled: Bool) async throws {
-        try await refuse("autoplay")
-        try await base.setAutoplayNext(enabled)
-    }
-
-    func setLanguages(_ change: LanguageChange) async throws {
-        try await refuse("languages")
-        try await base.setLanguages(change)
-    }
-
-    private func refuse(_ what: String) async throws {
-        guard what == refusing else { return }
-        try? await Task.sleep(for: .milliseconds(600))
-        throw APIError(status: nil, message: "The server didn’t answer.")
-    }
-}
-#endif
