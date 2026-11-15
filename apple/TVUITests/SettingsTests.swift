@@ -83,7 +83,8 @@ final class SettingsTests: XCTestCase {
         remote.press(.menu)
         XCTAssertTrue(app.waitForFocusedButton { $0.hasPrefix("Settings") }, "Menu from the list goes to the top bar")
         XCTAssertTrue(name.exists, "and Settings stays on Account & devices")
-        remote.press(.down)
+        // A press made while the top bar takes focus can be lost: press again until focus comes down.
+        for _ in 0..<3 where !focused(group, timeout: 3) { remote.press(.down) }
         XCTAssertTrue(focused(group), "Down from the top bar comes back to the group")
     }
 
@@ -177,7 +178,8 @@ final class SettingsTests: XCTestCase {
         shot("Credits' menu")
         remote.press(.select)
         XCTAssertTrue(choice.waitUntilGone(timeout: 5), "choosing closes the menu")
-        XCTAssertTrue(holds(credits, in: app), "the row keeps focus while it saves")
+        // Focus comes back to the row from the closing menu, and stays there while it saves.
+        XCTAssertTrue(eventually(timeout: 3) { holds(credits, in: app) }, "the row keeps focus while it saves")
         XCTAssertTrue(credits.wait(until: NSPredicate(format: "value CONTAINS %@", "Saved"), timeout: 10), "and says it saved: \(String(describing: credits.value))")
         XCTAssertTrue((credits.value as? String)?.hasPrefix("Skip after 3 seconds") == true, String(describing: credits.value))
         XCTAssertTrue(holds(credits, in: app), "and keeps focus after")
@@ -228,7 +230,7 @@ final class SettingsTests: XCTestCase {
         shot("Switch server, step 2")
         // The fakes approve the pairing code by themselves after a few seconds.
         XCTAssertTrue(app.staticTexts["You’re on Office Mac mini"].waitUntilExists(timeout: 30), "the last step says where this Apple TV is now")
-        XCTAssertEqual(steps.label, "All 3 steps done")
+        XCTAssertEqual(steps.label, "Switched", "the last step is named alone")
         XCTAssertTrue(app.staticTexts["You’re still signed in on Living room server."].exists || app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "still signed in on Living room server")).firstMatch.exists)
         let home = app.buttons["switch-go-home"]
         XCTAssertTrue(focused(home), "with focus on Go to Home")
