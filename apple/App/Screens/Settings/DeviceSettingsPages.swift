@@ -40,7 +40,7 @@ struct AccountSettingsPage: View {
         .refreshable { await model.loadSessions() }
         .task { await model.loadSessions() }
         .announces(outcome?.text)
-        .sheet(isPresented: Binding(get: { flow.renameDraft != nil }, set: { if !$0 { flow.renameDraft = nil } })) {
+        .sheet(isPresented: Binding(get: { flow.renaming }, set: { flow.renaming = $0 })) {
             RenameSheet(model: model)
         }
     }
@@ -62,7 +62,7 @@ struct AccountSettingsPage: View {
 
     private var thisDevice: some View {
         SettingsSection(title: "This \(model.facts.family)") {
-            Button { flow.renameDraft = model.deviceName } label: {
+            Button { flow.renameDraft = model.deviceName; flow.renaming = true } label: {
                 LinkRowLabel(title: "Name", value: model.deviceName)
             }
             .buttonStyle(SettingsRowStyle())
@@ -234,7 +234,7 @@ private struct RenameSheet: View {
     @FocusState private var focused: Bool
     @State private var discarding = false
 
-    private var draft: String { flow.renameDraft ?? "" }
+    private var draft: String { flow.renameDraft }
     private var trimmed: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var changed: Bool { !trimmed.isEmpty && trimmed != model.deviceName }
 
@@ -286,7 +286,7 @@ private struct RenameSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { flow.renameDraft = nil }
+                    Button("Cancel") { flow.renaming = false }
                         .keyboardShortcut(.cancelAction)
                         .accessibilityIdentifier("rename-cancel")
                 }
@@ -304,7 +304,7 @@ private struct RenameSheet: View {
         .presentationBackground(Palette.sheet)
         .asksBeforeDismissing(when: changed) { discarding = true }
         .confirmationDialog("Discard the new name?", isPresented: $discarding, titleVisibility: .visible) {
-            Button("Discard", role: .destructive) { flow.renameDraft = nil }
+            Button("Discard", role: .destructive) { flow.renaming = false }
             Button("Keep editing", role: .cancel) {}
         } message: {
             Text("This \(model.facts.family) stays \(model.deviceName).")
@@ -315,7 +315,7 @@ private struct RenameSheet: View {
     private func rename() {
         guard changed else { return }
         let name = trimmed
-        flow.renameDraft = nil
+        flow.renaming = false
         Task { await model.rename(name) }
     }
 }

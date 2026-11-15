@@ -12,8 +12,10 @@ final class AppFlow {
     /// the original account needed by Cancel.
     var serverSwitch: ServerSwitchModel?
     var appliedSwitchLaunch = false
-    /// The name typed in Rename this iPhone while its sheet is up.
-    var renameDraft: String?
+    /// Rename this iPhone's sheet is up, and the name typed in it. Apart,
+    /// since a field writes its text back as it loses focus while closing.
+    var renaming = false
+    var renameDraft = ""
     /// Done on Switch server's last step: the root then shows the new server's Home.
     var serverSwitchDone = false
     /// Link a TV's steps, kept here for the same reason as the server switch.
