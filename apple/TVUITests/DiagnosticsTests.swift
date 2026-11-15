@@ -1,10 +1,11 @@
 import XCTest
 
 /// Settings › About › Diagnostics on Apple TV (TvDiagnostics.dc.html,
-/// PLAN-APPLE-REVIEW.md §6.4), on the fakes: the Help group's row, the code
-/// to scan beside a summary of what it holds (no server name, address or
-/// account), Show as text in pages, and Done and Menu. `-diagnostics` opens
-/// the code at launch, as Select on the row does. Runs in
+/// PLAN-APPLE-REVIEW.md §6.4), on the fakes: About's row, with the panel at
+/// the right saying nothing is sent, the code to scan beside a summary of what
+/// it holds (no server name, address or account), Show as text in pages, and
+/// Done and Menu. `-settingsGroup about` shows About's page and `-diagnostics`
+/// opens the code at launch, as Select on the row does. Runs in
 /// `make apple-tv-test-sim`.
 final class DiagnosticsTests: XCTestCase {
     @MainActor private var remote: XCUIRemote { XCUIRemote.shared }
@@ -14,7 +15,7 @@ final class DiagnosticsTests: XCTestCase {
     @MainActor
     private func launch(_ arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-fakes", "-tab", "settings"] + arguments
+        app.launchArguments = ["-fakes", "-tab", "settings", "-settingsGroup", "about"] + arguments
         app.launch()
         return app
     }
@@ -38,13 +39,14 @@ final class DiagnosticsTests: XCTestCase {
         let row = app.buttons["settings-diagnostics"]
         XCTAssertTrue(row.waitUntilExists(timeout: 20))
         XCTAssertTrue(row.label.contains("Diagnostics"))
-        XCTAssertTrue(app.staticTexts["Nothing is sent from this Apple TV. No account, server address or titles are included."].exists)
-        // Down the right-hand column, past the devices and About, to Diagnostics.
-        for _ in 0..<25 where !row.hasFocus {
-            remote.press(.down)
-            _ = XCTWaiter().wait(for: [XCTestExpectation(description: "move")], timeout: 0.3)
-        }
-        XCTAssertTrue(focused(row), "Down the right-hand column reaches Diagnostics")
+        XCTAssertTrue(focused(app.buttons["settings-group-about"]), "launch puts focus on About in the list")
+        // Into About's page, on its first row, then down to Diagnostics.
+        remote.press(.right)
+        XCTAssertTrue(focused(app.buttons["settings-row-privacy"]))
+        remote.press(.down)
+        XCTAssertTrue(focused(row), "Diagnostics is under the privacy policy")
+        let help = app.descendants(matching: .any)["settings-help"]
+        XCTAssertTrue(help.waitForLabel(containing: "Nothing is sent from this Apple TV. No account, server address or titles are included."), help.label)
         shot("Diagnostics row focused")
         remote.press(.select)
         XCTAssertTrue(app.buttons["diagnostics-done"].waitUntilExists(timeout: 10), "Select opens the code")
