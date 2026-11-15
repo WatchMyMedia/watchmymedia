@@ -18,6 +18,12 @@ struct LanguageSettingsPage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
+                Text(SettingsWords.languagesLede(audio: model.audio.languages, subtitles: model.subtitles.languages, choice: model.subtitleChoice))
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 4)
+                    .accessibilityIdentifier("settings-lede")
                 if !model.supportsSubtitlePreferences {
                     Text("Update the server to use subtitle preferences.").foregroundStyle(Palette.muted)
                 } else if model.supportsAudioLanguages && width >= 680 {
@@ -33,7 +39,6 @@ struct LanguageSettingsPage: View {
                     subtitleSection
                     onlineSection
                 }
-                if let error = model.languageError { ErrorLine(message: error) }
             }
             .padding(.horizontal, width >= 680 ? 32 : 16)
             .padding(.top, 8)
@@ -52,11 +57,11 @@ struct LanguageSettingsPage: View {
     // MARK: Sections
 
     private var audioSection: some View {
-        section("Audio languages", "Videos start in the first of these languages they have. If they have none, they play the file’s default.",
-                note: limitNote(.audio) ?? "Commentary and audio description are never chosen for you. You can pick them in the player.") {
+        section(SettingsWords.audioLanguages, SettingsWords.audioLanguagesNote,
+                note: line(.audioLanguages, rest: model.addLanguageOffReason(for: .audio) ?? SettingsWords.audioLanguagesFootnote)) {
             languageRows(.audio)
             if model.audio.languages.isEmpty {
-                Text("No audio language yet. Videos play the file’s default audio.")
+                Text(SettingsWords.noAudioLanguage)
                     .font(.subheadline)
                     .foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -65,10 +70,10 @@ struct LanguageSettingsPage: View {
                     .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
                 if let suggested = model.suggestion(for: .audio) {
                     HStack(spacing: 12) {
-                        Text("Your \(model.facts.family) uses \(languageTagName(suggested)).")
+                        Text(SettingsWords.deviceUses(suggested, device: model.facts.family))
                             .foregroundStyle(Palette.textSecondary)
                         Spacer(minLength: 8)
-                        Button("Use \(languageTagName(suggested))") { Task { await model.addLanguage(suggested, to: .audio) } }
+                        Button(SettingsWords.use(suggested)) { Task { await model.addLanguage(suggested, to: .audio) } }
                             .buttonStyle(GoldTextButtonStyle(font: .body.weight(.semibold)))
                             .accessibilityIdentifier("audio-use-device-language")
                     }
@@ -100,7 +105,7 @@ struct LanguageSettingsPage: View {
     }
 
     private var startSection: some View {
-        section("Starting subtitles", "When a video starts", note: "A track you choose in the player always wins.") {
+        section(SettingsWords.startingSubtitles, SettingsWords.whenAVideoStarts, note: line(.subtitleChoice, rest: SettingsWords.playerTrackWins)) {
             ForEach(model.subtitleChoices, id: \.self) { choice in
                 let selected = model.subtitleChoice == choice
                 Button { Task { await model.setSubtitleChoice(choice) } } label: {
@@ -132,12 +137,12 @@ struct LanguageSettingsPage: View {
     }
 
     private var subtitleSection: some View {
-        section("Subtitle languages", "Use the first of these languages that has a subtitle.",
-                note: limitNote(.subtitles) ?? (model.subtitlesUseAudioLanguages ? "Until you add one, subtitles use your audio languages." : nil)) {
+        section(SettingsWords.subtitleLanguages, SettingsWords.subtitleLanguagesNote,
+                note: line(.subtitleLanguages, rest: model.addLanguageOffReason(for: .subtitles) ?? (model.subtitlesUseAudioLanguages ? "Until you add one, subtitles use your audio languages." : nil))) {
             languageRows(.subtitles)
             if let suggested = model.suggestion(for: .subtitles) {
                 Button { Task { await model.addLanguage(suggested, to: .subtitles) } } label: {
-                    Text("Use \(languageTagName(suggested))")
+                    Text(SettingsWords.use(suggested))
                         .font(.body.weight(.medium))
                         .foregroundStyle(Palette.gold)
                         .padding(.horizontal, 14)
@@ -152,18 +157,16 @@ struct LanguageSettingsPage: View {
     }
 
     private var onlineSection: some View {
-        section("Online subtitles", nil, note: model.automaticDownloadAvailable
+        section(SettingsWords.onlineSubtitles, nil, note: .plain(model.automaticDownloadAvailable
                 ? "When subtitles would start and no local track matches, download the exact-file match in your first subtitle language. Uses the server’s OpenSubtitles quota and download permissions. Kept on the server for apps that support subtitle preferences."
-                : model.supportsAudioLanguages ? "Choose On or When the audio isn’t in my languages, and add a subtitle language." : "Choose On and add a subtitle language.") {
+                : model.supportsAudioLanguages ? "Choose On or When the audio isn’t in my languages, and add a subtitle language." : "Choose On and add a subtitle language.")) {
             Toggle(isOn: Binding(get: { model.subtitles.automaticDownload && model.automaticDownloadAvailable },
                                  set: { on in Task { await model.setAutomaticSubtitles(on) } })) {
-                Text("Automatic download")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(Palette.text)
+                RowTitle(title: SettingsWords.automaticDownload, line: model.saveState(.automaticDownload).rowLine(rest: nil))
                     .opacity(model.automaticDownloadAvailable ? 1 : 0.4)
             }
             .tint(Palette.gold)
-            .disabled(!model.automaticDownloadAvailable)
+            .disabled(!model.automaticDownloadAvailable || model.saveState(.automaticDownload).isSaving)
             .padding(.horizontal, 14)
             .frame(minHeight: 48)
             .accessibilityIdentifier("subtitle-automatic-download")
@@ -185,7 +188,7 @@ struct LanguageSettingsPage: View {
         Button { adding = list } label: {
             HStack(spacing: 12) {
                 Image(systemName: "plus").font(.body.weight(.semibold))
-                Text("Add language").font(.body.weight(.medium))
+                Text(SettingsWords.addLanguage).font(.body.weight(.medium))
             }
             .foregroundStyle(Palette.gold)
             .opacity(model.canAdd(to: list) ? 1 : 0.45)
@@ -195,16 +198,16 @@ struct LanguageSettingsPage: View {
         }
         .buttonStyle(.plain)
         .disabled(!model.canAdd(to: list))
-        .accessibilityHint(model.canAdd(to: list) ? "" : "This list has 16, the most it can keep")
+        .accessibilityHint(model.addLanguageOffReason(for: list) ?? "")
         .accessibilityIdentifier("\(list.rawValue)-add-language")
     }
 
-    /// Under a full list: why Add language is dim.
-    private func limitNote(_ list: LanguageList) -> String? {
-        model.canAdd(to: list) ? nil : "You can keep up to 16 languages, and this list has 16. Remove one to add another."
+    /// A section's note: how its last change went, else its usual line.
+    private func line(_ key: SettingKey, rest: String?) -> RowLine? {
+        model.saveState(key).rowLine(rest: rest)
     }
 
-    private func section(_ title: String, _ description: String?, note: String?, @ViewBuilder rows: () -> some View) -> some View {
+    private func section(_ title: String, _ description: String?, note: RowLine?, @ViewBuilder rows: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             GroupHeading(title).padding(.horizontal, 16)
             if let description {
@@ -216,7 +219,7 @@ struct LanguageSettingsPage: View {
                     .padding(.bottom, 2)
             }
             RoundedGroup(content: rows)
-            if let note { GroupFootnote(note).padding(.horizontal, 16).padding(.top, 2) }
+            if let note { SectionNote(note).padding(.horizontal, 16).padding(.top, 2) }
         }
     }
 }
