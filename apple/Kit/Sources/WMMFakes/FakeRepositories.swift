@@ -262,6 +262,15 @@ public final class FakeAuthRepository: AuthRepository {
         device.approved = true
         return device
     }
+
+    /// Server settings' state as the fake server says it; an admin is at home unless set.
+    public var access: AdminAccess?
+
+    public func adminAccess() async -> AdminAccess? {
+        await FakeLatency.wait()
+        guard let user else { return nil }
+        return access ?? (user.isAdmin ? .home : .member)
+    }
 }
 
 @MainActor

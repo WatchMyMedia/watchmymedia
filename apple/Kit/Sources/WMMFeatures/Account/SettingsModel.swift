@@ -447,6 +447,18 @@ public final class SettingsModel {
         }
     }
 
+    // MARK: Server settings
+
+    /// What this account may do with the server's settings from here, once
+    /// ``loadAdminAccess()`` has asked; nil until then or when it couldn't.
+    public private(set) var adminAccess: AdminAccess?
+
+    /// Asks the server whether this account is an admin let in from here
+    /// (GET /api/auth/status), for Server settings; keeps what it knew when the server can't be asked.
+    public func loadAdminAccess() async {
+        if let access = await auth.adminAccess() { adminAccess = access }
+    }
+
     // MARK: Sign out
 
     public private(set) var signingOut = false

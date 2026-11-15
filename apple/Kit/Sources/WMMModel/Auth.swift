@@ -134,6 +134,43 @@ public struct PendingDevice: Hashable, Sendable {
     }
 }
 
+/// Why the server keeps an admin out of its settings here (`adminLimit` on GET /api/auth/status).
+public enum AdminLimit: String, Hashable, Sendable {
+    /// Away from home with admin settings away from home turned off.
+    case network
+    /// Away from home over plain http, or a proxy the server doesn't trust to say it is https.
+    case https
+}
+
+/// What the signed-in account may do with the server's settings from here
+/// (GET /api/auth/status; PLAN-APPLE-SETTINGS.md §5.6). The apps have no
+/// server settings of their own: an admin is handed to the web app.
+public enum AdminAccess: Hashable, Sendable {
+    /// Not an admin: Server settings isn't offered.
+    case member
+    /// An admin at home (the home network, the tailnet or the server itself).
+    case home
+    /// An admin away from home, let in over HTTPS: risky changes ask for the password again.
+    case away
+    /// An admin the server keeps out from here, and why.
+    case keptOut(AdminLimit)
+
+    /// From the auth status' fields. A server from before `onAdminNetwork`
+    /// can't say an admin is away, so an allowed admin is at home there; a
+    /// limit this app doesn't know is read as the network's.
+    public init(isAdmin: Bool, adminAllowed: Bool, onAdminNetwork: Bool?, adminLimit: String?) {
+        if !isAdmin {
+            self = .member
+        } else if adminAllowed {
+            self = onAdminNetwork == false ? .away : .home
+        } else {
+            self = .keptOut(adminLimit.flatMap(AdminLimit.init(rawValue:)) ?? .network)
+        }
+    }
+
+    public var isAdmin: Bool { self != .member }
+}
+
 /// Signing in on the server in use. Methods throw ``APIError``: a wrong
 /// password is status 401, throttling 429.
 @MainActor
@@ -167,4 +204,16 @@ public protocol AuthRepository: AnyObject, Observable {
 
     /// Link a TV: signs the device behind `code` in as the current user.
     func approvePairing(code: String) async throws -> PendingDevice
+
+    /// What the signed-in account may do with the server's settings from
+    /// here (GET /api/auth/status); nil when nobody is signed in or the
+    /// server couldn't be asked.
+    func adminAccess() async -> AdminAccess?
+}
+
+extension AuthRepository {
+    /// From the account alone, for repositories that can't ask the server.
+    public func adminAccess() async -> AdminAccess? {
+        user.map { $0.isAdmin ? .home : .member }
+    }
 }

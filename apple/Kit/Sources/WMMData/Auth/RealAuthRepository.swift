@@ -152,6 +152,16 @@ final class RealAuthRepository: AuthRepository {
         return try await store.call { try await $0.approvePairing(path: .init(code: code)).ok.body.json }.pendingDevice
     }
 
+    /// Server settings' state from GET /api/auth/status, which also says
+    /// who is signed in; nil offline or when the reply has no user.
+    func adminAccess() async -> AdminAccess? {
+        guard store.currentCredential != nil,
+              let status = try? await store.call({ try await $0.getAuthStatus().ok.body.json }),
+              let user = status.user else { return nil }
+        return AdminAccess(isAdmin: user.isAdmin, adminAllowed: status.adminAllowed,
+                           onAdminNetwork: status.onAdminNetwork, adminLimit: status.adminLimit?.rawValue)
+    }
+
     /// Refreshes the signed-in user from GET /api/auth/me (a renamed account, a
     /// change of admin rights). A revoked session signs out through the 401;
     /// being offline changes nothing.
