@@ -23,7 +23,7 @@ export function ContinueCard({ item }: { item: ContinueItem }) {
     <Link
       to="/play/$fileId"
       params={{ fileId: String(item.fileId) }}
-      search={{ start: item.positionMs / 1000, title: item.subtitle ? `${item.title} · ${item.subtitle}` : item.title, back }}
+      search={{ title: item.subtitle ? `${item.title} · ${item.subtitle}` : item.title, back }}
       className="card group block w-[304px] shrink-0 snap-start"
     >
       <div className="relative">

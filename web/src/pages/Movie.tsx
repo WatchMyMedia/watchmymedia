@@ -55,7 +55,7 @@ export function Movie({ movieId }: { movieId: number }) {
           <>
             {selected && m.watch && !m.watch.completed && m.watch.positionMs > 0 ? (
               <>
-                <Link to="/play/$fileId" params={{ fileId: String(selected.id) }} search={{ start: m.watch.positionMs / 1000, title: label, back: `/movies/${m.id}` }}>
+                <Link to="/play/$fileId" params={{ fileId: String(selected.id) }} search={{ title: label, back: `/movies/${m.id}` }}>
                   <PrimaryButton>▶ Resume from {formatDuration(m.watch.positionMs)}</PrimaryButton>
                 </Link>
                 <Link to="/play/$fileId" params={{ fileId: String(selected.id) }} search={{ start: 0, title: label, back: `/movies/${m.id}` }}>

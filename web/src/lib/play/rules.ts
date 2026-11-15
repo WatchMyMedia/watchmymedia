@@ -75,10 +75,15 @@ export type BeatState = 'playing' | 'paused' | 'buffering' | 'stopped' | 'closed
  * playing or buffering, so the server hears soon when the stream falls
  * behind (PLAN-AUTO-QUALITY.md §2).
  */
-export function beatDue(state: BeatState, lastBeatAt: number, now: number, auto = false) {
+export function beatDue(state: BeatState, lastBeatAt: number, now: number, auto = false, seeked = false) {
+  // A landed seek is saved at once, at most once a second while scrubbing,
+  // so a backward seek is not lost to the next beat (PLAN-RESUME.md §3.6).
+  if (seeked) return now - lastBeatAt >= SEEK_BEAT_GAP_MS
   const every = auto && (state === 'playing' || state === 'buffering') ? 5_000 : state === 'playing' ? 10_000 : 30_000
   return now - lastBeatAt >= every
 }
+
+const SEEK_BEAT_GAP_MS = 1_000
 
 type Ranges = { length: number; start(i: number): number; end(i: number): number }
 

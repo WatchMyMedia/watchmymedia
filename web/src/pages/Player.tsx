@@ -21,7 +21,7 @@ import { Scrubber, type ScrubPreview } from '../components/Scrubber'
 import { usableTrickplay } from '../lib/trickplay'
 import { NEXT_COUNTDOWN, SKIP_LABELS, StallMeter, activeSegment, beatDue, bufferedAhead, nextCardShowing, segmentEnd, segmentsAt, skipPlan, waitingAtJoint, type SkipMode } from '../lib/play/rules'
 import { AdaptiveFallback, failureRoute, observedRendition, requestAdaptive } from '../lib/play/adaptive'
-import { fileHlsBuffer, hlsStartPosition, timelineOffset } from '../lib/play/stream'
+import { fileHlsBuffer, hlsStartPosition, resumePlan, timelineOffset } from '../lib/play/stream'
 import { TransferMeter, higherStep, switchGeneration } from '../lib/play/recovery'
 import { mediaToken, prefersNativeHls, useAirPlay, withToken } from '../lib/airplay'
 import { noteLocalPlay, useCast } from '../cast/sender'
@@ -114,6 +114,8 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
   const durationRef = useRef(0)
   const stateRef = useRef<PlayState>('buffering')
   const lastBeat = useRef(0)
+  // A seek has landed since the last report (PLAN-RESUME.md §3.6).
+  const seekLanded = useRef(false)
   // What the heartbeats measure for Automatic quality (PLAN-AUTO-QUALITY.md
   // §3.1): stalls and startup, and hls.js's estimate once it has sampled a
   // fragment (before that it gives its default).
@@ -257,8 +259,11 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
           const sub = o.subtitleId ?? selection.subtitleId
           const subTrack = prev?.subtitles.find((s) => s.id === sub)
           meter.asked(Date.now())
+          // No explicit start: ask for none, so the server starts where this
+          // user resumes (PLAN-RESUME.md §3.7).
+          const resuming = o.resume !== false && start === undefined && from === 0
           const d = await startPlayback(fileId, {
-            startMs: Math.floor(from * 1000),
+            startMs: resuming ? undefined : Math.floor(from * 1000),
             audioIndex: o.audioIndex ?? audioIndex,
             subtitleId: sub || undefined,
             subtitleMode: selection.subtitleMode,
@@ -302,12 +307,10 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
           setClock(performance.now())
           setStarting(false)
           setDecision(d)
-          const whole = d.protocol === 'file' || d.playlist === 'vod'
-          // No explicit start: pick up where this user left off.
-          if (o.resume !== false && start === undefined && from === 0 && d.resumeMs > 5000) {
-            if (whole) from = d.resumeMs / 1000
-            else return run(d.resumeMs / 1000, { ...o, resume: false }, d)
-          }
+          // No explicit start: pick up where this user resumes.
+          const resume = resuming ? resumePlan(d) : undefined
+          if (resume?.again) return run(resume.fromMs / 1000, { ...o, resume: false }, d)
+          if (resume) from = resume.fromMs / 1000
           // The Apple TV fetches what it AirPlays itself, without our cookie.
           const token = native ? await mediaToken() : ''
           if (!active.current || sequence !== loadSequence.current || scope !== authScope()) return
@@ -468,8 +471,9 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
     (state: PlayState, force = false): Promise<void> => {
       const now = Date.now()
       if (ownerScope !== authScope() || adminStopped.current || !playIdRef.current) return Promise.resolve()
-      if (!force && !beatDue(state, lastBeat.current, now, autoRef.current)) return Promise.resolve()
+      if (!force && !beatDue(state, lastBeat.current, now, autoRef.current, seekLanded.current)) return Promise.resolve()
       lastBeat.current = now
+      seekLanded.current = false
       const dur = durationRef.current * 1000
       const pos = finished.current ? dur : posRef.current * 1000
       const hls = hlsRef.current
@@ -527,6 +531,8 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
     // HAVE_FUTURE_DATA: the seek landed in what is buffered.
     const onSeeked = () => {
       if (!video.paused && video.readyState >= 3) meter.settled()
+      // The next tick saves where it landed (beatDue).
+      seekLanded.current = true
     }
     const onPlay = () => {
       meter.excuse()

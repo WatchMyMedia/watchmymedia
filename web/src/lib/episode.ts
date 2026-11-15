@@ -71,10 +71,11 @@ export function episodeActions(e: Pick<Episode, 'aired' | 'airDate' | 'hasFile' 
   }
   const mark = e.watch?.completed ? { label: 'Mark unwatched', watched: false } : { label: 'Mark watched', watched: true }
   if (e.watch && isPartlyWatched(e)) {
-    // Resume the version the saved position belongs to, at that position.
+    // Resume the version the saved position belongs to. No start: the
+    // server resumes a few seconds before it (PLAN-RESUME.md §3.8).
     const file = e.files.find((f) => f.id === e.watch?.fileId) ?? best
     return {
-      primary: { kind: 'play', label: `Resume from ${formatDuration(e.watch.positionMs)}`, fileId: file.id, start: e.watch.positionMs / 1000 },
+      primary: { kind: 'play', label: `Resume from ${formatDuration(e.watch.positionMs)}`, fileId: file.id },
       fromStart: { label: 'From the start', fileId: file.id, start: 0 },
       mark,
     }
