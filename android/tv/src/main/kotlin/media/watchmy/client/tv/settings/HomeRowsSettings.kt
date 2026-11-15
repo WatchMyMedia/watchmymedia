@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -25,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Text
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.RowScreens
 import media.watchmy.client.model.attempt
@@ -51,11 +54,14 @@ private const val TV_LISTS_NOTE = "Lists are made in WatchMyMedia on the web. Li
  * in the side panel. Every change is saved as it is made. Hidden rows stay
  * in the list; there is no Add a row on the TV. [initialScreen] is the
  * screen a library's Edit rows opened it on; [focus] then takes focus to
- * its Screen row.
+ * its Screen row, which is also the pane's [first].
+ *
+ * Reset asks first (android-tv/SettingsConfirm.dc.html, Tweak `which`:
+ * `resetRows`), since it changes every device the person signs in on.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun ColumnScope.HomeRowsSettings(initialScreen: String?, focus: FocusRequester) {
+internal fun ColumnScope.HomeRowsSettings(initialScreen: String?, focus: FocusRequester, first: FocusRequester) {
     val services = LocalAppServices.current
     var screen by rememberSaveable { mutableStateOf(initialScreen ?: RowScreens.HOME) }
     val screens by produceState(listOf(RowsScreen(RowScreens.HOME, "Home"))) {
@@ -67,6 +73,9 @@ internal fun ColumnScope.HomeRowsSettings(initialScreen: String?, focus: FocusRe
     val vm = viewModel(key = "tv-rows-$screen") { RowLayoutViewModel(services.rows, screen, current.name, autosave = true) }
     val state by vm.state.collectAsStateWithLifecycle()
     var picking by remember { mutableStateOf(false) }
+    var resetting by rememberSaveable { mutableStateOf<ResetStep?>(null) }
+    val scope = rememberCoroutineScope()
+    val serverName = services.servers.current.collectAsStateWithLifecycle().value?.server?.name
     var options by remember { mutableStateOf<String?>(null) }
     val requesters = remember { HashMap<String, FocusRequester>() }
     var refocus by remember { mutableStateOf<String?>(null) }
@@ -86,47 +95,68 @@ internal fun ColumnScope.HomeRowsSettings(initialScreen: String?, focus: FocusRe
         shown = true
     }
 
-    Section("Home rows") {
-        Note("The rows on ${current.name}, in your order. They are the same on every device you sign in on.")
-        SettingRow(
-            "Screen",
-            onClick = { picking = true },
-            description = "Movies and TV Shows have rows of their own",
-            modifier = Modifier.focusRequester(focus).bringIntoViewRequester(bring),
-        ) { Value(current.name, chevron = true) }
-        when (val layout = state.layout) {
-            Load.Loading -> Note("Loading…")
-            is Load.Failed -> SettingRow("Couldn't load the rows", onClick = vm::retry, description = layout.message) { Value("Try again") }
-            is Load.Ready -> state.entries.forEachIndexed { i, entry -> key(entry.id) {
-                val line = entry.copy(hidden = false).editorLine(state.listFor(entry))
-                val note = entry.notShown
-                val requester = remember { FocusRequester() }
-                DisposableEffect(requester) {
-                    requesters[entry.id] = requester
-                    onDispose { requesters.remove(entry.id) }
-                }
-                SettingRow(
-                    "${i + 1}. ${entry.title}",
-                    onClick = { options = entry.id },
-                    description = if (note == null) line else "$line\n$note",
-                    stacked = note != null,
-                    labelColor = if (entry.hidden) WmmColors.TextFaint else WmmColors.Text,
-                    modifier = Modifier.focusRequester(requester),
-                ) { Value(if (entry.hidden) "Hidden" else "Options", chevron = true) }
-            } }
-        }
-        Note(TV_LISTS_NOTE, Modifier.padding(top = 4.dp), color = WmmColors.TextFaint)
-        SettingRow("Reset ${current.name} rows", onClick = vm::reset, description = "Back to the rows everyone on this server starts with") { Box {} }
-        if (state.saving) Text("Saving…", style = inter(17.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(horizontal = 18.dp))
-        state.message?.let { message ->
-            Text(message, style = inter(17.sp), color = WmmColors.TextSoft, modifier = Modifier.padding(horizontal = 18.dp))
-            LaunchedEffect(message) {
-                kotlinx.coroutines.delay(2600)
-                vm.messageShown()
+    Note("The rows on ${current.name}, in your order. They are the same on every device you sign in on.")
+    SettingRow(
+        "Screen",
+        onClick = { picking = true },
+        description = "Movies and TV Shows have rows of their own",
+        modifier = Modifier.focusRequester(focus).focusRequester(first).bringIntoViewRequester(bring),
+    ) { Value(current.name, chevron = true) }
+    when (val layout = state.layout) {
+        Load.Loading -> Note("Loading…")
+        is Load.Failed -> SettingRow("Couldn't load the rows", onClick = vm::retry, description = layout.message) { Value("Try again") }
+        is Load.Ready -> state.entries.forEachIndexed { i, entry -> key(entry.id) {
+            val line = entry.copy(hidden = false).editorLine(state.listFor(entry))
+            val note = entry.notShown
+            val requester = remember { FocusRequester() }
+            DisposableEffect(requester) {
+                requesters[entry.id] = requester
+                onDispose { requesters.remove(entry.id) }
             }
+            SettingRow(
+                "${i + 1}. ${entry.title}",
+                onClick = { options = entry.id },
+                description = if (note == null) line else "$line\n$note",
+                stacked = note != null,
+                labelColor = if (entry.hidden) WmmColors.TextFaint else WmmColors.Text,
+                modifier = Modifier.focusRequester(requester),
+            ) { Value(if (entry.hidden) "Hidden" else "Options", chevron = true) }
+        } }
+    }
+    Note(TV_LISTS_NOTE, Modifier.padding(top = 4.dp), color = WmmColors.TextFaint)
+    SettingRow("Reset ${current.name} rows", onClick = { resetting = ResetStep.Asking }, description = "Back to the rows everyone on this server starts with") { Box {} }
+    if (state.saving) Text("Saving…", style = inter(17.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(horizontal = 18.dp))
+    state.message?.let { message ->
+        Text(message, style = inter(17.sp), color = WmmColors.TextSoft, modifier = Modifier.padding(horizontal = 18.dp))
+        LaunchedEffect(message) {
+            kotlinx.coroutines.delay(2600)
+            vm.messageShown()
         }
     }
 
+    if (resetting != null) {
+        val step = resetting
+        ConfirmDialog(
+            ConfirmWords("Reset ${possessive(current.name)} rows?", keep = "Keep my rows", go = "Reset rows", busy = "Resetting…"),
+            working = step == ResetStep.Working,
+            failure = if (step == ResetStep.Failed) "Couldn’t reset. Your rows are as they were." else null,
+            onKeep = { resetting = null },
+            onGo = {
+                resetting = ResetStep.Working
+                scope.launch {
+                    vm.reset()
+                    // The view model says how a reset ended only in its message: the sentence it gives on success, else why it failed.
+                    vm.state.first { it.saving }
+                    val end = vm.state.first { !it.saving }
+                    if (resetting == ResetStep.Working) resetting = if (end.message?.endsWith(RESET_DONE) == true) null else ResetStep.Failed
+                }
+            },
+        ) {
+            ConfirmPart(null, "${current.name} goes back to the rows everyone on ${serverName ?: "this server"} starts with, on every device you sign in on.")
+            ConfirmPart("Deleted", "Your order, and which rows you hid.")
+            ConfirmPart("Stays", "Your lists.")
+        }
+    }
     if (picking) {
         OptionsDialog(
             title = "Screen",
@@ -186,6 +216,12 @@ internal fun ColumnScope.HomeRowsSettings(initialScreen: String?, focus: FocusRe
         }
     }
 }
+
+/** Where Reset's confirmation is: asking, resetting, or failed. */
+private enum class ResetStep { Asking, Working, Failed }
+
+/** The end of RowLayoutViewModel's sentence for a reset that worked: "Home is back to the rows everyone starts with." */
+private const val RESET_DONE = "is back to the rows everyone starts with."
 
 /** What the side panel offers for a row. */
 private enum class RowAction {
