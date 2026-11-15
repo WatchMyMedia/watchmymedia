@@ -252,7 +252,7 @@ private struct SwitchSignInStep: View {
             } else if signIn.codeSignIn {
                 PairingCard(model: signIn, family: deviceFamily(model: services.client.model))
             } else {
-                field("Name") {
+                field("Name", .name) {
                     TextField("Name", text: $signIn.name)
                         .textContentType(.username)
                         .textInputAutocapitalization(.never)
@@ -262,7 +262,7 @@ private struct SwitchSignInStep: View {
                         .onSubmit { focus = .password }
                         .accessibilityIdentifier("switch-name")
                 }
-                field("Password", warning: fieldError) {
+                field("Password", .password, warning: fieldError) {
                     SecureField("Password", text: $signIn.password)
                         .textContentType(.password)
                         .submitLabel(.go)
@@ -297,7 +297,8 @@ private struct SwitchSignInStep: View {
         model.signInProblem.map { TaskProblem(title: $0.title, message: $0.body) }
     }
 
-    private func field(_ label: String, warning: String? = nil, @ViewBuilder input: () -> some View) -> some View {
+    /// A labelled field; a tap anywhere on its box puts the cursor in it.
+    private func field(_ label: String, _ which: Field, warning: String? = nil, @ViewBuilder input: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
                 .font(.footnote.weight(.semibold))
@@ -311,6 +312,8 @@ private struct SwitchSignInStep: View {
                 .frame(minHeight: 50)
                 .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(warning != nil ? Palette.warning : Palette.outlineStrong, lineWidth: warning != nil ? 2 : 1))
+                .contentShape(RoundedRectangle(cornerRadius: 12))
+                .onTapGesture { focus = which }
                 .disabled(signIn.busy)
             if let warning {
                 Text(warning).font(.footnote).foregroundStyle(Palette.warning).fixedSize(horizontal: false, vertical: true).padding(.horizontal, 4)
