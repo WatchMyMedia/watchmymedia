@@ -101,7 +101,22 @@ public final class Navigator {
     /// ⌘F asked for Search: the Search screen puts the cursor in its field, then clears this.
     public var searchFieldRequested = false
 
+    /// A row's See all for a library (PLAN-SEE-ALL.md §4.4), kept for the
+    /// tab that shows it until that tab's grid takes it: one a tab, used once.
+    @ObservationIgnored private var browseLinks: [AppTab: RowLink] = [:]
+
     public init() {}
+
+    /// Keeps `link` for `tab`'s grid, over one it hasn't taken yet.
+    public func post(_ link: RowLink, for tab: AppTab) {
+        browseLinks[tab] = link
+    }
+
+    /// The link kept for `tab`, once: taking it clears it, so selecting the
+    /// tab again later leaves the grid as the person last had it.
+    public func takeBrowseLink(for tab: AppTab) -> RowLink? {
+        browseLinks.removeValue(forKey: tab)
+    }
 
     /// ⌘F on a hardware keyboard (PLAN-APPLE-REVIEW.md §6.3): the Search tab,
     /// with the cursor in its field. Nothing while a player is open.

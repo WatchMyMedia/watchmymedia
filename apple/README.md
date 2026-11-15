@@ -282,8 +282,17 @@ style (`ArrangedRow`, `TVArrangedRow`), the app's own Live TV row in the
 beside the hero only while it is the first row drawn. Movies and TV Shows put
 the library's rows above the grid (`getLibraryRows`), then Edit rows and the
 grid as All movies or All shows; a title search hides them, and a library
-row's See all sorts and filters the grid below. Older servers keep today's
-fixed rows, and their library screens have none.
+row's See all sorts and filters the grid below. On iPhone and iPad every row
+with a link ends in a See all card the size of its cards ("See all TV shows",
+"By last aired"; PLAN-SEE-ALL.md §4.4), and has See all in its heading too.
+From Home it opens the TV Shows or Movies tab at its grid, sorted the row's
+way with no filter: `Navigator.open(_:home:)` keeps the row's link for that
+tab and the tab's `LibraryModel` takes it once (`takeBrowseLink(for:)`), so
+selecting the tab again later leaves the grid as the person has it. Continue
+watching and Live TV have no See all, nor do Home's rows that mix two
+libraries of one type, which the server sends without a link. On iPad's Home
+screens the card never leads its row. Older servers keep today's fixed rows,
+and their library screens have none.
 
 Home rows (Edit Home at the end of Home, Settings › Home rows, and Edit rows
 on a library) is one sheet on iPhone and iPad: drag handles, Hide and Show in
@@ -307,7 +316,8 @@ Add a row; `-open watchmymedia://lists/9001` opens Top rated science fiction
 (with titles to request) and `lists/9002` Rainy Sunday films (an import with a
 title not found). On Apple TV, `-tab settings -homeRowsSettings` opens Home
 rows. Add `-fakesMember` for a member, who can't delete or refresh the
-household's lists.
+household's lists, and `-fakesTwoMovieLibraries` for a server with two movie
+libraries, whose Home movie rows have no See all.
 
 ## First run, audio languages and subtitles
 

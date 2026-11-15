@@ -73,6 +73,11 @@ public final class LibraryModel {
     public private(set) var scrollTargetID: Int?
     /// Changes on every jump, including a repeated tap on the same letter.
     public private(set) var scrollRequestID = 0
+    /// Changes when the grid has loaded with a Home row's See all
+    /// (PLAN-SEE-ALL.md §4.4): the screen scrolls to the grid's heading, below the rows.
+    public private(set) var gridJump = 0
+    /// Home's See all was taken and its options chosen; the grid hasn't loaded with them yet.
+    @ObservationIgnored private var browseLinkWaiting = false
     private var changingQuery = false
     public var message: String?
     public var notice: Notice?
@@ -188,12 +193,25 @@ public final class LibraryModel {
     /// the event doesn't say watched or not), and the grid is loaded again,
     /// in pieces, only when this library changed or a show's state can't be
     /// told otherwise. Coming back to it loads nothing unless something
-    /// changed meanwhile (``ScreenChanges``).
+    /// changed meanwhile (``ScreenChanges``). Each time it starts it takes a
+    /// Home row's See all for this tab, if one is waiting: the grid loads
+    /// from the top with its sort, then ``gridJump`` moves. A See all taken
+    /// while the grid is on screen loads it again; one that was left before
+    /// it loaded loads when the screen shows again.
     public func run() async {
+        takeBrowseLink()
+        if browseLinkWaiting, state.value != nil {
+            await load(.change)
+            changes.loaded()
+            browseLinkLoaded()
+        }
         await changes.run(
             subscribe: { merge(library.libraryChanges(), unknown: rowsRepository?.changes()) },
             hasContent: state.value != nil,
-            load: { quiet in await load(quiet ? .quiet : .first) },
+            load: { quiet in
+                await load(quiet ? .quiet : .first)
+                browseLinkLoaded()
+            },
             apply: { changes in await apply(changes) }
         )
     }
@@ -291,15 +309,48 @@ public final class LibraryModel {
         switch link {
         case .list(let id):
             navigator.open(.mediaList(id: id))
-        case .library(_, let sort, let filter, let genre, let decade):
-            self.sort = sort.flatMap { sorts.contains($0) ? $0 : nil } ?? self.sort
-            self.filter = filter.flatMap { filters.contains($0) ? $0 : nil } ?? .all
-            self.genre = genre
-            self.decade = decade
-            searchText = ""
-            pendingSearch?.cancel()
+        case .library:
+            choose(link)
             await load(.change)
         }
+    }
+
+    /// What a row's See all card and heading link say (PLAN-SEE-ALL.md §3);
+    /// nil for a row without one. A library link opens the grid below.
+    public func seeAll(_ row: ScreenRow) -> SeeAllWords? {
+        SeeAllWords(row: row, libraryType: type)
+    }
+
+    /// The tab that shows this grid, whose Home See all it takes.
+    private var tab: AppTab { type.tab }
+
+    /// A library link's sort (when this library offers it) and filters, as the
+    /// person's own choice (PLAN-SEE-ALL.md decision 3): the filter All unless
+    /// the link names one, the link's genre and decade, no title search.
+    private func choose(_ link: RowLink) {
+        guard case .library(_, let sort, let filter, let genre, let decade) = link else { return }
+        self.sort = sort.flatMap { sorts.contains($0) ? $0 : nil } ?? self.sort
+        self.filter = filter.flatMap { filters.contains($0) ? $0 : nil } ?? .all
+        self.genre = genre
+        self.decade = decade
+        searchText = ""
+        pendingSearch?.cancel()
+    }
+
+    /// Takes Home's See all for this tab, when there is one
+    /// (``Navigator/takeBrowseLink(for:)``): its sort and filters are chosen
+    /// now and the grid loads with them; then ``gridJump`` moves.
+    private func takeBrowseLink() {
+        guard let link = navigator.takeBrowseLink(for: tab), case .library = link else { return }
+        choose(link)
+        browseLinkWaiting = true
+    }
+
+    /// Home's See all was taken: the grid loaded with it, so the screen goes to it.
+    private func browseLinkLoaded() {
+        guard browseLinkWaiting, !Task.isCancelled else { return }
+        browseLinkWaiting = false
+        gridJump += 1
     }
 
     /// The library's rows; nil when they couldn't be read (the grid still

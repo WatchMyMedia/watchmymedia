@@ -19,6 +19,10 @@ public final class FakeRowsRepository: RowsRepository {
     private let now: Date
     private var listeners: [UUID: AsyncStream<Void>.Continuation] = [:]
 
+    /// Home's movie rows mix two movie libraries (`-fakesTwoMovieLibraries`), so,
+    /// as the server does, they carry no See all link (PLAN-SEE-ALL.md decision 6).
+    public var twoMovieLibraries = false
+
     public init(servers: FakeServerRepository? = nil, admin: Bool = true, now: Date = .now) {
         self.servers = servers
         self.admin = admin
@@ -177,24 +181,29 @@ public final class FakeRowsRepository: RowsRepository {
     }
 
     /// The rows the screen draws, filled from `home` (for Home's built-in rows) and the library.
+    /// Each built-in row links to its library sorted its way, as the server's
+    /// `builtinLink` does: on Home only while one library has the row's type.
     func screenRows(_ screen: RowScreen, home: HomeData) -> [ScreenRow] {
-        merged(screen).filter { !$0.hidden }.compactMap { entry in
+        func link(_ library: Int, _ sort: ItemSort) -> RowLink? {
+            if screen == .home, twoMovieLibraries, library == FakeData.movieLibrary { return nil }
+            return .library(id: library, sort: sort, filter: nil, genre: nil, decade: nil)
+        }
+        let screenLibrary: Int? = if case .library(let id) = screen { id } else { nil }
+        return merged(screen).filter { !$0.hidden }.compactMap { entry in
             let row: ScreenRow? = switch (screen, entry.id) {
             case (.home, "continue"): ScreenRow(id: entry.id, style: .continue, title: entry.title, continueItems: home.continueWatching)
             case (.home, "live"): ScreenRow(id: entry.id, style: .live, title: entry.title)
             case (.home, "recentlyAddedShows"):
-                ScreenRow(id: entry.id, style: .poster, title: entry.title, items: home.recentlyAddedShows,
-                          seeAll: .library(id: FakeData.tvLibrary, sort: .added, filter: nil, genre: nil, decade: nil))
-            case (_, "recentlyAired"): ScreenRow(id: entry.id, style: .episode, title: entry.title, episodes: home.recentlyAired)
+                ScreenRow(id: entry.id, style: .poster, title: entry.title, items: home.recentlyAddedShows, seeAll: link(FakeData.tvLibrary, .added))
+            case (_, "recentlyAired"):
+                ScreenRow(id: entry.id, style: .episode, title: entry.title, episodes: home.recentlyAired, seeAll: link(screenLibrary ?? FakeData.tvLibrary, .aired))
             case (.home, "recentlyAddedMovies"):
-                ScreenRow(id: entry.id, style: .poster, title: entry.title, items: home.recentlyAddedMovies,
-                          seeAll: .library(id: FakeData.movieLibrary, sort: .added, filter: nil, genre: nil, decade: nil))
+                ScreenRow(id: entry.id, style: .poster, title: entry.title, items: home.recentlyAddedMovies, seeAll: link(FakeData.movieLibrary, .added))
             case (_, "recentlyReleased"):
-                ScreenRow(id: entry.id, style: .wide, title: entry.title, items: home.recentlyReleased,
-                          seeAll: .library(id: FakeData.movieLibrary, sort: .released, filter: nil, genre: nil, decade: nil))
+                ScreenRow(id: entry.id, style: .wide, title: entry.title, items: home.recentlyReleased, seeAll: link(screenLibrary ?? FakeData.movieLibrary, .released))
             case (.library(let id), "recentlyAdded"):
                 ScreenRow(id: entry.id, style: .poster, title: entry.title, items: id == FakeData.tvLibrary ? home.recentlyAddedShows : home.recentlyAddedMovies,
-                          seeAll: .library(id: id, sort: .added, filter: nil, genre: nil, decade: nil))
+                          seeAll: link(id, .added))
             default: entry.listID.flatMap { listRow($0, screen: screen) }
             }
             return row.flatMap { $0.isEmpty ? nil : $0 }

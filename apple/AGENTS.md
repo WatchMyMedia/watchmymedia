@@ -199,7 +199,9 @@ didn't start.
   a field has the keyboard up taps a key instead. Put the keyboard away
   first, wait for the tab's `isSelected`, and find a page's search field by
   its prompt, since another tab's may still be in the tree
-  (`UITests/LiveExtrasTests.swift`).
+  (`UITests/LiveExtrasTests.swift`). On iPad (iPadOS 27.2) the tabs beside
+  the title are not in `app.tabBars`: find a tab as `app.buttons[name]`
+  when the tab bar has none (`UITests/SeeAllTests.swift`).
 - Builds for the simulator are signed ad hoc (`APPLE_SIM_SIGNING` in the
   Makefile). Without it the Keychain refuses the app and the sign-in does not
   survive a relaunch, so use the make targets or copy those flags.

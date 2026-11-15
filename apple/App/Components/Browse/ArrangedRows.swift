@@ -12,7 +12,13 @@ struct RowActions {
     var openPage: (ContinueItem) -> Void = { _ in }
     var setWatched: (WatchTarget, Bool) async -> Void
     /// A row's See all, or nil when it has none here.
-    var seeAll: (ScreenRow) -> (() -> Void)?
+    var seeAll: (ScreenRow) -> RowSeeAll?
+}
+
+/// A row's See all: what its card and heading link say, and what they open.
+struct RowSeeAll {
+    let words: SeeAllWords
+    let open: () -> Void
 }
 
 /// One arranged row (PLAN-ROWS.md §6.1), drawn by its style with Home's
@@ -21,7 +27,8 @@ struct RowActions {
 /// heading ("18 of 50 · From TMDB", LibraryRows.dc.html). On the iPad's Home
 /// screens (PLAN-HOME.md §7.6) `counter` is "Row 2 of 7" and `leading` holds
 /// the leading card's key, which the row outlines in gold and keeps up to
-/// date as the row snaps.
+/// date as the row snaps. A poster, 16:9 or episode row with a See all ends
+/// in a ``SeeAllCard`` (PLAN-SEE-ALL.md §4.4) and has See all in its heading.
 struct ArrangedRow: View {
     let row: ScreenRow
     let actions: RowActions
@@ -38,8 +45,24 @@ struct ArrangedRow: View {
         return (leading.wrappedValue ?? first) == key
     }
 
+    /// `leading` as the row reports it: the See all card never leads, so the
+    /// panel above stays on the card it was on (``RowPanel/leadingCard(settledOn:was:)``).
+    private var leadingCard: Binding<String?>? {
+        guard let leading else { return nil }
+        return Binding(get: { leading.wrappedValue }, set: { leading.wrappedValue = RowPanel.leadingCard(settledOn: $0, was: leading.wrappedValue) })
+    }
+
+    /// The row's card sizes: the See all card is as big as their artwork.
+    private var posterSize: CGSize { wide ? CGSize(width: 150, height: 225) : CGSize(width: 110, height: 165) }
+    private var wideSize: CGSize { CGSize(width: wideCardWidth, height: (wideCardWidth * 9 / 16).rounded()) }
+
+    @ViewBuilder private func seeAllCard(_ seeAll: RowSeeAll?, size: CGSize) -> some View {
+        if let seeAll { SeeAllCard(seeAll: seeAll, size: size) }
+    }
+
     var body: some View {
         let heading = row.heading
+        let seeAll = row.style == .continue ? nil : actions.seeAll(row)
         switch row.style {
         case .live:
             // On now with listings, Live TV's channels without (only one of them draws).
@@ -48,34 +71,97 @@ struct ArrangedRow: View {
                 LiveOnNowRow(counter: counter, leading: leading)
             }
         case .continue:
-            CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 18 : 12, seeAll: actions.seeAll(row), counter: counter, leading: leading) {
+            // Continue watching has no See all (PLAN-SEE-ALL.md decision 4).
+            CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 18 : 12, counter: counter, leading: leading) {
                 ForEach(row.continueItems, id: \.cardKey) { item in
                     ContinueCard(item: item, actions: actions, width: wideCardWidth, leading: isLeading(item.cardKey, first: row.continueItems.first?.cardKey))
                 }
             }
             .accessibilityIdentifier("row-\(row.id)")
         case .episode:
-            CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 18 : 12, seeAll: actions.seeAll(row), counter: counter, leading: leading) {
+            CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 18 : 12, seeAll: seeAll?.open, seeAllLabel: seeAll?.words.accessibilityLabel, counter: counter, leading: leadingCard) {
                 ForEach(row.episodes, id: \.cardKey) { episode in
                     EpisodeRowCard(episode: episode, actions: actions, width: wideCardWidth, leading: isLeading(episode.cardKey, first: row.episodes.first?.cardKey))
                 }
+                seeAllCard(seeAll, size: wideSize)
             }
             .accessibilityIdentifier("row-\(row.id)")
         case .wide:
-            CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 18 : 12, seeAll: actions.seeAll(row), counter: counter, leading: leading) {
+            CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 18 : 12, seeAll: seeAll?.open, seeAllLabel: seeAll?.words.accessibilityLabel, counter: counter, leading: leadingCard) {
                 ForEach(row.items, id: \.cardID) { item in
                     WideItemCard(item: item, actions: actions, width: wideCardWidth, leading: isLeading(item.cardID, first: row.items.first?.cardID))
                 }
+                seeAllCard(seeAll, size: wideSize)
             }
             .accessibilityIdentifier("row-\(row.id)")
         case .poster:
-            CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 16 : 10, seeAll: actions.seeAll(row), counter: counter, leading: leading) {
+            CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 16 : 10, seeAll: seeAll?.open, seeAllLabel: seeAll?.words.accessibilityLabel, counter: counter, leading: leadingCard) {
                 ForEach(row.items, id: \.cardID) { item in
-                    PosterItemCard(item: item, actions: actions, width: wide ? 150 : 110, leading: isLeading(item.cardID, first: row.items.first?.cardID))
+                    PosterItemCard(item: item, actions: actions, width: posterSize.width, leading: isLeading(item.cardID, first: row.items.first?.cardID))
                 }
+                seeAllCard(seeAll, size: posterSize)
             }
             .accessibilityIdentifier("row-\(row.id)")
         }
+    }
+}
+
+/// The card at the end of a row (HomeSeeAll.dc.html, Pad2HomeRowSeeAll.dc.html):
+/// as big as the row's artwork, with no title under it. A grid glyph on a gold
+/// tint (a list's glyph for a list), "See all TV shows" and "By last aired".
+/// It opens what the heading's See all opens. On iPad's Home screens it is
+/// tapped like any card and never leads the row, so the panel has nothing of its own for it.
+struct SeeAllCard: View {
+    let seeAll: RowSeeAll
+    let size: CGSize
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var glyph: String {
+        if case .list = seeAll.words.destination { return "list.bullet" }
+        return "square.grid.2x2"
+    }
+
+    var body: some View {
+        let wide = sizeClass.isWide
+        let title = seeAll.words.title
+        Button(action: seeAll.open) {
+            VStack(spacing: wide ? 8 : 6) {
+                Image(systemName: glyph)
+                    .font(.system(size: wide ? 20 : 17, weight: .semibold))
+                    .foregroundStyle(Palette.gold)
+                    .frame(width: wide ? 44 : 36, height: wide ? 44 : 36)
+                    .background(Palette.gold.opacity(0.18), in: Circle())
+                // "See all TV shows" on one line where it fits, else as "See all" over "TV shows".
+                ViewThatFits(in: .horizontal) {
+                    titleText(title).lineLimit(1)
+                    titleText(title.replacingOccurrences(of: "See all ", with: "See all\n"))
+                }
+                if let detail = seeAll.words.detail {
+                    Text(detail)
+                        .scaledFont(13)
+                        .foregroundStyle(Palette.muted)
+                        .multilineTextAlignment(.center)
+                        .minimumScaleFactor(0.7)
+                }
+            }
+            .padding(.horizontal, wide ? 14 : 10)
+            .frame(width: size.width, height: size.height)
+            .background(Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.outline))
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(CardButtonStyle())
+        .accessibilityLabel(seeAll.words.accessibilityLabel)
+        .accessibilityIdentifier("row-see-all")
+        .id(SeeAllWords.cardKey)
+    }
+
+    private func titleText(_ text: String) -> some View {
+        Text(text)
+            .scaledFont(sizeClass.isWide ? 16 : 15, weight: .semibold)
+            .foregroundStyle(Palette.text)
+            .multilineTextAlignment(.center)
+            .minimumScaleFactor(0.7)
     }
 }
 

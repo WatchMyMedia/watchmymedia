@@ -75,6 +75,11 @@ private struct LibraryView: View {
                     .onChange(of: model.scrollRequestID) {
                         if let target = model.scrollTargetID { proxy.scrollTo(target, anchor: .top) }
                     }
+                    // A Home row's See all opens the tab at its grid, below the tab's own rows
+                    // (PLAN-SEE-ALL.md §11.2), once the grid has loaded sorted the row's way.
+                    .onChange(of: model.gridJump) {
+                        Task { @MainActor in proxy.scrollTo(Self.gridAnchor, anchor: .top) }
+                    }
                 }
             }
         }
@@ -150,8 +155,8 @@ private struct LibraryView: View {
             resume: { model.resume($0) },
             setWatched: { await model.setWatched($0, $1) },
             seeAll: { row in
-                guard let link = row.seeAll else { return nil }
-                return {
+                guard let link = row.seeAll, let words = model.seeAll(row) else { return nil }
+                return RowSeeAll(words: words) {
                     Task {
                         await model.open(link)
                         if case .library = link { withAnimation { proxy.scrollTo(Self.gridAnchor, anchor: .top) } }
