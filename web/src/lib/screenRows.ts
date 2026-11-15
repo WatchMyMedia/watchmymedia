@@ -1,6 +1,6 @@
 import type { components } from '../api/schema'
 import { relativeTime } from './format'
-import { itemFilter, itemSort } from './browseOptions'
+import { itemFilter, itemSort, sortOptions } from './browseOptions'
 import type { BrowseSearch } from './routeSearch'
 
 // Home and a library's Overview drawn from the server's rows, in the
@@ -46,18 +46,18 @@ export function drawable(row: ScreenRow): boolean {
 /**
  * Home's rows. An arranged reply sends rows (or none, when every row is
  * hidden) and empty fixed arrays; an unarranged one sends only the fixed
- * arrays, which become the built-in rows in today's order.
+ * arrays, which become the built-in rows in today's order, each linking to
+ * its library sorted the row's way, as an arranged row's link does.
  */
 export function homeRows(h: HomeData): ScreenRow[] {
   if (h.rows) return h.rows
-  const tv = h.tvLibraryId ? { kind: 'library', libraryId: h.tvLibraryId } : undefined
-  const movies = h.movieLibraryId ? { kind: 'library', libraryId: h.movieLibraryId } : undefined
+  const link = (libraryId: number | undefined, sort: string) => (libraryId ? { kind: 'library', libraryId, sort } : undefined)
   return [
     { id: 'continue', style: 'continue', title: 'Continue watching', continue: h.continueWatching },
-    { id: 'recentlyAddedShows', style: 'poster', title: 'Recently added · TV Shows', items: h.recentlyAddedShows, seeAll: tv },
-    { id: 'recentlyAired', style: 'episode', title: 'Recently aired · Episodes', episodes: h.recentlyAired, seeAll: tv },
-    { id: 'recentlyAddedMovies', style: 'poster', title: 'Recently added · Movies', items: h.recentlyAddedMovies, seeAll: movies },
-    { id: 'recentlyReleased', style: 'poster', title: 'Recently released · Movies', items: h.recentlyReleased, seeAll: movies },
+    { id: 'recentlyAddedShows', style: 'poster', title: 'Recently added · TV Shows', items: h.recentlyAddedShows, seeAll: link(h.tvLibraryId, 'added') },
+    { id: 'recentlyAired', style: 'episode', title: 'Recently aired · Episodes', episodes: h.recentlyAired, seeAll: link(h.tvLibraryId, 'aired') },
+    { id: 'recentlyAddedMovies', style: 'poster', title: 'Recently added · Movies', items: h.recentlyAddedMovies, seeAll: link(h.movieLibraryId, 'added') },
+    { id: 'recentlyReleased', style: 'poster', title: 'Recently released · Movies', items: h.recentlyReleased, seeAll: link(h.movieLibraryId, 'released') },
   ]
 }
 
@@ -161,6 +161,24 @@ export function seeAllTarget(row: Pick<ScreenRow, 'seeAll' | 'listId' | 'items'>
     type,
     search: { ...options, view: any ? 'all' : undefined, library: first && first.id !== lib.id ? lib.id : undefined },
   }
+}
+
+export type SeeAllWords = { title: string; detail?: string; label: string }
+
+/**
+ * What a row's See all says (PLAN-SEE-ALL.md §4.4), on its card and, as
+ * `label`, to a screen reader from the card and the heading's link alike. A
+ * library's grid is "See all TV shows" over "By last aired", the sort in the
+ * grid's own words so the two can't drift, and no second line without a
+ * sort; a list is "See all" over "With the ones you don’t have".
+ */
+export function seeAllWords(target: SeeAllTarget, rowTitle: string): SeeAllWords {
+  if (target.kind === 'list') return { title: 'See all', detail: 'With the ones you don’t have', label: `See all of ${rowTitle}` }
+  const title = target.type === 'tv' ? 'See all TV shows' : 'See all movies'
+  const sort = sortOptions(target.type).find((o) => o.value === target.search.sort)?.label
+  if (!sort) return { title, label: title }
+  const by = sort.charAt(0).toLowerCase() + sort.slice(1)
+  return { title, detail: `By ${by}`, label: `${title}, by ${by}` }
 }
 
 export type ScreenTarget = { to: '/' } | { to: '/movies' | '/tv'; library?: number }

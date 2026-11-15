@@ -1,16 +1,18 @@
 import type { ReactNode } from 'react'
 import { Link, type LinkProps } from '@tanstack/react-router'
 
-/** Horizontal scroller with heading, muted sub-label and "See all ›". */
+/** Horizontal scroller with heading, muted sub-label and "See all ›", read aloud as seeAllLabel. */
 export function Row({
   title,
   subtitle,
   seeAll,
+  seeAllLabel,
   children,
 }: {
   title: string
   subtitle?: ReactNode
   seeAll?: LinkProps
+  seeAllLabel?: string
   children: ReactNode
 }) {
   return (
@@ -21,7 +23,7 @@ export function Row({
           {subtitle && <span className="ml-2 text-sm font-normal text-neutral-500">{subtitle}</span>}
         </h2>
         {seeAll && (
-          <Link {...seeAll} className="text-sm text-neutral-400 hover:text-neutral-100">
+          <Link {...seeAll} aria-label={seeAllLabel} className="text-sm text-neutral-400 hover:text-neutral-100">
             See all ›
           </Link>
         )}
