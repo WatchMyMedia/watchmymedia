@@ -1,4 +1,5 @@
 import SwiftUI
+import WMMFeatures
 import WMMModel
 import WMMUI
 
@@ -35,13 +36,24 @@ struct SettingsGroup<Content: View>: View {
 /// and what it still is.
 enum RowNote: Equatable {
     case saving
+    /// "Saved. Credits now skip after 3 seconds, on every device."
     case saved(String)
     case failed(String)
+
+    /// A control's ``SaveState`` from the Kit; nil at rest, when the row says its usual line.
+    init?(_ state: SaveState) {
+        switch state {
+        case .rest: return nil
+        case .saving: self = .saving
+        case .saved(let line): self = .saved(line)
+        case .failed(let line): self = .failed(line)
+        }
+    }
 
     var text: String {
         switch self {
         case .saving: "Saving…"
-        case .saved(let line): "✓ Saved. \(line)"
+        case .saved(let line): "✓ \(line)"
         case .failed(let reason): reason
         }
     }
@@ -426,6 +438,19 @@ struct TVQuestion: Identifiable {
     /// "Sign out of this Apple TV".
     let act: String
     let action: () async -> Void
+
+    init(title: String, paragraphs: [String], keep: String, act: String, action: @escaping () async -> Void) {
+        self.title = title
+        self.paragraphs = paragraphs
+        self.keep = keep
+        self.act = act
+        self.action = action
+    }
+
+    /// The Kit's words for a question: its title, lines, the keeping button and the acting one.
+    init(_ words: ConfirmWords, action: @escaping () async -> Void) {
+        self.init(title: words.title, paragraphs: words.lines, keep: words.keep, act: words.confirm, action: action)
+    }
 }
 
 /// The question over the dimmed screen. Menu is the keeping button; focus

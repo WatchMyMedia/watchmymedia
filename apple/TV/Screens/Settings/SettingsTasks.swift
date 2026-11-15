@@ -4,33 +4,26 @@ import WMMModel
 import WMMUI
 
 /// Name this Apple TV (TvSettings2Rename.dc.html): room names to choose
-/// from, so most people never type with the remote, and Type another name
-/// for the rest. Select on a name saves it; Menu goes back and keeps the
-/// name it had.
+/// from (`SettingsModel.roomNames`, this one's first), so most people never
+/// type with the remote, and Type another name for the rest. Select on a
+/// name saves it; Menu goes back and keeps the name it had.
 struct TVRenameScreen: View {
-    let current: String
-    /// "Apple TV".
-    let family: String
+    let model: SettingsModel
     let onChoose: (String) -> Void
     let onClose: () -> Void
     @State private var typing = false
     @State private var typed = ""
     @FocusState private var focused: String?
 
-    /// The rooms, with this one's name first when it isn't among them.
-    private var names: [String] {
-        let rooms = TVWords.rooms.map { "\($0) \(family)" }
-        return rooms.contains(current) || current.isEmpty ? rooms : [current] + rooms
-    }
+    private var current: String { model.deviceName }
 
     var body: some View {
         TVTaskFrame(
-            crumb: "Settings › Account & devices", title: "Name this \(family)",
-            lede: "Shown in Signed-in devices and in the server’s Activity, so you can tell your devices apart.",
-            hint: "Select a name to save it · Menu goes back to Account & devices and keeps \(current)"
+            crumb: "\(SettingsWords.settings) › \(SettingsWords.accountAndDevices)", title: SettingsWords.nameTitle(device: model.facts.family),
+            lede: SettingsWords.renameHelp, hint: SettingsWords.roomNamesHint(keeping: current)
         ) {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 4), alignment: .leading, spacing: 14) {
-                ForEach(names, id: \.self) { name in
+                ForEach(model.roomNames, id: \.self) { name in
                     Button { onChoose(name) } label: { ChipLabel(title: name, mark: name == current ? "Now" : nil) }
                         .buttonStyle(TVGridChipStyle())
                         .focused($focused, equals: name)
@@ -43,7 +36,7 @@ struct TVRenameScreen: View {
                 typed = current
                 typing = true
             } label: {
-                SettingsRow(title: "Type another name…", detail: "Opens the keyboard. An iPhone nearby can type for you, or hold the microphone to say it.") { EmptyView() }
+                SettingsRow(title: SettingsWords.typeAnotherName, detail: SettingsWords.typeAnotherNameLine) { EmptyView() }
                     .frame(minHeight: 76)
             }
             .buttonStyle(SettingsRowStyle())
@@ -52,18 +45,19 @@ struct TVRenameScreen: View {
             .accessibilityIdentifier("rename-type")
             .focusSection()
         }
-        .defaultFocus($focused, names.contains(current) ? current : names.first)
+        .defaultFocus($focused, current)
         .onExitCommand(perform: onClose)
-        .alert("Name this \(family)", isPresented: $typing) {
-            TextField("Name", text: $typed)
+        .alert(SettingsWords.nameTitle(device: model.facts.family), isPresented: $typing) {
+            TextField(SettingsWords.deviceNameLabel, text: $typed)
                 .autocorrectionDisabled()
-            Button("Rename") {
-                let name = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !name.isEmpty { onChoose(name) }
+            Button(SettingsWords.rename) {
+                let task = model.renameTask()
+                task.name = typed
+                if task.canRename { onChoose(task.cleanName) }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(SettingsWords.cancel, role: .cancel) {}
         } message: {
-            Text("Shown in Signed-in devices and in the server’s Activity.")
+            Text(SettingsWords.renameHelp)
         }
     }
 }
@@ -74,7 +68,7 @@ struct TVRenameScreen: View {
 struct TVScanCodeScreen: View {
     let crumb: String
     let title: String
-    let lede: String
+    var lede: String?
     let url: URL
     let paragraphs: [String]
     let hint: String
@@ -90,7 +84,7 @@ struct TVScanCodeScreen: View {
                         .clipShape(RoundedRectangle(cornerRadius: 24))
                         .accessibilityLabel("QR code that opens \(title) in the web app")
                         .accessibilityIdentifier("scan-code")
-                    Text(TVWords.shown(url))
+                    Text(Self.shown(url))
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Palette.text)
                         .accessibilityIdentifier("scan-address")
@@ -104,7 +98,7 @@ struct TVScanCodeScreen: View {
                             .foregroundStyle(Palette.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    Button("Done", action: onClose)
+                    Button(SettingsWords.done, action: onClose)
                         .buttonStyle(TVButtonStyle(height: 64, fontSize: 22))
                         .focused($doneFocused)
                         .accessibilityIdentifier("scan-done")
@@ -117,53 +111,89 @@ struct TVScanCodeScreen: View {
         .defaultFocus($doneFocused, true)
         .onExitCommand(perform: onClose)
     }
+
+    /// "home.example.net/settings": an address as people type it.
+    static func shown(_ url: URL) -> String {
+        var s = url.absoluteString
+        for prefix in ["https://", "http://"] where s.hasPrefix(prefix) { s.removeFirst(prefix.count) }
+        return s
+    }
 }
 
-/// Add a language (TvSettings2AddLanguage.dc.html): names in a grid, the
-/// ones already in the list marked Added. Select adds one to the end of the
-/// list, which saves at once, and goes back.
+/// Add a language (TvSettings2AddLanguage.dc.html, `LanguagePicker`): every
+/// language by name in a grid, A to Z, the ones already in the list marked
+/// Added and the device's own first. Search languages above it takes the
+/// keyboard or the microphone. Select adds one to the end of the list, which
+/// saves at once, and goes back.
 struct TVAddLanguageScreen: View {
     let list: LanguageList
     let model: SettingsModel
     let onClose: () -> Void
+    @State private var query = ""
     @FocusState private var focused: String?
 
-    private var tags: [String] {
-        TVWords.languages.sorted { languageTagName($0).localizedStandardCompare(languageTagName($1)) == .orderedAscending }
-    }
-
-    private func added(_ tag: String) -> Bool {
-        model.languages(list).contains { $0.caseInsensitiveCompare(tag) == .orderedSame }
-    }
+    private static let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 4)
 
     var body: some View {
-        let full = !model.canAdd(to: list)
+        let picker = model.languagePicker(for: list)
+        let options = picker.options(matching: query)
         TVTaskFrame(
-            crumb: "Settings › \(model.languagesTitle)", title: list == .audio ? "Add an audio language" : "Add a subtitle language",
-            lede: full ? "Your list holds 16 languages, the most it can. Remove one to add another."
-                : "Choose a language to add it to the end of your list. It saves at once. You can keep up to 16.",
-            hint: "Select adds it · Menu goes back to \(model.languagesTitle)"
+            crumb: "\(SettingsWords.settings) › \(model.languagesTitle)", title: picker.title,
+            lede: picker.limitReason ?? LanguagePicker.tvLede,
+            hint: PanelWords.addLanguageHint(back: model.languagesTitle)
         ) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 4), alignment: .leading, spacing: 14) {
-                ForEach(tags, id: \.self) { tag in
-                    let have = added(tag)
-                    Button {
-                        guard !have, !full else { return }
-                        onClose()
-                        Task { await model.addLanguage(tag, to: list) }
-                    } label: {
-                        ChipLabel(title: languageTagName(tag), mark: have ? "Added" : nil)
+            TextField(LanguagePicker.searchPrompt, text: $query)
+                .autocorrectionDisabled()
+                .font(.system(size: 22))
+                .frame(width: 813)
+                .focused($focused, equals: "search")
+                .accessibilityIdentifier("add-language-search")
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 14) {
+                    if query.isEmpty, let suggested = picker.suggested {
+                        heading(LanguagePicker.suggestedHeading)
+                        LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 14) {
+                            chip(suggested, picker: picker, focusID: "suggested-\(suggested.tag)")
+                        }
+                        heading(LanguagePicker.allLanguages).padding(.top, 10)
+                    } else if !query.isEmpty {
+                        heading(options.isEmpty ? LanguagePicker.noMatch(query) : LanguagePicker.resultsLine(options.count))
                     }
-                    .buttonStyle(TVGridChipStyle(dimmed: have || full))
-                    .focused($focused, equals: tag)
-                    .accessibilityValue(have ? "Added" : "")
-                    .accessibilityIdentifier("add-language-\(tag)")
+                    LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 14) {
+                        ForEach(options) { option in chip(option, picker: picker, focusID: option.tag) }
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .frame(maxWidth: 1680, alignment: .leading)
             }
-            .frame(maxWidth: 1640)
+            .padding(.horizontal, -20)
+            .frame(maxHeight: 560)
             .focusSection()
         }
-        .defaultFocus($focused, tags.first { !added($0) })
+        .defaultFocus($focused, picker.suggested.map { "suggested-\($0.tag)" } ?? options.first { !$0.added }?.tag)
         .onExitCommand(perform: onClose)
+    }
+
+    private func heading(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(.system(size: 16, weight: .bold))
+            .tracking(1.6)
+            .foregroundStyle(Palette.muted)
+    }
+
+    private func chip(_ option: LanguagePicker.Option, picker: LanguagePicker, focusID: String) -> some View {
+        let off = option.added || !picker.canAdd
+        return Button {
+            guard !off else { return }
+            onClose()
+            Task { await model.addLanguage(option.tag, to: list) }
+        } label: {
+            ChipLabel(title: option.name, mark: option.added ? LanguagePicker.added : nil)
+        }
+        .buttonStyle(TVGridChipStyle(dimmed: off))
+        .focused($focused, equals: focusID)
+        .accessibilityValue(option.added ? LanguagePicker.added : "")
+        .accessibilityIdentifier("add-language-\(focusID)")
     }
 }

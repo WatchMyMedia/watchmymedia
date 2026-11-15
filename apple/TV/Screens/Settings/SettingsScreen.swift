@@ -6,14 +6,15 @@ import WMMUI
 
 /// Settings on Apple TV (TvSettings2*.dc.html, PLAN-APPLE-SETTINGS.md §3.3
 /// and §5.9): the web's groups as a list at the left, each with how things
-/// stand in it; the chosen group's page beside it; and what the focused
-/// setting does in a panel at the right.
+/// stand in it (`tvSettingsGroups`); the chosen group's page beside it; and
+/// what the focused setting does in a panel at the right.
 ///
 /// Focus: moving along the list chooses the group. Right (or Select) moves
 /// into its page, on the row it had last; Menu from the page comes back to
 /// its group, and Menu from the list goes to the top bar (the stack's root
 /// leaves Menu to the system here, `MainTabs`). A choice saves when it is
-/// made and says so in its row; what is typed, a name, takes the screen.
+/// made and says so in its row (`SettingsModel.saveState(_:)`); what is
+/// typed, a name, takes the screen.
 struct SettingsScreen: View {
     @Environment(AppServices.self) private var services
 
@@ -29,10 +30,10 @@ struct SettingsScreen: View {
 
 /// Where focus is in Settings: a group in the list, or a row of its page.
 enum SettingsFocus: Hashable {
-    case group(SettingsSection)
-    case row(SettingsSection, String)
+    case group(SettingsDestination)
+    case row(SettingsDestination, String)
 
-    var section: SettingsSection {
+    var section: SettingsDestination {
         switch self {
         case .group(let section), .row(let section, _): section
         }
@@ -65,11 +66,13 @@ private struct SettingsView: View {
     @State var homeRows: RowEditorModel
     /// Your requests, for the group's "2 waiting".
     @State var requests: MyRequestsModel
+    /// Saved lines for what is kept on this Apple TV (Quality, its name),
+    /// which the Kit's save states don't cover.
     @State private var saves = RowSaves()
     /// The group whose page is shown.
-    @State private var chosen: SettingsSection = .playback
+    @State private var chosen: SettingsDestination = .playback
     /// Each group's row that last had focus.
-    @State private var remembered: [SettingsSection: String] = [:]
+    @State private var remembered: [SettingsDestination: String] = [:]
     /// Where focus was last in Settings, for when it comes back from the top
     /// bar, a menu, a question or a task.
     @State private var lastFocus: SettingsFocus?
@@ -102,6 +105,7 @@ private struct SettingsView: View {
         .onChange(of: focus) { old, new in focusMoved(from: old, to: new) }
         .task { await model.loadSessions() }
         .task { await model.loadPreferences() }
+        .task { await model.loadAdminAccess() }
         .task(id: services.rows.available) { if services.rows.available { await homeRows.load() } }
         .task(id: services.requests.options.hasYourRequests) { if services.requests.options.hasYourRequests { await requests.run() } }
         .task(id: extras.available) { if extras.available { await extras.refresh() } }
@@ -112,34 +116,38 @@ private struct SettingsView: View {
 
     // MARK: The list of groups
 
-    private var sections: [SettingsSection] {
-        SettingsSection.allCases.filter { section in
-            switch section {
-            case .languages: model.supportsSubtitlePreferences
-            case .homeRows: services.rows.available
-            case .requests: services.requests.options.hasYourRequests
-            default: true
-            }
-        }
+    /// The groups and their lines, as the Kit words them for Apple TV.
+    private var groups: [SettingsHubRow] {
+        let hidden = homeRows.state.value == nil ? nil : homeRows.rows.filter(\.hidden).count
+        let facts = model.hubFacts(
+            rowsAvailable: services.rows.available,
+            homeRowsShown: hidden.map { homeRows.rows.count - $0 }, homeRowsHidden: hidden,
+            requests: services.requests.options,
+            requestsWaiting: requests.state.value.map { $0.filter { $0.status == .pending }.count },
+            remindersAvailable: extras.available, reminderCount: extras.reminders.count
+        )
+        return tvSettingsGroups(facts)
     }
+
+    private var sections: [SettingsDestination] { groups.map(\.destination) }
 
     private var groupList: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Settings")
+            Text(SettingsWords.settings)
                 .font(.system(size: 40, weight: .heavy))
                 .tracking(-0.8)
                 .foregroundStyle(Palette.text)
                 .padding(.bottom, 14)
                 .accessibilityAddTraits(.isHeader)
-            ForEach(sections) { section in
-                Button { enter(section) } label: {
-                    SettingsNavLabel(title: title(section), line: line(section))
+            ForEach(groups) { group in
+                Button { enter(group.destination) } label: {
+                    SettingsNavLabel(title: group.title, line: group.value ?? "")
                 }
-                .buttonStyle(SettingsNavStyle(chosen: section == chosen))
-                .focused($focus, equals: .group(section))
-                .accessibilityIdentifier("settings-group-\(section.rawValue)")
+                .buttonStyle(SettingsNavStyle(chosen: group.destination == chosen))
+                .focused($focus, equals: .group(group.destination))
+                .accessibilityIdentifier("settings-group-\(group.destination.rawValue)")
             }
-            Text([model.user.map { "Signed in as \($0.name)" }, model.server?.name].compactMap { $0 }.joined(separator: "\n"))
+            Text([tvSignedInLine(model.user), model.server?.name].compactMap { $0 }.joined(separator: "\n"))
                 .font(.system(size: 16))
                 .lineSpacing(6)
                 .foregroundStyle(Palette.faint)
@@ -149,41 +157,8 @@ private struct SettingsView: View {
         .focusSection()
     }
 
-    private func title(_ section: SettingsSection) -> String {
-        switch section {
-        case .playback: "Playback"
-        case .languages: model.languagesTitle
-        case .homeRows: "Home rows"
-        case .account: "Account & devices"
-        case .requests: "Your requests"
-        case .server: "Server"
-        case .about: "About"
-        }
-    }
-
-    /// How things stand in the group, under its name.
-    private func line(_ section: SettingsSection) -> String {
-        switch section {
-        case .playback: "\(model.quality.shortLabel) · \(model.autoplayNext ? "next episode plays by itself" : "next episode waits")"
-        case .languages: model.languagesValue
-        case .homeRows: homeRows.summary ?? ""
-        case .account: myDevices.map(TVWords.devicesSignedIn) ?? model.deviceName
-        case .requests: requestsLine ?? ""
-        case .server: model.server.map { "\($0.name) · \($0.versionLabel)" } ?? ""
-        case .about: "Version \(model.facts.appVersionLabel)"
-        }
-    }
-
-    /// This account's devices, even while Everyone's is on; nil until loaded.
-    private var myDevices: Int? {
-        model.sessions.value.map { list in model.everyone ? list.filter { $0.userName == model.user?.name }.count : list.count }
-    }
-
-    private var requestsLine: String? {
-        guard let list = requests.state.value else { return nil }
-        let waiting = list.filter { $0.status == .pending }.count
-        if waiting > 0 { return "\(formatCount(waiting)) waiting" }
-        return list.isEmpty ? "None yet" : plural(list.count, "request")
+    private func title(_ section: SettingsDestination) -> String {
+        groups.first { $0.destination == section }?.title ?? section.rawValue
     }
 
     // MARK: The page
@@ -205,6 +180,9 @@ private struct SettingsView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                if let banner = model.banner {
+                    TVMessage(title: banner.title, message: banner.body)
+                }
                 content(chosen)
             }
             // Room for a focused row to lift without being cut off.
@@ -223,24 +201,22 @@ private struct SettingsView: View {
         .accessibilityIdentifier("settings-page")
     }
 
-    private func lede(_ section: SettingsSection) -> String? {
+    private func lede(_ section: SettingsDestination) -> String? {
         switch section {
-        case .playback: "Yours, on every device you sign in to. Quality is this \(family)’s alone."
-        case .languages: "Yours, on every device you sign in to. Each change saves at once."
+        case .playback: SettingsWords.playbackLede(device: family)
+        case .languages: SettingsWords.languagesLede(audio: model.audio.languages, subtitles: model.subtitles.languages, choice: model.subtitleChoice)
         case .homeRows: "Your rows are the same on all your devices."
-        case .account: TVWords.accountLede(user: model.user, serverName: model.server?.name, devices: myDevices)
+        case .account: model.accountLede
         case .requests: "What you asked for, and where each one is."
-        case .server:
-            model.server.map { server in
-                "\(server.name), \(server.versionLabel).\(model.user.map { " You’re signed in as \($0.name)\($0.isAdmin ? ", an admin" : "")." } ?? "")"
-            }
+        case .server: model.serverLede
         case .about: "WatchMyMedia \(model.facts.appVersionLabel) for \(family)."
+        case .downloads, .inbox: nil
         }
     }
 
     private var family: String { model.facts.family }
 
-    @ViewBuilder private func content(_ section: SettingsSection) -> some View {
+    @ViewBuilder private func content(_ section: SettingsDestination) -> some View {
         switch section {
         case .playback: playbackPage
         case .languages: languagesPage
@@ -249,65 +225,50 @@ private struct SettingsView: View {
         case .requests: requestsPage
         case .server: serverPage
         case .about: aboutPage
+        case .downloads, .inbox: EmptyView()
         }
     }
 
     // MARK: Playback
 
     @ViewBuilder private var playbackPage: some View {
-        if model.playbackError != nil, saves.note("autoplay") == nil {
-            TVMessage(title: "Couldn’t load your playback choices", message: "The server didn’t answer. Nothing has changed: your players keep using the choices you saved.")
+        if model.preferencesLoadFailed, model.banner == nil {
+            TVMessage(title: SettingsWords.playbackCantLoad.title, message: SettingsWords.playbackCantLoad.body)
         }
-        SettingsGroup("Quality · this \(family)") {
-            menuRow(.playback, "quality", title: "Default quality", detail: model.quality.checklistDetail, value: model.quality.shortLabel,
+        SettingsGroup(SettingsWords.qualityHeading(device: family)) {
+            menuRow(.playback, "quality", title: SettingsWords.defaultQuality, detail: model.quality.checklistDetail, note: saves.note("quality"),
+                    value: model.quality.shortLabel,
                     choices: model.qualities.map { MenuChoice(value: $0, id: $0.rawValue, title: $0.checklistTitle, line: $0.checklistDetail) },
                     chosen: model.quality) { quality in
                 model.setQuality(quality)
-                saves.saved("quality", TVWords.qualitySaved(quality))
+                saves.saved("quality", PanelWords.qualitySaved(quality, device: family))
             }
         }
-        SettingsGroup("Skipping") {
+        SettingsGroup(SettingsWords.skipping) {
             ForEach(SegmentKind.allCases, id: \.self) { kind in
-                let key = "skip-\(kind.rawValue)"
-                menuRow(.playback, key, title: kind.partTitle, value: model.skipMode(kind).choiceTitle,
-                        choices: SkipMode.webOrder.map { MenuChoice(value: $0, id: $0.rawValue, title: $0.choiceTitle, line: $0.choiceLine) },
+                menuRow(.playback, "skip-\(kind.rawValue)", title: kind.settingsLabel, note: RowNote(model.saveState(.skip(kind))),
+                        value: model.skipMode(kind).label,
+                        choices: SkipMode.allCases.map { MenuChoice(value: $0, id: $0.rawValue, title: $0.label, line: $0.line) },
                         chosen: model.skipMode(kind)) { mode in
-                    let before = model.skipMode(kind).choiceTitle
-                    Task {
-                        await saves.run(key, saved: TVWords.skipSaved(kind, mode), failed: { TVWords.notSaved(still: before) }) {
-                            await model.setSkip(kind, mode: mode)
-                            return model.skipError == nil
-                        }
-                    }
+                    Task { await model.setSkip(kind, mode: mode) }
                 }
             }
         }
-        SettingsGroup("Next episode") {
-            toggleRow(.playback, "autoplay", title: "Play the next episode by itself", on: model.autoplayNext) {
+        SettingsGroup(SettingsWords.nextEpisode) {
+            toggleRow(.playback, "autoplay", title: SettingsWords.nextEpisodeTitle, note: RowNote(model.saveState(.autoplayNext)), on: model.autoplayNext) {
                 let on = !model.autoplayNext
-                let before = model.autoplayNext ? "on" : "off"
-                Task {
-                    await saves.run("autoplay", saved: TVWords.autoplaySaved(on), failed: { TVWords.notSaved(still: before) }) {
-                        await model.setAutoplayNext(on)
-                        return model.playbackError == nil
-                    }
-                }
+                Task { await model.setAutoplayNext(on) }
             }
         }
         if extras.available {
-            SettingsGroup("Live TV reminders") {
-                menuRow(.playback, "lead", title: liveRemindMe, value: liveLeadChoice(extras.leadMinutes),
+            SettingsGroup(SettingsWords.liveTVReminders) {
+                menuRow(.playback, "lead", title: SettingsWords.remindMe, note: RowNote(extras.leadSave), value: liveLeadChoice(extras.leadMinutes),
                         choices: LiveReminderLead.choices.map { MenuChoice(value: $0, id: "\($0)", title: liveLeadChoice($0), line: nil) },
                         chosen: extras.leadMinutes) { minutes in
-                    let before = liveLeadChoice(extras.leadMinutes)
-                    Task {
-                        await saves.run("lead", saved: TVWords.leadSaved(minutes), failed: { TVWords.notSaved(still: before) }) {
-                            await extras.setLead(minutes)
-                            return extras.leadMinutes == minutes
-                        }
-                    }
+                    // In the row, so the pill that speaks for the guide stays quiet.
+                    Task { await extras.setLead(minutes, inRow: true) }
                 }
-                navRow(.playback, "reminders", title: liveRemindersTitle, value: liveRemindersComingUp(extras.reminders.count)) {
+                navRow(.playback, "reminders", title: SettingsWords.reminders, value: SettingsWords.remindersValue(extras.reminders.count)) {
                     navigator.open(.liveReminders)
                 }
             }
@@ -319,15 +280,16 @@ private struct SettingsView: View {
     @ViewBuilder private var languagesPage: some View {
         SettingsGroup(nil) {
             if model.supportsAudioLanguages {
-                navRow(.languages, "audio", title: "Audio languages", value: names(.audio) ?? "File default") { task = .languages }
+                navRow(.languages, "audio", title: SettingsWords.audioLanguages, note: RowNote(model.saveState(.audioLanguages)),
+                       value: names(.audio) ?? "File default") { task = .languages }
             }
-            navRow(.languages, "starting", title: "Starting subtitles", value: model.subtitleChoice.shortLabel) { task = .languages }
-            navRow(.languages, "subtitle-languages", title: "Subtitle languages",
+            navRow(.languages, "starting", title: SettingsWords.startingSubtitles, note: RowNote(model.saveState(.subtitleChoice)),
+                   value: model.subtitleChoice.shortLabel) { task = .languages }
+            navRow(.languages, "subtitle-languages", title: SettingsWords.subtitleLanguages, note: RowNote(model.saveState(.subtitleLanguages)),
                    value: names(.subtitles) ?? (model.subtitlesUseAudioLanguages ? "Your audio languages" : "None")) { task = .languages }
-            navRow(.languages, "automatic", title: "Automatic download",
+            navRow(.languages, "automatic", title: SettingsWords.automaticDownload, note: RowNote(model.saveState(.automaticDownload)),
                    value: model.subtitles.automaticDownload && model.automaticDownloadAvailable ? "On" : "Off") { task = .languages }
         }
-        if let error = model.languageError { TVMessage(title: error) }
     }
 
     private func names(_ list: LanguageList) -> String? {
@@ -339,20 +301,21 @@ private struct SettingsView: View {
 
     @ViewBuilder private var homeRowsPage: some View {
         SettingsGroup(nil) {
-            navRow(.homeRows, "edit", title: "Edit Home rows", detail: "Move, hide and add the rows on Home", value: homeRows.summary) { task = .homeRows }
+            navRow(.homeRows, "edit", title: "Edit Home rows", detail: "Move, hide and add the rows on Home",
+                   value: groups.first { $0.destination == .homeRows }?.value) { task = .homeRows }
         }
     }
 
     // MARK: Account & devices
 
     @ViewBuilder private var accountPage: some View {
-        SettingsGroup("This \(family)") {
-            navRow(.account, "name", title: "Name", value: model.deviceName, chevron: false) { task = .rename }
+        SettingsGroup(SettingsWords.thisDevice(family)) {
+            navRow(.account, "name", title: SettingsWords.name, note: saves.note("name"), value: model.deviceName, chevron: false) { task = .rename }
             GroupFoot(model.facts.summaryLine)
         }
-        SettingsGroup("Signed-in devices") {
+        SettingsGroup(SettingsWords.signedInDevices) {
             if model.canSeeEveryone {
-                toggleRow(.account, "everyone", title: "Everyone’s devices", detail: "Admins can see and sign out every account", on: model.everyone) {
+                toggleRow(.account, "everyone", title: SettingsWords.everyonesDevices, detail: SettingsWords.everyonesDevicesLine, on: model.everyone) {
                     Task { await model.setEveryone(!model.everyone) }
                 }
             }
@@ -361,7 +324,7 @@ private struct SettingsView: View {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 58)
             case .failed(let message):
                 TVMessage(title: "Couldn’t list your devices", message: message)
-                navRow(.account, "devices-retry", title: "Try again", chevron: false) { Task { await model.loadSessions() } }
+                navRow(.account, "devices-retry", title: SettingsWords.tryAgain, chevron: false) { Task { await model.loadSessions() } }
             case .loaded:
                 ForEach(model.sessionGroups, id: \.user) { group in
                     if model.everyone {
@@ -370,14 +333,36 @@ private struct SettingsView: View {
                     ForEach(group.sessions) { session in deviceRow(session) }
                 }
             }
-            if let error = model.devicesError { TVMessage(title: error) }
+            signOutNote
         }
-        SettingsGroup("Password") {
-            navRow(.account, "password", title: "Change password", detail: "Typing a password with the remote is slow, so this shows a code to scan",
-                   value: "On your phone or computer", chevron: false) { task = .changePassword }
+        SettingsGroup(SettingsWords.password) {
+            navRow(.account, "password", title: SettingsWords.changePassword, detail: SettingsWords.changePasswordTVLine,
+                   value: SettingsWords.changePasswordTVValue, chevron: false) { task = .changePassword }
         }
         SettingsGroup(nil) {
-            navRow(.account, "signout", title: "Sign out of this \(family)", chevron: false, red: true) { askSignOut() }
+            navRow(.account, "signout", title: SettingsWords.signOutOfThis(family), chevron: false, red: true) { askSignOut() }
+        }
+    }
+
+    /// How signing another device out ended, under the list: signed out,
+    /// already gone (without the tick), or why it couldn't be.
+    @ViewBuilder private var signOutNote: some View {
+        switch model.saveState(.signedInDevices) {
+        case .saved(let line):
+            let gone = model.lastSignOut?.result == .alreadyGone
+            Text(gone ? line : "✓ \(line)")
+                .font(.system(size: 16)).foregroundStyle(Palette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 18)
+                .accessibilityIdentifier("settings-devices-note")
+        case .failed(let line):
+            Text(line)
+                .font(.system(size: 16)).foregroundStyle(Palette.warning)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 18)
+                .accessibilityIdentifier("settings-devices-note")
+        case .rest, .saving:
+            if let error = model.devicesError { TVMessage(title: error) }
         }
     }
 
@@ -391,14 +376,14 @@ private struct SettingsView: View {
             .accessibilityElement(children: .combine)
             Spacer(minLength: 12)
             if session.current {
-                TVBadge("This \(family)", style: .gold, size: 13)
+                TVBadge(SettingsWords.thisDevice(family), style: .gold, size: 13)
             } else {
                 // Disabled while it works, it keeps focus (apple/AGENTS.md).
-                Button(model.revoking == session.id ? "Signing out…" : "Sign out") { askRevoke(session) }
+                Button(model.revoking == session.id ? "Signing out…" : SettingsWords.signOut) { askRevoke(session) }
                     .buttonStyle(TVButtonStyle(height: 42, fontSize: 16))
                     .disabled(model.revoking != nil)
                     .focused($focus, equals: .row(.account, "device-\(session.id)"))
-                    .accessibilityLabel("Sign out \(session.name)")
+                    .accessibilityLabel(SettingsWords.signOutNamed(session.name))
                     .accessibilityIdentifier("settings-row-device-\(session.id)")
             }
         }
@@ -409,22 +394,11 @@ private struct SettingsView: View {
     }
 
     private func askSignOut() {
-        let family = family
-        question = TVQuestion(
-            title: signOutQuestion(serverName: model.server?.name),
-            paragraphs: ["Your account, watch history and settings stay on the server.",
-                         "This \(family) will need a new code, or your password, to sign in again."],
-            keep: "Stay signed in", act: "Sign out of this \(family)"
-        ) { [model] in await model.signOut() }
+        question = TVQuestion(model.signOutThisDeviceWords()) { [model] in await model.signOut() }
     }
 
     private func askRevoke(_ session: DeviceSession) {
-        let whose = session.userName != model.user?.name ? "It is \(session.userName)’s. " : ""
-        question = TVQuestion(
-            title: "Sign out \(session.name)?",
-            paragraphs: ["\(whose)It will need a password or a code to sign in again. Anything it is playing stops."],
-            keep: "Keep it signed in", act: "Sign out \(session.name)"
-        ) { await revoke(session) }
+        question = TVQuestion(model.signOutWords(for: session)) { await revoke(session) }
     }
 
     /// Signs another device out, then puts focus on the row that took its place.
@@ -433,7 +407,7 @@ private struct SettingsView: View {
         let index = rowKeys(.account).firstIndex(of: key) ?? 0
         await model.revoke(session)
         let keys = rowKeys(.account)
-        guard model.devicesError == nil, !keys.contains(key), !keys.isEmpty else { return }
+        guard !keys.contains(key), !keys.isEmpty else { return }
         if focus == nil || focus == .row(.account, key) || chosen == .account {
             focus = .row(.account, keys[min(index, keys.count - 1)])
         }
@@ -443,7 +417,8 @@ private struct SettingsView: View {
 
     @ViewBuilder private var requestsPage: some View {
         SettingsGroup(nil) {
-            navRow(.requests, "mine", title: "Your requests", detail: "What you asked for, and where it is", value: requestsLine) {
+            navRow(.requests, "mine", title: SettingsWords.yourRequests, detail: "What you asked for, and where it is",
+                   value: groups.first { $0.destination == .requests }?.value) {
                 navigator.open(.myRequests)
             }
         }
@@ -453,30 +428,32 @@ private struct SettingsView: View {
 
     @ViewBuilder private var serverPage: some View {
         if let server = model.server {
-            SettingsGroup("This server") {
-                FactRow(label: "Name", value: server.name)
-                FactRow(label: "Address", value: server.displayAddress)
-                FactRow(label: "Version", value: server.versionAndAPI)
+            SettingsGroup(SettingsWords.thisServer) {
+                FactRow(label: SettingsWords.name, value: server.name)
+                FactRow(label: SettingsWords.address, value: server.displayAddress)
+                FactRow(label: SettingsWords.version, value: server.versionAndAPI)
             }
         }
-        SettingsGroup("Another server") {
-            navRow(.server, "switch", title: switchServerTitle, detail: "Three steps: choose it, sign in, done", chevron: false) {
+        SettingsGroup(SettingsWords.anotherServer) {
+            navRow(.server, "switch", title: switchServerTitle, detail: SettingsWords.switchServerShortLine, chevron: false) {
                 flow.startSwitch(services)
             }
         }
         if services.requests.options.inboxAllowed {
             let waiting = services.requests.options.inbox
-            SettingsGroup("Inbox") {
-                navRow(.server, "inbox", title: "Inbox", detail: "Requests to approve and problems people reported",
+            SettingsGroup(SettingsWords.inbox) {
+                navRow(.server, "inbox", title: SettingsWords.inbox, detail: SettingsWords.inboxLine,
                        value: waiting > 0 ? "\(formatCount(waiting)) waiting" : nil) { navigator.open(.inbox) }
             }
         }
-        if model.user?.isAdmin == true, let server = model.server {
-            SettingsGroup("Server settings") {
-                Button { task = .serverSettings } label: { ServerSettingsLabel(server: server) }
-                    .buttonStyle(SettingsRowStyle())
-                    .focused($focus, equals: .row(.server, "server-settings"))
-                    .accessibilityIdentifier("settings-row-server-settings")
+        if let server = model.server, let access = model.adminAccess, let notice = tvServerSettingsNotice(server, access: access) {
+            SettingsGroup(SettingsWords.serverSettings) {
+                Button { task = .serverSettings } label: {
+                    ServerSettingsLabel(server: server, notice: notice, keptOut: model.serverSettingsRow?.enabled == false)
+                }
+                .buttonStyle(SettingsRowStyle())
+                .focused($focus, equals: .row(.server, "server-settings"))
+                .accessibilityIdentifier("settings-row-server-settings")
             }
         }
     }
@@ -485,8 +462,8 @@ private struct SettingsView: View {
 
     @ViewBuilder private var aboutPage: some View {
         SettingsGroup("This app") {
-            FactRow(label: "Version", value: model.facts.appVersionLabel)
-            FactRow(label: "This \(family)", value: "\(model.facts.model) · \(model.facts.system)")
+            FactRow(label: SettingsWords.version, value: model.facts.appVersionLabel)
+            FactRow(label: SettingsWords.thisDevice(family), value: "\(model.facts.model) · \(model.facts.system)")
         }
         SettingsGroup("Privacy") {
             navRow(.about, "privacy", title: "Privacy policy and licences", detail: "A code to read the policy on your phone") { task = .privacy }
@@ -500,10 +477,10 @@ private struct SettingsView: View {
     // MARK: Rows
 
     /// A row that opens something, or does something, on Select.
-    private func navRow(_ section: SettingsSection, _ key: String, title: String, detail: String? = nil, value: String? = nil,
-                        chevron: Bool = true, red: Bool = false, action: @escaping () -> Void) -> some View {
+    private func navRow(_ section: SettingsDestination, _ key: String, title: String, detail: String? = nil, note: RowNote? = nil,
+                        value: String? = nil, chevron: Bool = true, red: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            SettingsRow(title: title, detail: detail, note: saves.note(key), red: red) {
+            SettingsRow(title: title, detail: detail, note: note, red: red) {
                 if value != nil || chevron { RowValue(text: value, chevron: chevron) }
             }
         }
@@ -514,8 +491,9 @@ private struct SettingsView: View {
 
     /// A row that opens a menu of its choices, each with what it does; the
     /// choice saves when it is made, and the row says so.
-    private func menuRow<Value: Hashable>(_ section: SettingsSection, _ key: String, title: String, detail: String? = nil, value: String,
-                                         choices: [MenuChoice<Value>], chosen: Value, choose: @escaping (Value) -> Void) -> some View {
+    private func menuRow<Value: Hashable>(_ section: SettingsDestination, _ key: String, title: String, detail: String? = nil, note: RowNote?,
+                                         value: String, choices: [MenuChoice<Value>], chosen: Value,
+                                         choose: @escaping (Value) -> Void) -> some View {
         Menu {
             Section(title) {
                 // A toggle per choice: the menu ticks the chosen one and keeps every line.
@@ -528,20 +506,20 @@ private struct SettingsView: View {
                 }
             }
         } label: {
-            SettingsRow(title: title, detail: detail, note: saves.note(key)) { RowValue(text: value) }
+            SettingsRow(title: title, detail: detail, note: note) { RowValue(text: value) }
         }
         .buttonStyle(SettingsRowStyle())
         .focused($focus, equals: .row(section, key))
         // A Menu's label isn't read out: name it, and give its choice and how its save went as its value.
         .accessibilityLabel(title)
-        .accessibilityValue([value, saves.note(key)?.text].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityValue([value, note?.text].compactMap { $0 }.joined(separator: ", "))
         .accessibilityIdentifier("settings-row-\(key)")
     }
 
-    private func toggleRow(_ section: SettingsSection, _ key: String, title: String, detail: String? = nil, on: Bool,
-                           action: @escaping () -> Void) -> some View {
+    private func toggleRow(_ section: SettingsDestination, _ key: String, title: String, detail: String? = nil, note: RowNote? = nil,
+                           on: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            SettingsRow(title: title, detail: detail, note: saves.note(key)) { TVSwitch(on: on) }
+            SettingsRow(title: title, detail: detail, note: note) { TVSwitch(on: on) }
         }
         .buttonStyle(SettingsRowStyle())
         .focused($focus, equals: .row(section, key))
@@ -550,7 +528,7 @@ private struct SettingsView: View {
     }
 
     /// The rows each page draws that take focus, top to bottom.
-    private func rowKeys(_ section: SettingsSection) -> [String] {
+    private func rowKeys(_ section: SettingsDestination) -> [String] {
         switch section {
         case .playback:
             ["quality"] + SegmentKind.allCases.map { "skip-\($0.rawValue)" } + ["autoplay"] + (extras.available ? ["lead", "reminders"] : [])
@@ -561,8 +539,9 @@ private struct SettingsView: View {
             ["name"] + (model.canSeeEveryone ? ["everyone"] : []) + deviceKeys + ["password", "signout"]
         case .requests: ["mine"]
         case .server:
-            ["switch"] + (services.requests.options.inboxAllowed ? ["inbox"] : []) + (model.user?.isAdmin == true ? ["server-settings"] : [])
+            ["switch"] + (services.requests.options.inboxAllowed ? ["inbox"] : []) + (model.serverSettingsRow != nil ? ["server-settings"] : [])
         case .about: ["privacy", "diagnostics"]
+        case .downloads, .inbox: []
         }
     }
 
@@ -576,13 +555,13 @@ private struct SettingsView: View {
 
     // MARK: Focus
 
-    private func enter(_ section: SettingsSection) {
+    private func enter(_ section: SettingsDestination) {
         chosen = section
         focus = target(in: section)
     }
 
     /// The row focus goes to in a group's page: the one it had, else the first.
-    private func target(in section: SettingsSection) -> SettingsFocus {
+    private func target(in section: SettingsDestination) -> SettingsFocus {
         let keys = rowKeys(section)
         if let key = remembered[section], keys.contains(key) { return .row(section, key) }
         return keys.first.map { .row(section, $0) } ?? .group(section)
@@ -639,92 +618,68 @@ private struct SettingsView: View {
         }
     }
 
-    private func groupHelp(_ section: SettingsSection) -> SettingsHelp {
-        let about: String = switch section {
-        case .playback:
-            "How videos start and move on: the quality on this \(family), what to skip, the next episode\(extras.available ? " and Live TV reminders" : "")."
-        case .languages: "The languages videos start in, and when subtitles start. Yours, on every device."
-        case .homeRows: "Which rows Home shows, and in what order. The same on all your devices."
-        case .account: "This \(family)’s name, the devices signed in to your account, your password, and signing out."
-        case .requests: "What you asked for, and where each one is."
-        case .server:
-            model.user?.isAdmin == true
-                ? "Which server this \(family) uses, switching to another, the Inbox and the server’s own settings."
-                : "Which server this \(family) uses, and switching to another."
-        case .about: "This app’s version, the privacy policy, and diagnostics for a bug report."
-        }
-        return SettingsHelp(title: title(section), paragraphs: [about], hint: "Right opens \(title(section)) · Menu goes to the top bar")
+    private func groupHelp(_ section: SettingsDestination) -> SettingsHelp {
+        let group = groups.first { $0.destination == section }
+        return SettingsHelp(title: title(section), paragraphs: group?.about.map { [$0] } ?? [], hint: SettingsWords.tvHintGroup(title(section)))
     }
 
-    private static let backToList = "Menu goes back to the list"
-
-    private func rowHelp(_ section: SettingsSection, _ key: String) -> SettingsHelp? {
-        let changes = "Select changes it · \(Self.backToList)"
-        let opens = "Select opens it · \(Self.backToList)"
+    private func rowHelp(_ section: SettingsDestination, _ key: String) -> SettingsHelp? {
+        let changes = SettingsWords.tvHintChange
+        let opens = PanelWords.hintOpens
         if key.hasPrefix("skip-"), let kind = SegmentKind(rawValue: String(key.dropFirst(5))) {
-            let mode = model.skipMode(kind)
-            return SettingsHelp(title: kind.partTitle, paragraphs: [kind.about, "\(mode.explanation) A part you seek into is never skipped for you.", TVWords.keptOnServer], hint: changes)
+            return SettingsHelp(title: kind.settingsLabel, paragraphs: SettingsWords.skipAbout(kind, mode: model.skipMode(kind)), hint: changes)
         }
         if key.hasPrefix("device-"), let session = model.sessions.value?.first(where: { "device-\($0.id)" == key }) {
-            let ago = formatAgo(session.lastSeenAt)
-            var first = session.model.flatMap { $0.isEmpty ? nil : "\($0), last used \(ago)." } ?? "Last used \(ago)."
-            if session.userName != model.user?.name { first = "\(session.userName)’s. " + first }
-            return SettingsHelp(title: session.name, paragraphs: [first, "Signing it out stops anything it is playing. It will need a password or a code to sign in again."],
-                                hint: "Select asks first · \(Self.backToList)")
+            var paragraphs = SettingsWords.deviceAbout(session)
+            if session.userName != model.user?.name { paragraphs.insert("\(session.userName)’s device.", at: 0) }
+            return SettingsHelp(title: session.name, paragraphs: paragraphs, hint: SettingsWords.tvHintAsks)
         }
         switch key {
         case "quality":
-            return SettingsHelp(title: "Default quality", paragraphs: [qualityFootnote(device: family, auto: model.qualities.contains(.auto))], hint: changes)
+            return SettingsHelp(title: SettingsWords.defaultQuality, paragraphs: [SettingsWords.qualityNote(auto: model.qualities.contains(.auto)),
+                                                                                 PanelWords.qualityHere(device: family)], hint: changes)
         case "autoplay":
-            return SettingsHelp(title: "Play the next episode by itself", paragraphs: [
-                model.autoplayNext ? "On, the Next Episode card counts down 10 seconds from the credits, then plays it." : "Off, the Next Episode card waits for you.",
-                TVWords.keptOnServer,
-            ], hint: changes)
+            return SettingsHelp(title: SettingsWords.nextEpisodeTitle, paragraphs: [SettingsWords.nextEpisodeLine, SettingsWords.keptOnTheServer], hint: changes)
         case "lead":
-            return SettingsHelp(title: liveRemindMe, paragraphs: ["How long before a programme you asked to be reminded of.", liveTVLeadSettingsNote], hint: changes)
+            return SettingsHelp(title: SettingsWords.remindMe, paragraphs: [PanelWords.leadAbout, liveTVLeadSettingsNote], hint: changes)
         case "reminders":
-            return SettingsHelp(title: liveRemindersTitle, paragraphs: ["The programmes you asked to be reminded of, by day. Select one to find it in the guide, or remove it."], hint: opens)
+            return SettingsHelp(title: SettingsWords.reminders, paragraphs: [PanelWords.remindersAbout], hint: opens)
         case "audio":
-            return SettingsHelp(title: "Audio languages", paragraphs: ["Videos start in the first of these languages they have. If they have none, they play the file’s default.", "Each change saves at once, on every device."], hint: opens)
+            return SettingsHelp(title: SettingsWords.audioLanguages, paragraphs: [SettingsWords.audioLanguagesNote, PanelWords.savesAtOnce], hint: opens)
         case "starting":
-            return SettingsHelp(title: "Starting subtitles", paragraphs: [model.subtitleChoice.line, "A track you choose in the player always wins."], hint: opens)
+            return SettingsHelp(title: SettingsWords.startingSubtitles, paragraphs: [model.subtitleChoice.line, SettingsWords.playerTrackWins], hint: opens)
         case "subtitle-languages":
-            return SettingsHelp(title: "Subtitle languages", paragraphs: ["Subtitles use the first of these languages that has one."] + (model.subtitlesUseAudioLanguages ? ["Until you add one, subtitles use your audio languages."] : []), hint: opens)
+            return SettingsHelp(title: SettingsWords.subtitleLanguages,
+                                paragraphs: [SettingsWords.subtitleLanguagesNote] + (model.subtitlesUseAudioLanguages ? [PanelWords.subtitlesUseAudio] : []), hint: opens)
         case "automatic":
-            return SettingsHelp(title: "Automatic download", paragraphs: [model.automaticDownloadAvailable
-                ? "Only an exact-file match in your first subtitle language, when no local track matches. Uses the server’s OpenSubtitles quota and download permissions."
-                : model.supportsAudioLanguages ? "Choose On or When the audio isn’t in my languages, and add a subtitle language." : "Choose On and add a subtitle language."], hint: opens)
+            return SettingsHelp(title: SettingsWords.automaticDownload, paragraphs: [PanelWords.automaticDownloadAbout(available: model.automaticDownloadAvailable,
+                                                                                                                      audioLanguages: model.supportsAudioLanguages)], hint: opens)
         case "edit":
-            return SettingsHelp(title: "Home rows", paragraphs: [homeRows.tvIntro, listsMadeOnTheWeb], hint: opens)
+            return SettingsHelp(title: SettingsWords.homeRows, paragraphs: [homeRows.tvIntro, listsMadeOnTheWeb], hint: opens)
         case "name":
-            return SettingsHelp(title: "This \(family)’s name", paragraphs: ["Shown in Signed-in devices and in the server’s Activity, so you can tell your devices apart.", "Choose a room, or type another name."],
-                                hint: "Select renames it · \(Self.backToList)")
+            return SettingsHelp(title: SettingsWords.nameTitle(device: family), paragraphs: [SettingsWords.renameHelp, PanelWords.chooseARoom],
+                                hint: PanelWords.hintRenames)
         case "everyone":
-            return SettingsHelp(title: "Everyone’s devices", paragraphs: ["On, the list shows every account’s devices, so you can sign any of them out. Off, only yours."], hint: changes)
+            return SettingsHelp(title: SettingsWords.everyonesDevices, paragraphs: [PanelWords.everyoneAbout], hint: changes)
         case "devices-retry":
-            return SettingsHelp(title: "Signed-in devices", paragraphs: ["The list didn’t load. Nothing was signed out."], hint: "Select tries again · \(Self.backToList)")
+            return SettingsHelp(title: SettingsWords.signedInDevices, paragraphs: [PanelWords.devicesDidNotLoad], hint: PanelWords.hintTriesAgain)
         case "password":
-            return SettingsHelp(title: "Change password", paragraphs: [
-                "Typing a password with the remote is slow, so Select shows a code to scan with your phone. It opens Change password in the web app.",
-                "Every device but the one you change it on is signed out, this \(family) too. It signs in again with a code.",
-            ], hint: "Select shows the code · \(Self.backToList)")
+            return SettingsHelp(title: SettingsWords.changePassword, paragraphs: PanelWords.passwordAbout(device: family), hint: PanelWords.hintShowsCode)
         case "signout":
-            return SettingsHelp(title: "Sign out of this \(family)", paragraphs: ["Your account, watch history and settings stay on the server.", "This \(family) will need a new code, or your password, to sign in again."],
-                                hint: "Select asks first · \(Self.backToList)")
+            return SettingsHelp(title: SettingsWords.signOutOfThis(family), paragraphs: model.signOutThisDeviceWords().lines, hint: SettingsWords.tvHintAsks)
         case "mine":
-            return SettingsHelp(title: "Your requests", paragraphs: ["What you asked for, and where it is. Select one that waits to cancel it."], hint: opens)
+            return SettingsHelp(title: SettingsWords.yourRequests, paragraphs: [PanelWords.requestsAbout], hint: opens)
         case "switch":
-            return SettingsHelp(title: switchServerTitle, paragraphs: ["Choose another server on this network, or enter its address, then sign in there.", "You stay signed in here, and switching back needs no password."],
-                                hint: "Select starts · \(Self.backToList)")
+            return SettingsHelp(title: switchServerTitle, paragraphs: SettingsWords.switchServerAbout, hint: SettingsWords.tvHintStarts)
         case "inbox":
-            return SettingsHelp(title: "Inbox", paragraphs: ["Requests to approve and problems people reported."], hint: opens)
+            return SettingsHelp(title: SettingsWords.inbox, paragraphs: ["\(SettingsWords.inboxLine)."], hint: opens)
         case "server-settings":
-            return SettingsHelp(title: "Server settings", paragraphs: ["Libraries, people, Live TV, Plex and the rest are in the web app, for admins.", "Away from home, it may ask for your password."],
-                                hint: "Select shows the code larger · \(Self.backToList)")
+            return SettingsHelp(title: SettingsWords.serverSettings, paragraphs: [model.serverSettingsRow?.note ?? SettingsWords.serverSettingsDetail],
+                                hint: PanelWords.hintCodeLarger)
         case "privacy":
-            return SettingsHelp(title: "Privacy policy and licences", paragraphs: ["WatchMyMedia talks only to your own server, and sends nothing to anyone else.", "Select shows a code to read the policy on your phone, with the credits and licences."], hint: opens)
+            return SettingsHelp(title: "Privacy policy and licences", paragraphs: PanelWords.privacyAbout, hint: opens)
         case "diagnostics":
-            return SettingsHelp(title: "Diagnostics", paragraphs: ["What the app can give you for a bug report, as a code to scan with your phone.", "Nothing is sent from this \(family). No account, server address or titles are included."], hint: opens)
+            return SettingsHelp(title: "Diagnostics", paragraphs: PanelWords.diagnosticsAbout(device: family), hint: opens)
         default:
             return nil
         }
@@ -735,37 +690,36 @@ private struct SettingsView: View {
     @ViewBuilder private func taskView(_ shown: SettingsTask) -> some View {
         switch shown {
         case .rename:
-            TVRenameScreen(current: model.deviceName, family: family) { name in
+            TVRenameScreen(model: model) { name in
                 task = nil
                 guard name != model.deviceName else { return }
                 Task {
-                    await saves.run("name", saved: TVWords.renamed(name), failed: { "" }) {
-                        await model.rename(name)
-                        return true
+                    let rename = model.renameTask()
+                    rename.name = name
+                    if await model.rename(rename) {
+                        saves.saved("name", PanelWords.renamed(model.deviceName, device: family))
+                        // Signed-in devices shows the new name once the server has it.
+                        await model.loadSessions()
                     }
-                    // Signed-in devices shows the new name once the server has it.
-                    await model.loadSessions()
                 }
             } onClose: { task = nil }
         case .changePassword:
             if let server = model.server {
+                let notice = SettingsWords.changePasswordOnAPhone(server)
                 TVScanCodeScreen(
-                    crumb: "Settings › Account & devices", title: "Change your password",
-                    lede: "Typing a password with the remote is slow, so you change it on your phone or computer.",
-                    url: TVWords.changePasswordURL(server),
-                    paragraphs: ["Scan the code with your phone’s camera, or open the address in a browser. It opens Change password in the web app.",
-                                 "Every device but the one you change it on is signed out, this \(family) too. It signs in again with a code, so there’s nothing to type here."],
-                    hint: "Menu goes back to Account & devices"
+                    crumb: "\(SettingsWords.settings) › \(SettingsWords.accountAndDevices)", title: notice.title,
+                    url: changePasswordURL(server), paragraphs: [notice.body],
+                    hint: "Menu goes back to \(SettingsWords.accountAndDevices)"
                 ) { task = nil }
             }
         case .serverSettings:
             if let server = model.server {
+                let notice = model.adminAccess.flatMap { tvServerSettingsNotice(server, access: $0) }
                 TVScanCodeScreen(
-                    crumb: "Settings › Server", title: "Server settings",
-                    lede: "Libraries, people, Live TV, Plex and the rest are in the web app.",
-                    url: TVWords.serverSettingsURL(server),
-                    paragraphs: ["Scan the code with your phone’s camera, or go to \(server.displayAddress) in a browser.", "Away from home, it may ask for your password."],
-                    hint: "Menu goes back to Server"
+                    crumb: "\(SettingsWords.settings) › \(SettingsWords.server)", title: SettingsWords.serverSettings,
+                    lede: notice?.title, url: serverSettingsURL(server),
+                    paragraphs: [notice?.body ?? SettingsWords.serverSettingsDetail],
+                    hint: "Menu goes back to \(SettingsWords.server)"
                 ) { task = nil }
             }
         case .languages:
@@ -798,7 +752,7 @@ private struct SettingsView: View {
         launched = true
         let arguments = ProcessInfo.processInfo.arguments
         if let i = arguments.firstIndex(of: "-settingsGroup"), arguments.indices.contains(i + 1),
-           let section = SettingsSection(rawValue: arguments[i + 1]), sections.contains(section) {
+           let section = SettingsDestination(rawValue: arguments[i + 1]), sections.contains(section) {
             chosen = section
             focus = .group(section)
         }
@@ -814,25 +768,29 @@ private struct SettingsView: View {
 }
 
 /// Server settings in the web app, as a code to scan beside what it holds
-/// (TvSettings2Server.dc.html).
+/// (TvSettings2Server.dc.html, `tvServerSettingsNotice`). Where the server
+/// keeps admins out from here, the reason is in the warning colour.
 private struct ServerSettingsLabel: View {
     let server: Server
+    let notice: SettingsNotice
+    let keptOut: Bool
     @Environment(\.isFocused) private var focused
 
     var body: some View {
         HStack(alignment: .center, spacing: 22) {
-            QRCodeView(TVWords.serverSettingsURL(server).absoluteString)
+            QRCodeView(serverSettingsURL(server).absoluteString)
                 .frame(width: 150, height: 150)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
+                .opacity(keptOut ? 0.5 : 1)
                 .accessibilityLabel("QR code that opens Server settings in the web app")
             VStack(alignment: .leading, spacing: 4) {
-                Text("Server settings are in the web app")
+                Text(notice.title)
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(focused ? Palette.ground : Palette.text)
-                Text("Libraries, people, Live TV, Plex and the rest. Scan to open them on your phone, or go to \(server.displayAddress) in a browser. Away from home, it may ask for your password.")
+                Text(notice.body)
                     .font(.system(size: 17))
                     .lineSpacing(4)
-                    .foregroundStyle(focused ? Color(hex: 0x525252) : Palette.muted)
+                    .foregroundStyle(keptOut ? (focused ? Color(hex: 0x9A3412) : Palette.warning) : focused ? Color(hex: 0x525252) : Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
