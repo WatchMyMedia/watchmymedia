@@ -93,7 +93,7 @@ extension SegmentKind {
     }
 }
 
-enum SettingsWords {
+enum TVWords {
     static let keptOnServer = "Kept on the server, so every device you sign in to follows it."
 
     /// "Credits now skip after 3 seconds, on every device."

@@ -19,7 +19,7 @@ struct TVRenameScreen: View {
 
     /// The rooms, with this one's name first when it isn't among them.
     private var names: [String] {
-        let rooms = SettingsWords.rooms.map { "\($0) \(family)" }
+        let rooms = TVWords.rooms.map { "\($0) \(family)" }
         return rooms.contains(current) || current.isEmpty ? rooms : [current] + rooms
     }
 
@@ -90,7 +90,7 @@ struct TVScanCodeScreen: View {
                         .clipShape(RoundedRectangle(cornerRadius: 24))
                         .accessibilityLabel("QR code that opens \(title) in the web app")
                         .accessibilityIdentifier("scan-code")
-                    Text(SettingsWords.shown(url))
+                    Text(TVWords.shown(url))
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Palette.text)
                         .accessibilityIdentifier("scan-address")
@@ -129,7 +129,7 @@ struct TVAddLanguageScreen: View {
     @FocusState private var focused: String?
 
     private var tags: [String] {
-        SettingsWords.languages.sorted { languageTagName($0).localizedStandardCompare(languageTagName($1)) == .orderedAscending }
+        TVWords.languages.sorted { languageTagName($0).localizedStandardCompare(languageTagName($1)) == .orderedAscending }
     }
 
     private func added(_ tag: String) -> Bool {

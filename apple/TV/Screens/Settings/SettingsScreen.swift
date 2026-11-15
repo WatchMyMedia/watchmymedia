@@ -76,6 +76,8 @@ private struct SettingsView: View {
     @FocusState private var focus: SettingsFocus?
     @State private var task: SettingsTask?
     @State private var question: TVQuestion?
+    /// The launch arguments are applied once, not each time Settings reappears.
+    @State private var launched = false
     @Environment(AppFlow.self) private var flow
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
@@ -165,7 +167,7 @@ private struct SettingsView: View {
         case .playback: "\(model.quality.shortLabel) · \(model.autoplayNext ? "next episode plays by itself" : "next episode waits")"
         case .languages: model.languagesValue
         case .homeRows: homeRows.summary ?? ""
-        case .account: myDevices.map(SettingsWords.devicesSignedIn) ?? model.deviceName
+        case .account: myDevices.map(TVWords.devicesSignedIn) ?? model.deviceName
         case .requests: requestsLine ?? ""
         case .server: model.server.map { "\($0.name) · \($0.versionLabel)" } ?? ""
         case .about: "Version \(model.facts.appVersionLabel)"
@@ -226,7 +228,7 @@ private struct SettingsView: View {
         case .playback: "Yours, on every device you sign in to. Quality is this \(family)’s alone."
         case .languages: "Yours, on every device you sign in to. Each change saves at once."
         case .homeRows: "Your rows are the same on all your devices."
-        case .account: SettingsWords.accountLede(user: model.user, serverName: model.server?.name, devices: myDevices)
+        case .account: TVWords.accountLede(user: model.user, serverName: model.server?.name, devices: myDevices)
         case .requests: "What you asked for, and where each one is."
         case .server:
             model.server.map { server in
@@ -261,7 +263,7 @@ private struct SettingsView: View {
                     choices: model.qualities.map { MenuChoice(value: $0, id: $0.rawValue, title: $0.checklistTitle, line: $0.checklistDetail) },
                     chosen: model.quality) { quality in
                 model.setQuality(quality)
-                saves.saved("quality", SettingsWords.qualitySaved(quality))
+                saves.saved("quality", TVWords.qualitySaved(quality))
             }
         }
         SettingsGroup("Skipping") {
@@ -272,7 +274,7 @@ private struct SettingsView: View {
                         chosen: model.skipMode(kind)) { mode in
                     let before = model.skipMode(kind).choiceTitle
                     Task {
-                        await saves.run(key, saved: SettingsWords.skipSaved(kind, mode), failed: { SettingsWords.notSaved(still: before) }) {
+                        await saves.run(key, saved: TVWords.skipSaved(kind, mode), failed: { TVWords.notSaved(still: before) }) {
                             await model.setSkip(kind, mode: mode)
                             return model.skipError == nil
                         }
@@ -285,7 +287,7 @@ private struct SettingsView: View {
                 let on = !model.autoplayNext
                 let before = model.autoplayNext ? "on" : "off"
                 Task {
-                    await saves.run("autoplay", saved: SettingsWords.autoplaySaved(on), failed: { SettingsWords.notSaved(still: before) }) {
+                    await saves.run("autoplay", saved: TVWords.autoplaySaved(on), failed: { TVWords.notSaved(still: before) }) {
                         await model.setAutoplayNext(on)
                         return model.playbackError == nil
                     }
@@ -299,7 +301,7 @@ private struct SettingsView: View {
                         chosen: extras.leadMinutes) { minutes in
                     let before = liveLeadChoice(extras.leadMinutes)
                     Task {
-                        await saves.run("lead", saved: SettingsWords.leadSaved(minutes), failed: { SettingsWords.notSaved(still: before) }) {
+                        await saves.run("lead", saved: TVWords.leadSaved(minutes), failed: { TVWords.notSaved(still: before) }) {
                             await extras.setLead(minutes)
                             return extras.leadMinutes == minutes
                         }
@@ -530,6 +532,9 @@ private struct SettingsView: View {
         }
         .buttonStyle(SettingsRowStyle())
         .focused($focus, equals: .row(section, key))
+        // A Menu's label isn't read out: name it, and give its choice and how its save went as its value.
+        .accessibilityLabel(title)
+        .accessibilityValue([value, saves.note(key)?.text].compactMap { $0 }.joined(separator: ", "))
         .accessibilityIdentifier("settings-row-\(key)")
     }
 
@@ -658,7 +663,7 @@ private struct SettingsView: View {
         let opens = "Select opens it · \(Self.backToList)"
         if key.hasPrefix("skip-"), let kind = SegmentKind(rawValue: String(key.dropFirst(5))) {
             let mode = model.skipMode(kind)
-            return SettingsHelp(title: kind.partTitle, paragraphs: [kind.about, "\(mode.explanation) A part you seek into is never skipped for you.", SettingsWords.keptOnServer], hint: changes)
+            return SettingsHelp(title: kind.partTitle, paragraphs: [kind.about, "\(mode.explanation) A part you seek into is never skipped for you.", TVWords.keptOnServer], hint: changes)
         }
         if key.hasPrefix("device-"), let session = model.sessions.value?.first(where: { "device-\($0.id)" == key }) {
             let ago = formatAgo(session.lastSeenAt)
@@ -673,7 +678,7 @@ private struct SettingsView: View {
         case "autoplay":
             return SettingsHelp(title: "Play the next episode by itself", paragraphs: [
                 model.autoplayNext ? "On, the Next Episode card counts down 10 seconds from the credits, then plays it." : "Off, the Next Episode card waits for you.",
-                SettingsWords.keptOnServer,
+                TVWords.keptOnServer,
             ], hint: changes)
         case "lead":
             return SettingsHelp(title: liveRemindMe, paragraphs: ["How long before a programme you asked to be reminded of.", liveTVLeadSettingsNote], hint: changes)
@@ -734,7 +739,7 @@ private struct SettingsView: View {
                 task = nil
                 guard name != model.deviceName else { return }
                 Task {
-                    await saves.run("name", saved: SettingsWords.renamed(name), failed: { "" }) {
+                    await saves.run("name", saved: TVWords.renamed(name), failed: { "" }) {
                         await model.rename(name)
                         return true
                     }
@@ -747,7 +752,7 @@ private struct SettingsView: View {
                 TVScanCodeScreen(
                     crumb: "Settings › Account & devices", title: "Change your password",
                     lede: "Typing a password with the remote is slow, so you change it on your phone or computer.",
-                    url: SettingsWords.changePasswordURL(server),
+                    url: TVWords.changePasswordURL(server),
                     paragraphs: ["Scan the code with your phone’s camera, or open the address in a browser. It opens Change password in the web app.",
                                  "Every device but the one you change it on is signed out, this \(family) too. It signs in again with a code, so there’s nothing to type here."],
                     hint: "Menu goes back to Account & devices"
@@ -758,7 +763,7 @@ private struct SettingsView: View {
                 TVScanCodeScreen(
                     crumb: "Settings › Server", title: "Server settings",
                     lede: "Libraries, people, Live TV, Plex and the rest are in the web app.",
-                    url: SettingsWords.serverSettingsURL(server),
+                    url: TVWords.serverSettingsURL(server),
                     paragraphs: ["Scan the code with your phone’s camera, or go to \(server.displayAddress) in a browser.", "Away from home, it may ask for your password."],
                     hint: "Menu goes back to Server"
                 ) { task = nil }
@@ -789,6 +794,8 @@ private struct SettingsView: View {
             }
         }
         #if DEBUG
+        guard !launched else { return }
+        launched = true
         let arguments = ProcessInfo.processInfo.arguments
         if let i = arguments.firstIndex(of: "-settingsGroup"), arguments.indices.contains(i + 1),
            let section = SettingsSection(rawValue: arguments[i + 1]), sections.contains(section) {
@@ -814,7 +821,7 @@ private struct ServerSettingsLabel: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 22) {
-            QRCodeView(SettingsWords.serverSettingsURL(server).absoluteString)
+            QRCodeView(TVWords.serverSettingsURL(server).absoluteString)
                 .frame(width: 150, height: 150)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .accessibilityLabel("QR code that opens Server settings in the web app")
