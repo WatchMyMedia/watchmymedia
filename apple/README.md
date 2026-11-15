@@ -211,10 +211,12 @@ Switch server's three steps, which `RootView` keeps above the tabs because a
 switch rebuilds them. Sign-out questions open on the button that keeps
 things, and Menu is that button. The groups and their lines
 (`tvSettingsGroups`), the words, each row's save (`saveState(_:)`,
-`LiveExtrasStore.leadSave`), the dialogs and the steps are the Kit's; the
-panel's own text is `TV/Screens/Settings/SettingsPanelWords.swift`, and
-`RowSaves` says Saved for the two changes kept on the device (Quality, the
-name).
+`qualitySave`, `deviceNameSave`, `LiveExtrasStore.leadSave`), the dialogs,
+the steps and Switch server's sign-in (`pairsByDefault`, starting on the
+code) are the Kit's; the panel's own text is
+`TV/Screens/Settings/SettingsPanelWords.swift`. `-fakesSaveFails recap`
+(the Kit's, with `:422`, a list, `languages` or `all`) makes a save fail,
+to see a row say why.
 `-settingsGroup playback|languages|homeRows|account|requests|server|about`
 shows a group with focus on it at launch; `-renameDevice`, `-changePassword`,
 `-serverSettingsCode`, `-signOutQuestion`, `-switchServer`,
