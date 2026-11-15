@@ -131,6 +131,30 @@ final class SettingsTasksTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10))
     }
 
+    /// In landscape an iPad's pages stand in two columns beside the sidebar
+    /// (Pad2Settings2, Pad2Settings2Account): Skipping beside Quality, and
+    /// Signed-in devices beside This iPad.
+    @MainActor
+    func testIPadPagesStandInTwoColumnsInLandscape() throws {
+        try XCTSkipUnless(pad, "Columns are an iPad's")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = launch(["-settingsPage", "playback"])
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let quality = app.buttons["playback-quality"]
+        let intro = app.buttons["playback-skip-intro"]
+        XCTAssertTrue(intro.waitForExistence(timeout: 15))
+        XCTAssertGreaterThan(intro.frame.minX, quality.frame.maxX, "Skipping stands beside Quality")
+        shot(app, "iPad — Playback in two columns")
+
+        tap(app.buttons["settings-account"])
+        let rename = app.buttons["account-rename"]
+        let everyone = app.switches["account-everyone"].exists ? app.switches["account-everyone"] : app.descendants(matching: .any)["account-everyone"]
+        XCTAssertTrue(rename.waitForExistence(timeout: 10))
+        XCTAssertTrue(everyone.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(everyone.frame.minX, rename.frame.maxX, "Signed-in devices stands beside This iPad")
+        shot(app, "iPad — Account & devices in two columns")
+    }
+
     // MARK: Switch server
 
     @MainActor
