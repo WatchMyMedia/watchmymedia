@@ -45,7 +45,33 @@ type eventState struct {
 	servedMs   atomic.Int64
 	evictedMs  atomic.Int64
 	baseMs     atomic.Int64 // start of the compacted FFmpeg append playlist
+
+	// wantMs is where the viewer asked to start, in file time; the session
+	// may start earlier, on a keyframe, and the playlist's EXT-X-START
+	// says how far in the asked-for frame is (PLAN-RESUME.md §3.3).
+	wantMs int64
+	// finder finds keyframes for copied video from a file; nil runs each
+	// window as asked. startUs is where the first run starts in file time
+	// and firstEnd, when known, the keyframe that ends it.
+	finder   KeyframeFinder
+	startUs  int64
+	firstEnd *Keyframe
+	// nextUs is where the next run starts, in file time: the keyframe the
+	// last run ended just before, or -1 when that run ended where its
+	// window did. runNextUs is the running run's, kept until it finishes.
+	nextUs    atomic.Int64
+	runNextUs int64
+	// viewerMs is the play's latest reported position in session time,
+	// once viewerSeen: trimming never reaches into the viewerKeep before it
+	// (PLAN-RESUME.md §3.4). Before the first report today's rule applies.
+	viewerMs   atomic.Int64
+	viewerSeen atomic.Bool
 }
+
+// viewerKeep is how much just behind the viewer an event session keeps
+// listed whatever the player has fetched ahead, so the playlist's first
+// segment never passes the picture and a ten-second replay stays playable.
+const viewerKeep = 10 * time.Second
 
 func (e *eventState) running() bool { return e.active.Load() }
 
@@ -54,6 +80,28 @@ func (m *Manager) startEvent(ctx context.Context, spec Spec) (*Session, error) {
 		return nil, err
 	}
 	encoder := m.encoderFor(spec)
+	window := m.eventAhead
+	if window <= 0 {
+		window = m.resources.EventAhead
+		if window <= 0 {
+			window = eventAhead
+		}
+	}
+	want := spec.StartMs
+	finder := spec.Keyframes
+	if !spec.Video.Copy || spec.Growing != nil {
+		finder = nil
+	}
+	startUs, firstEnd := spec.StartMs*1000, (*Keyframe)(nil)
+	if finder != nil {
+		var ok bool
+		if startUs, firstEnd, ok = eventStartPlan(ctx, finder, spec.StartMs, window, m.keyframeLookupWait()); ok {
+			spec.StartMs = ceilMs(startUs)
+		} else {
+			finder = nil
+			m.log.Debug("event start not on a keyframe", "file", spec.FileID, "start_ms", spec.StartMs)
+		}
+	}
 	m.mu.Lock()
 	s, sessCtx, err := m.newSessionLocked(spec, encoder)
 	if err != nil {
@@ -61,13 +109,9 @@ func (m *Manager) startEvent(ctx context.Context, spec Spec) (*Session, error) {
 		return nil, err
 	}
 	s.StartMs = spec.StartMs
-	e := &eventState{m: m, s: s, ctx: sessCtx, spec: spec, window: m.eventAhead, resume: m.eventResume, keepBehind: m.resources.EventKeepBehind}
-	if e.window <= 0 {
-		e.window = m.resources.EventAhead
-		if e.window <= 0 {
-			e.window = eventAhead
-		}
-	}
+	e := &eventState{m: m, s: s, ctx: sessCtx, spec: spec, window: window, resume: m.eventResume, keepBehind: m.resources.EventKeepBehind,
+		wantMs: want, finder: finder, startUs: startUs, firstEnd: firstEnd}
+	e.nextUs.Store(-1)
 	if e.resume <= 0 || e.resume >= e.window {
 		e.resume = min(e.window/4, eventResume)
 	}
@@ -127,6 +171,7 @@ func (e *eventState) startRun(caller context.Context) error {
 		e.s.starting.Store(false)
 		e.mu.Unlock()
 	}()
+	fromUs, runUs, nextUs := e.runBounds(caller, startMs)
 	if err := e.m.admitStorage(); err != nil {
 		return err
 	}
@@ -145,8 +190,8 @@ func (e *eventState) startRun(caller context.Context) error {
 		return caller.Err()
 	}
 	spec := e.spec
-	spec.StartMs += startMs
-	spec.eventChunk = e.window
+	spec.StartMs = ceilMs(fromUs)
+	spec.eventChunk, spec.eventRunUs = e.window, runUs
 	var input io.ReadCloser
 	if spec.Growing != nil {
 		opened, openErr := spec.Growing(runCtx, spec.StartMs)
@@ -209,11 +254,43 @@ func (e *eventState) startRun(caller context.Context) error {
 	done := make(chan struct{})
 	e.mu.Lock()
 	e.stopRun, e.runDone, e.s.cmd = cancel, done, cmd
+	e.runNextUs = nextUs
 	e.active.Store(true)
 	e.mu.Unlock()
 	e.m.log.Debug("ffmpeg event run", "session", e.s.ID, "from_ms", spec.StartMs, "args", strings.Join(args, " "))
 	go e.wait(runCtx, cmd, input, copied, release, cancel, done, startMs)
 	return nil
+}
+
+// runBounds is where the run from playlist time preparedMs starts in the
+// file, in microseconds, and, when it can end just before a keyframe, its
+// length (-t) and where the next run then starts. runUs 0 runs it for the
+// window, as a session without keyframes does; nextUs is then -1.
+func (e *eventState) runBounds(ctx context.Context, preparedMs int64) (fromUs, runUs, nextUs int64) {
+	if preparedMs == 0 {
+		if e.firstEnd != nil {
+			if n := eventRunLength(e.startUs, *e.firstEnd); n > 0 {
+				return e.startUs, n, e.firstEnd.Us
+			}
+		}
+		return e.startUs, 0, -1
+	}
+	fromUs = (e.spec.StartMs + preparedMs) * 1000
+	next := e.nextUs.Load()
+	if e.finder == nil || next < 0 {
+		return fromUs, 0, -1
+	}
+	ctx, cancel := context.WithTimeout(ctx, max(eventRunLookup, e.m.keyframeLookupWait()))
+	defer cancel()
+	end, err := e.finder.AtOrAfter(ctx, next+e.window.Microseconds())
+	if err != nil {
+		// The file may end inside this window; the run then stops there.
+		return next, 0, -1
+	}
+	if n := eventRunLength(next, end); n > 0 {
+		return next, n, end.Us
+	}
+	return next, 0, -1
 }
 
 func (e *eventState) wait(runCtx context.Context, cmd *ffexec.Cmd, input io.ReadCloser, copied <-chan struct{}, release func(), cancel context.CancelFunc, done chan struct{}, startMs int64) {
@@ -246,6 +323,12 @@ func (e *eventState) wait(runCtx context.Context, cmd *ffexec.Cmd, input io.Read
 	e.active.Store(false)
 	if e.runDone == done {
 		e.stopRun = nil
+	}
+	// Only a run that ran to its end stopped just before its keyframe.
+	if err == nil && runCtx.Err() == nil {
+		e.nextUs.Store(e.runNextUs)
+	} else {
+		e.nextUs.Store(-1)
 	}
 	if err != nil && runCtx.Err() == nil {
 		e.s.err = err
@@ -420,6 +503,9 @@ func (e *eventState) prune(p eventPlaylist) {
 		return
 	}
 	cutoff := e.servedMs.Load() - e.keepBehind.Milliseconds()
+	if e.viewerSeen.Load() {
+		cutoff = min(cutoff, e.viewerMs.Load()-viewerKeep.Milliseconds())
+	}
 	for _, entry := range p.entries {
 		if entry.endMs <= e.evictedMs.Load() {
 			continue
@@ -447,10 +533,37 @@ func (s *Session) EventPlaylist() ([]byte, error) {
 	if e.servedMs.Load() >= e.preparedMs.Load()-e.resume.Milliseconds() && !e.running() {
 		go e.resumeRun()
 	}
-	return filterEventPlaylist(b, e.evictedMs.Load(), e.baseMs.Load()), nil
+	evicted := e.evictedMs.Load()
+	return filterEventPlaylist(b, evicted, e.baseMs.Load(), eventStartTag(e.wantMs-s.StartMs-evicted)), nil
 }
 
-func filterEventPlaylist(raw []byte, evictedMs, baseMs int64) []byte {
+// eventStartTag tells a player to start offsetMs into the playlist, on the
+// frame: without it the playlist reads as live, and Media3 and Safari
+// started near the end of what was prepared (PLAN-RESUME.md §1.3).
+func eventStartTag(offsetMs int64) string {
+	return fmt.Sprintf("#EXT-X-START:TIME-OFFSET=%.3f,PRECISE=YES\n", float64(max(offsetMs, 0))/1000)
+}
+
+// NoteViewer records where a play has got to, in file time, for its event
+// session's trimming (PLAN-RESUME.md §3.4).
+func (m *Manager) NoteViewer(playID string, userID, fileMs int64) {
+	if playID == "" {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, s := range m.sessions {
+		if s.event != nil && s.PlayID == playID && s.UserID == userID {
+			s.event.viewerMs.Store(max(fileMs-s.StartMs, 0))
+			s.event.viewerSeen.Store(true)
+		}
+	}
+}
+
+// filterEventPlaylist is the playlist without the segments trimmed through
+// evictedMs. start, an EXT-X-START line, goes only into what players are
+// served, never into the append source FFmpeg reads back.
+func filterEventPlaylist(raw []byte, evictedMs, baseMs int64, start string) []byte {
 	lines := strings.Split(string(raw), "\n")
 	var target, mapping, independent string
 	var mediaSequence, discontinuitySequence int64
@@ -491,6 +604,7 @@ func filterEventPlaylist(raw []byte, evictedMs, baseMs int64) []byte {
 	}
 	var b strings.Builder
 	b.WriteString("#EXTM3U\n#EXT-X-VERSION:7\n")
+	b.WriteString(start)
 	if target != "" {
 		b.WriteString(target + "\n")
 	}
@@ -536,7 +650,7 @@ func (e *eventState) compactPlaylist() {
 	if len(e.s.playlist) == 0 {
 		return
 	}
-	trimmed := filterEventPlaylist(e.s.playlist, evicted, e.baseMs.Load())
+	trimmed := filterEventPlaylist(e.s.playlist, evicted, e.baseMs.Load(), "")
 	path := filepath.Join(e.s.Dir, PlaylistName)
 	tmp := path + ".resume"
 	if err := os.WriteFile(tmp, trimmed, 0o600); err != nil {

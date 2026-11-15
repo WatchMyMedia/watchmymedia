@@ -47,6 +47,9 @@ func newResumeEnv(t *testing.T) resumeEnv {
 		t.Skipf("ffmpeg cannot make the clip (libx264 and ac3 needed): %v\n%s", err, b)
 	}
 	mgr := playback.NewManager(ffmpeg, filepath.Join(t.TempDir(), "transcode"), playback.Capabilities{Encoder: "libx264"}, time.Minute, 8, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	// Beside the package's other ffmpeg tests a 20 ms lookup can take
+	// longer than the start's bound, and the session then starts as asked.
+	mgr.KeyframeLookupsMayTake(10 * time.Second)
 	t.Cleanup(mgr.StopAll)
 	srv := newTestServerWith(t, func(d *Deps) { d.Playback, d.Prober = mgr, &probe.Prober{} })
 	ctx := t.Context()

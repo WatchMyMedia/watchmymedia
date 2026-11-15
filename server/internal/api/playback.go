@@ -388,12 +388,21 @@ func startFilePlayback(ctx context.Context, deps Deps, in *PlaybackInput) (*Play
 				spec.VOD = opts
 				d.Playlist = "vod"
 				// Start where the viewer will: the requested position,
-				// else where they left off. The playlist covers the
-				// whole file either way.
-				if spec.StartMs == 0 && watch != nil && !watch.Completed && watch.PositionMs > 5000 {
-					spec.StartMs = watch.PositionMs
+				// else where they resume. The playlist covers the whole
+				// file either way.
+				if spec.StartMs == 0 {
+					spec.StartMs = resumeStart(watch)
 				}
 			}
+		}
+		if d.Playlist == "event" {
+			// With no start asked for, an event play starts where it
+			// resumes, so the player needn't ask again (PLAN-RESUME.md
+			// §3.7). Copied video starts on the keyframe before.
+			if in.Body.StartMs == nil {
+				spec.StartMs = resumeStart(watch)
+			}
+			spec.Keyframes = keyframeFinder(deps, row, info, d)
 		}
 		s, adaptive := startAdaptiveVOD(ctx, deps, in.Body, info, spec, d.Bitrate)
 		if s == nil {
@@ -418,6 +427,7 @@ func startFilePlayback(ctx context.Context, deps Deps, in *PlaybackInput) (*Play
 			d.Reasons = append(d.Reasons, s.Fallback)
 		}
 		d.URL = fmt.Sprintf("%s/playback/%s/%s", Prefix, s.ID, playback.PlaylistName)
+		d.StartMs = s.StartMs
 		if s.IsVOD() {
 			d.URL = fmt.Sprintf("%s/playback/%s/%s", Prefix, s.ID, playback.VODMaster)
 			d.StartMs = 0
@@ -436,9 +446,7 @@ func startFilePlayback(ctx context.Context, deps Deps, in *PlaybackInput) (*Play
 	}
 	prepareSubtitles(deps, row, d)
 	addMarkers(ctx, deps, row, info, &d)
-	if watch != nil && !watch.Completed {
-		d.ResumeMs = watch.PositionMs
-	}
+	d.ResumeMs = resumePoint(watch)
 	if m, ok := fileTrickplay(ctx, deps, row); ok {
 		d.Trickplay = m
 	}
@@ -505,6 +513,19 @@ func uploadDemand(d playback.Decision, info *probe.MediaInfo) int64 {
 		return bps + bps*2/5
 	}
 	return bps + bps/4
+}
+
+// keyframeFinder reads the file's keyframes near a time for an event
+// session of its copied video (PLAN-RESUME.md §3.1); nil without a prober.
+func keyframeFinder(deps Deps, row db.MediaFile, info *probe.MediaInfo, d playback.Decision) playback.KeyframeFinder {
+	if deps.Prober == nil || !d.Video.Copy {
+		return nil
+	}
+	var startUs *int64
+	if info.Extended {
+		startUs = &info.StartUs
+	}
+	return playback.NewKeyframeFinder(deps.Prober, row.Path, startUs)
 }
 
 // sessionSpec is the ffmpeg session for an HLS decision, with the subtitle
