@@ -10,9 +10,8 @@ import WMMUI
 struct TVLanguageSettings: View {
     let model: SettingsModel
     @Environment(\.dismiss) private var dismiss
-    /// The list "Other language…" adds to.
-    @State private var typing: LanguageList?
-    @State private var languageCode = ""
+    /// The list Add a language adds to (TvSettings2AddLanguage.dc.html).
+    @State private var adding: AddingLanguage?
 
     var body: some View {
         ScrollView {
@@ -41,27 +40,29 @@ struct TVLanguageSettings: View {
                 HStack(alignment: .top, spacing: 60) {
                     if model.supportsAudioLanguages {
                         column {
-                            heading("Audio languages", "Videos start in the first of these languages they have. If they have none, they play the file’s default.")
+                            heading(SettingsWords.audioLanguages, SettingsWords.audioLanguagesNote)
+                            note(.audioLanguages)
                             languages(.audio)
                             if model.audio.languages.isEmpty {
-                                Text("No audio language yet. Videos play the file’s default audio.")
+                                Text(SettingsWords.noAudioLanguage)
                                     .font(.system(size: 23)).foregroundStyle(Palette.textSecondary)
                                 if let suggested = model.suggestion(for: .audio) {
                                     card {
-                                        Text("Your Apple TV uses \(languageTagName(suggested)).")
+                                        Text(SettingsWords.deviceUses(suggested, device: model.facts.family))
                                             .font(.system(size: 24, weight: .medium)).foregroundStyle(Palette.textSecondary)
-                                        Button("Use \(languageTagName(suggested))") { Task { await model.addLanguage(suggested, to: .audio) } }
+                                        Button(SettingsWords.use(suggested)) { Task { await model.addLanguage(suggested, to: .audio) } }
                                             .buttonStyle(TVButtonStyle(height: 50, fontSize: 19))
                                             .accessibilityIdentifier("audio-use-device-language")
                                     }
                                 }
                             }
                             addLanguage(.audio)
-                            foot("Commentary and audio description are never chosen for you. You can pick them in the player.")
+                            foot(SettingsWords.audioLanguagesFootnote)
                         }
                     }
                     column {
-                        heading("Starting subtitles", "When a video starts")
+                        heading(SettingsWords.startingSubtitles, SettingsWords.whenAVideoStarts)
+                        note(.subtitleChoice)
                         Menu {
                             ForEach(model.subtitleChoices, id: \.self) { choice in
                                 Button { Task { await model.setSubtitleChoice(choice) } } label: {
@@ -86,9 +87,10 @@ struct TVLanguageSettings: View {
                         Text(model.subtitleChoice.line)
                             .font(.system(size: 23)).foregroundStyle(Palette.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        foot("A track you choose in the player always wins.")
-                        heading("Online subtitles", nil).padding(.top, 20)
-                        Toggle("Automatic download", isOn: Binding(get: { model.subtitles.automaticDownload && model.automaticDownloadAvailable },
+                        foot(SettingsWords.playerTrackWins)
+                        heading(SettingsWords.onlineSubtitles, nil).padding(.top, 20)
+                        note(.automaticDownload)
+                        Toggle(SettingsWords.automaticDownload, isOn: Binding(get: { model.subtitles.automaticDownload && model.automaticDownloadAvailable },
                                                                    set: { on in Task { await model.setAutomaticSubtitles(on) } }))
                             .disabled(!model.automaticDownloadAvailable)
                             .accessibilityIdentifier("subtitle-automatic-download")
@@ -97,17 +99,21 @@ struct TVLanguageSettings: View {
                              : model.supportsAudioLanguages ? "Choose On or When the audio isn’t in my languages, and add a subtitle language." : "Choose On and add a subtitle language.")
                     }
                     column {
-                        heading("Subtitle languages", "Use the first of these languages that has a subtitle.")
+                        heading(SettingsWords.subtitleLanguages, SettingsWords.subtitleLanguagesNote)
+                        note(.subtitleLanguages)
                         languages(.subtitles)
                         if let suggested = model.suggestion(for: .subtitles) {
-                            Button("Use \(languageTagName(suggested))") { Task { await model.addLanguage(suggested, to: .subtitles) } }
+                            Button(SettingsWords.use(suggested)) { Task { await model.addLanguage(suggested, to: .subtitles) } }
                                 .accessibilityIdentifier("subtitle-use-device-language")
                         }
                         addLanguage(.subtitles)
                         if model.subtitlesUseAudioLanguages { foot("Until you add one, subtitles use your audio languages.") }
                     }
                 }
-                if let error = model.languageError { Text(error).font(.system(size: 23)).foregroundStyle(Palette.warning) }
+                // A change's failure is said in its own column; anything else here.
+                if let error = model.languageError, ![SettingKey.audioLanguages, .subtitleChoice, .subtitleLanguages, .automaticDownload].contains(where: { model.saveState($0).isFailed }) {
+                    Text(error).font(.system(size: 23)).foregroundStyle(Palette.warning)
+                }
             }
             .foregroundStyle(Palette.text)
             .padding(.horizontal, TVLayout.gutter)
@@ -116,12 +122,15 @@ struct TVLanguageSettings: View {
         }
         .background(Palette.ground)
         .task { await model.loadPreferences() }
-        .alert("Add a language", isPresented: Binding(get: { typing != nil }, set: { if !$0 { typing = nil } }), presenting: typing) { list in
-            TextField("Language code, such as en or pt-BR", text: $languageCode)
-                .autocorrectionDisabled()
-            Button("Add") { Task { await model.addLanguage(languageCode, to: list) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in Text("Use a language code such as en or pt-BR.") }
+        .fullScreenCover(item: $adding) { adding in
+            TVAddLanguageScreen(list: adding.list, model: model) { self.adding = nil }
+        }
+        #if DEBUG
+        .onAppear {
+            let arguments = ProcessInfo.processInfo.arguments
+            if let i = arguments.firstIndex(of: "-addLanguage"), arguments.indices.contains(i + 1), let list = LanguageList(rawValue: arguments[i + 1]) { adding = AddingLanguage(list: list) }
+        }
+        #endif
     }
 
     // MARK: Pieces
@@ -142,6 +151,17 @@ struct TVLanguageSettings: View {
             if let line {
                 Text(line).font(.system(size: 23)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    /// How the column's last change went: Saving, Saved and what it did, or why it couldn't.
+    @ViewBuilder private func note(_ key: SettingKey) -> some View {
+        if let note = RowNote(model.saveState(key)) {
+            Text(note.text)
+                .font(.system(size: 21))
+                .foregroundStyle({ if case .failed = note { Palette.warning } else { Palette.textSecondary } }())
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("language-note")
         }
     }
 
@@ -187,17 +207,20 @@ struct TVLanguageSettings: View {
         }
     }
 
-    private func addLanguage(_ list: LanguageList) -> some View {
-        Menu {
-            ForEach(model.addable(to: list), id: \.self) { tag in
-                Button(languageTagName(tag)) { Task { await model.addLanguage(tag, to: list) } }
-            }
-            Button("Other language…") { languageCode = ""; typing = list }
-        } label: {
+    /// Add language opens the names in a grid; at 16 it is off and the line under it says why.
+    @ViewBuilder private func addLanguage(_ list: LanguageList) -> some View {
+        Button { adding = AddingLanguage(list: list) } label: {
             Text("\(Image(systemName: "plus")) Add language")
                 .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
         }
         .disabled(!model.canAdd(to: list))
         .accessibilityIdentifier("\(list.rawValue)-add-language")
+        if let reason = model.addLanguageOffReason(for: list) { foot(reason) }
     }
+}
+
+/// The list Add a language is adding to, for the full-screen grid.
+private struct AddingLanguage: Identifiable {
+    let list: LanguageList
+    var id: String { list.rawValue }
 }

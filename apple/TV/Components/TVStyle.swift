@@ -22,6 +22,8 @@ extension Color {
     /// #B42318 and its edge: a destructive button (Delete episode).
     static let tvDanger = Color(hex: 0xB42318)
     static let tvDangerEdge = Color(hex: 0xE5484D)
+    /// #FF6B63: the words of a button or row that signs out, on the dark ground.
+    static let tvRedText = Color(hex: 0xFF6B63)
 }
 
 /// The brand's focus on the native look: lifted, shadowed, and a 3 pt gold
@@ -54,9 +56,10 @@ extension View {
 
 /// A 10-foot button (the artboards' `.btn`): translucent, burgundy for the
 /// main action, or red for a destructive one; focused, white with dark text
-/// (red for a destructive one), lifted, with the gold rim.
+/// (red for a destructive one), lifted, with the gold rim. `redText` is
+/// translucent with red words (`.btn.red`, Sign out in a question).
 struct TVButtonStyle: ButtonStyle {
-    enum Kind { case primary, secondary, danger }
+    enum Kind { case primary, secondary, danger, redText }
 
     var kind: Kind = .secondary
     var height: CGFloat = 68
@@ -78,12 +81,12 @@ struct TVButtonStyle: ButtonStyle {
             configuration.label
                 .font(.system(size: fontSize, weight: .semibold))
                 .lineLimit(1)
-                .foregroundStyle(focused ? (kind == .danger ? Color.tvDanger : Palette.ground) : .white)
+                .foregroundStyle(focused ? (kind == .danger || kind == .redText ? Color.tvDanger : Palette.ground) : kind == .redText ? Color.tvRedText : .white)
                 .padding(.horizontal, height * 0.5)
                 .frame(height: height)
                 .background(background, in: RoundedRectangle(cornerRadius: 16))
                 .overlay {
-                    if kind != .secondary && !focused {
+                    if kind != .secondary && kind != .redText && !focused {
                         RoundedRectangle(cornerRadius: 16).strokeBorder(kind == .danger ? Color.tvDangerEdge : Palette.burgundyEdge, lineWidth: 1)
                     }
                 }
@@ -96,7 +99,7 @@ struct TVButtonStyle: ButtonStyle {
             if focused { return Palette.text }
             switch kind {
             case .primary: return Palette.burgundy
-            case .secondary: return .white.opacity(0.14)
+            case .secondary, .redText: return .white.opacity(0.14)
             case .danger: return .tvDanger
             }
         }

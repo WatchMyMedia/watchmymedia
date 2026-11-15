@@ -208,9 +208,9 @@ final class LiveExtrasTests: XCTestCase {
 
     @MainActor
     func testSettingsHasTheLeadTime() {
-        let app = launch(["-tab", "settings"])
-        XCTAssertTrue(app.buttons["live-lead-5"].waitUntilExists(timeout: 20), "Settings › Live TV has Remind me")
-        XCTAssertTrue(app.buttons["settings-live-reminders"].exists)
+        let app = launch(["-tab", "settings", "-settingsGroup", "playback"])
+        XCTAssertTrue(app.descendants(matching: .any)["settings-row-lead"].waitUntilExists(timeout: 20), "Settings › Playback has Remind me")
+        XCTAssertTrue(app.buttons["settings-row-reminders"].exists)
         snap("tv-settings")
         app.terminate()
     }

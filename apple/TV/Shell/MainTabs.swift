@@ -5,8 +5,8 @@ import WMMUI
 
 /// The tvOS tab bar at the top (TvHome.dc.html): Search as a magnifier,
 /// Home, TV Shows, Movies and Settings, each tab with its own stack. Menu
-/// pops a stack, and from a section's root goes to Home; the player covers
-/// everything.
+/// pops a stack, and from a section's root goes to Home (from Settings'
+/// list, to the top bar); the player covers everything.
 struct MainTabs: View {
     @Environment(Navigator.self) private var navigator
     @Environment(AppServices.self) private var services
@@ -71,8 +71,10 @@ struct MainTabs: View {
         NavigationStack(path: Binding(get: { navigator.path(for: tab) }, set: { navigator.setPath($0, for: tab) })) {
             root(tab)
                 .navigationDestination(for: Route.self) { destination($0, tab: tab) }
-                // Menu at a section's root goes Home; at Home's (and on the search keyboard) it is the system's.
-                .onExitCommand(perform: tab == .home || tab == .search ? nil : { navigator.exitSection() })
+                // Menu at a section's root goes Home. At Home's (and on the search
+                // keyboard) it is the system's, and in Settings, whose page goes back
+                // to its list itself, the list's Menu is the system's: the top bar.
+                .onExitCommand(perform: tab == .home || tab == .search || tab == .settings ? nil : { navigator.exitSection() })
         }
     }
 

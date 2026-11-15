@@ -158,6 +158,34 @@ server, and on iPad in both a regular and a compact width.
     (measured 2026-11-13: one `TabPage` content build per owner redraw, none
     besides), and the model reads in the content would then redraw the owner
     rather than `TabPage` alone.
+  - Apple TV's Settings (`TV/Screens/Settings/SettingsScreen.swift`, the
+    groups beside their page) moves focus the focus engine puts elsewhere:
+    Right from the list lands on the row level with the group, so it goes
+    to the page's remembered row; Left from a page lands on whichever group
+    is level with the row, which would change the page, so it goes to the
+    page's own group; and focus coming back from nil goes to where it was.
+    The view's `@FocusState` is nil while the top bar has focus and while a
+    `Menu`'s choices, a full-screen cover or a question is up, so "from nil"
+    covers all of them. A press made before the move lands goes from where
+    focus was, so a test waits for focus after each press. `MainTabs`
+    leaves Menu at Settings' root to the system (the top bar); the page has
+    its own `onExitCommand` back to the list.
+  - In a SwiftUI `Menu` on Apple TV a `Label { Text; Text } icon:` item
+    drops its second `Text`, so a ticked choice lost its line. A `Toggle`
+    per choice keeps the title and the line and is ticked when on
+    (Settings' `menuRow`). The menu opens with focus on its first choice,
+    not the ticked one. XCUI sees each toggle as an `Other` inside a cell,
+    labelled "title, line", `isSelected` when ticked, and without its
+    identifier: find a choice by its label (`TVUITests/SettingsTests.swift`).
+    A `Menu`'s own label isn't read out either, so a row that is a `Menu`
+    sets its `accessibilityLabel` and `accessibilityValue`.
+  - On Apple TV, when a focused button's content is replaced (sign-in's
+    "Sign in with a password instead"), focus goes to the new content's
+    `defaultFocus` only if what was replaced was built in the same body.
+    With the pairing pieces moved into views of their own, nothing had
+    focus after the switch (tvOS 27.2 simulator, `BusyFocusTests`), so the
+    pieces sign-in and Switch server share are `@ViewBuilder` functions
+    (`pairingCodeArea(_:)` in `TV/Screens/SignIn/SignInScreen.swift`).
   - On Apple TV a focused button that becomes disabled keeps focus, dimmed,
     until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
     up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable
@@ -243,7 +271,10 @@ didn't start.
 - Nothing can tap a simulator from a script, so reach screens with launch
   arguments (`-fakes`, `-tab`, `-open watchmymedia://…`, the player's
   `-player…` arguments) and capture with `xcrun simctl io <udid> screenshot`.
-  Screenshots can lag a frame: take another before acting on one.
+  Screenshots can lag a frame: take another before acting on one. A
+  Settings row says Saved for 4 s (`SaveStates.linger`), which a press with
+  the simulator tool followed by its screenshot can outlast: capture with
+  `xcrun simctl io` straight after the press, or read the row in a UI test.
 - Run `make apple-e2e` against your own server copy on its own port
   (`E2E_SERVER=localhost:<port>`), not a fixture server another session runs.
 - Typing into the in-app Safari (`SFSafariViewController`) arrives late and
