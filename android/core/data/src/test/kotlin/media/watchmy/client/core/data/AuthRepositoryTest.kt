@@ -18,6 +18,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -293,6 +294,38 @@ class AuthRepositoryTest {
 
         server.on("DELETE /api/auth/sessions/86e0d90b273fc14a", noContent())
         h.services.auth.revoke("86e0d90b273fc14a")
+        assertNull(h.services.auth.user.value)
+    }
+
+    @Test
+    fun `changing the password sends both and keeps this device signed in`() = runBlocking {
+        h.signIn()
+        server.on("PUT /api/auth/password", noContent())
+        h.services.auth.changePassword("old secret", "a new secret")
+        val put = server.last("PUT /api/auth/password")
+        assertEquals("Bearer tok-viewer", put.getHeader("Authorization"))
+        val body = h.body(put)
+        assertEquals("old secret", body["current"]!!.jsonPrimitive.content)
+        assertEquals("a new secret", body["new"]!!.jsonPrimitive.content)
+        assertEquals(User(2, "viewer", false), h.services.auth.user.value)
+    }
+
+    @Test
+    fun `a wrong current password is a 401 that leaves this device signed in`() = runBlocking {
+        h.signIn()
+        server.on("PUT /api/auth/password", problem(401, "current password is wrong"))
+        val e = assertThrows(ApiException::class.java) { runBlocking { h.services.auth.changePassword("nope", "a new secret") } }
+        assertEquals(401, e.status)
+        assertFalse(e is SignedOutException)
+        assertEquals("Current password is wrong.", e.message)
+        assertEquals(User(2, "viewer", false), h.services.auth.user.value)
+    }
+
+    @Test
+    fun `a sign-in that ended still signs out when changing the password`() = runBlocking {
+        h.signIn()
+        server.on("PUT /api/auth/password", problem(401, "sign in required"))
+        assertThrows(SignedOutException::class.java) { runBlocking { h.services.auth.changePassword("old secret", "a new secret") } }
         assertNull(h.services.auth.user.value)
     }
 

@@ -82,6 +82,33 @@ class LinkTvViewModelTest {
         assertTrue(vm.state.value.step is LinkTvViewModel.Step.Found)
         assertEquals("The code ran out. Ask the TV for a new one.", vm.state.value.error)
         vm.startOver()
-        assertEquals(LinkTvViewModel.State(), vm.state.value)
+        assertEquals("started over, with the field told to clear", LinkTvViewModel.State(revision = 1), vm.state.value)
+    }
+
+    @Test fun `each of the board's problems is told apart`() = runTest {
+        auth.pairingFailure = ApiException(404, "That code is not waiting to be linked.")
+        val vm = LinkTvViewModel(auth, initialCode = null)
+        vm.setCode("AAAAAA")
+        assertEquals("under the field", LinkProblem.UnknownCode, vm.state.value.problem)
+
+        auth.pairingFailure = ApiException(410, "The code ran out.")
+        vm.setCode("AAAAAB")
+        assertEquals("under the field", LinkProblem.ExpiredCode, vm.state.value.problem)
+
+        auth.pairingFailure = ApiException(null, "Couldn't reach the server.", java.io.IOException("down"))
+        vm.lookUp()
+        assertEquals("above the button, which tries again", LinkProblem.Unreachable, vm.state.value.problem)
+
+        auth.pairingFailure = null
+        vm.lookUp()
+        assertNull(vm.state.value.problem)
+        assertTrue(vm.state.value.step is LinkTvViewModel.Step.Found)
+    }
+
+    @Test fun `a short code says so under the field`() = runTest {
+        val vm = LinkTvViewModel(auth, initialCode = null)
+        vm.setCode("KQ7")
+        vm.lookUp()
+        assertEquals(LinkProblem.Short, vm.state.value.problem)
     }
 }

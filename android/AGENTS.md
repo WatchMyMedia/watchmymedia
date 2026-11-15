@@ -147,6 +147,18 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   (`deploy/ci/baseline_profile.py`). Generate them again (README,
   "Baseline profile") rather than loosening the check. The journeys find
   screens by `TestTags`; keep a tag when you rework its screen.
+- **Focus between two panes.** On the TV's Settings (groups beside a pane),
+  `focusProperties { onEnter = … }` on a focus group did not redirect a ▶ from
+  the sibling column under Robolectric: focus went to the nearest row. Catch
+  the key instead (`onPreviewKeyEvent` for ▶ on the groups and ◀ on the pane).
+  When a dialog removes the focused row (a device signed out from its
+  confirmation), move focus in a `SideEffect` of the composition that removed
+  it; a `LaunchedEffect` a frame later finds focus already elsewhere. A
+  `FocusRequester` whose element has left the composition throws on
+  `requestFocus()`; use `tryFocus()` (`tv/src/main/kotlin/media/watchmy/client/tv/components/Focus.kt`).
+- **Passwords in fields.** `rememberModelTextField` keeps its text across
+  process death, so password fields use a plain `remember`ed state
+  (`ChangePasswordScreen`): a password never outlives the process.
 - **Focus tests and cleared semantics.** `HomeFocusTest` finds the focused
   element by its `Focused` semantics. A card that `clearAndSetSemantics` to
   read as one thing must set `focused` itself (as `TvOnNowCard` does), or the
