@@ -263,8 +263,8 @@ private struct SwitchSignIn: View {
         HStack(alignment: .top, spacing: 80) {
             VStack(alignment: .leading, spacing: 26) {
                 if model.codeSignIn {
-                    PairingInstructions(model: model)
-                    PairingCodeArea(model: model)
+                    pairingInstructions(model)
+                    pairingCodeArea(model)
                     if model.passwordAllowed {
                         Button("Sign in with a password instead") { model.usePassword() }
                             .buttonStyle(TVButtonStyle())
@@ -276,7 +276,7 @@ private struct SwitchSignIn: View {
             }
             .frame(width: 960, alignment: .leading)
             .focusSection()
-            if model.codeSignIn { PairingQR(model: model, size: 340) }
+            if model.codeSignIn { pairingQR(model, size: 340) }
         }
         .task(id: model.codeSignIn ? model.pairingRun : -1) { await model.pair() }
     }

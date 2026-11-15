@@ -66,11 +66,11 @@ private struct SignInContent: View {
         }
     }
 
-    private var instructions: some View { PairingInstructions(model: model) }
+    @ViewBuilder private var instructions: some View { pairingInstructions(model) }
 
-    private var codeArea: some View { PairingCodeArea(model: model) }
+    @ViewBuilder private var codeArea: some View { pairingCodeArea(model) }
 
-    private var qr: some View { PairingQR(model: model) }
+    private var qr: some View { pairingQR(model) }
 
     // MARK: Password
 
@@ -160,93 +160,88 @@ private struct SignInContent: View {
     }
 }
 
-/// What to do with the pairing code, once there is one: open the server's
-/// link page on a phone or computer and enter it. Sign-in and Switch
-/// server's second step share it.
-struct PairingInstructions: View {
-    let model: SignInModel
+// The pairing code's pieces, shared by sign-in and Switch server's second
+// step. They are @ViewBuilder functions, not views of their own: as views,
+// choosing "Sign in with a password instead" left nothing focused when the
+// form replaced them (tvOS 27.2 simulator, BusyFocusTests), where built into
+// the same body focus goes to the name field (apple/AGENTS.md).
 
-    var body: some View {
-        Group {
-            if let code = model.waitingCode {
-                Text("On your iPhone or computer, open ") + Text(linkPageLabel(code.linkURL)).foregroundStyle(Palette.text).fontWeight(.semibold) + Text(" and enter this code.")
-            } else {
-                Text("On your iPhone, open WatchMyMedia and choose Link a TV, or open the server’s link page on a computer.")
-            }
-        }
-        .font(.system(size: 26))
-        .lineSpacing(8)
-        .foregroundStyle(Palette.textSecondary)
-        .frame(maxWidth: 820, alignment: .leading)
+/// What to do with the pairing code, once there is one: open the server's
+/// link page on a phone or computer and enter it.
+@MainActor @ViewBuilder
+func pairingInstructions(_ model: SignInModel) -> some View {
+    if let code = model.waitingCode {
+        (Text("On your iPhone or computer, open ") + Text(linkPageLabel(code.linkURL)).foregroundStyle(Palette.text).fontWeight(.semibold) + Text(" and enter this code."))
+            .font(.system(size: 26))
+            .lineSpacing(8)
+            .foregroundStyle(Palette.textSecondary)
+            .frame(maxWidth: 820, alignment: .leading)
+    } else {
+        Text("On your iPhone, open WatchMyMedia and choose Link a TV, or open the server’s link page on a computer.")
+            .font(.system(size: 26))
+            .lineSpacing(8)
+            .foregroundStyle(Palette.textSecondary)
+            .frame(maxWidth: 820, alignment: .leading)
     }
 }
 
 /// The pairing code as tiles and how it stands: waiting with the time
 /// left, accepted, run out with Get a new code, or still coming.
-struct PairingCodeArea: View {
-    let model: SignInModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 26) {
-            switch model.pairing {
-            case .waiting(let code):
-                CodeTiles(code: code.code)
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    HStack(spacing: 12) {
-                        Circle().fill(Palette.gold).frame(width: 12, height: 12)
-                        Text(tvPairingWaitingLine(expiresAt: code.expiresAt, now: context.date))
-                    }
-                    .font(.system(size: 20))
-                    .foregroundStyle(Palette.muted)
-                }
-            case .approved:
-                CodeTiles(code: "", dim: true)
-                Label(pairingCodeAccepted, systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(Palette.gold)
-            case .expired, .failed:
-                CodeTiles(code: "", dim: true)
-                if let problem = model.pairingProblem { WarningLine(text: problem) }
-                Button(pairingNewCode) { model.newCode() }
-                    .buttonStyle(TVButtonStyle(kind: .primary))
-            case .starting, nil:
-                CodeTiles(code: "", dim: true)
-                HStack(spacing: 12) {
-                    ProgressView()
-                    Text(pairingGettingCode)
-                }
-                .font(.system(size: 20))
-                .foregroundStyle(Palette.muted)
+@MainActor @ViewBuilder
+func pairingCodeArea(_ model: SignInModel) -> some View {
+    switch model.pairing {
+    case .waiting(let code):
+        CodeTiles(code: code.code)
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            HStack(spacing: 12) {
+                Circle().fill(Palette.gold).frame(width: 12, height: 12)
+                Text(tvPairingWaitingLine(expiresAt: code.expiresAt, now: context.date))
             }
-            if !model.passwordAllowed {
-                Text("This server’s sign-in protection is on, so this Apple TV signs in with the code.")
-                    .font(.system(size: 18))
-                    .foregroundStyle(Palette.faint)
-            }
+            .font(.system(size: 20))
+            .foregroundStyle(Palette.muted)
         }
+    case .approved:
+        CodeTiles(code: "", dim: true)
+        Label(pairingCodeAccepted, systemImage: "checkmark.circle.fill")
+            .font(.system(size: 22, weight: .semibold))
+            .foregroundStyle(Palette.gold)
+    case .expired, .failed:
+        CodeTiles(code: "", dim: true)
+        if let problem = model.pairingProblem { WarningLine(text: problem) }
+        Button(pairingNewCode) { model.newCode() }
+            .buttonStyle(TVButtonStyle(kind: .primary))
+    case .starting, nil:
+        CodeTiles(code: "", dim: true)
+        HStack(spacing: 12) {
+            ProgressView()
+            Text(pairingGettingCode)
+        }
+        .font(.system(size: 20))
+        .foregroundStyle(Palette.muted)
+    }
+    if !model.passwordAllowed {
+        Text("This server’s sign-in protection is on, so this Apple TV signs in with the code.")
+            .font(.system(size: 18))
+            .foregroundStyle(Palette.faint)
     }
 }
 
 /// The link page's QR code, which opens it with the code filled in.
-struct PairingQR: View {
-    let model: SignInModel
-    var size: CGFloat = 392
-
-    var body: some View {
-        VStack(spacing: 22) {
-            Group {
-                if let code = model.waitingCode {
-                    QRCodeView(code.linkURL.absoluteString)
-                } else {
-                    Color.white.overlay { ProgressView().tint(Palette.ground) }
-                }
+@MainActor
+func pairingQR(_ model: SignInModel, size: CGFloat = 392) -> some View {
+    VStack(spacing: 22) {
+        Group {
+            if let code = model.waitingCode {
+                QRCodeView(code.linkURL.absoluteString)
+            } else {
+                Color.white.overlay { ProgressView().tint(Palette.ground) }
             }
-            .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: 26))
-            .shadow(color: .black.opacity(0.6), radius: 35, y: 30)
-            .accessibilityLabel("QR code for the link page")
-            Text("Or scan with the iPhone camera").font(.system(size: 20)).foregroundStyle(Palette.muted)
         }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 26))
+        .shadow(color: .black.opacity(0.6), radius: 35, y: 30)
+        .accessibilityLabel("QR code for the link page")
+        Text("Or scan with the iPhone camera").font(.system(size: 20)).foregroundStyle(Palette.muted)
     }
 }
 
