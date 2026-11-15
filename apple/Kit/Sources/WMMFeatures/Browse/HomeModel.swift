@@ -122,7 +122,7 @@ public final class HomeModel {
         navigator.open(episode)
     }
 
-    /// A row's See all: the list's page, or the library's tab.
+    /// A row's See all: the list's page, or the library's tab at its grid, sorted the row's way.
     public func open(_ link: RowLink) {
         navigator.open(link, home: state.value)
     }
@@ -131,8 +131,17 @@ public final class HomeModel {
     public func canOpen(_ link: RowLink) -> Bool {
         switch link {
         case .list: true
-        case .library(let id, _, _, _, _): id == state.value?.tvLibraryID || id == state.value?.movieLibraryID
+        case .library(let id, _, _, _, _): state.value?.libraryType(id) != nil
         }
+    }
+
+    /// What a row's See all card and heading link say (PLAN-SEE-ALL.md §3),
+    /// or nil when the row has none: no link (Continue watching, Live TV, a
+    /// row mixing two libraries of a type), or a library this Home doesn't know.
+    public func seeAll(_ row: ScreenRow) -> SeeAllWords? {
+        guard let link = row.seeAll, canOpen(link) else { return nil }
+        let type: LibraryType? = if case .library(let id, _, _, _, _) = link { state.value?.libraryType(id) } else { nil }
+        return SeeAllWords(row: row, libraryType: type)
     }
 
     public func play(_ episode: EpisodeCard) {

@@ -171,18 +171,20 @@ final class LatestLoad {
 }
 
 extension Navigator {
-    /// A row's See all: a list's page, or the library's tab (`home` says which
-    /// library is the TV one and which the movies').
+    /// A row's See all: a list's page, or the library's tab at its grid,
+    /// which takes the link's sort and filters once (``takeBrowseLink(for:)``,
+    /// PLAN-SEE-ALL.md §4.4). `home` says which library is the TV one and
+    /// which the movies'; a library it doesn't know goes nowhere. A page
+    /// pushed on the tab is closed, so its grid shows.
     public func open(_ link: RowLink, home: HomeData?) {
         switch link {
         case .list(let id):
             open(.mediaList(id: id))
         case .library(let id, _, _, _, _):
-            if id == home?.tvLibraryID {
-                select(.tvShows)
-            } else if id == home?.movieLibraryID {
-                select(.movies)
-            }
+            guard let tab = home?.libraryType(id)?.tab else { return }
+            post(link, for: tab)
+            setPath([], for: tab)
+            select(tab)
         }
     }
 }
