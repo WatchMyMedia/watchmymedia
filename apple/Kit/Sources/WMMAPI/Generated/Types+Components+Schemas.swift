@@ -2086,7 +2086,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Decision/reasons`.
             public var reasons: [Swift.String]
-            /// The user's saved position for this item, if partway through.
+            /// Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread (PLAN-RESUME.md §3.8).
             ///
             /// - Remark: Generated from `#/components/schemas/Decision/resumeMs`.
             public var resumeMs: Swift.Int64
@@ -2094,7 +2094,7 @@ extension Components {
             public var segments: [Components.Schemas.Segment]
             /// - Remark: Generated from `#/components/schemas/Decision/sessionId`.
             public var sessionId: Swift.String?
-            /// Where the HLS session starts; add to the player's time to get the file position.
+            /// Where the HLS session starts; add to the player's time to get the file position. An event session of copied video starts on the keyframe at or before the time asked for, so this can be up to 12 s earlier than the request.
             ///
             /// - Remark: Generated from `#/components/schemas/Decision/startMs`.
             public var startMs: Swift.Int64
@@ -2140,10 +2140,10 @@ extension Components {
             ///   - playlist: HLS only: vod (start at 0, file time = player time) or event (file time = startMs + player time).
             ///   - _protocol:
             ///   - reasons: Why a cheaper mode was not possible.
-            ///   - resumeMs: The user's saved position for this item, if partway through.
+            ///   - resumeMs: Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread (PLAN-RESUME.md §3.8).
             ///   - segments:
             ///   - sessionId:
-            ///   - startMs: Where the HLS session starts; add to the player's time to get the file position.
+            ///   - startMs: Where the HLS session starts; add to the player's time to get the file position. An event session of copied video starts on the keyframe at or before the time asked for, so this can be up to 12 s earlier than the request.
             ///   - subtitleId: The initial subtitle track selected from the request or the person's preferences (API level 18); absent means Off.
             ///   - subtitles:
             ///   - trickplay: The file's seek thumbnails; absent until the server has made them.
@@ -9973,7 +9973,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Request/quality`.
             public var quality: Swift.String?
-            /// Position to start from; only used by HLS sessions.
+            /// Position to start from; only used by HLS sessions. Omitted, a play of something partway through starts preparing where it resumes (resumeMs); 0 starts at the beginning.
             ///
             /// - Remark: Generated from `#/components/schemas/Request/startMs`.
             public var startMs: Swift.Int64?
@@ -10006,7 +10006,7 @@ extension Components {
             ///   - playlist: HLS playlist kind: event (default) or vod (the whole file, for native players).
             ///   - profile:
             ///   - quality: The quality the viewer picked: original, 2160, 1080, 720, 480 or 360, shown in activity, with its caps already in the profile; or auto, with the device's own profile, for the server to pick the step and lower it when the connection cannot keep up (API level 3).
-            ///   - startMs: Position to start from; only used by HLS sessions.
+            ///   - startMs: Position to start from; only used by HLS sessions. Omitted, a play of something partway through starts preparing where it resumes (resumeMs); 0 starts at the beginning.
             ///   - subtitleId:
             ///   - subtitleMode: From API level 18: auto uses the person's subtitle preferences; off explicitly disables them. A subtitleId takes precedence. Omitted, older players keep their existing behavior.
             ///   - switchGeneration: Generation of a quality directive this request accepts. Omit for a new play or an unrelated seek/track change.

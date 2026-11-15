@@ -140,6 +140,34 @@ func watchForFile(ctx context.Context, deps Deps, user auth.User, f db.MediaFile
 	return &ws
 }
 
+// resumeRewindMs is how far before the saved position a resume starts, so
+// people pick up the thread (PLAN-RESUME.md §3.8). Only resuming saved
+// progress rewinds: an explicit start, such as a seek or a reload, is
+// played as asked, and the saved position itself stays exact.
+const resumeRewindMs = 5_000
+
+// resumeMinMs is the apps' own threshold: they resume only past it.
+const resumeMinMs = 5_000
+
+// resumePoint is where a play of an item partway through resumes: 5 s
+// before its saved position, never before the start. 0 for nothing saved,
+// or an item watched to the end.
+func resumePoint(w *WatchState) int64 {
+	if w == nil || w.Completed {
+		return 0
+	}
+	return max(w.PositionMs-resumeRewindMs, 0)
+}
+
+// resumeStart is where a session starts preparing for a play that asked
+// for no start: its resume point, past the apps' threshold, else 0.
+func resumeStart(w *WatchState) int64 {
+	if r := resumePoint(w); r > resumeMinMs {
+		return r
+	}
+	return 0
+}
+
 // watchable checks that the movie or episode a mark is for exists, so no
 // watch state is written for an ID that names nothing.
 func watchable(ctx context.Context, deps Deps, itemType string, id int64) error {
@@ -180,6 +208,11 @@ func registerWatch(h huma.API, deps Deps) {
 			if out.Body.PlayID != "" {
 				playWatchedAt, playDuration, _ = deps.Activity.WatchedAt(out.Body.PlayID, user.ID, f.ID)
 			}
+		}
+		// The play's event session keeps its history behind this position
+		// (PLAN-RESUME.md §3.4).
+		if deps.Playback != nil {
+			deps.Playback.NoteViewer(in.Body.PlayID, user.ID, in.Body.PositionMs)
 		}
 		itemType, ids, err := itemsForFile(ctx, deps, f)
 		if err != nil {

@@ -4499,14 +4499,14 @@ export interface components {
             reasons: string[];
             /**
              * Format: int64
-             * @description The user's saved position for this item, if partway through.
+             * @description Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread (PLAN-RESUME.md §3.8).
              */
             resumeMs: number;
             segments: components["schemas"]["Segment"][];
             sessionId?: string;
             /**
              * Format: int64
-             * @description Where the HLS session starts; add to the player's time to get the file position.
+             * @description Where the HLS session starts; add to the player's time to get the file position. An event session of copied video starts on the keyframe at or before the time asked for, so this can be up to 12 s earlier than the request.
              */
             startMs: number;
             /** @description The initial subtitle track selected from the request or the person's preferences (API level 18); absent means Off. */
@@ -7733,7 +7733,7 @@ export interface components {
             quality?: string;
             /**
              * Format: int64
-             * @description Position to start from; only used by HLS sessions.
+             * @description Position to start from; only used by HLS sessions. Omitted, a play of something partway through starts preparing where it resumes (resumeMs); 0 starts at the beginning.
              */
             startMs?: number;
             subtitleId?: string;

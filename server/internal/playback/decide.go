@@ -90,7 +90,7 @@ type Request struct {
 	SubtitleMode string `json:"subtitleMode,omitempty" enum:"auto,off" required:"false" doc:"From API level 18: auto uses the person's subtitle preferences; off explicitly disables them. A subtitleId takes precedence. Omitted, older players keep their existing behavior."`
 	// BurnIn forces the selected subtitle to be burned into the video.
 	BurnIn  bool   `json:"burnIn,omitempty"`
-	StartMs int64  `json:"startMs,omitempty" doc:"Position to start from; only used by HLS sessions."`
+	StartMs *int64 `json:"startMs,omitempty" doc:"Position to start from; only used by HLS sessions. Omitted, a play of something partway through starts preparing where it resumes (resumeMs); 0 starts at the beginning."`
 	PlayID  string `json:"playId,omitempty" pattern:"^[0-9a-f]{16}$" doc:"The playId an earlier request for this file returned. The new request continues that play and replaces its session (seeking, track and quality changes); omit it to start a new play."`
 	// Client names the device for activity; omitted, it is worked out from the user agent.
 	Client           *Client `json:"client,omitempty"`
@@ -102,6 +102,14 @@ type Request struct {
 	// so native players show the real timeline and seek anywhere; its
 	// master playlist also offers the text subtitles as renditions.
 	Playlist string `json:"playlist,omitempty" enum:"event,vod" doc:"HLS playlist kind: event (default) or vod (the whole file, for native players)."`
+}
+
+// Start is where the request asks to start, 0 when it doesn't say.
+func (r Request) Start() int64 {
+	if r.StartMs == nil {
+		return 0
+	}
+	return max(*r.StartMs, 0)
 }
 
 // Client describes the app or browser playing.
@@ -191,8 +199,8 @@ type Decision struct {
 	SessionID   string          `json:"sessionId,omitempty"`
 	DurationMs  int64           `json:"durationMs"`
 	Growing     *Growing        `json:"growing,omitempty" required:"false" doc:"A recording still being written. Use event playback and extend the recorded duration from the clock, up to endsAt (API level 19)."`
-	StartMs     int64           `json:"startMs" doc:"Where the HLS session starts; add to the player's time to get the file position."`
-	ResumeMs    int64           `json:"resumeMs" doc:"The user's saved position for this item, if partway through."`
+	StartMs     int64           `json:"startMs" doc:"Where the HLS session starts; add to the player's time to get the file position. An event session of copied video starts on the keyframe at or before the time asked for, so this can be up to 12 s earlier than the request."`
+	ResumeMs    int64           `json:"resumeMs" doc:"Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread (PLAN-RESUME.md §3.8)."`
 	Bitrate     int64           `json:"bitrate" required:"false" doc:"About how many bits per second the stream needs: the file's average when its video is copied, else the video encoder's cap plus the audio; 0 when unknown."`
 	Auto        *AutoChoice     `json:"auto,omitempty" doc:"Set when the request asked for quality auto: the step the server picked."`
 	Video       VideoPlan       `json:"video"`
@@ -504,7 +512,7 @@ func isTextSubtitle(codec string) bool { return probe.SubtitleKind(codec) == pro
 // use and how large it may be. The caller fills in URLs and the session.
 func Decide(info *probe.MediaInfo, ext string, req Request, sidecars []Sidecar, caps Capabilities) Decision {
 	p := req.Profile
-	d := Decision{caps: &caps, Reasons: []string{}, AudioTracks: []AudioTrack{}, Subtitles: []SubtitleTrack{}, Segments: []Segment{}, DurationMs: info.DurationMs, StartMs: req.StartMs}
+	d := Decision{caps: &caps, Reasons: []string{}, AudioTracks: []AudioTrack{}, Subtitles: []SubtitleTrack{}, Segments: []Segment{}, DurationMs: info.DurationMs, StartMs: req.Start()}
 
 	// --- video ---
 	var videoOK bool

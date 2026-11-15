@@ -578,9 +578,7 @@ func registerOffline(h huma.API, r *chi.Mux, deps Deps) {
 		}
 		prepareSubtitles(deps, row, d)
 		addMarkers(ctx, deps, row, info, &d)
-		if w := watchForFile(ctx, deps, u, row); w != nil && !w.Completed {
-			d.ResumeMs = w.PositionMs
-		}
+		d.ResumeMs = resumePoint(watchForFile(ctx, deps, u, row))
 		view := offlineView(rec, recordState{state: rec.State})
 		view.Decision = &d
 		deps.Log.Info("offline download made", "download", rec.PublicID, "file", row.ID, "user", u.ID, "device", dev.Name, "mode", d.Mode, "quality", quality)
