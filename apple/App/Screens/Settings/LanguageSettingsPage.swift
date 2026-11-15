@@ -7,12 +7,13 @@ import WMMUI
 /// Pad2SettingsLanguages.dc.html in two columns where the page is wide;
 /// PLAN-LANGUAGES.md §5.6): the audio languages, how subtitles start, the
 /// subtitle languages and automatic download. Each change saves at once.
+/// Add language opens every language by name, to search
+/// (Settings2AddLanguage.dc.html).
 struct LanguageSettingsPage: View {
     let model: SettingsModel
     @State private var width: CGFloat = 0
-    /// The list "Other language…" adds to.
-    @State private var typing: LanguageList?
-    @State private var languageCode = ""
+    /// The list Add language is adding to, while its sheet is up.
+    @State private var adding: LanguageList?
 
     var body: some View {
         ScrollView {
@@ -43,20 +44,16 @@ struct LanguageSettingsPage: View {
         .groundBackground()
         .navigationTitle(model.languagesTitle)
         .task { await model.loadPreferences() }
-        .alert("Add a language", isPresented: Binding(get: { typing != nil }, set: { if !$0 { typing = nil } }), presenting: typing) { list in
-            TextField("Language code", text: $languageCode)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            Button("Add") { Task { await model.addLanguage(languageCode, to: list) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in Text("Use a language code such as en or pt-BR.") }
+        .sheet(isPresented: Binding(get: { adding != nil }, set: { if !$0 { adding = nil } })) {
+            if let adding { AddLanguageSheet(model: model, list: adding) }
+        }
     }
 
     // MARK: Sections
 
     private var audioSection: some View {
         section("Audio languages", "Videos start in the first of these languages they have. If they have none, they play the file’s default.",
-                note: "Commentary and audio description are never chosen for you. You can pick them in the player.") {
+                note: limitNote(.audio) ?? "Commentary and audio description are never chosen for you. You can pick them in the player.") {
             languageRows(.audio)
             if model.audio.languages.isEmpty {
                 Text("No audio language yet. Videos play the file’s default audio.")
@@ -136,7 +133,7 @@ struct LanguageSettingsPage: View {
 
     private var subtitleSection: some View {
         section("Subtitle languages", "Use the first of these languages that has a subtitle.",
-                note: model.subtitlesUseAudioLanguages ? "Until you add one, subtitles use your audio languages." : nil) {
+                note: limitNote(.subtitles) ?? (model.subtitlesUseAudioLanguages ? "Until you add one, subtitles use your audio languages." : nil)) {
             languageRows(.subtitles)
             if let suggested = model.suggestion(for: .subtitles) {
                 Button { Task { await model.addLanguage(suggested, to: .subtitles) } } label: {
@@ -182,24 +179,29 @@ struct LanguageSettingsPage: View {
         }
     }
 
+    /// Add language opens the names to search (``AddLanguageSheet``); at 16
+    /// it is dim, and the note under the list says why.
     private func addRow(_ list: LanguageList) -> some View {
-        Menu {
-            ForEach(model.addable(to: list), id: \.self) { tag in
-                Button(languageTagName(tag)) { Task { await model.addLanguage(tag, to: list) } }
-            }
-            Button("Other language…") { languageCode = ""; typing = list }
-        } label: {
+        Button { adding = list } label: {
             HStack(spacing: 12) {
                 Image(systemName: "plus").font(.body.weight(.semibold))
                 Text("Add language").font(.body.weight(.medium))
             }
             .foregroundStyle(Palette.gold)
+            .opacity(model.canAdd(to: list) ? 1 : 0.45)
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
             .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .disabled(!model.canAdd(to: list))
+        .accessibilityHint(model.canAdd(to: list) ? "" : "This list has 16, the most it can keep")
         .accessibilityIdentifier("\(list.rawValue)-add-language")
+    }
+
+    /// Under a full list: why Add language is dim.
+    private func limitNote(_ list: LanguageList) -> String? {
+        model.canAdd(to: list) ? nil : "You can keep up to 16 languages, and this list has 16. Remove one to add another."
     }
 
     private func section(_ title: String, _ description: String?, note: String?, @ViewBuilder rows: () -> some View) -> some View {
