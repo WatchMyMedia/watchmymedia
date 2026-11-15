@@ -142,8 +142,19 @@ private fun NavHostController.openTabRoot(tab: MobileTab) = navigate(tab.route()
     launchSingleTop = true
 }
 
+/**
+ * [tab] as [openTab] leaves it, then back to its own page: a See all opens
+ * the library's grid, not a show opened from the tab before, and keeps the
+ * grid's model, which takes the row's sort (PLAN-SEE-ALL.md §4.4).
+ */
+private fun NavHostController.openTabPage(tab: MobileTab) {
+    openTab(tab)
+    popBackStack(tab.route(), inclusive = false)
+}
+
 /** Navigates to [route], as a tab switch when it is one of the tabs' routes. */
 private fun NavHostController.go(route: Any) {
+    if (route is LibraryTab) return openTabPage(if (route.type == LibraryType.Tv) MobileTab.TvShows else MobileTab.Movies)
     val tab = MobileTab.entries.firstOrNull { it.route() == route }
     if (tab != null) openTab(tab) else navigate(route)
 }

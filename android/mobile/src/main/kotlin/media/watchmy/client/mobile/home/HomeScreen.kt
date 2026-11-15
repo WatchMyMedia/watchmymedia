@@ -73,8 +73,9 @@ import media.watchmy.client.mobile.live.LiveHomeRow
 import media.watchmy.client.mobile.rows.ArrangedRow
 import media.watchmy.client.mobile.rows.EditRowsButton
 import media.watchmy.client.mobile.rows.RowActions
+import media.watchmy.client.mobile.rows.homeSeeAll
 import media.watchmy.client.mobile.rows.rowEditorRoute
-import media.watchmy.client.model.RowLink
+import media.watchmy.client.model.BrowseRequests
 import media.watchmy.client.model.RowScreens
 import media.watchmy.client.model.RowStyle
 import media.watchmy.client.model.arranged
@@ -229,7 +230,7 @@ fun HomeScreen(
                             if (liveFirst || (arranged && state.isEmpty)) liveRow()
                             if (arranged) {
                                 val actions = RowActions(onPlay, onOpenShow, onOpenMovie, onOpenEpisode, notMatched, vm::setWatched)
-                                arrangedRows(home, services.library, vm, actions, layout.isTablet, layout.twoPane, onNavigate, live = liveRow.takeIf { liveChannels.isNotEmpty() && !state.isEmpty })
+                                arrangedRows(home, services.library, services.browseRequests, actions, layout.isTablet, layout.twoPane, onNavigate, live = liveRow.takeIf { liveChannels.isNotEmpty() && !state.isEmpty })
                             } else {
                                 homeRows(home, services.library, vm, onPlay, onOpenShow, onOpenMovie, onOpenEpisode, notMatched, layout.isTablet, layout.twoPane, onNavigate, onNow = liveRow.takeIf { !liveFirst })
                             }
@@ -374,13 +375,14 @@ private fun LazyListScope.homeRows(
 /**
  * Home in the person's order (PLAN-ROWS.md §8.2): the hero, then each row by
  * its style, Live TV in its place ([live], when there are channels), Edit
- * Home and the totals. The tablet keeps Continue beside the hero only while
- * it is the first row drawn.
+ * Home and the totals. A row with somewhere to go ends in See all, on the
+ * phone as on the tablet ([homeSeeAll]). The tablet keeps Continue beside
+ * the hero only while it is the first row drawn.
  */
 private fun LazyListScope.arrangedRows(
     home: HomeData,
     library: LibraryRepository,
-    vm: HomeViewModel,
+    requests: BrowseRequests,
     actions: RowActions,
     tablet: Boolean,
     twoPane: Boolean,
@@ -402,7 +404,7 @@ private fun LazyListScope.arrangedRows(
             live?.invoke(this)
         } else {
             item(key = "row-${row.id}", contentType = "row-${row.style}") {
-                ArrangedRow(row, library, tablet, actions, onSeeAll = row.seeAll?.let { link -> seeAll(link, home, tablet, onNavigate) })
+                ArrangedRow(row, library, tablet, actions, seeAll = homeSeeAll(row, home, requests, onNavigate))
             }
         }
     }
@@ -418,15 +420,6 @@ private fun LazyListScope.arrangedRows(
             modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
-}
-
-/**
- * Where a Home row's See all goes: a list's page, or the library's tab. The
- * phone's built-in rows keep the heading without one, as before.
- */
-private fun seeAll(link: RowLink, home: HomeData, tablet: Boolean, onNavigate: (Any) -> Unit): (() -> Unit)? = when (link) {
-    is RowLink.ToList -> ({ onNavigate(MobileRoutes.MediaList(link.listId)) })
-    is RowLink.Library -> if (!tablet) null else ({ onNavigate(if (link.libraryId == home.tvLibraryId) MobileRoutes.TvShows else MobileRoutes.Movies) })
 }
 
 /** A titled row of cards. */

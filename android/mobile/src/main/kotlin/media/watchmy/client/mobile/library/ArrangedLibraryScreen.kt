@@ -54,12 +54,13 @@ import media.watchmy.client.mobile.rows.ArrangedRow
 import media.watchmy.client.mobile.rows.EditRowsButton
 import media.watchmy.client.mobile.rows.RowActions
 import media.watchmy.client.mobile.rows.bleed
+import media.watchmy.client.mobile.rows.librarySeeAll
 import media.watchmy.client.mobile.rows.rowEditorRoute
 import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.PlayRequest
-import media.watchmy.client.model.RowLink
+import media.watchmy.client.model.BrowseRequest
 import media.watchmy.client.model.RowStyle
 import media.watchmy.client.model.drawn
 import media.watchmy.client.model.formatCount
@@ -102,7 +103,9 @@ internal fun ArrangedLibraryScreen(
     // A new sort or filter from deep in the grid goes back up to its heading; with the heading or
     // the rows in view nothing moves, and coming back from a show keeps the place.
     grid.FollowLibrary(state, top = drawn.size + 1, first = drawn.size + 2, loadMore = vm::loadMore)
-    ShowRowsWhenTheyArrive(grid, drawn.size)
+    // A row's See all, here or on Home, lands on the grid's heading, under the rows.
+    grid.GoToGridWhenAsked(state, heading = drawn.size + 1, onShown = vm::gridShown)
+    ShowRowsWhenTheyArrive(grid, drawn.size, toGrid = state.toGrid)
     val actions = libraryRowActions(onPlay, onOpenShow, onOpenMovie, onNavigate, onNotMatched, rowsVm)
 
     Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
@@ -117,7 +120,7 @@ internal fun ArrangedLibraryScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    libraryRows(drawn, library, actions, tablet = false, edge = 16.dp, onNavigate = onNavigate)
+                    libraryRows(drawn, library, actions, tablet = false, edge = 16.dp, type = type, libraryId = state.libraryId, onOpen = vm::open, onNavigate = onNavigate)
                     item(key = "edit", span = { GridItemSpan(maxLineSpan) }, contentType = "edit") {
                         EditRowsButton("Edit rows", { rows.screen?.let { onNavigate(rowEditorRoute(it, title, tablet = false)) } }, tablet = false, edge = 0.dp, modifier = Modifier.padding(top = 10.dp, bottom = 10.dp))
                     }
@@ -146,11 +149,13 @@ internal fun ArrangedLibraryScreen(
 /**
  * Rows that arrive after the grid would go in above what is on screen, where
  * a lazy grid keeps its place: the first time they come, and while the page
- * is still at its top, scroll up to show them.
+ * is still at its top, scroll up to show them. Not after a See all went to
+ * the grid ([toGrid]): the rows stay above it.
  */
 @Composable
-internal fun ShowRowsWhenTheyArrive(grid: androidx.compose.foundation.lazy.grid.LazyGridState, rows: Int) {
+internal fun ShowRowsWhenTheyArrive(grid: androidx.compose.foundation.lazy.grid.LazyGridState, rows: Int, toGrid: Boolean = false) {
     var seen by rememberSaveable { mutableStateOf(rows > 0) }
+    LaunchedEffect(toGrid) { if (toGrid) seen = true }
     LaunchedEffect(rows > 0) {
         if (seen || rows == 0) return@LaunchedEffect
         seen = true
@@ -168,12 +173,25 @@ internal fun libraryRowActions(
     rowsVm: LibraryRowsViewModel,
 ) = RowActions(onPlay, onOpenShow, onOpenMovie, { id, season, episode -> onNavigate(MobileRoutes.Episode(id, season, episode)) }, onNotMatched, rowsVm::setWatched)
 
-/** The library's rows as full-width items of a grid, reaching the screen's edges. */
-internal fun LazyGridScope.libraryRows(rows: List<media.watchmy.client.model.ScreenRow>, library: LibraryRepository, actions: RowActions, tablet: Boolean, edge: Dp, onNavigate: (Any) -> Unit) {
+/**
+ * The library's rows as full-width items of a grid, reaching the screen's
+ * edges. A row's See all opens a list's page, or sorts the grid below the
+ * row's way ([onOpen], PLAN-SEE-ALL.md §4.4).
+ */
+internal fun LazyGridScope.libraryRows(
+    rows: List<media.watchmy.client.model.ScreenRow>,
+    library: LibraryRepository,
+    actions: RowActions,
+    tablet: Boolean,
+    edge: Dp,
+    type: LibraryType,
+    libraryId: Long?,
+    onOpen: (BrowseRequest) -> Unit,
+    onNavigate: (Any) -> Unit,
+) {
     rows.filter { it.style != RowStyle.Live }.forEach { row ->
         item(key = "row-${row.id}", span = { GridItemSpan(maxLineSpan) }, contentType = "row-${row.style}") {
-            val seeAll = (row.seeAll as? RowLink.ToList)?.let { link -> { onNavigate(MobileRoutes.MediaList(link.listId)) } }
-            ArrangedRow(row, library, tablet, actions, seeAll, Modifier.bleed(edge).padding(bottom = 10.dp), edge = edge)
+            ArrangedRow(row, library, tablet, actions, librarySeeAll(row, type, libraryId, onOpen, onNavigate), Modifier.bleed(edge).padding(bottom = 10.dp), edge = edge)
         }
     }
 }

@@ -112,6 +112,14 @@ object WmmIcons {
 
     // Rows (PLAN-ROWS.md): the editor, Add a row and the list page.
     val ListBullets = stroke("M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01")
+
+    /** Four rounded tiles: a library's grid, on a row's See all card (HomeSeeAll.dc.html). */
+    val Grid = stroke(
+        "M5.5 4h3.5a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 1-1.5 1.5h-3.5a1.5 1.5 0 0 1-1.5-1.5v-3.5a1.5 1.5 0 0 1 1.5-1.5z",
+        "M15 4h3.5a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 1-1.5 1.5h-3.5a1.5 1.5 0 0 1-1.5-1.5v-3.5a1.5 1.5 0 0 1 1.5-1.5z",
+        "M5.5 13.5h3.5a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 1-1.5 1.5h-3.5a1.5 1.5 0 0 1-1.5-1.5v-3.5a1.5 1.5 0 0 1 1.5-1.5z",
+        "M15 13.5h3.5a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 1-1.5 1.5h-3.5a1.5 1.5 0 0 1-1.5-1.5v-3.5a1.5 1.5 0 0 1 1.5-1.5z",
+    )
     val Sliders = stroke("M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12", "M18 6a2 2 0 1 1-4 0a2 2 0 1 1 4 0", "M12 12a2 2 0 1 1-4 0a2 2 0 1 1 4 0", "M20 18a2 2 0 1 1-4 0a2 2 0 1 1 4 0")
     val Rows = stroke("M4 5h16v4H4z", "M4 11h16v4H4z", "M4 17h10")
     val Filter = stroke("M4 5h16l-6 7v6l-4 2v-8z")

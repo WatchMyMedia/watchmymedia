@@ -67,17 +67,18 @@ import media.watchmy.client.mobile.live.LiveHomeRow
 import media.watchmy.client.mobile.navigation.MobileRoutes
 import media.watchmy.client.mobile.rows.ArrangedRow
 import media.watchmy.client.mobile.rows.RowActions
+import media.watchmy.client.mobile.rows.homeSeeAll
 import media.watchmy.client.mobile.rows.rowEditorRoute
 import media.watchmy.client.model.CardPanel
 import media.watchmy.client.model.CardTarget
 import media.watchmy.client.model.Hero
 import media.watchmy.client.model.HomeData
+import media.watchmy.client.model.cardCount
 import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.model.LiveClockFormat
 import media.watchmy.client.model.LiveRepository
-import media.watchmy.client.model.RowLink
 import media.watchmy.client.model.RowScreens
 import media.watchmy.client.model.RowStyle
 import media.watchmy.client.model.ScreenRow
@@ -142,7 +143,7 @@ internal fun TabletPagedHome(
             Column(Modifier.fillMaxSize()) {
                 when (val page = pages[index]) {
                     is TabletPage.Start -> StartPage(home, page.row, library, actions, twoPane, rows, onNavigate, liveChannels, onWatchLive, liveListings, Modifier.weight(1f))
-                    is TabletPage.Row -> RowPage(page.row, rows, library, live, home.tvLibraryId, actions, twoPane, onNavigate, liveChannels, onWatchLive, liveListings, available, now, format, Modifier.weight(1f))
+                    is TabletPage.Row -> RowPage(page.row, rows, library, live, home, actions, twoPane, onNavigate, liveChannels, onWatchLive, liveListings, available, now, format, Modifier.weight(1f))
                     TabletPage.End -> EndPage(home, onEdit = { onNavigate(rowEditorRoute(RowScreens.HOME, "Home", tablet = true)) }, onTop = { pageTo(0) }, Modifier.weight(1f))
                 }
                 val end = pages[index] == TabletPage.End
@@ -217,7 +218,7 @@ private fun StartPage(
                 heroCard(Modifier.padding(horizontal = 24.dp).padding(end = 16.dp), heroHeight)
                 if (row != null) {
                     if (row.style == RowStyle.Live) LiveHomeRow(liveChannels, onWatchLive, onSeeAll = { onNavigate(MobileRoutes.LiveTV) }, listings = liveListings)
-                    else ArrangedRow(row, library, tablet = true, actions, onSeeAll = row.seeAll?.let { seeAll(it, home.tvLibraryId, onNavigate) }, counter = counter)
+                    else ArrangedRow(row, library, tablet = true, actions, seeAll = homeSeeAll(row, home, LocalAppServices.current.browseRequests, onNavigate), counter = counter)
                 }
             }
         }
@@ -236,7 +237,7 @@ private fun RowPage(
     rows: List<ScreenRow>,
     library: LibraryRepository,
     live: LiveRepository,
-    tvLibraryId: Long?,
+    home: HomeData,
     actions: RowActions,
     twoPane: Boolean,
     onNavigate: (Any) -> Unit,
@@ -251,12 +252,15 @@ private fun RowPage(
     val listState = rememberLazyListState()
     val fling = rememberSnapFlingBehavior(listState, SnapPosition.Start)
     var lead by rememberSaveable(row.id) { mutableIntStateOf(0) }
-    // The leading card once the snap settles: the visible card nearest the row's start.
-    LaunchedEffect(listState) {
+    // The leading card once the snap settles: the visible card nearest the row's start. Never the See all card after
+    // the last one, which has no panel of its own (PLAN-SEE-ALL.md §11.3): the panel stays on the last card. The Live
+    // row's Full guide card has a panel.
+    val lastCard = if (row.style == RowStyle.Live) Int.MAX_VALUE else (row.cardCount - 1).coerceAtLeast(0)
+    LaunchedEffect(listState, lastCard) {
         snapshotFlow { listState.isScrollInProgress to listState.layoutInfo.visibleItemsInfo.minByOrNull { kotlin.math.abs(it.offset) }?.index }
             .filter { (scrolling, _) -> !scrolling }
             .distinctUntilChanged()
-            .collect { (_, index) -> if (index != null) lead = index }
+            .collect { (_, index) -> if (index != null) lead = index.coerceAtMost(lastCard) }
     }
     val panel = remember(row, lead, available, now) { row.cardPanelAt(lead, available, now, format) }
     val counter = "Row ${rows.indexOf(row) + 1} of ${rows.size}"
@@ -275,16 +279,10 @@ private fun RowPage(
         if (row.style == RowStyle.Live) {
             LiveHomeRow(liveChannels, onWatchLive, onSeeAll = { onNavigate(MobileRoutes.LiveTV) }, listings = liveListings, state = listState, flingBehavior = fling, lead = lead, counter = counter)
         } else {
-            ArrangedRow(row, library, tablet = true, actions, onSeeAll = row.seeAll?.let { seeAll(it, tvLibraryId, onNavigate) }, state = listState, flingBehavior = fling, lead = lead, counter = counter)
+            ArrangedRow(row, library, tablet = true, actions, seeAll = homeSeeAll(row, home, LocalAppServices.current.browseRequests, onNavigate), state = listState, flingBehavior = fling, lead = lead, counter = counter)
         }
         if (!twoPane) Spacer(Modifier.weight(1f))
     }
-}
-
-/** Where a row's See all goes: a list's page, or the library's tab. */
-private fun seeAll(link: RowLink, tvLibraryId: Long?, onNavigate: (Any) -> Unit): () -> Unit = when (link) {
-    is RowLink.ToList -> ({ onNavigate(MobileRoutes.MediaList(link.listId)) })
-    is RowLink.Library -> ({ onNavigate(if (link.libraryId == tvLibraryId) MobileRoutes.TvShows else MobileRoutes.Movies) })
 }
 
 /** A panel button: its label and what it does. */

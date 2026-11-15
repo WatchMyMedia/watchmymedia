@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import media.watchmy.client.model.formatCount
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -101,12 +104,14 @@ internal fun TabletLibraryScreen(
     val arranged = rowsVm?.arranges == true && state.libraryId != null
     val drawn = if (arranged) rows.rows.drawn(live = false) else emptyList()
     val rowActions = rowsVm?.let { libraryRowActions(onPlay, onOpenShow, onOpenMovie, onNavigate, onNotMatched, it) }
-    ShowRowsWhenTheyArrive(grid, drawn.size)
+    ShowRowsWhenTheyArrive(grid, drawn.size, toGrid = state.toGrid)
     var filtersVisible by rememberSaveable { mutableStateOf(true) }
     var filtersSheet by remember { mutableStateOf(false) }
     val noun = if (type == LibraryType.Tv) "show" else "movie"
     // A new sort or filter goes back up to the grid; a letter jumped to, to its first title, under the rows when there are any.
     grid.FollowLibrary(state, top = 0, first = if (arranged) drawn.size + 2 else 0, loadMore = vm::loadMore)
+    // A row's See all, here or on Home, lands on the grid's heading, under the rows (TabLibrarySeeAll.dc.html).
+    grid.GoToGridWhenAsked(state, heading = if (arranged) drawn.size + 1 else 0, onShown = vm::gridShown)
 
     Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
         MainTopBar(if (type == LibraryType.Tv) "TV Shows" else "Movies", userName, { onNavigate(MobileRoutes.Search) }, { onNavigate(MobileRoutes.Settings) })
@@ -133,7 +138,7 @@ internal fun TabletLibraryScreen(
                     androidx.compose.material3.pulltorefresh.PullToRefreshBox(state.refreshing, vm::refresh, Modifier.fillMaxSize()) {
                         LazyVerticalGrid(GridCells.Adaptive(TabletLayout.posterMinimum), state = grid, modifier = Modifier.testTag(TestTags.LIBRARY), contentPadding = PaddingValues(bottom = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             if (arranged && rowActions != null) {
-                                libraryRows(drawn, library, rowActions, tablet = true, edge = 0.dp, onNavigate = onNavigate)
+                                libraryRows(drawn, library, rowActions, tablet = true, edge = 0.dp, type = type, libraryId = state.libraryId, onOpen = vm::open, onNavigate = onNavigate)
                                 item(key = "edit", span = { GridItemSpan(maxLineSpan) }, contentType = "edit") {
                                     val title = if (type == LibraryType.Tv) "TV Shows" else "Movies"
                                     EditRowsButton("Edit rows", { rows.screen?.let { onNavigate(rowEditorRoute(it, title, tablet = true)) } }, tablet = true, edge = 0.dp)
@@ -141,7 +146,13 @@ internal fun TabletLibraryScreen(
                                 item(key = "all", span = { GridItemSpan(maxLineSpan) }, contentType = "all") {
                                     Column(Modifier.padding(top = 4.dp)) {
                                         androidx.compose.material3.HorizontalDivider(color = WmmColors.Line)
-                                        Text("All ${noun}s", color = WmmColors.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 18.dp))
+                                        // "All shows 142 · Last aired": the heading says the sort a See all opened it with (TabLibrarySeeAll.dc.html).
+                                        Row(Modifier.padding(top = 18.dp).semantics(mergeDescendants = true) { heading() }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Text("All ${noun}s", color = WmmColors.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.alignByBaseline())
+                                            val count = if (state.filtered) state.total else state.summary?.items ?: state.total
+                                            val small = listOfNotNull(formatCount(count).takeIf { !state.loading || state.items.isNotEmpty() }, state.choices.sort.label).joinToString(" · ")
+                                            Text(small, color = WmmColors.TextMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.alignByBaseline())
+                                        }
                                     }
                                 }
                             }

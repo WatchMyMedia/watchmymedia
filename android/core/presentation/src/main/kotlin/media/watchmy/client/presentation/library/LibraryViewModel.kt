@@ -8,9 +8,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import media.watchmy.client.model.BrowseItem
+import media.watchmy.client.model.BrowseRequest
+import media.watchmy.client.model.BrowseRequests
 import media.watchmy.client.model.ItemFilter
 import media.watchmy.client.model.ItemKind
 import media.watchmy.client.model.ItemPage
@@ -44,7 +49,8 @@ import media.watchmy.client.presentation.Freshness
  * so the letter's first title sits in its own column and earlier pages line
  * up when they load. [countsLine] asks for the TV's grey line under the
  * title ([State.countsLine]), which needs a query or two on servers that
- * don't send the library's counts.
+ * don't send the library's counts. [requests] brings a row's See all from
+ * Home ([open]).
  */
 class LibraryViewModel(
     private val library: LibraryRepository,
@@ -54,6 +60,8 @@ class LibraryViewModel(
     private val pageSize: Int = PAGE_SIZE,
     private val columns: Int = 1,
     private val countsLine: Boolean = false,
+    /** The app's [BrowseRequests]: the grid takes its library's, once (PLAN-SEE-ALL.md §4.4). */
+    private val requests: BrowseRequests? = null,
 ) : ViewModel() {
     data class Choices(
         val sort: ItemSort = ItemSort.Added,
@@ -108,6 +116,11 @@ class LibraryViewModel(
         /** The server has no library of this type. */
         val noLibrary: Boolean = false,
         val message: String? = null,
+        /**
+         * A row's See all opened the grid ([open]): the screen goes to the
+         * grid's heading once the first page is in, then calls [gridShown].
+         */
+        val toGrid: Boolean = false,
     ) {
         val filtered: Boolean get() = choices.filtered
         val hasMore: Boolean get() = end < total
@@ -144,6 +157,13 @@ class LibraryViewModel(
 
     init {
         reload()
+        // A See all from Home while the grid is open, or before it knew its library: taken once, when both are known.
+        requests?.let { r ->
+            viewModelScope.launch {
+                combine(r.pending, _state.map { it.libraryId }.distinctUntilChanged()) { request, id -> id.takeIf { request != null } }
+                    .collect { id -> if (id != null) r.take(id)?.let(::open) }
+            }
+        }
     }
 
     /** Whether the grid is on screen; changes that came while it wasn't reload it now. */
@@ -161,6 +181,26 @@ class LibraryViewModel(
     fun setDecade(decade: Int?) = change { it.copy(decade = decade) }
 
     fun clearFilters() = change { it.copy(filter = ItemFilter.All, genre = null, decade = null, text = "") }
+
+    /**
+     * A row's See all (PLAN-SEE-ALL.md decision 3): the link's sort when this
+     * library offers it, its filter (else All), its genre and decade, and no
+     * title filter, from the first page. They are kept as the person's own
+     * choices would be, until the person changes them. The screen then goes
+     * to the grid ([State.toGrid]).
+     */
+    fun open(request: BrowseRequest) {
+        beforeJump = null
+        val choices = _state.value.choices.opened(request)
+        _state.update { it.copy(choices = choices, letters = null, anchorLetter = null) }
+        save(choices)
+        reload()
+        // After the reload has said it is loading, so the screen waits for the first page.
+        _state.update { it.copy(toGrid = true) }
+    }
+
+    /** The screen went to the grid for [open]. */
+    fun gridShown() = _state.update { it.copy(toGrid = false) }
 
     fun retry() = reload()
 
@@ -305,13 +345,26 @@ class LibraryViewModel(
         if (after == before) return
         beforeJump = null
         _state.update { it.copy(choices = after, letters = null, anchorLetter = null) }
-        saved[SORT] = after.sort.name
-        saved[FILTER] = after.filter.name
-        saved[GENRE] = after.genre
-        saved[DECADE] = after.decade
-        saved[TEXT] = after.text
+        save(after)
         reload(debounce = debounce)
     }
+
+    private fun save(choices: Choices) {
+        saved[SORT] = choices.sort.name
+        saved[FILTER] = choices.filter.name
+        saved[GENRE] = choices.genre
+        saved[DECADE] = choices.decade
+        saved[TEXT] = choices.text
+    }
+
+    /** The choices a See all asks for, from these: a sort this library doesn't offer leaves the sort as it is. */
+    private fun Choices.opened(request: BrowseRequest) = Choices(
+        sort = request.sort?.takeIf { it in sorts } ?: sort,
+        filter = request.filter?.takeIf { it in filters } ?: ItemFilter.All,
+        genre = request.genre,
+        decade = request.decade,
+        text = "",
+    )
 
     /**
      * Loads the grid. A quiet reload (a library change) or a pull to refresh
@@ -338,7 +391,17 @@ class LibraryViewModel(
         job = viewModelScope.launch {
             if (debounce) delay(DEBOUNCE_MS)
             val result = attempt {
-                val id = _state.value.libraryId ?: library.libraries().firstOrNull { it.type == type }?.id
+                val known = _state.value.libraryId
+                val id = known ?: library.libraries().firstOrNull { it.type == type }?.id
+                // A See all that opened the tab before its grid knew its library: its choices make the first page,
+                // over any the saved state brought back (the window is the first page here, as nothing is loaded yet).
+                if (known == null && id != null) {
+                    requests?.take(id)?.let { request ->
+                        val choices = _state.value.choices.opened(request)
+                        save(choices)
+                        _state.update { it.copy(choices = choices, letters = null, anchorLetter = null, toGrid = true) }
+                    }
+                }
                 id to id?.let {
                     val query = _state.value.query(it, offset = requestedOffset).copy(limit = limit)
                     val page = library.items(query)

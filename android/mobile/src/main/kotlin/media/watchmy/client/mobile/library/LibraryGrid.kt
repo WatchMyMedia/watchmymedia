@@ -48,6 +48,26 @@ internal fun LazyGridState.FollowLibrary(state: LibraryViewModel.State, top: Int
     LaunchedEffect(grid, state.items.size, state.offset) { snapshotFlow { nearEnd }.collect { if (it) more() } }
 }
 
+/**
+ * A row's See all opened the grid ([LibraryViewModel.State.toGrid],
+ * PLAN-SEE-ALL.md §4.4): once its first page is in, the grid's [heading]
+ * comes to the top (the tab's own rows are above it, a scroll up away), also
+ * when the rows were in view, which [FollowLibrary] leaves alone. Then
+ * [onShown], so turning the screen doesn't do it again.
+ */
+@Composable
+internal fun LazyGridState.GoToGridWhenAsked(state: LibraryViewModel.State, heading: Int, onShown: () -> Unit) {
+    val grid = this
+    val ready = state.toGrid && !state.loading && !state.refreshing
+    val index by rememberUpdatedState(heading)
+    val shown by rememberUpdatedState(onShown)
+    LaunchedEffect(ready) {
+        if (!ready) return@LaunchedEffect
+        grid.scrollToItem(index)
+        shown()
+    }
+}
+
 /** The grid's loading, error and empty states, the same in each layout; null once it has posters. */
 internal fun LibraryViewModel.State.loadStatus(type: LibraryType, vm: LibraryViewModel): LoadStatus? {
     val noun = if (type == LibraryType.Tv) "show" else "movie"

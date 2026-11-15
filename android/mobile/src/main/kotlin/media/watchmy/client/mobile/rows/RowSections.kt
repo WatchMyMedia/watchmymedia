@@ -77,14 +77,14 @@ private val Title = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBo
 private val Small = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = WmmColors.TextMuted)
 
 /**
- * A row's heading (LibraryRows.dc.html): the title, the words beside it
- * ("Movies", or a list's "18 of 50 · From TMDB"), [counter] ("· Row 2 of
- * 7" on the tablet's Home screens) and See all when there is somewhere to
- * go. The phone keeps See all for list rows, as its built-in rows never had
- * one.
+ * A row's heading (LibraryRows.dc.html, HomeSeeAll.dc.html): the title, the
+ * words beside it ("Movies", or a list's "18 of 50 · From TMDB"), [counter]
+ * ("· Row 2 of 7" on the tablet's Home screens) and See all when there is
+ * somewhere to go, read aloud as the row's last card is ("See all TV shows,
+ * by last aired").
  */
 @Composable
-internal fun ArrangedRowHeading(row: ScreenRow, tablet: Boolean, onSeeAll: (() -> Unit)?, edge: Dp = if (tablet) 24.dp else 16.dp, counter: String? = null) {
+internal fun ArrangedRowHeading(row: ScreenRow, tablet: Boolean, seeAll: RowSeeAll?, edge: Dp = if (tablet) 24.dp else 16.dp, counter: String? = null) {
     val (title, small) = row.heading()
     Row(
         Modifier.fillMaxWidth().padding(start = edge, end = if (tablet) edge else 4.dp),
@@ -96,8 +96,8 @@ internal fun ArrangedRowHeading(row: ScreenRow, tablet: Boolean, onSeeAll: (() -
             if (small != null) Text(small, style = Small, maxLines = 1, modifier = Modifier.alignByBaseline())
             if (counter != null) Text("· $counter", style = Small, maxLines = 1, modifier = Modifier.alignByBaseline())
         }
-        if (onSeeAll != null) {
-            TextButton(onClick = onSeeAll, modifier = Modifier.semantics { contentDescription = "See all of $title" }) {
+        if (seeAll != null) {
+            TextButton(onClick = seeAll.onClick, modifier = Modifier.semantics { contentDescription = seeAll.words.spoken }) {
                 Text("See all", color = WmmColors.Accent, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 if (!tablet) Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(18.dp))
             }
@@ -108,7 +108,9 @@ internal fun ArrangedRowHeading(row: ScreenRow, tablet: Boolean, onSeeAll: (() -
 /**
  * One arranged row by its style, as Home's rows have always looked: posters,
  * 16:9 cards, Recently aired's episodes or Continue watching. The Live TV row
- * is the screen's to draw. The tablet's Home screens pass the row's [state]
+ * is the screen's to draw. With [seeAll], a poster, 16:9 or episode row ends
+ * in a See all card the size of its cards, and its heading has See all
+ * (PLAN-SEE-ALL.md §4.4). The tablet's Home screens pass the row's [state]
  * and a snapping [flingBehavior], outline the card at [lead] (the one the
  * row snapped to, PLAN-HOME.md §7.5) and show [counter] by the heading.
  */
@@ -118,7 +120,7 @@ internal fun ArrangedRow(
     library: LibraryRepository,
     tablet: Boolean,
     actions: RowActions,
-    onSeeAll: (() -> Unit)?,
+    seeAll: RowSeeAll?,
     modifier: Modifier = Modifier,
     /** The space before the heading and the first card: the screen's margin, or none inside a padded grid. */
     edge: Dp = if (tablet) 24.dp else 16.dp,
@@ -134,7 +136,7 @@ internal fun ArrangedRow(
         else -> 12.dp
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ArrangedRowHeading(row, tablet, onSeeAll, edge, counter)
+        ArrangedRowHeading(row, tablet, seeAll, edge, counter)
         LazyRow(state = state, flingBehavior = flingBehavior, contentPadding = PaddingValues(horizontal = edge), horizontalArrangement = Arrangement.spacedBy(spacing)) {
             when (row.style) {
                 RowStyle.Poster -> itemsIndexed(row.items, key = { _, it -> "${it.kind}${it.id}" }) { i, item -> PosterRowCard(item, library, tablet, actions, outlined = i == lead) }
@@ -161,9 +163,16 @@ internal fun ArrangedRow(
                 }
                 RowStyle.Live -> Unit
             }
+            val card = seeAllCardSize(row.style, tablet)
+            if (seeAll != null && card != null) {
+                item(key = SEE_ALL_KEY, contentType = SEE_ALL_KEY) { SeeAllCard(seeAll, card.first, card.second, tablet) }
+            }
         }
     }
 }
+
+/** The See all card's key in its row. */
+internal const val SEE_ALL_KEY = "see-all"
 
 @Composable
 private fun PosterRowCard(item: BrowseItem, library: LibraryRepository, tablet: Boolean, actions: RowActions, outlined: Boolean = false) {

@@ -240,6 +240,15 @@ first row's first card. Movies and TV get their rows above the grid.
   dialog) and imports' unmatched titles as Not found
   (`MediaListViewModel`). Refresh now and Delete are on the phone's ⋮ for
   whoever may change the list.
+- **See all** (PLAN-SEE-ALL.md §4.4), on the phone and the tablet: a row
+  with a `seeAll` link ends in a See all card the size of its cards and has
+  See all in its heading ("See all TV shows · By last aired", `seeAllWords`).
+  A list's opens the list page. A library's posts the link's sort to
+  `AppServices.browseRequests` and opens the tab at its grid; the tab's
+  `LibraryViewModel` takes the request once (`open`), as if the person had
+  chosen the sort, and the screen scrolls to the grid's heading
+  (`State.toGrid`). The rows above the Movies and TV grids call `open`
+  directly. Continue watching and Live TV have none.
 - `rows.changed` and `lists.changed` read the screens again
   (`RowsRepository.changes`). The TV's Watch Next row follows the Continue
   row, or Continue watching asked for alone when Home has none.
