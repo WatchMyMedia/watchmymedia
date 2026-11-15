@@ -13,12 +13,12 @@ final class TabletServerSwitchTests: XCTestCase {
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         choose("Office Mac mini", in: app)
 
-        let name = app.textFields["Username"]
+        let name = app.textFields["switch-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 15))
         assertLockedSettingsShell(app)
         name.tap()
         name.typeText("Robin")
-        let password = app.secureTextFields["Password"]
+        let password = app.secureTextFields["switch-password"]
         password.tap()
         password.typeText("unfinished")
         let concealedPassword = password.value as? String
@@ -28,7 +28,7 @@ final class TabletServerSwitchTests: XCTestCase {
         XCTAssertTrue(name.waitForExistence(timeout: 10))
         XCTAssertEqual(name.value as? String, "Robin")
         XCTAssertEqual(password.value as? String, concealedPassword)
-        XCTAssertTrue(app.buttons["Cancel"].exists)
+        XCTAssertTrue(app.buttons["task-cancel"].exists)
         shot(app, "Settings switch — password form after portrait rotation")
 
         XCUIDevice.shared.orientation = .landscapeLeft
@@ -42,15 +42,15 @@ final class TabletServerSwitchTests: XCTestCase {
         let app = try launchPicker()
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         choose("Office Mac mini", in: app)
-        XCTAssertTrue(app.textFields["Username"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.textFields["switch-name"].waitForExistence(timeout: 15))
         assertLockedSettingsShell(app)
 
-        let cancel = app.buttons["Cancel"].firstMatch
+        let cancel = app.buttons["task-cancel"].firstMatch
         waitForHittable(cancel)
         cancel.tap()
         assertServerPage(app, server: "Living room server", user: "Sam")
-        XCTAssertFalse(app.textFields["Username"].exists)
-        XCTAssertTrue(app.buttons["Sign out"].firstMatch.isEnabled)
+        XCTAssertFalse(app.textFields["switch-name"].exists)
+        XCTAssertTrue(app.buttons["settings-account"].firstMatch.isEnabled)
         shot(app, "Settings switch — cancellation restored Sam on Living room server")
     }
 
@@ -59,22 +59,22 @@ final class TabletServerSwitchTests: XCTestCase {
         let app = try launchPicker()
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         choose("Office Mac mini", in: app)
-        let name = app.textFields["Username"]
+        let name = app.textFields["switch-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 15))
         name.tap()
         name.typeText("Robin")
-        let password = app.secureTextFields["Password"]
+        let password = app.secureTextFields["switch-password"]
         password.tap()
         password.typeText("password")
-        app.buttons["Sign in"].firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 20))
+        app.buttons["switch-sign-in"].firstMatch.tap()
+        finishSwitch(app)
 
         openSettings(app)
         assertServerPage(app, server: "Office Mac mini", user: "Robin")
         openPicker(app)
         choose("Living room server", signedInAs: "Sam", in: app)
-        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.textFields["Username"].exists)
+        finishSwitch(app)
+        XCTAssertFalse(app.textFields["switch-name"].exists)
         openSettings(app)
         assertServerPage(app, server: "Living room server", user: "Sam")
 
@@ -82,8 +82,8 @@ final class TabletServerSwitchTests: XCTestCase {
         // of the initial Sam account supplied by the fakes.
         openPicker(app)
         choose("Office Mac mini", signedInAs: "Robin", in: app)
-        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.textFields["Username"].exists)
+        finishSwitch(app)
+        XCTAssertFalse(app.textFields["switch-name"].exists)
         openSettings(app)
         assertServerPage(app, server: "Office Mac mini", user: "Robin")
         shot(app, "Settings switch — remembered Robin account restored")
@@ -112,23 +112,34 @@ final class TabletServerSwitchTests: XCTestCase {
         row.tap()
     }
 
+    /// Switched (Settings2SwitchDone.dc.html): what changed, then Done shows the new server's Home.
+    @MainActor
+    private func finishSwitch(_ app: XCUIApplication) {
+        let done = app.buttons["switch-done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 20))
+        XCTAssertTrue(element(in: app, containing: "It needs no password").exists)
+        waitForHittable(done)
+        done.tap()
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15))
+    }
+
     @MainActor
     private func assertLockedSettingsShell(_ app: XCUIApplication) {
         XCTAssertTrue(app.navigationBars["Settings"].exists)
-        XCTAssertTrue(app.navigationBars["Sign in"].exists)
+        XCTAssertTrue(app.navigationBars["Switch server"].exists)
         XCTAssertTrue(element(in: app, containing: "Admin · Living room server").exists)
-        let signOut = app.buttons["Sign out"].firstMatch
-        XCTAssertTrue(signOut.exists)
-        XCTAssertFalse(signOut.isEnabled, "An unsigned server switch must not expose account mutations.")
+        let account = app.buttons["settings-account"].firstMatch
+        XCTAssertTrue(account.exists)
+        XCTAssertFalse(account.isEnabled, "An unsigned server switch must not expose account mutations.")
         let home = app.buttons["Home"].firstMatch
         // The adaptable tab bar can report enabled through accessibility
         // even when TabContent.disabled is set. Exercise the selection gate
         // instead of treating that system-reported flag as the behavior.
         if home.exists && home.isEnabled && home.isHittable { home.tap() }
-        XCTAssertTrue(app.textFields["Username"].waitForExistence(timeout: 5))
-        waitForHittable(app.buttons["Cancel"].firstMatch)
+        XCTAssertTrue(app.textFields["switch-name"].waitForExistence(timeout: 5))
+        waitForHittable(app.buttons["task-cancel"].firstMatch)
         XCTAssertTrue(app.navigationBars["Settings"].exists)
-        XCTAssertTrue(app.navigationBars["Sign in"].exists)
+        XCTAssertTrue(app.navigationBars["Switch server"].exists)
         XCTAssertFalse(app.navigationBars["Home"].exists, "Tapping Home must keep the unsigned switch inside Settings.")
     }
 
@@ -142,7 +153,7 @@ final class TabletServerSwitchTests: XCTestCase {
 
     @MainActor
     private func openPicker(_ app: XCUIApplication) {
-        let switchServer = app.buttons["Switch server"].firstMatch
+        let switchServer = app.buttons["server-switch"].firstMatch
         waitForHittable(switchServer)
         switchServer.tap()
         XCTAssertTrue(app.navigationBars["Switch server"].waitForExistence(timeout: 10))

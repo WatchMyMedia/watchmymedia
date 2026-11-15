@@ -3,7 +3,7 @@ import UIKit
 
 /// The app against a real server, end to end: type the server's address,
 /// sign in, browse Home and Movies, play a film and leave the player, and
-/// find this phone under Signed-in devices. `make apple-e2e` runs it against
+/// find this phone under Account & devices' Signed-in devices. `make apple-e2e` runs it against
 /// the fixture server; without `WMM_E2E_SERVER` (passed to xcodebuild as
 /// `TEST_RUNNER_WMM_E2E_SERVER`) it is skipped. Every step leaves a
 /// screenshot in the test results.
@@ -124,10 +124,11 @@ final class EndToEndTests: XCTestCase {
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: settings)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed)
         settings.tap()
-        let devices = element(containing: "Signed-in devices")
-        XCTAssertTrue(devices.waitForExistence(timeout: 15), "Settings finished opening")
+        // Signed-in devices are on Account & devices (PLAN-APPLE-SETTINGS.md §5.4).
+        let account = app.buttons["settings-account"]
+        XCTAssertTrue(account.waitForExistence(timeout: 15), "Settings finished opening")
         shot("6 Settings")
-        devices.tap()
+        account.tap()
         let device = UIDevice.current.userInterfaceIdiom == .pad ? "This iPad" : "This iPhone"
         XCTAssertTrue(element(containing: device).waitForExistence(timeout: 15), "this device is listed as signed in")
         shot("7 Signed-in devices")
