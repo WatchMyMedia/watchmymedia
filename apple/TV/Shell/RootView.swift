@@ -3,11 +3,35 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Whether the person asked to pick another server (from sign-in or Settings).
+/// Whether the person asked to pick another server (from sign-in), or is
+/// switching servers from Settings.
 @MainActor
 @Observable
 final class AppFlow {
     var choosingServer = false
+    /// Settings › Server › Switch server, kept here because a switch
+    /// rebuilds the tabs under it; nil when none is under way.
+    var serverSwitch: ServerSwitchModel?
+    /// Where Settings puts focus when it next appears (back from a switch).
+    var settingsReturn: SettingsFocus?
+
+    /// Starts Switch server, or the server picker when nobody is signed in to come back to.
+    func startSwitch(_ services: AppServices) {
+        guard serverSwitch == nil else { return }
+        serverSwitch = ServerSwitchModel(servers: services.servers, auth: services.auth)
+        if serverSwitch == nil { choosingServer = true }
+    }
+
+    /// Ends Switch server on Home, or on Settings with focus on Switch server.
+    func endSwitch(goingTo tab: AppTab) {
+        serverSwitch?.picker.stopDiscovery()
+        serverSwitch = nil
+        endedOn = tab
+        if tab == .settings { settingsReturn = .row(.server, "switch") }
+    }
+
+    /// The tab a switch ended on, for the root to select once the tabs are back.
+    var endedOn: AppTab?
 }
 
 /// The server picker until a server is chosen, sign-in until someone is
@@ -22,7 +46,9 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if services.servers.current == nil || flow.choosingServer {
+            if let switching = flow.serverSwitch {
+                SwitchServerScreen(model: switching)
+            } else if services.servers.current == nil || flow.choosingServer {
                 ServerPickerScreen()
             } else if services.auth.user == nil {
                 SignInScreen()
@@ -34,14 +60,34 @@ struct RootView: View {
         .groundBackground()
         .animation(.default, value: services.auth.user)
         .animation(.default, value: flow.choosingServer)
+        .animation(.default, value: flow.serverSwitch == nil)
         .onChange(of: account) { _, _ in
             navigator.closePlayer()
             for tab in AppTab.allCases { navigator.setPath([], for: tab) }
             navigator.tab = .home
             accountGeneration += 1
+            flow.serverSwitch?.accountChanged()
+        }
+        // Cancelled, the switch goes back to Settings › Server; an account
+        // change from elsewhere ends it where the root says. Switched, it
+        // stays up on its last step until Go to Home or Back to Settings.
+        .onChange(of: flow.serverSwitch?.outcome) { _, outcome in
+            switch outcome {
+            case .cancelled: flow.endSwitch(goingTo: .settings)
+            case .accountChanged: flow.endSwitch(goingTo: .home)
+            case .switched, nil: break
+            }
+        }
+        .onChange(of: flow.endedOn) { _, tab in
+            guard let tab else { return }
+            flow.endedOn = nil
+            navigator.tab = tab
         }
         .onChange(of: flow.choosingServer) { _, choosing in
             if choosing { navigator.closePlayer() }
+        }
+        .onChange(of: flow.serverSwitch == nil) { _, ended in
+            if !ended { navigator.closePlayer() }
         }
         // At launch, on every return to the app and on every sign-in (which
         // may leave scenePhase unchanged): one task, so launch asks once. A

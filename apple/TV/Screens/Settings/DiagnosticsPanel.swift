@@ -4,34 +4,27 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings' Help group (TvDiagnostics.dc.html, PLAN-APPLE-REVIEW.md §6.4):
-/// the Diagnostics row, which opens the redacted diagnostics as a QR code to
-/// scan with a phone (Apple TV has no clipboard to paste from), beside a
-/// summary of what it holds, with Show as text. Nothing is sent.
-struct DiagnosticsGroup: View {
+/// About's Diagnostics row (TvDiagnostics.dc.html, PLAN-APPLE-REVIEW.md
+/// §6.4), which opens the redacted diagnostics as a QR code to scan with a
+/// phone (Apple TV has no clipboard to paste from), beside a summary of what
+/// it holds, with Show as text. Nothing is sent; the panel at Settings' right
+/// says so while the row has focus.
+struct DiagnosticsRow: View {
+    let focus: FocusState<SettingsFocus?>.Binding
+    let id: SettingsFocus
     @Environment(AppServices.self) private var services
     @State private var shown: DiagnosticsShown?
     @State private var reports = 0
 
     var body: some View {
-        SettingsGroup("Help") {
-            Button(action: open) {
-                SettingsRow(title: "Diagnostics", detail: "Show what the app can give you for a bug report") {
-                    HStack(spacing: 8) {
-                        if reports > 0 { Text(plural(reports, "report")) }
-                        Image(systemName: "chevron.right").font(.system(size: 17, weight: .bold))
-                    }
-                }
+        Button(action: open) {
+            SettingsRow(title: "Diagnostics", detail: "Show what the app can give you for a bug report") {
+                RowValue(text: reports > 0 ? plural(reports, "report") : nil)
             }
-            .buttonStyle(SettingsRowStyle())
-            .accessibilityIdentifier("settings-diagnostics")
-            Text("Nothing is sent from this Apple TV. No account, server address or titles are included.")
-                .font(.system(size: 16))
-                .foregroundStyle(Palette.faint)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 18)
-                .padding(.top, 4)
         }
+        .buttonStyle(SettingsRowStyle())
+        .focused(focus, equals: id)
+        .accessibilityIdentifier("settings-diagnostics")
         .onAppear { reports = DiagnosticsStore.shared.latest().count }
         .fullScreenCover(item: $shown) { shown in
             DiagnosticsPanel(code: shown.code) { self.shown = nil }
@@ -66,7 +59,7 @@ struct DiagnosticsGroup: View {
     }
 }
 
-extension DiagnosticsGroup {
+extension DiagnosticsRow {
     /// Sixty made-up lines, an address among them, for `-diagnosticsLog`.
     nonisolated static var sampleLog: [String] {
         (0..<60).map { i in

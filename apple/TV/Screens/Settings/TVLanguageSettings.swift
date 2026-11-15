@@ -10,9 +10,8 @@ import WMMUI
 struct TVLanguageSettings: View {
     let model: SettingsModel
     @Environment(\.dismiss) private var dismiss
-    /// The list "Other language…" adds to.
-    @State private var typing: LanguageList?
-    @State private var languageCode = ""
+    /// The list Add a language adds to (TvSettings2AddLanguage.dc.html).
+    @State private var adding: AddingLanguage?
 
     var body: some View {
         ScrollView {
@@ -116,12 +115,15 @@ struct TVLanguageSettings: View {
         }
         .background(Palette.ground)
         .task { await model.loadPreferences() }
-        .alert("Add a language", isPresented: Binding(get: { typing != nil }, set: { if !$0 { typing = nil } }), presenting: typing) { list in
-            TextField("Language code, such as en or pt-BR", text: $languageCode)
-                .autocorrectionDisabled()
-            Button("Add") { Task { await model.addLanguage(languageCode, to: list) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in Text("Use a language code such as en or pt-BR.") }
+        .fullScreenCover(item: $adding) { adding in
+            TVAddLanguageScreen(list: adding.list, model: model) { self.adding = nil }
+        }
+        #if DEBUG
+        .onAppear {
+            let arguments = ProcessInfo.processInfo.arguments
+            if let i = arguments.firstIndex(of: "-addLanguage"), arguments.indices.contains(i + 1), let list = LanguageList(rawValue: arguments[i + 1]) { adding = AddingLanguage(list: list) }
+        }
+        #endif
     }
 
     // MARK: Pieces
@@ -187,17 +189,22 @@ struct TVLanguageSettings: View {
         }
     }
 
-    private func addLanguage(_ list: LanguageList) -> some View {
-        Menu {
-            ForEach(model.addable(to: list), id: \.self) { tag in
-                Button(languageTagName(tag)) { Task { await model.addLanguage(tag, to: list) } }
-            }
-            Button("Other language…") { languageCode = ""; typing = list }
-        } label: {
+    /// Add language opens the names in a grid; at 16 it is off and the line under it says why.
+    @ViewBuilder private func addLanguage(_ list: LanguageList) -> some View {
+        Button { adding = AddingLanguage(list: list) } label: {
             Text("\(Image(systemName: "plus")) Add language")
                 .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
         }
         .disabled(!model.canAdd(to: list))
         .accessibilityIdentifier("\(list.rawValue)-add-language")
+        if !model.canAdd(to: list) {
+            foot("Your list holds 16 languages, the most it can. Remove one to add another.")
+        }
     }
+}
+
+/// The list Add a language is adding to, for the full-screen grid.
+private struct AddingLanguage: Identifiable {
+    let list: LanguageList
+    var id: String { list.rawValue }
 }
