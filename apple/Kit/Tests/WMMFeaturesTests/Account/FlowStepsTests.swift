@@ -79,7 +79,8 @@ import WMMModel
 
     @Test func everyLinkFailureSaysNothingWasLinked() async {
         let auth = ScriptedAuth(user: sam)
-        let model = LinkTVModel(auth: auth, code: "K7M4PQ", serverName: "Living room server")
+        let time = ManualTime()
+        let model = LinkTVModel(auth: auth, code: "K7M4PQ", serverName: "Living room server", sleep: { try await time.sleep($0) })
 
         auth.lookUpResult = .failure(APIError(status: 404, message: "That code is not waiting to be linked."))
         await model.lookUp()
@@ -90,6 +91,7 @@ import WMMModel
         auth.lookUpResult = .failure(APIError(status: 429, message: "Too many attempts."))
         await model.lookUp()
         #expect(model.problem == SettingsNotice(title: "Too many wrong codes", body: "Nothing was linked. Try again in a minute."))
+        await time.advance(byMs: 60_000)
 
         auth.lookUpResult = .failure(APIError(status: nil, message: "Couldn't reach the server. Check the connection and try again."))
         await model.lookUp()
@@ -198,5 +200,51 @@ import WMMModel
         await model.connectToAddress()
         #expect(model.chooseProblem?.title == "Couldn’t connect to 192.0.2.9")
         #expect(model.chooseProblem?.body.hasSuffix("You’re still on Living room server.") == true)
+    }
+}
+
+/// After too many wrong codes, Check this code is off for a minute and says why
+/// (Settings2LinkTvCode.dc.html, `tooMany`).
+@MainActor
+@Suite struct LinkTVTooManyCodesTests {
+    init() { FakeLatency.duration = .zero }
+
+    @Test func checkIsOffForAMinuteAfterTooManyWrongCodes() async {
+        let time = ManualTime()
+        let auth = ScriptedAuth(user: sam)
+        auth.lookUpResult = .failure(APIError(status: 429, message: "Too many attempts. Wait a while and try again."))
+        let model = LinkTVModel(auth: auth, code: "K7M4PQ", serverName: "Living room server", sleep: { try await time.sleep($0) })
+        #expect(model.canCheck && !model.tooManyCodes)
+        await model.lookUp()
+        #expect(model.tooManyCodes)
+        #expect(!model.canCheck)
+        #expect(model.primaryOffReason == "Too many wrong codes. Nothing was linked. Try again in a minute.")
+        #expect(model.problem == SettingsNotice(title: "Too many wrong codes", body: "Nothing was linked. Try again in a minute."))
+
+        // Another code changes nothing: the server is refusing codes, not this one.
+        model.setCode("K7M4PZ")
+        #expect(model.primaryOffReason == "Too many wrong codes. Nothing was linked. Try again in a minute.")
+        auth.lookUpResult = .success(PendingDevice(code: "K7M4PZ", name: "Den TV", approved: false))
+        await model.lookUp()
+        #expect(model.flowStep.number == 1, "no code is sent meanwhile")
+
+        await time.advance(byMs: 59_000)
+        #expect(model.tooManyCodes)
+        await time.advance(byMs: 1_000)
+        #expect(!model.tooManyCodes)
+        #expect(model.canCheck && model.primaryOffReason == nil)
+        await model.lookUp()
+        #expect(model.flowStep.number == 2)
+    }
+
+    @Test func aRefusedApprovalLeavesTheCodeStepAlone() async {
+        let auth = ScriptedAuth(user: sam)
+        auth.lookUpResult = .success(PendingDevice(code: "K7M4PQ", name: "Den TV", approved: false))
+        auth.approveError = APIError(status: 429, message: "Too many attempts.")
+        let model = LinkTVModel(auth: auth, code: "K7M4PQ")
+        await model.lookUp()
+        await model.approve()
+        #expect(model.problem?.title == "Too many tries")
+        #expect(!model.tooManyCodes)
     }
 }

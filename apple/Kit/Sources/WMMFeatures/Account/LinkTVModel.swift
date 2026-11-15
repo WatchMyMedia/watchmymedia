@@ -25,13 +25,30 @@ public final class LinkTVModel {
     public private(set) var problem: SettingsNotice?
     /// The server's name, for "Couldn’t reach Living room server".
     public var serverName: String?
+    /// The server refused a code with too many wrong ones (429): Check this
+    /// code is off, and says why, until ``retryAfter`` has passed.
+    public private(set) var tooManyCodes = false
+
+    /// How long Check this code stays off after too many wrong codes.
+    @ObservationIgnored public let retryAfter: Duration
+    @ObservationIgnored private let sleep: @MainActor (Duration) async throws -> Void
+    @ObservationIgnored private var cooling: Task<Void, Never>?
 
     /// `code` comes from a watchmymedia://link?code= link (a scanned QR code).
-    public init(auth: any AuthRepository, code: String? = nil, serverName: String? = nil) {
+    /// - Parameter sleep: waits out `retryAfter`; tests pass a clock they move.
+    public init(auth: any AuthRepository, code: String? = nil, serverName: String? = nil,
+                retryAfter: Duration = .seconds(60),
+                sleep: @escaping @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
         self.auth = auth
         self.code = normalizePairingCode(code ?? "")
         self.serverName = serverName
+        self.retryAfter = retryAfter
+        self.sleep = sleep
     }
+
+    /// Check this code is on: six characters, not while the server is
+    /// refusing codes, and not while one is being checked.
+    public var canCheck: Bool { complete && !tooManyCodes && !busy }
 
     /// Who the TV will be signed in as.
     public var userName: String { auth.user?.name ?? "you" }
@@ -71,6 +88,7 @@ public final class LinkTVModel {
 
     /// Continue: the device behind the code.
     public func lookUp() async {
+        guard !tooManyCodes else { return }
         guard complete else {
             error = "The code has \(pairingCodeLength) characters."
             return
@@ -99,6 +117,20 @@ public final class LinkTVModel {
             self.error = message(error, fallback: "Couldn't check that code. Try again.")
             problem = approving.map { linkApproveProblem(error, device: $0, serverName: serverName) }
                 ?? linkLookUpProblem(error, serverName: serverName)
+            if approving == nil, (error as? APIError)?.status == 429 { refuseCodesForAWhile() }
+        }
+    }
+
+    /// Too many wrong codes: no code is sent until ``retryAfter`` has passed,
+    /// and then the problem it left goes too.
+    private func refuseCodesForAWhile() {
+        tooManyCodes = true
+        cooling?.cancel()
+        cooling = Task { [weak self, sleep, retryAfter] in
+            do { try await sleep(retryAfter) } catch { return }
+            guard let self else { return }
+            self.tooManyCodes = false
+            if self.problem == linkTooManyCodes { self.problem = nil }
         }
     }
 }

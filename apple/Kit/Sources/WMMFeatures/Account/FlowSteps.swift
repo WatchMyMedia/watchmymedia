@@ -62,13 +62,16 @@ func linkLookUpProblem(_ error: any Error, serverName: String?) -> SettingsNotic
         SettingsNotice(title: "No TV is waiting with that code",
                        body: "Nothing was linked. Check the code on the TV, or choose Get a new code there, then enter it here.")
     case 429?:
-        SettingsNotice(title: "Too many wrong codes", body: "Nothing was linked. Try again in a minute.")
+        linkTooManyCodes
     case nil, (500...)?:
         SettingsNotice(title: "Couldn’t reach \(serverName ?? "the server")", body: "Nothing was linked. Check your connection and try again.")
     default:
         SettingsNotice(title: "Couldn’t check that code", body: "Nothing was linked. \(error.displayMessage)")
     }
 }
+
+/// The server refused a code with too many wrong ones (Settings2LinkTvCode.dc.html, `tooMany`).
+let linkTooManyCodes = SettingsNotice(title: "Too many wrong codes", body: "Nothing was linked. Try again in a minute.")
 
 /// Why approving failed, ending in what wasn't done.
 func linkApproveProblem(_ error: any Error, device: PendingDevice, serverName: String?) -> SettingsNotice {
@@ -140,9 +143,12 @@ extension LinkTVModel {
         }
     }
 
-    /// Why the filled button is off; nil while it is on.
+    /// Why the filled button is off; nil while it is on. After too many
+    /// wrong codes it stays off for a minute, whatever is typed.
     public var primaryOffReason: String? {
-        if case .enter = step, !complete { return "Check is off until all six characters are in." }
+        guard case .enter = step else { return nil }
+        if tooManyCodes { return "Too many wrong codes. Nothing was linked. Try again in a minute." }
+        if !complete { return "Check is off until all six characters are in." }
         return nil
     }
 
