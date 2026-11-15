@@ -20,8 +20,6 @@ struct SwitchServerScreen: View {
     @State private var typing = false
     @State private var address = ""
 
-    static let steps = ["Choose a server", "Sign in", "Switched"]
-
     /// The step on screen: 0 to choose, 1 to sign in, 3 when switched.
     private var step: Int {
         switch model.phase {
@@ -68,13 +66,13 @@ struct SwitchServerScreen: View {
 
     private var choose: some View {
         TVTaskFrame(
-            crumb: "Settings › Server › \(switchServerTitle)", title: "Which server?",
+            crumb: ServerSwitchModel.tvPath, title: ServerSwitchModel.chooseTitle,
             lede: model.picker.localNetworkDenied
-                ? "Local network is off for WatchMyMedia, so it can’t look for servers. Allow it in Settings › Privacy & Security › Local Network, or enter an address. You stay signed in on \(original)."
-                : "Servers on this network appear by themselves. You stay signed in on \(original), and switching back needs no password.",
-            hint: "Step 1 of 3 · next: Sign in · Menu goes back to Settings"
+                ? "Local network is off for WatchMyMedia, so it can’t look for servers. Allow it in Settings › Privacy & Security › Local Network, or enter an address. \(model.stillOn)"
+                : model.chooseLede,
+            hint: "\(model.flowStep.shortLine) · Menu goes back to Settings"
         ) {
-            TVStepsBar(steps: Self.steps, current: 0)
+            TVStepsBar(step: model.flowStep)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 10) {
                     currentServer
@@ -98,7 +96,7 @@ struct SwitchServerScreen: View {
                         .padding(.top, 14)
                     }
                     Button { address = ""; typing = true } label: {
-                        SettingsRow(title: "Enter an address…", detail: "For a server that isn’t listed") {
+                        SettingsRow(title: ServerSwitchModel.enterAddress, detail: ServerSwitchModel.enterAddressLine) {
                             if model.picker.connecting == ServerPickerModel.addressKey { ProgressView() }
                         }
                     }
@@ -106,8 +104,10 @@ struct SwitchServerScreen: View {
                     .disabled(model.picker.connecting != nil)
                     .accessibilityIdentifier("switch-address")
                     .padding(.top, 14)
-                    if let problem = model.picker.error ?? model.picker.addressError ?? model.error {
-                        message(problem)
+                    if let problem = model.chooseProblem {
+                        TVMessage(title: problem.title, message: problem.body).accessibilityIdentifier("switch-message")
+                    } else if let problem = model.error {
+                        TVMessage(title: problem, message: model.stillOn).accessibilityIdentifier("switch-message")
                     }
                 }
                 .padding(.horizontal, 20)
@@ -119,7 +119,7 @@ struct SwitchServerScreen: View {
             .scrollClipDisabled()
             .focusSection()
         }
-        .alert("Enter an address", isPresented: $typing) {
+        .alert(ServerSwitchModel.connectTitle, isPresented: $typing) {
             TextField(serverAddressExample, text: $address)
                 .keyboardType(.URL)
                 .textContentType(.URL)
@@ -144,7 +144,7 @@ struct SwitchServerScreen: View {
             }
             .lineLimit(1)
             Spacer(minLength: 12)
-            TVBadge("Current", style: .gold, size: 13)
+            TVBadge(ServerSwitchModel.current, style: .gold, size: 13)
         }
         .padding(.horizontal, 18)
         .frame(minHeight: 58)
@@ -154,7 +154,7 @@ struct SwitchServerScreen: View {
 
     private func serverRow(_ row: ServerPickerModel.Row) -> some View {
         Button { Task { await model.choose(row) } } label: {
-            SettingsRow(title: row.name, detail: row.detail) {
+            SettingsRow(title: row.name, detail: model.detail(for: row, tv: true)) {
                 if model.picker.connecting == row.id { ProgressView() }
             }
         }
@@ -164,25 +164,18 @@ struct SwitchServerScreen: View {
         .accessibilityIdentifier("switch-server-\(row.id)")
     }
 
-    /// A failure in bold, then what it means, ending on the server still in use.
-    private func message(_ problem: String) -> some View {
-        let parts = problem.split(separator: ". ", maxSplits: 1).map(String.init)
-        let title = parts.first.map { $0.hasSuffix(".") ? String($0.dropLast()) : $0 } ?? problem
-        let rest = parts.count > 1 ? parts[1] + " " : ""
-        return TVMessage(title: title, message: "\(rest)You’re still on \(original).")
-            .accessibilityIdentifier("switch-message")
-    }
-
     // MARK: 2. Sign in
 
     private var signInStep: some View {
         TVTaskFrame(
-            crumb: "Settings › Server › \(switchServerTitle)", title: "Sign in to \(signIn?.server?.name ?? "the server")",
-            lede: "This Apple TV signs in by itself once the code is approved. You stay signed in on \(original).",
-            hint: "Step 2 of 3 · next: Switched · Menu goes back a step"
+            crumb: ServerSwitchModel.tvPath, title: model.signInTitle,
+            lede: model.signInLede,
+            hint: "\(model.flowStep.shortLine) · Menu goes back a step"
         ) {
-            TVStepsBar(steps: Self.steps, current: 1)
-            if let error = model.error { message(error) }
+            TVStepsBar(step: model.flowStep)
+            if let problem = model.signInProblem {
+                TVMessage(title: problem.title, message: problem.body).accessibilityIdentifier("switch-message")
+            }
             if let signIn {
                 SwitchSignIn(model: signIn).padding(.top, 12)
             } else {
@@ -193,18 +186,17 @@ struct SwitchServerScreen: View {
 
     // MARK: 3. Switched
 
-    private var done: some View {
-        let now = services.servers.current?.server.name ?? "the server"
-        return TVTaskFrame(
-            crumb: "Settings › Server › \(switchServerTitle)", title: "You’re on \(now)",
-            lede: services.auth.user.map { "Signed in as \($0.name)." },
-            hint: "There is no way back from here: the switch is done. Menu goes to Home"
+    @ViewBuilder private var done: some View {
+        let words = model.finished(device: "Apple TV")
+        TVTaskFrame(
+            crumb: ServerSwitchModel.tvPath, title: words?.title ?? "",
+            lede: words?.lede,
+            hint: ServerSwitchModel.tvFinishedHint
         ) {
-            TVStepsBar(steps: Self.steps, current: Self.steps.count)
+            TVStepsBar(step: model.flowStep)
             HStack(alignment: .top, spacing: 24) {
-                box("What changed", ["This Apple TV now shows \(now)’s library, Home and settings.", "You’re still signed in on \(original)."])
-                box("What happens next", ["Switch back any time under Settings › Server. It needs no password.",
-                                          "Playback and Audio & subtitles are your choices on \(now), kept there."])
+                box(FinishedWords.whatChangedHeading, words?.whatChanged ?? [])
+                box(FinishedWords.whatHappensNextHeading, words?.whatHappensNext ?? [])
             }
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: 1500)
@@ -243,11 +235,11 @@ private struct SwitchedButtons: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            Button("Go to Home", action: goHome)
+            Button(ServerSwitchModel.goHome, action: goHome)
                 .buttonStyle(TVButtonStyle(height: 64, fontSize: 22))
                 .focused($homeFocused)
                 .accessibilityIdentifier("switch-go-home")
-            Button("Back to Settings", action: backToSettings)
+            Button(ServerSwitchModel.backToSettings, action: backToSettings)
                 .buttonStyle(TVButtonStyle(height: 64, fontSize: 22))
                 .accessibilityIdentifier("switch-back-to-settings")
         }

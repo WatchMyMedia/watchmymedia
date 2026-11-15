@@ -391,21 +391,19 @@ struct ChipLabel: View {
     }
 }
 
-/// A flow's steps named across the top (the board's `.stp`): done ones
-/// ticked, the current one gold.
+/// A flow's steps named across the top (the board's `.stp`, the Kit's
+/// ``FlowStep``): done ones ticked, the current one gold.
 struct TVStepsBar: View {
-    let steps: [String]
-    /// The step on screen; `steps.count` when all are done.
-    let current: Int
+    let step: FlowStep
 
     var body: some View {
         HStack(spacing: 14) {
-            ForEach(Array(steps.enumerated()), id: \.offset) { index, name in
+            ForEach(Array(step.names.enumerated()), id: \.offset) { index, name in
                 if index > 0 {
                     Rectangle().fill(Palette.outlineStrong).frame(width: 60, height: 2)
                 }
-                let done = index < current || current >= steps.count
-                let now = index == current
+                let done = step.done.contains(index + 1)
+                let now = index + 1 == step.number && !done
                 HStack(spacing: 10) {
                     Text(done ? "✓" : "\(index + 1)")
                         .font(.system(size: 16, weight: .bold))
@@ -419,7 +417,7 @@ struct TVStepsBar: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(current < steps.count ? "Step \(current + 1) of \(steps.count), \(steps[current])" : "All \(steps.count) steps done")
+        .accessibilityLabel(step.accessibilityLabel)
         .accessibilityIdentifier("task-steps")
     }
 }
