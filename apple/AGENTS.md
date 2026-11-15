@@ -113,7 +113,11 @@ server, and on iPad in both a regular and a compact width.
   Menu with `XCUIRemote`. On Apple TV each screen is identified by what it
   shows (`HomePage`), not its place, and a row's screen (`HomeRowScreen`)
   holds its own focused card: a row appearing above keeps the others' cards,
-  and moving along a row redraws that screen alone.
+  and moving along a row redraws that screen alone. Selecting another tab
+  from code (a row's See all) sends focus to the tab bar first, which
+  scrolls Home to its first screen, and coming back to Home leaves focus in
+  the tab bar: Home puts a row back itself after Menu (`seeAllLeft`,
+  `Navigator.exitsToHome`; `TVUITests/SeeAllTests.swift`).
 - **Dialogs and focus.**
   - iOS 27's Back is a bare chevron. Hiding it for a labelled Back of your
     own turns off the edge swipe, and on iPad a leading toolbar item goes into
