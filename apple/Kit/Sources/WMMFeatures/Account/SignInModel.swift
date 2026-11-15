@@ -35,7 +35,11 @@ public final class SignInModel {
 
     public var showPassword = false
     public private(set) var busy = false
-    public private(set) var error: String?
+    public private(set) var error: String? {
+        didSet { if error == nil { errorStatus = nil } }
+    }
+    /// The HTTP status behind ``error``: 401 a wrong name or password, 429 too many tries; nil without one.
+    public private(set) var errorStatus: Int?
 
     /// The pairing under way while ``codeSignIn``; nil before it starts.
     public private(set) var pairing: PairingState?
@@ -123,6 +127,7 @@ public final class SignInModel {
                 pairingRun += 1
             } else {
                 self.error = signInMessage(error)
+                errorStatus = (error as? APIError)?.status
             }
         }
     }
