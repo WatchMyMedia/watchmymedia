@@ -344,6 +344,67 @@ func (p *Prober) Keyframes(ctx context.Context, file string) ([]int64, error) {
 	return keys, nil
 }
 
+// Packet is a video packet's presentation and decode times, in
+// microseconds of the file's own clock (format.start_time is not taken off).
+type Packet struct {
+	PtsUs, DtsUs int64
+	Key          bool
+}
+
+// VideoPackets reads the first video stream's packets between fromUs and
+// toUs of the file's own clock, in decode order, calling visit with each
+// until it returns false. ffprobe seeks to the keyframe at or before fromUs
+// and reads only from there, so a look around one time costs a seek and at
+// most a keyframe interval of reading, not the whole file. ctx bounds it.
+func (p *Prober) VideoPackets(ctx context.Context, file string, fromUs, toUs int64, visit func(Packet) bool) error {
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
+	interval := strconv.FormatFloat(float64(fromUs)/1e6, 'f', 6, 64) + "%" + strconv.FormatFloat(float64(toUs)/1e6, 'f', 6, 64)
+	cmd := ffexec.Command(ctx, p.bin(), "-v", "error", "-select_streams", "v:0", "-read_intervals", interval,
+		"-show_entries", "packet=pts_time,dts_time,flags", "-of", "csv=p=0", file)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("ffprobe: %w", err)
+	}
+	stopped := false
+	sc := bufio.NewScanner(stdout)
+	for sc.Scan() {
+		parts := strings.Split(sc.Text(), ",")
+		if len(parts) < 3 {
+			continue
+		}
+		pts, err := strconv.ParseFloat(parts[0], 64)
+		if err != nil {
+			continue
+		}
+		dts, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			dts = pts
+		}
+		if !visit(Packet{PtsUs: int64(math.Round(pts * 1e6)), DtsUs: int64(math.Round(dts * 1e6)), Key: strings.HasPrefix(parts[2], "K")}) {
+			stopped = true
+			stop()
+			break
+		}
+	}
+	err = cmd.Wait()
+	switch {
+	case stopped:
+		return nil
+	case ctx.Err() != nil:
+		return fmt.Errorf("ffprobe: %w", context.Cause(ctx))
+	case err != nil:
+		if msg := cmd.Tail(); msg != "" {
+			return fmt.Errorf("ffprobe: %s: %w", firstLine(msg), err)
+		}
+		return fmt.Errorf("ffprobe: %w", err)
+	}
+	return nil
+}
+
 func (p *Prober) bin() string {
 	if p.Path == "" {
 		return "ffprobe"

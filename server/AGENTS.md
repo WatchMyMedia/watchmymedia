@@ -195,6 +195,23 @@ one test that runs a download's ffmpeg at low priority, before its package's
 parallel tests; tests of what a download serves call
 `Manager.DownloadsAtNormalPriority` first, as `TestOfflineHLSDownloads` does.
 
+**Event sessions of copied video.** ffmpeg starts copied video at the
+keyframe at or before an input `-ss`, while converted audio starts on the
+dot, and `-t` stops copied video at the first packet decoded at or after the
+limit. So an event session of copied video starts on the keyframe that
+`KeyframeFinder` (`internal/playback/keyframes_near.go`) finds, reports it as
+the decision's `startMs`, and ends each run with `-t` one millisecond before
+the next keyframe's decode time, where the next run starts: playlist time
+then stays file time from window to window. Before, a play asked for 25 s on
+a file with a keyframe every 10 s showed 20 s while the apps counted 25 s,
+and each window skipped or repeated a few seconds (PLAN-RESUME.md §1.4). The
+served playlist carries `EXT-X-START` at the asked-for frame: without it
+players treat an event playlist as live, and Media3 and Safari started near
+the end of what was prepared. Trimming never passes the viewer's reported
+position (`Manager.NoteViewer`). A resume with no start begins 5 s before
+the saved position (`resumePoint` in `internal/api/watch.go`); the saved
+position itself stays exact.
+
 **Playback files.** Sessions write under
 `<transcode.dir>/watchmymedia-sessions`, the only part of `transcode.dir`
 the server clears at startup; the folder may be shared (`/tmp`,

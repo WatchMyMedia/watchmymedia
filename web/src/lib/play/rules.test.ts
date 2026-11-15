@@ -72,6 +72,11 @@ describe('beatDue', () => {
     expect(beatDue('buffering', 0, 5_000, true)).toBe(true)
     expect(beatDue('paused', 0, 29_999, true)).toBe(false)
   })
+  it('beats as soon as a seek lands, at most once a second while scrubbing', () => {
+    expect(beatDue('paused', 0, 1_000, false, true)).toBe(true)
+    expect(beatDue('playing', 0, 1_000, true, true)).toBe(true)
+    expect(beatDue('paused', 0, 999, false, true)).toBe(false)
+  })
 })
 
 const ranges = (...r: [number, number][]) => ({ length: r.length, start: (i: number) => r[i][0], end: (i: number) => r[i][1] })

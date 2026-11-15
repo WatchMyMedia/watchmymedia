@@ -41,9 +41,9 @@ describe('episodeActions', () => {
     expect(episodeActions(ep({ runtimeMin: undefined, files: [file(501, 0)] })).primary.label).toBe('Play')
   })
 
-  it('resumes a partly watched episode from its position, and offers the start', () => {
+  it('resumes a partly watched episode, leaving the start to the server, and offers the start', () => {
     const a = episodeActions(ep({ watch: watch({ positionMs: 23 * 60_000 + 10_000 }) }))
-    expect(a.primary).toEqual({ kind: 'play', label: 'Resume from 23:10', fileId: 501, start: 1390 })
+    expect(a.primary).toEqual({ kind: 'play', label: 'Resume from 23:10', fileId: 501 })
     expect(a.fromStart).toEqual({ label: 'From the start', fileId: 501, start: 0 })
     expect(a.mark).toEqual({ label: 'Mark watched', watched: true })
   })
@@ -54,12 +54,13 @@ describe('episodeActions', () => {
 
   it('resumes the version the position was saved on', () => {
     const a = episodeActions(ep({ files: [file(501), file(502)], watch: watch({ positionMs: 60_000, fileId: 502 }) }))
-    expect(a.primary).toMatchObject({ kind: 'play', fileId: 502, start: 60 })
+    expect(a.primary).toMatchObject({ kind: 'play', fileId: 502 })
+    expect(a.primary).not.toHaveProperty('start')
     expect(a.fromStart).toMatchObject({ fileId: 502, start: 0 })
   })
 
   it('falls back to the best file when the saved version is gone', () => {
-    expect(episodeActions(ep({ watch: watch({ positionMs: 10 * 60_000, fileId: 999 }) })).primary).toMatchObject({ fileId: 501, start: 600 })
+    expect(episodeActions(ep({ watch: watch({ positionMs: 10 * 60_000, fileId: 999 }) })).primary).toMatchObject({ fileId: 501 })
   })
 
   it('plays a watched episode again, and offers to unmark it', () => {

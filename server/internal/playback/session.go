@@ -85,8 +85,15 @@ type Spec struct {
 	run int
 	// caps pins device/filter choices across this session's VOD restarts.
 	caps *Capabilities
+	// Keyframes finds keyframes in Path, so an event session of copied
+	// video starts on one and ends each run just before one
+	// (PLAN-RESUME.md §3.1, §3.2); nil runs it from StartMs as asked.
+	Keyframes KeyframeFinder
 	// eventChunk caps one event ffmpeg run; zero is used by argument tests.
 	eventChunk time.Duration
+	// eventRunUs, when set, is the run's exact length instead, which ends
+	// it just before a keyframe.
+	eventRunUs int64
 }
 
 // GrowingInput supplies a recording transport reader and the approximate
@@ -370,10 +377,13 @@ type Manager struct {
 	vodAhead, vodResume time.Duration
 	// Event preparation is bounded independently of a player's HTTP buffer.
 	eventAhead, eventResume time.Duration
-	resources               ResourceLimits
-	resourceMu              sync.Mutex
-	liveRoot                string
-	stopLive                func(string)
+	// keyframeWait, when not zero, replaces how long an event start waits
+	// for its keyframe lookups (KeyframeLookupsMayTake).
+	keyframeWait atomic.Int64
+	resources    ResourceLimits
+	resourceMu   sync.Mutex
+	liveRoot     string
+	stopLive     func(string)
 	// lastResources is the latest measurement, which LastResources serves
 	// without walking the disk; the watchdog (checkResources) renews it.
 	lastResources atomic.Pointer[resourceReading]
@@ -1263,7 +1273,10 @@ func (m *Manager) args(spec Spec, dir string) []string {
 			filepath.Join(dir, run+".m3u8"),
 		)
 	}
-	if spec.eventChunk > 0 {
+	switch {
+	case spec.eventRunUs > 0:
+		a = append(a, "-t", strconv.FormatFloat(float64(spec.eventRunUs)/1e6, 'f', 6, 64))
+	case spec.eventChunk > 0:
 		a = append(a, "-t", ffexec.Seconds(spec.eventChunk.Milliseconds()))
 	}
 	a = append(a,

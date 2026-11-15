@@ -98,7 +98,8 @@ func registerRecordingPlayback(h huma.API, deps Deps) {
 		available := max(int64(0), recordedThrough.Sub(started).Milliseconds())
 		request := in.Body
 		request.Playlist = "event"
-		request.StartMs = min(max(request.StartMs, 0), max(available-8000, 0))
+		startMs := min(request.Start(), max(available-8000, 0))
+		request.StartMs = &startMs
 		// Growing recordings always use HLS, even when a client accepts MPEG-TS.
 		request.Profile.Containers = nil
 		if request.Quality == playback.QualityAuto {
@@ -182,8 +183,12 @@ func registerRecordingPlayback(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if deps.Playback != nil && (in.Body.State == "stopped" || in.Body.State == "closed") {
-			deps.Playback.StopPlay(in.Body.PlayID, u.ID)
+		if deps.Playback != nil {
+			if in.Body.State == "stopped" || in.Body.State == "closed" {
+				deps.Playback.StopPlay(in.Body.PlayID, u.ID)
+			} else {
+				deps.Playback.NoteViewer(in.Body.PlayID, u.ID, in.Body.PositionMs)
+			}
 		}
 		return &ProgressOutput{Body: Progress{WatchState: WatchState{PositionMs: pos, DurationMs: dur, UpdatedAt: time.Now()}}}, nil
 	})
