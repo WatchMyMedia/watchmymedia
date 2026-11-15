@@ -66,9 +66,6 @@ private struct SettingsView: View {
     @State var homeRows: RowEditorModel
     /// Your requests, for the group's "2 waiting".
     @State var requests: MyRequestsModel
-    /// Saved lines for what is kept on this Apple TV (Quality, its name),
-    /// which the Kit's save states don't cover.
-    @State private var saves = RowSaves()
     /// The group whose page is shown.
     @State private var chosen: SettingsDestination = .playback
     /// Each group's row that last had focus.
@@ -236,12 +233,11 @@ private struct SettingsView: View {
             TVMessage(title: SettingsWords.playbackCantLoad.title, message: SettingsWords.playbackCantLoad.body)
         }
         SettingsGroup(SettingsWords.qualityHeading(device: family)) {
-            menuRow(.playback, "quality", title: SettingsWords.defaultQuality, detail: model.quality.checklistDetail, note: saves.note("quality"),
+            menuRow(.playback, "quality", title: SettingsWords.defaultQuality, detail: model.quality.checklistDetail, note: RowNote(model.qualitySave),
                     value: model.quality.shortLabel,
                     choices: model.qualities.map { MenuChoice(value: $0, id: $0.rawValue, title: $0.checklistTitle, line: $0.checklistDetail) },
                     chosen: model.quality) { quality in
                 model.setQuality(quality)
-                saves.saved("quality", PanelWords.qualitySaved(quality, device: family))
             }
         }
         SettingsGroup(SettingsWords.skipping) {
@@ -310,7 +306,7 @@ private struct SettingsView: View {
 
     @ViewBuilder private var accountPage: some View {
         SettingsGroup(SettingsWords.thisDevice(family)) {
-            navRow(.account, "name", title: SettingsWords.name, note: saves.note("name"), value: model.deviceName, chevron: false) { task = .rename }
+            navRow(.account, "name", title: SettingsWords.name, note: RowNote(model.deviceNameSave), value: model.deviceName, chevron: false) { task = .rename }
             GroupFoot(model.facts.summaryLine)
         }
         SettingsGroup(SettingsWords.signedInDevices) {
@@ -696,11 +692,8 @@ private struct SettingsView: View {
                 Task {
                     let rename = model.renameTask()
                     rename.name = name
-                    if await model.rename(rename) {
-                        saves.saved("name", PanelWords.renamed(model.deviceName, device: family))
-                        // Signed-in devices shows the new name once the server has it.
-                        await model.loadSessions()
-                    }
+                    // The row says Saved (deviceNameSave); Signed-in devices shows the new name once the server has it.
+                    if await model.rename(rename) { await model.loadSessions() }
                 }
             } onClose: { task = nil }
         case .changePassword:

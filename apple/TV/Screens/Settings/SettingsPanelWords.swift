@@ -4,8 +4,7 @@ import WMMModel
 
 // The words of the panel at the right of Apple TV's Settings (what the
 // focused setting does) and of its hints, where the Kit's `SettingsWords`
-// has none; the rest of Settings' words are the Kit's. Also the Saved lines
-// for the two changes kept on this Apple TV, until the Kit has them.
+// has none; the rest of Settings' words are the Kit's.
 
 enum PanelWords {
     static let hintOpens = "Select opens it · Menu goes back to the list"
@@ -52,14 +51,6 @@ enum PanelWords {
             "Nothing is sent from this \(device). No account, server address or titles are included.",
         ]
     }
-
-    /// "Saved. Videos on this Apple TV now start at Automatic."
-    static func qualitySaved(_ quality: StreamQuality, device: String) -> String {
-        "Saved. Videos on this \(device) now start at \(quality.checklistTitle)."
-    }
-
-    /// "Saved. This Apple TV is now Bedroom Apple TV."
-    static func renamed(_ name: String, device: String) -> String { "Saved. This \(device) is now \(name)." }
 
     /// Add a language's hint: Select adds, and the search field takes the microphone.
     static func addLanguageHint(back: String) -> String {
