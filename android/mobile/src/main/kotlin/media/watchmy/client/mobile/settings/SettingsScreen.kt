@@ -1,99 +1,97 @@
 package media.watchmy.client.mobile.settings
 
-import android.os.Build
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import media.watchmy.client.mobile.navigation.OnTabReselected
-import media.watchmy.client.mobile.components.MobileTab
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import media.watchmy.client.mobile.components.FilledButton
+import media.watchmy.client.mobile.components.Avatar
+import media.watchmy.client.mobile.components.BackTopBar
 import media.watchmy.client.mobile.components.GoldTextButton
 import media.watchmy.client.mobile.components.IconTile
-import media.watchmy.client.mobile.components.InlineError
 import media.watchmy.client.mobile.components.ListRow
 import media.watchmy.client.mobile.components.MainTopBar
-import media.watchmy.client.mobile.components.MessageHost
+import media.watchmy.client.mobile.components.MobileTab
 import media.watchmy.client.mobile.components.PhoneIcons
-import media.watchmy.client.mobile.components.RowValue
-import media.watchmy.client.mobile.components.SectionLabel
+import media.watchmy.client.mobile.live.openReminderChannel
+import media.watchmy.client.mobile.live.rememberReminderSettings
 import media.watchmy.client.mobile.navigation.MobileRoutes
-import media.watchmy.client.mobile.components.panel
-import media.watchmy.client.model.DeviceSession
-import media.watchmy.client.model.SKIP_KINDS
-import media.watchmy.client.model.StreamQuality
+import media.watchmy.client.mobile.navigation.OnTabReselected
+import media.watchmy.client.model.MediaRequest
+import media.watchmy.client.model.RowLayoutEntry
+import media.watchmy.client.model.RowScreens
+import media.watchmy.client.model.ServerFeatures
+import media.watchmy.client.model.SettingsGroup
 import media.watchmy.client.model.languagesSummary
-import media.watchmy.client.model.displayAddress
-import media.watchmy.client.model.formatAgo
-import media.watchmy.client.model.kindLabel
-import media.watchmy.client.model.settingsLabel
-import media.watchmy.client.model.shortLabel
-import media.watchmy.client.model.versionLabel
+import media.watchmy.client.model.serverSettingsUrl
 import media.watchmy.client.presentation.Load
-import media.watchmy.client.presentation.downloads.DownloadsViewModel
+import media.watchmy.client.presentation.requests.MyRequestsViewModel
+import media.watchmy.client.presentation.rows.RowLayoutViewModel
+import media.watchmy.client.presentation.settings.AccountLoad
 import media.watchmy.client.presentation.settings.SettingsViewModel
-import media.watchmy.client.presentation.value
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
-import media.watchmy.client.ui.components.Badge
-import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.rememberTabletLayout
-import media.watchmy.client.mobile.live.LiveReminderSettings
-import media.watchmy.client.model.ROWS_API_LEVEL
-import media.watchmy.client.model.RowScreens
-import media.watchmy.client.model.TMDB_NOTICE
-
-/** The privacy policy Google Play requires the app to link to. */
-const val PRIVACY_POLICY_URL = "https://watchmy.media/privacy"
-
-private val Footnote = TextStyle(fontFamily = Inter, fontSize = 12.sp, lineHeight = 18.sp, color = WmmColors.TextFaint)
 
 /**
- * Settings (Settings.dc.html, a scrolling page): Your requests and the
- * admins' Inbox when the server takes requests, device name, quality,
- * autoplay and the skip modes, signed-in devices, Link a TV, Switch server,
- * Sign out and About.
+ * Settings as groups (PLAN-ANDROID-SETTINGS.md §4.1–§4.2; the
+ * SettingsOverview and TabSettingsOverview boards). On a phone, [open] null
+ * is the overview, a row per group with what is chosen under its name, and
+ * a group's route shows its page with Up. On a tablet (600 wide and up) the
+ * list sits beside the open group's page, Playback's when [open] is null.
+ *
+ * [onOpenPage] opens a group's page: pushed on a phone, in place of the one
+ * beside the list on a tablet ([beside]). Home rows, Your requests, the
+ * Inbox and Server settings open their own screens.
  */
 @Composable
 fun SettingsScreen(
@@ -101,346 +99,357 @@ fun SettingsScreen(
     onSignedOut: () -> Unit,
     onLinkTv: () -> Unit,
     onNavigate: (Any) -> Unit,
+    modifier: Modifier = Modifier,
+    open: SettingsGroup? = null,
+    onOpenPage: (group: SettingsGroup, beside: Boolean) -> Unit = { _, _ -> },
+    onBack: () -> Unit = {},
+    onChangePassword: (asDialog: Boolean) -> Unit = {},
     onOpenRequests: (() -> Unit)? = null,
     onOpenInbox: (() -> Unit)? = null,
     inboxCount: Int = 0,
 ) {
     val services = LocalAppServices.current
-    val vm = viewModel { SettingsViewModel(services.auth, services.servers, services.preferences) }
+    val vm = settingsModel()
     val state by vm.state.collectAsStateWithLifecycle()
-    val downloadsVm = viewModel { DownloadsViewModel(services.downloads) }
+    val downloadsVm = downloadsModel()
     val downloads by downloadsVm.state.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { downloadsVm.refreshStorage() }
     LaunchedEffect(vm) { vm.events.collect { if (it == SettingsViewModel.Event.SignedOut) onSignedOut() } }
-    // The phone has no line for it: a playback settings load that failed is said once.
-    LaunchedEffect(state.prefsError) { state.prefsError?.let(vm::say) }
+    val online = rememberOnline()
+    // Back online, what didn't load for want of a connection comes back by itself (§4.5).
+    LaunchedEffect(online) {
+        if (online) {
+            if (vm.state.value.account is AccountLoad.Failed) vm.reloadAccount()
+            if (vm.state.value.sessions is Load.Failed) vm.loadSessions()
+        }
+    }
     val uri = LocalUriHandler.current
-    // ACTION_VIEW in the browser; a device with none gets a message rather than a crash.
-    val openWeb = { url: String -> if (runCatching { uri.openUri(url) }.isFailure) vm.say("No browser to open $url") }
-    var dialog by rememberSaveable { mutableStateOf<String?>(null) }
-    var revoking by remember { mutableStateOf<DeviceSession?>(null) }
-    val twoPane = rememberTabletLayout().twoPane
-    var page by rememberSaveable { mutableStateOf(SettingsPage.Playback) }
-    val pageScroll = rememberScrollState()
-    OnTabReselected(MobileTab.Settings) { pageScroll.animateScrollTo(0) }
-    LaunchedEffect(page, twoPane) { pageScroll.scrollTo(0) }
-    val phone = if (LocalConfiguration.current.smallestScreenWidthDp >= 600) "tablet" else "phone"
-    val rowsAvailable = (state.server?.server?.apiLevel ?: 0) >= ROWS_API_LEVEL
+    // ACTION_VIEW in the browser; a device with none says so rather than crashing.
+    var noBrowser by remember { mutableStateOf<String?>(null) }
+    val openWeb = { url: String -> if (runCatching { uri.openUri(url) }.isFailure) noBrowser = url }
+    val twoPane = rememberTabletLayout().isTablet
+    val device = deviceWord()
+    val reminders = rememberReminderSettings()
+    val apiLevel = state.server?.server?.apiLevel ?: 0
+    val rowsAvailable = ServerFeatures(apiLevel).rows
+    val rows = if (rowsAvailable) homeRows() else null
+    val requests = if (onOpenRequests != null) myRequests() else null
+    val user = state.user
+    val server = state.server?.server
+    val locale = LocalConfiguration.current.locales[0]
 
-    Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
-        MainTopBar("Settings", state.user?.name, onSearch = null, onAvatar = null)
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center) {
-                if (twoPane) {
-                    Column(Modifier.width(360.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(state.user?.name ?: "Account", color = WmmColors.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(12.dp))
-                        RequestLinks(onOpenRequests, onOpenInbox, inboxCount)
-                        SettingsPage.entries.filter { (it != SettingsPage.Downloads || downloads.enabled) && (it != SettingsPage.Subtitles || state.subtitlePreferencesAvailable) }.forEach { destination ->
-                            val languages = destination == SettingsPage.Subtitles
-                            ListRow(if (languages) state.languagesTitle else destination.title,
-                                modifier = Modifier.panel(selected = destination == page).clickable { page = destination },
-                                trailing = {
-                                    // Audio & subtitles says what is chosen: "Spanish · For foreign audio".
-                                    if (languages) RowValue(languagesSummary(state.playback, state.audioLanguagesAvailable, LocalConfiguration.current.locales[0]), size = 13)
-                                    else Icon(WmmIcons.ChevronRight, null, tint = WmmColors.TextMuted)
-                                })
-                        }
-                        if (rowsAvailable) ListRow("Home rows", modifier = Modifier.clickable { onNavigate(MobileRoutes.EditRowsDialog(RowScreens.HOME, "Home")) })
-                        ListRow("Link a TV", modifier = Modifier.clickable(onClick = onLinkTv))
-                    }
-                }
-                Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
-                    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight().verticalScroll(pageScroll).padding(bottom = 24.dp)) {
-                        Text(
-                            listOfNotNull(state.user?.name?.let { "Signed in as $it" }, state.server?.server?.name).joinToString(" · "),
-                            style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = WmmColors.TextMuted),
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
-                        )
+    val lines = groupLines(
+        OverviewFacts(
+            device = device,
+            quality = state.quality,
+            autoplayNext = state.playback.autoplayNext,
+            account = state.account,
+            online = online,
+            languages = languagesSummary(state.playback, state.audioLanguagesAvailable, locale).takeIf { state.subtitlePreferencesAvailable },
+            downloads = downloads.all.size,
+            downloadBytes = downloads.usedBytes,
+            wifiOnly = downloads.settings.wifiOnly,
+            rows = rows,
+            userName = user?.name ?: "You",
+            devices = (state.sessions as? Load.Ready)?.data?.size,
+            requests = requests,
+            inbox = inboxCount.takeIf { onOpenInbox != null },
+            appVersion = services.client.version,
+            serverName = server?.name,
+            serverVersion = server?.version,
+            remindersBlocked = reminders.shown && !reminders.allowed,
+        ),
+    )
+    val groups = SettingsGroup.entries.filter { group ->
+        when (group) {
+            SettingsGroup.Languages -> state.subtitlePreferencesAvailable
+            SettingsGroup.Downloads -> downloads.enabled || downloads.all.isNotEmpty()
+            SettingsGroup.HomeRows -> rowsAvailable
+            SettingsGroup.Requests -> onOpenRequests != null
+            SettingsGroup.Inbox -> onOpenInbox != null
+            SettingsGroup.ServerSettings -> user?.isAdmin == true && server != null
+            else -> true
+        }
+    }.map { group ->
+        val line = lines[group]
+        GroupRow(group, if (group == SettingsGroup.Languages) state.languagesTitle else group.title, line?.long, line?.short, line?.warn == true, inboxCount.takeIf { group == SettingsGroup.Inbox && it > 0 })
+    }
+    val choose = { group: SettingsGroup ->
+        when (group) {
+            SettingsGroup.HomeRows -> onNavigate(if (twoPane) MobileRoutes.EditRowsDialog(RowScreens.HOME, "Home") else MobileRoutes.EditRows(RowScreens.HOME, "Home"))
+            SettingsGroup.Requests -> onOpenRequests?.invoke()
+            SettingsGroup.Inbox -> onOpenInbox?.invoke()
+            SettingsGroup.ServerSettings -> server?.let { openWeb(serverSettingsUrl(it.baseUrl)) }
+            else -> onOpenPage(group, twoPane)
+        }
+        Unit
+    }
+    val page = @Composable { group: SettingsGroup, pageModifier: Modifier ->
+        when (group) {
+            SettingsGroup.Playback -> PlaybackPage(twoPane, online, pageModifier)
+            // Its two-by-two panels need a wide page; beside the list on a tablet held upright it stacks, as on a phone.
+            SettingsGroup.Languages -> LanguageSettings(twoPane && windowWidth() >= 1000.dp, online, pageModifier)
+            SettingsGroup.Downloads -> DownloadsPage(twoPane, onSpace = { onNavigate(MobileRoutes.Downloads) }, modifier = pageModifier)
+            SettingsGroup.Account -> AccountPage(twoPane, onChangePassword = { onChangePassword(twoPane) }, onLinkTv = onLinkTv, onSwitchServer = onSwitchServer, modifier = pageModifier)
+            SettingsGroup.About -> AboutPage(twoPane, openWeb, pageModifier)
+            else -> Unit
+        }
+    }
 
-                        if (!twoPane) RequestLinks(onOpenRequests, onOpenInbox, inboxCount)
-                        // You (PLAN-ROWS.md §8.2): Home's rows, the same on every device the person signs in on.
-                        if (!twoPane && rowsAvailable) {
-                            Section("You")
-                            ListRow(
-                                "Home rows",
-                                subtitle = "Order, hide and add the rows on Home",
-                                modifier = Modifier.clickable { onNavigate(MobileRoutes.EditRows(RowScreens.HOME, "Home")) },
-                                trailing = { Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(22.dp)) },
-                            )
-                        }
-                        if (!twoPane || page == SettingsPage.Device) {
-                            Section("This device")
-                            ListRow(
-                                "Device name",
-                                subtitle = listOfNotNull(Build.MODEL, Build.VERSION.RELEASE?.let { "Android $it" }, "app ${services.client.version}").joinToString(" · "),
-                                modifier = Modifier.clickable { dialog = DIALOG_NAME },
-                                trailing = { RowValue(state.deviceName) },
-                            )
-
-                        }
-                        if (!twoPane || page == SettingsPage.Playback) {
-                            Section("Playback")
-                            if (twoPane) {
-                                state.qualities.forEach { quality ->
-                                    Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).selectable(selected = quality == state.quality, role = Role.RadioButton, onClick = { vm.setQuality(quality) }).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        RadioButton(selected = quality == state.quality, onClick = null)
-                                        Column(Modifier.padding(start = 12.dp)) {
-                                            Text(quality.label, color = WmmColors.Text)
-                                            if (quality == StreamQuality.Auto) Text(AUTO_DETAIL, style = Footnote)
-                                        }
-                                    }
-                                }
-                            } else ListRow(
-                                "Default quality",
-                                subtitle = when (state.quality) {
-                                    StreamQuality.Auto -> AUTO_NOTE
-                                    StreamQuality.Original -> "Direct play when the $phone can"
-                                    else -> "Converts anything above this"
-                                },
-                                modifier = Modifier.clickable { dialog = DIALOG_QUALITY },
-                                trailing = { RowValue(if (state.quality == StreamQuality.Original) "Original" else state.quality.label) },
-                            )
-                            ListRow(
-                                "On mobile data",
-                                subtitle = "When this $phone isn’t on Wi-Fi",
-                                modifier = Modifier.clickable { dialog = DIALOG_MOBILE },
-                                trailing = { RowValue(state.device.mobileQuality?.shortLabel ?: SAME_AS_WIFI) },
-                            )
-                            // One switch for TalkBack: the row toggles, and says what it is and whether it's on.
-                            ListRow(
-                                "Autoplay next episode",
-                                subtitle = "Counts down 10 s from the credits",
-                                modifier = Modifier.toggleable(value = state.playback.autoplayNext, role = Role.Switch, onValueChange = vm::setAutoplayNext),
-                                trailing = {
-                                    Switch(
-                                        checked = state.playback.autoplayNext,
-                                        onCheckedChange = null,
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = WmmColors.Ground,
-                                            checkedTrackColor = WmmColors.Accent,
-                                            checkedBorderColor = WmmColors.Accent,
-                                            uncheckedThumbColor = WmmColors.TextMuted,
-                                            uncheckedTrackColor = WmmColors.Surface3,
-                                            uncheckedBorderColor = WmmColors.FieldOutline,
-                                        ),
-                                    )
-                                },
-                            )
-
-                        }
-                        if (!twoPane || page == SettingsPage.Subtitles) LanguageSettings(state, vm, tablet = twoPane)
-                        if (!twoPane || page == SettingsPage.Playback) LiveReminderSettings()
-                        if (downloads.enabled && (!twoPane || page == SettingsPage.Downloads)) {
-                            DownloadSettings(
-                                downloads,
-                                phone,
-                                onQuality = { dialog = DIALOG_DOWNLOAD_QUALITY },
-                                onWifiOnly = downloadsVm::setWifiOnly,
-                                onSpace = { onNavigate(MobileRoutes.Downloads) },
-                                onRemoveAll = { dialog = DIALOG_REMOVE_ALL },
-                            )
-                        }
-                        if (!twoPane || page == SettingsPage.Skip) {
-                            Section("Skip")
-                            SKIP_KINDS.forEach { kind ->
-                                SkipRow(kind.settingsLabel, state.playback.skipMode(kind)) { vm.setSkip(kind, it) }
-                            }
-                            Text(
-                                "Ask shows a Skip button. Auto skips after one second. Auto 3 s shows the button filling up, then skips. A segment you seek into is never skipped for you.",
-                                style = Footnote,
-                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp),
-                            )
-
-                        }
-                        if (!twoPane || page == SettingsPage.Devices) {
-                            Section("Signed-in devices")
-                            val devices = state.sessions.value
-                            when {
-                                devices == null && state.sessions is Load.Failed -> InlineError((state.sessions as Load.Failed).message, vm::loadSessions)
-                                devices == null -> Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator(Modifier.size(24.dp), color = WmmColors.Accent, strokeWidth = 2.dp)
-                                }
-                                else -> devices.forEach { d ->
-                                    ListRow(
-                                        d.name,
-                                        subtitle = "${d.model ?: d.kindLabel} · ${if (d.current) "now" else formatAgo(d.lastSeenAtMs)}",
-                                        titleSize = 15,
-                                        subtitleSize = 12,
-                                        minHeight = 52.dp,
-                                        trailing = {
-                                            when {
-                                                d.current -> Badge("This $phone", style = BadgeStyle.Gold, horizontalPadding = 8.dp)
-                                                state.revoking == d.id -> CircularProgressIndicator(Modifier.padding(end = 12.dp).size(20.dp), color = WmmColors.Accent, strokeWidth = 2.dp)
-                                                else -> GoldTextButton("Sign out", { revoking = d })
-                                            }
-                                        },
-                                    )
-                                }
-                            }
-                            ListRow(
-                                "Link a TV",
-                                subtitle = "Enter the code shown on your TV",
-                                minHeight = 64.dp,
-                                modifier = Modifier.clickable(onClick = onLinkTv),
-                                leading = { IconTile(WmmIcons.Tv, background = WmmColors.Line2, tint = WmmColors.Accent) },
-                                trailing = { Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(22.dp)) },
-                            )
-                        }
-                        if (!twoPane || page == SettingsPage.Server) {
-                            ListRow(
-                                "Switch server",
-                                subtitle = state.server?.server?.let { "${it.name} · ${displayAddress(it.baseUrl)}" },
-                                minHeight = 64.dp,
-                                modifier = Modifier.clickable(onClick = onSwitchServer),
-                                leading = { IconTile(WmmIcons.Server) },
-                                trailing = { Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(22.dp)) },
-                            )
-                            FilledButton(
-                                "Sign out",
-                                onClick = vm::signOut,
-                                large = true,
-                                busy = state.signingOut,
-                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp).fillMaxWidth(),
-                            )
-
-                        }
-                        if (!twoPane || page == SettingsPage.About || page == SettingsPage.Server) {
-                            Section("About")
-                            state.server?.server?.let { s ->
-                                ListRow("Server", minHeight = 44.dp, titleSize = 15, trailing = { RowValue("${s.name} · ${versionLabel(s.version)} · ${displayAddress(s.baseUrl)}", chevron = false, size = 13) })
-                            }
-                            ListRow("App", minHeight = 44.dp, titleSize = 15, trailing = { RowValue("WatchMyMedia ${services.client.version}", chevron = false, size = 13) })
-                            state.server?.server?.let { s ->
-                                ListRow(
-                                    "Admin tools",
-                                    minHeight = 44.dp,
-                                    titleSize = 15,
-                                    modifier = Modifier.clickable { openWeb(s.baseUrl) },
-                                    trailing = { RowValue("Open the web app", icon = PhoneIcons.External, size = 13) },
-                                )
-                            }
-                            ListRow(
-                                "Privacy policy",
-                                minHeight = 44.dp,
-                                titleSize = 15,
-                                modifier = Modifier.clickable { openWeb(PRIVACY_POLICY_URL) },
-                                trailing = { RowValue("watchmy.media", icon = PhoneIcons.External, size = 13) },
-                            )
-                            // The app's last exits and why, for a bug report (PLAN-ANDROID-REVIEW §6.4, the Diagnostics board).
-                            ListRow(
-                                "Copy diagnostics",
-                                subtitle = "The app’s last exits and why, for a bug report",
-                                minHeight = 44.dp,
-                                titleSize = 15,
-                                modifier = Modifier.clickable { dialog = DIALOG_DIAGNOSTICS },
-                                trailing = { RowValue("") },
-                            )
-                            ListRow("Open-source licences", minHeight = 44.dp, titleSize = 15, modifier = Modifier.clickable { dialog = DIALOG_LICENCES }, trailing = { RowValue("") })
-                            // TMDB's terms ask apps that use its API to say so (PLAN-ROWS.md §3).
-                            Text(TMDB_NOTICE, style = Footnote, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp))
-                    }
-                    }
-                }
+    val scroll = rememberScrollState()
+    OnTabReselected(MobileTab.Settings) { if (!twoPane && open != null) onBack() else scroll.animateScrollTo(0) }
+    LaunchedEffect(open, twoPane) { scroll.scrollTo(0) }
+    when {
+        twoPane -> {
+            val shown = open ?: SettingsGroup.Playback
+            TabletSettings(
+                groups = groups,
+                open = shown,
+                title = groups.firstOrNull { it.group == shown }?.title ?: shown.title,
+                userName = user?.name,
+                role = listOfNotNull(if (user?.isAdmin == true) "Admin" else "Member", server?.name).joinToString(" · "),
+                onChoose = choose,
+                scroll = scroll,
+                modifier = modifier,
+            ) { page(shown, Modifier) }
+        }
+        open == null -> PhoneOverview(
+            groups = groups,
+            userName = user?.name,
+            header = listOfNotNull(user?.name?.let { "Signed in as $it" }, server?.name).joinToString(" · "),
+            onChoose = choose,
+            scroll = scroll,
+            modifier = modifier,
+        ) {
+            val failed = state.account as? AccountLoad.Failed
+            val serverName = server?.name ?: "The server"
+            when {
+                failed != null && !online -> StatusCard("You’re offline", "Settings kept on this $device still work. The rest come back when you reconnect.", NoteTone.Info, Modifier.cardInset(false))
+                failed != null -> StatusCard(
+                    "Your account’s settings didn’t load",
+                    (if (failed.unreachable) "$serverName didn’t answer." else failed.reason.trimEnd('.') + ".") + " The settings kept on this $device still work.",
+                    NoteTone.Warn,
+                    Modifier.cardInset(false),
+                    action = "Try again",
+                    onAction = vm::reloadAccount,
+                )
             }
-            MessageHost(state.message, vm::messageShown, Modifier.align(Alignment.BottomCenter))
+            if (reminders.shown && !reminders.allowed) {
+                val context = LocalContext.current
+                StatusCard(
+                    "Live TV reminders can’t show on this $device",
+                    "Notifications are off for WatchMyMedia in Android’s settings.",
+                    NoteTone.Warn,
+                    Modifier.cardInset(false),
+                    action = "Turn on notifications",
+                    onAction = { openReminderChannel(context) },
+                )
+            }
+        }
+        else -> Column(modifier.fillMaxSize().background(WmmColors.Ground)) {
+            // The page's title matches its row; system Back and Up do the same (§4.4).
+            BackTopBar(groups.firstOrNull { it.group == open }?.title ?: open.title, onBack)
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(bottom = 24.dp)) {
+                page(open, Modifier)
+            }
         }
     }
 
-    when (dialog) {
-        DIALOG_NAME -> RenameDialog(state.deviceName, onDismiss = { dialog = null }) {
-            vm.rename(it)
-            dialog = null
-        }
-        DIALOG_QUALITY -> QualityDialog(state.quality, state.qualities, onDismiss = { dialog = null }) {
-            vm.setQuality(it)
-            dialog = null
-        }
-        DIALOG_MOBILE -> MobileQualityDialog(state.device.mobileQuality, state.quality, state.qualities, phone, onDismiss = { dialog = null }) {
-            vm.setMobileQuality(it)
-            dialog = null
-        }
-        DIALOG_LICENCES -> LicencesDialog { dialog = null }
-        DIALOG_DIAGNOSTICS -> DiagnosticsDialog { dialog = null }
-        DIALOG_DOWNLOAD_QUALITY -> DownloadQualityDialog(downloads.settings.quality, phone, onDismiss = { dialog = null }) {
-            downloadsVm.setQuality(it)
-            dialog = null
-        }
-        DIALOG_REMOVE_ALL -> RemoveAllDialog(downloads, phone, onDismiss = { dialog = null }) {
-            downloadsVm.removeAll()
-            dialog = null
-        }
-    }
-    revoking?.let { d ->
+    noBrowser?.let { url ->
         AlertDialog(
-            onDismissRequest = { revoking = null },
+            onDismissRequest = { noBrowser = null },
             containerColor = WmmColors.Surface2,
-            title = { Text("Sign out ${d.name}?") },
-            text = { Text("It will need to sign in again, with a password or a code.") },
-            confirmButton = {
-                GoldTextButton("Sign out", {
-                    vm.revoke(d)
-                    revoking = null
-                })
-            },
-            dismissButton = { GoldTextButton("Cancel", { revoking = null }, color = WmmColors.TextSoft) },
+            title = { Text("No browser to open it") },
+            text = { Text("This $device has no app that opens $url. Install a browser, then try again.") },
+            confirmButton = { GoldTextButton("OK", { noBrowser = null }) },
         )
     }
 }
 
+/** A group's row in the overview or the tablet's list. */
+@Immutable
+internal data class GroupRow(val group: SettingsGroup, val title: String, val line: String?, val short: String?, val warn: Boolean, val count: Int?)
+
+/** Home's rows for the overview's line, from the Settings route's own model. */
 @Composable
-internal fun Section(title: String) = SectionLabel(title, Modifier.padding(top = 16.dp, bottom = 4.dp))
+private fun homeRows(): Load<List<RowLayoutEntry>> {
+    val services = LocalAppServices.current
+    val model = viewModel(key = "settings-home-rows") { RowLayoutViewModel(services.rows, RowScreens.HOME) }
+    val state by model.state.collectAsStateWithLifecycle()
+    return when (val layout = state.layout) {
+        is Load.Ready -> Load.Ready(state.entries)
+        is Load.Failed -> layout
+        Load.Loading -> Load.Loading
+    }
+}
 
-/** Automatic in the Default quality row and dialog. */
-private const val AUTO_NOTE = "Original first, lower when it can’t keep up"
-internal const val AUTO_DETAIL = "Original first, lowered when the connection can’t keep up"
-
-/** On mobile data, when it plays at the Default quality. */
-internal const val SAME_AS_WIFI = "Same as on Wi-Fi"
-
-private const val DIALOG_NAME = "name"
-private const val DIALOG_QUALITY = "quality"
-private const val DIALOG_MOBILE = "mobile"
-private const val DIALOG_LICENCES = "licences"
-private const val DIALOG_DIAGNOSTICS = "diagnostics"
-private const val DIALOG_DOWNLOAD_QUALITY = "download-quality"
-private const val DIALOG_REMOVE_ALL = "remove-all"
-
-private enum class SettingsPage(val title: String) { Playback("Playback"), Subtitles("Audio & subtitles"), Downloads("Downloads"), Skip("Skip intros and credits"), Device("This tablet"), Devices("Signed-in devices"), Server("Server"), About("About this app") }
-
-internal val SwitchColors @Composable get() = SwitchDefaults.colors(
-    checkedThumbColor = WmmColors.Ground,
-    checkedTrackColor = WmmColors.Accent,
-    checkedBorderColor = WmmColors.Accent,
-    uncheckedThumbColor = WmmColors.TextMuted,
-    uncheckedTrackColor = WmmColors.Surface3,
-    uncheckedBorderColor = WmmColors.FieldOutline,
-)
-
+/** The person's requests for Your requests' line. */
 @Composable
-private fun RequestLinks(onOpenRequests: (() -> Unit)?, onOpenInbox: (() -> Unit)?, inboxCount: Int) {
-                if (onOpenRequests != null || onOpenInbox != null) {
-                    Section("Requests")
-                    if (onOpenRequests != null) {
-                        ListRow(
-                            "Your requests",
-                            subtitle = "What you asked for, and where it stands",
-                            modifier = Modifier.clickable(onClick = onOpenRequests),
-                            trailing = { Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(22.dp)) },
-                        )
-                    }
-                    if (onOpenInbox != null) {
-                        ListRow(
-                            "Inbox",
-                            subtitle = "Requests to approve and problems people reported",
-                            modifier = Modifier.clickable(onClick = onOpenInbox),
-                            trailing = {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    if (inboxCount > 0) Badge("$inboxCount", style = BadgeStyle.Gold, horizontalPadding = 8.dp)
-                                    Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(22.dp))
-                                }
-                            },
-                        )
+private fun myRequests(): Load<List<MediaRequest>> {
+    val services = LocalAppServices.current
+    val model = viewModel(key = "settings-requests") { MyRequestsViewModel(services.requests) }
+    return model.state.collectAsStateWithLifecycle().value.mine
+}
+
+private val SettingsGroup.icon: ImageVector
+    get() = when (this) {
+        SettingsGroup.Playback -> WmmIcons.Play
+        SettingsGroup.Languages -> WmmIcons.Subtitles
+        SettingsGroup.Downloads -> PhoneIcons.Downloads
+        SettingsGroup.HomeRows -> PhoneIcons.Lines
+        SettingsGroup.Account -> WmmIcons.Person
+        SettingsGroup.Requests -> WmmIcons.ListBullets
+        SettingsGroup.About -> WmmIcons.Info
+        SettingsGroup.Inbox -> WmmIcons.Tray
+        SettingsGroup.ServerSettings -> WmmIcons.Server
+    }
+
+/**
+ * The phone's overview (SettingsOverview): who is signed in where, the cards
+ * for what needs attention ([cards]), then a row per group, with the
+ * account's groups below a divider and the admins' Server group last.
+ */
+@Composable
+private fun PhoneOverview(
+    groups: List<GroupRow>,
+    userName: String?,
+    header: String,
+    onChoose: (SettingsGroup) -> Unit,
+    scroll: ScrollState,
+    modifier: Modifier = Modifier,
+    cards: @Composable () -> Unit,
+) {
+    Column(modifier.fillMaxSize().background(WmmColors.Ground)) {
+        MainTopBar("Settings", userName, onSearch = null, onAvatar = null)
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(bottom = 24.dp)) {
+            if (header.isNotEmpty()) Text(header, style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = WmmColors.TextMuted), modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 6.dp))
+            cards()
+            var serverShown = false
+            groups.forEach { row ->
+                if (row.group == SettingsGroup.Account) Rule()
+                if (row.group.server && !serverShown) {
+                    serverShown = true
+                    PageHeading("Server", tablet = false)
+                }
+                ListRow(
+                    row.title,
+                    subtitle = row.line,
+                    minHeight = 60.dp,
+                    modifier = Modifier.clickable(onClickLabel = if (row.group == SettingsGroup.ServerSettings) "Open in your browser" else "Open") { onChoose(row.group) },
+                    leading = { IconTile(row.group.icon, background = WmmColors.Surface2, tint = WmmColors.TextSoft) },
+                    trailing = { GroupTrailing(row) },
+                )
+            }
+        }
+    }
+}
+
+/** What sits at the end of a group's row: a warning, the Inbox's count, and where a tap goes. */
+@Composable
+private fun GroupTrailing(row: GroupRow) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (row.warn) Icon(WmmIcons.Alert, contentDescription = "Needs attention", tint = WmmColors.Warn, modifier = Modifier.size(18.dp))
+        if (row.count != null) Count(row.count)
+        Icon(
+            if (row.group == SettingsGroup.ServerSettings) PhoneIcons.External else WmmIcons.ChevronRight,
+            contentDescription = null,
+            tint = WmmColors.TextMuted,
+            modifier = Modifier.size(if (row.group == SettingsGroup.ServerSettings) 18.dp else 22.dp),
+        )
+    }
+}
+
+/** The Inbox's count in a gold bubble (`.cnt`). */
+@Composable
+private fun Count(count: Int) {
+    Box(
+        Modifier.heightIn(min = 22.dp).widthIn(min = 22.dp).clip(RoundedCornerShape(11.dp)).background(WmmColors.Accent).padding(horizontal = 6.dp)
+            .semantics { contentDescription = "$count to look at" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("$count", style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, color = WmmColors.OnAccent))
+    }
+}
+
+/**
+ * The tablet's Settings (TabSettingsOverview): the groups in a list at the
+ * left, each with its value, the open one highlighted; its page at the
+ * right under its title, at most 720 wide.
+ */
+@Composable
+private fun TabletSettings(
+    groups: List<GroupRow>,
+    open: SettingsGroup,
+    title: String,
+    userName: String?,
+    role: String,
+    onChoose: (SettingsGroup) -> Unit,
+    scroll: ScrollState,
+    modifier: Modifier = Modifier,
+    page: @Composable () -> Unit,
+) {
+    val wide = windowWidth() >= 1000.dp
+    Row(modifier.fillMaxSize().background(WmmColors.Ground)) {
+        Column(
+            Modifier.width(if (wide) 400.dp else 320.dp).fillMaxHeight().background(ListGround).verticalScroll(rememberScrollState())
+                .statusBarsPadding().padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 16.dp),
+        ) {
+            if (userName != null) {
+                Row(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Avatar(userName, size = 44.dp)
+                    Column {
+                        Text(userName, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = WmmColors.Text))
+                        Text(role, style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = WmmColors.TextMuted))
                     }
                 }
-
+            }
+            var serverShown = false
+            groups.forEach { row ->
+                if (row.group == SettingsGroup.Account) Box(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth().height(1.dp).background(WmmColors.Line))
+                if (row.group.server && !serverShown) {
+                    serverShown = true
+                    Text(
+                        "SERVER",
+                        style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.88.sp, color = WmmColors.TextMuted),
+                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 14.dp, bottom = 4.dp).semantics { heading() },
+                    )
+                }
+                TabletGroupItem(row, selected = row.group == open, onClick = { onChoose(row.group) })
+            }
+        }
+        Box(Modifier.width(1.dp).fillMaxHeight().background(WmmColors.Line))
+        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(scroll).statusBarsPadding().padding(start = if (wide) 40.dp else 24.dp, end = if (wide) 48.dp else 24.dp, top = 34.dp, bottom = 32.dp)) {
+            Column(Modifier.widthIn(max = 720.dp)) {
+                Text(title, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 28.sp, color = WmmColors.Text), modifier = Modifier.padding(bottom = 2.dp).semantics { heading() })
+                page()
+            }
+        }
+    }
 }
+
+/** A group in the tablet's list (`.gi`): its name, and its value at the right. */
+@Composable
+private fun TabletGroupItem(row: GroupRow, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 50.dp).clip(RoundedCornerShape(25.dp))
+            .background(if (selected) WmmColors.Accent.copy(alpha = 0.16f) else Color.Transparent)
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(row.title, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = if (selected) WmmColors.Accent else WmmColors.Text), maxLines = 1)
+        Text(
+            row.short.orEmpty(),
+            style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = if (row.warn) WmmColors.Warn else WmmColors.TextMuted, textAlign = TextAlign.End),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (row.warn) Icon(WmmIcons.Alert, contentDescription = "Needs attention", tint = WmmColors.Warn, modifier = Modifier.size(16.dp))
+        if (row.count != null) Count(row.count)
+        if (row.group == SettingsGroup.ServerSettings) Icon(PhoneIcons.External, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(16.dp))
+        else Spacer(Modifier.width(0.dp))
+    }
+}
+
+private val ListGround = Color(0xFF121213)

@@ -32,6 +32,14 @@ object PhoneIcons {
     /** You're offline: a cloud struck through. */
     val CloudOff = stroke("M3 3l18 18", "M8.5 6.3A6 6 0 0 1 17.7 10H18a4 4 0 0 1 2.4 7.2M17 18H7a5 5 0 0 1-1.6-9.7")
 
+    // Settings' groups and rows (android/SettingsOverview.dc.html, SettingsAccount.dc.html).
+    /** Home rows: three lines, the last one short. */
+    val Lines = stroke("M4 6h16M4 12h16M4 18h10")
+    /** Change password: a padlock. */
+    val Lock = stroke("M6 11h12v9H6z", "M8 11V8a4 4 0 0 1 8 0v3")
+    /** Sign out: an arrow leaving a door. */
+    val SignOut = stroke("M15 4h4v16h-4", "M10 8l-4 4 4 4M6 12h10")
+
     /** The Cast glyph: a screen with waves from its corner. */
     val Cast = stroke("M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6", "M2 12a9 9 0 0 1 8 8", "M2 16a5 5 0 0 1 4 4", "M2 20h.01")
 

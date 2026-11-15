@@ -1,96 +1,122 @@
 package media.watchmy.client.mobile.settings
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import media.watchmy.client.mobile.components.GoldTextButton
 import media.watchmy.client.mobile.components.ListRow
 import media.watchmy.client.mobile.components.RowValue
-import media.watchmy.client.mobile.downloads.DangerText
 import media.watchmy.client.mobile.downloads.usedSize
 import media.watchmy.client.model.DownloadQuality
 import media.watchmy.client.model.freeSize
+import media.watchmy.client.model.onThisDevice
 import media.watchmy.client.model.plural
 import media.watchmy.client.presentation.downloads.DownloadsViewModel
-import media.watchmy.client.presentation.value
 import media.watchmy.client.ui.Inter
+import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
+/** The downloads' model, shared by the overview, Downloads and the sign-out dialog. */
+@Composable
+internal fun downloadsModel(): DownloadsViewModel {
+    val services = LocalAppServices.current
+    return viewModel { DownloadsViewModel(services.downloads) }
+}
+
+/** "7 downloads, 66.1 GB." for a dialog's Deleted line. */
+internal fun downloadsHeld(downloads: DownloadsViewModel.State): String = "${plural(downloads.all.size, "download")}, ${usedSize(downloads.usedBytes)}."
+
 /**
- * Settings › Downloads (SettingsDownloads.dc.html): the quality new downloads
- * are made at, Wi-Fi only, the space they take (to Downloads), and Remove
- * all downloads.
+ * Settings › Downloads (PLAN-ANDROID-SETTINGS.md §5.4, SettingsDownloadsPage):
+ * the state in a line, the quality new downloads are made at, Wi-Fi only,
+ * the space they take (to Downloads), and Remove all downloads apart at the
+ * bottom, which asks first.
  */
 @Composable
-internal fun DownloadSettings(
-    downloads: DownloadsViewModel.State,
-    device: String,
-    onQuality: () -> Unit,
-    onWifiOnly: (Boolean) -> Unit,
-    onSpace: () -> Unit,
-    onRemoveAll: () -> Unit,
-) = Column {
-    Section("Downloads")
-    ListRow(
-        "Quality",
-        subtitle = "For new downloads; each can pick another",
-        modifier = Modifier.clickable(onClick = onQuality),
-        trailing = { RowValue(downloads.settings.quality.short) },
-    )
-    val wifiOnly = downloads.settings.wifiOnly
-    ListRow(
-        "Wi-Fi only",
-        subtitle = if (wifiOnly) "Downloads wait for Wi-Fi" else "Downloads use mobile data too",
-        modifier = Modifier.toggleable(value = wifiOnly, role = Role.Switch, onValueChange = onWifiOnly),
-        trailing = { Switch(checked = wifiOnly, onCheckedChange = null, colors = SwitchColors) },
-    )
+internal fun DownloadsPage(tablet: Boolean, onSpace: () -> Unit, modifier: Modifier = Modifier) {
+    val vm = downloadsModel()
+    val downloads by vm.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { vm.refreshStorage() }
+    val device = deviceWord()
+    var dialog by rememberSaveable { mutableStateOf<String?>(null) }
     val held = downloads.all.size
-    ListRow(
-        "Space used",
-        subtitle = if (held == 0) "${freeSize(downloads.storage.freeBytes)} free on this $device" else "${plural(held, "download")} · ${freeSize(downloads.storage.freeBytes)} free",
-        modifier = Modifier.clickable(onClick = onSpace),
-        trailing = { RowValue(usedSize(downloads.usedBytes)) },
-    )
-    if (held > 0) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClick = onRemoveAll).padding(horizontal = 16.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(WmmIcons.Trash, contentDescription = null, tint = DangerText, modifier = Modifier.size(22.dp))
-            Text("Remove all downloads", style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 16.sp, color = DangerText))
+    val free = freeSize(downloads.storage.freeBytes)
+
+    Column(modifier) {
+        Text(
+            if (held > 0) "${plural(held, "download")} · ${usedSize(downloads.usedBytes)} used · $free free on this $device"
+            else "Nothing downloaded yet. Download a movie or an episode from its page to watch it without a connection.",
+            style = LedeStyle,
+            modifier = Modifier.padding(horizontal = if (tablet) 4.dp else 16.dp).padding(top = 4.dp, bottom = 2.dp),
+        )
+        PageHeading(onThisDevice(device), tablet, Modifier.padding(top = 0.dp))
+        SettingsRows(tablet) {
+            ListRow(
+                "Quality",
+                subtitle = "For new downloads; each can pick another",
+                modifier = Modifier.clickable { dialog = DIALOG_QUALITY },
+                trailing = { RowValue(downloads.settings.quality.short) },
+            )
+            val wifiOnly = downloads.settings.wifiOnly
+            ListRow(
+                "Wi-Fi only",
+                subtitle = if (wifiOnly) "Downloads wait for Wi-Fi" else "Downloads use mobile data too",
+                modifier = Modifier.toggleable(value = wifiOnly, role = Role.Switch, onValueChange = vm::setWifiOnly),
+                trailing = { Switch(checked = wifiOnly, onCheckedChange = null, colors = SettingSwitchColors) },
+            )
+            ListRow(
+                "Space used",
+                subtitle = if (held == 0) "$free free on this $device" else "${plural(held, "download")} · $free free",
+                modifier = Modifier.clickable(onClick = onSpace),
+                trailing = { RowValue(usedSize(downloads.usedBytes)) },
+            )
         }
+        if (held > 0) {
+            Rule(Modifier.padding(top = 4.dp))
+            DangerRow("Remove all downloads…", WmmIcons.Trash, onClick = { dialog = DIALOG_REMOVE_ALL })
+        }
+        FootNote("Downloads belong to your account on this $device. Signing out deletes them.", Modifier.padding(top = 6.dp), tablet = tablet)
+    }
+
+    when (dialog) {
+        DIALOG_QUALITY -> DownloadQualityDialog(downloads.settings.quality, device, onDismiss = { dialog = null }) {
+            vm.setQuality(it)
+            dialog = null
+        }
+        DIALOG_REMOVE_ALL -> RemoveAllDialog(downloads, device, onRemove = vm::removeAll, onClose = { dialog = null })
     }
 }
 
@@ -130,24 +156,42 @@ internal fun DownloadQualityDialog(current: DownloadQuality, device: String, onD
     )
 }
 
-/** Remove all downloads? (SettingsDownloads.dc.html, dialog removeAll). */
+/**
+ * Remove all downloads? (§4.6, SettingsConfirm's removeDownloads): what is
+ * deleted and what stays. Removing works on the files one by one; when some
+ * are still here a few seconds later it says how many went, and tries again.
+ */
 @Composable
-internal fun RemoveAllDialog(downloads: DownloadsViewModel.State, device: String, onDismiss: () -> Unit, onRemove: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = WmmColors.Surface2,
-        title = { Text("Remove all downloads?") },
-        text = {
-            Text(
-                "${plural(downloads.all.size, "download")}, ${usedSize(downloads.usedBytes)}, are deleted from this $device. You can download them again.",
-                style = TextStyle(fontFamily = Inter, fontSize = 14.sp, lineHeight = 21.sp, color = WmmColors.TextSoft),
-            )
+private fun RemoveAllDialog(downloads: DownloadsViewModel.State, device: String, onRemove: () -> Unit, onClose: () -> Unit) {
+    val count by rememberUpdatedState(downloads.all.size)
+    // How many there were when Remove all was pressed, while it works; then how many are left.
+    var removing by remember { mutableStateOf<Int?>(null) }
+    var stopped by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    LaunchedEffect(removing) {
+        val total = removing ?: return@LaunchedEffect
+        val gone = withTimeoutOrNull(REMOVE_WAIT_MS) { snapshotFlow { count }.first { it == 0 } } != null
+        removing = null
+        if (gone) onClose() else stopped = (total - count) to total
+    }
+    ConfirmDialog(
+        title = "Remove all downloads?",
+        lines = listOf(
+            ConfirmLine(downloadsHeld(downloads), label = "Deleted from this $device"),
+            ConfirmLine("What you’ve watched, and everything in your library. You can download them again.", label = "Stays"),
+        ),
+        keep = "Keep downloads",
+        go = "Remove all",
+        working = "Removing…",
+        busy = removing != null,
+        failure = stopped?.let { (done, total) -> ConfirmFailure("Couldn’t remove all of them", "$done of $total were removed. Try again to remove the rest.") },
+        onKeep = onClose,
+        onGo = {
+            removing = count
+            onRemove()
         },
-        confirmButton = {
-            Button(onClick = onRemove, shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB42318), contentColor = Color.White)) {
-                Text("Remove all", style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp))
-            }
-        },
-        dismissButton = { GoldTextButton("Cancel", onDismiss, color = WmmColors.TextSoft) },
     )
 }
+
+private const val REMOVE_WAIT_MS = 5_000L
+private const val DIALOG_QUALITY = "download-quality"
+private const val DIALOG_REMOVE_ALL = "remove-all"

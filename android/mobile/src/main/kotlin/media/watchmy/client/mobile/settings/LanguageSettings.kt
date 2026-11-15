@@ -47,37 +47,44 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.util.Locale
 import media.watchmy.client.mobile.components.GoldTextButton
 import media.watchmy.client.mobile.components.ListRow
 import media.watchmy.client.mobile.components.RowValue
-import media.watchmy.client.mobile.components.SectionLabel
 import media.watchmy.client.mobile.components.TonalButton
+import media.watchmy.client.model.ON_EVERY_DEVICE
+import media.watchmy.client.model.SaveFailure
 import media.watchmy.client.model.SubtitleChoice
+import media.watchmy.client.model.listLine
 import media.watchmy.client.model.subtitleLanguageLabel
 import media.watchmy.client.model.subtitleLanguageOptions
+import media.watchmy.client.presentation.settings.SettingKey
 import media.watchmy.client.presentation.settings.SettingsViewModel
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.presentation.settings.LanguageList
 
-/** Which list a language dialog adds to or edits. */
-
 private val Heading = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = WmmColors.Text)
 private val Description = TextStyle(fontFamily = Inter, fontSize = 13.sp, lineHeight = 19.sp, color = WmmColors.TextMuted)
 private val Foot = TextStyle(fontFamily = Inter, fontSize = 12.sp, lineHeight = 18.sp, color = WmmColors.TextFaint)
 
 /**
- * Settings › Audio & subtitles (PLAN-LANGUAGES.md §5.6): the audio languages,
- * how subtitles start, the subtitle languages and automatic download, each
- * saved as it changes. The phone stacks them and opens the four choices in a
- * dialog (android/SettingsLanguages.dc.html); a tablet sets them two by two
- * in panels and lists the choices in place (android-tablet/TabSettingsLanguages.dc.html).
- * A server before audio languages gets the subtitle sections alone.
+ * Settings › Audio & subtitles (PLAN-LANGUAGES.md §5.6; its own page in
+ * PLAN-ANDROID-SETTINGS.md §5.2): the audio languages, how subtitles start,
+ * the subtitle languages and automatic download, each saved as it changes,
+ * with Saving… and a failure on the part that changed. The phone stacks
+ * them and opens the four choices in a dialog (android/SettingsLanguages.dc.html);
+ * a tablet sets them two by two in panels and lists the choices in place
+ * (android-tablet/TabSettingsLanguages.dc.html). A server before audio
+ * languages gets the subtitle sections alone. They follow the account, so
+ * they are held until its settings have loaded.
  */
 @Composable
-internal fun LanguageSettings(state: SettingsViewModel.State, vm: SettingsViewModel, tablet: Boolean, modifier: Modifier = Modifier) {
+internal fun LanguageSettings(tablet: Boolean, online: Boolean, modifier: Modifier = Modifier) {
+    val vm = settingsModel()
+    val state by vm.state.collectAsStateWithLifecycle()
     if (!state.subtitlePreferencesAvailable) return
     var adding by rememberSaveable { mutableStateOf<LanguageList?>(null) }
     var editing by rememberSaveable { mutableStateOf<Pair<LanguageList, String>?>(null) }
@@ -85,36 +92,40 @@ internal fun LanguageSettings(state: SettingsViewModel.State, vm: SettingsViewMo
     val displayLocale = LocalConfiguration.current.locales[0]
     val device = if (LocalConfiguration.current.smallestScreenWidthDp >= 600) "tablet" else "phone"
     val audio = state.audioLanguagesAvailable
+    val ready = state.accountReady
+    val save = { key: SettingKey -> SaveLine(key in state.saving, state.failed[key]) }
 
     val audioSection: @Composable ColumnScope.() -> Unit = {
-        AudioLanguages(state.playback.audio.languages, displayLocale, device, tablet, onAdd = { adding = LanguageList.Audio }, onOptions = { editing = LanguageList.Audio to it }, onUse = vm::addAudioLanguage)
+        AudioLanguages(state.playback.audio.languages, displayLocale, device, tablet, ready, save(SettingKey.AudioLanguages), onRetry = { vm.retry(SettingKey.AudioLanguages) }, onAdd = { adding = LanguageList.Audio }, onOptions = { editing = LanguageList.Audio to it }, onUse = vm::addAudioLanguage)
         if (state.showForeignAudioNotice) ForeignAudioNotice(tablet)
     }
     val startSection: @Composable ColumnScope.() -> Unit = {
-        StartSubtitles(state.playback.subtitles.choice, state.subtitleChoices, tablet, onOpen = { choosing = true }, onPick = vm::setSubtitleChoice)
+        StartSubtitles(state.playback.subtitles.choice, state.subtitleChoices, tablet, ready, save(SettingKey.SubtitleChoice), onRetry = { vm.retry(SettingKey.SubtitleChoice) }, onOpen = { choosing = true }, onPick = vm::setSubtitleChoice)
     }
     val subtitleSection: @Composable ColumnScope.() -> Unit = {
-        SubtitleLanguages(state, displayLocale, tablet, onAdd = { adding = LanguageList.Subtitles }, onOptions = { editing = LanguageList.Subtitles to it }, onUse = vm::addSubtitleLanguage)
+        SubtitleLanguages(state, displayLocale, tablet, ready, save(SettingKey.SubtitleLanguages), onRetry = { vm.retry(SettingKey.SubtitleLanguages) }, onAdd = { adding = LanguageList.Subtitles }, onOptions = { editing = LanguageList.Subtitles to it }, onUse = vm::addSubtitleLanguage)
     }
     val onlineSection: @Composable ColumnScope.() -> Unit = {
-        OnlineSubtitles(state, tablet, vm::setAutomaticSubtitles)
+        OnlineSubtitles(state, tablet, ready, save(SettingKey.AutomaticSubtitles), onRetry = { vm.retry(SettingKey.AutomaticSubtitles) }, vm::setAutomaticSubtitles)
     }
 
     Column(modifier) {
-        SectionLabel(state.languagesTitle, Modifier.padding(top = 16.dp, bottom = 4.dp))
-        Text("Your settings follow your account on this server.", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = Description)
-        if (tablet) {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                PanelRow(if (audio) audioSection else startSection, if (audio) startSection else onlineSection)
-                PanelRow(subtitleSection, if (audio) onlineSection else null)
+        AccountLoadCard(state, online, tablet, onRetry = vm::reloadAccount, held = "your audio and subtitle settings can’t be changed yet.")
+        PageHeading(ON_EVERY_DEVICE, tablet)
+        AccountRows(ready) {
+            if (tablet) {
+                Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    PanelRow(if (audio) audioSection else startSection, if (audio) startSection else onlineSection)
+                    PanelRow(subtitleSection, if (audio) onlineSection else null)
+                }
+            } else {
+                if (audio) Column(content = audioSection)
+                Column(content = startSection)
+                Column(content = subtitleSection)
+                Column(content = onlineSection)
             }
-        } else {
-            if (audio) Column(content = audioSection)
-            Column(content = startSection)
-            Column(content = subtitleSection)
-            Column(content = onlineSection)
         }
-        if (state.subtitleSaving) Text("Saving…", Modifier.padding(16.dp), color = WmmColors.TextMuted)
+        SettingKey.LANGUAGES.forEach { SavedAnnouncement(state, it) }
     }
 
     adding?.let { list ->
@@ -151,6 +162,21 @@ internal fun LanguageSettings(state: SettingsViewModel.State, vm: SettingsViewMo
     })
 }
 
+/** A part's save state: Saving… while it goes, and its failure until tried again. */
+private data class SaveLine(val saving: Boolean, val failure: SaveFailure?)
+
+/** Saving… under a part's heading while it goes. */
+@Composable
+private fun Saving(line: SaveLine, tablet: Boolean) {
+    if (line.saving) SavingLine(Modifier.padding(start = if (tablet) 0.dp else 16.dp, bottom = 6.dp))
+}
+
+/** A list's failure: the list is back as it was. */
+@Composable
+private fun ListFailure(line: SaveLine, list: LanguageList, onRetry: () -> Unit) {
+    line.failure?.let { FailureLine(it.listLine(list.title), onRetry) }
+}
+
 /** Two sections side by side on a tablet, tops aligned; the second may be empty. */
 @Composable
 private fun PanelRow(start: @Composable ColumnScope.() -> Unit, end: (@Composable ColumnScope.() -> Unit)?) {
@@ -183,15 +209,15 @@ private fun Footnote(text: String, tablet: Boolean, color: Color = WmmColors.Tex
 }
 
 @Composable
-private fun ColumnScope.LanguageRows(languages: List<String>, displayLocale: Locale, tablet: Boolean, onOptions: (String) -> Unit) {
+private fun ColumnScope.LanguageRows(languages: List<String>, displayLocale: Locale, tablet: Boolean, enabled: Boolean, onOptions: (String) -> Unit) {
     languages.forEachIndexed { index, tag ->
-        ListRow("${index + 1}. ${subtitleLanguageLabel(tag, displayLocale)}", minHeight = if (tablet) 48.dp else 56.dp, modifier = Modifier.clickable(onClickLabel = "Options") { onOptions(tag) }, trailing = { RowValue("Options") })
+        ListRow("${index + 1}. ${subtitleLanguageLabel(tag, displayLocale)}", minHeight = if (tablet) 48.dp else 56.dp, modifier = Modifier.clickable(enabled = enabled, onClickLabel = "Options") { onOptions(tag) }, trailing = { RowValue("Options") })
     }
 }
 
 @Composable
-private fun AddLanguageRow(tablet: Boolean, onAdd: () -> Unit) {
-    ListRow("Add language", minHeight = if (tablet) 48.dp else 56.dp, modifier = Modifier.clickable(onClick = onAdd), trailing = { RowValue("", icon = WmmIcons.Plus) })
+private fun AddLanguageRow(tablet: Boolean, enabled: Boolean, onAdd: () -> Unit) {
+    ListRow("Add language", minHeight = if (tablet) 48.dp else 56.dp, modifier = Modifier.clickable(enabled = enabled, onClick = onAdd), trailing = { RowValue("", icon = WmmIcons.Plus) })
 }
 
 @Composable
@@ -200,13 +226,17 @@ private fun ColumnScope.AudioLanguages(
     displayLocale: Locale,
     device: String,
     tablet: Boolean,
+    enabled: Boolean,
+    save: SaveLine,
+    onRetry: () -> Unit,
     onAdd: () -> Unit,
     onOptions: (String) -> Unit,
     onUse: (String) -> Unit,
 ) {
     Head("Audio languages", "Videos start in the first of these languages they have. If they have none, they play the file’s default.", tablet, top = true)
+    Saving(save, tablet)
     Rows(tablet) {
-        LanguageRows(languages, displayLocale, tablet, onOptions)
+        LanguageRows(languages, displayLocale, tablet, enabled, onOptions)
         if (languages.isEmpty()) {
             Text("No audio language yet. Videos play the file’s default audio.", style = Description.copy(fontSize = 14.sp, color = WmmColors.TextSoft), modifier = Modifier.padding(horizontal = if (tablet) 12.dp else 16.dp, vertical = 6.dp))
             // Speech has no script or region to choose: the device's language alone.
@@ -215,12 +245,13 @@ private fun ColumnScope.AudioLanguages(
                 val name = subtitleLanguageLabel(suggested, displayLocale)
                 Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = if (tablet) 12.dp else 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Your $device uses $name.", style = Description, modifier = Modifier.weight(1f))
-                    TonalButton("Use $name", { onUse(suggested) }, compact = true)
+                    TonalButton("Use $name", { onUse(suggested) }, compact = true, enabled = enabled)
                 }
             }
         }
-        AddLanguageRow(tablet, onAdd)
+        AddLanguageRow(tablet, enabled, onAdd)
     }
+    ListFailure(save, LanguageList.Audio, onRetry)
     Footnote("Commentary and audio description are never chosen for you. You can pick them in the player.", tablet)
 }
 
@@ -244,31 +275,47 @@ private fun ForeignAudioNotice(tablet: Boolean) {
 }
 
 @Composable
-private fun ColumnScope.StartSubtitles(current: SubtitleChoice, choices: List<SubtitleChoice>, tablet: Boolean, onOpen: () -> Unit, onPick: (SubtitleChoice) -> Unit) {
+private fun ColumnScope.StartSubtitles(
+    current: SubtitleChoice,
+    choices: List<SubtitleChoice>,
+    tablet: Boolean,
+    enabled: Boolean,
+    save: SaveLine,
+    onRetry: () -> Unit,
+    onOpen: () -> Unit,
+    onPick: (SubtitleChoice) -> Unit,
+) {
     if (tablet) {
         Head("Start subtitles", "When a video starts", tablet)
+        Saving(save, tablet)
         Rows(tablet) {
             Column(Modifier.selectableGroup()) {
-                choices.forEach { c -> ChoiceRow(c, c == current, inPanel = true) { onPick(c) } }
+                choices.forEach { c -> ChoiceRow(c, c == current, inPanel = true, enabled = enabled) { onPick(c) } }
             }
         }
     } else {
         Head("Start subtitles", null, tablet)
-        ListRow("When a video starts", modifier = Modifier.clickable(onClick = onOpen), trailing = { RowValue(current.shortLabel) })
+        ListRow(
+            "When a video starts",
+            below = if (save.saving) ({ SavingLine() }) else null,
+            modifier = Modifier.clickable(enabled = enabled, onClick = onOpen),
+            trailing = { RowValue(current.shortLabel) },
+        )
         Text(current.detail, style = Description, modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp))
     }
+    RowFailure(save.failure, current.shortLabel, onRetry)
     Footnote("A track you choose in the player always wins.", tablet)
 }
 
 /** One of the four ways subtitles start, with its line; a tablet tints the chosen one. */
 @Composable
-private fun ChoiceRow(choice: SubtitleChoice, selected: Boolean, inPanel: Boolean, onClick: () -> Unit) {
+private fun ChoiceRow(choice: SubtitleChoice, selected: Boolean, inPanel: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(if (inPanel && selected) WmmColors.Accent.copy(alpha = 0.10f) else Color.Transparent)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
             .heightIn(min = 48.dp)
             .padding(horizontal = if (inPanel) 4.dp else 0.dp, vertical = 4.dp),
         verticalAlignment = Alignment.Top,
@@ -286,27 +333,32 @@ private fun ColumnScope.SubtitleLanguages(
     state: SettingsViewModel.State,
     displayLocale: Locale,
     tablet: Boolean,
+    enabled: Boolean,
+    save: SaveLine,
+    onRetry: () -> Unit,
     onAdd: () -> Unit,
     onOptions: (String) -> Unit,
     onUse: (String) -> Unit,
 ) {
     val languages = state.playback.subtitles.languages
     Head("Subtitle languages", "Use the first of these languages that has a subtitle.", tablet)
+    Saving(save, tablet)
     if (state.subtitlesFollowAudio && state.audioLanguagesAvailable) {
         Text("Until you add one, subtitles use your audio languages.", style = Description, modifier = Modifier.padding(horizontal = if (tablet) 0.dp else 16.dp).padding(bottom = 10.dp))
     }
     Rows(tablet) {
-        LanguageRows(languages, displayLocale, tablet, onOptions)
+        LanguageRows(languages, displayLocale, tablet, enabled, onOptions)
         if (languages.isEmpty()) {
             val tag = displayLocale.toLanguageTag()
-            if (tag != "und") ListRow("Use device language", minHeight = if (tablet) 48.dp else 56.dp, modifier = Modifier.clickable { onUse(tag) }, trailing = { RowValue(subtitleLanguageLabel(tag, displayLocale)) })
+            if (tag != "und") ListRow("Use device language", minHeight = if (tablet) 48.dp else 56.dp, modifier = Modifier.clickable(enabled = enabled) { onUse(tag) }, trailing = { RowValue(subtitleLanguageLabel(tag, displayLocale)) })
         }
-        AddLanguageRow(tablet, onAdd)
+        AddLanguageRow(tablet, enabled, onAdd)
     }
+    ListFailure(save, LanguageList.Subtitles, onRetry)
 }
 
 @Composable
-private fun ColumnScope.OnlineSubtitles(state: SettingsViewModel.State, tablet: Boolean, onChange: (Boolean) -> Unit) {
+private fun ColumnScope.OnlineSubtitles(state: SettingsViewModel.State, tablet: Boolean, enabled: Boolean, save: SaveLine, onRetry: () -> Unit, onChange: (Boolean) -> Unit) {
     val prefs = state.playback.subtitles
     val available = prefs.automaticAvailable
     val on = available && prefs.automaticDownload
@@ -314,7 +366,8 @@ private fun ColumnScope.OnlineSubtitles(state: SettingsViewModel.State, tablet: 
     Rows(tablet) {
         ListRow(
             "Automatic download",
-            modifier = Modifier.toggleable(on, enabled = available, role = Role.Switch, onValueChange = onChange),
+            below = if (save.saving) ({ SavingLine() }) else null,
+            modifier = Modifier.toggleable(on, enabled = available && enabled, role = Role.Switch, onValueChange = onChange),
             trailing = {
                 Switch(
                     on, onCheckedChange = null, enabled = available,
@@ -325,6 +378,7 @@ private fun ColumnScope.OnlineSubtitles(state: SettingsViewModel.State, tablet: 
                 )
             },
         )
+        RowFailure(save.failure, if (on) "on" else "off", onRetry)
     }
     Footnote("When subtitles would start and no local track matches, try one exact-file match from OpenSubtitles.com after the video starts. Uses the server’s download allowance.", tablet)
     if (!available) Footnote(state.automaticBlockedNote, tablet, color = WmmColors.TextSoft)
