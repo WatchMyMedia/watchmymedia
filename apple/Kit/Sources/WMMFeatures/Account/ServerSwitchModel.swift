@@ -33,10 +33,15 @@ public final class ServerSwitchModel {
         var valid = true
     }
 
-    public init?(servers: any ServerRepository, auth: any AuthRepository) {
+    /// Sign in starts on the pairing code, as Apple TV's does.
+    public let pairsByDefault: Bool
+
+    /// - Parameter pairsByDefault: Sign in starts on the pairing code (Apple TV), with the password as the other way.
+    public init?(servers: any ServerRepository, auth: any AuthRepository, pairsByDefault: Bool = false) {
         guard let original = servers.current, original.signedIn, let user = auth.user else { return nil }
         self.servers = servers
         self.auth = auth
+        self.pairsByDefault = pairsByDefault
         originalServer = original.server
         originalUser = user
         let permission = SelectionPermission()
@@ -74,7 +79,7 @@ public final class ServerSwitchModel {
         }
         target = current
         phase = .signingIn
-        signIn = SignInModel(servers: servers, auth: auth)
+        signIn = SignInModel(servers: servers, auth: auth, pairsByDefault: pairsByDefault)
         accountChanged()
         if outcome == .switched { skippedSignIn = true }
     }
@@ -130,7 +135,7 @@ public final class ServerSwitchModel {
         } catch {
             self.error = "Couldn't return to \(originalServer.name). \(error.displayMessage)"
             phase = .signingIn
-            signIn = SignInModel(servers: servers, auth: auth)
+            signIn = SignInModel(servers: servers, auth: auth, pairsByDefault: pairsByDefault)
             accountChanged()
         }
     }

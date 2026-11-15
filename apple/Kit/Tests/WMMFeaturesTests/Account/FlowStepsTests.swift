@@ -248,3 +248,65 @@ import WMMModel
         #expect(!model.tooManyCodes)
     }
 }
+
+/// Switch server's Sign in by a code from a signed-in device
+/// (Settings2SwitchSignIn.dc.html), and Apple TV's starting on the code.
+@MainActor
+@Suite struct SwitchServerCodeSignInTests {
+    init() { FakeLatency.duration = .zero }
+
+    @Test func aPhoneCanSignInByACodeInstead() async throws {
+        let services = AppServices.fake(client: .fakePhone)
+        let auth = try #require(services.auth as? FakeAuthRepository)
+        auth.pairingApproval = .zero
+        let model = try #require(ServerSwitchModel(servers: services.servers, auth: services.auth))
+        #expect(!model.pairsByDefault)
+        model.picker.address = FakeServers.officeMini.baseURL.absoluteString
+        await model.connectToAddress()
+        let form = try #require(model.signIn)
+        #expect(!form.codeSignIn, "the password form first")
+        #expect(model.otherWayTitle == "Use a code from a signed-in device instead")
+
+        let run = form.pairingRun
+        model.useCode()
+        #expect(form.codeSignIn)
+        #expect(form.pairingRun == run + 1, "a fresh code")
+        #expect(model.otherWayTitle == "Sign in with a password instead")
+        #expect(model.codeLede == "On a phone or computer signed in to Office Mac mini, open Link a TV and enter this code. You’re still on Living room server until it’s approved.")
+        #expect(model.signInOffReason == nil, "a code needs no name or password")
+
+        model.usePassword()
+        #expect(!form.codeSignIn)
+        model.useCode()
+        await form.pair()
+        model.accountChanged()
+        #expect(model.outcome == .switched)
+        #expect(!model.skippedSignIn)
+        #expect(model.finished(device: "iPhone")?.title == "You’re on Office Mac mini")
+    }
+
+    @Test func appleTVStartsOnTheCode() async throws {
+        let services = AppServices.fake(client: .fakeAppleTV)
+        let model = try #require(ServerSwitchModel(servers: services.servers, auth: services.auth, pairsByDefault: true))
+        #expect(model.pairsByDefault)
+        model.picker.address = FakeServers.officeMini.baseURL.absoluteString
+        await model.connectToAddress()
+        let form = try #require(model.signIn)
+        #expect(form.pairsByDefault && form.codeSignIn)
+        #expect(model.otherWayTitle == "Sign in with a password instead")
+        model.usePassword()
+        #expect(!form.codeSignIn)
+        model.useCode()
+        #expect(form.codeSignIn)
+    }
+
+    @Test func firstRunSignInOnAPhoneCanUseACodeToo() async {
+        let servers = FakeServerRepository(signedIn: false)
+        let model = SignInModel(servers: servers, auth: FakeAuthRepository(signedIn: false, servers: servers))
+        #expect(!model.codeSignIn && !model.usingCode)
+        model.usePairingCode()
+        #expect(model.codeSignIn && model.usingCode)
+        model.usePassword()
+        #expect(!model.codeSignIn && !model.usingCode)
+    }
+}

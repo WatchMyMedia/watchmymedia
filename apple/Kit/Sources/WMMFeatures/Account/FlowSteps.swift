@@ -261,6 +261,28 @@ extension ServerSwitchModel {
     /// Back from Sign in, to the list.
     public static let backToServersTitle = "Servers"
     public static let useCodeTitle = "Use a code from a signed-in device instead"
+    public static let usePasswordTitle = "Sign in with a password instead"
+
+    /// "Use a code from a signed-in device instead": Sign in shows a pairing
+    /// code to approve on a device signed in there; the screen runs the
+    /// sign-in's ``SignInModel/pair()`` keyed on its ``SignInModel/pairingRun``.
+    public func useCode() { signIn?.usePairingCode() }
+
+    /// "Sign in with a password instead", back to the form, where the server allows passwords.
+    public func usePassword() { signIn?.usePassword() }
+
+    /// The link to the other way in: the code under the form, the form under the code; nil when there is none.
+    public var otherWayTitle: String? {
+        guard let signIn, !signIn.setupRequired else { return nil }
+        if !signIn.codeSignIn { return Self.useCodeTitle }
+        return signIn.passwordAllowed ? Self.usePasswordTitle : nil
+    }
+
+    /// Under the code: "On a phone or computer signed in to Den server, open
+    /// Link a TV and enter this code. You’re still on Living room server until it’s approved."
+    public var codeLede: String {
+        "On a phone or computer signed in to \(signingInTo?.name ?? "that server"), open Link a TV and enter this code. You’re still on \(originalServer.name) until it’s approved."
+    }
     /// Apple TV's path over the steps.
     public static let tvPath = "Settings › Server › Switch server"
 
