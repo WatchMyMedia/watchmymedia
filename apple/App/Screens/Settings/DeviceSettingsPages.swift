@@ -5,25 +5,32 @@ import WMMUI
 
 /// Settings › Account & devices (Settings2Account.dc.html,
 /// Pad2Settings2Account.dc.html; PLAN-APPLE-SETTINGS.md §5.4): the web's tab.
-/// This device's name opens Rename; then Signed-in devices, Link a TV, and
+/// This device's name opens Rename; Change password; Signed-in devices, which
+/// says under the list what became of a device signed out; Link a TV; and
 /// Sign out of this iPhone as a red row apart at the bottom. Every sign-out
-/// asks first, in a dialog from the button that asked (a popover on iPad),
-/// naming the device and, in Everyone's devices, whose it is. Wide (an
-/// iPad), Signed-in devices stands beside the rest.
+/// asks first, in a dialog from the button that asked, naming the device
+/// and, in Everyone's devices, whose it is. Wide (an iPad), Signed-in
+/// devices stands beside the rest. The words and rules are the Kit's
+/// (`AccountDevices.swift`, `ChangePasswordModel`).
 struct AccountSettingsPage: View {
     let model: SettingsModel
     @Environment(AppServices.self) private var services
     @Environment(AppFlow.self) private var flow
     @Environment(Navigator.self) private var navigator
     @State private var confirmingSignOut = false
-    /// What became of the last device signed out here, for the line under the list.
-    @State private var outcome: RowLine?
 
     var body: some View {
-        SettingsScroll(lede: lede) {
+        SettingsScroll(lede: model.accountLede) {
+            // After Change password: what it did, until dismissed.
+            if let banner = model.accountBanner {
+                SettingsBanner(kind: .info, title: banner.title, message: banner.body,
+                               action: (SettingsWords.done, { model.dismissAccountBanner() }))
+                    .accessibilityIdentifier("account-banner")
+            }
             SettingsAdaptive {
                 SettingsColumns {
                     thisDevice
+                    password
                     linkTV
                     signOut.padding(.top, 10)
                 } right: {
@@ -31,46 +38,50 @@ struct AccountSettingsPage: View {
                 }
             } narrow: {
                 thisDevice
+                password
                 devices
                 linkTV
                 signOut.padding(.top, 10)
             }
         }
-        .navigationTitle("Account & devices")
+        .navigationTitle(SettingsWords.accountAndDevices)
         .refreshable { await model.loadSessions() }
         .task { await model.loadSessions() }
-        .announces(outcome?.text)
-        .sheet(isPresented: Binding(get: { flow.renaming }, set: { flow.renaming = $0 })) {
-            RenameSheet(model: model)
+        .sheet(isPresented: Binding(get: { flow.rename != nil }, set: { if !$0 { flow.rename = nil } })) {
+            if let task = flow.rename { RenameSheet(model: model, task: task) }
         }
-    }
-
-    /// "Sam, an admin on Living room server. 3 devices are signed in."
-    private var lede: String {
-        var who = model.user.map { $0.isAdmin ? "\($0.name), an admin" : $0.name } ?? "Not signed in"
-        if let server = model.server { who += " on \(server.name)" }
-        guard let count = mine?.count else { return who + "." }
-        return "\(who). " + (count <= 1 ? "Only this \(model.facts.family) is signed in." : "\(count) devices are signed in.")
-    }
-
-    /// This account's own sessions, once loaded.
-    private var mine: [DeviceSession]? {
-        model.sessions.value.map { list in list.filter { model.everyone ? $0.userName == model.user?.name : true } }
+        .sheet(isPresented: Binding(get: { flow.changePassword != nil }, set: { if !$0 { flow.changePassword = nil } })) {
+            if let task = flow.changePassword { ChangePasswordSheet(task: task) }
+        }
     }
 
     // MARK: This device
 
     private var thisDevice: some View {
-        SettingsSection(title: "This \(model.facts.family)") {
-            Button { flow.renameDraft = model.deviceName; flow.renaming = true } label: {
-                LinkRowLabel(title: "Name", value: model.deviceName)
+        SettingsSection(title: SettingsWords.thisDevice(model.facts.family)) {
+            Button { flow.rename = model.renameTask() } label: {
+                LinkRowLabel(title: SettingsWords.name, value: model.deviceName)
             }
             .buttonStyle(SettingsRowStyle())
-            .accessibilityLabel("Name, \(model.deviceName)")
-            .accessibilityHint("Renames this \(model.facts.family)")
+            .accessibilityLabel("\(SettingsWords.name), \(model.deviceName)")
+            .accessibilityHint(SettingsWords.renameTitle(device: model.facts.family))
             .accessibilityIdentifier("account-rename")
         } note: {
-            SectionNote("\(model.facts.model) · \(model.facts.system) · WatchMyMedia \(model.facts.appVersionLabel). The name shows in Signed-in devices and in the server’s Activity.")
+            SectionNote(model.thisDeviceLine)
+        }
+    }
+
+    // MARK: Password
+
+    private var password: some View {
+        SettingsSection(title: SettingsWords.password) {
+            Button { flow.changePassword = model.changePasswordTask() } label: {
+                LinkRowLabel(title: SettingsWords.changePassword)
+            }
+            .buttonStyle(SettingsRowStyle())
+            .accessibilityIdentifier("account-changePassword")
+        } note: {
+            SectionNote(SettingsWords.changePasswordLine)
         }
     }
 
@@ -78,34 +89,35 @@ struct AccountSettingsPage: View {
 
     @ViewBuilder private var devices: some View {
         if model.canSeeEveryone {
-            SettingsSection(title: "Signed-in devices") {
-                SwitchRow(title: "Everyone’s devices", line: .plain("Admins can see and sign out every account"),
+            SettingsSection(title: SettingsWords.signedInDevices) {
+                SwitchRow(title: SettingsWords.everyonesDevices, line: .plain(SettingsWords.everyonesDevicesLine),
                           isOn: model.everyone) { on in Task { await model.setEveryone(on) } }
                     .accessibilityIdentifier("account-everyone")
             }
         }
+        let heading = model.canSeeEveryone ? nil : SettingsWords.signedInDevices
         switch model.sessions {
         case .loading:
-            SettingsSection(title: model.canSeeEveryone ? nil : "Signed-in devices") {
+            SettingsSection(title: heading) {
                 ProgressView().tint(Palette.muted).frame(maxWidth: .infinity, minHeight: 60)
             }
         case .failed(let message):
             SettingsBanner(kind: .problem, title: "Couldn’t load your devices", message: message,
-                           action: ("Try again", { Task { await model.loadSessions() } }))
+                           action: (SettingsWords.tryAgain, { Task { await model.loadSessions() } }))
         case .loaded:
             let groups = model.sessionGroups
             VStack(alignment: .leading, spacing: 18) {
                 ForEach(Array(groups.enumerated()), id: \.element.user) { index, group in
-                    SettingsSection(title: model.everyone ? group.user : (model.canSeeEveryone ? nil : "Signed-in devices")) {
+                    SettingsSection(title: model.everyone ? group.user : heading) {
                         ForEach(group.sessions) { session in
-                            DeviceRow(model: model, session: session, outcome: $outcome)
+                            DeviceRow(model: model, session: session)
                         }
                     } note: {
                         if index == groups.count - 1 { devicesNote }
                     }
                 }
                 if groups.isEmpty {
-                    SettingsSection(title: model.canSeeEveryone ? nil : "Signed-in devices") {
+                    SettingsSection(title: heading) {
                         Text("No devices are signed in.").foregroundStyle(Palette.muted).padding(14)
                     } note: { devicesNote }
                 }
@@ -113,11 +125,17 @@ struct AccountSettingsPage: View {
         }
     }
 
+    /// Under the list: what became of the device last signed out, or why
+    /// Everyone's devices couldn't load.
     @ViewBuilder private var devicesNote: some View {
-        if let error = model.devicesError {
+        if let last = model.lastSignOut {
+            switch last.result {
+            case .signedOut: SectionNote(.saved(last.line))
+            case .alreadyGone: SectionNote(.plain(last.line))
+            case .failed: SectionNote(.failed(last.line))
+            }
+        } else if let error = model.devicesError {
             SectionNote(.failed(error))
-        } else if let outcome {
-            SectionNote(outcome)
         }
     }
 
@@ -126,46 +144,40 @@ struct AccountSettingsPage: View {
     private var linkTV: some View {
         SettingsSection {
             Button { navigator.queueLinkTV(code: nil) } label: {
-                LinkRowLabel(title: "Link a TV", icon: ("tv", .gold))
+                LinkRowLabel(title: SettingsWords.linkATV, icon: ("tv", .gold))
             }
             .buttonStyle(SettingsRowStyle())
             .accessibilityIdentifier("account-linkTV")
         } note: {
-            SectionNote("Sign a TV in as you with the code it shows.")
+            SectionNote(SettingsWords.linkATVLine)
         }
     }
 
     // MARK: Sign out
 
-    private var downloadCount: Int { services.downloads.downloads.count }
-
     private var signOut: some View {
         let downloads = DownloadsModel(downloads: services.downloads, navigator: navigator, device: model.facts.family)
+        let row = model.signOutThisDeviceRow(downloads: downloads.all.count)
+        let words = model.signOutThisDeviceWords(downloads: downloads.all.count, bytes: downloads.usedBytes)
         return SettingsSection {
             Button { confirmingSignOut = true } label: {
                 ZStack(alignment: .trailing) {
-                    DangerRowLabel(title: "Sign out of this \(model.facts.family)")
+                    DangerRowLabel(title: row.title)
                     if model.signingOut { ProgressView().tint(Palette.muted).padding(.trailing, 14) }
                 }
             }
             .buttonStyle(SettingsRowStyle())
             .disabled(model.signingOut)
             .accessibilityIdentifier("account-signOut")
-            // A dialog from the button that asked: an action sheet on iPhone, a popover on iPad.
-            .confirmationDialog(signOutQuestion(serverName: model.server?.name), isPresented: $confirmingSignOut, titleVisibility: .visible) {
-                Button(downloadCount > 0 ? "Sign out and delete \(plural(downloadCount, "download"))" : "Sign out of this \(model.facts.family)", role: .destructive) {
-                    Task { await model.signOut() }
-                }
-                Button("Stay signed in", role: .cancel) {}
+            // A dialog from the button that asked: a popover on iPhone and iPad alike.
+            .confirmationDialog(words.title, isPresented: $confirmingSignOut, titleVisibility: .visible) {
+                Button(words.confirm, role: .destructive) { Task { await model.signOut() } }
+                Button(words.keep, role: .cancel) {}
             } message: {
-                Text(downloadCount > 0
-                     ? "Stays on the server: your account, watch history and settings.\nDeleted from this \(model.facts.family): \(plural(downloadCount, "download")), \(downloads.used).\nTo sign in again you’ll need your password, or a code from a signed-in device."
-                     : "Your account, watch history and settings stay on the server. Nothing is deleted from this \(model.facts.family).\nTo sign in again you’ll need your password, or a code from a signed-in device.")
+                Text(words.message)
             }
         } note: {
-            SectionNote(downloadCount > 0
-                        ? "Deletes this \(model.facts.family)’s \(plural(downloadCount, "download")). Your account, watch history and settings stay on the server."
-                        : "Your account, watch history and settings stay on the server.")
+            SectionNote(row.line)
         }
     }
 }
@@ -175,7 +187,6 @@ struct AccountSettingsPage: View {
 private struct DeviceRow: View {
     let model: SettingsModel
     let session: DeviceSession
-    @Binding var outcome: RowLine?
     @State private var asking = false
 
     var body: some View {
@@ -192,62 +203,48 @@ private struct DeviceRow: View {
             .accessibilityElement(children: .combine)
         } trailing: {
             if session.current {
-                Badge("This \(model.facts.family)", style: .gold)
+                Badge(SettingsWords.thisDevice(model.facts.family), style: .gold)
             } else if model.revoking == session.id {
                 ProgressView().tint(Palette.gold).frame(width: 44, height: 44)
             } else {
-                Button("Sign out") { asking = true }
+                let words = model.signOutWords(for: session)
+                Button(SettingsWords.signOut) { asking = true }
                     .buttonStyle(SmallGhostButtonStyle())
-                    .accessibilityLabel("Sign out \(session.name)")
+                    .accessibilityLabel(SettingsWords.signOutNamed(session.name))
                     .disabled(model.revoking != nil)
                     // The dialog closes before a button's task runs, so the action names its session.
-                    .confirmationDialog("Sign out \(session.name)?", isPresented: $asking, titleVisibility: .visible) { [model, session] in
-                        Button("Sign out \(session.name)", role: .destructive) { Task { await signOut(session, model: model) } }
-                        Button("Keep it signed in", role: .cancel) {}
+                    .confirmationDialog(words.title, isPresented: $asking, titleVisibility: .visible) { [model, session] in
+                        Button(words.confirm, role: .destructive) { Task { await model.revoke(session) } }
+                        Button(words.keep, role: .cancel) {}
                     } message: {
-                        Text(someoneElse
-                             ? "\(session.userName) will need their password or a code to sign in on it again. Anything it is playing stops."
-                             : "It will need a password or a code to sign in again. Anything it is playing stops.")
+                        Text(words.message)
                     }
             }
-        }
-    }
-
-    private var someoneElse: Bool { session.userName != model.user?.name }
-
-    private func signOut(_ session: DeviceSession, model: SettingsModel) async {
-        outcome = nil
-        await model.revoke(session)
-        if model.devicesError == nil {
-            outcome = .saved("\(session.name) was signed out. It needs a password or a code to sign in again.")
         }
     }
 }
 
 /// Rename this iPhone (Settings2Rename.dc.html): a short sheet with Cancel,
-/// the field, and Rename, which is off until there is a new name. Swiping
-/// it away with a new name typed asks first. The draft is ``AppFlow``'s, so
-/// a resized iPad window keeps it.
+/// the field, and Rename, which is off until there is a name and says so.
+/// Swiping it away with a new name typed asks first. Its model is
+/// ``AppFlow``'s, so a resized iPad window keeps what was typed.
 private struct RenameSheet: View {
     let model: SettingsModel
+    @Bindable var task: RenameModel
     @Environment(AppFlow.self) private var flow
     @FocusState private var focused: Bool
     @State private var discarding = false
 
-    private var draft: String { flow.renameDraft }
-    private var trimmed: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var changed: Bool { !trimmed.isEmpty && trimmed != model.deviceName }
-
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Name")
+                Text(SettingsWords.name)
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Palette.muted)
                     .padding(.horizontal, 4)
                     .accessibilityHidden(true)
                 HStack(spacing: 8) {
-                    TextField("Device name", text: Binding(get: { draft }, set: { flow.renameDraft = $0 }))
+                    TextField(SettingsWords.deviceNameLabel, text: $task.name)
                         .font(.body)
                         .foregroundStyle(Palette.text)
                         .textInputAutocapitalization(.words)
@@ -255,10 +252,10 @@ private struct RenameSheet: View {
                         .submitLabel(.done)
                         .focused($focused)
                         .onSubmit(rename)
-                        .accessibilityLabel("Name")
+                        .accessibilityLabel(SettingsWords.name)
                         .accessibilityIdentifier("rename-field")
-                    if !draft.isEmpty {
-                        Button { flow.renameDraft = "" } label: {
+                    if !task.name.isEmpty {
+                        Button { task.name = "" } label: {
                             Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.faint)
                                 .frame(width: 44, height: 44).contentShape(Rectangle())
                         }
@@ -271,9 +268,7 @@ private struct RenameSheet: View {
                 .frame(minHeight: 50)
                 .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(focused ? Palette.gold : Palette.outlineStrong, lineWidth: focused ? 2 : 1))
-                Text(trimmed.isEmpty
-                     ? "Rename is off until there is a name. Cancel keeps \(model.deviceName)."
-                     : "Shown in Signed-in devices and in the server’s Activity, so you can tell your devices apart.")
+                Text(task.offReason ?? SettingsWords.renameHelp)
                     .font(.footnote)
                     .foregroundStyle(Palette.faint)
                     .fixedSize(horizontal: false, vertical: true)
@@ -282,19 +277,19 @@ private struct RenameSheet: View {
             }
             .padding(16)
             .background(Palette.sheet.ignoresSafeArea())
-            .navigationTitle("Rename this \(model.facts.family)")
+            .navigationTitle(task.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { flow.renaming = false }
+                    Button(SettingsWords.cancel) { flow.rename = nil }
                         .keyboardShortcut(.cancelAction)
                         .accessibilityIdentifier("rename-cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Rename", action: rename)
+                    Button(task.buttonTitle, action: rename)
                         .fontWeight(.semibold)
                         .keyboardShortcut(.defaultAction)
-                        .disabled(!changed)
+                        .disabled(!task.canRename)
                         .accessibilityIdentifier("rename-save")
                 }
             }
@@ -302,20 +297,115 @@ private struct RenameSheet: View {
         .presentationDetents([.height(260), .large])
         .presentationSizing(.form)
         .presentationBackground(Palette.sheet)
-        .asksBeforeDismissing(when: changed) { discarding = true }
-        .confirmationDialog("Discard the new name?", isPresented: $discarding, titleVisibility: .visible) {
-            Button("Discard", role: .destructive) { flow.renaming = false }
-            Button("Keep editing", role: .cancel) {}
-        } message: {
-            Text("This \(model.facts.family) stays \(model.deviceName).")
-        }
+        .asksBeforeDismissing(when: task.hasChanges) { discarding = true }
+        .discardDialog(task.discardQuestion, isPresented: $discarding) { flow.rename = nil }
         .onAppear { focused = true }
     }
 
     private func rename() {
-        guard changed else { return }
-        let name = trimmed
-        flow.renaming = false
-        Task { await model.rename(name) }
+        let task = task
+        Task { if await model.rename(task) { flow.rename = nil } }
+    }
+}
+
+/// Change password (Settings2Password.dc.html; Decision 9): the system's
+/// password fields, so the keychain offers to fill and update itself; the
+/// devices it signs out, by name; and its button with their count. Each
+/// refusal says nothing was changed: a wrong password under its field, too
+/// many tries or no connection above the button. Changed, the sheet closes
+/// and Account & devices says what happened.
+private struct ChangePasswordSheet: View {
+    private enum Field { case current, new }
+
+    @Bindable var task: ChangePasswordModel
+    @Environment(AppFlow.self) private var flow
+    @FocusState private var focus: Field?
+    @State private var discarding = false
+
+    var body: some View {
+        NavigationStack {
+            TaskFrame(title: ChangePasswordModel.title, cancel: { flow.changePassword = nil },
+                      problem: task.problem.map { TaskProblem(title: $0.title, message: $0.body) }, busy: task.busy) {
+                field(ChangePasswordModel.currentLabel, problem: task.currentProblem) {
+                    SecureField(ChangePasswordModel.currentLabel, text: $task.current)
+                        .textContentType(.password)
+                        .submitLabel(.next)
+                        .focused($focus, equals: .current)
+                        .onSubmit { focus = .new }
+                        .accessibilityIdentifier("password-current")
+                }
+                field(ChangePasswordModel.newLabel, problem: task.newProblem, hint: ChangePasswordModel.newHint) {
+                    SecureField(ChangePasswordModel.newLabel, text: $task.newPassword)
+                        .textContentType(.newPassword)
+                        .submitLabel(.go)
+                        .focused($focus, equals: .new)
+                        .onSubmit(submit)
+                        .accessibilityIdentifier("password-new")
+                }
+                if let unknown = task.othersUnknown {
+                    SettingsBanner(kind: .problem, title: unknown.title, message: unknown.body)
+                } else {
+                    TaskBox(title: task.othersHeading ?? "") {
+                        if let names = task.othersNames { Text(names) }
+                        Text(task.staysLine)
+                    }
+                }
+            } actions: {
+                Button(action: submit) { BusyLabel(title: task.buttonTitle, busy: task.busy) }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!task.canSubmit)
+                    .accessibilityIdentifier("password-change")
+            }
+        }
+        .taskSheet()
+        .asksBeforeDismissing(when: task.hasChanges || task.busy) { if !task.busy { discarding = true } }
+        .discardDialog(task.discardQuestion, isPresented: $discarding) { flow.changePassword = nil }
+        .onChange(of: task.finished) { _, finished in if finished != nil { flow.changePassword = nil } }
+        .onAppear { focus = .current }
+    }
+
+    private func field(_ label: String, problem: String?, hint: String? = nil, @ViewBuilder input: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Palette.muted)
+                .padding(.horizontal, 4)
+                .accessibilityHidden(true)
+            input()
+                .font(.body)
+                .foregroundStyle(Palette.text)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 50)
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(problem != nil ? Palette.warning : Palette.outlineStrong, lineWidth: problem != nil ? 2 : 1))
+                .disabled(task.busy)
+            if let text = problem ?? hint {
+                Text(text)
+                    .font(.footnote)
+                    .foregroundStyle(problem != nil ? Palette.warning : Palette.faint)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 4)
+                    .speaksSaving(problem.map(RowLine.failed))
+            }
+        }
+    }
+
+    private func submit() {
+        focus = nil
+        Task { await task.submit() }
+    }
+}
+
+extension View {
+    /// The question a sheet asks before a swipe throws away what was typed:
+    /// the Kit's words, and the button that throws it away.
+    func discardDialog(_ words: ConfirmWords, isPresented: Binding<Bool>, discard: @escaping () -> Void) -> some View {
+        confirmationDialog(words.title, isPresented: isPresented, titleVisibility: .visible) {
+            Button(words.confirm, role: .destructive, action: discard)
+            Button(words.keep, role: .cancel) {}
+        } message: {
+            Text(words.message)
+        }
     }
 }

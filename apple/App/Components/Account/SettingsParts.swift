@@ -488,12 +488,4 @@ extension View {
             }
         }
     }
-
-    /// Says `text` to VoiceOver, as a Saved or a failed line appears.
-    func announces(_ text: String?) -> some View {
-        onChange(of: text) { _, text in
-            guard let text, !text.isEmpty else { return }
-            AccessibilityNotification.Announcement(text).post()
-        }
-    }
 }

@@ -12,10 +12,11 @@ final class AppFlow {
     /// the original account needed by Cancel.
     var serverSwitch: ServerSwitchModel?
     var appliedSwitchLaunch = false
-    /// Rename this iPhone's sheet is up, and the name typed in it. Apart,
+    /// Rename this iPhone and Change password while their sheets are up. The
+    /// sheet shows while its model is here; the fields write to the model,
     /// since a field writes its text back as it loses focus while closing.
-    var renaming = false
-    var renameDraft = ""
+    var rename: RenameModel?
+    var changePassword: ChangePasswordModel?
     /// Next step cards answered Not now, until the app is next launched.
     var dismissedSteps: Set<SettingsNextStep.Kind> = []
     /// Done on Switch server's last step: the root then shows the new server's Home.
