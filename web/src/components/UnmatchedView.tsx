@@ -7,6 +7,8 @@ import { Poster } from './Poster'
 import { SeasonRows } from './SeasonLineUps'
 import { episodeCode, formatBytes, formatDate } from '../lib/format'
 import { ID_SEARCH_HINT } from '../lib/searchHint'
+import { settingsHref } from '../lib/settingsRoutes'
+import { HrefLink } from './settings/Frame'
 import type { components } from '../api/schema'
 
 type Group = components['schemas']['UnmatchedGroup']
@@ -71,6 +73,14 @@ export function UnmatchedView({ libraryId, type }: { libraryId: number; type: Li
             : `${files} file${files === 1 ? '' : 's'} in ${all.length} group${all.length === 1 ? '' : 's'} need a decision. A ${what} you pick is remembered for its folder, so files added there later match on their own.`}
         </p>
         <div className="flex flex-wrap gap-2">
+          {all.length > 0 && (
+            <HrefLink
+              href={settingsHref('libraries', libraryId, 'unmatched')}
+              className="inline-flex min-h-[40px] items-center rounded-md btn-primary px-4 text-sm font-semibold"
+            >
+              Review one at a time
+            </HrefLink>
+          )}
           <Link
             to="/libraries/$libraryId/files"
             params={{ libraryId: String(libraryId) }}
@@ -185,6 +195,60 @@ export function UnmatchedView({ libraryId, type }: { libraryId: number; type: Li
   )
 }
 
+/** What a card in the Settings queue reports when its files are sorted. */
+export type GroupOutcome = { how: 'matched' | 'seasons' | 'ignored'; text: string; showId?: number; movieId?: number; folder?: string; needEpisodes?: number }
+
+/**
+ * One group's card, as the Unmatched view draws it, with the same match,
+ * search and season line-up dialogs: the Settings review queue shows these
+ * one at a time (PLAN-ADMIN-SETTINGS.md §5.3).
+ */
+export function UnmatchedGroupCard({ g, libraryId, type, onSorted }: { g: Group; libraryId: number; type: LibraryType; onSorted: (o: GroupOutcome) => void }) {
+  const health = useQuery(healthQuery)
+  const tmdb = health.data?.tmdbConfigured ?? false
+  const rematch = useMatchLibrary()
+  const [searching, setSearching] = useState(false)
+  const matched = (c: Candidate, r: GroupResult) => {
+    let text = `Matched ${r.matched} file${r.matched === 1 ? '' : 's'} to ${c.title}${c.year ? ` (${c.year})` : ''}.`
+    if (r.needEpisodes) text += ` ${r.needEpisodes} need${r.needEpisodes === 1 ? 's' : ''} lining up next.`
+    if (r.folder) text += ` New files in ${r.folder} will use it.`
+    onSorted({ how: 'matched', text, showId: r.showId, movieId: r.movieId, folder: r.folder, needEpisodes: r.needEpisodes })
+  }
+  const ignored = () => onSorted({ how: 'ignored', text: `Ignored ${g.files.length === 1 ? 'the file' : `${g.files.length} files`}. They stay playable from the folder view.` })
+  return (
+    <>
+      {g.kind === 'show' ? (
+        <ShowGroup g={g} libraryId={libraryId} type={type} tmdb={tmdb} onSearch={() => setSearching(true)} onMatched={(_, c, r) => matched(c, r)} onIgnored={ignored} />
+      ) : g.kind === 'episodes' ? (
+        <EpisodesGroup
+          g={g}
+          libraryId={libraryId}
+          tmdb={tmdb}
+          onSearch={() => setSearching(true)}
+          onSeasonsMatched={(text, r) => onSorted({ how: 'seasons', text, showId: r.showId, folder: r.folder, needEpisodes: r.needEpisodes })}
+          onIgnored={ignored}
+        />
+      ) : g.kind === 'ignored' ? (
+        <IgnoredGroup g={g} libraryId={libraryId} />
+      ) : (
+        <LookupGroup g={g} libraryId={libraryId} tmdb={tmdb} retrying={rematch.isPending} onRetry={() => rematch.mutate({ id: libraryId, rematch: true })} onIgnored={ignored} />
+      )}
+      {searching && (
+        <MatchGroupDialog
+          g={g}
+          libraryId={libraryId}
+          type={type}
+          onClose={() => setSearching(false)}
+          onMatched={(c, r) => {
+            setSearching(false)
+            matched(c, r)
+          }}
+        />
+      )}
+    </>
+  )
+}
+
 function seasonsLabel(seasons: number[]): string {
   if (seasons.length === 0) return ''
   if (seasons.length === 1) return seasons[0] === 0 ? 'Specials' : `Season ${seasons[0]}`
@@ -235,6 +299,7 @@ function ShowGroup({
   tmdb,
   onSearch,
   onMatched,
+  onIgnored,
 }: {
   g: Group
   libraryId: number
@@ -242,6 +307,7 @@ function ShowGroup({
   tmdb: boolean
   onSearch: () => void
   onMatched: (g: Group, c: Candidate, r: GroupResult) => void
+  onIgnored?: () => void
 }) {
   const candidates = g.candidates.slice(0, 3)
   return (
@@ -271,7 +337,7 @@ function ShowGroup({
           >
             Search TMDB…
           </button>
-          <IgnoreButton g={g} libraryId={libraryId} />
+          <IgnoreButton g={g} libraryId={libraryId} onDone={onIgnored} />
         </div>
       </div>
     </article>
@@ -279,14 +345,14 @@ function ShowGroup({
 }
 
 /** Ignores every file of a group: samples, extras, stray clips. */
-function IgnoreButton({ g, libraryId, undo = false }: { g: Group; libraryId: number; undo?: boolean }) {
+function IgnoreButton({ g, libraryId, undo = false, onDone }: { g: Group; libraryId: number; undo?: boolean; onDone?: () => void }) {
   const ignore = useIgnoreFiles()
   const many = g.files.length > 1
   return (
     <button
       type="button"
       disabled={ignore.isPending}
-      onClick={() => ignore.mutate({ libraryId, fileIds: g.files.map((f) => f.id), ignored: !undo })}
+      onClick={() => ignore.mutate({ libraryId, fileIds: g.files.map((f) => f.id), ignored: !undo }, { onSuccess: onDone })}
       title={ignore.isError ? ignore.error.message : undefined}
       className="min-h-[36px] rounded-md px-3 text-sm text-neutral-400 hover:bg-surface-2 hover:text-neutral-100 disabled:opacity-50"
     >
@@ -397,12 +463,14 @@ function EpisodesGroup({
   tmdb,
   onSearch,
   onSeasonsMatched,
+  onIgnored,
 }: {
   g: Group
   libraryId: number
   tmdb: boolean
   onSearch: () => void
   onSeasonsMatched: (text: string, r: GroupResult) => void
+  onIgnored?: () => void
 }) {
   const show = g.show
   const detail = useQuery({ ...showQuery(show?.id ?? 0), enabled: show != null })
@@ -478,7 +546,7 @@ function EpisodesGroup({
             <button type="button" disabled={!tmdb} onClick={onSearch} className="min-h-[36px] rounded-md px-3 text-sm text-neutral-400 hover:bg-surface-2 hover:text-neutral-100 disabled:opacity-50">
               Wrong show? Change it…
             </button>
-            <IgnoreButton g={g} libraryId={libraryId} />
+            <IgnoreButton g={g} libraryId={libraryId} onDone={onIgnored} />
             {seasonRows.length > 0 && (
               <button type="button" onClick={() => setEach((v) => !v)} className="min-h-[36px] rounded-md px-3 text-sm text-neutral-400 hover:bg-surface-2 hover:text-neutral-100">
                 {each ? 'Line up by season' : 'Pick each episode instead'}
@@ -600,7 +668,7 @@ function EpisodeRow({
   )
 }
 
-function LookupGroup({ g, libraryId, tmdb, retrying, onRetry }: { g: Group; libraryId: number; tmdb: boolean; retrying: boolean; onRetry: () => void }) {
+function LookupGroup({ g, libraryId, tmdb, retrying, onRetry, onIgnored }: { g: Group; libraryId: number; tmdb: boolean; retrying: boolean; onRetry: () => void; onIgnored?: () => void }) {
   return (
     <div className="flex flex-wrap items-center gap-5 rounded-xl border border-line bg-surface px-5 py-4">
       <div className="min-w-0 flex-[1_1_420px] space-y-1">
@@ -620,7 +688,7 @@ function LookupGroup({ g, libraryId, tmdb, retrying, onRetry }: { g: Group; libr
       >
         Retry
       </button>
-      <IgnoreButton g={g} libraryId={libraryId} />
+      <IgnoreButton g={g} libraryId={libraryId} onDone={onIgnored} />
     </div>
   )
 }

@@ -474,7 +474,7 @@ func serve() error {
 	router, _ := api.New(api.Deps{Version: version, Host: cfg.Updates.Host, Queries: queries, Log: log, Bus: bus, Scanner: sc, Matcher: matcher,
 		AdaptiveHLS: cfg.Transcode.AdaptiveHLS, Images: imageCache.Handler(), Artwork: customArt, ImagesDir: imageCache.Dir(), Playback: sessions, Subtitles: subtitles, OnlineSubtitles: online, Keyframes: keyframes, Prober: prober, Auth: authSvc,
 		Settings: store, TMDB: tmdbClient, Conn: conn, DataDir: cfg.DataDir, DefaultHWAccel: cfg.Transcode.HWAccel, DefaultHWDevice: cfg.Transcode.HWDevice,
-		Net: guard, RemoteAdminConfig: cfg.Network.RemoteAdmin,
+		Net: guard, RemoteAdminConfig: cfg.Network.RemoteAdmin, TMDBKeyFromConfig: cfg.TMDB.APIKey != "",
 		Upload: uploadLimiter,
 		HSTS:   cfg.Auth.SecureCookies, Activity: tracker, Discovery: discoveryDep(advertiser), Turnstile: bot,
 		Cast: api.CastOptions{Enabled: cfg.Cast.Enabled, AppID: cfg.Cast.AppID, URL: cfg.Cast.URL, ReceiverOrigins: cfg.Cast.ReceiverOrigins,

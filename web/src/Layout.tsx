@@ -12,6 +12,7 @@ import { startCasting } from './cast/sender'
 import { CastBar, CastButton } from './components/Cast'
 import { ReminderNotices } from './components/liveTV/LiveReminders'
 import { serverCastsLive } from './lib/liveCast'
+import { isSettingsFlow } from './lib/settingsRoutes'
 
 export function Layout() {
   const auth = useAuth()
@@ -64,6 +65,8 @@ function Shell() {
 
   // Live TV reminders come on every page; their banner stays off the players.
   if (player) return <><Outlet /><ReminderNotices banner={false} /></>
+  // A Settings task is focused: it draws its own bar with Exit (PLAN-ADMIN-SETTINGS.md §3.2).
+  if (isSettingsFlow(path)) return <><Outlet /><CastBar /><ReminderNotices banner /></>
 
   return (
     <div className="flex min-h-screen flex-col">

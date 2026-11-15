@@ -57,7 +57,7 @@ export function useUpdateSettings() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (body: components['schemas']['UpdateSettingsInputBody']) =>
-      withConfirm(async () => unwrap(await api.PUT('/api/settings', { body })), body.upload ? 'change the remote upload limit' : 'change sign-in protection'),
+      withConfirm(async () => unwrap(await api.PUT('/api/settings', { body })), body.upload ? 'change the remote upload limit' : body.remoteAdmin === false ? 'turn off admin settings away from home' : 'change sign-in protection'),
     onSuccess: async (settings, body) => {
       qc.setQueryData(settingsQuery.queryKey, settings)
       inv()
@@ -103,7 +103,7 @@ export function useUpdateLibrary() {
 export function useDeleteLibrary() {
   const inv = useInvalidate(['libraries', 'home', 'items', 'rows'])
   return useMutation({
-    mutationFn: async (id: number) => unwrap(await api.DELETE('/api/libraries/{id}', { params: { path: { id } } })),
+    mutationFn: (id: number) => withConfirm(async () => unwrap(await api.DELETE('/api/libraries/{id}', { params: { path: { id } } })), 'remove this library'),
     onSuccess: inv,
   })
 }

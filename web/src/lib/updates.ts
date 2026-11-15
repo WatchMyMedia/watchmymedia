@@ -5,7 +5,7 @@ type Install = components['schemas']['UpdateStatus']['install']
 /**
  * The download button's label and the line beside it in Settings › General ›
  * Updates, by how the server was installed. Docker has no file: it pulls the
- * image instead (UpdatesSection).
+ * image instead (the Updates section on General).
  */
 /**
  * How a Docker install updates, by the platform the container runs on

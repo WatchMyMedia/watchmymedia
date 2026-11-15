@@ -84,5 +84,3 @@ export function useLinkSeerrUser() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['users'] }),
   })
 }
-
-export const appName: Record<IntegrationKind, string> = { radarr: 'Radarr', sonarr: 'Sonarr', seerr: 'Seerr' }

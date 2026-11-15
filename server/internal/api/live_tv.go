@@ -220,6 +220,9 @@ func registerLiveTV(h huma.API, deps Deps) {
 		return &LiveTVSourceOutput{Body: source}, liveError(err)
 	})
 	huma.Register(h, op("deleteLiveTVSource", "DELETE", "/settings/live-tv/sources/{id}", "Remove a tuner from this server", true), func(ctx context.Context, in *LiveTVIDInput) (*struct{}, error) {
+		if err := requireConfirmed(ctx, deps, "deleteLiveTVSource", in.ID); err != nil {
+			return nil, err
+		}
 		if err := available(); err != nil {
 			return nil, err
 		}

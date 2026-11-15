@@ -1660,6 +1660,11 @@
             "description": "Whether this signed-in admin may administer here; for others, whether first-run setup works on this network.",
             "type": "boolean"
           },
+          "adminConfirmedUntil": {
+            "description": "For a signed-in admin who entered their password again (confirmPassword) on this sign-in: when that confirmation runs out. Absent when there is none.",
+            "format": "date-time",
+            "type": "string"
+          },
           "adminLimit": {
             "enum": [
               "network",
@@ -4468,6 +4473,62 @@
         ],
         "type": "object"
       },
+      "LibraryRemoval": {
+        "additionalProperties": false,
+        "properties": {
+          "episodes": {
+            "description": "Episodes of its shows.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "files": {
+            "description": "Video files indexed from it, present or missing; trailer files go too but are not counted, as in the library's own counts. The files on disk are not touched.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "inProgress": {
+            "description": "Resume points on its movies and episodes, everyone's; they are removed with them.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "movies": {
+            "description": "Movies indexed from it.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "people": {
+            "description": "People whose watched marks or resume points are removed.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "playsKept": {
+            "description": "Plays of its files in Activity history. Removing the library keeps them: history keeps their titles and pictures.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "shows": {
+            "description": "Shows indexed from it.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "watched": {
+            "description": "Watched marks on its movies and episodes, everyone's; they are removed with them.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "movies",
+          "shows",
+          "episodes",
+          "files",
+          "watched",
+          "inProgress",
+          "people",
+          "playsKept"
+        ],
+        "type": "object"
+      },
       "LibraryRows": {
         "additionalProperties": false,
         "properties": {
@@ -6370,6 +6431,26 @@
         },
         "required": [
           "address"
+        ],
+        "type": "object"
+      },
+      "LiveTVSourceRemoval": {
+        "additionalProperties": false,
+        "properties": {
+          "recordingNow": {
+            "description": "Recordings from this tuner running now.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "scheduledRecordings": {
+            "description": "Recordings still to come on this tuner's channels: scheduled, waiting on a clash, or on a channel gone from its lineup. They won't record unless another tuner has a channel with the same number, or this one is added again.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scheduledRecordings",
+          "recordingNow"
         ],
         "type": "object"
       },
@@ -8950,6 +9031,20 @@
           "reasons",
           "video",
           "audio"
+        ],
+        "type": "object"
+      },
+      "PlaysOlderThan": {
+        "additionalProperties": false,
+        "properties": {
+          "plays": {
+            "description": "Plays the next trim would delete with that limit: finished plays that started before the day that many days ago, in the server's time zone. Statistics keep them unless Trim statistics is on.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "plays"
         ],
         "type": "object"
       },
@@ -12533,6 +12628,10 @@
             "$ref": "#/components/schemas/SubtitleStatus"
           },
           "tmdbConfigured": {
+            "type": "boolean"
+          },
+          "tmdbKeyFromConfig": {
+            "description": "config.yaml or the environment (tmdb.api_key, WATCHMYMEDIA_TMDB_API_KEY) has a TMDB key too. A saved key overrides it; after the saved key is removed, the server uses that one again from its next restart.",
             "type": "boolean"
           },
           "tmdbKeyHint": {
@@ -18964,7 +19063,7 @@
     },
     "/api/libraries/{id}": {
       "delete": {
-        "description": "Files on disk are untouched. Watch history for its items is removed.",
+        "description": "Files on disk are untouched. Watch history for its items is removed. Away from home it needs the password entered again (confirmPassword).",
         "operationId": "deleteLibrary",
         "parameters": [
           {
@@ -19718,6 +19817,51 @@
         "summary": "List matched movies in a library",
         "tags": [
           "browse"
+        ]
+      }
+    },
+    "/api/libraries/{id}/removal": {
+      "get": {
+        "description": "Counts for the dialog before deleteLibrary. Nothing changes.",
+        "operationId": "getLibraryRemoval",
+        "parameters": [
+          {
+            "description": "Library ID.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Library ID.",
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryRemoval"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "What removing a library would remove (admin)",
+        "tags": [
+          "libraries"
         ]
       }
     },
@@ -23662,6 +23806,54 @@
         ]
       }
     },
+    "/api/settings/activity/older-than": {
+      "get": {
+        "description": "For the dialog before saving a shorter activity.retentionDays. Counts by the rule the daily trim uses; nothing changes.",
+        "operationId": "countPlaysOlderThan",
+        "parameters": [
+          {
+            "description": "A Keep history for limit, in days, as Settings.activity.retentionDays takes it.",
+            "explode": false,
+            "in": "query",
+            "name": "days",
+            "required": true,
+            "schema": {
+              "description": "A Keep history for limit, in days, as Settings.activity.retentionDays takes it.",
+              "format": "int64",
+              "maximum": 36500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaysOlderThan"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "How many plays a shorter Keep history for would delete (admin)",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/api/settings/browse": {
       "get": {
         "operationId": "browseFolders",
@@ -24304,6 +24496,49 @@
           }
         },
         "summary": "Refresh the lineup without starting an RF scan",
+        "tags": [
+          "live-tv"
+        ]
+      }
+    },
+    "/api/settings/live-tv/sources/{id}/removal": {
+      "get": {
+        "description": "Counts for the dialog before deleteLiveTVSource. Nothing changes.",
+        "operationId": "getLiveTVSourceRemoval",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveTVSourceRemoval"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "What removing a tuner would affect (admin)",
         "tags": [
           "live-tv"
         ]

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { AutomaticSubtitles } from './automaticSubtitles'
+import { AutomaticSubtitles, asksForAutomaticSubtitle } from './automaticSubtitles'
 import { changeAuthScope } from './authScope'
 
 function deferred<T>() {
@@ -71,5 +71,18 @@ describe('automatic subtitle ownership', () => {
     await expect(first).resolves.toBeUndefined()
     await expect(work.begin('play-two')).resolves.toBeUndefined()
     expect(request).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('asksForAutomaticSubtitle', () => {
+  it('asks whenever subtitles would start, as the server allows', () => {
+    expect(asksForAutomaticSubtitle({ mode: 'on', automaticDownload: true })).toBe(true)
+    expect(asksForAutomaticSubtitle({ mode: 'forced', foreignAudio: true, automaticDownload: true })).toBe(true)
+  })
+  it('never asks without Automatic download, for forced alone, or when off', () => {
+    expect(asksForAutomaticSubtitle({ mode: 'on', automaticDownload: false })).toBe(false)
+    expect(asksForAutomaticSubtitle({ mode: 'forced', automaticDownload: true })).toBe(false)
+    expect(asksForAutomaticSubtitle({ mode: 'off', foreignAudio: true, automaticDownload: true })).toBe(false)
+    expect(asksForAutomaticSubtitle(undefined)).toBe(false)
   })
 })

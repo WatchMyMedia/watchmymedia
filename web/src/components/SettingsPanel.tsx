@@ -8,22 +8,6 @@ export const primaryButton = 'min-h-[40px] rounded-md btn-primary px-4 text-sm f
 export const secondaryButton = 'min-h-[40px] rounded-md border border-line-2 px-3.5 text-sm text-neutral-100 hover:bg-surface-2 disabled:opacity-50'
 export const textInput = 'min-h-[40px] rounded-md border border-line-2 bg-ground px-3 text-sm text-neutral-100 placeholder:text-neutral-500'
 
-/** A settings page's title and what it is for, with optional actions on the right. */
-export function PageHeader({ title, badge, actions, children }: { title: string; badge?: ReactNode; actions?: ReactNode; children?: ReactNode }) {
-  return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="min-w-0 max-w-2xl flex-1 basis-80">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-[22px] font-semibold tracking-tight">{title}</h2>
-          {badge}
-        </div>
-        {children && <p className="mt-1.5 text-neutral-400">{children}</p>}
-      </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
-    </div>
-  )
-}
-
 /** A titled card. Rows inside it are divided by lines; free content brings its own padding. */
 export function Panel({ title, description, actions, tone = 'plain', children }: { title?: ReactNode; description?: ReactNode; actions?: ReactNode; tone?: 'plain' | 'warn'; children?: ReactNode }) {
   const frame = tone === 'warn' ? 'border-orange-900/70 bg-orange-950/25' : 'border-line bg-surface'

@@ -120,3 +120,15 @@ ORDER BY r.id LIMIT sqlc.arg(row_limit);
 
 -- name: HasDVRFiles :one
 SELECT EXISTS(SELECT 1 FROM live_tv_recordings WHERE state IN ('done','partial') AND media_file_id IS NOT NULL);
+
+-- name: CountDVRSourceRecordings :one
+-- A tuner's recordings that removing it would affect: those still to
+-- record (scheduled, waiting on a clash, or on a channel gone from the
+-- lineup) and those recording now. Read through the state index; a
+-- household has few unfinished recordings.
+SELECT
+    CAST(COALESCE(SUM(state IN ('scheduled', 'conflict', 'gone')), 0) AS INTEGER) AS scheduled,
+    CAST(COALESCE(SUM(state = 'recording'), 0) AS INTEGER) AS recording
+FROM live_tv_recordings INDEXED BY live_tv_recording_state
+WHERE state IN ('scheduled', 'conflict', 'gone', 'recording')
+    AND source_id = sqlc.arg(source_id) AND end_at > sqlc.arg(now);

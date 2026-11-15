@@ -20,3 +20,10 @@ func IsUniqueViolation(err error) bool {
 	}
 	return false
 }
+
+// IsDiskFull reports whether SQLite stopped because the disk is full, as
+// VACUUM INTO does when a backup's copy of the database doesn't fit.
+func IsDiskFull(err error) bool {
+	e, ok := errors.AsType[*sqlite.Error](err)
+	return ok && e.Code()&0xff == sqlite3.SQLITE_FULL
+}

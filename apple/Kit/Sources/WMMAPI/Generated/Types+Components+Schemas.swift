@@ -799,6 +799,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AuthStatus/adminAllowed`.
             public var adminAllowed: Swift.Bool
+            /// For a signed-in admin who entered their password again (confirmPassword) on this sign-in: when that confirmation runs out. Absent when there is none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AuthStatus/adminConfirmedUntil`.
+            public var adminConfirmedUntil: Foundation.Date?
             /// - Remark: Generated from `#/components/schemas/AuthStatus/adminLimit`.
             @frozen public enum AdminLimitPayload: RawRepresentable, Codable, Hashable, Sendable, CaseIterable {
                 case network
@@ -857,6 +861,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - adminAllowed: Whether this signed-in admin may administer here; for others, whether first-run setup works on this network.
+            ///   - adminConfirmedUntil: For a signed-in admin who entered their password again (confirmPassword) on this sign-in: when that confirmation runs out. Absent when there is none.
             ///   - adminLimit:
             ///   - onAdminNetwork:
             ///   - setupRequired: True until the first admin account is created.
@@ -864,6 +869,7 @@ extension Components {
             ///   - user: The signed-in user, if any.
             public init(
                 adminAllowed: Swift.Bool,
+                adminConfirmedUntil: Foundation.Date? = nil,
                 adminLimit: Components.Schemas.AuthStatus.AdminLimitPayload? = nil,
                 onAdminNetwork: Swift.Bool? = nil,
                 setupRequired: Swift.Bool,
@@ -871,6 +877,7 @@ extension Components {
                 user: Components.Schemas.User? = nil
             ) {
                 self.adminAllowed = adminAllowed
+                self.adminConfirmedUntil = adminConfirmedUntil
                 self.adminLimit = adminLimit
                 self.onAdminNetwork = onAdminNetwork
                 self.setupRequired = setupRequired
@@ -879,6 +886,7 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case adminAllowed
+                case adminConfirmedUntil
                 case adminLimit
                 case onAdminNetwork
                 case setupRequired

@@ -2,6 +2,18 @@ import { authScope } from './authScope'
 import { SubtitleIntent } from './subtitleIntent'
 
 type Result<T> = { track?: T; error?: string }
+
+/**
+ * Whether a play should ask for an automatic subtitle: whenever subtitles
+ * would start, as the server allows. That is "Always" (mode on), and "When
+ * the audio isn't in my languages" (forced with foreignAudio), where the
+ * server checks the play's audio and answers with nothing when it is one of
+ * the person's languages.
+ */
+export function asksForAutomaticSubtitle(subtitles: { mode: string; foreignAudio?: boolean; automaticDownload?: boolean } | undefined) {
+  if (!subtitles?.automaticDownload) return false
+  return subtitles.mode === 'on' || (subtitles.mode === 'forced' && !!subtitles.foreignAudio)
+}
 type Request<T> = (fileId: number, playId: string, cancel?: boolean) => Promise<Result<T>>
 
 /** One optional request per owned play. The server separately enforces its

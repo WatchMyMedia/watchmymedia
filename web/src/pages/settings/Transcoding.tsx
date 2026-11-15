@@ -1,16 +1,15 @@
-import { PageHeader } from '../../components/SettingsPanel'
-import { TranscodeSection } from '../../components/SettingsSections'
-import { StreamingLimits } from '../../components/StreamingLimits'
+import { useSettingsPage } from '../../components/settings/hooks'
 import { ServerOnly } from './SettingsLayout'
+import { EncoderFlow } from './transcoding/EncoderFlow'
+import { TranscodingHub } from './transcoding/Hub'
+import { UploadLimitPage } from './transcoding/UploadLimit'
 
-/** Settings › Transcoding: the encoder ffmpeg uses and what this machine can do. */
+/**
+ * Settings › Server › Transcoding (PLAN-ADMIN-SETTINGS.md §5.7): the page,
+ * the Choose an encoder flow and the Remote upload limit page.
+ */
 export function TranscodingSettings() {
-  return (
-    <>
-      <PageHeader title="Transcoding">When a device can&rsquo;t play a file as it is, ffmpeg converts it while it streams. A hardware encoder keeps that fast and quiet.</PageHeader>
-      <ServerOnly>
-        <div className="space-y-6"><TranscodeSection /><StreamingLimits /></div>
-      </ServerOnly>
-    </>
-  )
+  const page = useSettingsPage()
+  if (page?.task === 'encoder') return <EncoderFlow step={page.params.step} />
+  return <ServerOnly tab="transcoding">{page?.task === 'upload-limit' ? <UploadLimitPage /> : <TranscodingHub />}</ServerOnly>
 }

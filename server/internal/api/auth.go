@@ -28,6 +28,9 @@ type AuthStatus struct {
 	AdminAllowed   bool       `json:"adminAllowed" doc:"Whether this signed-in admin may administer here; for others, whether first-run setup works on this network."`
 	AdminLimit     string     `json:"adminLimit,omitempty" required:"false" enum:"network,https"`
 	OnAdminNetwork *bool      `json:"onAdminNetwork,omitempty" required:"false"`
+	// AdminConfirmedUntil lets the web say how long risky actions away from
+	// home go ahead without asking for the password again.
+	AdminConfirmedUntil *time.Time `json:"adminConfirmedUntil,omitempty" required:"false" doc:"For a signed-in admin who entered their password again (confirmPassword) on this sign-in: when that confirmation runs out. Absent when there is none."`
 	// TurnstileSiteKey is set while sign-in needs Cloudflare Turnstile.
 	TurnstileSiteKey string `json:"turnstileSiteKey,omitempty" doc:"Set while password sign-in and setup need a Cloudflare Turnstile token: render the widget with this site key and send its token as turnstileToken."`
 }
@@ -310,6 +313,9 @@ func registerAuth(h huma.API, deps Deps) {
 			if u.IsAdmin {
 				trusted := netguard.Trusted(ctx)
 				out.Body.OnAdminNetwork = &trusted
+				if until, ok := deps.Auth.ConfirmedUntil(u); ok {
+					out.Body.AdminConfirmedUntil = &until
+				}
 				out.Body.AdminAllowed = netguard.AdminAllowed(ctx)
 				if !out.Body.AdminAllowed {
 					out.Body.AdminLimit = "https"

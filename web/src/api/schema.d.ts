@@ -1285,7 +1285,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a library and everything indexed from it (admin)
-         * @description Files on disk are untouched. Watch history for its items is removed.
+         * @description Files on disk are untouched. Watch history for its items is removed. Away from home it needs the password entered again (confirmPassword).
          */
         delete: operations["deleteLibrary"];
         options?: never;
@@ -1453,6 +1453,26 @@ export interface paths {
         };
         /** List matched movies in a library */
         get: operations["listMovies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/libraries/{id}/removal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What removing a library would remove (admin)
+         * @description Counts for the dialog before deleteLibrary. Nothing changes.
+         */
+        get: operations["getLibraryRemoval"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2706,6 +2726,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/activity/older-than": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How many plays a shorter Keep history for would delete (admin)
+         * @description For the dialog before saving a shorter activity.retentionDays. Counts by the rule the daily trim uses; nothing changes.
+         */
+        get: operations["countPlaysOlderThan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/browse": {
         parameters: {
             query?: never;
@@ -2912,6 +2952,26 @@ export interface paths {
         put?: never;
         /** Refresh the lineup without starting an RF scan */
         post: operations["refreshLiveTVSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/live-tv/sources/{id}/removal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What removing a tuner would affect (admin)
+         * @description Counts for the dialog before deleteLiveTVSource. Nothing changes.
+         */
+        get: operations["getLiveTVSourceRemoval"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4066,6 +4126,11 @@ export interface components {
         AuthStatus: {
             /** @description Whether this signed-in admin may administer here; for others, whether first-run setup works on this network. */
             adminAllowed: boolean;
+            /**
+             * Format: date-time
+             * @description For a signed-in admin who entered their password again (confirmPassword) on this sign-in: when that confirmation runs out. Absent when there is none.
+             */
+            adminConfirmedUntil?: string;
             /** @enum {string} */
             adminLimit?: "network" | "https";
             onAdminNetwork?: boolean;
@@ -5116,6 +5181,48 @@ export interface components {
         LibraryList: {
             items: components["schemas"]["Library"][];
         };
+        LibraryRemoval: {
+            /**
+             * Format: int64
+             * @description Episodes of its shows.
+             */
+            episodes: number;
+            /**
+             * Format: int64
+             * @description Video files indexed from it, present or missing; trailer files go too but are not counted, as in the library's own counts. The files on disk are not touched.
+             */
+            files: number;
+            /**
+             * Format: int64
+             * @description Resume points on its movies and episodes, everyone's; they are removed with them.
+             */
+            inProgress: number;
+            /**
+             * Format: int64
+             * @description Movies indexed from it.
+             */
+            movies: number;
+            /**
+             * Format: int64
+             * @description People whose watched marks or resume points are removed.
+             */
+            people: number;
+            /**
+             * Format: int64
+             * @description Plays of its files in Activity history. Removing the library keeps them: history keeps their titles and pictures.
+             */
+            playsKept: number;
+            /**
+             * Format: int64
+             * @description Shows indexed from it.
+             */
+            shows: number;
+            /**
+             * Format: int64
+             * @description Watched marks on its movies and episodes, everyone's; they are removed with them.
+             */
+            watched: number;
+        };
         LibraryRows: {
             recentlyAdded: components["schemas"]["BrowseItem"][];
             /** @description TV libraries only. */
@@ -5786,6 +5893,18 @@ export interface components {
             /** @description The tuner's LAN IP or hostname; HTTP control port 80 only. */
             address: string;
             name?: string;
+        };
+        LiveTVSourceRemoval: {
+            /**
+             * Format: int64
+             * @description Recordings from this tuner running now.
+             */
+            recordingNow: number;
+            /**
+             * Format: int64
+             * @description Recordings still to come on this tuner's channels: scheduled, waiting on a clash, or on a channel gone from its lineup. They won't record unless another tuner has a channel with the same number, or this one is added again.
+             */
+            scheduledRecordings: number;
         };
         LiveTVSourceUpdateInputBody: {
             address: string;
@@ -6821,6 +6940,13 @@ export interface components {
             /** @description Why a cheaper mode was not possible. */
             reasons: string[];
             video: components["schemas"]["VideoPlan"];
+        };
+        PlaysOlderThan: {
+            /**
+             * Format: int64
+             * @description Plays the next trim would delete with that limit: finished plays that started before the day that many days ago, in the server's time zone. Statistics keep them unless Trim statistics is on.
+             */
+            plays: number;
         };
         PlexAddress: {
             /** @description On the server's own network. */
@@ -8225,6 +8351,8 @@ export interface components {
             storage?: components["schemas"]["PlaybackCacheLoad"];
             subtitles: components["schemas"]["SubtitleStatus"];
             tmdbConfigured: boolean;
+            /** @description config.yaml or the environment (tmdb.api_key, WATCHMYMEDIA_TMDB_API_KEY) has a TMDB key too. A saved key overrides it; after the saved key is removed, the server uses that one again from its next restart. */
+            tmdbKeyFromConfig?: boolean;
             /** @description Last four characters of the stored key. */
             tmdbKeyHint?: string;
             /** @description Movie pages offer TMDB's trailers, which play from YouTube (on by default). Absent on older servers. */
@@ -12143,6 +12271,38 @@ export interface operations {
             };
         };
     };
+    getLibraryRemoval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Library ID. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryRemoval"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     getLibraryRows: {
         parameters: {
             query?: {
@@ -15027,6 +15187,38 @@ export interface operations {
             };
         };
     };
+    countPlaysOlderThan: {
+        parameters: {
+            query: {
+                /** @description A Keep history for limit, in days, as Settings.activity.retentionDays takes it. */
+                days: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaysOlderThan"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     browseFolders: {
         parameters: {
             query?: {
@@ -15548,6 +15740,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveTVSource"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getLiveTVSourceRemoval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveTVSourceRemoval"];
                 };
             };
             /** @description Error */
