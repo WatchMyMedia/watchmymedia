@@ -299,7 +299,7 @@ extension AppServices {
         let liveRepository = liveTV ? FakeLiveTVRepository(servers: servers, guide: liveGuide) : nil
         if liveAutomatic { liveRepository?.offered.automatic = true }
         if recordings { liveRepository?.offerRecordings(admin: admin) }
-        return AppServices(
+        let services = AppServices(
             servers: servers,
             auth: FakeAuthRepository(signedIn: signedIn, servers: servers, client: client, admin: admin),
             library: library,
@@ -313,6 +313,9 @@ extension AppServices {
             downloads: downloadRepository,
             rows: rowsRepository
         )
+        // `-fakesSaveFails` and `-fakesPasswordFails`, read here as `-fakesLargeLibrary` is.
+        services.applyFakeRefusals(ProcessInfo.processInfo.arguments)
+        return services
     }
 }
 
