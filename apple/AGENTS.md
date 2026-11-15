@@ -71,6 +71,16 @@ server, and on iPad in both a regular and a compact width.
   of the whole test bundle at once.
 - **iPhone and Apple TV share no files.** What both need goes in the Kit
   (README explains why `TV/` is separate from `App/`).
+- **Settings' words and saving are the Kit's** (README, Settings). A page
+  draws `SettingsWords`, `settingsHub`, `FlowStep` and the models' lines, and
+  never words a setting itself; a control kept on the server reads its
+  `SaveState` (`SettingsModel.saveState(_:)`, `LiveExtrasStore.leadSave`)
+  rather than a page-wide error. A new such control gets a `SettingKey`, a
+  Saved line that says what the change did and a failed line that names
+  what it is still, with a test that moves the save's sleep.
+- **A 401 that isn't a lost sign-in** (a wrong current password) needs its
+  operation in `ServerAPI.credentialOperations`, or the 401 signs the device
+  out: `changePassword` is there.
 - **The Top Shelf extension links only `WMMTopShelf`** and only reads the
   App Group (README, Top Shelf). Nothing the app writes there may name a
   server address, an image URL, a token or the person: add a field to the
