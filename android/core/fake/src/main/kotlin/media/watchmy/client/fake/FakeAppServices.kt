@@ -6,6 +6,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
 import media.watchmy.client.model.AppServices
+import media.watchmy.client.model.BrowseRequests
 import media.watchmy.client.model.CastService
 import media.watchmy.client.model.DownloadRepository
 import media.watchmy.client.model.RequestBackend
@@ -57,6 +58,9 @@ class FakeAppServices(signedIn: Boolean = true, tv: Boolean = false, seerr: Bool
     override val downloads: DownloadRepository = if (tv) DownloadRepository.Unavailable else fakeDownloads
 
     override val seekThumbnails = FakeSeekThumbnails()
+
+    /** Each fake's own, so one test's See all doesn't reach another's grid. */
+    override val browseRequests = BrowseRequests()
     override val cast: CastService = if (cast && !tv) FakeCastService("Living Room TV", connected = true) else CastService.None
     override val client = ClientInfo(
         deviceId = "fake-device",

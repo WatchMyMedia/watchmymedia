@@ -36,4 +36,13 @@ interface AppServices {
 
     /** How the app has fared on this device, for Settings; [Diagnostics.None] on the fakes. */
     val diagnostics: Diagnostics get() = Diagnostics.None
+
+    /**
+     * A row's See all on its way to a library's grid (PLAN-SEE-ALL.md §4.4).
+     * The app has one set of services, so it shares one; the fakes keep
+     * their own, so tests don't hand requests to each other.
+     */
+    val browseRequests: BrowseRequests get() = AppBrowseRequests
 }
+
+private val AppBrowseRequests = BrowseRequests()
