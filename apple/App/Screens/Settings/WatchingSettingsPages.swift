@@ -15,10 +15,12 @@ struct PlaybackSettingsPage: View {
     @Environment(LiveExtrasStore.self) private var extras
 
     var body: some View {
-        SettingsScroll(lede: "Yours, on every device you sign in to. Quality is this \(model.facts.family)’s alone.") {
-            if let error = model.playbackError {
-                SettingsBanner(kind: .problem, title: "Couldn’t load your playback choices", message: error,
-                               action: ("Try again", { Task { await model.loadPreferences() } }))
+        SettingsScroll(lede: SettingsWords.playbackLede(device: model.facts.family)) {
+            // The page that can't load (Settings2PlaybackStates): nothing changed, try again.
+            if model.preferencesLoadFailed && !model.preferencesLoaded {
+                let notice = SettingsWords.playbackCantLoad
+                SettingsBanner(kind: .problem, title: notice.title, message: notice.body,
+                               action: (SettingsWords.tryAgain, { Task { await model.loadPreferences() } }))
             }
             SettingsAdaptive {
                 SettingsColumns {
@@ -35,54 +37,43 @@ struct PlaybackSettingsPage: View {
                 if extras.available { LiveRemindersSettingsSection() }
             }
         }
-        .navigationTitle("Playback")
-        .announces(model.skipError)
+        .navigationTitle(SettingsWords.playback)
+        // Until the choices load the rows stand as placeholders, not the defaults.
+        .redacted(reason: model.preferencesLoaded || model.preferencesLoadFailed ? [] : .placeholder)
+        .task { await model.loadPreferences() }
     }
 
     private var quality: some View {
-        SettingsSection(title: "Quality · this \(model.facts.family)") {
-            MenuRow(title: "Quality", line: .plain(model.quality.checklistDetail),
+        SettingsSection(title: SettingsWords.qualityHeading(device: model.facts.family)) {
+            MenuRow(title: SettingsWords.quality, line: .plain(model.quality.checklistDetail),
                     choices: model.qualities.map { .init(value: $0, title: $0.checklistTitle, line: $0.checklistDetail) },
                     selection: model.quality) { model.setQuality($0) }
                 .accessibilityIdentifier("playback-quality")
         } note: {
-            SectionNote(model.qualities.contains(.auto)
-                ? "Automatic starts with the original and lowers the quality when your connection can’t keep up. A fixed lower quality has the server convert the video, which saves data away from home."
-                : "A lower quality has the server convert the video, which saves data away from home.")
+            SectionNote(SettingsWords.qualityNote(auto: model.qualities.contains(.auto)))
         }
     }
 
     private var skipping: some View {
-        SettingsSection(title: "Skipping") {
+        SettingsSection(title: SettingsWords.skipping) {
             ForEach(SegmentKind.allCases, id: \.self) { kind in
-                MenuRow(title: kind.settingsLabel, line: .plain(segmentLine(kind)),
-                        choices: SkipMode.allCases.map { .init(value: $0, title: $0.label) },
-                        selection: model.skipMode(kind)) { mode in Task { await model.setSkip(kind, mode: mode) } }
+                let state = model.saveState(.skip(kind))
+                MenuRow(title: kind.settingsLabel, line: state.rowLine(rest: kind.settingsHint),
+                        choices: SkipMode.allCases.map { .init(value: $0, title: $0.label, line: $0.line) },
+                        selection: model.skipMode(kind), disabled: state.isSaving) { mode in Task { await model.setSkip(kind, mode: mode) } }
                     .accessibilityIdentifier("playback-skip-\(kind.rawValue)")
             }
         } note: {
-            if let error = model.skipError { SectionNote(.failed(error)) } else { SectionNote("A part you seek into is never skipped for you.") }
+            SectionNote(SettingsWords.skippingNote)
         }
     }
 
     private var nextEpisode: some View {
-        SettingsSection(title: "Next episode") {
-            SwitchRow(title: "Autoplay next episode", line: .plain("Counts down 10 seconds from the credits. Off, it waits for you."),
-                      isOn: model.autoplayNext) { on in Task { await model.setAutoplayNext(on) } }
+        SettingsSection(title: SettingsWords.nextEpisode) {
+            let state = model.saveState(.autoplayNext)
+            SwitchRow(title: SettingsWords.nextEpisodeTitle, line: state.rowLine(rest: SettingsWords.nextEpisodeLine),
+                      isOn: model.autoplayNext, disabled: state.isSaving) { on in Task { await model.setAutoplayNext(on) } }
                 .accessibilityIdentifier("playback-autoplay")
-        } note: {
-            if let error = model.playbackError { SectionNote(.failed(error)) }
-        }
-    }
-
-    /// What each part is, under its name.
-    private func segmentLine(_ kind: SegmentKind) -> String {
-        switch kind {
-        case .intro: "Opening titles and theme"
-        case .recap: "“Previously on…”"
-        case .credits: "The closing credits"
-        case .preview: "“Next time on…”"
-        case .commercial: "Commercial breaks left in recordings"
         }
     }
 }
@@ -97,19 +88,19 @@ struct LiveRemindersSettingsSection: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        SettingsSection(title: "Live TV reminders") {
-            MenuRow(title: liveRemindMe, line: nil,
+        SettingsSection(title: SettingsWords.liveTVReminders) {
+            MenuRow(title: SettingsWords.remindMe, line: extras.leadSave.rowLine(rest: nil),
                     choices: LiveReminderLead.choices.map { .init(value: $0, title: liveLeadChoice($0)) },
-                    selection: extras.leadMinutes) { minutes in Task { await extras.setLead(minutes) } }
+                    selection: extras.leadMinutes, disabled: extras.leadSave.isSaving) { minutes in Task { await extras.setLead(minutes, inRow: true) } }
                 .accessibilityIdentifier("playback-remind-me")
             NavigationLink { LiveRemindersScreen() } label: {
-                LinkRowLabel(title: liveRemindersTitle, value: liveRemindersComingUp(extras.reminders.count))
+                LinkRowLabel(title: SettingsWords.reminders, value: SettingsWords.remindersValue(extras.reminders.count))
             }
             .buttonStyle(SettingsRowStyle())
             .accessibilityIdentifier("playback-reminders")
             Button { notificationsTapped() } label: {
                 AdaptiveRow {
-                    RowTitle(title: "Notifications", line: notificationsDetail.isEmpty ? nil : .plain(notificationsDetail))
+                    RowTitle(title: SettingsWords.notifications, line: notificationsDetail.isEmpty ? nil : .plain(notificationsDetail))
                 } trailing: {
                     HStack(spacing: 6) {
                         Text(notificationsOn ? "On" : "Off").font(.subheadline).foregroundStyle(Palette.muted)
@@ -121,19 +112,14 @@ struct LiveRemindersSettingsSection: View {
             .buttonStyle(SettingsRowStyle())
             .accessibilityIdentifier("playback-notifications")
         } note: {
-            if let message = extras.message {
-                SectionNote(.failed(message))
-            } else {
-                SectionNote("This \(liveDeviceNoun) tells you even when the app is closed. Changing notifications opens \(liveSystemName) Settings.")
-            }
+            SectionNote(SettingsWords.notificationsNote(device: liveDeviceNoun))
         }
         .task { await notifier.refreshStatus() }
         .task { await extras.refresh() }
-        .announces(extras.message)
     }
 
     /// "iOS" or "iPadOS", as the boards name the system's Settings.
-    private var liveSystemName: String { UIDevice.current.userInterfaceIdiom == .pad ? "iPadOS" : "iOS" }
+    private var liveSystemName: String { SettingsWords.systemName(device: liveDeviceNoun) }
 
     private var notificationsOn: Bool {
         switch notifier.status {
@@ -146,7 +132,7 @@ struct LiveRemindersSettingsSection: View {
         switch notifier.status {
         case .denied?: "Turn on in \(liveSystemName) Settings"
         case .notDetermined?: "\(liveSystemName) asks at your first reminder"
-        default: notificationsOn ? "Allowed in \(liveSystemName) Settings" : ""
+        default: SettingsWords.notificationsLine(allowed: notificationsOn, device: liveDeviceNoun)
         }
     }
 
