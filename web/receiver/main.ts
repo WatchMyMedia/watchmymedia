@@ -13,6 +13,7 @@ import { castRecoveryAvailable, recordCastTransfer, recordLiveCastTransfer } fro
 import { NEXT_COUNTDOWN, StallMeter, activeSegment, beatDue, bufferedAhead, episodeLine, nextCardShowing, segmentEnd, segmentsAt, skipPlan, type BeatState, type SkipMode } from '../src/lib/play/rules'
 import { noteAutoAdvance, noteInput, shouldAskStillWatching } from '../src/lib/stillWatching'
 import { ADAPTIVE_LEVEL, adaptiveRestrictions, observedRendition, requestAdaptive } from '../src/lib/play/adaptive'
+import { hlsStartPosition, resumePlan, timelineOffset } from '../src/lib/play/stream'
 import { castCaps, castProfile, hlsCodecDefaults } from './profile'
 import { render } from './ui'
 import { publicCastMessage } from './security'
@@ -74,6 +75,8 @@ type Play = {
   nextDueAt?: number
   lastBeat: number
   beatState: BeatState
+  // A seek has landed since the last report (PLAN-RESUME.md §3.6).
+  seekLanded: boolean
   /** An admin stopped it: no more reports. */
   adminStopped: boolean
   /** Reported over (stopped or closed) and its session let go. */
@@ -283,10 +286,13 @@ async function prepare(req: framework.messages.LoadRequestData, sequence: number
     if (!restore && d.sessionId) void api.DELETE('/api/playback/{session}', { params: { path: { session: d.sessionId } } }).catch(() => undefined)
     throw new StaleLoad()
   }
-  // No explicit start: pick up where this user left off.
-  if (fromMs === undefined && d.resumeMs > 5000) {
-    fromMs = d.resumeMs
-    if (d.protocol === 'hls' && d.playlist !== 'vod') {
+  // No explicit start: pick up where this user resumes. A server from
+  // PLAN-RESUME.md §3.7 starts an event session there itself; an older one
+  // is asked again.
+  const resume = fromMs === undefined ? resumePlan(d) : undefined
+  if (resume) {
+    fromMs = resume.fromMs
+    if (resume.again) {
       d = await decide(api, fileLoad, { startMs: fromMs, playId: d.playId })
       if (sequence !== loadSequence) {
         if (d.sessionId) void api.DELETE('/api/playback/{session}', { params: { path: { session: d.sessionId } } }).catch(() => undefined)
@@ -295,8 +301,7 @@ async function prepare(req: framework.messages.LoadRequestData, sequence: number
     }
   }
   const sub = startingSubtitle(load, d, levels.get(load.server.id) ?? 0)
-  const vod = d.protocol === 'file' || d.playlist === 'vod'
-  const offset = vod ? 0 : d.startMs / 1000
+  const offset = timelineOffset(d)
   const media = req.media
   media.contentId = contentId(load.fileId)
   media.contentUrl = withToken(base, d.url, credential.token)
@@ -332,7 +337,9 @@ async function prepare(req: framework.messages.LoadRequestData, sequence: number
     meta.title = title ?? ''
     media.metadata = meta
   }
-  req.currentTime = vod && fromMs !== undefined ? fromMs / 1000 : 0
+  // An event session of copied video begins on the keyframe before the
+  // start, so the player starts that far into it.
+  req.currentTime = fromMs !== undefined ? hlsStartPosition(d, fromMs / 1000) : 0
   req.autoplay = req.autoplay ?? true
   // Keep credentials only in our private play context. Legacy LOADs remain accepted.
   media.customData = { v: load.v, fileId: load.fileId }
@@ -358,6 +365,7 @@ async function prepare(req: framework.messages.LoadRequestData, sequence: number
     autoSkipped: cont && prev ? prev.autoSkipped : new Set(),
     lastBeat: 0,
     beatState: 'buffering',
+    seekLanded: false,
     adminStopped: false,
     over: false,
     quality: qualityById(load.quality, levels.get(load.server.id)).id,
@@ -507,8 +515,9 @@ function beat(state: BeatState, force = false) {
   const p = play
   if (!p || p.adminStopped || p.over) return
   const now = Date.now()
-  if (!force && !beatDue(state, p.lastBeat, now, !!p.decision.auto)) return
+  if (!force && !beatDue(state, p.lastBeat, now, !!p.decision.auto, p.seekLanded)) return
   p.lastBeat = now
+  p.seekLanded = false
   p.beatState = state
   const dur = p.decision.durationMs
   const pos = p.ended ? dur : Math.min(dur, filePositionMs())
@@ -581,6 +590,8 @@ function endPlay(p: Play, state: 'stopped' | 'closed') {
       .PUT('/api/files/{id}/progress', {
         params: { path: { id: p.fileId } },
         body: { positionMs: Math.max(0, Math.floor(pos)), durationMs: dur, playId: p.playId, state, bufferedMs: 0 },
+        // The last report outlives a receiver that is shutting down.
+        keepalive: true,
       })
       .catch(() => undefined)
   }
@@ -1258,7 +1269,10 @@ pm.addEventListener(cast.framework.events.EventType.PLAYING, () => {
 })
 pm.addEventListener([cast.framework.events.EventType.SEEKING, cast.framework.events.EventType.PLAY], () => play?.meter.excuse())
 pm.addEventListener(cast.framework.events.EventType.SEEKED, () => {
-  if (play && pm.getPlayerState() === M.PlayerState.PLAYING) play.meter.settled()
+  if (!play) return
+  if (pm.getPlayerState() === M.PlayerState.PLAYING) play.meter.settled()
+  // The next tick saves where it landed (beatDue).
+  play.seekLanded = true
 })
 pm.addEventListener(cast.framework.events.EventType.PAUSE, () => play?.meter.paused(Date.now()))
 
