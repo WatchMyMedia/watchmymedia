@@ -300,6 +300,7 @@ private struct SettingsRoot: View {
         let card = HStack(spacing: 14) {
             Text(String(displayedUser?.name.first ?? "?").uppercased())
                 .font(.title3.weight(.bold))
+                .dynamicTypeSize(...DynamicTypeSize.xLarge)
                 .foregroundStyle(Palette.text)
                 .frame(width: 48, height: 48)
                 .background(Palette.burgundy, in: Circle())
