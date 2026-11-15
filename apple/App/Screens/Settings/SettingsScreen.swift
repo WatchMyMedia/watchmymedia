@@ -160,7 +160,11 @@ struct SettingsPageView: View {
         switch page {
         case .playback: PlaybackSettingsPage(model: model)
         case .subtitles:
-            if model.supportsSubtitlePreferences { LanguageSettingsPage(model: model) } else { KeptOutPage(reason: .oldServer, server: model.server) }
+            if let reason = services.keptOut(.languages) {
+                KeptOutPage(title: model.languagesTitle, reason: reason)
+            } else {
+                LanguageSettingsPage(model: model)
+            }
         case .account: AccountSettingsPage(model: model)
         case .server: ServerSettingsPage(model: model)
         case .about: AboutSettingsPage(model: model)
@@ -176,7 +180,7 @@ struct RequestsPage: View {
     @Environment(AppServices.self) private var services
 
     var body: some View {
-        if services.requests.options.hasYourRequests { MyRequestsScreen() } else { KeptOutPage(reason: .requestsOff) }
+        if let reason = services.keptOut(.requests) { KeptOutPage(title: SettingsWords.yourRequests, reason: reason) } else { MyRequestsScreen() }
     }
 }
 
@@ -185,7 +189,7 @@ struct DownloadsPage: View {
     @Environment(AppServices.self) private var services
 
     var body: some View {
-        if services.downloads.enabled { DownloadsScreen() } else { KeptOutPage(reason: .downloadsOff) }
+        if let reason = services.keptOut(.downloads) { KeptOutPage(title: SettingsWords.downloads, reason: reason) } else { DownloadsScreen() }
     }
 }
 

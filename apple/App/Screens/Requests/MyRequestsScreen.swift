@@ -64,7 +64,7 @@ private struct MyRequestsView: View {
                 StatusLineView(request.stateLine, fontSize: 13)
                     .padding(.top, 2)
                 if request.status == .pending {
-                    CancelRequestButton(request: request, model: model)
+                    CancelRequestButton(request: request, model: model, viaSeerr: services.requests.options.backend == "seerr")
                         .padding(.top, -4)
                 }
             }
@@ -93,6 +93,7 @@ private struct MyRequestsView: View {
 private struct CancelRequestButton: View {
     let request: MediaRequest
     let model: MyRequestsModel
+    let viaSeerr: Bool
     @State private var asking = false
 
     var body: some View {
@@ -103,11 +104,16 @@ private struct CancelRequestButton: View {
         .accessibilityLabel("Cancel request for \(request.title)")
         .disabled(model.cancelling != nil)
         // The dialog closes before a button's task runs, so the action names its request.
-        .confirmationDialog("Cancel your request for \(request.title)?", isPresented: $asking, titleVisibility: .visible) { [model, request] in
-            Button("Cancel request", role: .destructive) { Task { await model.cancel(request) } }
-            Button("Keep request", role: .cancel) {}
+        .confirmationDialog(words.title, isPresented: $asking, titleVisibility: .visible) { [model, request] in
+            Button(words.confirm, role: .destructive) { Task { await model.cancel(request) } }
+            Button(words.keep, role: .cancel) {}
         } message: {
-            Text("It hasn’t been approved yet, so nothing has been downloaded. Admins stop seeing it, and you can ask again later.")
+            Text(words.message)
         }
+    }
+
+    /// The Kit's words, saying whether Seerr deletes it too.
+    private var words: ConfirmWords {
+        SettingsWords.cancelRequest(title: request.title, viaSeerr: viaSeerr)
     }
 }

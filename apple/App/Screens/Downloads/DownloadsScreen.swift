@@ -164,11 +164,11 @@ private struct DownloadsView: View {
                 Button("Remove all downloads", role: .destructive) { model.confirmingRemoveAll = true }
                     .frame(maxWidth: .infinity)
                     // Asks from the button (Settings2Confirm.dc.html), with the count on the button and what stays.
-                    .confirmationDialog("Remove all \(plural(model.all.count, "download"))?", isPresented: $model.confirmingRemoveAll, titleVisibility: .visible) {
-                        Button("Remove \(plural(model.all.count, "download"))", role: .destructive) { model.removeAll() }
-                        Button("Keep downloads", role: .cancel) {}
+                    .confirmationDialog(removeAll.title, isPresented: $model.confirmingRemoveAll, titleVisibility: .visible) {
+                        Button(removeAll.confirm, role: .destructive) { model.removeAll() }
+                        Button(removeAll.keep, role: .cancel) {}
                     } message: {
-                        Text("Frees \(model.used) on this \(model.device). Your watched marks and resume points stay, and you can download them again while they are in the library.")
+                        Text(removeAll.message)
                     }
             }
         } header: {
@@ -177,6 +177,11 @@ private struct DownloadsView: View {
             Text("Downloads keep going in the background and play until you remove them, even with no connection. Signing out deletes them.")
         }
         .listRowBackground(Palette.surfaceRaised)
+    }
+
+    /// Remove all downloads' question, in the Kit's words (Settings2Confirm.dc.html).
+    private var removeAll: ConfirmWords {
+        SettingsWords.removeAllDownloads(count: model.all.count, bytes: model.usedBytes, device: model.device)
     }
 
     private func row(_ d: OfflineDownload, art: CGSize) -> some View {
