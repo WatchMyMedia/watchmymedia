@@ -79,14 +79,14 @@ final class SettingsTasksTests: XCTestCase {
         tap(app.buttons["account-linkTV"])
         typeCode("K7M", in: app)
         swipeSheetDown(app)
-        let stop = dialogButton(app, "Stop linking")
+        let stop = dialogButton(app, "Discard")
         XCTAssertTrue(stop.waitForExistence(timeout: 10), "a typed code isn't thrown away by a swipe")
         shot(app, "Link a TV — asks before closing")
-        dismissDialog(app, keep: "Keep linking")
+        dismissDialog(app, keep: "Keep typing")
         XCTAssertTrue(stop.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["link-check"].exists, "keeping on leaves the sheet up")
         swipeSheetDown(app)
-        tap(dialogButton(app, "Stop linking"))
+        tap(dialogButton(app, "Discard"))
         XCTAssertTrue(app.buttons["link-check"].waitForNonExistence(timeout: 10))
     }
 
@@ -192,7 +192,88 @@ final class SettingsTasksTests: XCTestCase {
         XCTAssertTrue(text(app, "Sam · admin").exists, "Cancel keeps Sam on Living room server")
     }
 
+    // MARK: Saving
+
+    /// A choice saves at once and its row says so; one the server refuses
+    /// goes back, and its row says what it is still (Settings2PlaybackStates).
+    @MainActor
+    func testARowThatSavesSaysSoAndOneThatFailsGoesBack() {
+        let app = launch(["-fakesSaveFails", "recap", "-settingsPage", "playback"])
+        defer { app.terminate() }
+        let credits = app.buttons["playback-skip-credits"]
+        tap(credits)
+        tap(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Skip after 3 seconds")).firstMatch)
+        let saved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", "Saved."), object: credits)
+        XCTAssertEqual(XCTWaiter.wait(for: [saved], timeout: 10), .completed, String(describing: credits.value))
+        XCTAssertTrue((credits.value as? String)?.hasPrefix("Skip after 3 seconds") == true, String(describing: credits.value))
+        shot(app, "Playback — a row that saved")
+
+        let recap = app.buttons["playback-skip-recap"]
+        tap(recap)
+        tap(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Skip right away")).firstMatch)
+        let failed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", "Couldn’t save, so it’s still Show a Skip button"), object: recap)
+        XCTAssertEqual(XCTWaiter.wait(for: [failed], timeout: 10), .completed, String(describing: recap.value))
+        XCTAssertTrue((recap.value as? String)?.hasPrefix("Show a Skip button") == true, "the choice goes back")
+        shot(app, "Playback — a row that failed")
+    }
+
     // MARK: Account & devices
+
+    @MainActor
+    func testChangePasswordSaysWhatIsWrongThenSignsTheOthersOut() {
+        let app = launch(["-settingsPage", "account"])
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["Sign out Living room TV"].waitForExistence(timeout: 15), "the devices have loaded")
+        tap(app.buttons["account-changePassword"])
+        let current = app.secureTextFields["password-current"]
+        let new = app.secureTextFields["password-new"]
+        let change = app.buttons["password-change"]
+        XCTAssertTrue(current.waitForExistence(timeout: 10))
+        XCTAssertTrue(change.label.hasPrefix("Change password and sign out"), change.label)
+        XCTAssertTrue(text(app, "Living room TV").exists, "the devices it signs out, by name")
+
+        // Too short: the button is off and the field says why.
+        tap(current)
+        current.typeText("nope")
+        tap(new)
+        new.typeText("short")
+        XCTAssertTrue(text(app, "Use 8 characters or more.").waitForExistence(timeout: 5))
+        XCTAssertFalse(change.isEnabled)
+
+        // A wrong current password: said under its field, nothing changed.
+        new.typeText("-and-longer")
+        tap(change)
+        XCTAssertTrue(text(app, "That password is wrong. Nothing was changed.").waitForExistence(timeout: 10))
+        shot(app, "Change password — wrong password")
+
+        tap(current)
+        current.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 4) + "password")
+        tap(change)
+        XCTAssertTrue(current.waitForNonExistence(timeout: 10), "the sheet closes once changed")
+        XCTAssertTrue(app.descendants(matching: .any)["account-banner"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Sign out Living room TV"].exists, "the other devices are signed out")
+        shot(app, "Account & devices — password changed")
+    }
+
+    @MainActor
+    func testChangePasswordSaysTooManyTriesAboveItsButton() {
+        let app = launch(["-fakesPasswordFails", "429", "-settingsPage", "account"])
+        defer { app.terminate() }
+        tap(app.buttons["account-changePassword"])
+        let current = app.secureTextFields["password-current"]
+        XCTAssertTrue(current.waitForExistence(timeout: 10))
+        tap(current)
+        current.typeText("password")
+        let new = app.secureTextFields["password-new"]
+        tap(new)
+        new.typeText("a-new-password")
+        tap(app.buttons["password-change"])
+        let problem = app.descendants(matching: .any)["task-problem"]
+        XCTAssertTrue(problem.waitForExistence(timeout: 10))
+        XCTAssertTrue(problem.label.contains("Too many tries"), problem.label)
+        XCTAssertTrue(problem.label.contains("Nothing was changed"), problem.label)
+        XCTAssertTrue(current.exists, "the sheet stays up")
+    }
 
     @MainActor
     func testRenameIsASheetWithCancelAndRename() {
