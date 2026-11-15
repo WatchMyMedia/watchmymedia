@@ -173,6 +173,21 @@ public enum SettingsWords {
             : "Saved. The Next Episode card now waits for you, on every device."
     }
 
+    /// Quality's Saved line, this device's alone: "Saved. This iPhone now plays 1080p, up to 8 Mbps."
+    public static func qualitySaved(_ quality: StreamQuality, device: String) -> String {
+        switch quality {
+        case .auto: "Saved. This \(device) now plays the original first, and lower when the connection can’t keep up."
+        case .original: "Saved. This \(device) now plays the original quality where the file allows it."
+        default: "Saved. This \(device) now plays \(quality.shortLabel)\(quality.detail.map { ", up to \($0)" } ?? "")."
+        }
+    }
+
+    /// The device's name's Saved line: "Saved. This iPhone now shows as Den
+    /// iPhone in Signed-in devices and the server’s Activity."
+    public static func deviceNameSaved(_ name: String, device: String) -> String {
+        "Saved. This \(device) now shows as \(name) in Signed-in devices and the server’s Activity."
+    }
+
     /// "Saved. Reminders now come 5 minutes before, on every device."
     public static func reminderLeadSaved(_ minutes: Int) -> String {
         "Saved. Reminders now come \(liveLeadChoice(minutes).lowercased()), on every device."

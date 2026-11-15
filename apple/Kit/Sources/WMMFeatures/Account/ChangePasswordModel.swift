@@ -157,9 +157,31 @@ public func passwordChangedBanner(others: Int?, device: String) -> SettingsNotic
     return SettingsNotice(title: "Password changed", body: body)
 }
 
-/// Where Apple TV sends Change password: the web app's own, as a code to scan.
+/// The first server release whose web app has Change password at its own
+/// address, `/settings/account/password` (the web's Settings redesign).
+public let changePasswordPageVersion = "1.4.5"
+
+/// Whether the server's web app has `/settings/account/password`, by its
+/// version: a release from 1.4.5 on, or a build after one (`v1.4.5-3-gabc1234`,
+/// as `git describe` stamps it), has it. A pre-release of 1.4.5
+/// (`v1.4.5-rc.1`), an older release or a version that names no release
+/// (`dev`, a build from source) is taken not to.
+public func serverHasChangePasswordPage(_ server: Server) -> Bool {
+    guard let match = server.version.wholeMatch(of: /v?(\d+)\.(\d+)\.(\d+)(.*)/),
+          let major = Int(match.1), let minor = Int(match.2), let patch = Int(match.3) else { return false }
+    let rest = String(match.4)
+    let afterRelease = rest.isEmpty || rest.wholeMatch(of: /(-\d+-g[0-9a-f]+)?(-dirty)?/) != nil
+    let needed = changePasswordPageVersion.split(separator: ".").compactMap { Int($0) }
+    let version = [major, minor, patch]
+    if version == needed { return afterRelease }
+    return version.lexicographicallyPrecedes(needed) == false
+}
+
+/// Where Apple TV sends Change password, as a code to scan: the web app's
+/// own Change password from 1.4.5, and Account & devices, which every web
+/// app has, on a server older than that or whose version can't say.
 public func changePasswordURL(_ server: Server) -> URL {
-    server.baseURL.appending(path: "settings/account/password")
+    server.baseURL.appending(path: serverHasChangePasswordPage(server) ? "settings/account/password" : "settings/account")
 }
 
 extension SettingsWords {
@@ -167,11 +189,17 @@ extension SettingsWords {
     public static let changePasswordTVLine = "Typing a password with the remote is slow, so this shows a code to scan"
     public static let changePasswordTVValue = "On your phone or computer"
 
-    /// Apple TV's page with the code: where to change it, and that it signs this Apple TV out too.
+    /// Apple TV's page with the code: where to change it, and that it signs
+    /// this Apple TV out too. On a server before 1.4.5 the code opens
+    /// Account & devices, where Change password is.
     public static func changePasswordOnAPhone(_ server: Server) -> SettingsNotice {
-        SettingsNotice(
+        let address = changePasswordURL(server).absoluteString.replacingOccurrences(of: "https://", with: "").replacingOccurrences(of: "http://", with: "")
+        let scan = serverHasChangePasswordPage(server)
+            ? "Scan the code to change it in the web app, or go to \(address) in a browser."
+            : "Scan the code to open Account & devices in the web app and change it there, or go to \(address) in a browser."
+        return SettingsNotice(
             title: "Change your password on your phone",
-            body: "Scan the code to change it in the web app, or go to \(changePasswordURL(server).absoluteString.replacingOccurrences(of: "https://", with: "").replacingOccurrences(of: "http://", with: "")) in a browser. Changing it signs out every other device, this Apple TV too: it will need a new code, or the new password, to sign in again."
+            body: "\(scan) Changing it signs out every other device, this Apple TV too: it will need a new code, or the new password, to sign in again."
         )
     }
 }

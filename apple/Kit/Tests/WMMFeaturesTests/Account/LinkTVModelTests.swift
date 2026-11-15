@@ -80,11 +80,16 @@ import WMMModel
     @Test func tooManyWrongCodesShowTheServersWords() async {
         let auth = ScriptedAuth(user: sam)
         auth.lookUpResult = .failure(APIError(status: 429, message: "Too many tries. Wait a few minutes."))
-        let model = LinkTVModel(auth: auth, code: "AAAAAA")
+        let time = ManualTime()
+        let model = LinkTVModel(auth: auth, code: "AAAAAA", sleep: { try await time.sleep($0) })
         await model.lookUp()
         #expect(model.error == "Too many tries. Wait a few minutes.")
 
+        // No code is sent until the minute is up.
         auth.lookUpResult = .failure(URLError(.timedOut))
+        await model.lookUp()
+        #expect(model.error == "Too many tries. Wait a few minutes.")
+        await time.advance(byMs: 60_000)
         await model.lookUp()
         #expect(model.error == "Couldn't check that code. Try again.")
     }

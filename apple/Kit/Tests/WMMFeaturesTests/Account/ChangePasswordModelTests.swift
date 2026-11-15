@@ -134,3 +134,29 @@ import WMMModel
         #expect(try await auth.sessions(all: false).map(\.current) == [true])
     }
 }
+
+/// Apple TV's Change password address follows the server's version: the web
+/// app's own page from 1.4.5, Account & devices before (or when it can't tell).
+@Suite struct ChangePasswordAddressTests {
+    private func server(_ version: String) -> Server {
+        Server(id: "s", name: "Living room server", baseURL: URL(string: "https://home.example.net")!, version: version, apiLevel: 28)
+    }
+
+    @Test func fromReleaseOneFourFiveTheCodeOpensChangePassword() {
+        for version in ["v1.4.5", "1.4.5", "v1.4.6", "v1.5.0", "v2.0.0", "v1.4.5-3-gabc1234", "v1.4.5-dirty", "v1.10.0"] {
+            #expect(serverHasChangePasswordPage(server(version)), "\(version)")
+            #expect(changePasswordURL(server(version)).absoluteString == "https://home.example.net/settings/account/password", "\(version)")
+        }
+    }
+
+    @Test func beforeItOrWhenItCantTellTheCodeOpensAccountAndDevices() {
+        for version in ["v1.4.4", "1.4.4", "v1.4.5-rc.1", "v1.4.4-12-gabc1234", "v0.9.3", "dev", "", "1.4"] {
+            #expect(!serverHasChangePasswordPage(server(version)), "\(version)")
+            #expect(changePasswordURL(server(version)).absoluteString == "https://home.example.net/settings/account", "\(version)")
+        }
+        #expect(SettingsWords.changePasswordOnAPhone(server("v1.4.4")).body.hasPrefix(
+            "Scan the code to open Account & devices in the web app and change it there, or go to home.example.net/settings/account in a browser."))
+        #expect(SettingsWords.changePasswordOnAPhone(server("v1.4.5")).body.hasPrefix(
+            "Scan the code to change it in the web app, or go to home.example.net/settings/account/password in a browser."))
+    }
+}

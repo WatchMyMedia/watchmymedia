@@ -391,6 +391,12 @@ apps word and decide alike:
   `SettingsModel.loadAdminAccess()` asks GET /api/auth/status and
   `serverSettingsRow` says whether they open from here. **Change password**
   calls PUT /api/auth/password; Apple TV shows `changePasswordURL(_:)` as a code.
+- **Refusals on the fakes.** In a debug build `-fakesSaveFails recap` has the
+  fake preferences refuse that save every time, as an unanswered server would
+  (`recap:422` as a newer server would; also a list such as `recap,autoplay`,
+  `languages` or one of its parts, or `all`), and `-fakesPasswordFails 429`
+  (or `401`, `offline`) the next Change password. `AppServices.fake` reads them
+  (`applyFakeRefusals`), so both apps take them.
 
 ## First run, audio languages and subtitles
 
