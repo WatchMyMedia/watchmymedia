@@ -98,6 +98,39 @@ final class SettingsTasksTests: XCTestCase {
         XCTAssertEqual(steps(app).label, "Step 2 of 3, Check it’s yours")
     }
 
+    /// A task keeps its place when an iPad's window changes size: the
+    /// sheet goes from the iPad's layout to the iPhone's and back on the
+    /// same step, with the code still in.
+    @MainActor
+    func testLinkATVKeepsItsStepWhenTheWindowChangesSize() throws {
+        try XCTSkipUnless(pad, "Window sizes are an iPad's")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = launch(["-settingsPage", "account"])
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        tap(app.buttons["account-linkTV"])
+        typeCode("K7M4PQ", in: app)
+        tap(app.buttons["link-check"])
+        XCTAssertTrue(app.buttons["link-approve"].waitForExistence(timeout: 10))
+
+        let wide = app.windows.firstMatch.frame
+        resizeWindow(app, toWidth: 0.45)
+        XCTAssertTrue(app.buttons["link-approve"].waitForExistence(timeout: 10), "still on Check it’s yours")
+        XCTAssertEqual(steps(app).label, "Step 2 of 3, Check it’s yours")
+        shot(app, "Link a TV — compact window")
+        tap(app.buttons["task-cancel"])
+        XCTAssertTrue(app.buttons["account-linkTV"].waitForExistence(timeout: 10))
+        shot(app, "Account & devices — compact window")
+
+        // Back to full width: the iPad's layout, the sidebar beside the page.
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -3, dy: -3))
+            .press(forDuration: 0.5, thenDragTo: window.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: wide.maxX - window.frame.minX - 3, dy: wide.maxY - window.frame.minY - 3)))
+        let expanded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in app.windows.firstMatch.frame.width >= 1000 }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 10), .completed)
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10))
+    }
+
     // MARK: Switch server
 
     @MainActor
@@ -326,6 +359,15 @@ final class SettingsTasksTests: XCTestCase {
     private func chooseServer(_ name: String, in app: XCUIApplication) {
         let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
         tap(row)
+    }
+
+    /// Drags an iPad window's corner until it is `fraction` of the screen wide.
+    @MainActor
+    private func resizeWindow(_ app: XCUIApplication, toWidth fraction: CGFloat) {
+        let corner = app.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -3, dy: -3))
+        corner.press(forDuration: 0.5, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: fraction, dy: 0.9)))
+        let resized = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in app.windows.firstMatch.frame.width < 600 }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [resized], timeout: 10), .completed, "the window went compact")
     }
 
     @MainActor
