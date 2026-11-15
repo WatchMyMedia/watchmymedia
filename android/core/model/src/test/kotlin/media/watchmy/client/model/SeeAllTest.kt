@@ -106,4 +106,43 @@ class SeeAllTest {
         assertNull(row.cardPanelAt(1, emptyList(), 0, format))
         assertEquals(1, row.cardCount)
     }
+
+    @Test
+    fun `past a library row's last card the TV's panel names the library and the row's sort`() {
+        val item = BrowseItem(ItemKind.Movie, 5, movies, "Quiet Hours", 2026, "", emptyList(), null, null, null, null, false, false, null, false, null, null, 98, null)
+        val row = ScreenRow(RowIds.RECENTLY_RELEASED, RowStyle.Wide, "Recently released · Movies", items = listOf(item), seeAll = RowLink.Library(movies, ItemSort.Released))
+        assertEquals(
+            CardPanel(kicker = "Recently released", title = "See all movies", facts = listOf("By release date"), target = CardTarget.Library),
+            row.cardPanelAt(1, emptyList(), 0, LiveClockFormat(), home().seeAllType(row)),
+        )
+    }
+
+    @Test
+    fun `past Recently aired's last episode the panel says TV shows by last aired`() {
+        val row = ScreenRow(RowIds.RECENTLY_AIRED, RowStyle.Episode, "Recently aired · Episodes", seeAll = RowLink.Library(tv, ItemSort.Aired))
+        val panel = row.cardPanelAt(0, emptyList(), 0, LiveClockFormat(), LibraryType.Tv)
+        assertEquals("Recently aired", panel?.kicker)
+        assertEquals("See all TV shows", panel?.title)
+        assertEquals(listOf("By last aired"), panel?.facts)
+        assertEquals(CardTarget.Library, panel?.target)
+    }
+
+    @Test
+    fun `a list row's See all panel is as it was`() {
+        val row = ScreenRow("list:7", RowStyle.Poster, "Top rated", subtitle = "18 of 50 · From TMDB", seeAll = RowLink.ToList(7), listId = 7)
+        assertEquals(
+            CardPanel(kicker = "Top rated", title = "See all", facts = listOf("18 of 50 · From TMDB"), target = CardTarget.List),
+            row.cardPanelAt(0, emptyList(), 0, LiveClockFormat(), null),
+        )
+    }
+
+    @Test
+    fun `Home's See all type is its link's library, and none for a list, another library or no link`() {
+        val home = home()
+        assertEquals(LibraryType.Tv, home.seeAllType(ScreenRow(RowIds.RECENTLY_AIRED, RowStyle.Episode, "Recently aired", seeAll = RowLink.Library(tv, ItemSort.Aired))))
+        assertEquals(LibraryType.Movie, home.seeAllType(ScreenRow(RowIds.RECENTLY_ADDED_MOVIES, RowStyle.Poster, "Recently added", seeAll = RowLink.Library(movies))))
+        assertNull(home.seeAllType(ScreenRow("list:7", RowStyle.Poster, "Top rated", seeAll = RowLink.ToList(7), listId = 7)))
+        assertNull(home.seeAllType(ScreenRow(RowIds.RECENTLY_ADDED_MOVIES, RowStyle.Poster, "Recently added", seeAll = RowLink.Library(9))))
+        assertNull(home.seeAllType(ScreenRow(RowIds.CONTINUE, RowStyle.Continue, "Continue watching")))
+    }
 }

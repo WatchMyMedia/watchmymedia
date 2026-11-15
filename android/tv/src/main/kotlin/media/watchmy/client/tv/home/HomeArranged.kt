@@ -43,6 +43,7 @@ import androidx.tv.material3.Text
 import media.watchmy.client.model.Hero
 import media.watchmy.client.model.HomeData
 import media.watchmy.client.model.ImageSize
+import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.model.RowStyle
 import media.watchmy.client.model.ScreenRow
@@ -51,10 +52,12 @@ import media.watchmy.client.model.headingLine
 import media.watchmy.client.model.pictureUrl
 import media.watchmy.client.model.drawn
 import media.watchmy.client.model.episodeCards
+import media.watchmy.client.model.seeAllType
 import media.watchmy.client.tv.rows.OnFocusItem
 import media.watchmy.client.tv.rows.TvArrangedRow
 import media.watchmy.client.tv.rows.TvRowActions
 import media.watchmy.client.tv.rows.cardKey
+import media.watchmy.client.tv.rows.tvHomeSeeAll
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.totalsLine
 import media.watchmy.client.tv.components.ContentStart
@@ -80,6 +83,8 @@ import media.watchmy.client.ui.onBack
  * Edit rows and the totals. ▼ at a row pages down and ▲ pages up (the D-pad
  * pages, never a fling); each row comes back to the card it had focus on;
  * Back from a row page goes to page 0 first. Live TV sits in its place.
+ * A row with somewhere to go ends in See all: a list's page, or its
+ * library's grid sorted the row's way ([onOpenLibrary], PLAN-SEE-ALL.md).
  *
  * Focus moves first and the pager follows it: ▼ puts focus on the next
  * row's card at once and the screen slides after, so a key pressed during
@@ -98,8 +103,10 @@ internal fun ArrangedHomeContent(
     liveListings: Boolean,
     onLiveGuide: () -> Unit,
     onEditRows: () -> Unit,
+    onOpenLibrary: (LibraryType) -> Unit = {},
 ) {
     val live = liveChannels.any { it.available }
+    val requests = LocalAppServices.current.browseRequests
     val rows = home.rows.orEmpty().drawn(live)
     val pages = remember(home, rows) { homePages(home.hero != null, rows) }
     val pager = rememberPagerState { pages.size }
@@ -188,7 +195,11 @@ internal fun ArrangedHomeContent(
             onFocusIndex(i)
         }
         if (row.style == RowStyle.Live) LiveRow(liveChannels, liveListings, memory, onWatchLive, onLiveGuide, modifier, counter, onFocusItem)
-        else TvArrangedRow(row, library, memory, actions, modifier, counter, onFocusItem)
+        else {
+            // Kept across focus moves, which redraw the page, so the card's click stays the same one.
+            val seeAll = remember(row, home, actions, onOpenLibrary) { tvHomeSeeAll(row, home, requests, actions, onOpenLibrary) }
+            TvArrangedRow(row, library, memory, actions, modifier, counter, onFocusItem, seeAll = seeAll)
+        }
     }
 
     fun nextName(index: Int): String = when (val next = pages.getOrNull(index + 1)) {
@@ -226,7 +237,7 @@ internal fun ArrangedHomeContent(
                 is HomePage.Row -> {
                     val row = page.row
                     var focused by rememberSaveable(row.id) { mutableIntStateOf(0) }
-                    val panel = remember(row, focused, available, now) { row.cardPanelAt(focused, available, now, format) }
+                    val panel = remember(row, focused, available, now) { row.cardPanelAt(focused, available, now, format, home.seeAllType(row)) }
                     Box(Modifier.fillMaxSize()) {
                         RowBackdrop(panel?.pictureUrl(library, liveRepository, ImageSize.W1280), panel?.seed ?: row.title)
                         if (panel != null) FocusPanel(panel, Modifier.padding(start = ContentStart, top = 96.dp).width(940.dp))

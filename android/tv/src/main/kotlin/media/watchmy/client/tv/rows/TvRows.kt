@@ -3,10 +3,9 @@ package media.watchmy.client.tv.rows
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -18,34 +17,43 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
 import media.watchmy.client.model.BrowseItem
+import media.watchmy.client.model.BrowseRequest
+import media.watchmy.client.model.BrowseRequests
 import media.watchmy.client.model.ContinueItem
+import media.watchmy.client.model.HomeData
 import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.ItemKind
 import media.watchmy.client.model.LibraryRepository
+import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.RowLink
 import media.watchmy.client.model.RowStyle
 import media.watchmy.client.model.ScreenRow
+import media.watchmy.client.model.SeeAllWords
 import media.watchmy.client.model.airedLine
+import media.watchmy.client.model.browseRequest
 import media.watchmy.client.model.cardCount
 import media.watchmy.client.model.codeBadge
 import media.watchmy.client.model.formatDate
 import media.watchmy.client.model.heading
 import media.watchmy.client.model.playRequest
 import media.watchmy.client.model.remainingLine
+import media.watchmy.client.model.seeAllType
+import media.watchmy.client.model.seeAllWords
 import media.watchmy.client.tv.components.ArtBadge
 import media.watchmy.client.tv.components.ArtProgress
 import media.watchmy.client.tv.components.ArtWatched
 import media.watchmy.client.tv.components.CardRow
 import media.watchmy.client.tv.components.FocusMemory
-import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.MediaCard
+import media.watchmy.client.tv.components.RowArtCard
 import media.watchmy.client.tv.components.PlayMark
 import media.watchmy.client.tv.components.SectionHeader
 import media.watchmy.client.tv.components.focusMemory
@@ -65,6 +73,51 @@ internal class TvRowActions(
     val onToggleWatched: (BrowseItem) -> Unit,
     val onOpenList: (Long) -> Unit,
 )
+
+/**
+ * A row's See all on the TV (PLAN-SEE-ALL.md): what its last card says, and
+ * what OK on it does. [list] draws the list glyph instead of the grid's.
+ */
+internal class TvSeeAll(val words: SeeAllWords, val list: Boolean, val onClick: () -> Unit)
+
+/**
+ * A Home row's See all: a list's page, or its library's TV Shows or Movies
+ * at the grid, sorted the row's way ([requests] carries the sort there,
+ * [onOpenLibrary] goes). Null for a row without a link, and for a library
+ * Home has no section for (one of several of its type, PLAN-SEE-ALL.md
+ * decision 6). Continue watching and Live TV have no link.
+ */
+internal fun tvHomeSeeAll(row: ScreenRow, home: HomeData, requests: BrowseRequests, actions: TvRowActions, onOpenLibrary: (LibraryType) -> Unit): TvSeeAll? {
+    val link = row.seeAll ?: return null
+    val type = home.seeAllType(row)
+    val words = seeAllWords(link, type, row.heading().first) ?: return null
+    return TvSeeAll(words, list = link is RowLink.ToList) {
+        when (link) {
+            is RowLink.ToList -> actions.onOpenList(link.listId)
+            is RowLink.Library -> type?.let {
+                requests.post(link.browseRequest())
+                onOpenLibrary(it)
+            }
+        }
+    }
+}
+
+/**
+ * A See all on a row above the TV Shows or Movies grid: a list's page, or
+ * the grid below, sorted the row's way ([onOpen]). A link to another library
+ * than the grid's ([libraryId]) has none.
+ */
+internal fun tvLibrarySeeAll(row: ScreenRow, type: LibraryType, libraryId: Long?, actions: TvRowActions, onOpen: (BrowseRequest) -> Unit): TvSeeAll? {
+    val link = row.seeAll ?: return null
+    if (link is RowLink.Library && link.libraryId != libraryId) return null
+    val words = seeAllWords(link, type, row.heading().first) ?: return null
+    return TvSeeAll(words, list = link is RowLink.ToList) {
+        when (link) {
+            is RowLink.ToList -> actions.onOpenList(link.listId)
+            is RowLink.Library -> onOpen(link.browseRequest())
+        }
+    }
+}
 
 /**
  * The focus key of a row's card, so focus comes back to it: Continue
@@ -87,9 +140,11 @@ internal fun Modifier.rowCard(memory: FocusMemory, key: String, index: Int, onFo
 /**
  * One arranged row on the TV (Home, and LibraryRows.dc.html): its heading
  * and the line beside it, then its cards by style, as Home's rows have
- * always looked; a list's row ends with a See all card. The Live TV row is
- * the screen's to draw. Home's row screens pass [counter] ("Row 2 of 7")
- * and [onFocusItem], so the panel above the row follows the focused card.
+ * always looked; a row with somewhere to go ends with a See all card
+ * ([seeAll]: a list's page, or its library's grid, PLAN-SEE-ALL.md). The
+ * Live TV row is the screen's to draw. Home's row screens pass [counter]
+ * ("Row 2 of 7") and [onFocusItem], so the panel above the row follows the
+ * focused card.
  */
 @Composable
 internal fun TvArrangedRow(
@@ -100,6 +155,7 @@ internal fun TvArrangedRow(
     modifier: Modifier = Modifier,
     counter: String? = null,
     onFocusItem: OnFocusItem? = null,
+    seeAll: TvSeeAll? = null,
 ) {
     val (title, small) = row.heading()
     Column(modifier) {
@@ -173,9 +229,8 @@ internal fun TvArrangedRow(
                 }
                 RowStyle.Live -> Unit
             }
-            val link = row.seeAll as? RowLink.ToList
-            if (link != null) {
-                item("see-all") { SeeAllCard(title, wide = row.style != RowStyle.Poster, onClick = { actions.onOpenList(link.listId) }, modifier = Modifier.rowCard(memory, "${row.id}:all", row.cardCount, onFocusItem)) }
+            if (seeAll != null) {
+                item("see-all") { SeeAllCard(seeAll, wide = row.style != RowStyle.Poster, modifier = Modifier.rowCard(memory, "${row.id}:all", row.cardCount, onFocusItem)) }
             }
         }
     }
@@ -188,26 +243,34 @@ private fun ContinueItem.openPage(actions: TvRowActions) {
     }
 }
 
-/** A list row's last card (LibraryRows.dc.html `.more`): See all, with the titles the library doesn't have. */
+/**
+ * A row's last card (LibraryRows.dc.html `.more`), the size of the row's
+ * artwork as it grows with the row ([RowArtCard]): on a list's row See all,
+ * with the titles the library doesn't have;
+ * on a built-in row "See all TV shows" over "By last aired" with the grid
+ * glyph (PLAN-SEE-ALL.md §3), read aloud as one.
+ */
 @Composable
-private fun SeeAllCard(listName: String, wide: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    FocusableBox(
-        onClick = onClick,
-        modifier = modifier.width(if (wide) 320.dp else 160.dp).semantics { contentDescription = "See all of $listName" },
-        cornerRadius = 12.dp,
+private fun SeeAllCard(seeAll: TvSeeAll, wide: Boolean, modifier: Modifier = Modifier) {
+    RowArtCard(
+        width = if (wide) 320.dp else 160.dp,
+        height = if (wide) 180.dp else 240.dp,
+        onClick = seeAll.onClick,
+        modifier = modifier.semantics { contentDescription = seeAll.words.spoken },
     ) { focused ->
         Column(
             Modifier
-                .width(if (wide) 320.dp else 160.dp)
-                .height(if (wide) 180.dp else 240.dp)
+                .fillMaxSize()
                 .background(if (focused) WmmColors.Surface3 else WmmColors.Surface2, RoundedCornerShape(12.dp))
                 .padding(horizontal = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(WmmIcons.ListBullets, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(36.dp))
-            Text("See all", style = inter(21.sp, FontWeight.Bold), color = WmmColors.Text)
-            Text("With the ones you don’t have", style = inter(17.sp, lineHeight = 23.sp), color = WmmColors.TextMuted, textAlign = TextAlign.Center)
+            Icon(if (seeAll.list) WmmIcons.ListBullets else WmmIcons.Grid, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(36.dp))
+            Text(seeAll.words.title, style = inter(21.sp, FontWeight.Bold, lineHeight = 26.sp), color = WmmColors.Text, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            seeAll.words.detail?.let { detail ->
+                Text(detail, style = inter(17.sp, lineHeight = 23.sp), color = WmmColors.TextMuted, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }

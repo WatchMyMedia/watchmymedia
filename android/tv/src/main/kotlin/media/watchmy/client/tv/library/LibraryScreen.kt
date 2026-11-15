@@ -43,6 +43,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Text
 import media.watchmy.client.model.BrowseItem
+import media.watchmy.client.model.BrowseRequest
 import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.ItemKind
 import media.watchmy.client.model.LibraryType
@@ -85,6 +86,7 @@ import media.watchmy.client.tv.rows.TvArrangedRow
 import media.watchmy.client.tv.rows.TvRowActions
 import media.watchmy.client.tv.rows.bleed
 import media.watchmy.client.tv.rows.cardKey
+import media.watchmy.client.tv.rows.tvLibrarySeeAll
 import media.watchmy.client.ui.ReportShown
 import androidx.compose.runtime.derivedStateOf
 import media.watchmy.client.model.ItemSort
@@ -95,7 +97,9 @@ private enum class Picker { Sort, Decade }
 /**
  * TV Shows or Movies (mockup: design/mockups/android-tv/Library.dc.html):
  * an 8-column poster grid under the sort control and the filter, genre and
- * decade chips, loading more as focus nears the end.
+ * decade chips, loading more as focus nears the end. A row's See all, on
+ * Home or above the grid, opens it sorted the row's way with focus on its
+ * first card (PLAN-SEE-ALL.md §4.4).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -108,7 +112,9 @@ fun LibraryScreen(
 ) {
     val services = LocalAppServices.current
     val notMatched = rememberNotMatchedNotice()
-    val vm = viewModel(key = "library-$type") { LibraryViewModel(services.library, type, createSavedStateHandle(), pageSize = PAGE_SIZE, columns = COLUMNS, countsLine = true) }
+    val vm = viewModel(key = "library-$type") {
+        LibraryViewModel(services.library, type, createSavedStateHandle(), pageSize = PAGE_SIZE, columns = COLUMNS, countsLine = true, requests = services.browseRequests)
+    }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     var picker by rememberSaveable { mutableStateOf<Picker?>(null) }
@@ -138,6 +144,8 @@ fun LibraryScreen(
                 onEditRows = { rows.screen?.let { onNavigate(TvRoutes.RowSettings(it)) } },
                 onVisible = vm::onVisible,
                 onOpen = { item -> item.open(onOpenShow, onOpenMovie, onPlay, notMatched) },
+                onSeeAll = vm::open,
+                onGridShown = vm::gridShown,
             )
         } else Column(Modifier.fillMaxSize().onFocusChanged { contentFocused = it.hasFocus }) {
             Row(
@@ -223,6 +231,14 @@ fun LibraryScreen(
                             withFrameNanos { }
                             if (!contentFocused) memory.restore(fallback = state.items.firstOrNull()?.let { "item:${it.id}" })
                         }
+                        // A row's See all from Home: the grid's first card, once its first page is in.
+                        val toGrid = state.toGrid && !state.loading && !state.refreshing
+                        LaunchedEffect(toGrid) {
+                            if (!toGrid) return@LaunchedEffect
+                            gridState.scrollToItem(0)
+                            state.items.firstOrNull()?.let { focusSoon(memory, "item:${it.id}") }
+                            vm.gridShown()
+                        }
                     }
                 }
             }
@@ -259,9 +275,11 @@ fun LibraryScreen(
 
 /**
  * Movies or TV Shows with their rows (android-tv/LibraryRows.dc.html): the
- * title and its counts, the library's rows in the person's order (a list's
- * ending with See all), Edit rows (Settings › Home rows on this screen),
- * then All movies with Sort, the chips and the grid, in one scroll.
+ * title and its counts, the library's rows in the person's order (each with
+ * somewhere to go ending with See all: a list's page, or the grid below
+ * sorted the row's way, [onSeeAll]), Edit rows (Settings › Home rows on
+ * this screen), then All movies with Sort, the chips and the grid, in one
+ * scroll.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -280,6 +298,8 @@ private fun ArrangedLibrary(
     onEditRows: () -> Unit,
     onVisible: (Int) -> Unit,
     onOpen: (BrowseItem) -> Unit,
+    onSeeAll: (BrowseRequest) -> Unit,
+    onGridShown: () -> Unit,
 ) {
     val services = LocalAppServices.current
     val drawn = rows.rows.drawn(live = false)
@@ -308,7 +328,9 @@ private fun ArrangedLibrary(
                 }
             }
             drawn.forEach { row ->
-                item("row-${row.id}", span = full) { TvArrangedRow(row, services.library, memory, actions, Modifier.bleed(ContentStart, end)) }
+                item("row-${row.id}", span = full) {
+                    TvArrangedRow(row, services.library, memory, actions, Modifier.bleed(ContentStart, end), seeAll = tvLibrarySeeAll(row, type, state.libraryId, actions, onSeeAll))
+                }
             }
             item("edit", span = full) {
                 Row { TvButton("Edit rows", onEditRows, Modifier.focusMemory(memory, "edit"), icon = WmmIcons.Sliders) }
@@ -375,8 +397,20 @@ private fun ArrangedLibrary(
     // it is still there: once the person has moved it (a chip, a filter), the page leaves it be,
     // where it used to throw it back to the top after every filter (§3.2.2).
     var placed by remember { mutableStateOf<String?>(null) }
+    // A row's See all, on Home or above the grid, lands on the grid's first card under All shows, the rows a
+    // scroll up away (PLAN-SEE-ALL.md §4.4). Rows that arrive afterwards leave focus there.
+    var atGrid by remember { mutableStateOf(false) }
+    val gridAsked = state.toGrid && !state.loading && !state.refreshing
+    LaunchedEffect(gridAsked) {
+        if (!gridAsked) return@LaunchedEffect
+        atGrid = true
+        gridState.scrollToItem(drawn.size + 2)
+        state.items.firstOrNull()?.let { item -> if (focusSoon(memory, "item:${item.id}")) placed = "item:${item.id}" }
+        onGridShown()
+    }
     val ready = !(state.loading && state.items.isEmpty())
     LaunchedEffect(first, ready) {
+        if (state.toGrid || atGrid) return@LaunchedEffect
         if (!ready || placed != null && memory.key != placed) return@LaunchedEffect
         val target = if (placed == null) returning ?: first else first
         // The grid's first page may have taken focus and scrolled the rows away: bring them back first.
@@ -391,6 +425,15 @@ private fun ArrangedLibrary(
         memory.restore(fallback = first)
         placed = memory.key
     }
+}
+
+/** Puts focus on [key] as soon as its card is composed, within ten frames; false if it never was. */
+private suspend fun focusSoon(memory: media.watchmy.client.tv.components.FocusMemory, key: String): Boolean {
+    repeat(10) {
+        withFrameNanos { }
+        if (runCatching { memory.requester(key).requestFocus() }.getOrDefault(false)) return true
+    }
+    return false
 }
 
 /** Filters, a divider, then genres and Decade; scrolls sideways when the library has many genres. */

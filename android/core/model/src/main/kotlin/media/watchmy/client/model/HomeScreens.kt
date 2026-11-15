@@ -46,8 +46,11 @@ enum class CardTarget {
     /** The Live TV guide (the Full guide card). */
     Guide,
 
-    /** A list's page (the See all card). */
+    /** A list's page (a list row's See all card). */
     List,
+
+    /** A library's grid, sorted the row's way (a built-in row's See all card, PLAN-SEE-ALL.md). */
+    Library,
 
     /** A file that isn't matched to anything. */
     File,
@@ -73,13 +76,15 @@ fun ScreenRow.headingLine(liveListings: Boolean): String {
  * The panel for the card at [index] of this row: the card itself, or the
  * See all card after the last one. A Live row takes the channel at [index]
  * from [channels] (those available, in the row's order), and the Full
- * guide card after them.
+ * guide card after them. A built-in row's See all names its library, of
+ * [libraryType] (Home's [seeAllType] for the row); without one it has no
+ * panel, as on the tablet, whose panel never reaches that card.
  */
-fun ScreenRow.cardPanelAt(index: Int, channels: List<LiveChannel>, now: Long, format: LiveClockFormat): CardPanel? {
+fun ScreenRow.cardPanelAt(index: Int, channels: List<LiveChannel>, now: Long, format: LiveClockFormat, libraryType: LibraryType? = null): CardPanel? {
     val (headingTitle, _) = heading()
     return when (style) {
-        RowStyle.Poster, RowStyle.Wide -> items.getOrNull(index)?.let { itemPanel(it, index) } ?: seeAllPanel(headingTitle)
-        RowStyle.Episode -> episodes.getOrNull(index)?.let { episodePanel(it, headingTitle) } ?: seeAllPanel(headingTitle)
+        RowStyle.Poster, RowStyle.Wide -> items.getOrNull(index)?.let { itemPanel(it, index) } ?: seeAllPanel(headingTitle, libraryType)
+        RowStyle.Episode -> episodes.getOrNull(index)?.let { episodePanel(it, headingTitle) } ?: seeAllPanel(headingTitle, libraryType)
         RowStyle.Continue -> continueItems.getOrNull(index)?.let(::continuePanel)
         RowStyle.Live -> channels.getOrNull(index)?.let { livePanel(it, now, format) } ?: CardPanel(
             kicker = "Live TV",
@@ -90,12 +95,24 @@ fun ScreenRow.cardPanelAt(index: Int, channels: List<LiveChannel>, now: Long, fo
     }
 }
 
-private fun ScreenRow.seeAllPanel(headingTitle: String): CardPanel? = if (listId == null) null else CardPanel(
-    kicker = headingTitle,
-    title = "See all",
-    facts = listOf(subtitle ?: "With the ones you don’t have"),
-    target = CardTarget.List,
-)
+/**
+ * The See all card's panel: a list's, or a library's in the card's own words
+ * ("See all TV shows", "By last aired", PLAN-SEE-ALL.md §3), over no picture
+ * of its own, as the list's has none.
+ */
+private fun ScreenRow.seeAllPanel(headingTitle: String, libraryType: LibraryType?): CardPanel? {
+    if (listId != null) {
+        return CardPanel(
+            kicker = headingTitle,
+            title = "See all",
+            facts = listOf(subtitle ?: "With the ones you don’t have"),
+            target = CardTarget.List,
+        )
+    }
+    val link = seeAll as? RowLink.Library ?: return null
+    val words = seeAllWords(link, libraryType, headingTitle) ?: return null
+    return CardPanel(kicker = headingTitle, title = words.title, facts = listOfNotNull(words.detail), target = CardTarget.Library)
+}
 
 private fun ScreenRow.itemPanel(item: BrowseItem, index: Int): CardPanel {
     val (headingTitle, _) = heading()
