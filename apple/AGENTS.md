@@ -179,6 +179,13 @@ server, and on iPad in both a regular and a compact width.
     identifier: find a choice by its label (`TVUITests/SettingsTests.swift`).
     A `Menu`'s own label isn't read out either, so a row that is a `Menu`
     sets its `accessibilityLabel` and `accessibilityValue`.
+  - On Apple TV, when a focused button's content is replaced (sign-in's
+    "Sign in with a password instead"), focus goes to the new content's
+    `defaultFocus` only if what was replaced was built in the same body.
+    With the pairing pieces moved into views of their own, nothing had
+    focus after the switch (tvOS 27.2 simulator, `BusyFocusTests`), so the
+    pieces sign-in and Switch server share are `@ViewBuilder` functions
+    (`pairingCodeArea(_:)` in `TV/Screens/SignIn/SignInScreen.swift`).
   - On Apple TV a focused button that becomes disabled keeps focus, dimmed,
     until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
     up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable
@@ -243,7 +250,10 @@ didn't start.
 - Nothing can tap a simulator from a script, so reach screens with launch
   arguments (`-fakes`, `-tab`, `-open watchmymedia://…`, the player's
   `-player…` arguments) and capture with `xcrun simctl io <udid> screenshot`.
-  Screenshots can lag a frame: take another before acting on one.
+  Screenshots can lag a frame: take another before acting on one. A
+  Settings row says Saved for 4 s (`SaveStates.linger`), which a press with
+  the simulator tool followed by its screenshot can outlast: capture with
+  `xcrun simctl io` straight after the press, or read the row in a UI test.
 - Run `make apple-e2e` against your own server copy on its own port
   (`E2E_SERVER=localhost:<port>`), not a fixture server another session runs.
 - Typing into the in-app Safari (`SFSafariViewController`) arrives late and

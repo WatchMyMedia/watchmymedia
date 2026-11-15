@@ -204,10 +204,17 @@ Remind me), each choice with its line; it saves when it is made and the row
 says Saving, then Saved and what it did, or why it couldn't and what it still
 is. What takes the screen has the path across its top and what the remote
 does along its bottom: Name this Apple TV (room names, and Type another name
-for the keyboard), Add a language (names in a grid), the codes to scan for
-Change password and Server settings, and Switch server's three steps, which
-`RootView` keeps above the tabs because a switch rebuilds them. Sign-out
-questions open on the button that keeps things, and Menu is that button.
+for the keyboard), Add a language (every language by name in a grid that
+scrolls, with Search languages above it for the keyboard or the
+microphone), the codes to scan for Change password and Server settings, and
+Switch server's three steps, which `RootView` keeps above the tabs because a
+switch rebuilds them. Sign-out questions open on the button that keeps
+things, and Menu is that button. The groups and their lines
+(`tvSettingsGroups`), the words, each row's save (`saveState(_:)`,
+`LiveExtrasStore.leadSave`), the dialogs and the steps are the Kit's; the
+panel's own text is `TV/Screens/Settings/SettingsPanelWords.swift`, and
+`RowSaves` says Saved for the two changes kept on the device (Quality, the
+name).
 `-settingsGroup playback|languages|homeRows|account|requests|server|about`
 shows a group with focus on it at launch; `-renameDevice`, `-changePassword`,
 `-serverSettingsCode`, `-signOutQuestion`, `-switchServer`,
