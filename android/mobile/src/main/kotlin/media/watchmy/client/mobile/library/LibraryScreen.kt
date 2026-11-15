@@ -105,7 +105,8 @@ fun LibraryScreen(
 ) {
     val services = LocalAppServices.current
     val notMatched = rememberNotMatchedNotice()
-    val vm = viewModel(key = "library-$type") { LibraryViewModel(services.library, type, saved = createSavedStateHandle()) }
+    // A row's See all from Home reaches the grid through the app's browse requests (PLAN-SEE-ALL.md §4.4).
+    val vm = viewModel(key = "library-$type") { LibraryViewModel(services.library, type, saved = createSavedStateHandle(), requests = services.browseRequests) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val user by services.auth.user.collectAsStateWithLifecycle()
@@ -133,6 +134,7 @@ fun LibraryScreen(
     }
     // A new sort or filter starts at the top; coming back from a show keeps the place.
     grid.FollowLibrary(state, top = 0, first = 0, loadMore = vm::loadMore)
+    grid.GoToGridWhenAsked(state, heading = 0, onShown = vm::gridShown)
 
     val title = if (type == LibraryType.Tv) "TV Shows" else "Movies"
     // The first page on its way: the outline of the grid (HomeLoading.dc.html, library), with the sort as it is.

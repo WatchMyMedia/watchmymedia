@@ -1,6 +1,7 @@
 package media.watchmy.client.mobile.navigation
 
 import kotlinx.serialization.Serializable
+import media.watchmy.client.model.LibraryType
 
 /** Phone destinations (type-safe Navigation routes). */
 object MobileRoutes {
@@ -45,3 +46,12 @@ object MobileRoutes {
     @Serializable data class MediaList(val id: Long)
     @Serializable data class Player(val fileId: Long, val startMs: Long? = null, val title: String, val subtitle: String? = null, val backdropPath: String? = null, val recordingId: String? = null)
 }
+
+/**
+ * Not a destination: the TV Shows or Movies tab at its own page, its grid,
+ * for a row's See all (PLAN-SEE-ALL.md §4.4). The tab comes back as it was
+ * left, so its grid takes the row's sort from the app's browse requests,
+ * and a page opened from the tab is closed. A tab switch from the bar keeps
+ * that page.
+ */
+internal data class LibraryTab(val type: LibraryType)
