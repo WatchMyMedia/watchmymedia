@@ -9,7 +9,8 @@ Tablet layouts follow [PLAN-TABLETS.md](../PLAN-TABLETS.md) and the
 [tablet boards](../design/mockups/android-tablet). At 600 dp the bottom bar
 becomes a navigation rail, grids fit the available width, and dialogs and
 single-column pages keep readable widths. At 1000 dp Home, Library, Search,
-details, Settings and the Inbox use two panes. Narrow windows retain the phone layout.
+details and the Inbox use two panes. Settings puts its list of groups beside the
+open group's page from 600 dp. Narrow windows retain the phone layout.
 Tablet playback supports portrait, with episodes below the video, and landscape,
 with Audio, Subtitles and Quality in a side panel that leaves the video playing.
 
@@ -83,6 +84,17 @@ problem reports stay in the Inbox. Admin Inbox access follows both the
 account and the server’s admin-network permission; Search now and Monitor
 still require Radarr/Sonarr management. Settings has Your requests, and admins' Inbox with its count
 on the Settings tab (phone) and the rail's Settings (tablet and TV).
+
+Settings on a phone or tablet ([PLAN-ANDROID-SETTINGS.md](../PLAN-ANDROID-SETTINGS.md))
+opens on a list of groups named and ordered as the
+web app's tabs, each saying what is chosen: Playback, Audio & subtitles,
+Downloads, Home rows, then Account & devices, Your requests and About, and for
+admins a Server group (Inbox, and Server settings, which opens the web app's
+Settings). A group opens its own page (`MobileRoutes.Settings*`), with headings
+for what is kept on this device and what follows the account. A change that
+doesn't save stays on its row with Try again; the account's rows wait until its
+settings have loaded. Signing out, signing another device out and Remove all
+downloads ask first.
 
 A show, a season and an episode all open one page ([PLAN-SHOW-PAGE.md](../PLAN-SHOW-PAGE.md),
 `ShowPageViewModel`): the chosen episode on top with Play, Mark watched and
@@ -227,7 +239,7 @@ own Live TV row in that place. The tablet keeps Continue beside the hero only
 while it is the first row drawn; the TV's first focus is the hero, else the
 first row's first card. Movies and TV get their rows above the grid.
 
-- **Edit Home** (end of Home, and Settings › You › Home rows) and a
+- **Edit Home** (end of Home, and Settings › Home rows) and a
   library's **Edit rows**: a page on the phone, a dialog on the tablet.
   Rows drag by their handle or move with ⋮; Hide and Show, Add a row (the
   hidden rows and lists; lists are made on the web), Reset. Done saves once;
@@ -467,7 +479,7 @@ listings, in channel order. Live TV's top bar has Search listings and More
 (Reminders, Reminder time); from 1000 dp they are header buttons that switch
 the panel beside the guide. A later programme that starts more than the lead
 time ahead offers Remind me, and its details then show the reminder, moved
-or gone, with Remove. Settings › Live TV picks the lead time (0, 1, 5, 10 or
+or gone, with Remove. Settings › Playback › Live TV reminders picks the lead time (0, 1, 5, 10 or
 15 minutes, the same on all the person's devices) and opens the Live TV
 reminders notification channel. Below level 15 nothing of this shows or is
 asked for. The wording is in `core:model`'s `LivePersonal.kt`.

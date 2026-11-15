@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -73,7 +74,13 @@ import media.watchmy.client.mobile.player.PlayerScreen
 import media.watchmy.client.mobile.requests.InboxScreen
 import media.watchmy.client.mobile.requests.MyRequestsScreen
 import media.watchmy.client.mobile.search.SearchScreen
+import media.watchmy.client.mobile.settings.ChangePasswordScreen
 import media.watchmy.client.mobile.settings.SettingsScreen
+import media.watchmy.client.model.SettingsGroup
+import media.watchmy.client.presentation.settings.SettingsViewModel
+import media.watchmy.client.ui.TabletLayout
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.navigation.NavBackStackEntry
 import media.watchmy.client.model.ShowArrival
 import media.watchmy.client.model.DeepLink
 import media.watchmy.client.model.LibraryType
@@ -117,7 +124,41 @@ private fun NavDestination.tab(): MobileTab? = when {
     hasRoute<MobileRoutes.LiveRecordings>() -> MobileTab.LiveTV
     hasRoute<MobileRoutes.LiveReminders>() -> MobileTab.LiveTV
     hasRoute<MobileRoutes.Settings>() -> MobileTab.Settings
+    // Settings' pages keep the bottom bar; its tasks (Link a TV, Change password) hide it (§4.4).
+    hasRoute<MobileRoutes.SettingsPlayback>() -> MobileTab.Settings
+    hasRoute<MobileRoutes.SettingsLanguages>() -> MobileTab.Settings
+    hasRoute<MobileRoutes.SettingsDownloads>() -> MobileTab.Settings
+    hasRoute<MobileRoutes.SettingsAccount>() -> MobileTab.Settings
+    hasRoute<MobileRoutes.SettingsAbout>() -> MobileTab.Settings
     else -> null
+}
+
+/** A Settings group's page route; null for the groups that open screens of their own. */
+private fun SettingsGroup.route(): Any? = when (this) {
+    SettingsGroup.Playback -> MobileRoutes.SettingsPlayback
+    SettingsGroup.Languages -> MobileRoutes.SettingsLanguages
+    SettingsGroup.Downloads -> MobileRoutes.SettingsDownloads
+    SettingsGroup.Account -> MobileRoutes.SettingsAccount
+    SettingsGroup.About -> MobileRoutes.SettingsAbout
+    else -> null
+}
+
+/**
+ * Opens [group]'s page: over the overview on a phone, so Back is Up; beside
+ * the list on a tablet ([beside]), in place of the page there, so Back leaves
+ * Settings' page rather than walking back through each group opened. A
+ * tablet's Settings route is Playback's page.
+ */
+private fun NavHostController.openSettingsPage(group: SettingsGroup, beside: Boolean) {
+    val route = group.route() ?: return
+    when {
+        !beside -> navigate(route) { launchSingleTop = true }
+        group == SettingsGroup.Playback && popBackStack<MobileRoutes.Settings>(inclusive = false) -> Unit
+        else -> navigate(route) {
+            popUpTo<MobileRoutes.Settings>()
+            launchSingleTop = true
+        }
+    }
 }
 
 /** Switches tab the Material way: one copy of each tab, each keeping its own back stack and scroll. */
@@ -205,6 +246,8 @@ fun MobileNavHost(
         entry?.destination?.hasRoute<MobileRoutes.Show>() == true -> MobileTab.TvShows
         entry?.destination?.hasRoute<MobileRoutes.Movie>() == true -> MobileTab.Movies
         entry?.destination?.hasRoute<MobileRoutes.LinkTv>() == true -> MobileTab.Settings
+        entry?.destination?.hasRoute<MobileRoutes.ChangePassword>() == true -> MobileTab.Settings
+        entry?.destination?.hasRoute<MobileRoutes.ChangePasswordDialog>() == true -> MobileTab.Settings
         entry?.destination?.hasRoute<MobileRoutes.EditRows>() == true -> MobileTab.Home
         entry?.destination?.hasRoute<MobileRoutes.MediaList>() == true -> MobileTab.Home
         else -> null
@@ -245,6 +288,11 @@ fun MobileNavHost(
     val openEpisode = { id: Long, season: Int, episode: Long -> nav.navigate(MobileRoutes.Episode(id, season, episode)) }
     val openMovie = { id: Long -> nav.navigate(MobileRoutes.Movie(id)) }
     val go = { route: Any -> nav.go(route) }
+    // Reminder time is in Settings › Playback (PLAN-ANDROID-SETTINGS.md §5.1).
+    val openReminderTime = {
+        go(MobileRoutes.Settings)
+        nav.openSettingsPage(SettingsGroup.Playback, beside = layoutIsTablet(nav))
+    }
 
     val user by services.auth.user.collectAsStateWithLifecycle()
     val layout = rememberTabletLayout()
@@ -351,7 +399,7 @@ fun MobileNavHost(
                                 onReminders = { nav.navigate(MobileRoutes.LiveReminders) },
                                 onRecordings = { nav.navigate(MobileRoutes.LiveRecordings) },
                                 onPlayRecording = nav::play,
-                                onReminderTime = { go(MobileRoutes.Settings) },
+                                onReminderTime = openReminderTime,
                                 target = guideTarget, onTargetShown = { guideTarget = null },
                                 castDevice = castDevice, notLiveDevice = notLiveDevice,
                             )
@@ -370,7 +418,7 @@ fun MobileNavHost(
                             LiveRemindersScreen(
                                 live.channels, onBack = { nav.popBackStack() },
                                 onOpen = { r -> r.channelId?.let { openInGuide(LiveGuideViewModel.Target(it, r.programmeId, r.startMs)) } },
-                                onSettings = { go(MobileRoutes.Settings) },
+                                onSettings = openReminderTime,
                             )
                         }
                         composable<MobileRoutes.LivePlayer> {
@@ -389,16 +437,38 @@ fun MobileNavHost(
                                 },
                             )
                         }
-                        composable<MobileRoutes.Settings> {
-                            SettingsScreen(
-                                onSwitchServer = onSwitchServer,
-                                onSignedOut = onSignedOut,
-                                onLinkTv = { nav.navigate(MobileRoutes.LinkTv()) },
-                                onNavigate = go,
-                                onOpenRequests = { nav.navigate(MobileRoutes.MyRequests) }.takeIf { badge.requests },
-                                onOpenInbox = { nav.navigate(MobileRoutes.Inbox) }.takeIf { badge.inbox != null },
-                                inboxCount = badge.inbox ?: 0,
-                            )
+                        // Settings and a route per group (§7), all on the Settings entry's models.
+                        val settings = @Composable { entry: NavBackStackEntry, open: SettingsGroup? ->
+                            SettingsRoute(nav, entry) {
+                                SettingsScreen(
+                                    onSwitchServer = onSwitchServer,
+                                    onSignedOut = onSignedOut,
+                                    onLinkTv = { nav.navigate(MobileRoutes.LinkTv()) },
+                                    onNavigate = go,
+                                    open = open,
+                                    onOpenPage = nav::openSettingsPage,
+                                    onBack = { nav.popBackStack() },
+                                    onChangePassword = { dialog -> nav.navigate(if (dialog) MobileRoutes.ChangePasswordDialog else MobileRoutes.ChangePassword) },
+                                    onOpenRequests = { nav.navigate(MobileRoutes.MyRequests) }.takeIf { badge.requests },
+                                    onOpenInbox = { nav.navigate(MobileRoutes.Inbox) }.takeIf { badge.inbox != null },
+                                    inboxCount = badge.inbox ?: 0,
+                                )
+                            }
+                        }
+                        composable<MobileRoutes.Settings> { settings(it, null) }
+                        composable<MobileRoutes.SettingsPlayback> { settings(it, SettingsGroup.Playback) }
+                        composable<MobileRoutes.SettingsLanguages> { settings(it, SettingsGroup.Languages) }
+                        composable<MobileRoutes.SettingsDownloads> { settings(it, SettingsGroup.Downloads) }
+                        composable<MobileRoutes.SettingsAccount> { settings(it, SettingsGroup.Account) }
+                        composable<MobileRoutes.SettingsAbout> { settings(it, SettingsGroup.About) }
+                        composable<MobileRoutes.ChangePassword> { ChangePasswordRoute(nav, it, asDialog = false) }
+                        // Not put away by a tap beside it: what was typed would go (§5.3). Back is the screen's.
+                        // The window draws under the keyboard and pads for it: on a tablet held sideways the
+                        // keyboard takes half the screen, and the surface's middle scrolls with its buttons above it.
+                        dialog<MobileRoutes.ChangePasswordDialog>(dialogProperties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
+                            Box(Modifier.fillMaxSize().safeDrawingPadding().padding(20.dp), contentAlignment = Alignment.Center) {
+                                ChangePasswordRoute(nav, it, asDialog = true)
+                            }
                         }
                         composable<MobileRoutes.EditRows> {
                             val r = it.toRoute<MobileRoutes.EditRows>()
@@ -443,6 +513,43 @@ fun MobileNavHost(
             }
         }
     }
+}
+
+/** Whether the window is a tablet's now, for a link into Settings from elsewhere. */
+private fun layoutIsTablet(nav: NavHostController): Boolean {
+    val configuration = nav.context.resources.configuration
+    return TabletLayout.isTablet(configuration.screenWidthDp, configuration.screenHeightDp)
+}
+
+/** The Settings route's entry, whose models the overview, every page and Change password share; [entry] if it isn't there. */
+private fun NavHostController.settingsEntry(entry: NavBackStackEntry): NavBackStackEntry =
+    runCatching { getBackStackEntry<MobileRoutes.Settings>() }.getOrDefault(entry)
+
+/** [content] with the Settings entry's models, so a page and the overview change the same settings. */
+@Composable
+private fun SettingsRoute(nav: NavHostController, entry: NavBackStackEntry, content: @Composable () -> Unit) {
+    val owner = remember(entry) { nav.settingsEntry(entry) }
+    CompositionLocalProvider(LocalViewModelStoreOwner provides owner, content = content)
+}
+
+/**
+ * Change password (§5.3): when it is changed, closes and tells Settings,
+ * whose Account & devices then says how many devices were signed out and
+ * lists them again.
+ */
+@Composable
+private fun ChangePasswordRoute(nav: NavHostController, entry: NavBackStackEntry, asDialog: Boolean) {
+    val services = LocalAppServices.current
+    val owner = remember(entry) { nav.settingsEntry(entry) }
+    val settings = viewModel(owner) { SettingsViewModel(services.auth, services.servers, services.preferences) }
+    ChangePasswordScreen(
+        onClose = { nav.popBackStack() },
+        onChanged = { signedOut ->
+            settings.passwordChanged(signedOut)
+            nav.popBackStack()
+        },
+        asDialog = asDialog,
+    )
 }
 
 /** The one page for a show, a season or an episode (PLAN-SHOW-PAGE.md §4.2): what goes on top first is [arrival]'s. */

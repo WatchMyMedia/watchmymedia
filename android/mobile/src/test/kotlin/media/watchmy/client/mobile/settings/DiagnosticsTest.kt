@@ -13,6 +13,7 @@ import media.watchmy.client.fake.fakeLatencyMs
 import media.watchmy.client.model.AppServices
 import media.watchmy.client.model.Diagnostics
 import media.watchmy.client.model.ProcessExit
+import media.watchmy.client.model.SettingsGroup
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WatchMyMediaPhoneTheme
 import org.junit.After
@@ -27,7 +28,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 
-/** Copy diagnostics in Settings (PLAN-ANDROID-REVIEW §6.4, the Diagnostics board); its words are tested in core:model. */
+/** Copy diagnostics in Settings › About (PLAN-ANDROID-REVIEW §6.4, the Diagnostics board); its words are tested in core:model. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xxhdpi")
 class DiagnosticsTest {
@@ -56,7 +57,7 @@ class DiagnosticsTest {
         }
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides services) {
-                WatchMyMediaPhoneTheme { SettingsScreen(onSwitchServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {}) }
+                WatchMyMediaPhoneTheme { SettingsScreen(onSwitchServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {}, open = SettingsGroup.About) }
             }
         }
         compose.onNodeWithText("Copy diagnostics").performScrollTo().performClick()

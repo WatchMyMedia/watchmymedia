@@ -8,11 +8,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.AuthRepository
 import media.watchmy.client.model.PendingDevice
 import media.watchmy.client.model.User
 import media.watchmy.client.model.attempt
 import media.watchmy.client.model.errorMessage
+import media.watchmy.client.model.isUnreachable
 
 /**
  * The phone side of pairing: type the TV's code, check which device it is,
@@ -31,9 +33,13 @@ class LinkTvViewModel(private val auth: AuthRepository, initialCode: String?) : 
         val code: String = "",
         val step: Step = Step.Enter,
         val busy: Boolean = false,
+        /** The server's words for what went wrong, and which of the board's cases it is. */
         val error: String? = null,
+        val problem: LinkProblem? = null,
         /** The code came in a link rather than off the TV's screen: approve only if the TV shows it now. */
         val fromLink: Boolean = false,
+        /** Moves on when the model sets the code itself (started over), so the field takes it. */
+        val revision: Int = 0,
     ) {
         val complete: Boolean get() = code.length == CODE_LENGTH
     }
@@ -57,14 +63,14 @@ class LinkTvViewModel(private val auth: AuthRepository, initialCode: String?) : 
         val code = normalizeCode(raw)
         if (code == _state.value.code && _state.value.step == Step.Enter) return
         job?.cancel()
-        _state.update { State(code = code, fromLink = fromLink) }
+        _state.update { State(code = code, fromLink = fromLink, revision = it.revision) }
         if (code.length == CODE_LENGTH) lookUp()
     }
 
     fun lookUp() {
         val code = _state.value.code
         if (code.length != CODE_LENGTH) {
-            _state.update { it.copy(error = "The code has $CODE_LENGTH characters.") }
+            _state.update { it.copy(error = "The code has $CODE_LENGTH characters.", problem = LinkProblem.Short) }
             return
         }
         request { auth.lookUpPairing(code) }
@@ -78,25 +84,48 @@ class LinkTvViewModel(private val auth: AuthRepository, initialCode: String?) : 
     /** Back to typing a code. */
     fun startOver() {
         job?.cancel()
-        _state.update { State() }
+        _state.update { State(revision = it.revision + 1) }
     }
 
     private fun request(call: suspend () -> PendingDevice) {
         job?.cancel()
-        _state.update { it.copy(busy = true, error = null) }
+        _state.update { it.copy(busy = true, error = null, problem = null) }
         job = viewModelScope.launch {
             attempt { call() }
                 .onSuccess { device ->
                     _state.update { it.copy(busy = false, step = if (device.approved) Step.Approved(device) else Step.Found(device)) }
                 }
                 .onFailure { e ->
-                    _state.update { it.copy(busy = false, error = errorMessage(e, "Couldn't check that code. Try again.")) }
+                    _state.update { it.copy(busy = false, error = errorMessage(e, "Couldn't check that code. Try again."), problem = LinkProblem.of(e)) }
                 }
         }
     }
 
     companion object {
         const val CODE_LENGTH = 6
+    }
+}
+
+/**
+ * What stopped a code (the SettingsLinkTv board's problems): one no TV is
+ * showing and one that ran out go under the field; a server that didn't
+ * answer goes above the button, which then tries again.
+ */
+enum class LinkProblem {
+    Short,
+    UnknownCode,
+    ExpiredCode,
+    Unreachable,
+    Other,
+    ;
+
+    companion object {
+        fun of(e: Throwable): LinkProblem = when {
+            e.isUnreachable() -> Unreachable
+            (e as? ApiException)?.status == 404 -> UnknownCode
+            (e as? ApiException)?.status == 410 -> ExpiredCode
+            else -> Other
+        }
     }
 }
 

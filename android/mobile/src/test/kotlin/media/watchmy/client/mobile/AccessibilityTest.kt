@@ -25,6 +25,7 @@ import media.watchmy.client.mobile.components.PosterCard
 import media.watchmy.client.mobile.player.ScrubberRow
 import media.watchmy.client.mobile.settings.SettingsScreen
 import media.watchmy.client.model.PlaybackProgress
+import media.watchmy.client.model.SettingsGroup
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.components.Sheen
 import org.junit.Assert.assertEquals
@@ -76,7 +77,7 @@ class AccessibilityTest {
     fun `the autoplay row is one switch, and On mobile data picks a quality`() {
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides FakeAppServices()) {
-                SettingsScreen(onSwitchServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {})
+                SettingsScreen(onSwitchServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {}, open = SettingsGroup.Playback)
             }
         }
         val autoplay = compose.onNode(hasText("Autoplay next episode") and isToggleable())

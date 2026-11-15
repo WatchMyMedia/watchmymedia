@@ -78,7 +78,8 @@ class LiveNavigationFlowTest {
         tab("Live TV").performClick()
         compose.onAllNodes(hasContentDescription("Settings") and hasClickAction()).onFirst().performClick()
         assertTrue(compose.onAllNodes(hasText("Settings")).fetchSemanticsNodes().isNotEmpty())
-        assertTrue(compose.onAllNodes(hasText("Sign out") and hasClickAction()).fetchSemanticsNodes().isNotEmpty())
+        // Settings' overview: signing out is in Account & devices (PLAN-ANDROID-SETTINGS.md §4.1).
+        assertTrue(compose.onAllNodes(hasText("Account & devices") and hasClickAction()).fetchSemanticsNodes().isNotEmpty())
     }
 
     @Test

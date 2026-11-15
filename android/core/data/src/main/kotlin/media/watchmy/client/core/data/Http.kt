@@ -155,6 +155,32 @@ internal class Http(
         return result
     }
 
+    /**
+     * [signedIn] for a call whose 401 may be a refusal rather than a sign-in
+     * that has ended: changing the password with a wrong current one. The
+     * credential clears nothing on its own; a 401 that [isRefusal] reads as
+     * the call's own refusal is thrown as an [ApiException] with status 401,
+     * and any other 401 clears the sign-in as [signedIn] would.
+     */
+    suspend fun <T> signedInRefusing401(isRefusal: (ApiException) -> Boolean, block: suspend (baseUrl: String, client: Call.Factory) -> T): T {
+        val (session, revision) = store.requestSnapshot()
+        val account = session?.account ?: throw SignedOutException()
+        val token = call(signedIn = true) { withContext(Dispatchers.IO) { store.tokenForRequest(session.server.id, account) } }
+            ?: throw SignedOutException()
+        val calls = calls(Credential(session.server.baseUrl, token))
+        val result = try {
+            call(signedIn = false) { block(session.server.baseUrl, calls) }
+        } catch (e: ApiException) {
+            if (e.status == 401 && !isRefusal(e)) {
+                store.tokenRejected(session.server.id, token)
+                throw SignedOutException()
+            }
+            throw e
+        }
+        if (store.revision != revision) throw CancellationException("The signed-in account changed.")
+        return result
+    }
+
     /** Capture before suspension; playback keeps this access through its final stop report. */
     fun bind(): ServerAccess = bind(store.requestSnapshot().first)
 

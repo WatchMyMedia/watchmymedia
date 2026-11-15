@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import media.watchmy.client.core.api.apis.AuthApi
+import media.watchmy.client.core.api.models.ChangePasswordInputBody
 import media.watchmy.client.core.api.models.ClaimPairingInputBody
 import media.watchmy.client.core.api.models.CredentialsInputBody
 import media.watchmy.client.core.api.models.PairingClaim
@@ -159,6 +160,14 @@ internal class RealAuthRepository(
 
     override suspend fun approvePairing(code: String): PendingDevice =
         http.signedIn { base, client -> AuthApi(base, client).approvePairing(normaliseCode(code)) }.toModel()
+
+    // The server answers a wrong current password with 401 "current password is
+    // wrong", which must not sign this device out; "sign in required" still does.
+    override suspend fun changePassword(current: String, new: String) {
+        http.signedInRefusing401({ it.message.orEmpty().contains("password", ignoreCase = true) }) { base, client ->
+            AuthApi(base, client).changePassword(ChangePasswordInputBody(current = current, new = new))
+        }
+    }
 
     /**
      * Refreshes the signed-in user from GET /api/auth/me (a renamed account, a

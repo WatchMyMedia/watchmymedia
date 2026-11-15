@@ -279,17 +279,6 @@
     <issue
         id="ComposeModifierMissing"
         message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
-        errorLine1="fun LinkTvScreen(initialCode: String?, onDone: () -> Unit) {"
-        errorLine2="    ~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/media/watchmy/client/mobile/link/LinkTvScreen.kt"
-            line="63"
-            column="5"/>
-    </issue>
-
-    <issue
-        id="ComposeModifierMissing"
-        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
         errorLine1="fun MobileApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {"
         errorLine2="    ~~~~~~~~~">
         <location
@@ -361,17 +350,6 @@
         <location
             file="src/main/kotlin/media/watchmy/client/mobile/servers/ServerPickerScreen.kt"
             line="72"
-            column="5"/>
-    </issue>
-
-    <issue
-        id="ComposeModifierMissing"
-        message="This @Composable function emits content but doesn&apos;t have a modifier parameter.&#xA;&#xA;See https://slackhq.github.io/compose-lints/rules/#when-should-i-expose-modifier-parameters for more information."
-        errorLine1="fun SettingsScreen("
-        errorLine2="    ~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/media/watchmy/client/mobile/settings/SettingsScreen.kt"
-            line="98"
             column="5"/>
     </issue>
 
