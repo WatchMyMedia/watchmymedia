@@ -492,12 +492,14 @@ private struct SettingsView: View {
                                          choose: @escaping (Value) -> Void) -> some View {
         Menu {
             Section(title) {
-                // A toggle per choice: the menu ticks the chosen one and keeps every line.
+                // A toggle per choice: the menu ticks the chosen one and keeps every line. The label
+                // names both, since tvOS 26 reads out the title alone (27 joins the two by itself).
                 ForEach(choices, id: \.self) { choice in
                     Toggle(isOn: Binding(get: { choice.value == chosen }, set: { on in if on && choice.value != chosen { choose(choice.value) } })) {
                         Text(choice.title)
                         if let line = choice.line { Text(line) }
                     }
+                    .accessibilityLabel([choice.title, choice.line].compactMap { $0 }.joined(separator: ", "))
                     .accessibilityIdentifier("choice-\(key)-\(choice.id)")
                 }
             }

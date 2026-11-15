@@ -175,8 +175,10 @@ server, and on iPad in both a regular and a compact width.
     per choice keeps the title and the line and is ticked when on
     (Settings' `menuRow`). The menu opens with focus on its first choice,
     not the ticked one. XCUI sees each toggle as an `Other` inside a cell,
-    labelled "title, line", `isSelected` when ticked, and without its
-    identifier: find a choice by its label (`TVUITests/SettingsTests.swift`).
+    `isSelected` when ticked. tvOS 27 labels it "title, line" by itself
+    and drops its identifier; tvOS 26.5 keeps the identifier but reads out
+    the title alone, so each toggle sets its `accessibilityLabel` to both.
+    Find a choice by that label (`TVUITests/SettingsTests.swift`).
     A `Menu`'s own label isn't read out either, so a row that is a `Menu`
     sets its `accessibilityLabel` and `accessibilityValue`.
   - On Apple TV, when a focused button's content is replaced (sign-in's

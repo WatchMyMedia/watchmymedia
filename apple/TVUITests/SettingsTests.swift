@@ -166,7 +166,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(credits.value as? String, "Show a Skip button")
         remote.press(.select)
         // The menu's choices are toggles, which reach XCUI as elements inside
-        // cells labelled "<choice>, <its line>", without their identifiers.
+        // cells labelled "<choice>, <its line>"; tvOS 27 drops their identifiers.
         func menuChoice(_ title: String) -> XCUIElement {
             app.otherElements.matching(NSPredicate(format: "label BEGINSWITH %@", "\(title), ")).firstMatch
         }
