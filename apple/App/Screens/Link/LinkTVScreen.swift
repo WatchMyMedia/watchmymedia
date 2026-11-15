@@ -73,7 +73,8 @@ private struct LinkTVSteps: View {
             Button(action: lookUp) { BusyLabel(title: model.primaryTitle, busy: model.busy) }
                 .buttonStyle(PrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
-                .disabled(model.busy || model.primaryOffReason != nil)
+                // Off until six characters are in, and for a minute after too many wrong codes.
+                .disabled(!model.canCheck)
                 .accessibilityHint(model.primaryOffReason ?? "")
                 .accessibilityIdentifier("link-check")
             if let reason = model.primaryOffReason {
