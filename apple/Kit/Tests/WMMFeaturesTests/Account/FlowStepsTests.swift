@@ -79,7 +79,8 @@ import WMMModel
 
     @Test func everyLinkFailureSaysNothingWasLinked() async {
         let auth = ScriptedAuth(user: sam)
-        let model = LinkTVModel(auth: auth, code: "K7M4PQ", serverName: "Living room server")
+        let time = ManualTime()
+        let model = LinkTVModel(auth: auth, code: "K7M4PQ", serverName: "Living room server", sleep: { try await time.sleep($0) })
 
         auth.lookUpResult = .failure(APIError(status: 404, message: "That code is not waiting to be linked."))
         await model.lookUp()
@@ -90,6 +91,7 @@ import WMMModel
         auth.lookUpResult = .failure(APIError(status: 429, message: "Too many attempts."))
         await model.lookUp()
         #expect(model.problem == SettingsNotice(title: "Too many wrong codes", body: "Nothing was linked. Try again in a minute."))
+        await time.advance(byMs: 60_000)
 
         auth.lookUpResult = .failure(APIError(status: nil, message: "Couldn't reach the server. Check the connection and try again."))
         await model.lookUp()
@@ -198,5 +200,113 @@ import WMMModel
         await model.connectToAddress()
         #expect(model.chooseProblem?.title == "Couldn’t connect to 192.0.2.9")
         #expect(model.chooseProblem?.body.hasSuffix("You’re still on Living room server.") == true)
+    }
+}
+
+/// After too many wrong codes, Check this code is off for a minute and says why
+/// (Settings2LinkTvCode.dc.html, `tooMany`).
+@MainActor
+@Suite struct LinkTVTooManyCodesTests {
+    init() { FakeLatency.duration = .zero }
+
+    @Test func checkIsOffForAMinuteAfterTooManyWrongCodes() async {
+        let time = ManualTime()
+        let auth = ScriptedAuth(user: sam)
+        auth.lookUpResult = .failure(APIError(status: 429, message: "Too many attempts. Wait a while and try again."))
+        let model = LinkTVModel(auth: auth, code: "K7M4PQ", serverName: "Living room server", sleep: { try await time.sleep($0) })
+        #expect(model.canCheck && !model.tooManyCodes)
+        await model.lookUp()
+        #expect(model.tooManyCodes)
+        #expect(!model.canCheck)
+        #expect(model.primaryOffReason == "Too many wrong codes. Nothing was linked. Try again in a minute.")
+        #expect(model.problem == SettingsNotice(title: "Too many wrong codes", body: "Nothing was linked. Try again in a minute."))
+
+        // Another code changes nothing: the server is refusing codes, not this one.
+        model.setCode("K7M4PZ")
+        #expect(model.primaryOffReason == "Too many wrong codes. Nothing was linked. Try again in a minute.")
+        auth.lookUpResult = .success(PendingDevice(code: "K7M4PZ", name: "Den TV", approved: false))
+        await model.lookUp()
+        #expect(model.flowStep.number == 1, "no code is sent meanwhile")
+
+        await time.advance(byMs: 59_000)
+        #expect(model.tooManyCodes)
+        await time.advance(byMs: 1_000)
+        #expect(!model.tooManyCodes)
+        #expect(model.canCheck && model.primaryOffReason == nil)
+        await model.lookUp()
+        #expect(model.flowStep.number == 2)
+    }
+
+    @Test func aRefusedApprovalLeavesTheCodeStepAlone() async {
+        let auth = ScriptedAuth(user: sam)
+        auth.lookUpResult = .success(PendingDevice(code: "K7M4PQ", name: "Den TV", approved: false))
+        auth.approveError = APIError(status: 429, message: "Too many attempts.")
+        let model = LinkTVModel(auth: auth, code: "K7M4PQ")
+        await model.lookUp()
+        await model.approve()
+        #expect(model.problem?.title == "Too many tries")
+        #expect(!model.tooManyCodes)
+    }
+}
+
+/// Switch server's Sign in by a code from a signed-in device
+/// (Settings2SwitchSignIn.dc.html), and Apple TV's starting on the code.
+@MainActor
+@Suite struct SwitchServerCodeSignInTests {
+    init() { FakeLatency.duration = .zero }
+
+    @Test func aPhoneCanSignInByACodeInstead() async throws {
+        let services = AppServices.fake(client: .fakePhone)
+        let auth = try #require(services.auth as? FakeAuthRepository)
+        auth.pairingApproval = .zero
+        let model = try #require(ServerSwitchModel(servers: services.servers, auth: services.auth))
+        #expect(!model.pairsByDefault)
+        model.picker.address = FakeServers.officeMini.baseURL.absoluteString
+        await model.connectToAddress()
+        let form = try #require(model.signIn)
+        #expect(!form.codeSignIn, "the password form first")
+        #expect(model.otherWayTitle == "Use a code from a signed-in device instead")
+
+        let run = form.pairingRun
+        model.useCode()
+        #expect(form.codeSignIn)
+        #expect(form.pairingRun == run + 1, "a fresh code")
+        #expect(model.otherWayTitle == "Sign in with a password instead")
+        #expect(model.codeLede == "On a phone or computer signed in to Office Mac mini, open Link a TV and enter this code. You’re still on Living room server until it’s approved.")
+        #expect(model.signInOffReason == nil, "a code needs no name or password")
+
+        model.usePassword()
+        #expect(!form.codeSignIn)
+        model.useCode()
+        await form.pair()
+        model.accountChanged()
+        #expect(model.outcome == .switched)
+        #expect(!model.skippedSignIn)
+        #expect(model.finished(device: "iPhone")?.title == "You’re on Office Mac mini")
+    }
+
+    @Test func appleTVStartsOnTheCode() async throws {
+        let services = AppServices.fake(client: .fakeAppleTV)
+        let model = try #require(ServerSwitchModel(servers: services.servers, auth: services.auth, pairsByDefault: true))
+        #expect(model.pairsByDefault)
+        model.picker.address = FakeServers.officeMini.baseURL.absoluteString
+        await model.connectToAddress()
+        let form = try #require(model.signIn)
+        #expect(form.pairsByDefault && form.codeSignIn)
+        #expect(model.otherWayTitle == "Sign in with a password instead")
+        model.usePassword()
+        #expect(!form.codeSignIn)
+        model.useCode()
+        #expect(form.codeSignIn)
+    }
+
+    @Test func firstRunSignInOnAPhoneCanUseACodeToo() async {
+        let servers = FakeServerRepository(signedIn: false)
+        let model = SignInModel(servers: servers, auth: FakeAuthRepository(signedIn: false, servers: servers))
+        #expect(!model.codeSignIn && !model.usingCode)
+        model.usePairingCode()
+        #expect(model.codeSignIn && model.usingCode)
+        model.usePassword()
+        #expect(!model.codeSignIn && !model.usingCode)
     }
 }

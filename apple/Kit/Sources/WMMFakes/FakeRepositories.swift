@@ -575,23 +575,39 @@ public final class FakePreferencesRepository: PreferencesRepository {
     public private(set) var playback = PlaybackPreferences()
     /// Automatic, as on a device that never picked one.
     public private(set) var quality: StreamQuality = .auto
+    /// Saves refused as a server would (`-fakesSaveFails`, ``FakeSaveRefusal``).
+    public var refusal: FakeSaveRefusal?
+    /// How long a refused save takes, so the row says Saving first; none while ``FakeLatency`` is zero.
+    public var refusalDelay: Duration = .milliseconds(600)
 
     public init() {}
 
     public func refresh() async throws { await FakeLatency.wait() }
 
     public func setSkip(_ kind: SegmentKind, mode: SkipMode) async throws {
+        try await refuse(kind.rawValue)
         playback.skip[kind] = mode
     }
 
     public func setAutoplayNext(_ enabled: Bool) async throws {
+        try await refuse("autoplay")
         playback.autoplayNext = enabled
+    }
+
+    private func refuse(_ part: String, in group: String? = nil) async throws {
+        guard let refusal, refusal.refuses(part, in: group) else { return }
+        if FakeLatency.duration > .zero { try? await Task.sleep(for: refusalDelay) }
+        throw refusal.error
     }
 
     /// The server's rule (PLAN-LANGUAGES.md §5.3): someone who saves their
     /// first audio language and never chose how subtitles start gets
     /// subtitles for foreign audio.
     public func setLanguages(_ change: LanguageChange) async throws {
+        let part = change.audioLanguages != nil ? "audioLanguages"
+            : change.subtitleLanguages != nil ? "subtitleLanguages"
+            : change.choice != nil ? "subtitleChoice" : "automaticDownload"
+        try await refuse(part, in: "languages")
         change.apply(to: &playback)
         if change.choice != nil { choseSubtitles = true }
         if change.audioLanguages?.isEmpty == false, !choseSubtitles {

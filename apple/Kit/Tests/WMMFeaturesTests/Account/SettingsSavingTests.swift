@@ -228,3 +228,56 @@ import WMMModel
         #expect(SaveState.saving.line == nil && SaveState.saving.isSaving)
     }
 }
+
+/// The two settings kept on the device say Saved too, worded for the device
+/// (PLAN-APPLE-SETTINGS.md §3.1): Quality, and the device's name.
+@MainActor
+@Suite struct DeviceSettingsSavedTests {
+    init() { FakeLatency.duration = .zero }
+
+    private func model(_ device: String, level: Int = ServerFeatures.Level.tokenWithDecision, time: ManualTime) -> SettingsModel {
+        let servers = TestServers()
+        var server = FakeServers.livingRoom
+        server.apiLevel = level
+        servers.current = SavedServer(server: server, userName: "Sam", signedIn: true, lastUsedAt: .now)
+        return SettingsModel(servers: servers, auth: ScriptedAuth(user: sam), preferences: FakePreferencesRepository(),
+                             facts: .init(model: device, system: "", appVersion: "1", build: ""), sleep: { try await time.sleep($0) })
+    }
+
+    @Test func qualitySaysWhatThisDeviceNowPlays() async {
+        let time = ManualTime()
+        let phone = model("iPhone 16", time: time)
+        phone.setQuality(.fullHD)
+        #expect(phone.qualitySave == .saved("Saved. This iPhone now plays 1080p, up to 8 Mbps."))
+        await time.advance(byMs: 4_000)
+        #expect(phone.qualitySave == .rest)
+        phone.setQuality(.fullHD)
+        #expect(phone.qualitySave == .rest, "the same choice says nothing")
+        phone.setQuality(.auto)
+        #expect(phone.qualitySave.savedLine == "Saved. This iPhone now plays the original first, and lower when the connection can’t keep up.")
+        phone.setQuality(.original)
+        #expect(phone.qualitySave.savedLine == "Saved. This iPhone now plays the original quality where the file allows it.")
+
+        // A server that can't choose the step plays a saved Automatic as the original.
+        let old = model("Apple TV 4K", level: 2, time: time)
+        old.setQuality(.uhd)
+        #expect(old.qualitySave.savedLine == "Saved. This Apple TV now plays 4K, up to 20 Mbps.")
+        old.setQuality(.auto)
+        #expect(old.qualitySave.savedLine == "Saved. This Apple TV now plays the original quality where the file allows it.")
+    }
+
+    @Test func theNameSaysWhereItNowShows() async {
+        let time = ManualTime()
+        let pad = model("iPad Air", time: time)
+        await pad.rename("Den iPad")
+        #expect(pad.deviceNameSave == .saved("Saved. This iPad now shows as Den iPad in Signed-in devices and the server’s Activity."))
+        await time.advance(byMs: 4_000)
+        #expect(pad.deviceNameSave == .rest)
+        await pad.rename("Den iPad")
+        #expect(pad.deviceNameSave == .rest, "the same name says nothing")
+        let task = pad.renameTask()
+        task.name = " Kitchen iPad "
+        await pad.rename(task)
+        #expect(pad.deviceNameSave.savedLine?.contains("Kitchen iPad in Signed-in devices") == true)
+    }
+}
