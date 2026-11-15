@@ -198,6 +198,30 @@ final class SettingsTasksTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15), "Done shows the new server's Home")
     }
 
+    /// "Use a code from a signed-in device instead" swaps the form for a
+    /// code, and back; the fakes approve a code after a few seconds, so
+    /// the switch ends on Switched without a password.
+    @MainActor
+    func testSwitchServerSignsInWithACodeFromASignedInDevice() {
+        let app = launch(["-settingsPage", "server"])
+        defer { app.terminate() }
+        tap(app.buttons["server-switch"])
+        chooseServer("Office Mac mini", in: app)
+        XCTAssertTrue(app.textFields["switch-name"].waitForExistence(timeout: 15))
+        let other = app.buttons["switch-other-way"]
+        XCTAssertEqual(other.label, "Use a code from a signed-in device instead")
+        tap(other)
+        XCTAssertTrue(app.descendants(matching: .any)["switch-code"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.textFields["switch-name"].exists)
+        XCTAssertEqual(app.buttons["switch-other-way"].label, "Sign in with a password instead")
+        shot(app, "Switch server — a code from a signed-in device")
+        tap(app.buttons["switch-other-way"])
+        XCTAssertTrue(app.textFields["switch-name"].waitForExistence(timeout: 10), "back to the form")
+        tap(app.buttons["switch-other-way"])
+        XCTAssertTrue(app.buttons["switch-done"].waitForExistence(timeout: 30), "the code was approved")
+        XCTAssertEqual(steps(app).label, "Switched")
+    }
+
     @MainActor
     func testSwitchServerCancelsAtEachStepAndStaysOnTheFirstServer() {
         let app = launch(["-settingsPage", "server"])
@@ -224,6 +248,13 @@ final class SettingsTasksTests: XCTestCase {
     func testARowThatSavesSaysSoAndOneThatFailsGoesBack() {
         let app = launch(["-fakesSaveFails", "recap", "-settingsPage", "playback"])
         defer { app.terminate() }
+        // Quality is kept on this device: it can't fail, and still says Saved.
+        let quality = app.buttons["playback-quality"]
+        tap(quality)
+        tap(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "1080p")).firstMatch)
+        let qualitySaved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", "Saved."), object: quality)
+        XCTAssertEqual(XCTWaiter.wait(for: [qualitySaved], timeout: 10), .completed, String(describing: quality.value))
+
         let credits = app.buttons["playback-skip-credits"]
         tap(credits)
         tap(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Skip after 3 seconds")).firstMatch)
@@ -321,7 +352,9 @@ final class SettingsTasksTests: XCTestCase {
         field.typeText("Den iPhone")
         tap(app.buttons["rename-save"])
         XCTAssertTrue(field.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["account-rename"].label.contains("Den iPhone"), app.buttons["account-rename"].label)
+        let renamed = app.buttons["account-rename"]
+        XCTAssertTrue(renamed.label.contains("Den iPhone"), renamed.label)
+        XCTAssertTrue(renamed.label.contains("Saved."), "the row says the name saved: \(renamed.label)")
         shot(app, "Account & devices — renamed")
     }
 
