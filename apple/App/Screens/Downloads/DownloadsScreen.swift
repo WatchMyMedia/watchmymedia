@@ -55,12 +55,6 @@ private struct DownloadsView: View {
         .groundBackground()
         .navigationTitle("Downloads")
         .onAppear { model.refreshStorage() }
-        .alert("Remove all downloads?", isPresented: $model.confirmingRemoveAll) {
-            Button("Cancel", role: .cancel) {}
-            Button("Remove all", role: .destructive) { model.removeAll() }
-        } message: {
-            Text(model.removeAllLine)
-        }
         .messageToast($model.message)
     }
 
@@ -169,6 +163,13 @@ private struct DownloadsView: View {
             if !model.all.isEmpty {
                 Button("Remove all downloads", role: .destructive) { model.confirmingRemoveAll = true }
                     .frame(maxWidth: .infinity)
+                    // Asks from the button (Settings2Confirm.dc.html), with the count on the button and what stays.
+                    .confirmationDialog("Remove all \(plural(model.all.count, "download"))?", isPresented: $model.confirmingRemoveAll, titleVisibility: .visible) {
+                        Button("Remove \(plural(model.all.count, "download"))", role: .destructive) { model.removeAll() }
+                        Button("Keep downloads", role: .cancel) {}
+                    } message: {
+                        Text("Frees \(model.used) on this \(model.device). Your watched marks and resume points stay, and you can download them again while they are in the library.")
+                    }
             }
         } header: {
             Text("Download settings")

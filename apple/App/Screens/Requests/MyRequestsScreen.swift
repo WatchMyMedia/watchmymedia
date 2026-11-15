@@ -64,13 +64,8 @@ private struct MyRequestsView: View {
                 StatusLineView(request.stateLine, fontSize: 13)
                     .padding(.top, 2)
                 if request.status == .pending {
-                    Button { Task { await model.cancel(request) } } label: {
-                        BusyLabel(title: "Cancel request", busy: model.cancelling == request.id)
-                    }
-                    .buttonStyle(SmallGhostButtonStyle())
-                    .accessibilityLabel("Cancel request for \(request.title)")
-                    .disabled(model.cancelling != nil)
-                    .padding(.top, -4)
+                    CancelRequestButton(request: request, model: model)
+                        .padding(.top, -4)
                 }
             }
             Spacer(minLength: 0)
@@ -90,5 +85,29 @@ private struct MyRequestsView: View {
         if let id = request.movieID { return .movie(id: id) }
         if let id = request.showID { return .show(id: id, season: request.seasons.first) }
         return nil
+    }
+}
+
+/// Cancel request, which asks first (Settings2Confirm.dc.html, as the web
+/// does since its redesign), from the button that asked.
+private struct CancelRequestButton: View {
+    let request: MediaRequest
+    let model: MyRequestsModel
+    @State private var asking = false
+
+    var body: some View {
+        Button { asking = true } label: {
+            BusyLabel(title: "Cancel request", busy: model.cancelling == request.id)
+        }
+        .buttonStyle(SmallGhostButtonStyle())
+        .accessibilityLabel("Cancel request for \(request.title)")
+        .disabled(model.cancelling != nil)
+        // The dialog closes before a button's task runs, so the action names its request.
+        .confirmationDialog("Cancel your request for \(request.title)?", isPresented: $asking, titleVisibility: .visible) { [model, request] in
+            Button("Cancel request", role: .destructive) { Task { await model.cancel(request) } }
+            Button("Keep request", role: .cancel) {}
+        } message: {
+            Text("It hasn’t been approved yet, so nothing has been downloaded. Admins stop seeing it, and you can ask again later.")
+        }
     }
 }
