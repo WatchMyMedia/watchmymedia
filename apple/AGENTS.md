@@ -186,6 +186,12 @@ server, and on iPad in both a regular and a compact width.
   a `Toggle` per choice in a `Menu`: it ticks the chosen one and a second
   `Text` is its line. A page's two columns hold groups in another order than
   the phone's single column, so a page gives each its own (`SettingsAdaptive`).
+  The words, saving states, steps and dialogs are the Kit's (`SettingsWords`,
+  `SaveState`, `FlowStep`, `ConfirmWords`): a view draws a control's
+  `saveState` as its row's line with `rowLine(rest:)` and disables only that
+  control while it saves, and a new sentence goes into the Kit, not the view.
+  To see or test a refusal on the fakes, launch a debug build with
+  `-fakesSaveFails <part>` or `-fakesPasswordFails <status>`.
 - **Accessibility identifiers.** An `.accessibilityIdentifier` on a container
   that isn't an element (a `VStack`, a `TimelineView`) is given to every
   child, over their own: add `.accessibilityElement(children: .contain)`
