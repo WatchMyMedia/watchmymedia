@@ -11,17 +11,27 @@ struct TVRowActions {
     var resume: (ContinueItem) -> Void = { _ in }
     var openPage: (ContinueItem) -> Void = { _ in }
     var setWatched: (WatchTarget, Bool) async -> Void
-    /// A list's page, from the See all card at the end of its row.
-    var openList: (Int) -> Void
+    /// The row's See all (PLAN-SEE-ALL.md): what its card says and what Select
+    /// on it does, or nil for a row without one.
+    var seeAll: (ScreenRow) -> TVRowSeeAll? = { _ in nil }
+}
+
+/// A row's See all card: its words (``SeeAllWords``) and what Select does, a
+/// list's page or the library's grid sorted the row's way.
+struct TVRowSeeAll {
+    let words: SeeAllWords
+    let open: () -> Void
 }
 
 /// One arranged row on Apple TV (PLAN-ROWS.md §6.1; TvLibraryRows.dc.html),
 /// drawn by its style with Home's cards, or the app's Live TV row in the
 /// `live` slot. A list row has its line beside its name ("18 of 50 · From
-/// TMDB") and ends in a See all card. On Home's screens (PLAN-HOME.md §7.4)
-/// `counter` is "Row 2 of 7", `focusedCard` receives the focused card's key
-/// (``BrowseItem/cardID``, ``EpisodeCard/cardKey``, ``ContinueItem/cardKey``)
-/// and `focusedChannel` the Live TV row's focused channel.
+/// TMDB"). A poster, 16:9 or episode row with a See all (a list, or a
+/// built-in row's library, PLAN-SEE-ALL.md §4.3) ends in a See all card. On
+/// Home's screens (PLAN-HOME.md §7.4) `counter` is "Row 2 of 7",
+/// `focusedCard` receives the focused card's key (``BrowseItem/cardID``,
+/// ``EpisodeCard/cardKey``, ``ContinueItem/cardKey``) and `focusedChannel`
+/// the Live TV row's focused channel.
 struct TVArrangedRow: View {
     let row: ScreenRow
     let actions: TVRowActions
@@ -38,28 +48,27 @@ struct TVArrangedRow: View {
             TVLiveHomeRow(counter: counter, focusedChannel: focusedChannel)
         case .continue:
             ShelfRow(title: heading.title, detail: detail, items: row.continueItems, counter: counter, focusedItem: focusKey { id in row.continueItems.first { $0.id == id }?.cardKey }) { item in continueCard(item) }
-        case .episode:
-            ShelfRow(title: heading.title, detail: detail, items: row.episodes, counter: counter, focusedItem: focusKey { id in row.episodes.first { $0.id == id }?.cardKey }) { episode in episodeCard(episode) }
-        case .wide:
-            ShelfRow(title: heading.title, detail: detail, items: cards, counter: counter, focusedItem: itemKey) { card in
+        case .episode, .wide, .poster:
+            let seeAll = actions.seeAll(row)
+            ShelfRow(title: heading.title, detail: detail, items: cards(seeAll), counter: counter, focusedItem: cardKey) { card in
                 switch card {
-                case .item(let item): wideCard(item)
-                case .seeAll(let id, let total): SeeAllCard(total: total, width: 320, height: 180) { actions.openList(id) }
-                }
-            }
-        case .poster:
-            ShelfRow(title: heading.title, detail: detail, items: cards, counter: counter, focusedItem: itemKey) { card in
-                switch card {
-                case .item(let item): posterCard(item)
-                case .seeAll(let id, let total): SeeAllCard(total: total, width: 160, height: 240) { actions.openList(id) }
+                case .item(let item):
+                    if row.style == .poster { posterCard(item) } else { wideCard(item) }
+                case .episode(let episode):
+                    episodeCard(episode)
+                case .seeAll:
+                    if let seeAll {
+                        SeeAllCard(seeAll: seeAll, line: seeAll.words.tvCardLine(listTotal: row.listTotal), poster: row.style == .poster)
+                    }
                 }
             }
         }
     }
 
-    /// `focusedCard` over the row's cards: a See all card leaves the last item's panel up.
-    private var itemKey: Binding<ShelfCard.ID?>? {
-        focusKey { id in id.hasPrefix("seeAll-") ? nil : id }
+    /// `focusedCard` over the row's cards: the See all card leaves the last
+    /// card's panel up, as it never leads the row (``RowPanel/leadingCard(settledOn:was:)``).
+    private var cardKey: Binding<ShelfCard.ID?>? {
+        focusKey { id in RowPanel.leadingCard(settledOn: id, was: nil) }
     }
 
     /// `focusedCard` as a binding over a row's own ids, written through `key`.
@@ -68,18 +77,11 @@ struct TVArrangedRow: View {
         return Binding(get: { nil }, set: { id in if let id, let key = key(id) { focusedCard.wrappedValue = key } })
     }
 
-    /// The row's items, then See all for a list.
-    private var cards: [ShelfCard] {
-        var cards = row.items.map(ShelfCard.item)
-        if case .list(let id)? = row.seeAll { cards.append(.seeAll(listID: id, total: listTotal)) }
+    /// The row's cards, then See all when it has one.
+    private func cards(_ seeAll: TVRowSeeAll?) -> [ShelfCard] {
+        var cards = row.style == .episode ? row.episodes.map(ShelfCard.episode) : row.items.map(ShelfCard.item)
+        if seeAll != nil { cards.append(.seeAll) }
         return cards
-    }
-
-    /// "50", from the line "18 of 50 · From TMDB".
-    private var listTotal: String? {
-        guard let line = row.subtitle, let range = line.range(of: " of ") else { return nil }
-        let total = line[range.upperBound...].prefix { $0.isNumber || $0 == "," }
-        return total.isEmpty ? nil : String(total)
     }
 
     private func url(_ path: String?, _ size: ImageSize) -> URL? {
@@ -157,47 +159,67 @@ struct TVArrangedRow: View {
     }
 }
 
-/// A card in a row: an item, or a list's See all at its end.
-enum ShelfCard: Identifiable, Hashable {
+/// A card in a row: an item, an episode, or the row's See all at its end.
+enum ShelfCard: Identifiable {
     case item(BrowseItem)
-    case seeAll(listID: Int, total: String?)
+    case episode(EpisodeCard)
+    case seeAll
 
     var id: String {
         switch self {
         case .item(let item): item.cardID
-        case .seeAll(let id, _): "seeAll-\(id)"
+        case .episode(let episode): episode.cardKey
+        case .seeAll: SeeAllWords.cardKey
         }
     }
 }
 
-/// "See all 50" on a faint card the size of the row's others.
+/// A row's last card, the size of its others (TvLibraryRows.dc.html's list
+/// card): "See all" over a list's count, or "See all TV shows" over "By
+/// last aired" for a built-in row's library (PLAN-SEE-ALL.md §3).
 private struct SeeAllCard: View {
-    let total: String?
-    let width: CGFloat
-    let height: CGFloat
-    let action: () -> Void
+    let seeAll: TVRowSeeAll
+    let line: String?
+    /// A poster row's 160 × 240; else a 16:9 row's 320 × 180.
+    let poster: Bool
 
     var body: some View {
-        Button(action: action) { Face(total: total, width: width, height: height) }
+        Button(action: seeAll.open) { Face(words: seeAll.words, line: line, poster: poster) }
             .buttonStyle(.borderless)
-            .accessibilityLabel(total.map { "See all \($0)" } ?? "See all")
+            // Play/Pause on it does what Select does, as on a show's card.
+            .playPauseCard(.select) { seeAll.open() }
+            .accessibilityLabel(seeAll.words.accessibilityLabel)
             .accessibilityIdentifier("row-see-all")
     }
 
+    /// A list's card as TvLibraryRows.dc.html draws it, "See all" over the
+    /// count in one size; a library's with its name over the sort in a
+    /// smaller line, "TV shows" under "See all" on a poster, where the whole
+    /// name doesn't fit a line.
     private struct Face: View {
-        let total: String?
-        let width: CGFloat
-        let height: CGFloat
+        let words: SeeAllWords
+        let line: String?
+        let poster: Bool
         @Environment(\.isFocused) private var focused
 
         var body: some View {
-            Text(total.map { "See all\n\($0)" } ?? "See all")
-                .font(.system(size: 20, weight: .semibold))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(focused ? Palette.ground : Palette.textSecondary)
-                .frame(width: width, height: height)
-                .background(focused ? Palette.text : .white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
-                .focusRim(focused, cornerRadius: 16)
+            Group {
+                if words.destination == .list {
+                    Text([words.title, line].compactMap { $0 }.joined(separator: "\n"))
+                } else {
+                    VStack(spacing: 8) {
+                        Text(poster ? words.title.replacingOccurrences(of: "See all ", with: "See all\n") : words.title)
+                        if let line { Text(line).font(.system(size: 17, weight: .regular)) }
+                    }
+                }
+            }
+            .font(.system(size: 20, weight: .semibold))
+            .multilineTextAlignment(.center)
+            .foregroundStyle(focused ? Palette.ground : Palette.textSecondary)
+            .padding(.horizontal, 12)
+            .frame(width: poster ? 160 : 320, height: poster ? 240 : 180)
+            .background(focused ? Palette.text : .white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+            .focusRim(focused, cornerRadius: 16)
         }
     }
 }

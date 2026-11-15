@@ -66,6 +66,17 @@ public struct SeeAllWords: Hashable, Sendable {
         }
     }
 
+    /// The second line on Apple TV's See all card (PLAN-SEE-ALL.md S5), which
+    /// keeps the list card's look (TvLibraryRows.dc.html): a list's whole
+    /// count, "50", as that card has always said; a library's sort, "By last
+    /// aired". Nil when there is neither. VoiceOver reads ``accessibilityLabel``.
+    public func tvCardLine(listTotal: Int?) -> String? {
+        switch destination {
+        case .list: listTotal.map(formatCount)
+        case .library: detail
+        }
+    }
+
     /// The See all card's identity among a row's cards (beside
     /// ``BrowseItem/cardID`` and ``EpisodeCard/cardKey``). It never becomes the
     /// iPad's leading card: ``RowPanel/leadingCard(settledOn:was:)``.

@@ -4,9 +4,9 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// A row's See all on iPhone and iPad (PLAN-SEE-ALL.md §4.4, S3): the card's
-/// words, Home handing the row's link to the library's tab once, and the grid
-/// taking it.
+/// A row's See all on iPhone and iPad (PLAN-SEE-ALL.md §4.4, S3) and Apple
+/// TV (S5): the card's words, Home handing the row's link to the library's
+/// tab once, and the grid taking it.
 @MainActor
 @Suite struct SeeAllTests {
     let navigator = Navigator()
@@ -78,6 +78,64 @@ import WMMModel
         #expect(RowPanel.leadingCard(settledOn: SeeAllWords.cardKey, was: nil) == nil)
         #expect(RowPanel.leadingCard(settledOn: "movie-513", was: "movie-512") == "movie-513")
         #expect(RowPanel.leadingCard(settledOn: nil, was: "movie-512") == nil)
+    }
+
+    // MARK: Apple TV's card (S5)
+
+    @Test func appleTVsCardKeepsTheListCardsCountAndNamesALibrarysSort() throws {
+        // A list's card says "See all" over its count, as TvLibraryRows.dc.html draws it.
+        let list = ScreenRow(id: "list:9001", style: .poster, title: "Top rated this year", subtitle: "18 of 1,204 · From TMDB",
+                             items: [FakeData.movies[0]], seeAll: .list(id: 9001), listID: 9001)
+        let listWords = try #require(SeeAllWords(row: list, libraryType: nil))
+        #expect(listWords.tvCardLine(listTotal: list.listTotal) == "1,204")
+        #expect(listWords.accessibilityLabel == "See all of Top rated this year, 1,204 titles", "VoiceOver hears the whole of it")
+        let uncounted = ScreenRow(id: "list:2", style: .poster, title: "Rainy Sunday films", seeAll: .list(id: 2), listID: 2)
+        #expect(try #require(SeeAllWords(row: uncounted, libraryType: nil)).tvCardLine(listTotal: uncounted.listTotal) == nil)
+
+        // A built-in row's: the library over its sort, episodes' Recently aired too.
+        let aired = ScreenRow(id: "recentlyAired", style: .episode, title: "Recently aired · Episodes",
+                              episodes: FakeData.recentlyAired(), seeAll: Self.link(FakeData.tvLibrary, .aired))
+        let airedWords = try #require(SeeAllWords(row: aired, libraryType: .tv))
+        #expect(airedWords.title == "See all TV shows")
+        #expect(airedWords.tvCardLine(listTotal: aired.listTotal) == "By last aired")
+        #expect(SeeAllWords(library: .movie, sort: nil).tvCardLine(listTotal: nil) == nil)
+    }
+
+    @Test func theSeeAllCardNeverTakesTheTVPanel() {
+        // Home's row screens keep the panel on the last card while See all has focus:
+        // the card's key writes nothing, as it never leads an iPad row.
+        #expect(RowPanel.leadingCard(settledOn: SeeAllWords.cardKey, was: nil) == nil)
+        #expect(RowPanel.leadingCard(settledOn: FakeData.recentlyAired()[0].cardKey, was: nil) == FakeData.recentlyAired()[0].cardKey)
+    }
+
+    @Test func onlyMenuFromASectionsRootCountsAsAReturnHome() {
+        // Apple TV's Home brings back a See all's row after Menu from its grid, not after the tab bar.
+        navigator.open(Self.link(FakeData.tvLibrary, .aired), home: FakeData.home())
+        navigator.open(.show(id: 100))
+        #expect(navigator.exitSection())
+        #expect(navigator.exitsToHome == 0, "Menu on a page goes back to the grid")
+        #expect(navigator.exitSection())
+        #expect(navigator.tab == .home)
+        #expect(navigator.exitsToHome == 1)
+        #expect(!navigator.exitSection())
+        #expect(navigator.exitsToHome == 1, "Menu at Home's root is the system's")
+        navigator.select(.movies)
+        navigator.select(.home)
+        #expect(navigator.exitsToHome == 1, "Home chosen in the tab bar")
+    }
+
+    @Test func theRowsAboveATVLibrarysGridSetItTheirWay() async throws {
+        let services = fakes()
+        let model = LibraryModel(library: services.library, navigator: navigator, type: .tv, rows: services.rows)
+        let running = Task { await model.run() }
+        defer { running.cancel() }
+        #expect(await eventually { model.state.value != nil && !model.shownRows.isEmpty })
+        let aired = try #require(model.shownRows.first { $0.id == "recentlyAired" })
+        #expect(model.seeAll(aired)?.accessibilityLabel == "See all TV shows, by last aired")
+        await model.open(try #require(aired.seeAll))
+        #expect(model.sort == .aired)
+        #expect(model.state.value?.items.isEmpty == false)
+        #expect(navigator.tab == .home, "the grid below changes; no tab is selected")
     }
 
     // MARK: Home's rows

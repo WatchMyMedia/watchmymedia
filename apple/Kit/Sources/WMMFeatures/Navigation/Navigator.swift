@@ -153,6 +153,12 @@ public final class Navigator {
         }
     }
 
+    /// Counts the times Menu went from a section's root to Home
+    /// (``exitSection()``), not a tab chosen in the tab bar: Apple TV's Home
+    /// puts focus back on a row's See all after Menu from the grid it opened
+    /// (PLAN-SEE-ALL.md §3).
+    public private(set) var exitsToHome = 0
+
     /// Menu (Back) on the Siri Remote, past what the stacks handle: pops the
     /// current tab's stack, else goes from a section's root to Home. False at
     /// Home's root, where the system takes over (the tvOS Home screen).
@@ -164,6 +170,7 @@ public final class Navigator {
         }
         guard tab != .home else { return false }
         tab = .home
+        exitsToHome += 1
         return true
     }
 
