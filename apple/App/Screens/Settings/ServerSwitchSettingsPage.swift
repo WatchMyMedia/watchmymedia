@@ -249,8 +249,11 @@ private struct SwitchSignInStep: View {
                   problem: problem, busy: model.busy) {
             if signIn.setupRequired {
                 SetupCard(model: signIn)
-            } else if signIn.codeSignIn {
+            } else if signIn.codeSignIn && !signIn.passwordAllowed {
+                // The server takes no passwords from apps: its web page approves the code.
                 PairingCard(model: signIn, family: deviceFamily(model: services.client.model))
+            } else if signIn.codeSignIn {
+                SwitchCodeCard(signIn: signIn, lede: model.codeLede)
             } else {
                 field("Name", .name) {
                     TextField("Name", text: $signIn.name)
@@ -270,6 +273,16 @@ private struct SwitchSignInStep: View {
                         .onSubmit(submit)
                         .accessibilityIdentifier("switch-password")
                 }
+            }
+            // The other way in (Settings2SwitchSignIn): a code from a signed-in device, or the password again.
+            if let other = model.otherWayTitle {
+                Button(other) {
+                    focus = nil
+                    if signIn.codeSignIn { model.usePassword() } else { model.useCode() }
+                }
+                .buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
+                .disabled(model.busy)
+                .accessibilityIdentifier("switch-other-way")
             }
         } actions: {
             if !signIn.setupRequired && !signIn.codeSignIn {
@@ -324,5 +337,60 @@ private struct SwitchSignInStep: View {
     private func submit() {
         focus = nil
         Task { await signIn.signIn() }
+    }
+}
+
+/// The code to approve from a device signed in to the chosen server, when
+/// the person chose it over the password ("Use a code from a signed-in
+/// device instead"): the code, how long it lasts, a new one, and where to
+/// enter it (`ServerSwitchModel.codeLede`). The step runs the pairing.
+private struct SwitchCodeCard: View {
+    let signIn: SignInModel
+    let lede: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            switch signIn.pairing {
+            case .waiting(let code):
+                CodeBoxes(code: code.code, size: .large, boxBackground: Palette.surface)
+                TimelineView(.periodic(from: .now, by: 10)) { context in
+                    Text(pairingWaitingLine(expiresAt: code.expiresAt, now: context.date))
+                        .font(.footnote)
+                        .foregroundStyle(Palette.muted)
+                        .frame(maxWidth: .infinity)
+                }
+                Button(pairingNewCode) { signIn.newCode() }
+                    .buttonStyle(GoldTextButtonStyle())
+                    .frame(maxWidth: .infinity)
+            case .approved:
+                Label(pairingCodeAccepted, systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Palette.gold)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+            case .expired, .failed:
+                CodeBoxes(code: "", size: .large, dim: true, boxBackground: Palette.surface)
+                if let problem = signIn.pairingProblem { ErrorLine(message: problem) }
+                Button(pairingNewCode) { signIn.newCode() }
+                    .buttonStyle(GhostButtonStyle(height: 46))
+            case .starting, nil:
+                CodeBoxes(code: "", size: .large, dim: true, boxBackground: Palette.surface)
+                HStack(spacing: 8) {
+                    ProgressView().tint(Palette.muted)
+                    Text(pairingGettingCode)
+                }
+                .font(.footnote)
+                .foregroundStyle(Palette.muted)
+                .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            Text(lede)
+                .font(.subheadline)
+                .foregroundStyle(Palette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .background(Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.separator))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("switch-code")
     }
 }
