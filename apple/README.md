@@ -364,24 +364,29 @@ apps word and decide alike:
 On iPhone and iPad (`App/Screens/Settings/`; `Settings2*` and `Pad2Settings2*` boards):
 
 - **The root is the hub** (`App/Screens/Settings/SettingsScreen.swift`): the
-  account opens Account & devices, then You (Playback, Audio & subtitles, Home
-  rows, Account & devices, Your requests), This iPhone (Downloads), Server (the
-  server, and the Inbox for admins) and About WatchMyMedia, each row with how
-  things stand at its right. On iPad it is the sidebar of a split view and the
-  page stands beside it, in two columns where the page is 680 pt or wider; a
-  compact width shows the iPhone's. There is no Sign out on the root.
+  account opens Account & devices, then the Kit's `settingsHub` groups, each
+  row with how things stand at its right; one Next step card under the account
+  when there is something to do (Use English, or Open iOS Settings for
+  reminders), and a banner with Try again when the server can't be reached. On
+  iPad it is the sidebar of a split view and the page stands beside it, in two
+  columns where the page is 680 pt or wider; a compact width shows the
+  iPhone's. There is no Sign out on the root.
 - **Pages** share `Components/Account/SettingsParts.swift`: a line under the
-  title, groups with a note, rows whose own line says how a change went, choices
-  as menus from their row (each choice a `Toggle`, so the menu ticks the chosen
-  one and shows its line), and a red row apart at the bottom for what signs out.
+  title, groups with a note, rows whose own line says how a change went (the
+  Kit's `SaveState` as a `RowLine`: Saving, the Saved line, or why it failed,
+  said to VoiceOver with the system's success or error tap), choices as menus
+  from their row (each choice a `Toggle`, so the menu ticks the chosen one and
+  shows its line), and a red row apart at the bottom for what signs out.
   A row keeps its value whole at its right and puts it under the title when it
   can't share the line, and always at the accessibility text sizes.
 - **Playback** holds Quality (this device's), Skipping (a menu per part), Next
   episode and Live TV reminders, which were pages of their own. **Account &
-  devices** holds this device's name (Rename is a sheet), Signed-in devices,
-  Link a TV and Sign out of this iPhone. **Server** offers Switch server, and
-  Server settings to admins only. **Audio & subtitles'** Add language is a sheet
-  of every language by name, to search.
+  devices** holds this device's name (Rename is a sheet), Change password (a
+  sheet with the system's password fields, naming the devices it signs out),
+  Signed-in devices, Link a TV and Sign out of this iPhone. **Server** offers
+  Switch server, and Server settings to admins only, as the server says they
+  stand here. **Audio & subtitles'** Add language is a sheet of every language
+  by name (the Kit's `LanguagePicker`), to search.
 - **Tasks are sheets** (`Components/Account/TaskSheet.swift`): Cancel, the
   task's name, the steps bar ("Step 2 of 3"), one filled button at the bottom
   (Return presses it on a hardware keyboard, Escape is Cancel) and a last step
@@ -403,8 +408,13 @@ On iPhone and iPad (`App/Screens/Settings/`; `Settings2*` and `Pad2Settings2*` b
 `thisDevice` and `devices`, which open the page they moved into);
 `-open 'watchmymedia://link?code=K7M4PQ'` opens Link a TV at its second step,
 `-linkTVApprove` at its last; `-settingsPage server -switchServer` starts
-Switch server. `UITests/SettingsTasksTests.swift` runs both tasks through
-every step on the fakes, with Back and Cancel, Rename and both sign-outs.
+Switch server. In a debug build `-fakesSaveFails recap` (a Skipping part,
+`autoplay` or `languages`) has the fakes refuse that change, to see a row's
+failed line, and `-fakesPasswordFails 429` (or `offline`) the next Change
+password. `UITests/SettingsTasksTests.swift` runs both tasks through every
+step on the fakes, with Back and Cancel, a row that saves and one that fails,
+Rename, Change password and its errors, and both sign-outs; on an iPad, a
+task across a window resize.
 
 ## First run, audio languages and subtitles
 
