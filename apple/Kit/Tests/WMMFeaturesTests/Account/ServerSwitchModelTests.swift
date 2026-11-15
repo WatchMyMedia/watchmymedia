@@ -249,7 +249,7 @@ import WMMModel
 /// as LocalStore does. No credentials are manufactured by selecting a server.
 @MainActor
 @Observable
-private final class SwitchAccount: ServerRepository, AuthRepository {
+final class SwitchAccount: ServerRepository, AuthRepository {
     var entries = Dictionary(uniqueKeysWithValues: [FakeServers.livingRoom, FakeServers.officeMini, FakeServers.remoteHome].map { ($0.id, $0) })
     var users: [URL: User] = [FakeServers.livingRoom.baseURL: sam]
     var currentID = FakeServers.livingRoom.id

@@ -784,6 +784,72 @@ public struct Client: APIProtocol {
             }
         )
     }
+    /// Change your own password (signs out other devices)
+    ///
+    /// - Remark: HTTP `PUT /api/auth/password`.
+    /// - Remark: Generated from `#/paths//api/auth/password/put(changePassword)`.
+    public func changePassword(_ input: Operations.ChangePassword.Input) async throws -> Operations.ChangePassword.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ChangePassword.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/api/auth/password",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .put
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 204:
+                    return .noContent(.init())
+                default:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ChangePassword.Output.Default.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/problem+json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/problem+json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ErrorModel.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .applicationProblemJson(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .`default`(
+                        statusCode: response.status.code,
+                        .init(body: body)
+                    )
+                }
+            }
+        )
+    }
     /// Signed-in browsers and devices
     ///
     /// Your sessions, newest activity first; admins may ask for everyone's with all=true.

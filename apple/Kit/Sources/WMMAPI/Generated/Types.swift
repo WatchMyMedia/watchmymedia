@@ -76,6 +76,11 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /api/auth/pair/{code}/approve`.
     /// - Remark: Generated from `#/paths//api/auth/pair/{code}/approve/post(approvePairing)`.
     func approvePairing(_ input: Operations.ApprovePairing.Input) async throws -> Operations.ApprovePairing.Output
+    /// Change your own password (signs out other devices)
+    ///
+    /// - Remark: HTTP `PUT /api/auth/password`.
+    /// - Remark: Generated from `#/paths//api/auth/password/put(changePassword)`.
+    func changePassword(_ input: Operations.ChangePassword.Input) async throws -> Operations.ChangePassword.Output
     /// Signed-in browsers and devices
     ///
     /// Your sessions, newest activity first; admins may ask for everyone's with all=true.
@@ -659,6 +664,19 @@ extension APIProtocol {
         try await approvePairing(Operations.ApprovePairing.Input(
             path: path,
             headers: headers
+        ))
+    }
+    /// Change your own password (signs out other devices)
+    ///
+    /// - Remark: HTTP `PUT /api/auth/password`.
+    /// - Remark: Generated from `#/paths//api/auth/password/put(changePassword)`.
+    public func changePassword(
+        headers: Operations.ChangePassword.Input.Headers = .init(),
+        body: Operations.ChangePassword.Input.Body
+    ) async throws -> Operations.ChangePassword.Output {
+        try await changePassword(Operations.ChangePassword.Input(
+            headers: headers,
+            body: body
         ))
     }
     /// Signed-in browsers and devices

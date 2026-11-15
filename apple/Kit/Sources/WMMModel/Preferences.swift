@@ -15,11 +15,45 @@ public enum SegmentKind: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// "Intro", the Settings row.
+    /// "Intro", the Settings row, in the web's words (PLAN-APPLE-SETTINGS.md §6).
     public var settingsLabel: String {
         switch self {
         case .intro: "Intro"
         case .recap: "Recap"
+        case .credits: "Credits"
+        case .preview: "Preview"
+        case .commercial: "Ads"
+        }
+    }
+
+    /// The line under the row: "Opening titles and theme" (the web's `SKIP_KINDS`).
+    public var settingsHint: String {
+        switch self {
+        case .intro: "Opening titles and theme"
+        case .recap: "“Previously on…”"
+        case .credits: "End credits; the Next Episode card takes over on the last block"
+        case .preview: "“Next time on…”"
+        case .commercial: "Commercial breaks left in recordings"
+        }
+    }
+
+    /// What the part is, for the Apple TV's panel beside the focused row
+    /// (TvSettings2.dc.html): "The end titles of an episode or a film."
+    public var settingsAbout: String {
+        switch self {
+        case .intro: "The opening titles and theme of an episode."
+        case .recap: "The “Previously on…” at the start of an episode."
+        case .credits: "The end titles of an episode or a film."
+        case .preview: "The “Next time on…” after an episode’s credits."
+        case .commercial: "The commercial breaks left in a recording."
+        }
+    }
+
+    /// "Credits", "Intros": the part in a sentence's subject, as the Saved line says it.
+    public var pluralLabel: String {
+        switch self {
+        case .intro: "Intros"
+        case .recap: "Recaps"
         case .credits: "Credits"
         case .preview: "Previews"
         case .commercial: "Ads"
@@ -27,16 +61,39 @@ public enum SegmentKind: String, CaseIterable, Hashable, Sendable {
     }
 }
 
-/// How a kind of segment is handled: no button, a Skip button, skip at once, or skip after 3 s.
+/// How a kind of segment is handled: no button, a Skip button, skip after
+/// 3 s, or skip at once. The cases are in the web's order, so `allCases`
+/// lists them as every Settings page does.
 public enum SkipMode: String, CaseIterable, Hashable, Sendable {
-    case none, ask, auto, autoDelay = "auto-delay"
+    case none, ask, autoDelay = "auto-delay", auto
 
+    /// The web's words (PLAN-APPLE-SETTINGS.md §6).
     public var label: String {
         switch self {
-        case .none: "Never"
-        case .ask: "Ask"
-        case .auto: "Auto"
-        case .autoDelay: "Auto after 3 s"
+        case .none: "Do nothing"
+        case .ask: "Show a Skip button"
+        case .autoDelay: "Skip after 3 seconds"
+        case .auto: "Skip right away"
+        }
+    }
+
+    /// The line under the choice in its menu (Settings2PlaybackStates.dc.html).
+    public var line: String {
+        switch self {
+        case .none: "The part plays through"
+        case .ask: "For parts 3 seconds or longer"
+        case .autoDelay: "Shows the button, then skips by itself"
+        case .auto: "Not for a part you seek into"
+        }
+    }
+
+    /// What the part now does, in the Saved line: "skip after 3 seconds".
+    public var does: String {
+        switch self {
+        case .none: "play through"
+        case .ask: "show a Skip button"
+        case .autoDelay: "skip after 3 seconds"
+        case .auto: "skip right away"
         }
     }
 }

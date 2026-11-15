@@ -21,6 +21,7 @@ filter:
     - approvePairing
     - listSessions
     - revokeSession
+    - changePassword
     - events
     - getHome
     - getLibraryRows

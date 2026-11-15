@@ -20,11 +20,17 @@ public final class LinkTVModel {
     public private(set) var step: Step = .enter
     public private(set) var busy = false
     public private(set) var error: String?
+    /// The last failure as its step says it, ending in what was done:
+    /// "Nothing was linked." (PLAN-APPLE-SETTINGS.md §5.5).
+    public private(set) var problem: SettingsNotice?
+    /// The server's name, for "Couldn’t reach Living room server".
+    public var serverName: String?
 
     /// `code` comes from a watchmymedia://link?code= link (a scanned QR code).
-    public init(auth: any AuthRepository, code: String? = nil) {
+    public init(auth: any AuthRepository, code: String? = nil, serverName: String? = nil) {
         self.auth = auth
         self.code = normalizePairingCode(code ?? "")
+        self.serverName = serverName
     }
 
     /// Who the TV will be signed in as.
@@ -38,7 +44,24 @@ public final class LinkTVModel {
         guard clean != code else { return }
         code = clean
         error = nil
+        problem = nil
         step = .enter
+    }
+
+    /// Back from Check it's yours to the code, which stays as typed.
+    public func backToCode() {
+        guard case .found = step, !busy else { return }
+        step = .enter
+        problem = nil
+    }
+
+    /// Link another TV, from Linked: the first step with nothing typed.
+    public func startAgain() {
+        guard !busy else { return }
+        code = ""
+        step = .enter
+        error = nil
+        problem = nil
     }
 
     /// Looks a code from a link up at once, as the QR code means to.
@@ -53,19 +76,20 @@ public final class LinkTVModel {
             return
         }
         let code = code
-        await request { try await self.auth.lookUpPairing(code: code) }
+        await request(approving: nil) { try await self.auth.lookUpPairing(code: code) }
     }
 
     /// Approve: signs the TV in as this account.
     public func approve() async {
         guard case .found(let device) = step else { return }
-        await request { try await self.auth.approvePairing(code: device.code) }
+        await request(approving: device) { try await self.auth.approvePairing(code: device.code) }
     }
 
-    private func request(_ call: () async throws -> PendingDevice) async {
+    private func request(approving: PendingDevice?, _ call: () async throws -> PendingDevice) async {
         guard !busy else { return }
         busy = true
         error = nil
+        problem = nil
         defer { busy = false }
         do {
             let device = try await call()
@@ -73,6 +97,8 @@ public final class LinkTVModel {
         } catch is CancellationError {
         } catch {
             self.error = message(error, fallback: "Couldn't check that code. Try again.")
+            problem = approving.map { linkApproveProblem(error, device: $0, serverName: serverName) }
+                ?? linkLookUpProblem(error, serverName: serverName)
         }
     }
 }

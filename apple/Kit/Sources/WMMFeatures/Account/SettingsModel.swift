@@ -48,26 +48,44 @@ public final class SettingsModel {
     }
 
     private let servers: any ServerRepository
-    private let auth: any AuthRepository
+    let auth: any AuthRepository
     private let preferences: any PreferencesRepository
     public let facts: DeviceFacts
     /// The language the device is set to, offered for an empty list ("Use English").
     public let deviceLanguage: String?
+    /// Each server-kept control's save (PLAN-APPLE-SETTINGS.md §3.1); read one with ``saveState(_:)``.
+    public let saves: SaveStates<SettingKey>
 
+    /// - Parameters:
+    ///   - savedLinger: how long a row says Saved before its usual line returns.
+    ///   - sleep: waits out `savedLinger`; tests pass a clock they move.
     public init(servers: any ServerRepository, auth: any AuthRepository, preferences: any PreferencesRepository, facts: DeviceFacts,
-                deviceLanguage: String? = suggestedLanguage(Locale.preferredLanguages)) {
+                deviceLanguage: String? = suggestedLanguage(Locale.preferredLanguages),
+                savedLinger: Duration = .seconds(4),
+                sleep: @escaping @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
         self.servers = servers
         self.auth = auth
         self.preferences = preferences
         self.facts = facts
         self.deviceLanguage = deviceLanguage
+        saves = SaveStates(linger: savedLinger, sleep: sleep)
     }
+
+    /// Where a control kept on the server stands: at rest, saving, saved with
+    /// what the change did, or failed with what it is still.
+    public func saveState(_ key: SettingKey) -> SaveState { saves[key] }
 
     // MARK: Account
 
     public var user: User? { auth.user }
     public var server: Server? { servers.current?.server }
     public var deviceName: String { auth.deviceName }
+
+    /// Whether the server answered its last check (``ServerRepository/reachable``).
+    var reachable: Bool? { servers.reachable }
+
+    /// Asks the server who it is again, quietly.
+    func refreshServer() async { await servers.refreshCurrent() }
 
     /// "Admin · Living room server".
     public var accountLine: String { accountCardLine(user: user, serverName: server?.name) }
@@ -106,13 +124,26 @@ public final class SettingsModel {
     /// The Skip row's value: the intro's mode.
     public var skipValue: String { skipMode(.intro).label }
 
+    /// The playback settings came from the server at least once since this
+    /// model was made, so what the pages show is the person's, not the defaults.
+    public private(set) var preferencesLoaded = false
+    /// The last load of the playback settings failed (``SettingsWords/playbackCantLoad``).
+    public private(set) var preferencesLoadFailed = false
+    /// The last load failed without an answer from the server: it can't be reached.
+    public private(set) var preferencesUnreachable = false
+
     /// Loads the playback settings from the server.
     public func loadPreferences() async {
         do {
             try await preferences.refresh()
+            preferencesLoaded = true
+            preferencesLoadFailed = false
+            preferencesUnreachable = false
         } catch is CancellationError {
         } catch {
             playbackError = message(error, fallback: "Couldn't load your playback settings.")
+            preferencesLoadFailed = true
+            preferencesUnreachable = (error as? APIError).map { $0.status == nil } ?? true
         }
     }
 
@@ -121,28 +152,44 @@ public final class SettingsModel {
         preferences.setQuality(quality)
     }
 
-    /// Shows the change at once; puts it back with the reason if the server refuses it.
+    /// Shows the change at once; puts it back with the reason if the server
+    /// refuses it. Its row says Saved, or what it is still
+    /// (``saveState(_:)`` for ``SettingKey/autoplayNext``).
     public func setAutoplayNext(_ enabled: Bool) async {
         guard enabled != autoplayNext else { return }
+        let before = preferences.playback.autoplayNext
         pendingAutoplay = enabled
         playbackError = nil
+        let token = saves.begin(.autoplayNext)
         do {
             try await preferences.setAutoplayNext(enabled)
+            saves.saved(.autoplayNext, token, SettingsWords.nextEpisodeSaved(enabled))
+        } catch is CancellationError {
+            saves.rest(.autoplayNext, token)
         } catch {
             playbackError = message(error, fallback: "Couldn't save autoplay.")
+            saves.failed(.autoplayNext, token, saveFailed(error, stillValue: before ? "on" : "off", retry: .tryAgain))
         }
         if pendingAutoplay == enabled { pendingAutoplay = nil }
     }
 
-    /// Shows the change at once; puts it back with the reason if the server refuses it.
+    /// Shows the change at once; puts it back with the reason if the server
+    /// refuses it. Its row says Saved, or what it is still
+    /// (``saveState(_:)`` for ``SettingKey/skip(_:)``).
     public func setSkip(_ kind: SegmentKind, mode: SkipMode) async {
         guard mode != skipMode(kind) else { return }
+        let before = preferences.playback.skipMode(kind)
         pendingSkip[kind] = mode
         skipError = nil
+        let token = saves.begin(.skip(kind))
         do {
             try await preferences.setSkip(kind, mode: mode)
+            saves.saved(.skip(kind), token, SettingsWords.skipSaved(kind, mode: mode))
+        } catch is CancellationError {
+            saves.rest(.skip(kind), token)
         } catch {
             skipError = message(error, fallback: "Couldn't save the skip setting.")
+            saves.failed(.skip(kind), token, saveFailed(error, stillValue: before.label))
         }
         if pendingSkip[kind] == mode { pendingSkip[kind] = nil }
     }
@@ -219,20 +266,50 @@ public final class SettingsModel {
         change.apply(to: &after)
         guard after.audio != audio || after.subtitles != subtitles else { return }
         let before = subtitleChoice
+        let saved = preferences.playback
+        let key = change.settingKey
         languageRevision += 1
         let mine = languageRevision
         pendingLanguages = (after.audio, after.subtitles)
         languageError = nil
         foreignAudioNotice = false
+        let token = saves.begin(key)
         do {
             try await preferences.setLanguages(change)
             if mine == languageRevision {
                 foreignAudioNotice = change.choice == nil && before != .foreign && preferences.playback.subtitles.choice == .foreign
             }
+            saves.saved(key, token, Self.savedLine(change, before: saved))
+        } catch is CancellationError {
+            saves.rest(key, token)
         } catch {
             if mine == languageRevision { languageError = message(error, fallback: "Couldn’t save your languages.") }
+            saves.failed(key, token, Self.failedLine(change, error: error, saved: saved))
         }
         if mine == languageRevision { pendingLanguages = nil }
+    }
+
+    /// What a language change did, for its row or section.
+    private static func savedLine(_ change: LanguageChange, before: PlaybackPreferences) -> String {
+        if let audio = change.audioLanguages {
+            return SettingsWords.listSaved(.audio, before: before.audio.languages, after: audio)
+        }
+        if let subtitles = change.subtitleLanguages {
+            return SettingsWords.listSaved(.subtitles, before: before.subtitles.languages, after: subtitles)
+        }
+        if let choice = change.choice { return SettingsWords.subtitleChoiceSaved(choice) }
+        return SettingsWords.automaticDownloadSaved(change.automaticDownload ?? before.subtitles.automaticDownload)
+    }
+
+    /// What a failed language change left as it was.
+    private static func failedLine(_ change: LanguageChange, error: any Error, saved: PlaybackPreferences) -> String {
+        func list(_ tags: [String], _ noun: String) -> String {
+            SettingsWords.listValue(tags).map { "your \(noun)s are still \($0)" } ?? "you still have no \(noun)"
+        }
+        if change.audioLanguages != nil { return saveFailed(error, still: list(saved.audio.languages, "audio language"), retry: .tryAgain) }
+        if change.subtitleLanguages != nil { return saveFailed(error, still: list(saved.subtitles.languages, "subtitle language"), retry: .tryAgain) }
+        if change.choice != nil { return saveFailed(error, stillValue: saved.subtitles.choice.label) }
+        return saveFailed(error, stillValue: saved.subtitles.automaticDownload ? "on" : "off", retry: .tryAgain)
     }
 
     public func setSubtitleChoice(_ choice: SubtitleChoice) async {
@@ -334,19 +411,62 @@ public final class SettingsModel {
         }
     }
 
-    /// Signs another device out.
+    /// How the last sign-out of another device ended, said under Signed-in devices.
+    public private(set) var lastSignOut: DeviceSignOut?
+
+    /// Signs another device out. The list says how it ended
+    /// (``lastSignOut``, and ``saveState(_:)`` for ``SettingKey/signedInDevices``):
+    /// signed out; already gone (the server had forgotten it), when the list
+    /// is loaded again; or failed, with the device still listed.
     public func revoke(_ session: DeviceSession) async {
         guard revoking == nil, !session.current else { return }
         revoking = session.id
         devicesError = nil
+        let token = saves.begin(.signedInDevices)
         defer { revoking = nil }
+        func drop() {
+            if case .loaded(let list) = sessions { sessions = .loaded(list.filter { $0.id != session.id }) }
+        }
         do {
             try await auth.revoke(sessionID: session.id)
-            if case .loaded(let list) = sessions { sessions = .loaded(list.filter { $0.id != session.id }) }
+            drop()
+            lastSignOut = DeviceSignOut(result: .signedOut, name: session.name, line: SettingsWords.deviceSignedOut(session.name))
+            saves.saved(.signedInDevices, token, SettingsWords.deviceSignedOut(session.name))
         } catch is CancellationError {
+            saves.rest(.signedInDevices, token)
+        } catch let error as APIError where error.status == 404 {
+            drop()
+            await loadSessions()
+            lastSignOut = DeviceSignOut(result: .alreadyGone, name: session.name, line: SettingsWords.deviceAlreadyGone(session.name))
+            saves.saved(.signedInDevices, token, SettingsWords.deviceAlreadyGone(session.name))
         } catch {
             devicesError = message(error, fallback: "Couldn't sign \(session.name) out. Try again.")
+            let line = SettingsWords.deviceSignOutFailed(session.name, status: (error as? APIError)?.status)
+            lastSignOut = DeviceSignOut(result: .failed, name: session.name, line: line)
+            saves.failed(.signedInDevices, token, line)
         }
+    }
+
+    // MARK: Change password
+
+    /// The banner a finished task left on Account & devices ("Password
+    /// changed"), until the page is left or it is closed.
+    public private(set) var accountBanner: SettingsNotice?
+
+    func showAccountBanner(_ banner: SettingsNotice) { accountBanner = banner }
+
+    public func dismissAccountBanner() { accountBanner = nil }
+
+    // MARK: Server settings
+
+    /// What this account may do with the server's settings from here, once
+    /// ``loadAdminAccess()`` has asked; nil until then or when it couldn't.
+    public private(set) var adminAccess: AdminAccess?
+
+    /// Asks the server whether this account is an admin let in from here
+    /// (GET /api/auth/status), for Server settings; keeps what it knew when the server can't be asked.
+    public func loadAdminAccess() async {
+        if let access = await auth.adminAccess() { adminAccess = access }
     }
 
     // MARK: Sign out
@@ -359,6 +479,32 @@ public final class SettingsModel {
         signingOut = true
         defer { signingOut = false }
         await auth.signOut()
+    }
+}
+
+/// How signing another device out ended (Settings2Account.dc.html's notes).
+public struct DeviceSignOut: Hashable, Sendable {
+    public enum Result: Hashable, Sendable {
+        /// "Kitchen iPad was signed out. It needs a password or a code to sign in again."
+        case signedOut
+        /// The server had forgotten it; the list was loaded again.
+        case alreadyGone
+        /// It is still signed in.
+        case failed
+    }
+
+    public var result: Result
+    public var name: String
+    public var line: String
+}
+
+extension LanguageChange {
+    /// The control a change belongs to, whose row says how it went.
+    var settingKey: SettingKey {
+        if audioLanguages != nil { return .audioLanguages }
+        if subtitleLanguages != nil { return .subtitleLanguages }
+        if choice != nil { return .subtitleChoice }
+        return .automaticDownload
     }
 }
 
