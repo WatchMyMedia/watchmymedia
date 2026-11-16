@@ -14,9 +14,7 @@ import (
 // the arrival's id, so a test can tell an arrival kept from one made again.
 func arrivalsOf(t *testing.T, e env) (map[string]int64, map[string]int64) {
 	t.Helper()
-	rows, err := e.conn.QueryContext(e.ctx, `SELECT a.id, a.quiet, s.tmdb_id, se.number, ep.number
-		FROM episode_arrivals a JOIN episodes ep ON ep.id = a.episode_id JOIN seasons se ON se.id = ep.season_id
-		JOIN shows s ON s.id = a.show_id ORDER BY a.id`)
+	rows, err := e.conn.QueryContext(e.ctx, `SELECT id, quiet, tmdb_id, season, number FROM episode_arrivals ORDER BY id`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,8 +174,8 @@ func TestEpisodeArrivals(t *testing.T) {
 		if _, err := e.m.RematchShow(e.ctx, e.tv, old, 1397, false); err != nil {
 			t.Fatal(err)
 		}
-		// The old show's row went, and its arrivals with it.
-		wantArrivals(t, e, map[string]int64{"1397 S01E01": 1})
+		// The old show's row went; its TMDB episode had still arrived.
+		wantArrivals(t, e, map[string]int64{"1396 S01E01": 0, "1397 S01E01": 1})
 	})
 
 	t.Run("season mapping onto an episode that never had a file is quiet", func(t *testing.T) {
@@ -214,6 +212,67 @@ func TestEpisodeArrivals(t *testing.T) {
 			t.Fatal(err)
 		}
 		wantArrivals(t, e, map[string]int64{"1396 S01E02": 0})
+	})
+
+	t.Run("a copy in a second library is silent", func(t *testing.T) {
+		t.Parallel()
+		e := setup(t)
+		e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E01.mkv", pilot)
+		matchTV(t, e)
+		before := wantArrivals(t, e, map[string]int64{"1396 S01E01": 0})
+		// Sonarr's 4K instance adds its copy to a library of its own days
+		// later.
+		uhd, err := e.q.UpsertLibrary(e.ctx, db.UpsertLibraryParams{Type: "tv", Name: "TV 4K", Path: "/t4k"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.file(uhd, "/t4k/Breaking Bad (2008)/Season 01/Breaking Bad - S01E01 - 2160p.mkv", pilot)
+		if _, err := e.m.MatchLibrary(e.ctx, uhd, false); err != nil {
+			t.Fatal(err)
+		}
+		if after := wantArrivals(t, e, map[string]int64{"1396 S01E01": 0}); !maps.Equal(after, before) {
+			t.Errorf("the arrival was made again: %v, was %v", after, before)
+		}
+		// A new episode reaching the 4K library first is an arrival there.
+		e.file(uhd, "/t4k/Breaking Bad (2008)/Season 01/Breaking Bad - S01E02 - 2160p.mkv", `{"kind":"episode","title":"Breaking Bad","year":2008,"season":1,"episodes":[2]}`)
+		if _, err := e.m.MatchLibrary(e.ctx, uhd, false); err != nil {
+			t.Fatal(err)
+		}
+		wantArrivals(t, e, map[string]int64{"1396 S01E01": 0, "1396 S01E02": 0})
+	})
+
+	t.Run("a library removed and added again is silent", func(t *testing.T) {
+		t.Parallel()
+		e := setup(t)
+		path := "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E01.mkv"
+		e.file(e.tv, path, pilot)
+		matchTV(t, e)
+		before := wantArrivals(t, e, map[string]int64{"1396 S01E01": 0})
+		// Moving storage: the library goes, with its files, shows and
+		// episodes, and comes back under a new id.
+		if _, err := e.conn.ExecContext(e.ctx, `DELETE FROM libraries WHERE id = ?`, e.tv.ID); err != nil {
+			t.Fatal(err)
+		}
+		var gone *int64
+		if err := e.conn.QueryRowContext(e.ctx, `SELECT episode_id FROM episode_arrivals`).Scan(&gone); err != nil || gone != nil {
+			t.Fatalf("the arrival's episode after its library went: %v, %v", gone, err)
+		}
+		lib, err := e.q.UpsertLibrary(e.ctx, db.UpsertLibraryParams{Type: "tv", Name: "TV", Path: "/tv-new"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.tv = lib
+		f := e.file(lib, path, pilot)
+		matchTV(t, e)
+		if after := wantArrivals(t, e, map[string]int64{"1396 S01E01": 0}); !maps.Equal(after, before) {
+			t.Errorf("the arrival was made again: %v, was %v", after, before)
+		}
+		// The arrival points at the episode it is in the library as now.
+		eps, _ := e.q.ListEpisodeIDsForFile(e.ctx, f.ID)
+		var now *int64
+		if err := e.conn.QueryRowContext(e.ctx, `SELECT episode_id FROM episode_arrivals`).Scan(&now); err != nil || len(eps) != 1 || now == nil || *now != eps[0] {
+			t.Errorf("the arrival's episode = %v, want %v (%v)", now, eps, err)
+		}
 	})
 
 	t.Run("a recording is an arrival once matched", func(t *testing.T) {

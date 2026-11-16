@@ -85,8 +85,10 @@ type Episode struct {
 
 type EpisodeArrival struct {
 	ID        int64  `json:"id"`
-	EpisodeID int64  `json:"episode_id"`
-	ShowID    int64  `json:"show_id"`
+	TmdbID    int64  `json:"tmdb_id"`
+	Season    int64  `json:"season"`
+	Number    int64  `json:"number"`
+	EpisodeID *int64 `json:"episode_id"`
 	ArrivedAt string `json:"arrived_at"`
 	Quiet     int64  `json:"quiet"`
 }

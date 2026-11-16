@@ -2091,7 +2091,7 @@ export interface paths {
         };
         /**
          * Episodes that arrived for the shows the signed-in person follows
-         * @description What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show (an episode in two libraries is listed once). An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out.
+         * @description What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show. An episode arrives once, in whichever library it reaches first; a copy in another library, or in a library removed and added again, is not new. Each episode named has a present file, in any library. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out.
          */
         get: operations["listNewEpisodes"];
         put?: never;

@@ -147,10 +147,13 @@ SQLite plans joins without statistics, and a plan that looks fine after
 `Matcher.record` (`internal/metadata/matcher.go`): in the same transaction it
 records each episode's arrival, which people following the show are told
 about, from `media_files.first_linked_at` and `episode_arrivals`
-([PLAN-NEW-EPISODES.md](../PLAN-NEW-EPISODES.md) §5.2). A file never linked
-before makes an arrival, a file linked before a quiet one, and an episode
-that has arrived nothing more, so better copies, renames and rematches stay
-silent. Inserting `episode_files` anywhere else skips that.
+([PLAN-NEW-EPISODES.md](../PLAN-NEW-EPISODES.md) §5.2). An arrival belongs
+to the TMDB episode (show TMDB id, season, number), not the episode row, so
+it is once across libraries and outlives a library removed. A file never
+linked before makes an arrival, a file linked before a quiet one, and a
+TMDB episode that has arrived nothing more, so better copies, renames,
+rematches, a 4K library's copy and a library added again stay silent.
+Inserting `episode_files` anywhere else skips that.
 
 **Watch state.** Change `watch_state` only through `internal/watchstate`, never
 with its queries directly: each change must also take a revision and leave a

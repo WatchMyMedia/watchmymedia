@@ -61,15 +61,17 @@ func (e followEnv) special(lib, show int64) int64 {
 	return e.episode(lib, show, season, 1)
 }
 
-// arrive records an episode's arrival ago in the past, as the matcher does.
+// arrive records an episode's arrival ago in the past, as the matcher does:
+// for its TMDB episode, on its row.
 func (e followEnv) arrive(episode int64, ago time.Duration, quiet bool) int64 {
 	e.t.Helper()
 	q := 0
 	if quiet {
 		q = 1
 	}
-	return e.exec(`INSERT INTO episode_arrivals (episode_id, show_id, arrived_at, quiet) SELECT id, show_id, ?, ? FROM episodes WHERE id = ?`,
-		db.FormatTime(time.Now().Add(-ago)), q, episode)
+	return e.exec(`INSERT INTO episode_arrivals (tmdb_id, season, number, episode_id, arrived_at, quiet)
+		SELECT s.tmdb_id, se.number, ep.number, ep.id, ?, ? FROM episodes ep JOIN seasons se ON se.id = ep.season_id JOIN shows s ON s.id = ep.show_id
+		WHERE ep.id = ?`, db.FormatTime(time.Now().Add(-ago)), q, episode)
 }
 
 func (e followEnv) feed(as func(string, string, string, any) reply, after string) NewEpisodes {
@@ -319,8 +321,7 @@ func TestNewEpisodesFeed(t *testing.T) {
 }
 
 // One reply has at most 50 shows and 200 arrivals; the cursor stops short
-// of the rest, which the next check gets. An episode in two libraries is
-// one episode.
+// of the rest, which the next check gets.
 func TestNewEpisodesFeedLimits(t *testing.T) {
 	t.Parallel()
 	e := newFollowEnv(t)
@@ -339,16 +340,13 @@ func TestNewEpisodesFeedLimits(t *testing.T) {
 	}
 	cursor := e.feed(e.admin, first.Cursor).Cursor
 
-	// The same show's episode in a second library, and 55 more shows.
-	other := e.exec(`INSERT INTO libraries (type, name, path) VALUES ('tv', 'TV 4K', '/t4k')`)
-	_, big4K := e.show(other, 8000, "Long Haul", 1)
+	// 55 more shows.
 	var shows []int64
 	for i := range feedMaxShows + 5 {
 		id, eps := e.show(e.tv, int64(8001+i), fmt.Sprintf("Show %02d", i), 1)
 		e.follow(e.admin, id)
 		shows = append(shows, eps[0])
 	}
-	e.arrive(big4K[0], time.Hour, false)
 	for _, ep := range shows {
 		e.arrive(ep, time.Hour, false)
 	}
@@ -356,20 +354,63 @@ func TestNewEpisodesFeedLimits(t *testing.T) {
 	if len(page.Shows) != feedMaxShows {
 		t.Fatalf("%d shows in a reply", len(page.Shows))
 	}
-	// Newest arrival first; Long Haul's copy is one of the 50.
-	if page.Shows[0].Show.Title != "Show 48" || page.Shows[len(page.Shows)-1].Show.Title != "Long Haul" {
+	// Newest arrival first.
+	if page.Shows[0].Show.Title != "Show 49" || page.Shows[len(page.Shows)-1].Show.Title != "Show 00" {
 		t.Errorf("order = %q ... %q", page.Shows[0].Show.Title, page.Shows[len(page.Shows)-1].Show.Title)
 	}
 	rest := e.feed(e.admin, page.Cursor)
-	if want := []string{"Show 54: S1E1 (1) open S1E1", "Show 53: S1E1 (1) open S1E1", "Show 52: S1E1 (1) open S1E1", "Show 51: S1E1 (1) open S1E1", "Show 50: S1E1 (1) open S1E1", "Show 49: S1E1 (1) open S1E1"}; !slices.Equal(groups(rest), want) {
+	if want := []string{"Show 54: S1E1 (1) open S1E1", "Show 53: S1E1 (1) open S1E1", "Show 52: S1E1 (1) open S1E1", "Show 51: S1E1 (1) open S1E1", "Show 50: S1E1 (1) open S1E1"}; !slices.Equal(groups(rest), want) {
 		t.Errorf("the rest = %q", groups(rest))
 	}
-	// Both libraries' copies of one episode arriving together are one.
-	e.exec(`DELETE FROM episode_arrivals`)
-	e.arrive(bigEps[0], time.Hour, false)
-	e.arrive(big4K[0], time.Hour, false)
-	if both := e.feed(e.admin, "0"); !slices.Equal(groups(both), []string{"Long Haul: S1E1 (1) open S1E1"}) {
-		t.Errorf("two libraries' copies = %q", groups(both))
+}
+
+// An arrival belongs to the TMDB episode, so it reaches a person whichever
+// library has the episode now: the feed names an episode row with a
+// present file in any library, its own first, leaves out one finished in
+// any library, and skips one no library has any more. The list keeps the
+// latest arrival of a show whose library went.
+func TestNewEpisodesAcrossLibraries(t *testing.T) {
+	t.Parallel()
+	e := newFollowEnv(t)
+	tide, tideEps := e.show(e.tv, 7001, "Tidewater", 2)
+	e.follow(e.admin, tide)
+	start := e.feed(e.admin, "").Cursor
+	e.arrive(tideEps[0], time.Hour, false)
+	e.arrive(tideEps[1], time.Hour, false)
+	uhd := e.exec(`INSERT INTO libraries (type, name, path) VALUES ('tv', 'TV 4K', '/t4k')`)
+	tide4K, tide4KEps := e.show(uhd, 7001, "Tidewater", 1)
+
+	got := e.feed(e.admin, start)
+	if g := groups(got); len(g) != 1 || g[0] != "Tidewater: S1E1 S1E2 (2) open S1E1" || got.Shows[0].Open.EpisodeID != tideEps[0] || got.Shows[0].Show.ID != tide {
+		t.Fatalf("both libraries = %q %+v", g, got.Shows)
+	}
+	// E01's file in the first library goes: the 4K copy opens.
+	e.exec(`UPDATE media_files SET status = 'missing' WHERE id IN (SELECT media_file_id FROM episode_files WHERE episode_id = ?)`, tideEps[0])
+	got = e.feed(e.admin, start)
+	if len(got.Shows) != 1 || got.Shows[0].Open.EpisodeID != tide4KEps[0] || got.Shows[0].Show.ID != tide4K || got.Shows[0].Count != 2 {
+		t.Fatalf("opened from the 4K library = %q %+v", groups(got), got.Shows)
+	}
+	// Finished in one library is finished.
+	e.exec(`INSERT INTO watch_state (user_id, item_type, item_id, completed) VALUES (1, 'episode', ?, 1)`, tideEps[0])
+	if g := groups(e.feed(e.admin, start)); len(g) != 1 || g[0] != "Tidewater: S1E2 (1) open S1E2" {
+		t.Errorf("finished in the other library = %q", g)
+	}
+	e.exec(`DELETE FROM watch_state WHERE item_id = ?`, tideEps[0])
+	// The first library goes: E02 is nowhere now; E01 is in 4K.
+	e.exec(`DELETE FROM libraries WHERE id = ?`, e.tv)
+	if g := groups(e.feed(e.admin, start)); len(g) != 1 || g[0] != "Tidewater: S1E1 (1) open S1E1" {
+		t.Errorf("after the library went = %q", g)
+	}
+	var home HomeData
+	e.admin(http.MethodGet, "/api/home?arranged=true", "", &home)
+	if at := slices.Index(rowIDs(home.Rows), rowFollowed); at < 0 || len(home.Rows[at].Episodes) != 1 || home.Rows[at].Episodes[0].EpisodeID != tide4KEps[0] {
+		t.Errorf("home's row = %v", rowIDs(home.Rows))
+	}
+	var list FollowList
+	e.admin(http.MethodGet, "/api/me/follows", "", &list)
+	if len(list.Follows) != 1 || list.Follows[0].Show == nil || list.Follows[0].Show.ID != tide4K ||
+		list.Follows[0].Latest == nil || list.Follows[0].Latest.Number != 2 || list.Follows[0].Latest.Title != "" {
+		t.Errorf("follows = %+v", list.Follows)
 	}
 }
 

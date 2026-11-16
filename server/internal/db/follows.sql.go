@@ -109,20 +109,27 @@ func (q *Queries) LatestArrivalID(ctx context.Context) (int64, error) {
 }
 
 const listFollowedArrivals = `-- name: ListFollowedArrivals :many
-SELECT a.id, a.episode_id, a.show_id, a.arrived_at,
-    s.tmdb_id, s.title AS show_title, s.poster_path AS show_poster_path,
-    se.number AS season_number, e.number AS episode_number, e.title, e.still_path
+SELECT a.id, a.tmdb_id, a.arrived_at, a.season AS season_number, a.number AS episode_number,
+    e.id AS episode_id, e.show_id, e.title, e.still_path, s.title AS show_title, s.poster_path AS show_poster_path
 FROM show_follows f
-CROSS JOIN shows s INDEXED BY shows_tmdb_idx ON s.tmdb_id = f.tmdb_id
-CROSS JOIN episode_arrivals a INDEXED BY episode_arrivals_show_idx
-    ON a.show_id = s.id AND a.id > MAX(f.since_arrival, CAST(?1 AS INTEGER)) AND a.id <= ?2
-CROSS JOIN episodes e ON e.id = a.episode_id
-CROSS JOIN seasons se ON se.id = e.season_id
+CROSS JOIN episode_arrivals a INDEXED BY episode_arrivals_follow_idx
+    ON a.tmdb_id = f.tmdb_id AND a.id > MAX(f.since_arrival, CAST(?1 AS INTEGER)) AND a.id <= ?2
+CROSS JOIN episodes e ON e.id = (
+    SELECT e2.id FROM shows s2
+    CROSS JOIN seasons se2 ON se2.show_id = s2.id AND se2.number = a.season
+    CROSS JOIN episodes e2 ON e2.season_id = se2.id AND e2.number = a.number
+    WHERE s2.tmdb_id = a.tmdb_id
+      AND EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files mf ON mf.id = ef.media_file_id
+          WHERE ef.episode_id = e2.id AND mf.status = 'present')
+    ORDER BY e2.id = a.episode_id DESC, e2.id
+    LIMIT 1)
+CROSS JOIN shows s ON s.id = e.show_id
 WHERE f.user_id = ?3 AND a.quiet = 0 AND a.arrived_at >= ?4
-  AND EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files mf ON mf.id = ef.media_file_id
-      WHERE ef.episode_id = a.episode_id AND mf.status = 'present')
-  AND NOT EXISTS (SELECT 1 FROM watch_state w
-      WHERE w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = a.episode_id AND w.completed = 1)
+  AND NOT EXISTS (SELECT 1 FROM shows s3
+      CROSS JOIN seasons se3 ON se3.show_id = s3.id AND se3.number = a.season
+      CROSS JOIN episodes e3 ON e3.season_id = se3.id AND e3.number = a.number
+      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id AND w.completed = 1
+      WHERE s3.tmdb_id = a.tmdb_id)
 ORDER BY a.id
 LIMIT ?5
 `
@@ -137,24 +144,26 @@ type ListFollowedArrivalsParams struct {
 
 type ListFollowedArrivalsRow struct {
 	ID             int64   `json:"id"`
-	EpisodeID      int64   `json:"episode_id"`
-	ShowID         int64   `json:"show_id"`
-	ArrivedAt      string  `json:"arrived_at"`
 	TmdbID         int64   `json:"tmdb_id"`
-	ShowTitle      string  `json:"show_title"`
-	ShowPosterPath *string `json:"show_poster_path"`
+	ArrivedAt      string  `json:"arrived_at"`
 	SeasonNumber   int64   `json:"season_number"`
 	EpisodeNumber  int64   `json:"episode_number"`
+	EpisodeID      int64   `json:"episode_id"`
+	ShowID         int64   `json:"show_id"`
 	Title          string  `json:"title"`
 	StillPath      *string `json:"still_path"`
+	ShowTitle      string  `json:"show_title"`
+	ShowPosterPath *string `json:"show_poster_path"`
 }
 
 // What a person hears about (section 5.4), in the order it arrived: the
 // announced arrivals of shows they follow, after both the device's cursor
-// and the follow and up to upto, since a date (the week, or the wait), of
-// episodes with a present file that they haven't finished. The join is
-// pinned: the person's follows (tens of rows), each one's show rows by
-// TMDB id, then each show's arrivals from its (show_id, id) index.
+// and the follow and up to upto, since a date (the week, or the wait),
+// that they haven't finished in any library. Each comes with an episode
+// row of its TMDB episode that has a present file, in any library: its own
+// row first. One with none is left out. The join is pinned: the person's
+// follows (tens of rows), then each one's arrivals from (tmdb_id, id); an
+// episode row is found by show TMDB id, season and number.
 func (q *Queries) ListFollowedArrivals(ctx context.Context, arg ListFollowedArrivalsParams) ([]ListFollowedArrivalsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listFollowedArrivals,
 		arg.After,
@@ -172,16 +181,16 @@ func (q *Queries) ListFollowedArrivals(ctx context.Context, arg ListFollowedArri
 		var i ListFollowedArrivalsRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.EpisodeID,
-			&i.ShowID,
-			&i.ArrivedAt,
 			&i.TmdbID,
-			&i.ShowTitle,
-			&i.ShowPosterPath,
+			&i.ArrivedAt,
 			&i.SeasonNumber,
 			&i.EpisodeNumber,
+			&i.EpisodeID,
+			&i.ShowID,
 			&i.Title,
 			&i.StillPath,
+			&i.ShowTitle,
+			&i.ShowPosterPath,
 		); err != nil {
 			return nil, err
 		}
@@ -197,22 +206,30 @@ func (q *Queries) ListFollowedArrivals(ctx context.Context, arg ListFollowedArri
 }
 
 const listNewestFollowedArrivals = `-- name: ListNewestFollowedArrivals :many
-SELECT a.id, a.episode_id, a.show_id, a.arrived_at,
-    s.tmdb_id, s.title AS show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
-    se.number AS season_number, e.number AS episode_number, e.title, e.overview, e.air_date, e.still_path,
+SELECT a.id, a.tmdb_id, a.arrived_at, a.season AS season_number, a.number AS episode_number,
+    e.id AS episode_id, e.show_id, e.title, e.overview, e.air_date, e.still_path,
+    s.title AS show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
     CAST(COALESCE((SELECT mf.id FROM episode_files ef CROSS JOIN media_files mf ON mf.id = ef.media_file_id
-        WHERE ef.episode_id = a.episode_id AND mf.status = 'present' ORDER BY mf.height DESC LIMIT 1), 0) AS INTEGER) AS file_id
+        WHERE ef.episode_id = e.id AND mf.status = 'present' ORDER BY mf.height DESC LIMIT 1), 0) AS INTEGER) AS file_id
 FROM show_follows f
-CROSS JOIN shows s INDEXED BY shows_tmdb_idx ON s.tmdb_id = f.tmdb_id
-CROSS JOIN episode_arrivals a INDEXED BY episode_arrivals_show_idx
-    ON a.show_id = s.id AND a.id > f.since_arrival
-CROSS JOIN episodes e ON e.id = a.episode_id
-CROSS JOIN seasons se ON se.id = e.season_id
+CROSS JOIN episode_arrivals a INDEXED BY episode_arrivals_follow_idx
+    ON a.tmdb_id = f.tmdb_id AND a.id > f.since_arrival
+CROSS JOIN episodes e ON e.id = (
+    SELECT e2.id FROM shows s2
+    CROSS JOIN seasons se2 ON se2.show_id = s2.id AND se2.number = a.season
+    CROSS JOIN episodes e2 ON e2.season_id = se2.id AND e2.number = a.number
+    WHERE s2.tmdb_id = a.tmdb_id
+      AND EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files mf ON mf.id = ef.media_file_id
+          WHERE ef.episode_id = e2.id AND mf.status = 'present')
+    ORDER BY e2.id = a.episode_id DESC, e2.id
+    LIMIT 1)
+CROSS JOIN shows s ON s.id = e.show_id
 WHERE f.user_id = ?1 AND a.quiet = 0 AND a.arrived_at >= ?2
-  AND EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files mf ON mf.id = ef.media_file_id
-      WHERE ef.episode_id = a.episode_id AND mf.status = 'present')
-  AND NOT EXISTS (SELECT 1 FROM watch_state w
-      WHERE w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = a.episode_id AND w.completed = 1)
+  AND NOT EXISTS (SELECT 1 FROM shows s3
+      CROSS JOIN seasons se3 ON se3.show_id = s3.id AND se3.number = a.season
+      CROSS JOIN episodes e3 ON e3.season_id = se3.id AND e3.number = a.number
+      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id AND w.completed = 1
+      WHERE s3.tmdb_id = a.tmdb_id)
 ORDER BY a.id DESC
 LIMIT ?3
 `
@@ -225,25 +242,25 @@ type ListNewestFollowedArrivalsParams struct {
 
 type ListNewestFollowedArrivalsRow struct {
 	ID               int64   `json:"id"`
-	EpisodeID        int64   `json:"episode_id"`
-	ShowID           int64   `json:"show_id"`
-	ArrivedAt        string  `json:"arrived_at"`
 	TmdbID           int64   `json:"tmdb_id"`
-	ShowTitle        string  `json:"show_title"`
-	ShowPosterPath   *string `json:"show_poster_path"`
-	ShowBackdropPath *string `json:"show_backdrop_path"`
+	ArrivedAt        string  `json:"arrived_at"`
 	SeasonNumber     int64   `json:"season_number"`
 	EpisodeNumber    int64   `json:"episode_number"`
+	EpisodeID        int64   `json:"episode_id"`
+	ShowID           int64   `json:"show_id"`
 	Title            string  `json:"title"`
 	Overview         string  `json:"overview"`
 	AirDate          *string `json:"air_date"`
 	StillPath        *string `json:"still_path"`
+	ShowTitle        string  `json:"show_title"`
+	ShowPosterPath   *string `json:"show_poster_path"`
+	ShowBackdropPath *string `json:"show_backdrop_path"`
 	FileID           int64   `json:"file_id"`
 }
 
 // Home's row "New from shows you follow" (section 5.5): the same
 // arrivals as ListFollowedArrivals since a date, newest first, with what
-// an episode card shows and the episode's tallest present file.
+// an episode card shows and the episode row's tallest present file.
 func (q *Queries) ListNewestFollowedArrivals(ctx context.Context, arg ListNewestFollowedArrivalsParams) ([]ListNewestFollowedArrivalsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listNewestFollowedArrivals, arg.UserID, arg.Since, arg.MaxRows)
 	if err != nil {
@@ -255,19 +272,19 @@ func (q *Queries) ListNewestFollowedArrivals(ctx context.Context, arg ListNewest
 		var i ListNewestFollowedArrivalsRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.EpisodeID,
-			&i.ShowID,
-			&i.ArrivedAt,
 			&i.TmdbID,
-			&i.ShowTitle,
-			&i.ShowPosterPath,
-			&i.ShowBackdropPath,
+			&i.ArrivedAt,
 			&i.SeasonNumber,
 			&i.EpisodeNumber,
+			&i.EpisodeID,
+			&i.ShowID,
 			&i.Title,
 			&i.Overview,
 			&i.AirDate,
 			&i.StillPath,
+			&i.ShowTitle,
+			&i.ShowPosterPath,
+			&i.ShowBackdropPath,
 			&i.FileID,
 		); err != nil {
 			return nil, err
@@ -286,14 +303,11 @@ func (q *Queries) ListNewestFollowedArrivals(ctx context.Context, arg ListNewest
 const listShowFollows = `-- name: ListShowFollows :many
 SELECT f.tmdb_id, f.title, f.created_at,
     s.id AS show_id, s.title AS show_title, s.poster_path AS show_poster_path,
-    a.arrived_at AS latest_arrived_at, se.number AS latest_season, e.number AS latest_number, e.title AS latest_title
+    a.arrived_at AS latest_arrived_at, a.season AS latest_season, a.number AS latest_number, e.title AS latest_title
 FROM show_follows f
 LEFT JOIN shows s ON s.id = (SELECT MIN(s2.id) FROM shows s2 WHERE s2.tmdb_id = f.tmdb_id)
-LEFT JOIN episode_arrivals a ON a.id = (
-    SELECT MAX((SELECT MAX(a2.id) FROM episode_arrivals a2 WHERE a2.show_id = s3.id))
-    FROM shows s3 WHERE s3.tmdb_id = f.tmdb_id)
+LEFT JOIN episode_arrivals a ON a.id = (SELECT MAX(a2.id) FROM episode_arrivals a2 WHERE a2.tmdb_id = f.tmdb_id)
 LEFT JOIN episodes e ON e.id = a.episode_id
-LEFT JOIN seasons se ON se.id = e.season_id
 WHERE f.user_id = ?1
 ORDER BY f.created_at DESC, f.since_arrival DESC, f.tmdb_id DESC
 `
@@ -312,9 +326,10 @@ type ListShowFollowsRow struct {
 }
 
 // A person's follows, newest first, each with a show row that has its TMDB
-// id (the lowest, for a show in two libraries) and its newest arrival
-// across those rows, announced or not. Each show row's newest arrival is
-// the last entry of its (show_id, id) index.
+// id (the lowest, for a show in two libraries) and its newest arrival,
+// announced or not, the last entry for the TMDB id in (tmdb_id, id). The
+// arrival outlives a library removed; its title is its episode's while
+// the episode is there.
 func (q *Queries) ListShowFollows(ctx context.Context, userID int64) ([]ListShowFollowsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listShowFollows, userID)
 	if err != nil {
@@ -350,10 +365,14 @@ func (q *Queries) ListShowFollows(ctx context.Context, userID int64) ([]ListShow
 }
 
 const recordEpisodeArrival = `-- name: RecordEpisodeArrival :exec
-INSERT INTO episode_arrivals (episode_id, show_id, arrived_at, quiet)
-SELECT e.id, e.show_id, CAST(?1 AS TEXT), CAST(?2 AS INTEGER)
-FROM episodes e WHERE e.id = ?3
-ON CONFLICT (episode_id) DO NOTHING
+INSERT INTO episode_arrivals (tmdb_id, season, number, episode_id, arrived_at, quiet)
+SELECT s.tmdb_id, se.number, e.number, e.id, CAST(?1 AS TEXT), CAST(?2 AS INTEGER)
+FROM episodes e
+CROSS JOIN seasons se ON se.id = e.season_id
+CROSS JOIN shows s ON s.id = e.show_id
+WHERE e.id = ?3
+ON CONFLICT (tmdb_id, season, number) DO UPDATE SET episode_id = excluded.episode_id
+WHERE episode_arrivals.episode_id IS NULL
 `
 
 type RecordEpisodeArrivalParams struct {
@@ -362,7 +381,9 @@ type RecordEpisodeArrivalParams struct {
 	EpisodeID int64  `json:"episode_id"`
 }
 
-// An episode's arrival, unless it has one: an episode arrives once.
+// An episode's arrival, unless its TMDB episode (the show's TMDB id, the
+// season and the number) has one, in any library: it arrives once. An
+// arrival whose episode row has gone, with its library, moves to this one.
 func (q *Queries) RecordEpisodeArrival(ctx context.Context, arg RecordEpisodeArrivalParams) error {
 	_, err := q.db.ExecContext(ctx, recordEpisodeArrival, arg.ArrivedAt, arg.Quiet, arg.EpisodeID)
 	return err

@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"maps"
 	"math"
 	"net/http"
 	"slices"
@@ -224,7 +223,7 @@ func registerFollows(h huma.API, deps Deps) {
 			return nil, unfollow(ctx, deps, u.ID, in.TMDBID)
 		})
 	huma.Register(h, op("listNewEpisodes", http.MethodGet, "/me/new-episodes", "Episodes that arrived for the shows the signed-in person follows",
-		"What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show (an episode in two libraries is listed once). An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out."),
+		"What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show. An episode arrives once, in whichever library it reaches first; a copy in another library, or in a library removed and added again, is not new. Each episode named has a present file, in any library. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out."),
 		func(ctx context.Context, in *NewEpisodesInput) (*NewEpisodesOutput, error) {
 			u, err := currentUser(ctx)
 			if err != nil {
@@ -295,9 +294,10 @@ func newEpisodes(ctx context.Context, q *db.Queries, userID int64, after string,
 	if err != nil {
 		return out, err
 	}
+	// An arrival is a TMDB episode's, once, so a group is a TMDB show's.
 	type group struct {
 		newest   int64
-		episodes map[[2]int64]db.ListFollowedArrivalsRow
+		episodes []db.ListFollowedArrivalsRow
 	}
 	groups := map[int64]*group{}
 	var order []int64
@@ -312,20 +312,17 @@ func newEpisodes(ctx context.Context, q *db.Queries, userID int64, after string,
 		}
 		taken++
 		if !ok {
-			g = &group{episodes: map[[2]int64]db.ListFollowedArrivalsRow{}}
+			g = &group{}
 			groups[r.TmdbID] = g
 			order = append(order, r.TmdbID)
 		}
 		g.newest = r.ID
-		// The same episode in a second library is the same episode.
-		if _, dup := g.episodes[[2]int64{r.SeasonNumber, r.EpisodeNumber}]; !dup {
-			g.episodes[[2]int64{r.SeasonNumber, r.EpisodeNumber}] = r
-		}
+		g.episodes = append(g.episodes, r)
 	}
 	out.Cursor = strconv.FormatInt(end, 10)
 	slices.SortFunc(order, func(a, b int64) int { return cmp.Compare(groups[b].newest, groups[a].newest) })
 	for _, tmdbID := range order {
-		eps := slices.Collect(maps.Values(groups[tmdbID].episodes))
+		eps := groups[tmdbID].episodes
 		slices.SortFunc(eps, func(a, b db.ListFollowedArrivalsRow) int {
 			return cmp.Or(cmp.Compare(seasonOrder(a.SeasonNumber), seasonOrder(b.SeasonNumber)), cmp.Compare(a.EpisodeNumber, b.EpisodeNumber))
 		})
@@ -356,22 +353,15 @@ func seasonOrder(n int64) int64 {
 // followedEpisodes is Home's row "New from shows you follow"
 // (PLAN-NEW-EPISODES.md §5.5): what arrived for the person's followed shows
 // in the last 7 days, by the feed's rules but without its wait, newest
-// first. An episode in two libraries is shown once.
+// first.
 func followedEpisodes(ctx context.Context, q *db.Queries, userID int64, now time.Time) ([]EpisodeCard, error) {
-	// Room for an episode in several libraries.
 	rows, err := q.ListNewestFollowedArrivals(ctx, db.ListNewestFollowedArrivalsParams{UserID: userID,
-		Since: db.FormatTime(now.Add(-newWindow)), MaxRows: 3 * followedRowLength})
+		Since: db.FormatTime(now.Add(-newWindow)), MaxRows: followedRowLength})
 	if err != nil {
 		return nil, err
 	}
-	out := []EpisodeCard{}
-	seen := map[[3]int64]bool{}
+	out := make([]EpisodeCard, 0, len(rows))
 	for _, r := range rows {
-		k := [3]int64{r.TmdbID, r.SeasonNumber, r.EpisodeNumber}
-		if seen[k] {
-			continue
-		}
-		seen[k] = true
 		arrived := db.ParseTime(r.ArrivedAt)
 		c := EpisodeCard{
 			EpisodeID: r.EpisodeID, ShowID: r.ShowID, ShowTitle: r.ShowTitle, SeasonNumber: r.SeasonNumber, EpisodeNumber: r.EpisodeNumber,
@@ -384,9 +374,6 @@ func followedEpisodes(ctx context.Context, q *db.Queries, userID int64, now time
 			c.HasFile, c.FileID = true, &id
 		}
 		out = append(out, c)
-		if len(out) == followedRowLength {
-			break
-		}
 	}
 	return out, nil
 }

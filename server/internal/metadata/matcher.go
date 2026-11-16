@@ -603,14 +603,17 @@ func (m *Matcher) record(ctx context.Context, fileID int64, status string, movie
 }
 
 // recordArrivals notes the episodes a file is being linked to as arrived
-// (PLAN-NEW-EPISODES.md §5.2). An episode arrives once, the first time a
-// file that was never linked before is linked to it: that is an arrival,
-// which followers hear about. An episode with an arrival already gets
-// nothing, so a better copy, a second version, a rename or a file back
-// after going missing is silent. A file linked before that lands on an
-// episode with none (a rematch, Fix match or season mapping moved it)
-// gives a quiet arrival, which is never announced. Then the file counts as
-// linked.
+// (PLAN-NEW-EPISODES.md §5.2). An arrival belongs to the TMDB episode (the
+// show's TMDB id, season and number), not the episode row, and a TMDB
+// episode arrives once, the first time a file that was never linked
+// before is linked to it in any library: that is an arrival, which
+// followers hear about. One that has arrived gets nothing, so a better
+// copy, a second version, a rename, a file back after going missing, a
+// copy in a second (4K) library and a library removed and added again are
+// silent; the last moves the arrival to the new episode row. A file linked
+// before that lands on a TMDB episode with none (a rematch, Fix match or
+// season mapping moved it) gives a quiet arrival, which is never
+// announced. Then the file counts as linked.
 func recordArrivals(ctx context.Context, q *db.Queries, fileID int64, episodeIDs []int64) error {
 	if len(episodeIDs) == 0 {
 		return nil

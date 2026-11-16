@@ -16,35 +16,50 @@ CREATE TABLE show_follows (
     PRIMARY KEY (user_id, tmdb_id)
 );
 
--- episode_arrivals has one row per episode that has ever had a file: the
+-- episode_arrivals has one row per TMDB episode (the show's TMDB id, the
+-- season and episode number) that has ever had a file in any library: the
 -- first time a file that was never linked before is linked to it
--- (Matcher.record, section 5.2). quiet rows are never announced. The id
--- counts up and is never reused (AUTOINCREMENT), so it is the order of
--- arrival and every device's cursor is one.
+-- (Matcher.record, section 5.2). It belongs to the TMDB episode, not to an
+-- episode row, so a copy in a second library (a 4K one) is not another
+-- arrival, and the row outlives a library removed and added again:
+-- episode_id is the row it arrived on, or the next one linked once that
+-- row is gone. quiet rows are never announced. The id counts up and is
+-- never reused (AUTOINCREMENT), so it is the order of arrival and every
+-- device's cursor is one. Follows are by TMDB id, so the feed reads
+-- (tmdb_id, id).
 CREATE TABLE episode_arrivals (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    episode_id INTEGER NOT NULL UNIQUE REFERENCES episodes(id) ON DELETE CASCADE,
-    show_id    INTEGER NOT NULL REFERENCES shows(id) ON DELETE CASCADE,
+    tmdb_id    INTEGER NOT NULL,
+    season     INTEGER NOT NULL,
+    number     INTEGER NOT NULL,
+    episode_id INTEGER REFERENCES episodes(id) ON DELETE SET NULL,
     arrived_at TEXT NOT NULL,
     quiet      INTEGER NOT NULL DEFAULT 0
 );
-CREATE INDEX episode_arrivals_show_idx ON episode_arrivals (show_id, id);
+CREATE UNIQUE INDEX episode_arrivals_episode_idx ON episode_arrivals (tmdb_id, season, number);
+CREATE INDEX episode_arrivals_follow_idx ON episode_arrivals (tmdb_id, id);
+-- Deleting an episode finds its arrival by this, rather than reading them
+-- all, when a library is removed.
+CREATE INDEX episode_arrivals_episode_id_idx ON episode_arrivals (episode_id);
 
 -- When the file was first linked to an episode; empty until then. A file
 -- linked before is a better copy, a rename or a file moved by a rematch,
 -- never an arrival.
 ALTER TABLE media_files ADD COLUMN first_linked_at TEXT;
 
--- Nobody is told about the library as it stands: every episode with a link
--- has arrived, quietly, in the order its files came, and every linked file
--- has been linked.
-INSERT INTO episode_arrivals (episode_id, show_id, arrived_at, quiet)
-SELECT e.id, e.show_id, MIN(COALESCE(NULLIF(f.added_at, ''), f.first_seen_at)) AS arrived, 1
+-- Nobody is told about the library as it stands: every TMDB episode with
+-- a link in any library has arrived, quietly, on the row linked first and
+-- in the order the files came, and every linked file has been linked.
+-- (With one MIN(), SQLite takes e.id from the row that has it.)
+INSERT INTO episode_arrivals (tmdb_id, season, number, episode_id, arrived_at, quiet)
+SELECT s.tmdb_id, se.number, e.number, e.id, MIN(COALESCE(NULLIF(f.added_at, ''), f.first_seen_at)) AS arrived, 1
 FROM episodes e
+JOIN seasons se ON se.id = e.season_id
+JOIN shows s ON s.id = e.show_id
 JOIN episode_files ef ON ef.episode_id = e.id
 JOIN media_files f ON f.id = ef.media_file_id
-GROUP BY e.id
-ORDER BY arrived, e.id;
+GROUP BY s.tmdb_id, se.number, e.number
+ORDER BY arrived, s.tmdb_id, se.number, e.number;
 
 UPDATE media_files SET first_linked_at = COALESCE(matched_at, NULLIF(added_at, ''), first_seen_at)
 WHERE id IN (SELECT media_file_id FROM episode_files);

@@ -617,8 +617,10 @@ func TestMigrationCustomPosters(t *testing.T) {
 
 // The library as it stands when following arrives has arrived already,
 // quietly: nobody is told about it (PLAN-NEW-EPISODES.md section 5.1).
-// Each episode with a link gets one quiet arrival, in the order its files
-// came, and each linked file counts as linked; nothing else does.
+// Each TMDB episode with a link in any library gets one quiet arrival, on
+// the episode row linked first and in the order the files came, and each
+// linked file counts as linked; nothing else does. An arrival outlives its
+// episode row.
 func TestMigrationShowFollows(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -630,11 +632,12 @@ func TestMigrationShowFollows(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	exec(`INSERT INTO libraries (id, type, name, path) VALUES (1, 'tv', 'TV', '/tv'), (2, 'movie', 'Movies', '/m')`)
-	exec(`INSERT INTO shows (id, library_id, tmdb_id, title, genres) VALUES (3, 1, 77, 'Inspector Vane', '[]')`)
-	exec(`INSERT INTO seasons (id, show_id, number, name, overview, episode_count) VALUES (4, 3, 1, 'Season 1', '', 4)`)
+	exec(`INSERT INTO libraries (id, type, name, path) VALUES (1, 'tv', 'TV', '/tv'), (2, 'movie', 'Movies', '/m'), (5, 'tv', 'TV 4K', '/tv4k')`)
+	exec(`INSERT INTO shows (id, library_id, tmdb_id, title, genres) VALUES (3, 1, 77, 'Inspector Vane', '[]'), (6, 5, 77, 'Inspector Vane', '[]')`)
+	exec(`INSERT INTO seasons (id, show_id, number, name, overview, episode_count) VALUES (4, 3, 1, 'Season 1', '', 4), (8, 6, 1, 'Season 1', '', 4)`)
 	exec(`INSERT INTO episodes (id, season_id, show_id, number, title) VALUES
-		(10, 4, 3, 1, 'Low Tide'), (11, 4, 3, 2, 'Neap'), (12, 4, 3, 3, 'Flood'), (13, 4, 3, 4, 'Not Out Yet')`)
+		(10, 4, 3, 1, 'Low Tide'), (11, 4, 3, 2, 'Neap'), (12, 4, 3, 3, 'Flood'), (13, 4, 3, 4, 'Not Out Yet'),
+		(20, 8, 6, 1, 'Low Tide'), (21, 8, 6, 4, 'Not Out Yet')`)
 	exec(`INSERT INTO movies (id, library_id, tmdb_id, title, genres) VALUES (7, 2, 949, 'Harbor Lights', '[]')`)
 	file := func(id int64, lib int64, path, status, added, matched string) {
 		t.Helper()
@@ -653,33 +656,37 @@ func TestMigrationShowFollows(t *testing.T) {
 	file(103, 1, "/tv/Vane/S01E02E03.mkv", "present", "2026-02-01T00:00:00.000Z", "2026-02-02T00:00:00.000Z")
 	file(104, 1, "/tv/Vane/unmatched.mkv", "present", "2026-03-01T00:00:00.000Z", "")
 	file(105, 2, "/m/Harbor Lights.mkv", "present", "2026-03-01T00:00:00.000Z", "2026-03-01T00:00:00.000Z")
+	// The 4K library had E01 first, and is the only one with E04.
+	file(106, 5, "/tv4k/Vane/S01E01.mkv", "present", "2026-01-15T00:00:00.000Z", "2026-01-16T00:00:00.000Z")
+	file(107, 5, "/tv4k/Vane/S01E04.mkv", "present", "2026-05-01T00:00:00.000Z", "2026-05-02T00:00:00.000Z")
 	exec(`UPDATE media_files SET movie_id = 7 WHERE id = 105`)
-	exec(`INSERT INTO episode_files (episode_id, media_file_id) VALUES (10, 100), (10, 101), (11, 102), (11, 103), (12, 103)`)
+	exec(`INSERT INTO episode_files (episode_id, media_file_id) VALUES (10, 100), (10, 101), (11, 102), (11, 103), (12, 103), (20, 106), (21, 107)`)
 	if _, err := p.UpTo(ctx, 42); err != nil {
 		t.Fatal(err)
 	}
 
-	rows, err := conn.QueryContext(ctx, `SELECT episode_id, show_id, arrived_at, quiet FROM episode_arrivals ORDER BY id`)
+	rows, err := conn.QueryContext(ctx, `SELECT tmdb_id, season, number, episode_id, arrived_at, quiet FROM episode_arrivals ORDER BY id`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = rows.Close() }()
 	var got []string
 	for rows.Next() {
-		var episode, show, quiet int64
+		var tmdbID, season, number, episode, quiet int64
 		var at string
-		if err := rows.Scan(&episode, &show, &at, &quiet); err != nil {
+		if err := rows.Scan(&tmdbID, &season, &number, &episode, &at, &quiet); err != nil {
 			t.Fatal(err)
 		}
-		got = append(got, fmt.Sprintf("%d/%d %s quiet=%d", episode, show, at, quiet))
+		got = append(got, fmt.Sprintf("%d S%02dE%02d on %d %s quiet=%d", tmdbID, season, number, episode, at, quiet))
 	}
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
 	want := []string{
-		"11/3 2026-02-01T00:00:00.000Z quiet=1", // by the two-episode file, the first to come
-		"12/3 2026-02-01T00:00:00.000Z quiet=1",
-		"10/3 2026-03-05T00:00:00.000Z quiet=1", // its first copy, not the better one
+		"77 S01E01 on 20 2026-01-15T00:00:00.000Z quiet=1", // in the 4K library first; once, not per library
+		"77 S01E02 on 11 2026-02-01T00:00:00.000Z quiet=1", // by the two-episode file, the first to come
+		"77 S01E03 on 12 2026-02-01T00:00:00.000Z quiet=1",
+		"77 S01E04 on 21 2026-05-01T00:00:00.000Z quiet=1",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("arrivals:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
@@ -691,6 +698,8 @@ func TestMigrationShowFollows(t *testing.T) {
 		103: "2026-02-02T00:00:00.000Z",
 		104: "", // never linked
 		105: "", // a movie's
+		106: "2026-01-16T00:00:00.000Z",
+		107: "2026-05-02T00:00:00.000Z",
 	} {
 		var at *string
 		if err := conn.QueryRowContext(ctx, `SELECT first_linked_at FROM media_files WHERE id = ?`, id).Scan(&at); err != nil {
@@ -705,14 +714,17 @@ func TestMigrationShowFollows(t *testing.T) {
 			t.Errorf("file %d first linked never, want %q", id, want)
 		}
 	}
-	// A follow keeps to its person; the arrivals keep to their episodes.
+	// A follow keeps to its person; an arrival outlives its episode row
+	// and its library.
 	exec(`INSERT INTO users (id, name, password_hash) VALUES (5, 'Casey', 'x')`)
 	exec(`INSERT INTO show_follows (user_id, tmdb_id, title, since_arrival) VALUES (5, 77, 'Inspector Vane', 3)`)
 	exec(`DELETE FROM episodes WHERE id = 12`)
+	exec(`DELETE FROM libraries WHERE id = 5`)
 	exec(`DELETE FROM users WHERE id = 5`)
-	var follows, arrivals int
-	if err := conn.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM show_follows), (SELECT COUNT(*) FROM episode_arrivals)`).Scan(&follows, &arrivals); err != nil || follows != 0 || arrivals != 2 {
-		t.Errorf("after deleting: %d follows, %d arrivals, %v", follows, arrivals, err)
+	var follows, arrivals, orphans int
+	if err := conn.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM show_follows), (SELECT COUNT(*) FROM episode_arrivals),
+		(SELECT COUNT(*) FROM episode_arrivals WHERE episode_id IS NULL)`).Scan(&follows, &arrivals, &orphans); err != nil || follows != 0 || arrivals != 4 || orphans != 3 {
+		t.Errorf("after deleting: %d follows, %d arrivals (%d without an episode), %v", follows, arrivals, orphans, err)
 	}
 	if _, err := p.DownTo(ctx, 41); err != nil {
 		t.Fatal(err)

@@ -33,10 +33,11 @@ func seedFollows(tb testing.TB, conn *sql.DB, tv int64, follows, fresh int, now 
 			tb.Fatal(err)
 		}
 	}
-	exec(`INSERT INTO episode_arrivals (episode_id, show_id, arrived_at, quiet)
-		SELECT e.id, e.show_id, MIN(f.added_at) AS arrived, 1 FROM episodes e
+	exec(`INSERT INTO episode_arrivals (tmdb_id, season, number, episode_id, arrived_at, quiet)
+		SELECT s.tmdb_id, se.number, e.number, e.id, MIN(f.added_at) AS arrived, 1 FROM episodes e
+		JOIN seasons se ON se.id = e.season_id JOIN shows s ON s.id = e.show_id
 		JOIN episode_files ef ON ef.episode_id = e.id JOIN media_files f ON f.id = ef.media_file_id
-		GROUP BY e.id ORDER BY arrived, e.id`)
+		GROUP BY s.tmdb_id, se.number, e.number ORDER BY arrived, s.tmdb_id, se.number, e.number`)
 	exec(`UPDATE media_files SET first_linked_at = added_at WHERE id IN (SELECT media_file_id FROM episode_files)`)
 	var before int64
 	if err := tx.QueryRowContext(ctx, `SELECT MAX(id) FROM episode_arrivals`).Scan(&before); err != nil {
@@ -74,7 +75,9 @@ func seedFollows(tb testing.TB, conn *sql.DB, tv int64, follows, fresh int, now 
 		exec(`INSERT INTO media_files (library_id, path, size, mtime, status, parsed, height, added_at, match_status, first_linked_at)
 			VALUES (?, ?, 1, ?, 'present', '{"kind":"episode"}', 1080, ?, 'matched', ?)`, tv, fmt.Sprintf("/t/new/%d.mkv", id), at, at, at)
 		exec(`INSERT INTO episode_files (episode_id, media_file_id) VALUES (?, last_insert_rowid())`, id)
-		exec(`INSERT INTO episode_arrivals (episode_id, show_id, arrived_at, quiet) SELECT id, show_id, ?, 0 FROM episodes WHERE id = ?`, at, id)
+		exec(`INSERT INTO episode_arrivals (tmdb_id, season, number, episode_id, arrived_at, quiet)
+			SELECT s.tmdb_id, se.number, e.number, e.id, ?, 0 FROM episodes e JOIN seasons se ON se.id = e.season_id JOIN shows s ON s.id = e.show_id
+			WHERE e.id = ?`, at, id)
 	}
 	if err := tx.Commit(); err != nil {
 		tb.Fatal(err)
@@ -118,9 +121,9 @@ func (p *planner) QueryContext(ctx context.Context, query string, args ...any) (
 // TestNewEpisodesSpeed times the feed devices check, the follows list and
 // Home's followed row over the large seeded library, alone and ten at once
 // (PLAN-NEW-EPISODES.md section 5.4), and checks the feed's and the row's
-// plans without statistics: the person's follows, their shows by TMDB id,
-// and each show's arrivals from its (show_id, id) index, never a scan of
-// all arrivals or episodes.
+// plans without statistics: the person's follows, then each one's
+// arrivals from (tmdb_id, id), and an episode row by show TMDB id, season
+// and number, never a scan of all arrivals, shows or episodes.
 func TestNewEpisodesSpeed(t *testing.T) {
 	if testing.Short() {
 		t.Skip("seeds a large library")
