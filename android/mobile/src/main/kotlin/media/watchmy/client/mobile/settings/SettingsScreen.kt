@@ -63,7 +63,9 @@ import media.watchmy.client.mobile.components.PhoneIcons
 import media.watchmy.client.mobile.live.rememberReminderSettings
 import media.watchmy.client.mobile.navigation.MobileRoutes
 import media.watchmy.client.mobile.navigation.OnTabReselected
-import media.watchmy.client.model.LIVE_REMINDER_CHANNEL
+import media.watchmy.client.model.TURN_ON_NOTIFICATIONS
+import media.watchmy.client.model.text
+import media.watchmy.client.model.title
 import media.watchmy.client.model.MediaRequest
 import media.watchmy.client.model.RowLayoutEntry
 import media.watchmy.client.model.RowScreens
@@ -131,6 +133,12 @@ fun SettingsScreen(
     val reminders = rememberReminderSettings()
     val apiLevel = state.server?.server?.apiLevel ?: 0
     val rowsAvailable = ServerFeatures(apiLevel).rows
+    // Following shows (PLAN-NEW-EPISODES.md §7.2): the group's line, and the one card with reminders' (§7.3).
+    val followsAvailable = ServerFeatures(apiLevel).follows
+    val notifications = if (followsAvailable) notificationsModel().state.collectAsStateWithLifecycle().value else null
+    val following = notifications?.count?.let { it > 0 } == true
+    val channels = rememberChannelsAllowed()
+    val blocked = channels.blocked(remindersShown = reminders.shown, newEpisodesOn = following && notifications?.notifyHere == true)
     val rows = if (rowsAvailable) homeRows() else null
     val requests = if (onOpenRequests != null) myRequests() else null
     val user = state.user
@@ -157,6 +165,15 @@ fun SettingsScreen(
             serverName = server?.name,
             serverVersion = server?.version,
             remindersBlocked = reminders.shown && !reminders.allowed,
+            follows = notifications?.list?.let { list ->
+                when (list) {
+                    is Load.Ready -> Load.Ready(list.data.size)
+                    is Load.Failed -> list
+                    Load.Loading -> Load.Loading
+                }
+            },
+            notifyHere = notifications?.notifyHere ?: true,
+            newEpisodesBlocked = blocked.newEpisodes,
         ),
     )
     val groups = SettingsGroup.entries.filter { group ->
@@ -164,6 +181,7 @@ fun SettingsScreen(
             SettingsGroup.Languages -> state.subtitlePreferencesAvailable
             SettingsGroup.Downloads -> downloads.enabled || downloads.all.isNotEmpty()
             SettingsGroup.HomeRows -> rowsAvailable
+            SettingsGroup.Notifications -> followsAvailable
             SettingsGroup.Requests -> onOpenRequests != null
             SettingsGroup.Inbox -> onOpenInbox != null
             SettingsGroup.ServerSettings -> user?.isAdmin == true && server != null
@@ -189,6 +207,12 @@ fun SettingsScreen(
             // Its two-by-two panels need a wide page; beside the list on a tablet held upright it stacks, as on a phone.
             SettingsGroup.Languages -> LanguageSettings(twoPane && windowWidth() >= 1000.dp, online, pageModifier)
             SettingsGroup.Downloads -> DownloadsPage(twoPane, onSpace = { onNavigate(MobileRoutes.Downloads) }, modifier = pageModifier)
+            SettingsGroup.Notifications -> NotificationsPage(
+                twoPane, online, remindersShown = reminders.shown,
+                onOpenShow = { onNavigate(MobileRoutes.Show(it)) },
+                onOpenPlayback = { onOpenPage(SettingsGroup.Playback, twoPane) },
+                modifier = pageModifier,
+            )
             SettingsGroup.Account -> AccountPage(twoPane, onChangePassword = { onChangePassword(twoPane) }, onLinkTv = onLinkTv, onSwitchServer = onSwitchServer, modifier = pageModifier)
             SettingsGroup.About -> AboutPage(twoPane, openWeb, pageModifier)
             else -> Unit
@@ -233,15 +257,16 @@ fun SettingsScreen(
                     onAction = vm::reloadAccount,
                 )
             }
-            if (reminders.shown && !reminders.allowed) {
+            // One card, never two: what can't show, and one button for it (the boards' `off`).
+            if (blocked.any) {
                 val context = LocalContext.current
                 StatusCard(
-                    "Live TV reminders can’t show on this $device",
-                    "Notifications are off for WatchMyMedia in Android’s settings.",
+                    blocked.title(device),
+                    blocked.text(),
                     NoteTone.Warn,
                     Modifier.cardInset(false),
-                    action = "Turn on notifications",
-                    onAction = { openNotifications(context, LIVE_REMINDER_CHANNEL) },
+                    action = TURN_ON_NOTIFICATIONS,
+                    onAction = { openNotificationsFor(context, blocked) },
                 )
             }
         }
@@ -296,6 +321,7 @@ private val SettingsGroup.icon: ImageVector
         SettingsGroup.Languages -> WmmIcons.Subtitles
         SettingsGroup.Downloads -> PhoneIcons.Downloads
         SettingsGroup.HomeRows -> PhoneIcons.Lines
+        SettingsGroup.Notifications -> WmmIcons.Bell
         SettingsGroup.Account -> WmmIcons.Person
         SettingsGroup.Requests -> WmmIcons.ListBullets
         SettingsGroup.About -> WmmIcons.Info

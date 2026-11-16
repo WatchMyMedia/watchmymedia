@@ -6,7 +6,7 @@ package media.watchmy.client.model
 // same place on every platform.
 
 /**
- * Settings' groups, in order. The first four are preferences; [Account],
+ * Settings' groups, in order. The first five are preferences; [Account],
  * [Requests] and [About] sit below a divider, as the web keeps them apart;
  * [Inbox] and [ServerSettings] are the Server group, for admins the server
  * allows. A screen leaves out the ones it can't show (Downloads on a TV, a
@@ -17,6 +17,9 @@ enum class SettingsGroup(val title: String) {
     Languages("Audio & subtitles"),
     Downloads("Downloads"),
     HomeRows("Home rows"),
+
+    /** The shows the person follows and this device's switch (PLAN-NEW-EPISODES.md §7.2), from [FOLLOWS_API_LEVEL]. */
+    Notifications("Notifications"),
     Account("Account & devices"),
     Requests("Your requests"),
     About("About"),
@@ -75,6 +78,7 @@ fun settingsTheServerLacks(features: ServerFeatures): List<String> = listOfNotNu
     "Audio & subtitles".takeIf { !features.subtitlePreferences },
     "Audio languages".takeIf { features.subtitlePreferences && !features.audioLanguages },
     "Home rows".takeIf { !features.rows },
+    "Notifications".takeIf { !features.follows },
 )
 
 /**

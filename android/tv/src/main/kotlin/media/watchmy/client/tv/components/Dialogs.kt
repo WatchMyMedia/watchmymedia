@@ -78,6 +78,8 @@ fun <T> OptionsDialog(
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     /** A grey line under the title: what the choices are for ("When a video starts", "Audio languages"). */
     context: String? = null,
+    /** A small heading over the title: the list the item is from ("Shows you follow"). */
+    kicker: String? = null,
 ) {
     val focus = remember { FocusRequester() }
     TvDialog(onDismiss) {
@@ -92,6 +94,7 @@ fun <T> OptionsDialog(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (kicker != null) Text(kicker.uppercase(), style = inter(16.sp, FontWeight.Bold, tracking = 0.1f), color = WmmColors.TextMuted)
                     Text(title, style = inter(30.sp, FontWeight.SemiBold), color = WmmColors.Text)
                     if (context != null) Text(context, style = inter(19.sp), color = WmmColors.TextMuted)
                 }

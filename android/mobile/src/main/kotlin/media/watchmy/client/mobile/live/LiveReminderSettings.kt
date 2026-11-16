@@ -35,7 +35,14 @@ import media.watchmy.client.mobile.settings.SubHeading
 import media.watchmy.client.mobile.settings.cardInset
 import media.watchmy.client.mobile.settings.notificationsAllowed
 import media.watchmy.client.mobile.settings.openNotifications
+import media.watchmy.client.mobile.settings.rememberChannelsAllowed
+import media.watchmy.client.model.LIVE_REMINDERS_ROW_LINE
 import media.watchmy.client.model.LIVE_REMINDER_CHANNEL
+import media.watchmy.client.model.NotificationsBlocked
+import media.watchmy.client.model.OTHER_DEVICES_STILL
+import media.watchmy.client.model.TURN_ON_NOTIFICATIONS
+import media.watchmy.client.model.remindersBlockedTitle
+import media.watchmy.client.model.text
 import media.watchmy.client.model.LIVE_REMINDER_LEADS
 import media.watchmy.client.model.liveLeadShort
 import media.watchmy.client.model.liveReminderSettingsNote
@@ -93,12 +100,14 @@ internal fun LiveRemindersBlock(enabled: Boolean, tablet: Boolean, modifier: Mod
     Column(modifier.fillMaxWidth()) {
         SubHeading("Live TV reminders", Modifier.padding(top = 4.dp))
         if (!reminders.allowed) {
+            // Its own card: the app's notifications off, or only the reminders' channel (the boards' `off`).
+            val blocked = NotificationsBlocked(app = !rememberChannelsAllowed().app, reminders = true, newEpisodes = false)
             StatusCard(
-                "Reminders can’t show on this $device",
-                "Notifications are off for WatchMyMedia in Android’s settings. Your other devices still get them.",
+                remindersBlockedTitle(device),
+                blocked.text() + " " + OTHER_DEVICES_STILL,
                 NoteTone.Warn,
                 Modifier.cardInset(tablet = false),
-                action = "Turn on notifications",
+                action = TURN_ON_NOTIFICATIONS,
                 onAction = { openNotifications(context, LIVE_REMINDER_CHANNEL) },
             )
         }
@@ -125,7 +134,7 @@ internal fun LiveRemindersBlock(enabled: Boolean, tablet: Boolean, modifier: Mod
         if (retry != null && error != null) FailureLine("Couldn’t save, so it’s still ${liveLeadShort(state.leadMinutes)}. $error", onRetry = { pick(retry) })
         ListRow(
             "Notifications",
-            subtitle = "Opens the Live TV reminders channel in Android’s settings",
+            subtitle = LIVE_REMINDERS_ROW_LINE,
             modifier = Modifier.clickable { openNotifications(context, LIVE_REMINDER_CHANNEL) },
             trailing = { RowValue(if (reminders.allowed) "Allowed" else "Off") },
         )

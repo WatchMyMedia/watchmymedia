@@ -128,6 +128,7 @@ private fun NavDestination.tab(): MobileTab? = when {
     hasRoute<MobileRoutes.SettingsPlayback>() -> MobileTab.Settings
     hasRoute<MobileRoutes.SettingsLanguages>() -> MobileTab.Settings
     hasRoute<MobileRoutes.SettingsDownloads>() -> MobileTab.Settings
+    hasRoute<MobileRoutes.SettingsNotifications>() -> MobileTab.Settings
     hasRoute<MobileRoutes.SettingsAccount>() -> MobileTab.Settings
     hasRoute<MobileRoutes.SettingsAbout>() -> MobileTab.Settings
     else -> null
@@ -138,6 +139,7 @@ private fun SettingsGroup.route(): Any? = when (this) {
     SettingsGroup.Playback -> MobileRoutes.SettingsPlayback
     SettingsGroup.Languages -> MobileRoutes.SettingsLanguages
     SettingsGroup.Downloads -> MobileRoutes.SettingsDownloads
+    SettingsGroup.Notifications -> MobileRoutes.SettingsNotifications
     SettingsGroup.Account -> MobileRoutes.SettingsAccount
     SettingsGroup.About -> MobileRoutes.SettingsAbout
     else -> null
@@ -461,6 +463,7 @@ fun MobileNavHost(
                         composable<MobileRoutes.SettingsPlayback> { settings(it, SettingsGroup.Playback) }
                         composable<MobileRoutes.SettingsLanguages> { settings(it, SettingsGroup.Languages) }
                         composable<MobileRoutes.SettingsDownloads> { settings(it, SettingsGroup.Downloads) }
+                        composable<MobileRoutes.SettingsNotifications> { settings(it, SettingsGroup.Notifications) }
                         composable<MobileRoutes.SettingsAccount> { settings(it, SettingsGroup.Account) }
                         composable<MobileRoutes.SettingsAbout> { settings(it, SettingsGroup.About) }
                         composable<MobileRoutes.ChangePassword> { ChangePasswordRoute(nav, it, asDialog = false) }

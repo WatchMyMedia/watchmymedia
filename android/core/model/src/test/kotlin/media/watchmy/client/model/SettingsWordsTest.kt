@@ -9,7 +9,7 @@ class SettingsWordsTest {
     @Test
     fun `the groups are the web's, in its order, with account and app information below the divider`() {
         assertEquals(
-            listOf("Playback", "Audio & subtitles", "Downloads", "Home rows", "Account & devices", "Your requests", "About", "Inbox", "Server settings"),
+            listOf("Playback", "Audio & subtitles", "Downloads", "Home rows", "Notifications", "Account & devices", "Your requests", "About", "Inbox", "Server settings"),
             SettingsGroup.entries.map { it.title },
         )
         assertEquals(listOf(SettingsGroup.Account, SettingsGroup.Requests, SettingsGroup.About), SettingsGroup.entries.filter { it.belowDivider })
@@ -37,8 +37,9 @@ class SettingsWordsTest {
 
     @Test
     fun `an older server's notice names what this app leaves out`() {
-        assertEquals(listOf("Audio languages", "Home rows"), settingsTheServerLacks(ServerFeatures(20)))
-        assertEquals(listOf("Audio & subtitles", "Home rows"), settingsTheServerLacks(ServerFeatures(17)))
+        assertEquals(listOf("Audio languages", "Home rows", "Notifications"), settingsTheServerLacks(ServerFeatures(20)))
+        assertEquals(listOf("Audio & subtitles", "Home rows", "Notifications"), settingsTheServerLacks(ServerFeatures(17)))
+        assertEquals("following shows came at level 29", listOf("Notifications"), settingsTheServerLacks(ServerFeatures(28)))
         assertTrue(settingsTheServerLacks(ServerFeatures(99)).isEmpty())
         val notice = olderServerNotice("Living room", "1.3.2", listOf("Audio languages", "Home rows"), admin = false)
         assertEquals("Living room is on an older version", notice.title)
