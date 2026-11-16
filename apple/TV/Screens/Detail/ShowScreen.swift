@@ -8,8 +8,8 @@ import WMMUI
 /// (or Resume and From the start), Mark watched and ⋯ (Report a problem,
 /// Replace file, the file's versions, Delete episode…); the season tabs (the
 /// specials last) with the season's line and Mark season watched at the end;
-/// the season's episodes in a row; then About the show (Mark show watched,
-/// Request missing seasons, Show missing, the cast).
+/// the season's episodes in a row; then About the show (Notify me, Mark show
+/// watched, Request missing seasons, Show missing, the cast).
 ///
 /// Focus starts on Play. Moving focus along the row changes the episode on
 /// top, as Home's rows change their backdrop; Select on a card moves focus
@@ -39,6 +39,8 @@ private enum PageFocus: Hashable {
     case card(Int)
     /// About the show's buttons, by place.
     case about(Int)
+    /// Notify me, first among them (PLAN-NEW-EPISODES.md §7.4).
+    case bell
 }
 
 private struct ShowPageView: View {
@@ -47,6 +49,7 @@ private struct ShowPageView: View {
     @State private var focusedTop = false
     @FocusState private var focus: PageFocus?
     @Environment(AppServices.self) private var services
+    @Environment(FollowsStore.self) private var follows
 
     var body: some View {
         TVLoadable(model.state, retry: model.retry) { show in page(show) }
@@ -71,6 +74,8 @@ private struct ShowPageView: View {
                 Separately { Color.clear.task(id: model.episode != nil) { await focusTop() } }
             }
             .onChange(of: focus) { old, new in follow(from: old, to: new) }
+            // The line under the buttons says why the bell went back until it is pressed again or the page is left.
+            .onDisappear { follows.clearFailure() }
     }
 
     /// The top's first button takes focus once the page is on screen (it may
@@ -108,15 +113,16 @@ private struct ShowPageView: View {
             }
         case .about(let place)?:
             // From the row, About the show starts on its first button.
-            if case .card = old, let first = aboutFirst, first != place { focus = .about(first) }
+            if case .card = old, let first = aboutFirst, first != .about(place) { focus = first }
         default:
             break
         }
     }
 
-    /// The first of About the show's buttons.
-    private var aboutFirst: Int? {
-        model.canMarkShow ? 0 : model.canRequestMissingSeasons ? 1 : model.canShowMissing ? 2 : nil
+    /// The first of About the show's buttons: Notify me, where the server offers it.
+    private var aboutFirst: PageFocus? {
+        if let show = model.show, follows.canFollow(show) { return .bell }
+        return model.canMarkShow ? .about(0) : model.canRequestMissingSeasons ? .about(1) : model.canShowMissing ? .about(2) : nil
     }
 
     private func url(_ path: String?, _ size: ImageSize) -> URL? {
@@ -153,7 +159,9 @@ private struct ShowPageView: View {
                     canMarkShow: model.canMarkShow, showToggleLabel: model.showToggleLabel,
                     canRequestMissingSeasons: model.canRequestMissingSeasons,
                     canShowMissing: model.canShowMissing, showMissing: model.showMissing,
-                    busy: model.busy, model: model, focus: $focus
+                    busy: model.busy, model: model, focus: $focus,
+                    canFollow: follows.canFollow(show), following: follows.isFollowing(show),
+                    followFailure: follows.failureLine(for: show), bellFocused: focus == .bell, follows: follows
                 )
                 .equatable()
                 .padding(.horizontal, TVLayout.gutter)
@@ -521,9 +529,13 @@ private struct SeasonTabs: View, Equatable {
     }
 }
 
-/// About the show: the poster, title, facts, overview, Mark show watched,
-/// Request missing seasons, Show missing and the cast. Like ``SeasonTabs`` it
-/// compares what it shows, so moving along the episode row leaves it be.
+/// About the show: the poster, title, facts, overview, Notify me, Mark show
+/// watched, Request missing seasons, Show missing and the cast. Like
+/// ``SeasonTabs`` it compares what it shows, so moving along the episode row
+/// leaves it be. Notify me follows or stops at once, with no question
+/// (tvOS asks nothing); while it has focus the line under the buttons says
+/// the person's phone or tablet notifies, or, after a refusal, why the bell
+/// went back (the new-episodes boards' `tv-bell`).
 private struct AboutShow: View, Equatable {
     let show: ShowDetail
     let posterURL: URL?
@@ -535,11 +547,18 @@ private struct AboutShow: View, Equatable {
     let busy: Bool
     let model: ShowPageModel
     var focus: FocusState<PageFocus?>.Binding
+    let canFollow: Bool
+    let following: Bool
+    let followFailure: String?
+    let bellFocused: Bool
+    let follows: FollowsStore
 
     nonisolated static func == (a: Self, b: Self) -> Bool {
         a.show == b.show && a.posterURL == b.posterURL && a.canMarkShow == b.canMarkShow && a.showToggleLabel == b.showToggleLabel
             && a.canRequestMissingSeasons == b.canRequestMissingSeasons && a.canShowMissing == b.canShowMissing
             && a.showMissing == b.showMissing && a.busy == b.busy && a.model === b.model
+            && a.canFollow == b.canFollow && a.following == b.following && a.followFailure == b.followFailure
+            && a.bellFocused == b.bellFocused && a.follows === b.follows
     }
 
     var body: some View {
@@ -566,6 +585,16 @@ private struct AboutShow: View, Equatable {
                         .frame(maxWidth: 1100, alignment: .leading)
                 }
                 HStack(spacing: 18) {
+                    if canFollow {
+                        // The icon inside the Text: a focused button lifts an Image of its own (apple/AGENTS.md).
+                        Button { Task { await follows.toggle(show) } } label: {
+                            Text("\(Image(systemName: following ? "bell.fill" : "bell"))  \(NewEpisodeWords.bell(following: following))")
+                        }
+                        .buttonStyle(TVButtonStyle(kind: following ? .goldText : .secondary, height: 62, fontSize: 22))
+                        .focused(focus, equals: .bell)
+                        .accessibilityLabel(NewEpisodeWords.bellLabel(following: following, show: show.title))
+                        .accessibilityIdentifier("show-notify")
+                    }
                     if canMarkShow {
                         Button(showToggleLabel) { Task { await model.toggleShowWatched() } }
                             .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
@@ -591,6 +620,18 @@ private struct AboutShow: View, Equatable {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .focusSection()
+                if let followFailure {
+                    Text(followFailure)
+                        .font(.system(size: 20))
+                        .foregroundStyle(Palette.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("show-notify-failed")
+                } else if canFollow && bellFocused {
+                    Text("\(Image(systemName: "info.circle"))  \(NewEpisodeWords.tvLine)")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Palette.muted)
+                        .accessibilityIdentifier("show-notify-line")
+                }
                 if !show.cast.isEmpty {
                     CastRow(cast: show.cast).padding(.top, 10)
                 }
