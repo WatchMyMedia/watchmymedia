@@ -5,16 +5,27 @@ SELECT added_at FROM media_files WHERE id = ?;
 
 -- name: RecordEpisodeArrival :exec
 -- An episode's arrival, unless its TMDB episode (the show's TMDB id, the
--- season and the number) has one, in any library: it arrives once. An
--- arrival whose episode row has gone, with its library, moves to this one.
+-- season and the number) has one, in any library: it arrives once. It
+-- looks first rather than leaning on the unique index, since a conflict
+-- still uses up an AUTOINCREMENT id and a cursor would name no arrival.
 INSERT INTO episode_arrivals (tmdb_id, season, number, episode_id, arrived_at, quiet)
 SELECT s.tmdb_id, se.number, e.number, e.id, CAST(sqlc.arg(arrived_at) AS TEXT), CAST(sqlc.arg(quiet) AS INTEGER)
 FROM episodes e
 CROSS JOIN seasons se ON se.id = e.season_id
 CROSS JOIN shows s ON s.id = e.show_id
 WHERE e.id = sqlc.arg(episode_id)
-ON CONFLICT (tmdb_id, season, number) DO UPDATE SET episode_id = excluded.episode_id
-WHERE episode_arrivals.episode_id IS NULL;
+  AND NOT EXISTS (SELECT 1 FROM episode_arrivals a WHERE a.tmdb_id = s.tmdb_id AND a.season = se.number AND a.number = e.number);
+
+-- name: AdoptEpisodeArrival :exec
+-- An arrival whose episode row has gone, with its library, moves to this
+-- episode row of the same TMDB episode.
+UPDATE episode_arrivals SET episode_id = sqlc.arg(episode_id)
+WHERE episode_id IS NULL AND id = (
+    SELECT a.id FROM episodes e
+    CROSS JOIN seasons se ON se.id = e.season_id
+    CROSS JOIN shows s ON s.id = e.show_id
+    CROSS JOIN episode_arrivals a ON a.tmdb_id = s.tmdb_id AND a.season = se.number AND a.number = e.number
+    WHERE e.id = sqlc.arg(episode_id));
 
 -- name: LatestArrivalID :one
 -- The newest arrival's id, 0 when nothing has arrived: where a follow and
@@ -56,12 +67,11 @@ ORDER BY f.created_at DESC, f.since_arrival DESC, f.tmdb_id DESC;
 -- What a person hears about (section 5.4), in the order it arrived: the
 -- announced arrivals of shows they follow, after both the device's cursor
 -- and the follow and up to upto, since a date (the week, or the wait),
--- that they haven't finished in any library since it arrived. (Mark show
--- watched also marks the episodes TMDB lists that have no file yet, which
--- must not hide them when they come. Both times are TimeLayout strings,
--- which compare as times.) Each comes with an episode row of its TMDB
--- episode that has a present file, in any library: its own row first. One
--- with none is left out. The join is pinned: the person's follows (tens of
+-- that they haven't finished in any library, as the show page says.
+-- (Mark show watched leaves episodes that haven't aired unmarked, so they
+-- are unfinished when they come.) Each comes with an episode row of its
+-- TMDB episode that has a present file, in any library: its own row
+-- first. One with none is left out. The join is pinned: the person's follows (tens of
 -- rows), then each one's arrivals from (tmdb_id, id); an episode row is
 -- found by show TMDB id, season and number.
 SELECT a.id, a.tmdb_id, a.arrived_at, a.season AS season_number, a.number AS episode_number,
@@ -83,8 +93,7 @@ WHERE f.user_id = sqlc.arg(user_id) AND a.quiet = 0 AND a.arrived_at >= sqlc.arg
   AND NOT EXISTS (SELECT 1 FROM shows s3
       CROSS JOIN seasons se3 ON se3.show_id = s3.id AND se3.number = a.season
       CROSS JOIN episodes e3 ON e3.season_id = se3.id AND e3.number = a.number
-      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id
-          AND w.completed = 1 AND w.updated_at > a.arrived_at
+      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id AND w.completed = 1
       WHERE s3.tmdb_id = a.tmdb_id)
 ORDER BY a.id
 LIMIT sqlc.arg(max_rows);
@@ -115,8 +124,7 @@ WHERE f.user_id = sqlc.arg(user_id) AND a.quiet = 0 AND a.arrived_at >= sqlc.arg
   AND NOT EXISTS (SELECT 1 FROM shows s3
       CROSS JOIN seasons se3 ON se3.show_id = s3.id AND se3.number = a.season
       CROSS JOIN episodes e3 ON e3.season_id = se3.id AND e3.number = a.number
-      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id
-          AND w.completed = 1 AND w.updated_at > a.arrived_at
+      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id AND w.completed = 1
       WHERE s3.tmdb_id = a.tmdb_id)
 ORDER BY a.id DESC
 LIMIT sqlc.arg(max_rows);

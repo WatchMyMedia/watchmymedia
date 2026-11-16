@@ -100,6 +100,13 @@ func TestEpisodeArrivals(t *testing.T) {
 		if after := wantArrivals(t, e, map[string]int64{"1396 S01E01": 0}); !maps.Equal(after, before) {
 			t.Errorf("the arrival was made again: %v, was %v", after, before)
 		}
+		// The copy used up no id: the next arrival's follows on, so every
+		// cursor names an arrival.
+		e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E02.mkv", `{"kind":"episode","title":"Breaking Bad","year":2008,"season":1,"episodes":[2]}`)
+		matchTV(t, e)
+		if ids := wantArrivals(t, e, map[string]int64{"1396 S01E01": 0, "1396 S01E02": 0}); ids["1396 S01E02"] != ids["1396 S01E01"]+1 {
+			t.Errorf("ids = %v", ids)
+		}
 	})
 
 	t.Run("a better copy after the old file is deleted is silent", func(t *testing.T) {

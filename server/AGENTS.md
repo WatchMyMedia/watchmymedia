@@ -162,7 +162,10 @@ anywhere else skips that.
 with its queries directly: each change must also take a revision and leave a
 local guard in the same transaction, or an import can later overwrite the
 user's choice. Deleting a movie or episode deletes its state and guards by
-trigger.
+trigger. `episodes` holds every episode TMDB lists, aired or not, so a bulk
+mark must not mark what can't have been watched: Mark season and Mark show
+watched mark (and guard) only episodes that have aired by today (UTC) or
+have a file present, so a new episode isn't already watched when it comes.
 
 **Migrations.** New numbered files in `internal/db/migrations/` (`000NN_name.sql`)
 with `-- +goose Up` and `-- +goose Down` and a comment saying why. Never edit
