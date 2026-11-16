@@ -178,11 +178,11 @@ func TestRowLayouts(t *testing.T) {
 	defer cancel()
 	var l RowLayout
 	e.admin(http.MethodGet, "/api/me/rows/home", "", &l)
-	if want := []string{"continue", "recentlyAddedShows", "recentlyAired", "recentlyAddedMovies", "recentlyReleased"}; !slices.Equal(layoutIDs(l), want) || l.Customized || !l.Rows[0].Shown || l.Rows[0].Kind != rowKindBuiltin {
+	if want := []string{"continue", "followed", "recentlyAddedShows", "recentlyAired", "recentlyAddedMovies", "recentlyReleased"}; !slices.Equal(layoutIDs(l), want) || l.Customized || !l.Rows[0].Shown || l.Rows[0].Kind != rowKindBuiltin {
 		t.Fatalf("default layout = %+v", l)
 	}
 	e.admin(http.MethodPut, "/api/me/rows/home", `{"rows":[{"id":"recentlyReleased"},{"id":"continue","hidden":true}]}`, &l)
-	if want := []string{"recentlyReleased", "-continue", "recentlyAddedShows", "recentlyAired", "recentlyAddedMovies"}; !slices.Equal(layoutIDs(l), want) || !l.Customized || l.Rows[1].Shown {
+	if want := []string{"recentlyReleased", "-continue", "followed", "recentlyAddedShows", "recentlyAired", "recentlyAddedMovies"}; !slices.Equal(layoutIDs(l), want) || !l.Customized || l.Rows[1].Shown {
 		t.Fatalf("saved layout = %v %+v", layoutIDs(l), l)
 	}
 	select {
@@ -227,13 +227,13 @@ func TestRowLayouts(t *testing.T) {
 		}
 	}
 	e.asMember(http.MethodGet, "/api/me/rows/home", "", &l)
-	if want := []string{"recentlyAddedMovies", "recentlyReleased", "continue", "-recentlyAddedShows", "recentlyAired"}; !slices.Equal(layoutIDs(l), want) || l.Customized {
+	if want := []string{"recentlyAddedMovies", "recentlyReleased", "continue", "followed", "-recentlyAddedShows", "recentlyAired"}; !slices.Equal(layoutIDs(l), want) || l.Customized {
 		t.Errorf("member's layout = %v customized %v", layoutIDs(l), l.Customized)
 	}
 	// The admin's saved order stays theirs; the rows it leaves out go by
 	// the household's order now.
 	e.admin(http.MethodGet, "/api/me/rows/home", "", &l)
-	if want := []string{"recentlyAddedMovies", "recentlyReleased", "-continue", "recentlyAddedShows", "recentlyAired"}; !slices.Equal(layoutIDs(l), want) || !l.Customized {
+	if want := []string{"recentlyAddedMovies", "recentlyReleased", "-continue", "followed", "recentlyAddedShows", "recentlyAired"}; !slices.Equal(layoutIDs(l), want) || !l.Customized {
 		t.Errorf("the admin's own order = %v", layoutIDs(l))
 	}
 	// Back to the household's, then to the built-in order.
@@ -619,7 +619,7 @@ func TestListLimits(t *testing.T) {
 			tooMany++
 		}
 	}
-	if shown != maxRowsOnScreen || tooMany != 40+5-maxRowsOnScreen {
+	if shown != maxRowsOnScreen || tooMany != 40+6-maxRowsOnScreen {
 		t.Errorf("%d rows shown, %d too many", shown, tooMany)
 	}
 	var home HomeData

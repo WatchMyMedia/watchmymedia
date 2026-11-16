@@ -316,11 +316,19 @@ func registerRows(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
-		out, err := homeData(ctx, deps, marks, wantsOf(layout.Rows))
+		want := wantsOf(layout.Rows)
+		out, err := homeData(ctx, deps, marks, want)
 		if err != nil {
 			return nil, err
 		}
-		if out.Rows, err = homeRows(ctx, deps, c, placed, layout.Rows, out, data); err != nil {
+		// New from shows you follow (PLAN-NEW-EPISODES.md 5.5), when drawn.
+		var followed []EpisodeCard
+		if user, ok := auth.UserFrom(ctx); ok && want.followed {
+			if followed, err = followedEpisodes(ctx, deps.Queries, user.ID, time.Now()); err != nil {
+				return nil, err
+			}
+		}
+		if out.Rows, err = homeRows(ctx, deps, c, placed, layout.Rows, out, followed, data); err != nil {
 			return nil, err
 		}
 		out.ContinueWatching, out.RecentlyAddedShows, out.RecentlyAired, out.RecentlyAddedMovies, out.RecentlyReleased = []ContinueItem{}, []BrowseItem{}, []EpisodeCard{}, []BrowseItem{}, []BrowseItem{}

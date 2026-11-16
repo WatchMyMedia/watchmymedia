@@ -2074,7 +2074,7 @@ export interface paths {
         post?: never;
         /**
          * Stop following a show by its TMDB id
-         * @description Works for a show that is no longer in any library.
+         * @description Works for a show that is no longer in any library, and for one not followed.
          */
         delete: operations["removeFollow"];
         options?: never;
@@ -2091,7 +2091,7 @@ export interface paths {
         };
         /**
          * Episodes that arrived for the shows the signed-in person follows
-         * @description What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting.
+         * @description What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show (an episode in two libraries is listed once). An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out.
          */
         get: operations["listNewEpisodes"];
         put?: never;
@@ -3217,7 +3217,7 @@ export interface paths {
         get?: never;
         /**
          * Follow a show for the signed-in person
-         * @description Following is kept by the show's TMDB id, so it covers the show in every library. At most 500 a person: past that the reply is 409.
+         * @description Following is kept by the show's TMDB id, so it covers the show in every library. Only episodes that arrive from now on count. At most 500 a person: past that the reply is 409.
          */
         put: operations["followShow"];
         post?: never;

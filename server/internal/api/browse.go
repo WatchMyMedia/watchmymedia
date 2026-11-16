@@ -376,6 +376,9 @@ func registerBrowse(h huma.API, deps Deps) {
 			for i := range out.Body.Seasons {
 				out.Body.Seasons[i].WatchedCount = watchedBySeason[out.Body.Seasons[i].ID]
 			}
+			if out.Body.Following, err = deps.Queries.IsFollowingShow(ctx, db.IsFollowingShowParams{UserID: user.ID, TmdbID: row.TmdbID}); err != nil {
+				return nil, err
+			}
 			n, err := deps.Queries.NextUnwatchedEpisode(ctx, db.NextUnwatchedEpisodeParams{UserID: user.ID, ShowID: row.ID})
 			switch {
 			case err == nil:

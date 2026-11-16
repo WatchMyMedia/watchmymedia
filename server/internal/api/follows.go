@@ -1,11 +1,20 @@
 package api
 
 import (
+	"cmp"
 	"context"
+	"fmt"
+	"maps"
+	"math"
 	"net/http"
+	"slices"
+	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+
+	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/events"
 )
 
 // Following shows and the episodes that arrive for them
@@ -109,31 +118,275 @@ type NewEpisodes struct {
 
 type NewEpisodesOutput struct{ Body NewEpisodes }
 
+// The limits in PLAN-NEW-EPISODES.md §5.
+const (
+	// maxFollows is how many shows one person may follow.
+	maxFollows = 500
+	// arrivalWait is how long an arrival waits before the feed lists it, so
+	// episodes copied in together come as one group.
+	arrivalWait = 2 * time.Minute
+	// One reply of the feed lists at most this many shows and arrivals; the
+	// cursor stops short of the rest, which the next check gets.
+	feedMaxShows    = 50
+	feedMaxArrivals = 200
+	// feedListed is how many of a show's new episodes a group lists.
+	feedListed = 5
+	// followedRowLength is how many episodes Home's followed row shows.
+	followedRowLength = 20
+)
+
 func registerFollows(h huma.API, deps Deps) {
 	op := func(id, method, path, summary, description string) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: Prefix + path, Summary: summary, Description: description, Tags: []string{"follows"}}
 	}
 	huma.Register(h, op("followShow", http.MethodPut, "/shows/{id}/follow", "Follow a show for the signed-in person",
-		"Following is kept by the show's TMDB id, so it covers the show in every library. At most 500 a person: past that the reply is 409."),
+		"Following is kept by the show's TMDB id, so it covers the show in every library. Only episodes that arrive from now on count. At most 500 a person: past that the reply is 409."),
 		func(ctx context.Context, in *ShowFollowInput) (*struct{}, error) {
-			return nil, huma.Error501NotImplemented("not built yet")
+			u, err := currentUser(ctx)
+			if err != nil {
+				return nil, err
+			}
+			show, err := deps.Queries.GetShow(ctx, in.ID)
+			if err != nil {
+				return nil, notFound(err, "show not found")
+			}
+			added := false
+			err = deps.Queries.Transaction(ctx, func(q *db.Queries) error {
+				if following, err := q.IsFollowingShow(ctx, db.IsFollowingShowParams{UserID: u.ID, TmdbID: show.TmdbID}); err != nil || following {
+					return err
+				}
+				n, err := q.CountShowFollows(ctx, u.ID)
+				if err != nil {
+					return err
+				}
+				if n >= maxFollows {
+					return huma.Error409Conflict(fmt.Sprintf("you follow %d shows, the most one person may; stop following one to follow another", maxFollows))
+				}
+				since, err := q.LatestArrivalID(ctx)
+				if err != nil {
+					return err
+				}
+				rows, err := q.InsertShowFollow(ctx, db.InsertShowFollowParams{UserID: u.ID, TmdbID: show.TmdbID, Title: show.Title,
+					SinceArrival: since, CreatedAt: db.FormatTime(time.Now())})
+				added = rows > 0
+				return err
+			})
+			if err != nil {
+				return nil, err
+			}
+			if added {
+				publishFollowsChanged(deps, u.ID, show.TmdbID, true)
+			}
+			return nil, nil
 		})
 	huma.Register(h, op("unfollowShow", http.MethodDelete, "/shows/{id}/follow", "Stop following a show for the signed-in person", ""),
 		func(ctx context.Context, in *ShowFollowInput) (*struct{}, error) {
-			return nil, huma.Error501NotImplemented("not built yet")
+			u, err := currentUser(ctx)
+			if err != nil {
+				return nil, err
+			}
+			show, err := deps.Queries.GetShow(ctx, in.ID)
+			if err != nil {
+				return nil, notFound(err, "show not found")
+			}
+			return nil, unfollow(ctx, deps, u.ID, show.TmdbID)
 		})
 	huma.Register(h, op("listFollows", http.MethodGet, "/me/follows", "The shows the signed-in person follows", ""),
 		func(ctx context.Context, _ *struct{}) (*FollowListOutput, error) {
-			return &FollowListOutput{Body: FollowList{Follows: []Follow{}}}, nil
+			u, err := currentUser(ctx)
+			if err != nil {
+				return nil, err
+			}
+			rows, err := deps.Queries.ListShowFollows(ctx, u.ID)
+			if err != nil {
+				return nil, err
+			}
+			out := &FollowListOutput{Body: FollowList{Follows: make([]Follow, 0, len(rows))}}
+			for _, r := range rows {
+				f := Follow{TMDBID: r.TmdbID, Title: r.Title, FollowedAt: db.ParseTime(r.CreatedAt)}
+				if r.ShowID != nil {
+					f.Show = &FollowedShow{ID: *r.ShowID, Title: deref(r.ShowTitle), PosterPath: deref(r.ShowPosterPath)}
+				}
+				if r.LatestArrivedAt != nil && r.LatestSeason != nil && r.LatestNumber != nil {
+					f.Latest = &FollowLatest{Season: *r.LatestSeason, Number: *r.LatestNumber, Title: deref(r.LatestTitle), ArrivedAt: db.ParseTime(*r.LatestArrivedAt)}
+				}
+				out.Body.Follows = append(out.Body.Follows, f)
+			}
+			return out, nil
 		})
 	huma.Register(h, op("removeFollow", http.MethodDelete, "/me/follows/{tmdbId}", "Stop following a show by its TMDB id",
-		"Works for a show that is no longer in any library."),
+		"Works for a show that is no longer in any library, and for one not followed."),
 		func(ctx context.Context, in *FollowIDInput) (*struct{}, error) {
-			return nil, huma.Error501NotImplemented("not built yet")
+			u, err := currentUser(ctx)
+			if err != nil {
+				return nil, err
+			}
+			return nil, unfollow(ctx, deps, u.ID, in.TMDBID)
 		})
 	huma.Register(h, op("listNewEpisodes", http.MethodGet, "/me/new-episodes", "Episodes that arrived for the shows the signed-in person follows",
-		"What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting."),
+		"What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show (an episode in two libraries is listed once). An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out."),
 		func(ctx context.Context, in *NewEpisodesInput) (*NewEpisodesOutput, error) {
-			return &NewEpisodesOutput{Body: NewEpisodes{Cursor: "0", Shows: []NewEpisodeGroup{}}}, nil
+			u, err := currentUser(ctx)
+			if err != nil {
+				return nil, err
+			}
+			out, err := newEpisodes(ctx, deps.Queries, u.ID, in.After, time.Now())
+			if err != nil {
+				return nil, err
+			}
+			return &NewEpisodesOutput{Body: out}, nil
 		})
+}
+
+func unfollow(ctx context.Context, deps Deps, userID, tmdbID int64) error {
+	n, err := deps.Queries.DeleteShowFollow(ctx, db.DeleteShowFollowParams{UserID: userID, TmdbID: tmdbID})
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		publishFollowsChanged(deps, userID, tmdbID, false)
+	}
+	return nil
+}
+
+// publishFollowsChanged tells the person's other devices, and no one else,
+// to redraw the bell and the list.
+func publishFollowsChanged(deps Deps, userID, tmdbID int64, following bool) {
+	if deps.Bus == nil {
+		return
+	}
+	deps.Bus.Publish(events.Event{Type: FollowsChangedEvent, Data: FollowsChanged{TMDBID: tmdbID, Following: following},
+		To: &events.Audience{UserID: userID, Private: true}})
+}
+
+// newEpisodes is the feed a device checks (PLAN-NEW-EPISODES.md §5.4) at
+// now: what arrived for userID's followed shows after the cursor after.
+func newEpisodes(ctx context.Context, q *db.Queries, userID int64, after string, now time.Time) (NewEpisodes, error) {
+	out := NewEpisodes{Shows: []NewEpisodeGroup{}}
+	// Arrivals made while this runs are left for the next check.
+	upto, err := q.LatestArrivalID(ctx)
+	if err != nil {
+		return out, err
+	}
+	waitFrom := now.Add(-arrivalWait)
+	if after == "" {
+		// A device starts from now, short of an arrival still waiting.
+		waiting, err := q.ListFollowedArrivals(ctx, db.ListFollowedArrivalsParams{UserID: userID, Upto: upto, Since: db.FormatTime(waitFrom), MaxRows: 1})
+		if err != nil {
+			return out, err
+		}
+		out.Cursor = strconv.FormatInt(upto, 10)
+		if len(waiting) > 0 {
+			out.Cursor = strconv.FormatInt(waiting[0].ID-1, 10)
+		}
+		return out, nil
+	}
+	cursor, err := strconv.ParseInt(after, 10, 64)
+	if err != nil || cursor < 0 {
+		return out, huma.Error422UnprocessableEntity("after is a cursor from an earlier reply")
+	}
+	if cursor >= upto {
+		// Nothing new, or a cursor from before a restore: start from now.
+		out.Cursor = strconv.FormatInt(upto, 10)
+		return out, nil
+	}
+	rows, err := q.ListFollowedArrivals(ctx, db.ListFollowedArrivalsParams{UserID: userID, After: cursor, Upto: upto,
+		Since: db.FormatTime(now.Add(-newWindow)), MaxRows: feedMaxArrivals + 1})
+	if err != nil {
+		return out, err
+	}
+	type group struct {
+		newest   int64
+		episodes map[[2]int64]db.ListFollowedArrivalsRow
+	}
+	groups := map[int64]*group{}
+	var order []int64
+	end, taken := upto, 0
+	for _, r := range rows {
+		g, ok := groups[r.TmdbID]
+		// Stop at an arrival still waiting, or past the reply's limits: the
+		// cursor stays short of it, and the next check starts there.
+		if !db.ParseTime(r.ArrivedAt).Before(waitFrom) || taken == feedMaxArrivals || (!ok && len(order) == feedMaxShows) {
+			end = r.ID - 1
+			break
+		}
+		taken++
+		if !ok {
+			g = &group{episodes: map[[2]int64]db.ListFollowedArrivalsRow{}}
+			groups[r.TmdbID] = g
+			order = append(order, r.TmdbID)
+		}
+		g.newest = r.ID
+		// The same episode in a second library is the same episode.
+		if _, dup := g.episodes[[2]int64{r.SeasonNumber, r.EpisodeNumber}]; !dup {
+			g.episodes[[2]int64{r.SeasonNumber, r.EpisodeNumber}] = r
+		}
+	}
+	out.Cursor = strconv.FormatInt(end, 10)
+	slices.SortFunc(order, func(a, b int64) int { return cmp.Compare(groups[b].newest, groups[a].newest) })
+	for _, tmdbID := range order {
+		eps := slices.Collect(maps.Values(groups[tmdbID].episodes))
+		slices.SortFunc(eps, func(a, b db.ListFollowedArrivalsRow) int {
+			return cmp.Or(cmp.Compare(seasonOrder(a.SeasonNumber), seasonOrder(b.SeasonNumber)), cmp.Compare(a.EpisodeNumber, b.EpisodeNumber))
+		})
+		first := eps[0]
+		g := NewEpisodeGroup{
+			Show:     NewEpisodeShow{ID: first.ShowID, TMDBID: tmdbID, Title: first.ShowTitle, PosterPath: deref(first.ShowPosterPath)},
+			Count:    len(eps),
+			Episodes: make([]NewEpisode, 0, min(len(eps), feedListed)),
+			Open:     NewEpisodeOpen{EpisodeID: first.EpisodeID, Season: first.SeasonNumber, Number: first.EpisodeNumber},
+		}
+		for _, e := range eps[:min(len(eps), feedListed)] {
+			g.Episodes = append(g.Episodes, NewEpisode{ID: e.EpisodeID, Season: e.SeasonNumber, Number: e.EpisodeNumber,
+				Title: e.Title, StillPath: deref(e.StillPath), ArrivedAt: db.ParseTime(e.ArrivedAt)})
+		}
+		out.Shows = append(out.Shows, g)
+	}
+	return out, nil
+}
+
+// seasonOrder puts specials (season 0) after the other seasons.
+func seasonOrder(n int64) int64 {
+	if n == 0 {
+		return math.MaxInt64
+	}
+	return n
+}
+
+// followedEpisodes is Home's row "New from shows you follow"
+// (PLAN-NEW-EPISODES.md §5.5): what arrived for the person's followed shows
+// in the last 7 days, by the feed's rules but without its wait, newest
+// first. An episode in two libraries is shown once.
+func followedEpisodes(ctx context.Context, q *db.Queries, userID int64, now time.Time) ([]EpisodeCard, error) {
+	// Room for an episode in several libraries.
+	rows, err := q.ListNewestFollowedArrivals(ctx, db.ListNewestFollowedArrivalsParams{UserID: userID,
+		Since: db.FormatTime(now.Add(-newWindow)), MaxRows: 3 * followedRowLength})
+	if err != nil {
+		return nil, err
+	}
+	out := []EpisodeCard{}
+	seen := map[[3]int64]bool{}
+	for _, r := range rows {
+		k := [3]int64{r.TmdbID, r.SeasonNumber, r.EpisodeNumber}
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		arrived := db.ParseTime(r.ArrivedAt)
+		c := EpisodeCard{
+			EpisodeID: r.EpisodeID, ShowID: r.ShowID, ShowTitle: r.ShowTitle, SeasonNumber: r.SeasonNumber, EpisodeNumber: r.EpisodeNumber,
+			Title: r.Title, Overview: r.Overview, AirDate: deref(r.AirDate), StillPath: deref(r.StillPath),
+			ShowPosterPath: deref(r.ShowPosterPath), ShowBackdropPath: deref(r.ShowBackdropPath),
+			AddedAt: &arrived, IsNew: true,
+		}
+		if r.FileID > 0 {
+			id := r.FileID
+			c.HasFile, c.FileID = true, &id
+		}
+		out = append(out, c)
+		if len(out) == followedRowLength {
+			break
+		}
+	}
+	return out, nil
 }
