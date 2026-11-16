@@ -9,7 +9,7 @@ import WMMModel
 
 /// Where a row of the Settings root goes.
 public enum SettingsDestination: String, Hashable, Sendable, CaseIterable {
-    case playback, languages, homeRows, account, requests, downloads, server, inbox, about
+    case playback, languages, notifications, homeRows, account, requests, downloads, server, inbox, about
 }
 
 /// One row of the root: the page's name and how it stands.
@@ -59,6 +59,9 @@ public struct SettingsHubFacts: Hashable, Sendable {
     public var preferencesLoaded: Bool
     /// The device's language, offered when no audio language is chosen.
     public var suggestedLanguage: String?
+    /// The server offers following shows (``ServerFeatures/follows``), and how many the person follows once loaded.
+    public var followsAvailable: Bool
+    public var followCount: Int?
     /// The server arranges rows (``ServerFeatures/rows``); their counts once loaded.
     public var rowsAvailable: Bool
     public var homeRowsShown: Int?
@@ -84,6 +87,7 @@ public struct SettingsHubFacts: Hashable, Sendable {
                 quality: StreamQuality = .auto, autoplayNext: Bool = true,
                 audioLanguages: [String] = [], subtitleChoice: SubtitleChoice = .forced,
                 preferencesLoaded: Bool = true, suggestedLanguage: String? = nil,
+                followsAvailable: Bool = false, followCount: Int? = nil,
                 rowsAvailable: Bool = false, homeRowsShown: Int? = nil, homeRowsHidden: Int? = nil,
                 signedInDevices: Int? = nil, requests: RequestOptions = .none, requestsWaiting: Int? = nil,
                 downloadsEnabled: Bool = false, downloadCount: Int = 0, downloadBytes: Int64 = 0,
@@ -99,6 +103,8 @@ public struct SettingsHubFacts: Hashable, Sendable {
         self.subtitleChoice = subtitleChoice
         self.preferencesLoaded = preferencesLoaded
         self.suggestedLanguage = suggestedLanguage
+        self.followsAvailable = followsAvailable
+        self.followCount = followCount
         self.rowsAvailable = rowsAvailable
         self.homeRowsShown = homeRowsShown
         self.homeRowsHidden = homeRowsHidden
@@ -151,8 +157,8 @@ extension SettingsHubFacts {
 // MARK: - iPhone and iPad
 
 /// The root's groups on iPhone and iPad, in the web's order (§5.1): You
-/// (Playback, Audio & subtitles, Home rows, Account & devices, Your
-/// requests), This iPhone (Downloads), Server (the server, and the Inbox for
+/// (Playback, Audio & subtitles, Notifications, Home rows, Account & devices,
+/// Your requests), This iPhone (Downloads), Server (the server, and the Inbox for
 /// an admin allowed here), About. A row the server or account doesn't offer
 /// is left out; a group left empty goes too.
 public func settingsHub(_ f: SettingsHubFacts, locale: Locale = .current) -> [SettingsHubGroup] {
@@ -161,6 +167,9 @@ public func settingsHub(_ f: SettingsHubFacts, locale: Locale = .current) -> [Se
     ]
     if f.features.subtitlePreferences {
         you.append(SettingsHubRow(destination: .languages, title: f.languagesTitle, value: f.languagesValue(locale: locale)))
+    }
+    if f.followsAvailable {
+        you.append(SettingsHubRow(destination: .notifications, title: NewEpisodeWords.title, value: f.followCount.map(NewEpisodeWords.rootValue)))
     }
     if f.rowsAvailable {
         you.append(SettingsHubRow(destination: .homeRows, title: SettingsWords.homeRows, value: f.homeRowsShown.map { "\(formatCount($0)) shown" }))
@@ -190,7 +199,7 @@ public func settingsHub(_ f: SettingsHubFacts, locale: Locale = .current) -> [Se
 // MARK: - Apple TV
 
 /// Apple TV's list of groups beside the page (§5.9), in the web's order:
-/// Playback, Audio & subtitles, Home rows, Account & devices, Your requests,
+/// Playback, Audio & subtitles, Notifications, Home rows, Account & devices, Your requests,
 /// Server, About; each `value` is the line under its name and `about` the
 /// panel's while it is focused. The Inbox is on Server's page.
 public func tvSettingsGroups(_ f: SettingsHubFacts, locale: Locale = .current) -> [SettingsHubRow] {
@@ -205,6 +214,10 @@ public func tvSettingsGroups(_ f: SettingsHubFacts, locale: Locale = .current) -
                                    about: f.features.audioLanguages
                                        ? "The languages videos start in, and when subtitles start. Yours, on every device."
                                        : "When subtitles start, and in which languages. Yours, on every device."))
+    }
+    if f.followsAvailable {
+        rows.append(SettingsHubRow(destination: .notifications, title: NewEpisodeWords.title, value: f.followCount.map(NewEpisodeWords.tvGroupLine),
+                                   about: NewEpisodeWords.tvGroupPanel))
     }
     if f.rowsAvailable {
         let line = f.homeRowsShown.map { shown in "\(formatCount(shown)) shown · \(formatCount(f.homeRowsHidden ?? 0)) hidden" }
@@ -320,7 +333,8 @@ extension SettingsModel {
 
     /// The root's facts as far as this model knows them; the rest come from
     /// the services the app holds.
-    public func hubFacts(rowsAvailable: Bool = false, homeRowsShown: Int? = nil, homeRowsHidden: Int? = nil,
+    public func hubFacts(followsAvailable: Bool = false, followCount: Int? = nil,
+                         rowsAvailable: Bool = false, homeRowsShown: Int? = nil, homeRowsHidden: Int? = nil,
                          requests: RequestOptions = .none, requestsWaiting: Int? = nil,
                          downloadsEnabled: Bool = false, downloadCount: Int = 0, downloadBytes: Int64 = 0,
                          remindersAvailable: Bool = false, reminderCount: Int = 0, notificationsOff: Bool = false,
@@ -329,6 +343,7 @@ extension SettingsModel {
             user: user, server: server, device: facts.family, appVersion: facts.appVersionLabel,
             quality: quality, autoplayNext: autoplayNext, audioLanguages: audio.languages, subtitleChoice: subtitleChoice,
             preferencesLoaded: preferencesLoaded, suggestedLanguage: deviceLanguage,
+            followsAvailable: followsAvailable, followCount: followCount,
             rowsAvailable: rowsAvailable, homeRowsShown: homeRowsShown, homeRowsHidden: homeRowsHidden,
             signedInDevices: accountDeviceCount, requests: requests, requestsWaiting: requestsWaiting,
             downloadsEnabled: downloadsEnabled, downloadCount: downloadCount, downloadBytes: downloadBytes,

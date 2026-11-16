@@ -14,6 +14,8 @@ struct WatchMyMediaTVApp: App {
     /// Live TV favourites and reminders, shared by every screen (PLAN-LIVE-TV-GUIDE.md §6.5).
     @State private var extras: LiveExtrasStore
     @State private var recordings: LiveRecordingsStore
+    /// The shows the person follows: the bell, Settings' list (PLAN-NEW-EPISODES.md §7.4). The TV doesn't notify.
+    @State private var follows: FollowsStore
 
     init() {
         // Launch to Home's first content (PLAN-APPLE-REVIEW.md §4.3.1). tvOS has no MetricKit, so start() does nothing here.
@@ -23,6 +25,7 @@ struct WatchMyMediaTVApp: App {
         _services = State(initialValue: services)
         _extras = State(initialValue: LiveExtrasStore(repository: services.liveTV))
         _recordings = State(initialValue: LiveRecordingsStore(repository: services.liveTV))
+        _follows = State(initialValue: FollowsStore(repository: services.follows))
     }
 
     /// How long a reminder's banner stays: ten seconds, or, in a debug build,
@@ -46,6 +49,7 @@ struct WatchMyMediaTVApp: App {
                 .environment(navigator)
                 .environment(extras)
                 .environment(recordings)
+                .environment(follows)
                 .environment(\.imageLoader, services.images)
                 .preferredColorScheme(.dark)
                 .tint(Palette.gold)
@@ -60,6 +64,7 @@ struct WatchMyMediaTVApp: App {
                 // The person's other devices change favourites and reminders too.
                 .task { await extras.follow() }
                 .task { await recordings.follow() }
+                .task { await follows.listen() }
                 // tvOS notifications carry only badges: a reminder is a banner while the app is open.
                 .task(id: extras.alertsKey) { await extras.runBanners(duration: Self.bannerDuration) }
         }

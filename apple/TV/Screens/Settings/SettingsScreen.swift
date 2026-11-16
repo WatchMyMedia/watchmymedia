@@ -82,6 +82,7 @@ private struct SettingsView: View {
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
     @Environment(LiveExtrasStore.self) private var extras
+    @Environment(FollowsStore.self) private var follows
 
     /// From under the tab bar to the bottom of the screen.
     private static let pageHeight: CGFloat = 880
@@ -106,6 +107,7 @@ private struct SettingsView: View {
         .task(id: services.rows.available) { if services.rows.available { await homeRows.load() } }
         .task(id: services.requests.options.hasYourRequests) { if services.requests.options.hasYourRequests { await requests.run() } }
         .task(id: extras.available) { if extras.available { await extras.refresh() } }
+        .task(id: follows.available) { if follows.available { await follows.refresh() } }
         .fullScreenCover(item: $task, onDismiss: { if services.rows.available { Task { await homeRows.load() } } }) { taskView($0) }
         .question($question)
         .onAppear(perform: applyLaunchArguments)
@@ -117,6 +119,7 @@ private struct SettingsView: View {
     private var groups: [SettingsHubRow] {
         let hidden = homeRows.state.value == nil ? nil : homeRows.rows.filter(\.hidden).count
         let facts = model.hubFacts(
+            followsAvailable: follows.available, followCount: follows.loaded ? follows.follows.count : nil,
             rowsAvailable: services.rows.available,
             homeRowsShown: hidden.map { homeRows.rows.count - $0 }, homeRowsHidden: hidden,
             requests: services.requests.options,
@@ -202,6 +205,7 @@ private struct SettingsView: View {
         switch section {
         case .playback: SettingsWords.playbackLede(device: family)
         case .languages: SettingsWords.languagesLede(audio: model.audio.languages, subtitles: model.subtitles.languages, choice: model.subtitleChoice)
+        case .notifications: NewEpisodeWords.tvLine
         case .homeRows: "Your rows are the same on all your devices."
         case .account: model.accountLede
         case .requests: "What you asked for, and where each one is."
@@ -217,6 +221,7 @@ private struct SettingsView: View {
         switch section {
         case .playback: playbackPage
         case .languages: languagesPage
+        case .notifications: notificationsPage
         case .homeRows: homeRowsPage
         case .account: accountPage
         case .requests: requestsPage
@@ -291,6 +296,66 @@ private struct SettingsView: View {
     private func names(_ list: LanguageList) -> String? {
         let tags = model.languages(list)
         return tags.isEmpty ? nil : tags.map { languageTagName($0) }.joined(separator: ", ")
+    }
+
+    // MARK: Notifications
+
+    /// The shows the person follows (TvNotifications, the new-episodes boards'
+    /// `tv-settings`): no switch, since this TV doesn't notify. Select on a
+    /// show opens a menu, Go to show and Stop notifying; a show no longer in
+    /// the library has only Stop notifying, and its line is orange.
+    @ViewBuilder private var notificationsPage: some View {
+        SettingsGroup(NewEpisodeWords.followedTitle) {
+            if !follows.loaded, follows.error != nil {
+                TVMessage(title: NewEpisodeWords.listFailedTitle, message: NewEpisodeWords.listFailedLine)
+                navRow(.notifications, "follows-retry", title: NewEpisodeWords.tryAgain, chevron: false) { Task { await follows.refresh() } }
+            } else if !follows.loaded {
+                ProgressView().frame(maxWidth: .infinity, minHeight: 58)
+            } else if follows.follows.isEmpty {
+                Text(NewEpisodeWords.noneFollowed)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(Palette.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 22)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+                    .accessibilityIdentifier("settings-follows-none")
+            } else {
+                ForEach(follows.follows) { follow in followRow(follow) }
+            }
+        }
+    }
+
+    private func followRow(_ follow: FollowedShow) -> some View {
+        let line = follows.line(for: follow)
+        return Menu {
+            Section(follow.title) {
+                if let id = follow.showID {
+                    Button(NewEpisodeWords.goToShow) { navigator.open(.show(id: id)) }
+                        .accessibilityIdentifier("follow-go")
+                }
+                Button(NewEpisodeWords.stopNotifying) { Task { await stop(follow) } }
+                    .accessibilityIdentifier("follow-stop")
+            }
+        } label: {
+            FollowedShowLabel(follow: follow, line: line, posterURL: services.library.imageURL(follow.posterPath, size: .w185))
+        }
+        .buttonStyle(SettingsRowStyle())
+        .focused($focus, equals: .row(.notifications, "follow-\(follow.tmdbID)"))
+        .accessibilityLabel(follow.title)
+        .accessibilityValue(line.text)
+        .accessibilityIdentifier("settings-row-follow-\(follow.tmdbID)")
+    }
+
+    /// Stop notifying takes the row away; focus goes to the next row (the one before, at the end).
+    private func stop(_ follow: FollowedShow) async {
+        let key = "follow-\(follow.tmdbID)"
+        let index = rowKeys(.notifications).firstIndex(of: key) ?? 0
+        await follows.remove(follow)
+        let keys = rowKeys(.notifications)
+        guard !keys.contains(key) else { return }
+        focus = keys.isEmpty ? .group(.notifications) : .row(.notifications, keys[min(index, keys.count - 1)])
     }
 
     // MARK: Home rows
@@ -532,6 +597,8 @@ private struct SettingsView: View {
             ["quality"] + SegmentKind.allCases.map { "skip-\($0.rawValue)" } + ["autoplay"] + (extras.available ? ["lead", "reminders"] : [])
         case .languages:
             (model.supportsAudioLanguages ? ["audio"] : []) + ["starting", "subtitle-languages", "automatic"]
+        case .notifications:
+            if !follows.loaded { follows.error != nil ? ["follows-retry"] : [] } else { follows.follows.map { "follow-\($0.tmdbID)" } }
         case .homeRows: ["edit"]
         case .account:
             ["name"] + (model.canSeeEveryone ? ["everyone"] : []) + deviceKeys + ["password", "signout"]
@@ -627,6 +694,9 @@ private struct SettingsView: View {
         if key.hasPrefix("skip-"), let kind = SegmentKind(rawValue: String(key.dropFirst(5))) {
             return SettingsHelp(title: kind.settingsLabel, paragraphs: SettingsWords.skipAbout(kind, mode: model.skipMode(kind)), hint: changes)
         }
+        if key.hasPrefix("follow-"), let follow = follows.follows.first(where: { "follow-\($0.tmdbID)" == key }) {
+            return SettingsHelp(title: follow.title, paragraphs: [follows.line(for: follow).text], hint: NewEpisodeWords.tvShowHint(inLibrary: follow.inLibrary))
+        }
         if key.hasPrefix("device-"), let session = model.sessions.value?.first(where: { "device-\($0.id)" == key }) {
             var paragraphs = SettingsWords.deviceAbout(session)
             if session.userName != model.user?.name { paragraphs.insert("\(session.userName)’s device.", at: 0) }
@@ -659,6 +729,8 @@ private struct SettingsView: View {
                                 hint: PanelWords.hintRenames)
         case "everyone":
             return SettingsHelp(title: SettingsWords.everyonesDevices, paragraphs: [PanelWords.everyoneAbout], hint: changes)
+        case "follows-retry":
+            return SettingsHelp(title: NewEpisodeWords.listFailedTitle, paragraphs: [NewEpisodeWords.listFailedLine], hint: PanelWords.hintTriesAgain)
         case "devices-retry":
             return SettingsHelp(title: SettingsWords.signedInDevices, paragraphs: [PanelWords.devicesDidNotLoad], hint: PanelWords.hintTriesAgain)
         case "password":
@@ -803,5 +875,47 @@ extension SettingsModel.DeviceFacts {
             system: "\(device.systemName) \(device.systemVersion)",
             info: Bundle.main.infoDictionary ?? [:]
         )
+    }
+}
+
+/// A show followed, in Settings › Notifications: its poster (a dashed box
+/// once it has left the library), its title and line, orange when it has
+/// left or Stop notifying failed.
+private struct FollowedShowLabel: View {
+    let follow: FollowedShow
+    let line: (text: String, warning: Bool)
+    let posterURL: URL?
+    @Environment(\.isFocused) private var focused
+
+    var body: some View {
+        HStack(spacing: 18) {
+            Group {
+                if follow.inLibrary {
+                    Artwork(url: posterURL, seed: follow.title, maxPixel: 160)
+                } else {
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(Color(hex: 0x151517))
+                        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 4])).foregroundStyle(Palette.outline))
+                }
+            }
+            .frame(width: 44, height: 66)
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(follow.title)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(focused ? Palette.ground : Palette.text)
+                    .lineLimit(1)
+                Text(line.text)
+                    .font(.system(size: 17))
+                    .foregroundStyle(line.warning ? (focused ? Color(hex: 0x9A3412) : Palette.warning) : focused ? Color(hex: 0x525252) : Palette.muted)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 12)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .frame(minHeight: 58)
     }
 }

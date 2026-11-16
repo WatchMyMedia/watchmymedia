@@ -17,6 +17,9 @@ import WMMPlayback
 /// 21); followed by a list ("es,en") the person has saved those, with
 /// subtitles for foreign audio, as the server sets them. `-fakesRows` puts
 /// the server at API level 22, with arranged rows and lists (PLAN-ROWS.md).
+/// `-fakesFollows` puts it at API level 29: the bell on a show's page,
+/// Settings › Notifications' list and Home's New from shows you follow
+/// (PLAN-NEW-EPISODES.md).
 @MainActor
 enum ServicesFactory {
     static func make(arguments: [String]) -> AppServices {
@@ -56,7 +59,8 @@ enum ServicesFactory {
             apiLevel: arguments.contains("-fakesLiveAutomatic") ? liveAutomaticAPILevel : arguments.contains("-fakesAudioLanguages") ? audioPreferencesAPILevel : arguments.contains("-fakesLiveRecordings") ? liveRecordingAPILevel : arguments.contains("-fakesSubtitlePreferences") ? subtitlePreferencesAPILevel : nil,
             recordings: arguments.contains("-fakesLiveRecordings"),
             liveAutomatic: arguments.contains("-fakesLiveAutomatic"),
-            rows: arguments.contains("-fakesRows")
+            rows: arguments.contains("-fakesRows"),
+            follows: arguments.contains("-fakesFollows")
         )
         (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
         if let i = arguments.firstIndex(of: "-fakesAudioLanguages"), arguments.indices.contains(i + 1), !arguments[i + 1].hasPrefix("-") {

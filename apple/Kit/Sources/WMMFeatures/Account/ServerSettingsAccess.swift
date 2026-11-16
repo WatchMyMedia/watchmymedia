@@ -162,5 +162,8 @@ public func keptOutReason(_ destination: SettingsDestination, server: Server?, r
         return downloadsEnabled ? nil : .downloadsOff
     case .playback, .account, .server, .inbox, .about:
         return nil
+    case .notifications:
+        // Its row is left out below API level 29, and nothing links to the page.
+        return nil
     }
 }

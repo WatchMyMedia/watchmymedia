@@ -9,7 +9,7 @@ import WMMUI
 
 /// A page pushed from the Settings root (Settings2*.dc.html), one per row.
 enum SettingsPage: String, Hashable, CaseIterable {
-    case playback, subtitles, account, requests, downloads, server, inbox, about
+    case playback, subtitles, notifications, account, requests, downloads, server, inbox, about
 
     /// `-settingsPage` takes the pages' names, and the names of the pages
     /// they took in (Skip and Live TV are Playback's; This iPhone and
@@ -165,6 +165,7 @@ struct SettingsPageView: View {
             } else {
                 LanguageSettingsPage(model: model)
             }
+        case .notifications: NotificationSettingsPage(model: model)
         case .account: AccountSettingsPage(model: model)
         case .server: ServerSettingsPage(model: model)
         case .about: AboutSettingsPage(model: model)
@@ -275,6 +276,8 @@ private struct SettingsRoot: View {
             await requests.refresh()
         }
         .task { await notifier.refreshStatus() }
+        // The Notifications row's "3 shows".
+        .task(id: follows.available) { if follows.available { await follows.refresh() } }
         .sheet(isPresented: $addingLanguage) { AddLanguageSheet(model: model, list: .audio) }
     }
 
@@ -285,6 +288,7 @@ private struct SettingsRoot: View {
         let waiting = myRequests?.state.value.map { $0.filter { $0.status == .pending }.count }
         let downloads = DownloadsModel(downloads: services.downloads, navigator: navigator)
         return model.hubFacts(
+            followsAvailable: follows.available, followCount: follows.loaded ? follows.follows.count : nil,
             rowsAvailable: services.rows.available, homeRowsShown: shown, homeRowsHidden: hidden,
             requests: services.requests.options, requestsWaiting: waiting,
             downloadsEnabled: services.downloads.enabled, downloadCount: downloads.all.count, downloadBytes: downloads.usedBytes,
@@ -305,6 +309,7 @@ private struct SettingsRoot: View {
             .accessibilityIdentifier("settings-homeRows")
         case .playback: link(.playback, icon: "play.fill", style: .burgundy, row: row)
         case .languages: link(.subtitles, icon: "captions.bubble", style: .burgundy, row: row)
+        case .notifications: link(.notifications, icon: "bell", style: .neutral, row: row)
         case .account: link(.account, icon: "person.crop.circle", style: .neutral, row: row)
         case .requests: link(.requests, icon: "tray.and.arrow.down", style: .neutral, row: row)
         case .downloads: link(.downloads, icon: "arrow.down.to.line", style: .gold, row: row)
