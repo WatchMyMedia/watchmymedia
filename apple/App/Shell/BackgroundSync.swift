@@ -6,7 +6,11 @@ import WMMModel
 /// make Continue watching right on the person's other devices) in a
 /// background refresh, so it reaches the server before the app is next
 /// opened (PLAN-APPLE-REVIEW.md §6.3). It is ``DownloadRepository/sync()``,
-/// the same sync the app runs at launch and on each return.
+/// the same sync the app runs at launch and on each return. Then it checks
+/// for new episodes of the shows the person follows and notifies
+/// (PLAN-NEW-EPISODES.md §7.4): the same check the app runs when it opens,
+/// which does nothing unless the person follows a show, this device's switch
+/// is on and iOS allows the notifications. Nothing new is scheduled for it.
 ///
 /// The system allows only identifiers the Info.plist lists, and registering
 /// another stops the app, so this does nothing until `project.yml` gives the
@@ -18,14 +22,16 @@ enum BackgroundSync {
     /// The soonest the system is asked to run it after the app leaves.
     static let interval: TimeInterval = 60 * 60
     private static var services: AppServices?
+    private static var newEpisodes: NewEpisodeNotifier?
 
     private static var permitted: Bool {
         (Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as? [String])?.contains(identifier) == true
     }
 
     /// At launch, before it finishes.
-    static func register(_ services: AppServices) {
+    static func register(_ services: AppServices, newEpisodes: NewEpisodeNotifier) {
         self.services = services
+        self.newEpisodes = newEpisodes
         guard permitted else { return }
         BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: .main) { task in
             MainActor.assumeIsolated { run(task) }
@@ -45,6 +51,7 @@ enum BackgroundSync {
         guard let services else { return task.setTaskCompleted(success: false) }
         let work = Task { @MainActor in
             await services.downloads.sync()
+            if !Task.isCancelled { await newEpisodes?.check() }
             task.setTaskCompleted(success: !Task.isCancelled)
         }
         task.expirationHandler = { work.cancel() }

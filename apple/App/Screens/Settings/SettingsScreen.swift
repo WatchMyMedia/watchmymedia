@@ -210,7 +210,8 @@ private struct SettingsRoot: View {
     @Environment(AppFlow.self) private var flow
     @Environment(AppServices.self) private var services
     @Environment(LiveExtrasStore.self) private var extras
-    @Environment(LiveReminderNotifier.self) private var notifier
+    @Environment(NotificationRouter.self) private var notifier
+    @Environment(FollowsStore.self) private var follows
     @Environment(\.openURL) private var openURL
 
     init(model: SettingsModel, selection: Binding<SettingsPage?>? = nil, rows: any RowsRepository) {
@@ -484,7 +485,8 @@ private struct SettingsRow: View {
     }
     .environment(AppServices.fake())
     .environment(LiveExtrasStore(repository: UnavailableLiveTVRepository()))
-    .environment(LiveReminderNotifier.shared)
+    .environment(NotificationRouter.shared)
+    .environment(FollowsStore(repository: UnavailableFollows()))
     .environment(AppFlow())
     .environment(Navigator())
     .preferredColorScheme(.dark)

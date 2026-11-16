@@ -63,7 +63,10 @@ struct RootView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(Navigator.self) private var navigator
     @Environment(LiveExtrasStore.self) private var extras
-    @Environment(LiveReminderNotifier.self) private var notifier
+    @Environment(NotificationRouter.self) private var router
+    @Environment(FollowsStore.self) private var follows
+    @Environment(NewEpisodeNotifier.self) private var newEpisodes
+    private var notifier: LiveReminderNotifier { .shared }
     @State private var flow = AppFlow()
     @State private var accountGeneration = 0
 
@@ -86,8 +89,9 @@ struct RootView: View {
         .animation(.default, value: flow.choosingServer)
         .onChange(of: account) { old, _ in
             flow.forgetSignIn()
-            // Another account's reminders never notify here.
+            // Another account's reminders never notify here, nor are its new episodes kept.
             Task { await notifier.reschedule([]) }
+            Task { await newEpisodes.accountChanged() }
             if let switching = flow.serverSwitch {
                 switching.accountChanged()
             } else {
@@ -115,15 +119,20 @@ struct RootView: View {
         .task(id: Refresh(account: account, active: scenePhase == .active)) {
             guard scenePhase == .active else { return }
             await services.servers.refreshCurrent()
-            let services = services, extras = extras
+            newEpisodes.refreshBackgroundStatus()
+            let services = services, extras = extras, follows = follows, newEpisodes = newEpisodes
             await together(
                 { await services.requests.refreshOptions() },
                 // Live TV's access, then its reminders, which need it.
                 { try? await services.liveTV.refresh(); await extras.refresh() },
                 // Offline progress and what the server decided of the downloads (PLAN-DOWNLOADS.md §6).
-                { await services.downloads.sync() }
+                { await services.downloads.sync() },
+                // The shows followed, then new episodes of them (PLAN-NEW-EPISODES.md §6.1).
+                { await follows.refresh(); await newEpisodes.check() }
             )
         }
+        // While the app is open, new episodes are looked for 3 minutes after the last library change.
+        .task(id: account) { await newEpisodes.checker.followLibrary(services.library.libraryChanges()) }
         // Reminders as notifications (PLAN-LIVE-TV-GUIDE.md §6.5): the soonest 64,
         // again whenever they or the lead time change, once the list is loaded.
         // A server that keeps none clears them; offline, they stay as they were.
@@ -164,7 +173,7 @@ struct RootView: View {
     private var reminderSchedule: [String] {
         extras.alertsKey + [extras.loaded ? "loaded" : "", services.auth.user.map { "\($0.id)" } ?? "out",
                             services.liveTV.capabilities.map { $0.extrasAvailable ? "extras" : "none" } ?? "unknown",
-                            "\(notifier.status?.rawValue ?? -1)"]
+                            "\(router.status?.rawValue ?? -1)"]
     }
 
     private struct Account: Equatable {

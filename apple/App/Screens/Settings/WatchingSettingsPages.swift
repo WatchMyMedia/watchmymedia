@@ -85,7 +85,7 @@ struct PlaybackSettingsPage: View {
 /// through. Notifications asks iOS at first, then opens iOS Settings.
 struct LiveRemindersSettingsSection: View {
     @Environment(LiveExtrasStore.self) private var extras
-    @Environment(LiveReminderNotifier.self) private var notifier
+    @Environment(NotificationRouter.self) private var notifier
     @Environment(\.openURL) private var openURL
 
     var body: some View {
