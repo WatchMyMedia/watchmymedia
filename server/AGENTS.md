@@ -206,8 +206,9 @@ then stays file time from window to window. Before, a play asked for 25 s on
 a file with a keyframe every 10 s showed 20 s while the apps counted 25 s,
 and each window skipped or repeated a few seconds (PLAN-RESUME.md §1.4). The
 served playlist carries `EXT-X-START` at the asked-for frame: without it
-players treat an event playlist as live, and Media3 and Safari started near
-the end of what was prepared. Trimming never passes the viewer's reported
+players treat an event playlist as live, and one loaded without a start of
+its own (Safari's native player) begins near the end of what was prepared.
+Media3 keeps an explicit start, 0 included, over the tag. Trimming never passes the viewer's reported
 position (`Manager.NoteViewer`). A resume with no start begins 5 s before
 the saved position (`resumePoint` in `internal/api/watch.go`); the saved
 position itself stays exact.
