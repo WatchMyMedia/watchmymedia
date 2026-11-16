@@ -39,7 +39,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * @param id On Home: continue, live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>.
+ * @param id On Home: continue, followed (from API level 29), live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>.
  * @param style How to draw it: poster (items), wide (items as 16:9 cards), episode (episodes), continue (continue) or live (no items: draw the app's Live TV row in this place). A plain string: skip a row whose style you don't know.
  * @param title
  * @param `continue` Style continue.
@@ -54,7 +54,7 @@ import kotlinx.serialization.encoding.Encoder
 
 data class ScreenRow (
 
-    /* On Home: continue, live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>. */
+    /* On Home: continue, followed (from API level 29), live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>. */
     @SerialName(value = "id")
     val id: kotlin.String,
 

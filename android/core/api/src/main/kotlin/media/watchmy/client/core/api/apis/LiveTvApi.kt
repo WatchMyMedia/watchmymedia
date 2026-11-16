@@ -57,6 +57,7 @@ import media.watchmy.client.core.api.models.LiveTVSessionView
 import media.watchmy.client.core.api.models.LiveTVSettings
 import media.watchmy.client.core.api.models.LiveTVSource
 import media.watchmy.client.core.api.models.LiveTVSourceInputBody
+import media.watchmy.client.core.api.models.LiveTVSourceRemoval
 import media.watchmy.client.core.api.models.LiveTVSourceUpdateInputBody
 import media.watchmy.client.core.api.models.LiveTVStartInputBody
 import media.watchmy.client.core.api.models.Progress
@@ -1476,6 +1477,79 @@ open class LiveTvApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/api/settings/live-tv",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /api/settings/live-tv/sources/{id}/removal
+     * What removing a tuner would affect (admin)
+     * Counts for the dialog before deleteLiveTVSource. Nothing changes.
+     * @param id 
+     * @return LiveTVSourceRemoval
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun getLiveTVSourceRemoval(id: kotlin.String) : LiveTVSourceRemoval = withContext(Dispatchers.IO) {
+        val localVarResponse = getLiveTVSourceRemovalWithHttpInfo(id = id)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as LiveTVSourceRemoval
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /api/settings/live-tv/sources/{id}/removal
+     * What removing a tuner would affect (admin)
+     * Counts for the dialog before deleteLiveTVSource. Nothing changes.
+     * @param id 
+     * @return ApiResponse<LiveTVSourceRemoval?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun getLiveTVSourceRemovalWithHttpInfo(id: kotlin.String) : ApiResponse<LiveTVSourceRemoval?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = getLiveTVSourceRemovalRequestConfig(id = id)
+
+        return@withContext request<Unit, LiveTVSourceRemoval>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getLiveTVSourceRemoval
+     *
+     * @param id 
+     * @return RequestConfig
+     */
+    fun getLiveTVSourceRemovalRequestConfig(id: kotlin.String) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/api/settings/live-tv/sources/{id}/removal".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,

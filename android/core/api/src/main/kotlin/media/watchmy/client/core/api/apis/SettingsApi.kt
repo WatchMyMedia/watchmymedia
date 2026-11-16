@@ -33,6 +33,7 @@ import media.watchmy.client.core.api.models.ErrorModel
 import media.watchmy.client.core.api.models.Info
 import media.watchmy.client.core.api.models.PathCheck
 import media.watchmy.client.core.api.models.PathInputBody
+import media.watchmy.client.core.api.models.PlaysOlderThan
 import media.watchmy.client.core.api.models.Settings
 import media.watchmy.client.core.api.models.TestResult
 import media.watchmy.client.core.api.models.TestTMDBInputBody
@@ -357,6 +358,82 @@ open class SettingsApi(basePath: kotlin.String = defaultBasePath, client: Call.F
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/api/settings/turnstile/check",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /api/settings/activity/older-than
+     * How many plays a shorter Keep history for would delete (admin)
+     * For the dialog before saving a shorter activity.retentionDays. Counts by the rule the daily trim uses; nothing changes.
+     * @param days A Keep history for limit, in days, as Settings.activity.retentionDays takes it.
+     * @return PlaysOlderThan
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun countPlaysOlderThan(days: kotlin.Long) : PlaysOlderThan = withContext(Dispatchers.IO) {
+        val localVarResponse = countPlaysOlderThanWithHttpInfo(days = days)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as PlaysOlderThan
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /api/settings/activity/older-than
+     * How many plays a shorter Keep history for would delete (admin)
+     * For the dialog before saving a shorter activity.retentionDays. Counts by the rule the daily trim uses; nothing changes.
+     * @param days A Keep history for limit, in days, as Settings.activity.retentionDays takes it.
+     * @return ApiResponse<PlaysOlderThan?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun countPlaysOlderThanWithHttpInfo(days: kotlin.Long) : ApiResponse<PlaysOlderThan?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = countPlaysOlderThanRequestConfig(days = days)
+
+        return@withContext request<Unit, PlaysOlderThan>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation countPlaysOlderThan
+     *
+     * @param days A Keep history for limit, in days, as Settings.activity.retentionDays takes it.
+     * @return RequestConfig
+     */
+    fun countPlaysOlderThanRequestConfig(days: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                put("days", listOf(days.toString()))
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/api/settings/activity/older-than",
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,

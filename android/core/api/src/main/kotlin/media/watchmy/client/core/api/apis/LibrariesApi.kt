@@ -31,6 +31,7 @@ import media.watchmy.client.core.api.models.CreateLibraryInputBody
 import media.watchmy.client.core.api.models.ErrorModel
 import media.watchmy.client.core.api.models.Library
 import media.watchmy.client.core.api.models.LibraryList
+import media.watchmy.client.core.api.models.LibraryRemoval
 import media.watchmy.client.core.api.models.ScanRequested
 import media.watchmy.client.core.api.models.UpdateLibraryInputBody
 
@@ -139,7 +140,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
     /**
      * DELETE /api/libraries/{id}
      * Remove a library and everything indexed from it (admin)
-     * Files on disk are untouched. Watch history for its items is removed.
+     * Files on disk are untouched. Watch history for its items is removed. Away from home it needs the password entered again (confirmPassword).
      * @param id Library ID.
      * @return void
      * @throws IllegalStateException If the request is not correctly configured
@@ -170,7 +171,7 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
     /**
      * DELETE /api/libraries/{id}
      * Remove a library and everything indexed from it (admin)
-     * Files on disk are untouched. Watch history for its items is removed.
+     * Files on disk are untouched. Watch history for its items is removed. Away from home it needs the password entered again (confirmPassword).
      * @param id Library ID.
      * @return ApiResponse<Unit?>
      * @throws IllegalStateException If the request is not correctly configured
@@ -273,6 +274,79 @@ open class LibrariesApi(basePath: kotlin.String = defaultBasePath, client: Call.
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/api/libraries/{id}".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /api/libraries/{id}/removal
+     * What removing a library would remove (admin)
+     * Counts for the dialog before deleteLibrary. Nothing changes.
+     * @param id Library ID.
+     * @return LibraryRemoval
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun getLibraryRemoval(id: kotlin.Long) : LibraryRemoval = withContext(Dispatchers.IO) {
+        val localVarResponse = getLibraryRemovalWithHttpInfo(id = id)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as LibraryRemoval
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /api/libraries/{id}/removal
+     * What removing a library would remove (admin)
+     * Counts for the dialog before deleteLibrary. Nothing changes.
+     * @param id Library ID.
+     * @return ApiResponse<LibraryRemoval?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun getLibraryRemovalWithHttpInfo(id: kotlin.Long) : ApiResponse<LibraryRemoval?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = getLibraryRemovalRequestConfig(id = id)
+
+        return@withContext request<Unit, LibraryRemoval>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getLibraryRemoval
+     *
+     * @param id Library ID.
+     * @return RequestConfig
+     */
+    fun getLibraryRemovalRequestConfig(id: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/api/libraries/{id}/removal".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,

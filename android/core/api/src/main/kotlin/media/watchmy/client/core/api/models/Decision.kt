@@ -53,9 +53,9 @@ import kotlinx.serialization.encoding.Encoder
  * @param playId Identifies this viewing; send it back with later requests for the same file.
  * @param protocol
  * @param reasons Why a cheaper mode was not possible.
- * @param resumeMs The user's saved position for this item, if partway through.
+ * @param resumeMs Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread (PLAN-RESUME.md §3.8).
  * @param segments
- * @param startMs Where the HLS session starts; add to the player's time to get the file position.
+ * @param startMs Where the HLS session starts; add to the player's time to get the file position. An event session of copied video starts on the keyframe at or before the time asked for, so this can be up to 12 s earlier than the request.
  * @param subtitles
  * @param upNextMs When to offer the next episode: the credits, else shortly before the end; 0 means do not offer it.
  * @param url
@@ -105,14 +105,14 @@ data class Decision (
     @SerialName(value = "reasons")
     val reasons: kotlin.collections.List<kotlin.String>,
 
-    /* The user's saved position for this item, if partway through. */
+    /* Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread (PLAN-RESUME.md §3.8). */
     @SerialName(value = "resumeMs")
     val resumeMs: kotlin.Long,
 
     @SerialName(value = "segments")
     val segments: kotlin.collections.List<Segment>,
 
-    /* Where the HLS session starts; add to the player's time to get the file position. */
+    /* Where the HLS session starts; add to the player's time to get the file position. An event session of copied video starts on the keyframe at or before the time asked for, so this can be up to 12 s earlier than the request. */
     @SerialName(value = "startMs")
     val startMs: kotlin.Long,
 

@@ -37,6 +37,7 @@ import kotlinx.serialization.encoding.Encoder
 /**
  * @param adminAllowed Whether this signed-in admin may administer here; for others, whether first-run setup works on this network.
  * @param setupRequired True until the first admin account is created.
+ * @param adminConfirmedUntil For a signed-in admin who entered their password again (confirmPassword) on this sign-in: when that confirmation runs out. Absent when there is none.
  * @param adminLimit
  * @param onAdminNetwork
  * @param turnstileSiteKey Set while password sign-in and setup need a Cloudflare Turnstile token: render the widget with this site key and send its token as turnstileToken.
@@ -53,6 +54,10 @@ data class AuthStatus (
     /* True until the first admin account is created. */
     @SerialName(value = "setupRequired")
     val setupRequired: kotlin.Boolean,
+
+    /* For a signed-in admin who entered their password again (confirmPassword) on this sign-in: when that confirmation runs out. Absent when there is none. */
+    @SerialName(value = "adminConfirmedUntil")
+    val adminConfirmedUntil: kotlin.String? = null,
 
     @SerialName(value = "adminLimit")
     val adminLimit: AuthStatus.AdminLimit? = null,
