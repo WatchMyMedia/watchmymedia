@@ -236,6 +236,9 @@ class RealPlaybackController(
         var error: String? = null
         var lastReported: PlayState? = null
         var lastBeatAt = 0L
+
+        /** A seek has landed since the last report: the next tick sends one (PLAN-RESUME.md §3.6). */
+        var seekLanded = false
         var recoveries = 0
         var recoveredAt = 0L
 
@@ -519,12 +522,15 @@ class RealPlaybackController(
                 val naming = if (request.title.isBlank()) async { attempt("name the file") { withContext(io) { lookups.name(request) } } } else null
                 var d = decide(v, startMs = request.startMs, playId = null)
                 var start = request.startMs ?: 0
-                // No explicit start: pick up where the viewer left off. A VOD
-                // playlist (or the file) just starts there; an event playlist
-                // is restarted there, as the web does.
+                // No explicit start: pick up where the server resumes, 5 s
+                // before where the viewer left off. A VOD playlist (or the
+                // file) just starts there. An event session from a server of
+                // PLAN-RESUME.md §3.7 starts there already; one an older
+                // server started at 0 is restarted there, as the web does.
                 if (request.startMs == null && d.resumeMs > RESUME_MIN_MS) {
                     start = d.resumeMs
-                    if (StreamClock.of(d).event) {
+                    // A server that starts the session there already needs no second request.
+                    if (StreamClock.of(d).event && !d.startsAt(start)) {
                         val first = d
                         d = decide(v, startMs = start, playId = d.playId)
                         endReplacedSession(first, d)
@@ -828,6 +834,7 @@ class RealPlaybackController(
 
     private fun seekWithin(v: Viewing, target: Long) {
         val p = media ?: return
+        v.seekLanded = true
         when {
             v.loading -> v.pendingPositionMs = target
             v.streamClock.canSeekLocally(target, p.bufferedPositionMs) -> p.seekTo(v.streamClock.playerPosition(target))
@@ -1154,7 +1161,9 @@ class RealPlaybackController(
             else -> BEAT_IDLE_MS
         }
         val changed = state != v.lastReported
-        if (!force && !changed && clock.elapsedMs() - v.lastBeatAt < interval) return
+        val sinceBeat = clock.elapsedMs() - v.lastBeatAt
+        val seekDue = v.seekLanded && sinceBeat >= SEEK_BEAT_GAP_MS
+        if (!force && !changed && !seekDue && sinceBeat < interval) return
         if (!report(v, state, pos, buffered)) return
         // A pause partway goes on the Continue watching row.
         if (changed && status == PlayerStatus.Paused) leftPartway(v, pos)
@@ -1169,6 +1178,7 @@ class RealPlaybackController(
         if (backgrounded && state != PlayState.Closed && state != PlayState.Stopped) return false
         v.lastReported = state
         v.lastBeatAt = clock.elapsedMs()
+        v.seekLanded = false
         val position = if (v.finished) duration(d) else pos
         // Measured here, on the player's thread, before the report goes to the queue.
         val m = measure(media, buffered, v.switch)
@@ -1432,6 +1442,5 @@ class RealPlaybackController(
         const val TOKEN_RETRY_MS = 30_000L
         const val MAX_RECOVERIES = 2
         const val RECOVERY_RESET_MS = 60_000L
-        const val EVENT_START_TOLERANCE_MS = 15_000L
     }
 }

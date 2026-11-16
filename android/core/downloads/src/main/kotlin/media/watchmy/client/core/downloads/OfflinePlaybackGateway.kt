@@ -14,6 +14,7 @@ import media.watchmy.client.model.PlaybackPlan
 import media.watchmy.client.model.PlaybackProfile
 import media.watchmy.client.model.ProgressReply
 import media.watchmy.client.model.ProgressReport
+import media.watchmy.client.model.RESUME_REWIND_MS
 import media.watchmy.client.model.StreamProtocol
 import media.watchmy.client.model.requiresBurnIn
 import media.watchmy.client.model.StreamQuality
@@ -90,7 +91,10 @@ internal class OfflinePlaybackGateway(
          * that finished downloading).
          */
         fun offlineDecision(d: OfflineDownload, stored: PlaybackDecision, nextDownloaded: Boolean, parts: Set<String>, partOf: (String) -> String): PlaybackDecision {
-            val resume = d.watch?.takeIf { !it.completed }?.positionMs ?: 0
+            val saved = d.watch?.takeIf { !it.completed }?.positionMs ?: 0
+            // A position kept here resumes 5 s back, as the server's resumeMs does. One
+            // that is the stored decision's resumeMs came from the server, already back.
+            val resume = if (saved == stored.resumeMs) saved else (saved - RESUME_REWIND_MS).coerceAtLeast(0)
             val hls = stored.protocol == StreamProtocol.Hls
             return stored.copy(
                 playId = OFFLINE_PLAY,

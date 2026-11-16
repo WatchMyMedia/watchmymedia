@@ -84,6 +84,17 @@ class StreamTest {
     }
 
     @Test
+    fun anEventSessionThatStartsAtTheResumePointNeedsNoSecondRequest() {
+        // The server started where the play resumes, on the keyframe 5 s before it (PLAN-RESUME.md §3.7).
+        h.start(resumeRequest) { decision(vod = false, startMs = 295_000, resumeMs = 300_000) }
+        assertEquals(1, h.gateway.decisions.size)
+        assertEquals(null, h.gateway.decisions.single().startMs)
+        assertTrue(h.gateway.stoppedSessions.isEmpty())
+        assertEquals(5_000L, h.player.loads.single().startPositionMs)
+        assertEquals(300_000L, h.progress.positionMs)
+    }
+
+    @Test
     fun theDecisionsSeekThumbnailsReachTheScrubberAndTheNextFileStartsWithout() {
         val tiles = Trickplay(10_000, 320, 180, 10, 10, 300, 3, "http://srv/api/files/1/trickplay/9c1e07a2/{sheet}.jpg")
         h.start(resumeRequest, decision(trickplay = tiles))

@@ -13,6 +13,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
@@ -161,9 +162,9 @@ class ExoMediaPlayer(
 
     override val playWhenReady: Boolean get() = exo.playWhenReady
 
-    override val positionMs: Long get() = exo.currentPosition
+    override val positionMs: Long get() = exo.currentPosition - windowShiftMs()
 
-    override val bufferedPositionMs: Long get() = exo.bufferedPosition
+    override val bufferedPositionMs: Long get() = exo.bufferedPosition - windowShiftMs()
 
     override val throughputBps: Long? get() = meter.throughputBps
 
@@ -179,6 +180,27 @@ class ExoMediaPlayer(
 
     override val endedEventDurationMs: Long?
         get() = exo.duration.takeIf { live && !exo.currentTimeline.isEmpty && !exo.isCurrentMediaItemDynamic && it != C.TIME_UNSET && it >= 0 }
+            ?.let { it - windowShiftMs() }
+
+    /**
+     * Where Media3's live window starts in the stream, as a position within
+     * the window (0 or negative), for an event playlist of a file or a
+     * recording. Media3 gives live positions within the window, which moves
+     * on as the server trims the playlist's head, so a position read or a
+     * seek made in the window's terms would drift by what was trimmed
+     * (PLAN-RESUME.md §3.5). Positions here count from the stream's start
+     * instead. A Live TV channel keeps the window's terms: it is followed
+     * from its edge.
+     */
+    private fun windowShiftMs(): Long {
+        if (!fromStreamStart) return 0
+        val timeline = exo.currentTimeline
+        if (timeline.isEmpty) return 0
+        return timeline.getPeriod(exo.currentPeriodIndex, period).positionInWindowMs
+    }
+
+    private val period = Timeline.Period()
+    @Volatile private var fromStreamStart = false
 
     override fun updateMediaToken(token: MediaToken) { mediaToken = token }
 
@@ -217,6 +239,7 @@ class ExoMediaPlayer(
             item.setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setMinPlaybackSpeed(1f).setMaxPlaybackSpeed(1f).build())
         }
         live = source.live
+        fromStreamStart = source.live && !source.atLiveEdge
         pendingAudio = source.audioOrdinal
         expectedAudioTracks = source.audioTracks
         pendingText = source.text
@@ -245,7 +268,7 @@ class ExoMediaPlayer(
     }
 
     override fun seekTo(positionMs: Long) {
-        exo.seekTo(positionMs)
+        exo.seekTo(positionMs + windowShiftMs())
     }
 
     override fun selectText(selection: TextSelection) {
