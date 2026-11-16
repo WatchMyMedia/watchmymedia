@@ -30,6 +30,7 @@ import media.watchmy.client.tv.quietTvFakes
 import media.watchmy.client.ui.LocalAppServices
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -46,9 +47,9 @@ import java.io.IOException
  * confirmations starting on the button that changes nothing, and Back
  * never held up.
  *
- * The fakes' groups: Playback, Audio & subtitles, Home rows, Account &
- * devices, Your requests, About, then Inbox and Server settings (Sam is an
- * admin).
+ * The fakes' groups: Playback, Audio & subtitles, Home rows, Notifications,
+ * Account & devices, Your requests, About, then Inbox and Server settings
+ * (Sam is an admin).
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -288,6 +289,30 @@ class SettingsFocusTest {
     }
 
     /** Opens the rail, goes down it to Settings and opens it. */
+    @Test
+    fun `Notifications lists the shows followed, OK opens a show's panel and Stop notifying moves focus to the next`() {
+        start()
+        goToGroup("Notifications")
+        compose.onNodeWithText("Your phone or tablet notifies you. This TV shows new episodes on Home.").assertExists()
+        press(Key.DirectionRight)
+        assertEquals("Harbor Lights", focused())
+        press(Key.DirectionDown)
+        assertEquals("Copperline", focused())
+        press(Key.DirectionCenter)
+        assertEquals("the panel starts on Go to show", "Go to show", focused())
+        compose.onNodeWithText("Back closes this panel.").assertExists()
+        press(Key.DirectionDown)
+        assertEquals("Stop notifying", focused())
+        press(Key.DirectionCenter)
+        assertTrue("the panel closed and the row went", !exists("Go to show") && !exists("Copperline"))
+        assertEquals("focus is on the next show", "Ashgrove", focused())
+        compose.onNodeWithText("Not in the library now").assertExists()
+        press(Key.DirectionCenter)
+        assertTrue("a show no longer in the library has only Stop notifying", !exists("Go to show") && exists("Stop notifying"))
+        backInDialog()
+        assertEquals("Back closes the panel and keeps the show", "Ashgrove", focused())
+    }
+
     private fun openSettings() {
         press(Key.DirectionLeft)
         repeat(8) { if (focused() != "Settings") press(Key.DirectionDown) }
