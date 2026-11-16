@@ -56,6 +56,37 @@ JOIN media_files f ON f.id = ef.media_file_id
 GROUP BY s.tmdb_id, se.number, e.number
 ORDER BY arrived, s.tmdb_id, se.number, e.number;
 
+-- Mark show watched and Mark season watched marked every episode TMDB
+-- listed, including ones that hadn't aired, so a new episode came already
+-- watched. They now leave those alone; clear the marks they made that
+-- can't be true: on an episode no library has ever had a file for (its
+-- TMDB episode has no arrival) that hadn't aired by the day of the mark
+-- (no air date, or a later one), and with the mark's guard, so an import
+-- may mark it later. Imported history (an import's guard) is left as it
+-- is. Going down doesn't put these marks back.
+DELETE FROM watch_guards
+WHERE owner = 'local' AND item_type = 'episode' AND EXISTS (
+    SELECT 1 FROM watch_state w
+    JOIN episodes e ON e.id = w.item_id
+    JOIN seasons se ON se.id = e.season_id
+    JOIN shows s ON s.id = e.show_id
+    WHERE w.user_id = watch_guards.user_id AND w.item_type = 'episode' AND w.item_id = watch_guards.item_id
+      AND w.completed = 1
+      AND (e.air_date IS NULL OR e.air_date = '' OR e.air_date > substr(w.updated_at, 1, 10))
+      AND NOT EXISTS (SELECT 1 FROM episode_arrivals a WHERE a.tmdb_id = s.tmdb_id AND a.season = se.number AND a.number = e.number));
+
+DELETE FROM watch_state
+WHERE item_type = 'episode' AND completed = 1
+  AND NOT EXISTS (SELECT 1 FROM watch_guards g
+      WHERE g.user_id = watch_state.user_id AND g.item_type = 'episode' AND g.item_id = watch_state.item_id AND g.owner = 'import')
+  AND EXISTS (
+    SELECT 1 FROM episodes e
+    JOIN seasons se ON se.id = e.season_id
+    JOIN shows s ON s.id = e.show_id
+    WHERE e.id = watch_state.item_id
+      AND (e.air_date IS NULL OR e.air_date = '' OR e.air_date > substr(watch_state.updated_at, 1, 10))
+      AND NOT EXISTS (SELECT 1 FROM episode_arrivals a WHERE a.tmdb_id = s.tmdb_id AND a.season = se.number AND a.number = e.number));
+
 -- +goose Down
 DROP TABLE episode_arrivals;
 DROP TABLE show_follows;

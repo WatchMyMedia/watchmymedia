@@ -415,48 +415,85 @@ func TestNewEpisodesAcrossLibraries(t *testing.T) {
 	}
 }
 
-// Marking a show watched marks the episodes TMDB lists that have no file
-// yet. That must not hide them when they arrive: only finishing an episode
-// after it arrived does, in the feed and on Home.
+// Marking a show watched mid-season leaves the episodes that haven't aired
+// unmarked, so one that arrives later is announced, and the show page and
+// season agree that it is unwatched and up next. An episode that had aired
+// and was marked watched before its file came is finished: its arrival is
+// not announced, in the feed or on Home.
 func TestFollowedAfterMarkShowWatched(t *testing.T) {
 	t.Parallel()
 	e := newFollowEnv(t)
-	tide, tideEps := e.show(e.tv, 7001, "Tidewater", 2)
-	// E02 is listed by TMDB but not out yet: no file.
-	e.exec(`DELETE FROM media_files WHERE id IN (SELECT media_file_id FROM episode_files WHERE episode_id = ?)`, tideEps[1])
-	// Mid-season, the person marks the show watched, an hour ago.
+	tide, eps := e.show(e.tv, 7001, "Tidewater", 4)
+	// E01 and E02 aired and are here; E03 aired but isn't here; E04
+	// hasn't aired (TMDB has no date yet) and isn't here.
+	e.exec(`UPDATE episodes SET air_date = '2026-01-01' WHERE id IN (?, ?, ?)`, eps[0], eps[1], eps[2])
+	e.exec(`DELETE FROM media_files WHERE id IN (SELECT media_file_id FROM episode_files WHERE episode_id IN (?, ?))`, eps[2], eps[3])
 	if res := e.admin(http.MethodPost, fmt.Sprintf("/api/shows/%d/watched", tide), "", nil); res.StatusCode >= 300 {
 		t.Fatalf("mark show watched = %d %s", res.StatusCode, res.Body)
 	}
-	var marked int
-	if err := e.conn.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM watch_state WHERE user_id = 1 AND item_id = ? AND completed = 1`, tideEps[1]).Scan(&marked); err != nil || marked != 1 {
-		t.Fatalf("the unaired episode marked: %d, %v", marked, err)
+	marked := func() []int64 {
+		t.Helper()
+		rows, err := e.conn.QueryContext(t.Context(), `SELECT item_id FROM watch_state WHERE user_id = 1 AND completed = 1 AND item_id IN (?, ?, ?, ?) ORDER BY item_id`, eps[0], eps[1], eps[2], eps[3])
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = rows.Close() }()
+		var out []int64
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			out = append(out, id)
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		return out
 	}
-	e.exec(`UPDATE watch_state SET updated_at = ? WHERE user_id = 1`, db.FormatTime(time.Now().Add(-time.Hour)))
+	if got := marked(); !slices.Equal(got, eps[:3]) {
+		t.Fatalf("marked %v, want %v", got, eps[:3])
+	}
 	e.follow(e.admin, tide)
 	start := e.feed(e.admin, "").Cursor
-	// E02 comes out.
-	f := e.exec(`INSERT INTO media_files (library_id, path, size, mtime, status, parsed, height, added_at, match_status)
-		VALUES (?, '/t/Tidewater/S01E02.mkv', 500, '2026-01-01T00:00:00.000Z', 'present', '{"kind":"episode"}', 1080, ?, 'matched')`, e.tv, db.FormatTime(time.Now()))
-	e.exec(`INSERT INTO episode_files (episode_id, media_file_id) VALUES (?, ?)`, tideEps[1], f)
-	e.arrive(tideEps[1], 5*time.Minute, false)
 
-	if g := groups(e.feed(e.admin, start)); len(g) != 1 || g[0] != "Tidewater: S1E2 (1) open S1E2" {
+	// E04 comes out and arrives; then E03's file turns up too.
+	arrive := func(ep int64, ago time.Duration) {
+		f := e.exec(`INSERT INTO media_files (library_id, path, size, mtime, status, parsed, height, added_at, match_status)
+			VALUES (?, ?, 500, '2026-01-01T00:00:00.000Z', 'present', '{"kind":"episode"}', 1080, ?, 'matched')`, e.tv, fmt.Sprintf("/t/Tidewater/%d.mkv", ep), db.FormatTime(time.Now()))
+		e.exec(`INSERT INTO episode_files (episode_id, media_file_id) VALUES (?, ?)`, ep, f)
+		e.arrive(ep, ago, false)
+	}
+	e.exec(`UPDATE episodes SET air_date = ? WHERE id = ?`, time.Now().UTC().Format(time.DateOnly), eps[3])
+	arrive(eps[3], 5*time.Minute)
+	arrive(eps[2], 4*time.Minute)
+
+	if g := groups(e.feed(e.admin, start)); len(g) != 1 || g[0] != "Tidewater: S1E4 (1) open S1E4" {
 		t.Errorf("feed = %q", g)
 	}
 	var home HomeData
 	e.admin(http.MethodGet, "/api/home?arranged=true", "", &home)
-	if at := slices.Index(rowIDs(home.Rows), rowFollowed); at < 0 || len(home.Rows[at].Episodes) != 1 || home.Rows[at].Episodes[0].EpisodeID != tideEps[1] {
+	if at := slices.Index(rowIDs(home.Rows), rowFollowed); at < 0 || len(home.Rows[at].Episodes) != 1 || home.Rows[at].Episodes[0].EpisodeID != eps[3] {
 		t.Errorf("home rows = %v", rowIDs(home.Rows))
 	}
-	// Watching it now finishes it.
+	// The show page plays it next, and its season isn't all watched.
+	var show ShowDetail
+	e.admin(http.MethodGet, fmt.Sprintf("/api/shows/%d", tide), "", &show)
+	if show.NextEpisode == nil || show.NextEpisode.EpisodeID != eps[3] || len(show.Seasons) != 1 ||
+		show.Seasons[0].AvailableCount != 4 || show.Seasons[0].WatchedCount != 3 {
+		t.Errorf("show = next %+v seasons %+v", show.NextEpisode, show.Seasons)
+	}
+	var season SeasonDetail
+	e.admin(http.MethodGet, fmt.Sprintf("/api/shows/%d/seasons/1", tide), "", &season)
+	for _, ep := range season.Episodes {
+		if watched := ep.Watch != nil && ep.Watch.Completed; watched != (ep.ID != eps[3]) {
+			t.Errorf("E%02d watched %v", ep.Number, watched)
+		}
+	}
+	// Watching it finishes it here too.
 	e.admin(http.MethodPost, fmt.Sprintf("/api/shows/%d/watched", tide), "", nil)
 	if g := groups(e.feed(e.admin, start)); len(g) != 0 {
 		t.Errorf("feed after watching = %q", g)
-	}
-	e.admin(http.MethodGet, "/api/home?arranged=true", "", &home)
-	if slices.Contains(rowIDs(home.Rows), rowFollowed) {
-		t.Errorf("home after watching = %v", rowIDs(home.Rows))
 	}
 }
 

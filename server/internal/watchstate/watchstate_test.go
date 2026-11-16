@@ -90,7 +90,8 @@ func (f *fixture) show(t *testing.T, episodes ...int) (int64, []int64, [][]Targe
 		seasons = append(seasons, se.ID)
 		var eps []Target
 		for e := 1; e <= n; e++ {
-			ep, err := f.q.UpsertEpisode(f.ctx, db.UpsertEpisodeParams{SeasonID: se.ID, ShowID: sh.ID, Number: int64(e), Title: fmt.Sprintf("Episode %d", e)})
+			// Aired long ago, so marking the season or show marks it.
+			ep, err := f.q.UpsertEpisode(f.ctx, db.UpsertEpisodeParams{SeasonID: se.ID, ShowID: sh.ID, Number: int64(e), Title: fmt.Sprintf("Episode %d", e), AirDate: new("2020-01-01")})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -530,5 +531,85 @@ func TestMoveRules(t *testing.T) {
 	}
 	if g, w := f.current(t, f.user, from); g != nil || w != nil {
 		t.Errorf("cleared: %+v %+v", g, w)
+	}
+}
+
+// Marking a season or show watched marks what can have been watched: the
+// episodes that have aired, here or not, and those with a file present
+// whatever their date. An episode TMDB lists that hasn't aired (no date,
+// or a later one) and isn't here is left alone, without a guard, so it is
+// unwatched when it comes and an import may still mark it. Clearing clears
+// and guards every episode (PLAN-NEW-EPISODES.md section 5.4).
+func TestMarkLeavesUnairedEpisodes(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	showID, seasons, eps := f.show(t, 5, 1)
+	tomorrow := time.Now().UTC().AddDate(0, 0, 1).Format(time.DateOnly)
+	set := func(target Target, airDate any) {
+		t.Helper()
+		if _, err := f.conn.ExecContext(f.ctx, `UPDATE episodes SET air_date = ? WHERE id = ?`, airDate, target.ItemID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Season 1: E01 aired; E02 airs today; E03 airs tomorrow; E04 has no
+	// date; E05 airs tomorrow but is here already (an early release).
+	set(eps[0][1], time.Now().UTC().Format(time.DateOnly))
+	set(eps[0][2], tomorrow)
+	set(eps[0][3], nil)
+	set(eps[0][4], tomorrow)
+	tvFile, err := f.q.UpsertMediaFile(f.ctx, db.UpsertMediaFileParams{LibraryID: f.tv.ID, Path: "/t/early.mkv", Size: 1, Mtime: db.FormatTime(time.Now()),
+		AddedAt: db.FormatTime(time.Now()), Parsed: "{}", LastSeenAt: db.FormatTime(time.Now()), SeenInScan: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.q.InsertEpisodeFile(f.ctx, db.InsertEpisodeFileParams{EpisodeID: eps[0][4].ItemID, MediaFileID: tvFile.ID}); err != nil {
+		t.Fatal(err)
+	}
+	// Season 2's only episode has no date.
+	set(eps[1][0], "")
+	marked := func() []string {
+		t.Helper()
+		var out []string
+		for s, season := range eps {
+			for e, target := range season {
+				guard, state := f.current(t, f.user, target)
+				switch {
+				case state != nil && state.Completed == 1 && guard != nil && guard.Owner == "local":
+					out = append(out, fmt.Sprintf("S%dE%d", s+1, e+1))
+				case state != nil || guard != nil:
+					out = append(out, fmt.Sprintf("S%dE%d?", s+1, e+1))
+				}
+			}
+		}
+		return out
+	}
+	if err := f.s.MarkSeason(f.ctx, f.user, seasons[0], true); err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(marked()); got != "[S1E1 S1E2 S1E5]" {
+		t.Errorf("season marked = %s", got)
+	}
+	if err := f.s.MarkShow(f.ctx, f.user, showID, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, season := range eps {
+		for _, target := range season {
+			if guard, state := f.current(t, f.user, target); state != nil || guard == nil || guard.Owner != "local" {
+				t.Errorf("after clearing the show: %+v %+v", guard, state)
+			}
+		}
+	}
+	if _, err := f.conn.ExecContext(f.ctx, `DELETE FROM watch_guards`); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.s.MarkShow(f.ctx, f.user, showID, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(marked()); got != "[S1E1 S1E2 S1E5]" {
+		t.Errorf("show marked = %s", got)
+	}
+	// An import may still mark one that was left alone.
+	if got := f.importOne(t, f.user, 9, eps[0][3]); got != Applied {
+		t.Errorf("importing the undated episode = %s", got)
 	}
 }

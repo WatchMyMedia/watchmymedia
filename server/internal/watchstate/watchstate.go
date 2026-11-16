@@ -16,6 +16,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"watchmymedia/server/internal/db"
 	"watchmymedia/server/internal/events"
@@ -177,22 +178,28 @@ func (s *Service) MarkUnwatched(ctx context.Context, userID int64, itemType stri
 	return err
 }
 
-// MarkSeason marks every episode of a season watched, or clears their
-// marks and progress. Either way every episode of the season is the user's
-// choice from now on, including those that had no state.
+// today is the date an episode must have aired by to be marked watched with
+// its season or show, as Episode.aired reads it (UTC).
+func today() *string { return new(time.Now().UTC().Format(time.DateOnly)) }
+
+// MarkSeason marks a season's episodes watched, or clears their marks and
+// progress. Marking leaves out what can't have been watched: an episode
+// TMDB lists that hasn't aired (no air date, or a later one) and has no
+// file here, so it is unwatched and new when it comes. What is marked, or
+// on clearing every episode of the season, is the user's choice from now
+// on, including episodes that had no state.
 func (s *Service) MarkSeason(ctx context.Context, userID, seasonID int64, watched bool) error {
 	ids := []int64{}
 	err := s.change(ctx, func(q *db.Queries, rev int64) error {
 		var err error
 		if watched {
-			err = q.MarkSeasonWatched(ctx, db.MarkSeasonWatchedParams{UserID: userID, SeasonID: seasonID})
-		} else {
-			err = q.UnmarkSeasonWatched(ctx, db.UnmarkSeasonWatchedParams{UserID: userID, SeasonID: seasonID})
+			if err = q.MarkSeasonWatched(ctx, db.MarkSeasonWatchedParams{UserID: userID, SeasonID: seasonID, Today: today()}); err == nil {
+				err = q.ClaimMarkedSeasonWatchGuards(ctx, db.ClaimMarkedSeasonWatchGuardsParams{UserID: userID, Revision: rev, SeasonID: seasonID, Today: today()})
+			}
+		} else if err = q.UnmarkSeasonWatched(ctx, db.UnmarkSeasonWatchedParams{UserID: userID, SeasonID: seasonID}); err == nil {
+			err = q.ClaimSeasonWatchGuards(ctx, db.ClaimSeasonWatchGuardsParams{UserID: userID, Revision: rev, SeasonID: seasonID})
 		}
 		if err != nil {
-			return err
-		}
-		if err := q.ClaimSeasonWatchGuards(ctx, db.ClaimSeasonWatchGuardsParams{UserID: userID, Revision: rev, SeasonID: seasonID}); err != nil {
 			return err
 		}
 		eps, err := q.ListSeasonEpisodes(ctx, seasonID)
@@ -210,22 +217,22 @@ func (s *Service) MarkSeason(ctx context.Context, userID, seasonID int64, watche
 	return err
 }
 
-// MarkShow marks every episode of a show watched, specials included, or
-// clears their marks and progress, as MarkSeason does for each season. One
-// watch.changed lists them all.
+// MarkShow marks a show's episodes watched, specials included, or clears
+// their marks and progress, as MarkSeason does for each season: marking
+// leaves out episodes that haven't aired and aren't here. One
+// watch.changed lists every episode.
 func (s *Service) MarkShow(ctx context.Context, userID, showID int64, watched bool) error {
 	var ids []int64
 	err := s.change(ctx, func(q *db.Queries, rev int64) error {
 		var err error
 		if watched {
-			err = q.MarkShowWatched(ctx, db.MarkShowWatchedParams{UserID: userID, ShowID: showID})
-		} else {
-			err = q.UnmarkShowWatched(ctx, db.UnmarkShowWatchedParams{UserID: userID, ShowID: showID})
+			if err = q.MarkShowWatched(ctx, db.MarkShowWatchedParams{UserID: userID, ShowID: showID, Today: today()}); err == nil {
+				err = q.ClaimMarkedShowWatchGuards(ctx, db.ClaimMarkedShowWatchGuardsParams{UserID: userID, Revision: rev, ShowID: showID, Today: today()})
+			}
+		} else if err = q.UnmarkShowWatched(ctx, db.UnmarkShowWatchedParams{UserID: userID, ShowID: showID}); err == nil {
+			err = q.ClaimShowWatchGuards(ctx, db.ClaimShowWatchGuardsParams{UserID: userID, Revision: rev, ShowID: showID})
 		}
 		if err != nil {
-			return err
-		}
-		if err := q.ClaimShowWatchGuards(ctx, db.ClaimShowWatchGuardsParams{UserID: userID, Revision: rev, ShowID: showID}); err != nil {
 			return err
 		}
 		ids, err = q.ListShowEpisodeIDs(ctx, showID)

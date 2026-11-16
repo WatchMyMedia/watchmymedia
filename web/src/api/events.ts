@@ -57,10 +57,14 @@ export function onPlayStopped(fn: (e: ActivityStopped) => void): () => void {
   }
 }
 
-const libraryListeners = new Set<() => void>()
+const libraryListeners = new Set<(reason: 'changed' | 'reopened') => void>()
 
-/** Calls fn whenever a library's contents change (library.changed); returns the unsubscribe function. */
-export function onLibraryChanged(fn: () => void): () => void {
+/**
+ * Calls fn whenever a library's contents change (library.changed), and when
+ * the stream comes back after a drop, which may have hidden one; returns the
+ * unsubscribe function.
+ */
+export function onLibraryChanged(fn: (reason: 'changed' | 'reopened') => void): () => void {
   libraryListeners.add(fn)
   return () => {
     libraryListeners.delete(fn)
@@ -95,6 +99,8 @@ function connect(qc: QueryClient) {
       // Discard our manual snapshots without replaying every older page.
       void resetPlexHistoryPages(qc, undefined, authScope())
       void qc.invalidateQueries()
+      // A library may have changed while it was down: new episodes check (PLAN-NEW-EPISODES.md §6.1).
+      libraryListeners.forEach((l) => l('reopened'))
     }
   }
   es.onerror = () => {
@@ -126,7 +132,7 @@ function connect(qc: QueryClient) {
   on<{ libraryId: number }>('library.changed', (e) => {
     invalidateLibrary(qc, e.libraryId)
     // New episodes are checked for a while after the last change (PLAN-NEW-EPISODES.md §6.1).
-    libraryListeners.forEach((l) => l())
+    libraryListeners.forEach((l) => l('changed'))
   })
   // Plays starting, changing and ending: Now playing refetches; history and
   // statistics change only when a play ends.

@@ -154,11 +154,14 @@ func TestNewEpisodesSpeed(t *testing.T) {
 			_, _ = q.ListNewestFollowedArrivals(t.Context(), db.ListNewestFollowedArrivalsParams{UserID: 1, Since: week, MaxRows: 3 * followedRowLength})
 		}},
 		{"list", func(q *db.Queries) { _, _ = q.ListShowFollows(t.Context(), 1) }},
+		// Show cards count watched episodes with a file present, so a new
+		// episode makes a watched show unwatched again.
+		{"show watched counts", func(q *db.Queries) { _, _ = q.ListShowWatchedCounts(t.Context(), 1) }},
 	} {
 		p := &planner{DB: conn, tb: t}
 		c.run(db.New(p))
 		t.Logf("%s plan:\n%s", c.name, p.plan)
-		for _, bad := range []string{"SCAN a\n", "SCAN episode_arrivals", "SCAN s\n", "SCAN shows", "SCAN e\n", "SCAN episodes", "SCAN mf\n", "SCAN media_files"} {
+		for _, bad := range []string{"SCAN a\n", "SCAN episode_arrivals", "SCAN s\n", "SCAN shows", "SCAN e\n", "SCAN episodes", "SCAN mf\n", "SCAN media_files", "SCAN f\n", "SCAN w\n", "SCAN watch_state"} {
 			if strings.Contains(p.plan+"\n", bad) {
 				t.Errorf("%s plan reads a whole table (%q)", c.name, strings.TrimSpace(bad))
 			}

@@ -56,11 +56,18 @@ the user asks in this conversation; see Authority in the root file.
   fetches, so nothing of the app is cached or served from it; keep it that
   way. Notifications, the worker and the Web Lock that lets one tab notify
   need a secure context: on plain `http://` LAN addresses reminders come as
-  the in-app banner only, and new episodes not at all. A chosen
+  the in-app banner only, and new episodes not at all. New episodes'
+  banner needs no permission, only a secure context; a hidden tab shows
+  system notifications when they are allowed, and otherwise leaves the
+  banner for when it is seen. A chosen
   notification opens only the paths `openablePath` in
   `src/lib/browserNotices.ts` lists. New episodes hold a lock of their own
   (a tab asking twice for one lock waits on itself); their check, cursor and
-  words are `src/lib/newEpisodes.ts` (PLAN-NEW-EPISODES.md §6.1, §7.5). A
+  words are `src/lib/newEpisodes.ts`, and when the holding tab checks is
+  `src/lib/newEpisodeSchedule.ts`, outside React and with the last change in
+  storage, so a redraw, a reload or another tab taking the lock still checks
+  when the window ends (PLAN-NEW-EPISODES.md §6.1, §7.5). The layout draws
+  the banners from one place in every page. A
   show's line is its one episode, the first to the last listed ("S3 E7 to
   E9"), or "From S3 E1" when more arrived than the feed lists, as on
   Android and Apple.

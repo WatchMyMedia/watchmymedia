@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '../api/schema'
 import {
-  bannerFor, bellWords, browserState, canFollow, followFailLine, followFailure, followLine, stopFailLine, clearBanner, episodeNotices, forgetCursor, forgetOnSignOut, groupNotice, loadBanner, loadCursor, moreShowsNotice, noteFollowAsked,
-  notifySwitch, personKey, runCheck, saveBanner, saveCursor, setNotifySwitch, shouldCheck, shouldExplainFollow,
+  bannerFor, bellWords, browserState, forgetPlace, lastLibraryChange, noteLibraryChange, noteSignedIn, signedInHere, canFollow, followFailLine, followFailure, followLine, stopFailLine, clearBanner, episodeNotices, forgetCursor, forgetOnSignOut, groupNotice, loadBanner, loadCursor, moreShowsNotice, noteFollowAsked,
+  notifySwitch, personKey, runCheck, saveBanner, saveCursor, setNotifySwitch, shouldCheck, shouldExplainFollow, deliveryFor,
 } from './newEpisodes'
 
 type Group = components['schemas']['NewEpisodeGroup']
@@ -33,14 +33,20 @@ function group(title: string, episodes: [number, number, string?][], { count = e
 }
 
 describe('when this browser checks', () => {
-  it('needs a followed show, the switch on and notifications allowed', () => {
-    expect(shouldCheck({ follows: 2, on: true, permission: 'granted' })).toBe(true)
-    expect(shouldCheck({ follows: 0, on: true, permission: 'granted' })).toBe(false)
-    expect(shouldCheck({ follows: 2, on: false, permission: 'granted' })).toBe(false)
-    expect(shouldCheck({ follows: 2, on: true, permission: 'default' })).toBe(false)
-    expect(shouldCheck({ follows: 2, on: true, permission: 'denied' })).toBe(false)
-    // A plain http:// address has no notifications at all.
-    expect(shouldCheck({ follows: 2, on: true, permission: 'unsupported' })).toBe(false)
+  it('needs a followed show, the switch on and a secure context, not the browser’s permission', () => {
+    expect(shouldCheck({ follows: 2, on: true, secure: true })).toBe(true)
+    expect(shouldCheck({ follows: 0, on: true, secure: true })).toBe(false)
+    expect(shouldCheck({ follows: 2, on: false, secure: true })).toBe(false)
+    // A plain http:// address has no Web Lock, banner or notification.
+    expect(shouldCheck({ follows: 2, on: true, secure: false })).toBe(false)
+  })
+  it('shows the banner in a tab in front, and in a hidden one waits for it to be seen unless notifications are allowed', () => {
+    expect(deliveryFor(true, 'granted')).toBe('banner')
+    expect(deliveryFor(true, 'denied')).toBe('banner')
+    expect(deliveryFor(false, 'granted')).toBe('system')
+    expect(deliveryFor(false, 'default')).toBe('banner')
+    expect(deliveryFor(false, 'denied')).toBe('banner')
+    expect(deliveryFor(false, 'unsupported')).toBe('banner')
   })
   it('offers Notify me from API level 29', () => {
     expect(canFollow(29)).toBe(true)
@@ -168,13 +174,13 @@ describe('what this browser keeps', () => {
 })
 
 describe('this browser in Settings › Notifications', () => {
-  it('shows the switch, not asked yet, blocked, a plain http:// address or no notifications at all', () => {
-    expect(browserState('granted', true, true)).toBe('on')
-    expect(browserState('granted', false, true)).toBe('off')
-    expect(browserState('default', true, true)).toBe('ask')
-    expect(browserState('denied', true, true)).toBe('blocked')
-    expect(browserState('unsupported', true, false)).toBe('http')
-    expect(browserState('unsupported', true, true)).toBe('unsupported')
+  it('says whether system notifications are allowed, not asked yet, blocked, impossible on http://, or missing', () => {
+    expect(browserState('granted', true)).toBe('granted')
+    expect(browserState('default', true)).toBe('ask')
+    expect(browserState('denied', true)).toBe('blocked')
+    expect(browserState('unsupported', false)).toBe('http')
+    expect(browserState('granted', false)).toBe('http')
+    expect(browserState('unsupported', true)).toBe('unsupported')
   })
 })
 
@@ -199,5 +205,31 @@ describe('Settings › Notifications’ list (settings-shows)', () => {
     expect(followFailLine('on', 'The Sleuth Files')).toBe('Couldn’t turn on notifications for The Sleuth Files. Check your connection and try again.')
     expect(followFailLine('off', 'The Sleuth Files')).toBe('Couldn’t turn off notifications for The Sleuth Files. Check your connection and try again.')
     expect([followFailure(true, 409), followFailure(true, 500), followFailure(false, 409), followFailure(true, undefined)]).toEqual(['limit', 'on', 'off', 'on'])
+  })
+})
+
+describe('what goes with the switch and the sign-in (review fixes)', () => {
+  it('forgets the banner with the cursor, so an old one doesn’t come back when the switch goes on', () => {
+    const p = personKey('srv-1', 1)
+    saveCursor(p, '10')
+    saveBanner(p, bannerFor([group('The Sleuth Files', [[3, 7]])], '10')!)
+    forgetPlace(p)
+    expect([loadCursor(p), loadBanner(p)]).toEqual([undefined, undefined])
+  })
+  it('shares when a library last changed between tabs', () => {
+    expect(lastLibraryChange()).toBeUndefined()
+    noteLibraryChange(1000)
+    expect(lastLibraryChange()).toBe(1000)
+    localStorage.setItem('wmm.newEpisodes.libraryChangedAt', '5000')
+    expect(lastLibraryChange()).toBe(5000)
+  })
+  it('lets only the person the browser is signed in as now check', () => {
+    expect(signedInHere(1)).toBe(true)
+    noteSignedIn(2)
+    expect(signedInHere(1)).toBe(false)
+    expect(signedInHere(2)).toBe(true)
+    expect(signedInHere(undefined)).toBe(false)
+    noteSignedIn(undefined)
+    expect(signedInHere(1)).toBe(true)
   })
 })

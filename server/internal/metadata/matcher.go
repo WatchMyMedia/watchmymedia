@@ -636,6 +636,9 @@ func recordArrivals(ctx context.Context, q *db.Queries, fileID int64, episodeIDs
 		if err := q.RecordEpisodeArrival(ctx, db.RecordEpisodeArrivalParams{EpisodeID: id, ArrivedAt: db.FormatTime(now), Quiet: quiet}); err != nil {
 			return err
 		}
+		if err := q.AdoptEpisodeArrival(ctx, &id); err != nil {
+			return err
+		}
 	}
 	return nil
 }
