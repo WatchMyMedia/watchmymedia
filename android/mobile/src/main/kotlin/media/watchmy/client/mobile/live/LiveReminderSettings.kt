@@ -101,7 +101,7 @@ internal fun LiveRemindersBlock(enabled: Boolean, tablet: Boolean, modifier: Mod
                 NoteTone.Warn,
                 Modifier.cardInset(tablet = false),
                 action = "Turn on notifications",
-                onAction = { openReminderChannel(context) },
+                onAction = { openReminderNotifications(context) },
             )
         }
         ListRow("Reminder time", subtitle = "How long before a programme starts", minHeight = 44.dp)
@@ -128,7 +128,7 @@ internal fun LiveRemindersBlock(enabled: Boolean, tablet: Boolean, modifier: Mod
         ListRow(
             "Notifications",
             subtitle = "Opens the Live TV reminders channel in Android’s settings",
-            modifier = Modifier.clickable { openReminderChannel(context) },
+            modifier = Modifier.clickable { openReminderNotifications(context) },
             trailing = { RowValue(if (reminders.allowed) "Allowed" else "Off") },
         )
         FootNote(liveReminderSettingsNote(state.leadMinutes))
@@ -143,12 +143,27 @@ private fun remindersAllowed(context: Context): Boolean {
     return channel.importance != NotificationManagerCompat.IMPORTANCE_NONE
 }
 
-/** Android's screen for the reminders channel, or the app's notifications where it has none. */
-internal fun openReminderChannel(context: Context) {
-    val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+/**
+ * Android's screen where reminders are turned on (PLAN-ANDROID-SETTINGS.md
+ * §4.7). With the app's notifications off, as they are on Android 13 and
+ * later until the permission is given, that is the app's notifications
+ * screen: the reminders channel's own screen says the channel is blocked
+ * and its switch does nothing until the app's switch is on. With only the
+ * channel off, it is the channel's screen. The app's screen also stands in
+ * where Android has no channel screen.
+ */
+internal fun openReminderNotifications(context: Context) {
+    val app = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
         .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-        .putExtra(Settings.EXTRA_CHANNEL_ID, LIVE_REMINDER_CHANNEL)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    val intent = if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+        app
+    } else {
+        Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .putExtra(Settings.EXTRA_CHANNEL_ID, LIVE_REMINDER_CHANNEL)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
     runCatching { context.startActivity(intent) }
-        .recoverCatching { context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        .recoverCatching { context.startActivity(app) }
 }
