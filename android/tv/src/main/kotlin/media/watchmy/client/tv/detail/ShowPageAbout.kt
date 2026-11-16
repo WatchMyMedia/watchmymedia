@@ -17,7 +17,16 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
+import media.watchmy.client.model.FOLLOW_TV_LINE
+import media.watchmy.client.model.followLabel
+import media.watchmy.client.model.followSpoken
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -52,8 +61,8 @@ import media.watchmy.client.ui.components.WmmIcons
 
 /**
  * About the show (`section`, past the row): the poster, title, facts and
- * status, the overview, then Mark show watched, Show missing episodes,
- * Request missing seasons and Cast & details. ▲ goes back to the row.
+ * status, the overview, then Notify me, Mark show watched, Show missing
+ * episodes, Request missing seasons and Cast & details. ▲ goes back to the row.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -79,12 +88,25 @@ internal fun About(show: ShowDetail, flags: AboutFlags, vm: ShowPageActions, lib
                 }
             }
             if (show.overview.isNotBlank()) Text(show.overview, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.TextSoft, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 1100.dp))
+            // Notify me, first of the show's buttons (PLAN-NEW-EPISODES.md §7.1, the boards' `tv-bell`), with who notifies under the buttons while it has focus.
+            var bellFocused by remember { mutableStateOf(false) }
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                flags.following?.let { following ->
+                    TvButton(
+                        followLabel(following),
+                        vm::toggleFollow,
+                        nav.focusMemory(memory, "about:follow").onFocusChanged { bellFocused = it.isFocused }
+                            .semantics { contentDescription = followSpoken(following, show.title) },
+                        icon = if (following) WmmIcons.BellFilled else WmmIcons.Bell,
+                        iconTint = if (following) WmmColors.Accent else Color.White,
+                    )
+                }
                 if (flags.canMarkShow) TvButton(markShowLabel(flags.showWatched), { vm.setShowWatched(!flags.showWatched) }, nav.focusMemory(memory, "about:mark"), enabled = !flags.acting)
                 if (flags.canShowMissing) TvButton(missingEpisodesLabel(flags.showMissing), { vm.setShowMissing(!flags.showMissing) }, nav.focusMemory(memory, "about:missing"))
                 if (flags.missingSeasons) TvButton("Request missing seasons", { onAsk(ALL_SEASONS) }, nav.focusMemory(memory, "about:request"))
                 TvButton("Cast & details", onDetails, nav.focusMemory(memory, "about:details"), icon = WmmIcons.Info)
             }
+            if (bellFocused && flags.following != null) Text(FOLLOW_TV_LINE, style = inter(19.sp), color = WmmColors.TextMuted)
         }
     }
 }
@@ -98,9 +120,11 @@ internal data class AboutFlags(
     val canShowMissing: Boolean,
     val showMissing: Boolean,
     val missingSeasons: Boolean,
+    /** Notify me: whether the person follows the show; null where the bell is hidden. */
+    val following: Boolean? = null,
 )
 
-internal fun ShowPageViewModel.State.aboutFlags() = AboutFlags(canMarkShow, showWatched, acting, canShowMissing, showMissing, missingSeasons)
+internal fun ShowPageViewModel.State.aboutFlags() = AboutFlags(canMarkShow, showWatched, acting, canShowMissing, showMissing, missingSeasons, following)
 
 /** "2022– · 3 seasons · 24 episodes · Drama · ★ 8.1". */
 private fun showFacts(show: ShowDetail): String {

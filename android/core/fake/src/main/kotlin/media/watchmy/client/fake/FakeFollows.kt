@@ -37,8 +37,8 @@ class FakeFollowsRepository(
     private val switch = MutableStateFlow(true)
     override val notifyHere: StateFlow<Boolean> = switch.asStateFlow()
 
-    /** Follow and unfollow calls refuse while true, for the bell's rollback. */
-    var refuse = false
+    /** Follow, unfollow and remove calls refuse with this status while set: the bell's and the list's failures (409 is the limit). */
+    var refuse: Int? = null
 
     private val events = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
     override val changes: Flow<Unit> = events
@@ -53,7 +53,7 @@ class FakeFollowsRepository(
 
     override suspend fun setFollowing(showId: Long, following: Boolean) {
         call {
-            if (refuse) throw ApiException(500, "The server couldn’t save that.")
+            refuse?.let { throw ApiException(it, "The server couldn’t save that.") }
             val show = FakeData.shows.firstOrNull { it.id == showId } ?: throw ApiException(404, "No such show.")
             val tmdbId = FakeData.tmdbId(showId)
             kept.value = kept.value.filter { it.tmdbId != tmdbId }.let {
@@ -64,7 +64,10 @@ class FakeFollowsRepository(
     }
 
     override suspend fun remove(tmdbId: Long) {
-        call { kept.value = kept.value.filter { it.tmdbId != tmdbId } }
+        call {
+            refuse?.let { throw ApiException(it, "The server couldn’t save that.") }
+            kept.value = kept.value.filter { it.tmdbId != tmdbId }
+        }
         list.value = kept.value
     }
 

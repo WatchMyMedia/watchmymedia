@@ -42,8 +42,8 @@ import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.Artwork
 
 /**
- * About the show: its poster, facts and status, overview, Mark show watched
- * and Request missing seasons, cast and what is on disk. [compact] is the
+ * About the show: its poster, facts and status, overview, Notify me, Mark
+ * show watched and Request missing seasons, cast and what is on disk. [compact] is the
  * tablet's card beside the episode.
  */
 @Composable
@@ -70,6 +70,8 @@ internal fun AboutShow(show: ShowDetail, state: ShowPageViewModel.State, vm: Sho
             }
         }
         if (show.overview.isNotBlank()) Overview(show.overview, collapsedLines = if (compact) 3 else 4)
+        // Notify me, first of the show's actions (PLAN-NEW-EPISODES.md §7.1).
+        state.following?.let { following -> FollowButton(following, show.title, page.onFollow, Modifier.fillMaxWidth()) }
         if (state.canMarkShow) TonalButton(markShowLabel(state.showWatched), { vm.setShowWatched(!state.showWatched) }, Modifier.fillMaxWidth(), enabled = !state.acting)
         if (state.missingSeasons) TonalButton("Request missing seasons", { page.onAsk(ALL_SEASONS) }, Modifier.fillMaxWidth())
         if (compact) {
