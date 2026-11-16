@@ -102,9 +102,9 @@ class FakeFollowsRepository(
         events.tryEmit(Unit)
     }
 
-    /** Home's New from shows you follow: the recently aired episodes of the shows followed. */
+    /** Home's New from shows you follow: the recently aired episodes of the shows followed, as the server lists them, with a file. */
     fun row(cards: List<EpisodeCard>): List<EpisodeCard> =
-        if (!supported) emptyList() else cards.filter { c -> kept.value.any { it.showId == c.showId } && !c.watched }
+        if (!supported) emptyList() else cards.filter { c -> kept.value.any { it.showId == c.showId } && c.hasFile && !c.watched }
 
     private fun seed(): List<FollowedShow> {
         val now = System.currentTimeMillis()

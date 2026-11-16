@@ -621,7 +621,8 @@ fun SettingsScreen(
                     kicker = SHOWS_YOU_FOLLOW,
                     context = show.line(),
                     options = actions,
-                    selected = actions.first(),
+                    // Actions, not a choice: no check; focus starts on the first, Go to show.
+                    selected = null,
                     label = { it.label },
                     onSelect = {
                         overlay = null

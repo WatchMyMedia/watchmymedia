@@ -359,6 +359,8 @@ private fun PhoneOverview(
                 ListRow(
                     row.title,
                     subtitle = row.line,
+                    // A group that needs attention says why in the warning colour (the new-episodes boards' `off`).
+                    subtitleColor = if (row.warn) WmmColors.Warn else WmmColors.TextMuted,
                     minHeight = 60.dp,
                     modifier = Modifier.clickable(onClickLabel = if (row.group == SettingsGroup.ServerSettings) "Open in your browser" else "Open") { onChoose(row.group) },
                     leading = { IconTile(row.group.icon, background = WmmColors.Surface2, tint = WmmColors.TextSoft) },
