@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"database/sql"
+	"embed"
 	"fmt"
 	"net/http"
 	"os"
@@ -65,10 +66,19 @@ func seedRowsLibrary(t testing.TB, conn *sql.DB) (tvLib int64) {
 	return tvLib
 }
 
+// The golden files are compiled into the test binary rather than read from
+// disk: Go's test cache checks files a test opens by modification time, which
+// a fresh checkout resets, so reading them made this package re-run on every
+// CI run. Embedded files are checked by content.
+//
+//go:embed testdata/unarranged_*.json
+var unarrangedGolden embed.FS
+
 // Without arranged=true, Home and the library rows are exactly what they
 // were before rows could be arranged (PLAN-ROWS.md §6.1), byte for byte, so
 // apps that don't know rows see no change. The golden files were written
-// by the code before arranged rows existed (WMM_UPDATE_GOLDEN=1).
+// by the code before arranged rows existed (WMM_UPDATE_GOLDEN=1, which
+// writes them to testdata/ for the next build to embed).
 func TestUnarrangedRepliesUnchanged(t *testing.T) {
 	t.Parallel()
 	srv := newTestServer(t)
@@ -87,14 +97,14 @@ func TestUnarrangedRepliesUnchanged(t *testing.T) {
 		if golden == "home_arranged_false" {
 			golden = "home"
 		}
-		file := filepath.Join("testdata", "unarranged_"+golden+".json")
+		file := "testdata/unarranged_" + golden + ".json"
 		if os.Getenv("WMM_UPDATE_GOLDEN") == "1" && golden == c.name {
-			if err := os.WriteFile(file, res.Body, 0o600); err != nil {
+			if err := os.WriteFile(filepath.FromSlash(file), res.Body, 0o600); err != nil {
 				t.Fatal(err)
 			}
 			continue
 		}
-		want, err := os.ReadFile(file) //nolint:gosec // the test's own golden file
+		want, err := unarrangedGolden.ReadFile(file)
 		if err != nil {
 			t.Fatal(err)
 		}

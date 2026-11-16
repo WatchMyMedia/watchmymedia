@@ -293,6 +293,15 @@ waits on timers runs in a synctest bubble on an in-memory server
   about 0.9 s under the race detector against 30 ms without, and calling
   `db.Migrate` per test made `internal/api` three times slower there. `internal/db`'s own tests, which cannot import it,
   use `openTest` and `migrateTo`.
+- Read fixtures and golden files through `//go:embed`, not `os.ReadFile`.
+  Go's test cache checks the files a test opens by size and modification
+  time, and a fresh checkout gives every file a new one, so `internal/api`,
+  `internal/plex` and `internal/livetv/guide/xmltv` re-ran on every CI run
+  until 2026-11-16 (about 50 s on Windows for `internal/api`). Embedded files
+  are checked by content. A test that rewrites its golden files
+  (`WMM_UPDATE_GOLDEN=1`) still writes them to `testdata/` for the next
+  build to embed; files in `t.TempDir()` are outside the module and don't
+  count.
 - Write a script that stands in for ffmpeg or ffprobe with
   `ffexectest.WriteScript` (`internal/ffexec/ffexectest`), not `os.WriteFile`.
   Linux refuses to run a file a process still has open for writing, and a
