@@ -1,12 +1,19 @@
 package media.watchmy.client.core.playback.player
 
 import android.os.Looper
+import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.test.utils.WebServerDispatcher
 import java.time.Duration
+import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import media.watchmy.client.model.MediaToken
+import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
+import okhttp3.mockwebserver.SocketPolicy
 import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -86,8 +93,52 @@ class ExoMediaPlayerLoadTest {
         assertEquals(404, failure.httpStatus)
     }
 
-    private fun source(url: String) = PlayerSource(
-        url = url, hls = false, live = false, startPositionMs = 0, playWhenReady = true,
+    /**
+     * An event playlist as the server serves it (PLAN-RESUME.md §3.3–§3.5):
+     * live, with EXT-X-START where the asked-for frame is. Its segments never
+     * answer, so the player stays paused on the timeline the playlists give.
+     * The app loads it where the asked-for frame is in the session; Media3
+     * keeps an explicit start, 0 included, over the playlist's default.
+     */
+    @Test
+    fun `an event playlist keeps counting from the stream's start once its head is trimmed`() {
+        val trimmed = AtomicBoolean(false)
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse =
+                if (request.requestUrl?.encodedPath?.endsWith("index.m3u8") == true) {
+                    MockResponse().setHeader("Content-Type", "application/vnd.apple.mpegurl").setBody(eventPlaylist(if (trimmed.get()) 1 else 0))
+                } else {
+                    MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
+                }
+        }
+        val base = server.url("/").toString().trimEnd('/')
+        // The session began on the keyframe 6 s before the frame asked for.
+        player.load(source("$base/api/playback/s1/index.m3u8", hls = true, live = true, playWhenReady = false, startPositionMs = 6_000))
+        val media3 = checkNotNull(player.media3)
+        until("the playlist's timeline") { !media3.currentTimeline.isEmpty && !media3.currentTimeline.getWindow(0, Timeline.Window()).isPlaceholder }
+        assertEquals("The tag is the window's default", 6_000L, media3.currentTimeline.getWindow(0, Timeline.Window()).defaultPositionMs)
+        assertEquals(6_000L, player.positionMs)
+
+        // The server trims the first segment: Media3's window moves on 4 s.
+        trimmed.set(true)
+        until("the trimmed playlist") { media3.currentPosition == 2_000L }
+        assertEquals("Still 6 s into the stream", 6_000L, player.positionMs)
+        player.seekTo(10_000)
+        until("the seek") { player.positionMs == 10_000L }
+        assertEquals(6_000L, media3.currentPosition)
+        assertTrue(failures.isEmpty())
+    }
+
+    /** Eight 4-second segments from [first], with the tag the server would give for a frame 6 s into the session. */
+    private fun eventPlaylist(first: Int): String = buildString {
+        append("#EXTM3U\n#EXT-X-VERSION:7\n")
+        append(String.format(Locale.ROOT, "#EXT-X-START:TIME-OFFSET=%.3f,PRECISE=YES\n", 6.0 - first * 4.0))
+        append("#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:$first\n#EXT-X-INDEPENDENT-SEGMENTS\n#EXT-X-MAP:URI=\"init.mp4\"\n")
+        for (i in first until first + 8) append(String.format(Locale.ROOT, "#EXTINF:4.000000,\nseg%05d.m4s\n", i))
+    }
+
+    private fun source(url: String, hls: Boolean = false, live: Boolean = false, playWhenReady: Boolean = true, startPositionMs: Long = 0) = PlayerSource(
+        url = url, hls = hls, live = live, startPositionMs = startPositionMs, playWhenReady = playWhenReady,
         subtitles = emptyList(), text = TextSelection.Off, audioOrdinal = null, title = "Test card", subtitle = null,
     )
 

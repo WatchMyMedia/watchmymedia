@@ -171,6 +171,13 @@ data class UpNextPrompt(val next: UpNext, val countdownMs: Long?, val totalMs: L
 const val UP_NEXT_COUNTDOWN_MS = 10_000L
 
 /**
+ * How far before the saved position a resume starts, so people pick up the
+ * thread (PLAN-RESUME.md §3.8). The server's resumeMs already starts there;
+ * a device applies it to the positions it keeps itself, for offline plays.
+ */
+const val RESUME_REWIND_MS = 5_000L
+
+/**
  * What the player shows, apart from where it has got to ([PlaybackProgress]).
  * It changes when something on screen should: the status, a prompt, a track,
  * the stream; not with every tick of the position.

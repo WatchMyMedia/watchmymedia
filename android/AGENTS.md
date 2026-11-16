@@ -129,6 +129,14 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   `FakeMediaPlayer` throws the same way; with one dispatcher for both, Live
   TV's Automatic heartbeat read the player inside `withContext(io)` unseen.
   Read the player on the main thread, then call the server.
+- **Event playlists' positions.** The server's event playlists of a file or
+  a recording are live to Media3 (PLAN-RESUME.md §3.5). Media3 gives a live
+  position within the live window, which moves on each time the server trims
+  the playlist's head, so `ExoMediaPlayer` reads and seeks those positions
+  from the stream's start (`windowShiftMs`); Live TV channels (`atLiveEdge`)
+  keep the window's terms. Media3 keeps an explicit start position, 0
+  included, over the playlist's `EXT-X-START` default: a load at 0 starts at
+  the session's start, not near its live edge (`ExoMediaPlayerLoadTest`).
 - **Media3's download service from the background.** On Android 12 and
   later, never start `WmmDownloadService` from a job or receiver: Media3's
   `DownloadService` calls `startForeground` unguarded once a download runs,

@@ -378,6 +378,15 @@ class DownloadRepositoryTest {
     }
 
     @Test
+    fun `an offline play with nothing kept here resumes at the server's resume point, not 5 s before it`() = runTest {
+        val r = repo()
+        r.download(DownloadChoice(42, DownloadQuality.Original))
+        engine.set(RECORD_ID, EngineDownload.State.Completed, 100f, 10)
+        // The download's decision said 120 s: the server's resume point, already 5 s back.
+        assertEquals(120_000L, r.offlinePlay(42)!!.decision.resumeMs)
+    }
+
+    @Test
     fun `an offline play resumes where this device was, with only what was downloaded`() = runTest {
         val r = repo()
         r.download(DownloadChoice(42, DownloadQuality.Original))
@@ -387,7 +396,7 @@ class DownloadRepositoryTest {
         r.mark(42, false)
         r.progress(r.offlinePlay(42)!!, report(600_000, PlayState.Paused))
         val d = r.offlinePlay(42)!!.decision
-        assertEquals(600_000L, d.resumeMs)
+        assertEquals("5 s before where this device was (PLAN-RESUME.md §3.8)", 595_000L, d.resumeMs)
         assertEquals(OfflinePlaybackGateway.OFFLINE_PLAY, d.playId)
         assertNull(d.sessionId)
         assertEquals(listOf("x0"), d.subtitles.map { it.option.id })

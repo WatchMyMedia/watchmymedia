@@ -74,6 +74,32 @@ class HeartbeatTest {
     }
 
     @Test
+    fun aLandedSeekIsReportedAtOnceEvenWhilePaused() {
+        startPlaying()
+        h.advance(60_000)
+        h.controller.pause()
+        h.run()
+        val before = h.gateway.reports.size
+        h.advance(2_000)
+        // Back 30 s while paused: saved within a second, not at the next 30 s beat.
+        h.controller.seekTo(30_000)
+        h.advance(250)
+        assertEquals(before + 1, h.gateway.reports.size)
+        assertEquals(30_000L, h.gateway.reports.last().positionMs)
+        assertEquals(PlayState.Paused, h.states.last())
+        // Scrubbing reports at most once a second, then the pause's own cadence again.
+        h.controller.seekTo(20_000)
+        h.controller.seekTo(10_000)
+        h.advance(500)
+        assertEquals(before + 1, h.gateway.reports.size)
+        h.advance(250)
+        assertEquals(before + 2, h.gateway.reports.size)
+        assertEquals(10_000L, h.gateway.reports.last().positionMs)
+        h.advance(28_000)
+        assertEquals(before + 2, h.gateway.reports.size)
+    }
+
+    @Test
     fun pausingOrStoppingPartwayGoesOnWatchNext() {
         startPlaying()
         h.advance(60_000)

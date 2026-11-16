@@ -538,8 +538,9 @@ func (s *Session) EventPlaylist() ([]byte, error) {
 }
 
 // eventStartTag tells a player to start offsetMs into the playlist, on the
-// frame: without it the playlist reads as live, and Media3 and Safari
-// started near the end of what was prepared (PLAN-RESUME.md §1.3).
+// frame: without it the playlist reads as live, and a player loading it
+// without a start of its own (Safari's native one) begins near the end of
+// what was prepared. Media3 keeps an explicit start, 0 included.
 func eventStartTag(offsetMs int64) string {
 	return fmt.Sprintf("#EXT-X-START:TIME-OFFSET=%.3f,PRECISE=YES\n", float64(max(offsetMs, 0))/1000)
 }

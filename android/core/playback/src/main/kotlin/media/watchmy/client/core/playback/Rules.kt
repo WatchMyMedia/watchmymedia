@@ -53,6 +53,23 @@ internal const val TOKEN_MIN_LIFETIME_MS = 30 * 60_000L
 internal const val EVENT_SEEK_SLACK_MS = 500L
 
 /**
+ * How far before the start asked for an event decision may begin: on the
+ * keyframe before it (PLAN-RESUME.md §3.1). Within it the session plays.
+ */
+internal const val EVENT_START_TOLERANCE_MS = 15_000L
+
+/** A landed seek is reported at once, at most this often while scrubbing (PLAN-RESUME.md §3.6). */
+internal const val SEEK_BEAT_GAP_MS = 1_000L
+
+/**
+ * Whether an event decision already starts at [fileMs], on the keyframe up
+ * to [EVENT_START_TOLERANCE_MS] before it. A server from PLAN-RESUME.md §3.7
+ * starts an event play that asked for no start where it resumes; an older
+ * one started it at 0, and the player asked again.
+ */
+internal fun PlaybackDecision.startsAt(fileMs: Long): Boolean = fileMs - startMs in 0..EVENT_START_TOLERANCE_MS
+
+/**
  * How the player's clock maps onto the file. VOD playlists and direct play
  * start at 0, so file position = player time; an event playlist starts at
  * the decision's startMs.
