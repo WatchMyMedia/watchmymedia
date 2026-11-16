@@ -58,9 +58,9 @@ class NewEpisodeNotifier(private val context: Context) : NewEpisodeNotices {
             val notification = builder()
                 .setContentTitle(group.noticeTitle())
                 .setContentText(group.noticeText())
-                .setContentIntent(activity(group.showId.toInt(), group.link(account)))
+                .setContentIntent(activity(group.tmdbId.toInt(), group.link(account)))
                 .build()
-            notify(manager, tagFor(group.showId), notification)
+            notify(manager, tagFor(group.tmdbId), notification)
         }
         if (notices.more > 0) {
             // It sorts last, after the five.
@@ -111,7 +111,7 @@ class NewEpisodeNotifier(private val context: Context) : NewEpisodeNotices {
         private const val MORE_ID = -1
         private const val ID = 1
 
-        /** A show's notification: one tag a show, so the next check for it replaces it. */
-        internal fun tagFor(showId: Long) = "$TAG:$showId"
+        /** A show's notification: one tag a show (the feed groups by TMDB id), so the next check for it replaces it. */
+        internal fun tagFor(tmdbId: Long) = "$TAG:$tmdbId"
     }
 }

@@ -25,22 +25,21 @@ fun NewEpisodeGroup.noticeTitle(): String = "${if (count == 1) "New episode" els
 /**
  * "S3 E7 · The Long Night" for one (just "S3 E7" without a title); "S3 E7 to
  * E9" for several in a season, "S2 E10 to S3 E2" across two. The feed lists
- * the first five: with more than were listed, the last listed is not the
- * last, so the rest are counted, "S3 E1 to E5 and 5 more" (not on the boards).
+ * the first five, earliest first: with more than were listed, the last
+ * listed is not the last, so it says where they start, "From S3 E1".
  */
 fun NewEpisodeGroup.noticeText(): String {
     val first = episodes.firstOrNull() ?: return shortEpisodeCode(open.season, open.number)
     if (count <= 1) {
         return listOfNotNull(shortEpisodeCode(first.season, first.number), first.title?.takeIf { it.isNotBlank() }).joinToString(" · ")
     }
+    if (count > episodes.size) return "From ${shortEpisodeCode(first.season, first.number)}"
     val last = episodes.last()
-    val span = when {
+    return when {
         last == first -> shortEpisodeCode(first.season, first.number)
         last.season == first.season -> "${shortEpisodeCode(first.season, first.number)} to E${last.number}"
         else -> "${shortEpisodeCode(first.season, first.number)} to ${shortEpisodeCode(last.season, last.number)}"
     }
-    val unlisted = count - episodes.size
-    return if (unlisted > 0) "$span and $unlisted more" else span
 }
 
 /** The notification for the shows past the first five, which opens Home: "4 more shows have new episodes". It has no text. */
@@ -99,17 +98,19 @@ fun stopNotifyingSpoken(show: String): String = "Stop notifying me of new episod
 
 /**
  * A followed show's line: its latest arrival and when, "S3 E7 · 2 days ago";
- * "No new episodes yet"; "Not in the library now" for a show that has left
- * it (in the warning colour).
+ * "No new episodes yet" until one arrives after the person followed it (the
+ * server's latest counts arrivals from before); "Not in the library now" for
+ * a show that has left it (in the warning colour).
  */
 fun FollowedShow.line(today: LocalDate = LocalDate.now(), zone: ZoneId = ZoneId.systemDefault()): String {
     if (gone) return FOLLOW_GONE
-    val latest = latest ?: return "No new episodes yet"
+    val latest = latest?.takeIf { l -> l.arrivedAtMs == null || followedAtMs == null || l.arrivedAtMs >= followedAtMs } ?: return NO_NEW_EPISODES_YET
     val day = latest.arrivedAtMs?.let { formatDay(Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toString(), today) }
     return listOfNotNull(shortEpisodeCode(latest.season, latest.number), day).joinToString(" · ")
 }
 
 const val FOLLOW_GONE = "Not in the library now"
+const val NO_NEW_EPISODES_YET = "No new episodes yet"
 
 /** TalkBack reads a show as one item: "The Sleuth Files, S3 E7 · 2 days ago". */
 fun FollowedShow.spoken(line: String): String = "$title, $line"

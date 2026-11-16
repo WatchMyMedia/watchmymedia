@@ -131,7 +131,7 @@ class NewEpisodesTest {
 
         assertEquals("S2 E10 to S3 E2", group(1, "Copperline", 2 to 10, 3 to 1, 3 to 2).noticeText())
         assertEquals("specials are season 0, unpadded", "S0 E3", group(1, "Copperline", 0 to 3).noticeText())
-        assertEquals("S3 E1 to E5 and 5 more", group(1, "Copperline", 3 to 1, 3 to 2, 3 to 3, 3 to 4, 3 to 5, count = 10).noticeText())
+        assertEquals("more than were listed: where they start", "From S3 E1", group(1, "Copperline", 3 to 1, 3 to 2, 3 to 3, 3 to 4, 3 to 5, count = 10).noticeText())
     }
 
     @Test
@@ -152,5 +152,64 @@ class NewEpisodesTest {
         assertEquals(false, ServerFeatures(FOLLOWS_API_LEVEL - 1).follows)
         assertEquals(true, ServerFeatures(FOLLOWS_API_LEVEL).follows)
         assertEquals(false, FollowsRepository.Unavailable.supported)
+    }
+
+    @Test
+    fun `the card names what can't show, and why`() {
+        val both = NotificationsBlocked(app = true, reminders = true, newEpisodes = true)
+        assertEquals("Live TV reminders and new episodes can’t show on this phone", both.title("phone"))
+        assertEquals("Notifications are off for WatchMyMedia in Android’s settings.", both.text())
+        val follows = NotificationsBlocked(app = false, reminders = false, newEpisodes = true)
+        assertEquals("New episodes can’t show on this tablet", follows.title("tablet"))
+        assertEquals("“New episodes” notifications are off for WatchMyMedia in Android’s settings.", follows.text())
+        val reminders = NotificationsBlocked(app = false, reminders = true, newEpisodes = false)
+        assertEquals("Live TV reminders can’t show on this phone", reminders.title("phone"))
+        assertEquals("“Live TV reminders” notifications are off for WatchMyMedia in Android’s settings.", reminders.text())
+        assertEquals(
+            "“Live TV reminders” and “New episodes” notifications are off for WatchMyMedia in Android’s settings.",
+            NotificationsBlocked(app = false, reminders = true, newEpisodes = true).text(),
+        )
+        assertEquals(false, NotificationsBlocked(app = true, reminders = false, newEpisodes = false).any)
+    }
+
+    @Test
+    fun `Settings says how many shows and whether this device notifies`() {
+        assertEquals("5 shows you follow · this phone notifies you", notificationsSummary(5, notifyHere = true, device = "phone"))
+        assertEquals("1 show you follow · this tablet doesn’t notify you", notificationsSummary(1, notifyHere = false, device = "tablet"))
+        assertEquals("You don’t follow any shows yet", notificationsSummary(0, notifyHere = true, device = "phone"))
+        assertEquals("5 shows", notificationsShort(5, true))
+        assertEquals("5 shows · off", notificationsShort(5, false))
+        assertEquals("None", notificationsShort(0, true))
+        assertEquals("5 shows you follow", notificationsTvSummary(5))
+        assertEquals("1 show you follow", notificationsTvSummary(1))
+        assertEquals("None", notificationsTvSummary(0))
+    }
+
+    @Test
+    fun `a followed show's line is its latest arrival and when`() {
+        val zone = java.time.ZoneOffset.UTC
+        val today = java.time.LocalDate.of(2026, 11, 16)
+        fun at(date: String) = java.time.LocalDate.parse(date).atStartOfDay(zone).toInstant().toEpochMilli() + 3_600_000
+        val show = FollowedShow(1399, "The Sleuth Files", showId = 11, latest = FollowLatest(3, 7, "The Long Night", at("2026-11-14")), followedAtMs = at("2026-10-01"))
+        assertEquals("S3 E7 · 2 days ago", show.line(today, zone))
+        assertEquals("S3 E2 · yesterday", show.copy(latest = FollowLatest(3, 2, null, at("2026-11-15"))).line(today, zone))
+        assertEquals("S4 E1 · Nov 3", show.copy(latest = FollowLatest(4, 1, null, at("2026-11-03"))).line(today, zone))
+        assertEquals("No new episodes yet", show.copy(latest = null).line(today, zone))
+        assertEquals("an arrival from before following", "No new episodes yet", show.copy(followedAtMs = at("2026-11-15")).line(today, zone))
+        assertEquals("Not in the library now", show.copy(showId = null).line(today, zone))
+        assertEquals("The Sleuth Files, S3 E7 · 2 days ago", show.spoken(show.line(today, zone)))
+    }
+
+    @Test
+    fun `the bell and the explainer say what they do`() {
+        assertEquals("Notify me", followLabel(false))
+        assertEquals("Notifications on", followLabel(true))
+        assertEquals("Notify me of new episodes of The Sleuth Files", followSpoken(false, "The Sleuth Files"))
+        assertEquals("Notifications on for The Sleuth Files. Turn them off", followSpoken(true, "The Sleuth Files"))
+        assertEquals("Couldn’t turn on notifications for The Sleuth Files. Check your connection and try again.", followRefused(true, "The Sleuth Files"))
+        assertEquals("When a new episode of The Sleuth Files reaches the library, this tablet shows a notification.", followAskBody("The Sleuth Files", LiveDevice.Tablet))
+        assertEquals("Notifications come about once an hour, and later while the phone is idle. The phone has to be able to reach your server.", newEpisodesLimits(LiveDevice.Phone))
+        assertEquals("Couldn’t stop notifying, so you still follow Copperline. Check your connection.", stopRefused("Copperline", tv = true))
+        assertEquals("The server didn’t answer. Check your connection and try again.", followsFailedLine(null))
     }
 }
