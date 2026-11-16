@@ -34,7 +34,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * @param arrivedAt When its first file was linked to it.
+ * @param arrivedAt When its first file was linked to it, in any library.
  * @param id The episode's ID.
  * @param number
  * @param season
@@ -45,7 +45,7 @@ import kotlinx.serialization.encoding.Encoder
 
 data class NewEpisode (
 
-    /* When its first file was linked to it. */
+    /* When its first file was linked to it, in any library. */
     @SerialName(value = "arrivedAt")
     val arrivedAt: kotlin.String,
 
