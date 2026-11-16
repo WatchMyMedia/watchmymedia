@@ -2045,6 +2045,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/follows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The shows the signed-in person follows */
+        get: operations["listFollows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/follows/{tmdbId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Stop following a show by its TMDB id
+         * @description Works for a show that is no longer in any library, and for one not followed.
+         */
+        delete: operations["removeFollow"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/new-episodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Episodes that arrived for the shows the signed-in person follows
+         * @description What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished since it arrived, with a file still present, at most 7 days ago, grouped by show. An episode arrives once, in whichever library it reaches first, and is listed only when the file it came with was added in the last 7 days (the New badge's measure); a copy in another library, or in a library removed and added again, is not new. Each episode named has a present file, in any library. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out.
+         */
+        get: operations["listNewEpisodes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/preferences": {
         parameters: {
             query?: never;
@@ -3145,6 +3202,27 @@ export interface paths {
          */
         post: operations["deleteShow"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shows/{id}/follow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Follow a show for the signed-in person
+         * @description Following is kept by the show's TMDB id, so it covers the show in every library. Only episodes that arrive from now on count. At most 500 a person: past that the reply is 409.
+         */
+        put: operations["followShow"];
+        post?: never;
+        /** Stop following a show for the signed-in person */
+        delete: operations["unfollowShow"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4798,6 +4876,49 @@ export interface components {
             effective: components["schemas"]["Segment"][];
             /** @description Every stored segment, by start. */
             segments: components["schemas"]["StoredSegment"][];
+        };
+        Follow: {
+            /** Format: date-time */
+            followedAt: string;
+            /** @description The newest episode that arrived for it, announced or not. Absent when none has. */
+            latest?: components["schemas"]["FollowLatest"];
+            /** @description The show, while it is in a library. Absent once it has left every library. */
+            show?: components["schemas"]["FollowedShow"];
+            /** @description The show's title, kept for a show that has left the library. */
+            title: string;
+            /**
+             * Format: int64
+             * @description The show's TMDB id: what removeFollow takes.
+             */
+            tmdbId: number;
+        };
+        FollowLatest: {
+            /** Format: date-time */
+            arrivedAt: string;
+            /** Format: int64 */
+            number: number;
+            /** Format: int64 */
+            season: number;
+            title?: string;
+        };
+        FollowList: {
+            /** @description Newest follow first. */
+            follows: components["schemas"]["Follow"][];
+        };
+        FollowedShow: {
+            /** Format: int64 */
+            id: number;
+            posterPath?: string;
+            title: string;
+        };
+        FollowsChanged: {
+            /** @description Whether the person follows it now. */
+            following: boolean;
+            /**
+             * Format: int64
+             * @description The show's TMDB id, as in listFollows.
+             */
+            tmdbId: number;
         };
         GroupOutputBody: {
             items: components["schemas"]["ActivityHistoryRow"][];
@@ -6557,6 +6678,58 @@ export interface components {
             /** @description "youtube": Key is a YouTube video id, played by YouTube's own player or app. "file": play FileID like any other file. Apps skip sources they don't know. */
             source: string;
         };
+        NewEpisode: {
+            /**
+             * Format: date-time
+             * @description When its first file was linked to it, in any library.
+             */
+            arrivedAt: string;
+            /**
+             * Format: int64
+             * @description The episode's ID.
+             */
+            id: number;
+            /** Format: int64 */
+            number: number;
+            /** Format: int64 */
+            season: number;
+            stillPath?: string;
+            title?: string;
+        };
+        NewEpisodeGroup: {
+            /**
+             * Format: int64
+             * @description How many episodes arrived, which may be more than episodes lists.
+             */
+            count: number;
+            /** @description Earliest first (by season, specials last, then episode), at most 5. */
+            episodes: components["schemas"]["NewEpisode"][];
+            /** @description The earliest of them, for the notification to open. */
+            open: components["schemas"]["NewEpisodeOpen"];
+            show: components["schemas"]["NewEpisodeShow"];
+        };
+        NewEpisodeOpen: {
+            /** Format: int64 */
+            episodeId: number;
+            /** Format: int64 */
+            number: number;
+            /** Format: int64 */
+            season: number;
+        };
+        NewEpisodeShow: {
+            /** Format: int64 */
+            id: number;
+            posterPath?: string;
+            title: string;
+            /** Format: int64 */
+            tmdbId: number;
+        };
+        NewEpisodes: {
+            /** @description Keep it and send it as after next time. An opaque string. */
+            cursor: string;
+            /** @description One a show, the show with the newest arrival first; at most 50. */
+            shows: components["schemas"]["NewEpisodeGroup"][];
+        };
         NextEpisode: {
             /** Format: int64 */
             episodeId: number;
@@ -7958,7 +8131,7 @@ export interface components {
             continue?: components["schemas"]["ContinueItem"][];
             /** @description Style episode. */
             episodes?: components["schemas"]["EpisodeCard"][];
-            /** @description On Home: continue, live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>. */
+            /** @description On Home: continue, followed (from API level 29), live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>. */
             id: string;
             /** @description Styles poster and wide. */
             items?: components["schemas"]["BrowseItem"][];
@@ -8428,6 +8601,8 @@ export interface components {
             /** Format: int64 */
             fileCount: number;
             firstAirDate?: string;
+            /** @description The signed-in person follows the show (followShow). Absent on servers below API level 29. */
+            following?: boolean;
             genres: string[];
             hdr: boolean;
             /** Format: int64 */
@@ -9838,6 +10013,17 @@ export interface operations {
                          * @constant
                          */
                         event: "activity.updated";
+                        /** @description The event ID. */
+                        id?: number | string;
+                        /** @description The retry time in milliseconds. */
+                        retry?: number;
+                    } | {
+                        data: components["schemas"]["FollowsChanged"];
+                        /**
+                         * @description The event name.
+                         * @constant
+                         */
+                        event: "follows.changed";
                         /** @description The event ID. */
                         id?: number | string;
                         /** @description The retry time in milliseconds. */
@@ -13719,6 +13905,97 @@ export interface operations {
             };
         };
     };
+    listFollows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowList"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    removeFollow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The followed show's TMDB id, as in listFollows. */
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listNewEpisodes: {
+        parameters: {
+            query?: {
+                /** @description The cursor from the device's last reply. Without it, the reply has the current cursor and no shows: a device starts from now. */
+                after?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewEpisodes"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     getPreferences: {
         parameters: {
             query?: never;
@@ -16094,6 +16371,66 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeleteResult"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    followShow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The show's ID. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    unfollowShow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The show's ID. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

@@ -114,7 +114,15 @@ type HealthOutput struct {
 // capabilities and channel list carry an ETag and answer 304. Clients read
 // mediaToken when present and else ask createMediaToken; they send waitMs
 // only from this level, as older servers reply at once.
-const APILevel = 28
+// 29: following shows (PLAN-NEW-EPISODES.md §5): PUT and DELETE
+// /shows/{id}/follow and ShowDetail.following; GET /me/follows and DELETE
+// /me/follows/{tmdbId}, by TMDB id, so a show that left the library can
+// still be removed; GET /me/new-episodes?after=<cursor>, the arrivals a
+// device notifies about, grouped by show, with a cursor the device keeps;
+// the follows.changed event to the person's own devices; and Home's built-in
+// row followed ("New from shows you follow", style episode). Apps offer
+// Notify me only from this level.
+const APILevel = 29
 
 // ServerInfo identifies the server to apps before anyone signs in.
 type ServerInfo struct {

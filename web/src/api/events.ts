@@ -5,6 +5,7 @@ import { watchEventInvalidator } from './watch'
 import { invalidatePlexState, plexHistoryEventInvalidator, resetPlexHistoryPages, type PlexHistoryChanged } from './plex'
 import { authScope } from '../lib/authScope'
 import { invalidatePersonalLiveTV, invalidateRecordings, invalidateRowsAndLists } from './queries'
+import { invalidateFollows } from './follows'
 
 export type ScanProgress = components['schemas']['ScanProgress']
 export type ScanFinished = components['schemas']['ScanFinished']
@@ -56,6 +57,20 @@ export function onPlayStopped(fn: (e: ActivityStopped) => void): () => void {
   }
 }
 
+const libraryListeners = new Set<(reason: 'changed' | 'reopened') => void>()
+
+/**
+ * Calls fn whenever a library's contents change (library.changed), and when
+ * the stream comes back after a drop, which may have hidden one; returns the
+ * unsubscribe function.
+ */
+export function onLibraryChanged(fn: (reason: 'changed' | 'reopened') => void): () => void {
+  libraryListeners.add(fn)
+  return () => {
+    libraryListeners.delete(fn)
+  }
+}
+
 function invalidateLibrary(qc: QueryClient, libraryId: number) {
   void qc.invalidateQueries({ queryKey: ['libraries'] })
   void qc.invalidateQueries({ queryKey: ['files', libraryId] })
@@ -84,6 +99,8 @@ function connect(qc: QueryClient) {
       // Discard our manual snapshots without replaying every older page.
       void resetPlexHistoryPages(qc, undefined, authScope())
       void qc.invalidateQueries()
+      // A library may have changed while it was down: new episodes check (PLAN-NEW-EPISODES.md §6.1).
+      libraryListeners.forEach((l) => l('reopened'))
     }
   }
   es.onerror = () => {
@@ -112,7 +129,11 @@ function connect(qc: QueryClient) {
     set({ matches: without(state.matches, r.libraryId), lastMatch: { ...state.lastMatch, [r.libraryId]: { finished: r, at: Date.now() } } })
     void qc.invalidateQueries({ queryKey: ['libraries'] })
   })
-  on<{ libraryId: number }>('library.changed', (e) => invalidateLibrary(qc, e.libraryId))
+  on<{ libraryId: number }>('library.changed', (e) => {
+    invalidateLibrary(qc, e.libraryId)
+    // New episodes are checked for a while after the last change (PLAN-NEW-EPISODES.md §6.1).
+    libraryListeners.forEach((l) => l('changed'))
+  })
   // Plays starting, changing and ending: Now playing refetches; history and
   // statistics change only when a play ends.
   on('activity.started', () => void qc.invalidateQueries({ queryKey: ['activity', 'live'] }))
@@ -144,6 +165,10 @@ function connect(qc: QueryClient) {
   // changed what is on it (PLAN-ROWS.md §6.2, §6.3).
   on('rows.changed', () => invalidateRowsAndLists(qc))
   on('lists.changed', () => invalidateRowsAndLists(qc))
+  // This person followed or stopped following a show, here or on another
+  // device: the bell, Settings › Notifications and Home's row redraw
+  // (PLAN-NEW-EPISODES.md §5.3).
+  on('follows.changed', () => invalidateFollows(qc))
   // A file's seek thumbnails are made (sent to admins): Settings › Transcoding's count moves on.
   on('trickplay.ready', () => void qc.invalidateQueries({ queryKey: ['trickplay'] }))
 }

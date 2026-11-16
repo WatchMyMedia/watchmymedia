@@ -24,14 +24,27 @@ JOIN episodes e ON e.id = w.item_id
 WHERE w.user_id = ? AND w.item_type = 'episode' AND e.show_id = ?;
 
 -- name: MarkSeasonWatched :exec
+-- Marks the season's episodes that can have been watched: those that have
+-- aired by today, and those with a file present. An episode TMDB lists
+-- that hasn't aired and isn't here is left alone, so it is unwatched and
+-- new when it comes (PLAN-NEW-EPISODES.md section 5.4).
 INSERT INTO watch_state (user_id, item_type, item_id, position_ms, completed)
-SELECT ?, 'episode', id, 0, 1 FROM episodes WHERE season_id = ?
+SELECT sqlc.arg(user_id), 'episode', e.id, 0, 1 FROM episodes e
+WHERE e.season_id = sqlc.arg(season_id)
+  AND ((e.air_date <> '' AND e.air_date <= sqlc.arg(today))
+    OR EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files f ON f.id = ef.media_file_id
+        WHERE ef.episode_id = e.id AND f.status = 'present'))
 ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
     completed = 1, position_ms = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
 
 -- name: MarkShowWatched :exec
+-- MarkSeasonWatched for every season of a show, specials included.
 INSERT INTO watch_state (user_id, item_type, item_id, position_ms, completed)
-SELECT ?, 'episode', id, 0, 1 FROM episodes WHERE show_id = ?
+SELECT sqlc.arg(user_id), 'episode', e.id, 0, 1 FROM episodes e
+WHERE e.show_id = sqlc.arg(show_id)
+  AND ((e.air_date <> '' AND e.air_date <= sqlc.arg(today))
+    OR EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files f ON f.id = ef.media_file_id
+        WHERE ef.episode_id = e.id AND f.status = 'present'))
 ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
     completed = 1, position_ms = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
 
@@ -56,9 +69,15 @@ LIMIT ?;
 SELECT item_id FROM watch_state WHERE user_id = ? AND item_type = 'movie' AND completed = 1;
 
 -- name: ListShowWatchedCounts :many
+-- Each show's watched episodes that have a file present, as
+-- ListSeasonWatchedCounts counts them: a show card is watched when they
+-- reach its episodes on disk, so an episode marked watched that never
+-- came can't make up for a new one that did.
 SELECT e.show_id, COUNT(DISTINCT e.id) AS watched
 FROM watch_state w JOIN episodes e ON e.id = w.item_id
 WHERE w.user_id = ? AND w.item_type = 'episode' AND w.completed = 1
+  AND EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files f ON f.id = ef.media_file_id
+      WHERE ef.episode_id = e.id AND f.status = 'present')
 GROUP BY e.show_id;
 
 -- name: NextUnwatchedEpisode :one
@@ -210,6 +229,31 @@ ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
 -- name: ClaimShowWatchGuards :exec
 INSERT INTO watch_guards (user_id, item_type, item_id, owner, revision)
 SELECT sqlc.arg(user_id), 'episode', id, 'local', sqlc.arg(revision) FROM episodes WHERE show_id = sqlc.arg(show_id)
+ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
+    owner = 'local', import_run = NULL, revision = excluded.revision,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
+
+-- name: ClaimMarkedSeasonWatchGuards :exec
+-- The guards for what MarkSeasonWatched marks, and only those: an episode
+-- it leaves alone is not the person's choice, so an import may mark it.
+INSERT INTO watch_guards (user_id, item_type, item_id, owner, revision)
+SELECT sqlc.arg(user_id), 'episode', e.id, 'local', sqlc.arg(revision) FROM episodes e
+WHERE e.season_id = sqlc.arg(season_id)
+  AND ((e.air_date <> '' AND e.air_date <= sqlc.arg(today))
+    OR EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files f ON f.id = ef.media_file_id
+        WHERE ef.episode_id = e.id AND f.status = 'present'))
+ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
+    owner = 'local', import_run = NULL, revision = excluded.revision,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
+
+-- name: ClaimMarkedShowWatchGuards :exec
+-- The guards for what MarkShowWatched marks.
+INSERT INTO watch_guards (user_id, item_type, item_id, owner, revision)
+SELECT sqlc.arg(user_id), 'episode', e.id, 'local', sqlc.arg(revision) FROM episodes e
+WHERE e.show_id = sqlc.arg(show_id)
+  AND ((e.air_date <> '' AND e.air_date <= sqlc.arg(today))
+    OR EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files f ON f.id = ef.media_file_id
+        WHERE ef.episode_id = e.id AND f.status = 'present'))
 ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
     owner = 'local', import_run = NULL, revision = excluded.revision,
     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');

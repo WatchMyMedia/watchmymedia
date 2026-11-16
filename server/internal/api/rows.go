@@ -24,8 +24,10 @@ import (
 
 // newWindow is how long after its newest file arrived an item can carry the
 // New badge. The badge also needs the signed-in person not to have watched
-// it (PLAN-HOME.md section 4); the window alone marks items for no one.
-const newWindow = 7 * 24 * time.Hour
+// it (PLAN-HOME.md section 4); the window alone marks items for no one. An
+// episode's arrival is announced only by a file this new
+// (PLAN-NEW-EPISODES.md section 5.2), so both read the one constant.
+const newWindow = metadata.NewWindow
 
 // BrowseItem is a movie or show as shown on a poster card or grid tile.
 // Files that are not matched yet appear too, as kind "unmatched": one item
@@ -316,11 +318,19 @@ func registerRows(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
-		out, err := homeData(ctx, deps, marks, wantsOf(layout.Rows))
+		want := wantsOf(layout.Rows)
+		out, err := homeData(ctx, deps, marks, want)
 		if err != nil {
 			return nil, err
 		}
-		if out.Rows, err = homeRows(ctx, deps, c, placed, layout.Rows, out, data); err != nil {
+		// New from shows you follow (PLAN-NEW-EPISODES.md 5.5), when drawn.
+		var followed []EpisodeCard
+		if user, ok := auth.UserFrom(ctx); ok && want.followed {
+			if followed, err = followedEpisodes(ctx, deps.Queries, user.ID, time.Now()); err != nil {
+				return nil, err
+			}
+		}
+		if out.Rows, err = homeRows(ctx, deps, c, placed, layout.Rows, out, followed, data); err != nil {
 			return nil, err
 		}
 		out.ContinueWatching, out.RecentlyAddedShows, out.RecentlyAired, out.RecentlyAddedMovies, out.RecentlyReleased = []ContinueItem{}, []BrowseItem{}, []EpisodeCard{}, []BrowseItem{}, []BrowseItem{}

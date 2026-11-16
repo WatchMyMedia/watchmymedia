@@ -274,7 +274,7 @@ test: ## Run Go tests and the web typecheck
 
 bench: ## Time history, home and DVR queries over large fixtures, failing over budget
 	cd server && WMM_ACTIVITY_PLAYS=250000 WMM_ACTIVITY_STRICT=1 go test ./internal/activity -run TestHistorySpeed -count=1 -v
-	cd server && WMM_HOME_STRICT=1 go test ./internal/api -run TestHomeSpeed -count=1 -v
+	cd server && WMM_HOME_STRICT=1 go test ./internal/api -run 'TestHomeSpeed|TestNewEpisodesSpeed' -count=1 -v
 	cd server && WMM_DVR_STRICT=1 go test ./internal/livetv/dvr -run TestDVRSpeed -count=1 -v
 
 server-deps: ## Report the server's outdated Go modules, Go version and pinned tools; UPDATE=patch|minor updates them and runs the checks

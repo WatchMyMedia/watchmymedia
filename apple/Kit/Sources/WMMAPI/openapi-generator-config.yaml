@@ -36,6 +36,11 @@ filter:
     - listLibraries
     - listLibraryItems
     - getShow
+    - followShow
+    - unfollowShow
+    - listFollows
+    - removeFollow
+    - listNewEpisodes
     - getSeason
     - getMovie
     - search

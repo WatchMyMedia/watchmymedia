@@ -1,8 +1,10 @@
-// WatchMyMedia's Live TV reminders (PLAN-LIVE-TV-GUIDE.md §6.5). An open
-// WatchMyMedia tab shows each reminder through this worker
-// (ServiceWorkerRegistration.showNotification works where new Notification()
-// doesn't, such as Android Chrome); choosing one opens its channel. The
-// worker handles no fetches, so nothing of the app is cached or served from it.
+// WatchMyMedia's Live TV reminders (PLAN-LIVE-TV-GUIDE.md §6.5) and
+// new-episode notices (PLAN-NEW-EPISODES.md §7.5). An open WatchMyMedia tab
+// shows each through this worker (ServiceWorkerRegistration.showNotification
+// works where new Notification() doesn't, such as Android Chrome); choosing
+// one opens its channel, its show's page or Home, in a tab already open when
+// there is one (the page's listener takes only those paths). The worker
+// handles no fetches, so nothing of the app is cached or served from it.
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))

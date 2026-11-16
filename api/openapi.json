@@ -3457,6 +3457,119 @@
         ],
         "type": "object"
       },
+      "Follow": {
+        "additionalProperties": false,
+        "properties": {
+          "followedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "latest": {
+            "$ref": "#/components/schemas/FollowLatest",
+            "description": "The newest episode that arrived for it, announced or not. Absent when none has."
+          },
+          "show": {
+            "$ref": "#/components/schemas/FollowedShow",
+            "description": "The show, while it is in a library. Absent once it has left every library."
+          },
+          "title": {
+            "description": "The show's title, kept for a show that has left the library.",
+            "type": "string"
+          },
+          "tmdbId": {
+            "description": "The show's TMDB id: what removeFollow takes.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tmdbId",
+          "title",
+          "followedAt"
+        ],
+        "type": "object"
+      },
+      "FollowLatest": {
+        "additionalProperties": false,
+        "properties": {
+          "arrivedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "number": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "season": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "season",
+          "number",
+          "arrivedAt"
+        ],
+        "type": "object"
+      },
+      "FollowList": {
+        "additionalProperties": false,
+        "properties": {
+          "follows": {
+            "description": "Newest follow first.",
+            "items": {
+              "$ref": "#/components/schemas/Follow"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "follows"
+        ],
+        "type": "object"
+      },
+      "FollowedShow": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "posterPath": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "type": "object"
+      },
+      "FollowsChanged": {
+        "additionalProperties": false,
+        "properties": {
+          "following": {
+            "description": "Whether the person follows it now.",
+            "type": "boolean"
+          },
+          "tmdbId": {
+            "description": "The show's TMDB id, as in listFollows.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tmdbId",
+          "following"
+        ],
+        "type": "object"
+      },
       "GroupOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -8121,6 +8234,142 @@
         ],
         "type": "object"
       },
+      "NewEpisode": {
+        "additionalProperties": false,
+        "properties": {
+          "arrivedAt": {
+            "description": "When its first file was linked to it, in any library.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "The episode's ID.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "number": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "season": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "stillPath": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "season",
+          "number",
+          "arrivedAt"
+        ],
+        "type": "object"
+      },
+      "NewEpisodeGroup": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "description": "How many episodes arrived, which may be more than episodes lists.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "episodes": {
+            "description": "Earliest first (by season, specials last, then episode), at most 5.",
+            "items": {
+              "$ref": "#/components/schemas/NewEpisode"
+            },
+            "type": "array"
+          },
+          "open": {
+            "$ref": "#/components/schemas/NewEpisodeOpen",
+            "description": "The earliest of them, for the notification to open."
+          },
+          "show": {
+            "$ref": "#/components/schemas/NewEpisodeShow"
+          }
+        },
+        "required": [
+          "show",
+          "count",
+          "episodes",
+          "open"
+        ],
+        "type": "object"
+      },
+      "NewEpisodeOpen": {
+        "additionalProperties": false,
+        "properties": {
+          "episodeId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "number": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "season": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "episodeId",
+          "season",
+          "number"
+        ],
+        "type": "object"
+      },
+      "NewEpisodeShow": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "posterPath": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "tmdbId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "tmdbId",
+          "title"
+        ],
+        "type": "object"
+      },
+      "NewEpisodes": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "description": "Keep it and send it as after next time. An opaque string.",
+            "type": "string"
+          },
+          "shows": {
+            "description": "One a show, the show with the newest arrival first; at most 50.",
+            "items": {
+              "$ref": "#/components/schemas/NewEpisodeGroup"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "cursor",
+          "shows"
+        ],
+        "type": "object"
+      },
       "NextEpisode": {
         "additionalProperties": false,
         "properties": {
@@ -11794,7 +12043,7 @@
             "type": "array"
           },
           "id": {
-            "description": "On Home: continue, live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:\u003cid\u003e.",
+            "description": "On Home: continue, followed (from API level 29), live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:\u003cid\u003e.",
             "type": "string"
           },
           "items": {
@@ -12974,6 +13223,10 @@
           },
           "firstAirDate": {
             "type": "string"
+          },
+          "following": {
+            "description": "The signed-in person follows the show (followShow). Absent on servers below API level 29.",
+            "type": "boolean"
           },
           "genres": {
             "items": {
@@ -15739,6 +15992,39 @@
                           "event"
                         ],
                         "title": "Event activity.updated",
+                        "type": "object"
+                      },
+                      {
+                        "properties": {
+                          "data": {
+                            "$ref": "#/components/schemas/FollowsChanged"
+                          },
+                          "event": {
+                            "const": "follows.changed",
+                            "description": "The event name.",
+                            "type": "string"
+                          },
+                          "id": {
+                            "description": "The event ID.",
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "retry": {
+                            "description": "The retry time in milliseconds.",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "data",
+                          "event"
+                        ],
+                        "title": "Event follows.changed",
                         "type": "object"
                       },
                       {
@@ -21954,6 +22240,120 @@
         ]
       }
     },
+    "/api/me/follows": {
+      "get": {
+        "operationId": "listFollows",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "The shows the signed-in person follows",
+        "tags": [
+          "follows"
+        ]
+      }
+    },
+    "/api/me/follows/{tmdbId}": {
+      "delete": {
+        "description": "Works for a show that is no longer in any library, and for one not followed.",
+        "operationId": "removeFollow",
+        "parameters": [
+          {
+            "description": "The followed show's TMDB id, as in listFollows.",
+            "in": "path",
+            "name": "tmdbId",
+            "required": true,
+            "schema": {
+              "description": "The followed show's TMDB id, as in listFollows.",
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Stop following a show by its TMDB id",
+        "tags": [
+          "follows"
+        ]
+      }
+    },
+    "/api/me/new-episodes": {
+      "get": {
+        "description": "What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished since it arrived, with a file still present, at most 7 days ago, grouped by show. An episode arrives once, in whichever library it reaches first, and is listed only when the file it came with was added in the last 7 days (the New badge's measure); a copy in another library, or in a library removed and added again, is not new. Each episode named has a present file, in any library. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out.",
+        "operationId": "listNewEpisodes",
+        "parameters": [
+          {
+            "description": "The cursor from the device's last reply. Without it, the reply has the current cursor and no shows: a device starts from now.",
+            "explode": false,
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "description": "The cursor from the device's last reply. Without it, the reply has the current cursor and no shows: a device starts from now.",
+              "maxLength": 20,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewEpisodes"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Episodes that arrived for the shows the signed-in person follows",
+        "tags": [
+          "follows"
+        ]
+      }
+    },
     "/api/me/preferences": {
       "get": {
         "operationId": "getPreferences",
@@ -25089,6 +25489,79 @@
         "summary": "Delete a show in the Sonarrs that hold it",
         "tags": [
           "delete"
+        ]
+      }
+    },
+    "/api/shows/{id}/follow": {
+      "delete": {
+        "operationId": "unfollowShow",
+        "parameters": [
+          {
+            "description": "The show's ID.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "The show's ID.",
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Stop following a show for the signed-in person",
+        "tags": [
+          "follows"
+        ]
+      },
+      "put": {
+        "description": "Following is kept by the show's TMDB id, so it covers the show in every library. Only episodes that arrive from now on count. At most 500 a person: past that the reply is 409.",
+        "operationId": "followShow",
+        "parameters": [
+          {
+            "description": "The show's ID.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "The show's ID.",
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Follow a show for the signed-in person",
+        "tags": [
+          "follows"
         ]
       }
     },

@@ -83,6 +83,16 @@ type Episode struct {
 	Rating     *float64 `json:"rating"`
 }
 
+type EpisodeArrival struct {
+	ID        int64  `json:"id"`
+	TmdbID    int64  `json:"tmdb_id"`
+	Season    int64  `json:"season"`
+	Number    int64  `json:"number"`
+	EpisodeID *int64 `json:"episode_id"`
+	ArrivedAt string `json:"arrived_at"`
+	Quiet     int64  `json:"quiet"`
+}
+
 type EpisodeFile struct {
 	EpisodeID   int64 `json:"episode_id"`
 	MediaFileID int64 `json:"media_file_id"`
@@ -750,6 +760,14 @@ type Show struct {
 	ContentRating *string  `json:"content_rating"`
 	PosterTmdb    *string  `json:"poster_tmdb"`
 	PosterSource  string   `json:"poster_source"`
+}
+
+type ShowFollow struct {
+	UserID       int64  `json:"user_id"`
+	TmdbID       int64  `json:"tmdb_id"`
+	Title        string `json:"title"`
+	SinceArrival int64  `json:"since_arrival"`
+	CreatedAt    string `json:"created_at"`
 }
 
 type Trickplay struct {

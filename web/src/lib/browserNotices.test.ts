@@ -81,3 +81,48 @@ describe('permission', () => {
     expect(await n.showReminder({ title: 't', body: 'b', tag: 'k' })).toBe(false)
   })
 })
+
+describe('a notification chosen in an open tab', () => {
+  function worker() {
+    const listeners = new Set<(e: MessageEvent) => void>()
+    vi.stubGlobal('window', { isSecureContext: true, Notification: {} })
+    vi.stubGlobal('Notification', { permission: 'granted' })
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        addEventListener: (_: string, fn: (e: MessageEvent) => void) => listeners.add(fn),
+        removeEventListener: (_: string, fn: (e: MessageEvent) => void) => listeners.delete(fn),
+      },
+    })
+    return (data: unknown) => listeners.forEach((fn) => fn({ data } as MessageEvent))
+  }
+  it('opens a channel, a show’s page and Home, and nothing else', async () => {
+    const post = worker()
+    const n = await import('./browserNotices')
+    const open = vi.fn()
+    const stop = n.onReminderOpened(open)
+    post({ type: 'wmm.open', path: '/live-tv/watch/c1' })
+    post({ type: 'wmm.open', path: '/shows/12/seasons/3/episodes/456' })
+    post({ type: 'wmm.open', path: '/' })
+    post({ type: 'wmm.open', path: '/settings/account' })
+    post({ type: 'wmm.open', path: 'https://example.com/shows/1' })
+    post({ type: 'other', path: '/shows/1' })
+    expect(open.mock.calls.map((c) => c[0])).toEqual(['/live-tv/watch/c1', '/shows/12/seasons/3/episodes/456', '/'])
+    stop()
+    post({ type: 'wmm.open', path: '/shows/1' })
+    expect(open).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('locks', () => {
+  it('new episodes hold their own lock, so one tab can hold both', async () => {
+    const names: string[] = []
+    vi.stubGlobal('navigator', { locks: { request: (name: string, _o: unknown, fn: () => Promise<void>) => { names.push(name); void fn(); return Promise.resolve() } } })
+    const n = await import('./browserNotices')
+    const reminders = vi.fn(), episodes = vi.fn()
+    n.holdNotifierLock(reminders)
+    n.holdNotifierLock(episodes, n.NEW_EPISODES_LOCK)
+    expect(names).toEqual(['watchmymedia.live-reminders', 'watchmymedia.new-episodes'])
+    expect(reminders).toHaveBeenCalledOnce()
+    expect(episodes).toHaveBeenCalledOnce()
+  })
+})

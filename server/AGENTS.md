@@ -131,6 +131,10 @@ SQLite plans joins without statistics, and a plan that looks fine after
   of the largest real one (about 2,850 movies, 1,100 shows, 18,700 files),
   with ten 250-entry lists and three library lists on Home, and times each
   page alone and the web Home's requests as one burst, arranged and not;
+  `TestNewEpisodesSpeed` (`internal/api/follows_speed_test.go`) adds 500
+  follows and a week of arrivals to it and times the new-episodes feed, the
+  follows list and Home's followed row, alone and ten at once, and fails
+  when their plans read a whole table;
   `internal/activity`'s speed test seeds plays; `internal/livetv/dvr` measures list and guide-mark bursts over 10,000 recordings without statistics. `make bench` fails over budget;
   plain `go test` runs smaller versions with looser budgets. Name such a
   test `Test...Speed`: CI's `server` and `windows-server` jobs skip `Speed$` in the
@@ -139,11 +143,29 @@ SQLite plans joins without statistics, and a plan that looks fine after
   `TestHistorySpeed` went over its budget (PR #16, 2026-11-12) though alone
   it has six times the room.
 
+**Episode links and arrivals.** Link files to episodes only through
+`Matcher.record` (`internal/metadata/matcher.go`): in the same transaction it
+records each episode's arrival in `episode_arrivals`, which people
+following the show are told about
+([PLAN-NEW-EPISODES.md](../PLAN-NEW-EPISODES.md) §5.2). An arrival belongs
+to the TMDB episode (show TMDB id, season, number), not the episode row, so
+it is made once across libraries, the first time any file is linked to
+it, and outlives a library removed. It is announced only when that file's
+`added_at` is within the New badge's 7 days (`metadata.NewWindow`, which
+`newWindow` in `internal/api` is), and is quiet otherwise. So better
+copies, renames, a 4K library's copy and a library added again are silent,
+old files matched late or moved onto another episode are quiet, and a new
+file fixed onto the right episode is announced. Inserting `episode_files`
+anywhere else skips that.
+
 **Watch state.** Change `watch_state` only through `internal/watchstate`, never
 with its queries directly: each change must also take a revision and leave a
 local guard in the same transaction, or an import can later overwrite the
 user's choice. Deleting a movie or episode deletes its state and guards by
-trigger.
+trigger. `episodes` holds every episode TMDB lists, aired or not, so a bulk
+mark must not mark what can't have been watched: Mark season and Mark show
+watched mark (and guard) only episodes that have aired by today (UTC) or
+have a file present, so a new episode isn't already watched when it comes.
 
 **Migrations.** New numbered files in `internal/db/migrations/` (`000NN_name.sql`)
 with `-- +goose Up` and `-- +goose Down` and a comment saying why. Never edit
