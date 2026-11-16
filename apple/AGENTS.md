@@ -300,6 +300,10 @@ didn't start.
   stack and the next opens nothing. With the app open, iOS shows the
   notification as a banner, and a tap on that reaches the app
   (`UITests/NewEpisodesTests.swift`).
+- The Simulator (iOS 27.2) doesn't keep a `BGAppRefreshTaskRequest`: the
+  submit is logged, then `_simulateLaunchForTaskWithIdentifier` from the
+  debugger says no request has been scheduled. Check background refresh
+  work on a device, and its logic in the Kit (`NewEpisodeChecker`).
 - Run `make apple-e2e` against your own server copy on its own port
   (`E2E_SERVER=localhost:<port>`), not a fixture server another session runs.
 - Typing into the in-app Safari (`SFSafariViewController`) arrives late and

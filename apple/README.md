@@ -499,15 +499,33 @@ Northfield Precinct, Orbital Decay and The Tidewater Array, which has left
 the library; Home has the row; a first check keeps the cursor and the next
 finds Harbor Lights' three episodes and one of Northfield Precinct's
 (`-fakesManyNewEpisodes`: seven shows). `-newEpisodesReset` (debug builds)
-forgets the device's cursor, switch and explainer mark at launch. The
-background task can be started from the debugger while the app is paused:
+forgets the device's cursor, switch and explainer mark at launch. On a
+device, the background task can be started from the debugger while the app
+is paused in the background:
 
 ```
 e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"media.watchmy.client.sync"]
 ```
 
+The iOS 27.2 Simulator doesn't keep the request (the app logs its submit,
+then "No task request with identifier media.watchmy.client.sync has been
+scheduled"), so on a simulator bring the app forward instead.
+
 `UITests/NewEpisodesTests.swift` and `TVUITests/NewEpisodesTests.swift` run
 the bell, the explainer, the notifications and Settings on the fakes.
+`UITests/NewEpisodesServerTests.swift` runs them against a real server, one
+step at a time with the server's side done between steps: on a throwaway
+server (its own port and data folder, `WATCHMYMEDIA_UPDATES_ENABLED=false`)
+with a TV library and a small fake TMDB on loopback
+(`WATCHMYMEDIA_TMDB_BASE_URL`), sign in and follow (`test1`), add an
+episode file and scan, wait out the server's two minutes, then open the app
+(`test2`, with `WMM_NE_TITLE`, `WMM_NE_BODY` and `WMM_NE_CODE` saying what
+to expect); `test3` reads Notification Center, `test4` turns the switch
+(`WMM_NE_SWITCH`), `test5` expects nothing (`WMM_NE_ABSENT`) and `test6`
+signs out. Pass the variables to xcodebuild as `TEST_RUNNER_…`, build once
+with `build-for-testing` and run each with `-only-testing` and
+`test-without-building`, on a fresh simulator (the first step expects iOS
+not to have asked for notifications).
 
 ## First run, audio languages and subtitles
 
