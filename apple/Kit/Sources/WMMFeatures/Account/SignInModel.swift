@@ -25,6 +25,10 @@ public final class SignInModel {
     /// Apple TV: the person chose the password form over the code.
     public private(set) var usingPassword = false
 
+    /// iPhone and iPad: the person chose a code from a signed-in device over
+    /// the password form ("Use a code from a signed-in device instead").
+    public private(set) var usingCode = false
+
     public var name = "" {
         didSet { if name != oldValue { error = nil } }
     }
@@ -35,7 +39,11 @@ public final class SignInModel {
 
     public var showPassword = false
     public private(set) var busy = false
-    public private(set) var error: String?
+    public private(set) var error: String? {
+        didSet { if error == nil { errorStatus = nil } }
+    }
+    /// The HTTP status behind ``error``: 401 a wrong name or password, 429 too many tries; nil without one.
+    public private(set) var errorStatus: Int?
 
     /// The pairing under way while ``codeSignIn``; nil before it starts.
     public private(set) var pairing: PairingState?
@@ -75,18 +83,25 @@ public final class SignInModel {
     /// Show the pairing code instead of the form: the server wants a browser
     /// check before a password sign-in, or (Apple TV) the password was not asked
     /// for. Not before the server has an account to approve it with.
-    public var codeSignIn: Bool { !setupRequired && (!passwordAllowed || (pairsByDefault && !usingPassword)) }
+    public var codeSignIn: Bool {
+        !setupRequired && (!passwordAllowed || usingCode || (pairsByDefault && !usingPassword))
+    }
 
-    /// "Sign in with a password instead" (Apple TV): the form, while the server allows passwords.
+    /// "Sign in with a password instead": the form, while the server allows passwords.
     public func usePassword() {
         guard passwordAllowed else { return }
         usingPassword = true
+        usingCode = false
         pairing = nil
     }
 
-    /// "Use a pairing code instead" (Apple TV): back to the code, a fresh one.
+    /// "Use a pairing code instead" on Apple TV, back to the code; "Use a
+    /// code from a signed-in device instead" on iPhone and iPad. A fresh code
+    /// either way; the screen runs ``pair()`` keyed on ``pairingRun``.
     public func usePairingCode() {
+        guard !setupRequired else { return }
         usingPassword = false
+        if !pairsByDefault { usingCode = true }
         error = nil
         newCode()
     }
@@ -123,6 +138,7 @@ public final class SignInModel {
                 pairingRun += 1
             } else {
                 self.error = signInMessage(error)
+                errorStatus = (error as? APIError)?.status
             }
         }
     }

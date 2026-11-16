@@ -18,7 +18,7 @@ extension SettingsModel.DeviceFacts {
 
 /// Launch arguments that reach a state for a screenshot on a simulator, where
 /// nothing can tap (DEBUG builds only): `-settingsPage <page>`, `-signInPairing`,
-/// `-chooseServer`, `-localNetworkDenied`, `-linkTVApprove`, `-editDeviceName`,
+/// `-chooseServer`, `-localNetworkDenied`, `-linkTVApprove`, `-switchServer`,
 /// `-search <query>`.
 enum ScreenshotLaunch {
     /// The value after `flag`, as `-settingsPage playback`.

@@ -30,6 +30,9 @@ final class TestServers: ServerRepository {
     var saved: [SavedServer] = []
     var current: SavedServer?
     var localNetworkDenied = false
+    /// What the last check of the server in use found; nil before one.
+    var reachable: Bool?
+    private(set) var refreshes = 0
 
     var probeResult: Result<Server, any Error> = .failure(APIError(status: nil, message: "Not set up."))
     private(set) var probed: [String] = []
@@ -56,7 +59,7 @@ final class TestServers: ServerRepository {
 
     func localAddress() async -> URL? { nil }
 
-    func refreshCurrent() async {}
+    func refreshCurrent() async { refreshes += 1 }
 }
 
 /// An auth repository whose answers are set by the test; `pair()` plays
@@ -130,6 +133,16 @@ final class ScriptedAuth: AuthRepository {
         var device = try await lookUpPairing(code: code)
         device.approved = true
         return device
+    }
+
+    var changePasswordError: (any Error)?
+    private(set) var passwordChanges: [(current: String, new: String)] = []
+
+    /// Signs the account's other devices out, as the server does.
+    func changePassword(current: String, new: String) async throws {
+        passwordChanges.append((current, new))
+        if let changePasswordError { throw changePasswordError }
+        sessionList.removeAll { !$0.current && $0.userName == user?.name }
     }
 }
 

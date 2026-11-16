@@ -71,11 +71,22 @@ public final class LiveExtrasStore {
     /// The channel list as last indexed, and each channel's star by id (``isFavourite(_:)``).
     @ObservationIgnored private var channelIndex: (channels: [LiveChannel], favourites: [String: Bool]) = ([], [:])
 
-    public init(repository: any LiveTVRepository, now: @escaping @MainActor () -> Date = { Date() }) {
+    /// Remind me's save on Settings › Playback (PLAN-APPLE-SETTINGS.md §3.1).
+    @ObservationIgnored private let saves: SaveStates<SettingKey>
+
+    /// - Parameter sleep: waits out how long Remind me says Saved; tests pass a clock they move.
+    public init(repository: any LiveTVRepository, now: @escaping @MainActor () -> Date = { Date() },
+                savedLinger: Duration = .seconds(4),
+                sleep: @escaping @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
         self.repository = repository
         self.now = now
+        saves = SaveStates(linger: savedLinger, sleep: sleep)
         context = repository.contextID
     }
+
+    /// Where Remind me's last change stands: saving, saved with when
+    /// reminders now come, or failed with the lead it is still.
+    public var leadSave: SaveState { context == repository.contextID ? saves[.reminderLead] : .rest }
 
     /// The server offers favourites, search and reminders with listings.
     public var available: Bool { repository.capabilities?.extrasAvailable == true }
@@ -274,21 +285,28 @@ public final class LiveExtrasStore {
         if isReminded(programme) { await removeReminder(for: programme) } else { await remind(programme, on: channel) }
     }
 
-    /// Settings' lead time, kept on the server for every device.
-    public func setLead(_ minutes: Int) async {
+    /// Settings' lead time, kept on the server for every device. ``leadSave``
+    /// says how it went; `inRow` leaves ``message`` alone, for a page that
+    /// says a failure in Remind me's own row rather than in a pill.
+    public func setLead(_ minutes: Int, inRow: Bool = false) async {
         guard available, LiveReminderLead.choices.contains(minutes), minutes != leadMinutes else { return }
         syncContext()
         generation += 1
         let identity = context, before = lead
         lead = minutes
+        let token = saves.begin(.reminderLead)
         let echo = echoes.expect(.reminders, at: now())
         do {
             try await repository.setReminderLead(minutes: minutes)
+            guard identity == repository.contextID else { return }
+            saves.saved(.reminderLead, token, SettingsWords.reminderLeadSaved(minutes))
         } catch {
             echoes.forget(echo)
-            guard identity == repository.contextID, !(error is CancellationError) else { return }
+            guard identity == repository.contextID else { return }
+            guard !(error is CancellationError) else { return saves.rest(.reminderLead, token) }
             lead = before
-            message = error.displayMessage
+            if !inRow { message = error.displayMessage }
+            saves.failed(.reminderLead, token, saveFailed(error, stillValue: liveLeadChoice(before)))
         }
     }
 
@@ -372,6 +390,7 @@ public final class LiveExtrasStore {
         items = []; lead = LiveReminderLead.standard; listLoaded = false; favourites = [:]; seenProgrammes = [:]
         knownStarts = [:]; previousStarts = [:]; bannersShown = []; echoes = LiveEchoes()
         error = nil; message = nil; reveal = nil; listedThrough = nil; banner = nil; loading = false
+        saves.clearAll()
     }
 }
 

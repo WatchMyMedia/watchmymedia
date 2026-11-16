@@ -72,7 +72,7 @@ import WMMModel
         #expect(liveRemindersComingUp(7) == "7 coming up")
         #expect(liveRemindersComingUp(0) == "None")
         #expect(liveRemindersNote(leadMinutes: 5, device: "iPhone")
-            == "Each comes 5 min before it starts, on every device you’re signed in to; change it in Settings › Live TV. One set on another device reaches this iPhone the next time the app opens.")
+            == "Each comes 5 min before it starts, on every device you’re signed in to; change it in Settings › Playback. One set on another device reaches this iPhone the next time the app opens.")
         #expect(liveRemindersPanelNote(leadMinutes: 5, device: "iPad")
             == "Each comes 5 min before, on every device you’re signed in to. One set elsewhere reaches this iPad the next time the app opens.")
         #expect(liveRemindersTVNote(leadMinutes: 5)

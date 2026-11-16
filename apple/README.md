@@ -148,7 +148,7 @@ filter panel, and Show/Movie details and Search use two panes. Title-sorted
 libraries offer an A–Z index when the server supplies it. In portrait the
 player shows the season below the video; in landscape it fills the screen.
 Audio, Subtitles and Quality open a side panel and keep the video playing.
-Settings keeps server selection and sign-in inside its split view.
+Settings keeps Switch server's steps inside its split view.
 
 The Apple TV app takes the same `-fakes`, `-fakesMember`, `-fakesSignedOut`,
 `-fakesNoServer`, `-tab` and `-open` arguments (`watchmymedia://link` is the
@@ -190,6 +190,39 @@ and runs with the rest in `make apple-tv-test-sim`. Its waits are in
 `TVUITests/Waiting.swift`: XCTest's own look a second late, and they add up
 over a test of many presses. XCUI does not see AVKit's contextual actions,
 so Skip is checked by hand.
+
+Settings on Apple TV (TvSettings2*.dc.html, PLAN-APPLE-SETTINGS.md §3.3 and
+§5.9; `TV/Screens/Settings/`) shows one group at a time: the web's groups in
+its order at the left (Playback, Audio & subtitles, Home rows, Account &
+devices, Your requests, Server, About), each with how things stand under its
+name; the chosen group's page beside them, which scrolls in its own column;
+and at the right a panel that says what the focused setting does. Moving
+along the list chooses a group; Right or Select moves into its page on the
+row it had last, Menu comes back to the list, and Menu again goes to the top
+bar. A choice is a row that opens a menu (Quality, each part of Skipping,
+Remind me), each choice with its line; it saves when it is made and the row
+says Saving, then Saved and what it did, or why it couldn't and what it still
+is. What takes the screen has the path across its top and what the remote
+does along its bottom: Name this Apple TV (room names, and Type another name
+for the keyboard), Add a language (every language by name in a grid that
+scrolls, with Search languages above it for the keyboard or the
+microphone), the codes to scan for Change password and Server settings, and
+Switch server's three steps, which `RootView` keeps above the tabs because a
+switch rebuilds them. Sign-out questions open on the button that keeps
+things, and Menu is that button. The groups and their lines
+(`tvSettingsGroups`), the words, each row's save (`saveState(_:)`,
+`qualitySave`, `deviceNameSave`, `LiveExtrasStore.leadSave`), the dialogs,
+the steps and Switch server's sign-in (`pairsByDefault`, starting on the
+code) are the Kit's; the panel's own text is
+`TV/Screens/Settings/SettingsPanelWords.swift`. `-fakesSaveFails recap`
+(the Kit's, with `:422`, a list, `languages` or `all`) makes a save fail,
+to see a row say why.
+`-settingsGroup playback|languages|homeRows|account|requests|server|about`
+shows a group with focus on it at launch; `-renameDevice`, `-changePassword`,
+`-serverSettingsCode`, `-signOutQuestion`, `-switchServer`,
+`-subtitlesSettings` (with `-addLanguage audio|subtitles`) and
+`-homeRowsSettings` open the rest, in debug builds.
+`TVUITests/SettingsTests.swift` drives them with the remote.
 
 Sorted by title, the Apple TV grid has a letter index down its right edge
 (TvLibraryAZ.dc.html, PLAN-APPLE-REVIEW.md §6.2): right from the last column
@@ -323,6 +356,105 @@ rows. Add `-fakesMember` for a member, who can't delete or refresh the
 household's lists, and `-fakesTwoMovieLibraries` for a server with two movie
 libraries, whose Home movie rows have no See all.
 
+## Settings
+
+Settings follows the web's (PLAN-APPLE-SETTINGS.md): the same groups, names
+and words, a root that is a hub, and one rule for saving. What the views draw
+comes from the Kit (`WMMFeatures/Account/`), so the iPhone, iPad and Apple TV
+apps word and decide alike:
+
+- **The hub.** `settingsHub(model.hubFacts(…))` gives the iPhone and iPad
+  root's groups in the web's order (You, This iPhone, Server, About) with each
+  row's value; rows the server or account doesn't offer are left out.
+  `tvSettingsGroups(_:)` is Apple TV's list beside the page, with the line
+  under each group and its panel. `settingsNextStep(_:)` picks at most one
+  Next step (a language to watch in, then notifications off while reminders
+  are set, which the app passes in); `banner` says the server can't be reached.
+- **Saving.** A switch or a choice kept on the server saves at once and says
+  so in its own row: `SettingsModel.saveState(.skip(.credits))` (and
+  `LiveExtrasStore.leadSave` for Remind me) is rest, saving, saved with what
+  the change did, or failed with the control back at the saved value and
+  named. Saved goes back to rest after four seconds through the sleep the
+  model was given. Anything typed (Rename, Change password) is a sheet with
+  its own model (`RenameModel`, `ChangePasswordModel`).
+- **Words.** `SettingsWords` holds every page's names, ledes, Saved lines,
+  dialogs (`ConfirmWords`, with the person and the numbers) and the pages that
+  aren't offered (`KeptOutWords`, from `keptOutReason(_:server:…)`). Skip's
+  modes are the web's (`SkipMode.label`, in the web's order).
+- **Languages by name.** `LanguageCatalog` (`WMMModel`) is every language the
+  system has locale data for, with the ISO 639-1 ones and pt-BR, pt-PT,
+  zh-Hans, zh-Hant and es-419; `LanguagePicker` searches it, marks what a list
+  holds and says why Add is off at 16. No code is typed.
+- **Tasks with steps.** `LinkTVModel` and `ServerSwitchModel` give each step
+  (`flowStep`: number, name, next), each button's title and why it is off,
+  failures that end in what was or wasn't done (`problem`, `chooseProblem`,
+  `signInProblem`), and the finished screen (`finished`).
+- **Server settings** are the web app's, for admins only:
+  `SettingsModel.loadAdminAccess()` asks GET /api/auth/status and
+  `serverSettingsRow` says whether they open from here. **Change password**
+  calls PUT /api/auth/password; Apple TV shows `changePasswordURL(_:)` as a code.
+- **Refusals on the fakes.** In a debug build `-fakesSaveFails recap` has the
+  fake preferences refuse that save every time, as an unanswered server would
+  (`recap:422` as a newer server would; also a list such as `recap,autoplay`,
+  `languages` or one of its parts, or `all`), and `-fakesPasswordFails 429`
+  (or `401`, `offline`) the next Change password. `AppServices.fake` reads them
+  (`applyFakeRefusals`), so both apps take them.
+
+On iPhone and iPad (`App/Screens/Settings/`; `Settings2*` and `Pad2Settings2*` boards):
+
+- **The root is the hub** (`App/Screens/Settings/SettingsScreen.swift`): the
+  account opens Account & devices, then the Kit's `settingsHub` groups, each
+  row with how things stand at its right; one Next step card under the account
+  when there is something to do (Use English, or Open iOS Settings for
+  reminders), and a banner with Try again when the server can't be reached. On
+  iPad it is the sidebar of a split view and the page stands beside it, in two
+  columns where the page is 680 pt or wider; a compact width shows the
+  iPhone's. There is no Sign out on the root.
+- **Pages** share `Components/Account/SettingsParts.swift`: a line under the
+  title, groups with a note, rows whose own line says how a change went (the
+  Kit's `SaveState` as a `RowLine`: Saving, the Saved line, or why it failed,
+  said to VoiceOver with the system's success or error tap), choices as menus
+  from their row (each choice a `Toggle`, so the menu ticks the chosen one and
+  shows its line), and a red row apart at the bottom for what signs out.
+  A row keeps its value whole at its right and puts it under the title when it
+  can't share the line, and always at the accessibility text sizes.
+- **Playback** holds Quality (this device's), Skipping (a menu per part), Next
+  episode and Live TV reminders, which were pages of their own. **Account &
+  devices** holds this device's name (Rename is a sheet), Change password (a
+  sheet with the system's password fields, naming the devices it signs out),
+  Signed-in devices, Link a TV and Sign out of this iPhone. **Server** offers
+  Switch server, and Server settings to admins only, as the server says they
+  stand here. **Audio & subtitles'** Add language is a sheet of every language
+  by name (the Kit's `LanguagePicker`), to search.
+- **Tasks are sheets** (`Components/Account/TaskSheet.swift`): Cancel, the
+  task's name, the steps bar ("Step 2 of 3"), one filled button at the bottom
+  (Return presses it on a hardware keyboard, Escape is Cancel) and a last step
+  that says what changed and what happens next, closed with Done. Link a TV and
+  Switch server are the two; on iPad Switch server stays in the detail column.
+  Their models live in `AppFlow` (`Shell/RootView.swift`), as the sign-in form
+  does, so a window resized mid-task keeps its step. A sheet with something
+  typed asks before a swipe throws it away (`asksBeforeDismissing`).
+- **Removes ask first** in a dialog from the button that asked (a popover on
+  iPad): signing out another device names it and whose it is, signing out of
+  this one names the downloads it deletes, and Cancel request and Remove all
+  downloads ask too.
+- **A page that isn't offered says why** (`KeptOutPage`): Your requests,
+  Downloads and Audio & subtitles opened by a link or `-settingsPage` when the
+  server or the account keeps them out.
+
+`-settingsPage` takes `playback`, `subtitles`, `account`, `requests`,
+`downloads`, `server`, `inbox` and `about` (and the old `skip`, `liveTV`,
+`thisDevice` and `devices`, which open the page they moved into);
+`-open 'watchmymedia://link?code=K7M4PQ'` opens Link a TV at its second step,
+`-linkTVApprove` at its last; `-settingsPage server -switchServer` starts
+Switch server, whose Sign in offers a code from a signed-in device in place
+of the password (the fakes approve it after a few seconds). The refusals
+above reach a row's failed line and Change password's errors.
+`UITests/SettingsTasksTests.swift` runs both tasks through every step on the
+fakes, with Back and Cancel, a row that saves and one that fails, Rename,
+Change password and its errors, and both sign-outs; on an iPad, a task
+across a window resize and the pages' two columns in landscape.
+
 ## First run, audio languages and subtitles
 
 Empty Home explains whether the server has no libraries, is scanning, could not
@@ -343,7 +475,8 @@ Each change saves at once and sends only what changed: the server gives
 someone who saves their first audio language without ever choosing how
 subtitles start the foreign-audio choice, and the page then says so once. An
 empty list offers the device's language; it is never saved without choosing
-it. A language's Move up, Move down and Remove are in a dialog from its row
+it. Add language opens every language the system can name, to search; a list
+holds 16 and says so when full. A language's Move up, Move down and Remove are in a dialog from its row
 (Apple TV: buttons on its card). Automatic download needs On or the
 foreign-audio choice and a subtitle language; when no local track matches, it
 can download one exact-file hash match in the first subtitle language, subject
@@ -715,6 +848,8 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
   reached the app there, so Escape needs a real keyboard.
 - **A pointer on iPad.** Cards (`CardButtonStyle`) lift and Search's and
   Settings' rows highlight under the pointer, as the system draws it.
+- **Settings' tasks** take Return for their filled button and Escape for
+  Cancel (`keyboardShortcut(.defaultAction)` and `.cancelAction`).
 - **Quick actions and App Shortcuts** (`App/Shell/QuickActions.swift`):
   Continue watching (Home at its top), Search, Live TV when the server offers
   it and Downloads when they are on. Each opens a link published for the
@@ -913,7 +1048,7 @@ lines, enough to fill the code and turn pages (`TVUITests/DiagnosticsTests.swift
 | `Kit/Sources/WMMFakes` | In-memory fakes of every protocol, with the mockups' library and a pretend player (`AppServices.fake()`) |
 | `Kit/Sources/WMMUI` | Brand tokens (`Palette`), `Artwork`, `Badge`, `Tag`, `ProgressStrip`, `WatchedCheck`, `BrandMark`, button styles, `Chip`, `LoadableView` and the empty and error states |
 | `Kit/Sources/WMMTopShelf` | The Apple TV Top Shelf's snapshot in the App Group: its format, what it may hold (`TopShelfRules`), the store, and the sections the system draws. Foundation and TVServices only, so the extension links nothing else |
-| `Kit/Sources/WMMFeatures` | Screen models and navigation, shared with the Apple TV app: `Navigation/` (`Navigator`, `Route`, `AppTab`, `DeepLink`), `Browse/` (Home, Library, Show, Movie, Search), `Account/` (server picker, sign-in and pairing, Settings, Link a TV), `Player/` (the controls' timing, double-tap seek, the scrubber, the picker's wording, and `TVPlayerModel` for the Apple TV's system player) |
+| `Kit/Sources/WMMFeatures` | Screen models and navigation, shared with the Apple TV app: `Navigation/` (`Navigator`, `Route`, `AppTab`, `DeepLink`), `Browse/` (Home, Library, Show, Movie, Search), `Account/` (server picker, sign-in and pairing, Settings with its hub, words and saving states, Link a TV, Switch server, Change password), `Player/` (the controls' timing, double-tap seek, the scrubber, the picker's wording, and `TVPlayerModel` for the Apple TV's system player) |
 | `App/` | The iPhone and iPad app: `Shell/` (app, root flow, tabs, `ServicesFactory`), `Screens/<feature>/` (SwiftUI views; a screen lays itself out for a regular width with `PadLayout` from `Components/Layout.swift`), `Components/Browse` and `Components/Account` (views those screens share) |
 | `TV/` | The Apple TV app, target "WatchMyMedia TV" (tvOS 18+, the same bundle ID for the universal purchase): `Shell/` (app, root flow, the tab bar, `TabPage`, its own `ServicesFactory` with the TV profile), `Screens/<feature>/`, `Components/` (focus, buttons, chips, cards, rows), `Resources/` (the layered icon and Top Shelf images from `brand/`) |
 | `TopShelf/` | The Apple TV app's Top Shelf extension, target "WatchMyMedia TopShelf": `ContentProvider` reads the snapshot (see Top Shelf), its privacy manifest and entitlements |

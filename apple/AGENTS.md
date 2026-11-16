@@ -71,6 +71,16 @@ server, and on iPad in both a regular and a compact width.
   of the whole test bundle at once.
 - **iPhone and Apple TV share no files.** What both need goes in the Kit
   (README explains why `TV/` is separate from `App/`).
+- **Settings' words and saving are the Kit's** (README, Settings). A page
+  draws `SettingsWords`, `settingsHub`, `FlowStep` and the models' lines, and
+  never words a setting itself; a control kept on the server reads its
+  `SaveState` (`SettingsModel.saveState(_:)`, `LiveExtrasStore.leadSave`)
+  rather than a page-wide error. A new such control gets a `SettingKey`, a
+  Saved line that says what the change did and a failed line that names
+  what it is still, with a test that moves the save's sleep.
+- **A 401 that isn't a lost sign-in** (a wrong current password) needs its
+  operation in `ServerAPI.credentialOperations`, or the 401 signs the device
+  out: `changePassword` is there.
 - **The Top Shelf extension links only `WMMTopShelf`** and only reads the
   App Group (README, Top Shelf). Nothing the app writes there may name a
   server address, an image URL, a token or the person: add a field to the
@@ -148,6 +158,47 @@ server, and on iPad in both a regular and a compact width.
     (measured 2026-11-13: one `TabPage` content build per owner redraw, none
     besides), and the model reads in the content would then redraw the owner
     rather than `TabPage` alone.
+  - Apple TV's Settings (`TV/Screens/Settings/SettingsScreen.swift`, the
+    groups beside their page) moves focus the focus engine puts elsewhere:
+    Right from the list lands on the row level with the group, so it goes
+    to the page's remembered row; Left from a page lands on whichever group
+    is level with the row, which would change the page, so it goes to the
+    page's own group; and focus coming back from nil goes to where it was.
+    The view's `@FocusState` is nil while the top bar has focus and while a
+    `Menu`'s choices, a full-screen cover or a question is up, so "from nil"
+    covers all of them. A press made before the move lands goes from where
+    focus was, so a test waits for focus after each press. `MainTabs`
+    leaves Menu at Settings' root to the system (the top bar); the page has
+    its own `onExitCommand` back to the list.
+  - In a SwiftUI `Menu` on Apple TV a `Label { Text; Text } icon:` item
+    drops its second `Text`, so a ticked choice lost its line. A `Toggle`
+    per choice keeps the title and the line and is ticked when on
+    (Settings' `menuRow`). The menu opens with focus on its first choice,
+    not the ticked one. XCUI sees each toggle as an `Other` inside a cell,
+    `isSelected` when ticked. tvOS 27 labels it "title, line" by itself
+    and drops its identifier; tvOS 26.5 keeps the identifier but reads out
+    the title alone, so each toggle sets its `accessibilityLabel` to both.
+    Find a choice by that label (`TVUITests/SettingsTests.swift`).
+    A `Menu`'s own label isn't read out either, so a row that is a `Menu`
+    sets its `accessibilityLabel` and `accessibilityValue`.
+  - On Apple TV, when a focused button's content is replaced (sign-in's
+    "Sign in with a password instead"), focus goes to the new content's
+    `defaultFocus` only if what was replaced was built in the same body.
+    With the pairing pieces moved into views of their own, nothing had
+    focus after the switch (tvOS 27.2 simulator, `BusyFocusTests`), so the
+    pieces sign-in and Switch server share are `@ViewBuilder` functions
+    (`pairingCodeArea(_:)` in `TV/Screens/SignIn/SignInScreen.swift`).
+    Even built in the same body, Switch server's form was left with nothing
+    focused on CI's tvOS 26.5 simulator (never on this Mac's, loaded or
+    not), so it moves focus itself when the way in changes
+    (`onChange(of: signIn.codeSignIn)` in `SwitchServerScreen.swift`).
+  - On tvOS 26.5 focus asked through a `@FocusState` of a view a lazy grid
+    hasn't drawn yet is dropped without a word, and no `onChange` follows
+    (the library grid's Menu from the letter index, once a letter's jump
+    had scrolled the poster away; on a loaded simulator, and on CI). The
+    grid's `focusItem` (`TV/Screens/Library/LibraryScreen.swift`) scrolls
+    the poster in and asks again until focus lands; ask that way wherever
+    focus goes to something that may be off screen.
   - On Apple TV a focused button that becomes disabled keeps focus, dimmed,
     until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
     up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable
@@ -161,6 +212,27 @@ server, and on iPad in both a regular and a compact width.
   - On iPad the toolbar beside the tab bar holds little: a third trailing
     item sends the rest into a ⋯ menu. Put a page's own buttons in its title
     row (the Live TV guide's search, Reminders and Guide/Channels switch).
+- **Settings** (README, Settings; PLAN-APPLE-SETTINGS.md). A task with steps
+  is a sheet in `TaskFrame`, presented from `SettingsTasks` in
+  `SettingsScreen.swift` so both widths share it, with its model kept in
+  `AppFlow` so a resized iPad window keeps the step. `.linkTV` in the
+  Settings tab's path is that sheet, never a pushed page: `MainTabView`
+  leaves it out of the stack's path (`[Route].pushed`) and keeps it when the
+  stack changes the path. A finished Switch server shows its last step until
+  Done (`AppFlow.serverSwitchDone`); only then does `RootView` rebuild the
+  tabs. A sheet that must ask before a swipe throws away what was typed uses
+  `asksBeforeDismissing`: `interactiveDismissDisabled` alone refuses the swipe
+  without saying so, and the helper hears UIKit's attempt through a proxy in
+  front of SwiftUI's own presentation delegate. A choice from a row's menu is
+  a `Toggle` per choice in a `Menu`: it ticks the chosen one and a second
+  `Text` is its line. A page's two columns hold groups in another order than
+  the phone's single column, so a page gives each its own (`SettingsAdaptive`).
+  The words, saving states, steps and dialogs are the Kit's (`SettingsWords`,
+  `SaveState`, `FlowStep`, `ConfirmWords`): a view draws a control's
+  `saveState` as its row's line with `rowLine(rest:)` and disables only that
+  control while it saves, and a new sentence goes into the Kit, not the view.
+  To see or test a refusal on the fakes, launch a debug build with
+  `-fakesSaveFails <part>` or `-fakesPasswordFails <status>`.
 - **Accessibility identifiers.** An `.accessibilityIdentifier` on a container
   that isn't an element (a `VStack`, a `TimelineView`) is given to every
   child, over their own: add `.accessibilityElement(children: .contain)`
@@ -212,7 +284,10 @@ didn't start.
 - Nothing can tap a simulator from a script, so reach screens with launch
   arguments (`-fakes`, `-tab`, `-open watchmymedia://…`, the player's
   `-player…` arguments) and capture with `xcrun simctl io <udid> screenshot`.
-  Screenshots can lag a frame: take another before acting on one.
+  Screenshots can lag a frame: take another before acting on one. A
+  Settings row says Saved for 4 s (`SaveStates.linger`), which a press with
+  the simulator tool followed by its screenshot can outlast: capture with
+  `xcrun simctl io` straight after the press, or read the row in a UI test.
 - Run `make apple-e2e` against your own server copy on its own port
   (`E2E_SERVER=localhost:<port>`), not a fixture server another session runs.
 - Typing into the in-app Safari (`SFSafariViewController`) arrives late and
@@ -224,6 +299,12 @@ didn't start.
 - YouTube's player (the movie trailer screen) needs the network. No video is
   known to refuse embedding reliably, so reach the refused screen with
   `-trailerError 150` in a debug build.
+- On iOS 27 a `.confirmationDialog` is a popover from the view it is
+  attached to, on iPhone as on iPad, and shows no `.cancel` button: tapping
+  outside is the answer that keeps things. A test finds the dialog's buttons
+  inside `app.popovers` (a row's own button can carry the same label) and
+  keeps things with a tap on `app.otherElements["PopoverDismissRegion"]`
+  (`UITests/SettingsTasksTests.swift`).
 - `typeKey` drives a hardware keyboard on the iOS simulator (space, arrows,
   ⌘F: `UITests/KeyboardTests.swift`, on an iPad), but its Escape reached
   neither `onKeyPress`, a cancel action nor a `UIKeyCommand` on iPadOS 27.2:

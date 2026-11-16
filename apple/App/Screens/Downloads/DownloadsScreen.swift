@@ -55,12 +55,6 @@ private struct DownloadsView: View {
         .groundBackground()
         .navigationTitle("Downloads")
         .onAppear { model.refreshStorage() }
-        .alert("Remove all downloads?", isPresented: $model.confirmingRemoveAll) {
-            Button("Cancel", role: .cancel) {}
-            Button("Remove all", role: .destructive) { model.removeAll() }
-        } message: {
-            Text(model.removeAllLine)
-        }
         .messageToast($model.message)
     }
 
@@ -169,6 +163,13 @@ private struct DownloadsView: View {
             if !model.all.isEmpty {
                 Button("Remove all downloads", role: .destructive) { model.confirmingRemoveAll = true }
                     .frame(maxWidth: .infinity)
+                    // Asks from the button (Settings2Confirm.dc.html), with the count on the button and what stays.
+                    .confirmationDialog(removeAll.title, isPresented: $model.confirmingRemoveAll, titleVisibility: .visible) {
+                        Button(removeAll.confirm, role: .destructive) { model.removeAll() }
+                        Button(removeAll.keep, role: .cancel) {}
+                    } message: {
+                        Text(removeAll.message)
+                    }
             }
         } header: {
             Text("Download settings")
@@ -176,6 +177,11 @@ private struct DownloadsView: View {
             Text("Downloads keep going in the background and play until you remove them, even with no connection. Signing out deletes them.")
         }
         .listRowBackground(Palette.surfaceRaised)
+    }
+
+    /// Remove all downloads' question, in the Kit's words (Settings2Confirm.dc.html).
+    private var removeAll: ConfirmWords {
+        SettingsWords.removeAllDownloads(count: model.all.count, bytes: model.usedBytes, device: model.device)
     }
 
     private func row(_ d: OfflineDownload, art: CGSize) -> some View {

@@ -1467,6 +1467,29 @@ extension Components {
                 case urls
             }
         }
+        /// - Remark: Generated from `#/components/schemas/ChangePasswordInputBody`.
+        public struct ChangePasswordInputBody: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ChangePasswordInputBody/current`.
+            public var current: Swift.String
+            /// - Remark: Generated from `#/components/schemas/ChangePasswordInputBody/new`.
+            public var new: Swift.String
+            /// Creates a new `ChangePasswordInputBody`.
+            ///
+            /// - Parameters:
+            ///   - current:
+            ///   - new:
+            public init(
+                current: Swift.String,
+                new: Swift.String
+            ) {
+                self.current = current
+                self.new = new
+            }
+            public enum CodingKeys: String, CodingKey {
+                case current
+                case new
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/ClaimPairingInputBody`.
         public struct ClaimPairingInputBody: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/ClaimPairingInputBody/secret`.

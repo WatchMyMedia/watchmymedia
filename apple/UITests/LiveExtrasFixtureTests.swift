@@ -110,18 +110,23 @@ final class LiveExtrasFixtureTests: XCTestCase {
         // The lead time is the server's preference.
         app.navigationBars.buttons.firstMatch.tap()
         app.buttons["Settings"].firstMatch.tap()
-        let row = app.buttons["settings-liveTV"]
+        // Live TV reminders are Playback's (PLAN-APPLE-SETTINGS.md §4): Remind me is a menu.
+        let row = app.buttons["settings-playback"]
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         // The iPad's Settings sheet keeps its rows disabled while it comes up.
         let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: row)
         XCTAssertEqual(XCTWaiter().wait(for: [enabled], timeout: 10), .completed)
         row.tap()
-        let ten = app.buttons["live-lead-10"]
+        let remind = app.buttons["playback-remind-me"]
+        XCTAssertTrue(remind.waitForExistence(timeout: 10))
+        remind.tap()
+        let ten = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "10 minutes before")).firstMatch
         XCTAssertTrue(ten.waitForExistence(timeout: 10))
         ten.tap()
         try await eventually("the server keeps the lead time") { try await api.leadMinutes() == 10 }
         snap("fixture-lead")
-        app.buttons["live-lead-5"].tap()
+        remind.tap()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "5 minutes before")).firstMatch.tap()
         try await eventually("and back") { try await api.leadMinutes() == 5 }
 
         // A wide iPad's panel beside the grid, with the fixture's listings.

@@ -3,77 +3,394 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Pad2SwitchServer: picker, password and pairing stay in Settings' detail
-/// column. The same model survives a resize to the compact navigation stack.
-struct ServerSwitchSettingsPage: View {
+/// Switch server on iPhone (Settings2SwitchChoose, Settings2SwitchSignIn,
+/// Settings2SwitchDone; PLAN-APPLE-SETTINGS.md §5.6): three steps in a
+/// sheet, Choose a server, Sign in, Switched. A server this device is
+/// already signed in to skips the second. Every failure says you're still on
+/// the first server, and swiping the sheet away is Cancel, which asks first
+/// when something is typed. The model is ``AppFlow``'s, so a window resized
+/// in the middle keeps its place (the iPad's detail column takes it over).
+struct ServerSwitchSheet: View {
     let model: ServerSwitchModel
-    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var askingToStop = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                if let error = model.error { ErrorLine(message: error) }
-                if let signIn = model.signIn {
-                    SignInContent(model: signIn, pane: true, switchingServer: true)
-                        .id(ObjectIdentifier(signIn))
-                    GroupFootnote("Signing in here keeps you signed in on \(model.originalServer.name) too. Settings › Server switches between them.")
-                } else if model.phase == .restoring {
-                    ProgressView("Returning to \(model.originalServer.name)…")
-                        .tint(Palette.gold)
-                        .frame(maxWidth: .infinity, minHeight: 120)
-                } else {
-                    currentServer
-                    PadServerPickerPane(picker: model.picker, title: nil, excludingServerID: model.originalServer.id,
-                                        choose: { await model.choose($0) }, connect: { await model.connectToAddress() })
-                    GroupFootnote("You stay signed in on \(model.originalServer.name); switching back needs no password.")
-                }
-            }
-            .frame(maxWidth: 640, alignment: .leading)
-            .padding(sizeClass.isWide ? 32 : 16)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+        NavigationStack {
+            ServerSwitchSteps(model: model)
         }
-        .scrollDismissesKeyboard(.interactively)
-        .groundBackground()
-        .navigationTitle(model.signIn == nil ? switchServerTitle : "Sign in")
-        .navigationBarTitleDisplayMode(.large)
-        .navigationBarBackButtonHidden()
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    Task {
-                        if model.signIn != nil { await model.backToPicker() } else { await model.cancel() }
-                    }
-                } label: {
-                    Label(model.signIn == nil ? "Server" : switchServerTitle, systemImage: "chevron.left")
-                }
-                .disabled(model.busy)
-            }
-            if model.signIn != nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Cancel") { Task { await model.cancel() } }
-                        .disabled(model.busy)
-                }
+        .taskSheet()
+        .asksBeforeDismissing(when: model.busy || typed) { if !model.busy { askingToStop = true } }
+        .discardDialog(SettingsWords.discardTyped(stays: model.stillOn), isPresented: $askingToStop) { Task { await model.cancel() } }
+    }
+
+    /// An address or a password is typed and nothing is switched yet.
+    private var typed: Bool {
+        guard model.outcome == nil else { return false }
+        return !model.picker.address.isEmpty || model.signIn.map { !$0.password.isEmpty } == true
+    }
+}
+
+/// Pad2SwitchServer: the same steps in Settings' detail column, beside the
+/// sidebar, on the page's colour.
+struct ServerSwitchSettingsPage: View {
+    let model: ServerSwitchModel
+
+    var body: some View {
+        ServerSwitchSteps(model: model)
+            .environment(\.taskGround, Palette.ground)
+    }
+}
+
+/// The step showing. The steps and words are the Kit's (`ServerSwitchModel`, `FlowSteps.swift`).
+private struct ServerSwitchSteps: View {
+    let model: ServerSwitchModel
+    @Environment(AppFlow.self) private var flow
+    @Environment(AppServices.self) private var services
+
+    var body: some View {
+        TaskStepSwitcher(index: model.flowStep.number) {
+            if model.outcome == .switched {
+                switched
+            } else if let signIn = model.signIn {
+                SwitchSignInStep(model: model, signIn: signIn)
+            } else {
+                SwitchChooseStep(model: model)
             }
         }
     }
 
-    private var currentServer: some View {
-        HStack(spacing: 14) {
-            RowIcon(systemImage: "server.rack", style: .gold, size: 40)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(model.originalServer.name)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Palette.text)
-                Text("\(model.originalServer.displayAddress) · \(model.originalServer.versionLabel) · signed in as \(model.originalUser.name)")
-                    .font(.footnote)
-                    .foregroundStyle(Palette.muted)
+    // MARK: Step 3, Switched
+
+    private var switched: some View {
+        TaskFrame(title: switchServerTitle, steps: model.flowStep) {
+            if let words = model.finished(device: deviceFamily(model: services.client.model),
+                                          downloadsKept: !services.downloads.downloads.isEmpty) {
+                TaskDone(words: words)
             }
-            Spacer(minLength: 0)
-            Badge("Current", style: .gold)
+        } actions: {
+            Button(SettingsWords.done) { flow.serverSwitchDone = true }
+                .buttonStyle(PrimaryButtonStyle())
+                .keyboardShortcut(.defaultAction)
+                .accessibilityIdentifier("switch-done")
+        }
+    }
+}
+
+// MARK: Step 1, Choose a server
+
+/// The server in use, then the ones on this network and the remembered ones
+/// (a tap connects, and one signed in already switches at once), and an
+/// address to type.
+private struct SwitchChooseStep: View {
+    let model: ServerSwitchModel
+    @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
+    @FocusState private var addressFocused: Bool
+    @State private var discoveryOwner = UUID()
+
+    private var picker: ServerPickerModel { model.picker }
+
+    var body: some View {
+        TaskFrame(title: switchServerTitle, steps: model.flowStep, heading: ServerSwitchModel.chooseTitle,
+                  cancel: { Task { await model.cancel() } }, problem: problem, busy: model.busy) {
+            current
+            if model.phase == .restoring {
+                ProgressView("Returning to \(model.originalServer.name)…")
+                    .tint(Palette.gold)
+                    .frame(maxWidth: .infinity, minHeight: 80)
+            }
+            SettingsSection(title: onThisNetwork) {
+                if picker.localNetworkDenied {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Local network is off for WatchMyMedia").font(.body.weight(.semibold)).foregroundStyle(Palette.text)
+                        Text("The app can’t look for servers on this network until you allow Local Network in Settings. You can still enter an address below.")
+                            .font(.footnote).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                        Button("Open Settings") { if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) } }
+                            .buttonStyle(GoldTextButtonStyle())
+                    }
+                    .padding(14)
+                } else if found.isEmpty {
+                    HStack(spacing: 12) {
+                        ProgressView().tint(Palette.muted)
+                        Text(lookingForServers).font(.subheadline).foregroundStyle(Palette.muted)
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                } else {
+                    ForEach(found) { serverRow($0) }
+                }
+            }
+            if !remembered.isEmpty {
+                SettingsSection(title: "Remembered") {
+                    ForEach(remembered) { serverRow($0) }
+                }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(enterAnAddressHeading)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Palette.muted)
+                    .padding(.horizontal, 4)
+                    .accessibilityHidden(true)
+                TextField(serverAddressLabel, text: Binding(get: { picker.address }, set: { picker.address = $0 }),
+                          prompt: Text(serverAddressExample).foregroundStyle(Palette.faint))
+                    .font(.body)
+                    .foregroundStyle(Palette.text)
+                    .textContentType(.URL)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.go)
+                    .focused($addressFocused)
+                    .onSubmit(connect)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 50)
+                    .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(fieldBorder, lineWidth: addressFocused || addressWarning != nil ? 2 : 1))
+                    .disabled(model.busy)
+                    .accessibilityIdentifier("switch-address")
+                if let addressWarning {
+                    Text(addressWarning).font(.footnote).foregroundStyle(Palette.warning).fixedSize(horizontal: false, vertical: true).padding(.horizontal, 4)
+                } else {
+                    GroupFootnote(serverAddressNote).padding(.horizontal, 4)
+                }
+            }
+        } actions: {
+            Button(action: connect) {
+                BusyLabel(title: ServerSwitchModel.connectTitle, busy: picker.connecting == ServerPickerModel.addressKey)
+            }
+            .buttonStyle(GhostButtonStyle(height: 50))
+            .disabled(model.busy || model.connectOffReason != nil)
+            .accessibilityHint(model.connectOffReason ?? "")
+            .accessibilityIdentifier("switch-connect")
+        }
+        .onAppear { picker.startDiscovery(owner: discoveryOwner) }
+        .onDisappear { picker.stopDiscovery(owner: discoveryOwner) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { picker.startDiscovery(owner: discoveryOwner) }
+            else if phase == .background { picker.stopDiscovery(owner: discoveryOwner) }
+        }
+    }
+
+    private var found: [ServerPickerModel.Row] { picker.found.filter { $0.id != model.originalServer.id } }
+    private var remembered: [ServerPickerModel.Row] { picker.remembered.filter { $0.id != model.originalServer.id } }
+
+    /// Under the address: it needs https. Why it couldn't connect is the step's problem, above the button.
+    private var addressWarning: String? {
+        picker.showsHTTPSNudge ? httpsNudge : (model.chooseProblem == nil ? picker.addressError : nil)
+    }
+
+    private var fieldBorder: Color {
+        addressWarning != nil ? Palette.warning : addressFocused ? Palette.gold : Palette.outlineStrong
+    }
+
+    /// Why connecting failed, ending in where you still are.
+    private var problem: TaskProblem? {
+        model.chooseProblem.map { TaskProblem(title: $0.title, message: $0.body) }
+    }
+
+    private var current: some View {
+        HStack(spacing: 12) {
+            RowIcon(systemImage: "server.rack", style: .gold, size: 30)
+            RowTitle(title: model.originalServer.name,
+                     line: .plain("\(model.originalServer.displayAddress) · \(model.originalServer.versionLabel) · signed in as \(model.originalUser.name)"))
+            Badge(ServerSwitchModel.current, style: .gold)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.gold.opacity(0.5)))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func serverRow(_ row: ServerPickerModel.Row) -> some View {
+        Button {
+            addressFocused = false
+            Task { await model.choose(row) }
+        } label: {
+            AdaptiveRow {
+                HStack(spacing: 12) {
+                    RowIcon(systemImage: row.kind == .found ? "server.rack" : "globe", style: .neutral, size: 30)
+                    RowTitle(title: row.name, line: row.tooOld ? .failed(row.detail) : .plain(model.detail(for: row)))
+                }
+            } trailing: {
+                if picker.connecting == row.id { ProgressView().tint(Palette.gold) } else { RowChevron() }
+            }
+        }
+        .buttonStyle(SettingsRowStyle())
+        .disabled(model.busy)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("switch-server-\(row.id)")
+    }
+
+    private func connect() {
+        addressFocused = false
+        Task { await model.connectToAddress() }
+    }
+}
+
+// MARK: Step 2, Sign in
+
+/// Signing in to the chosen server: the system's name and password fields
+/// (so the keychain offers to fill them), the pairing card where the server
+/// takes no passwords from apps, or its setup card.
+private struct SwitchSignInStep: View {
+    private enum Field { case name, password }
+
+    let model: ServerSwitchModel
+    @Bindable var signIn: SignInModel
+    @Environment(AppServices.self) private var services
+    @FocusState private var focus: Field?
+
+    var body: some View {
+        TaskFrame(title: switchServerTitle, steps: model.flowStep,
+                  heading: model.signInTitle, lede: model.signInLede,
+                  back: TaskBack(title: ServerSwitchModel.backToServersTitle) { Task { await model.backToPicker() } },
+                  cancel: { Task { await model.cancel() } },
+                  problem: problem, busy: model.busy) {
+            if signIn.setupRequired {
+                SetupCard(model: signIn)
+            } else if signIn.codeSignIn && !signIn.passwordAllowed {
+                // The server takes no passwords from apps: its web page approves the code.
+                PairingCard(model: signIn, family: deviceFamily(model: services.client.model))
+            } else if signIn.codeSignIn {
+                SwitchCodeCard(signIn: signIn, lede: model.codeLede)
+            } else {
+                field("Name", .name) {
+                    TextField("Name", text: $signIn.name)
+                        .textContentType(.username)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.next)
+                        .focused($focus, equals: .name)
+                        .onSubmit { focus = .password }
+                        .accessibilityIdentifier("switch-name")
+                }
+                field("Password", .password, warning: fieldError) {
+                    SecureField("Password", text: $signIn.password)
+                        .textContentType(.password)
+                        .submitLabel(.go)
+                        .focused($focus, equals: .password)
+                        .onSubmit(submit)
+                        .accessibilityIdentifier("switch-password")
+                }
+            }
+            // The other way in (Settings2SwitchSignIn): a code from a signed-in device, or the password again.
+            if let other = model.otherWayTitle {
+                Button(other) {
+                    focus = nil
+                    if signIn.codeSignIn { model.usePassword() } else { model.useCode() }
+                }
+                .buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
+                .disabled(model.busy)
+                .accessibilityIdentifier("switch-other-way")
+            }
+        } actions: {
+            if !signIn.setupRequired && !signIn.codeSignIn {
+                Button(action: submit) {
+                    BusyLabel(title: model.signInTitle, busy: signIn.busy)
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .keyboardShortcut(.defaultAction)
+                .disabled(model.busy || signIn.errorStatus == 429)
+                .accessibilityIdentifier("switch-sign-in")
+                if let reason = model.signInOffReason {
+                    Text(reason).font(.footnote).foregroundStyle(Palette.faint)
+                }
+            }
+        }
+        .task(id: signIn.codeSignIn ? signIn.pairingRun : -1) { await signIn.pair() }
+        .onAppear { if !signIn.codeSignIn && !signIn.setupRequired { focus = signIn.name.isEmpty ? .name : .password } }
+    }
+
+    /// A wrong name or password, under the field.
+    private var fieldError: String? { model.passwordProblem }
+
+    /// Too many tries, another refusal, or the way back failing, above the button.
+    private var problem: TaskProblem? {
+        model.signInProblem.map { TaskProblem(title: $0.title, message: $0.body) }
+    }
+
+    /// A labelled field; a tap anywhere on its box puts the cursor in it.
+    private func field(_ label: String, _ which: Field, warning: String? = nil, @ViewBuilder input: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Palette.muted)
+                .padding(.horizontal, 4)
+                .accessibilityHidden(true)
+            input()
+                .font(.body)
+                .foregroundStyle(Palette.text)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 50)
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(warning != nil ? Palette.warning : Palette.outlineStrong, lineWidth: warning != nil ? 2 : 1))
+                .contentShape(RoundedRectangle(cornerRadius: 12))
+                .onTapGesture { focus = which }
+                .disabled(signIn.busy)
+            if let warning {
+                Text(warning).font(.footnote).foregroundStyle(Palette.warning).fixedSize(horizontal: false, vertical: true).padding(.horizontal, 4)
+            }
+        }
+    }
+
+    private func submit() {
+        focus = nil
+        Task { await signIn.signIn() }
+    }
+}
+
+/// The code to approve from a device signed in to the chosen server, when
+/// the person chose it over the password ("Use a code from a signed-in
+/// device instead"): the code, how long it lasts, a new one, and where to
+/// enter it (`ServerSwitchModel.codeLede`). The step runs the pairing.
+private struct SwitchCodeCard: View {
+    let signIn: SignInModel
+    let lede: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            switch signIn.pairing {
+            case .waiting(let code):
+                CodeBoxes(code: code.code, size: .large, boxBackground: Palette.surface)
+                TimelineView(.periodic(from: .now, by: 10)) { context in
+                    Text(pairingWaitingLine(expiresAt: code.expiresAt, now: context.date))
+                        .font(.footnote)
+                        .foregroundStyle(Palette.muted)
+                        .frame(maxWidth: .infinity)
+                }
+                Button(pairingNewCode) { signIn.newCode() }
+                    .buttonStyle(GoldTextButtonStyle())
+                    .frame(maxWidth: .infinity)
+            case .approved:
+                Label(pairingCodeAccepted, systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Palette.gold)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+            case .expired, .failed:
+                CodeBoxes(code: "", size: .large, dim: true, boxBackground: Palette.surface)
+                if let problem = signIn.pairingProblem { ErrorLine(message: problem) }
+                Button(pairingNewCode) { signIn.newCode() }
+                    .buttonStyle(GhostButtonStyle(height: 46))
+            case .starting, nil:
+                CodeBoxes(code: "", size: .large, dim: true, boxBackground: Palette.surface)
+                HStack(spacing: 8) {
+                    ProgressView().tint(Palette.muted)
+                    Text(pairingGettingCode)
+                }
+                .font(.footnote)
+                .foregroundStyle(Palette.muted)
+                .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            Text(lede)
+                .font(.subheadline)
+                .foregroundStyle(Palette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Palette.gold.opacity(0.5)))
-        .accessibilityElement(children: .combine)
+        .background(Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.separator))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("switch-code")
     }
 }

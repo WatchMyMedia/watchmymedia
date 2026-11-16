@@ -215,15 +215,20 @@ final class LiveExtrasTests: XCTestCase {
         let profile = app.buttons["Settings"].firstMatch
         XCTAssertTrue(profile.waitForExistence(timeout: 20))
         profile.tap()
-        let row = app.buttons["settings-liveTV"]
-        XCTAssertTrue(row.waitForExistence(timeout: 10))
-        XCTAssertTrue(row.label.contains("5 minutes before"), row.label)
-        row.tap()
-        let ten = app.buttons["live-lead-10"]
+        // Live TV reminders are Playback's (PLAN-APPLE-SETTINGS.md §4): Remind me is a menu.
+        let playback = app.buttons["settings-playback"]
+        XCTAssertTrue(playback.waitForExistence(timeout: 10))
+        playback.tap()
+        let remind = app.buttons["playback-remind-me"]
+        XCTAssertTrue(remind.waitForExistence(timeout: 10))
+        XCTAssertEqual(remind.value as? String, "5 minutes before")
+        remind.tap()
+        let ten = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "10 minutes before")).firstMatch
         XCTAssertTrue(ten.waitForExistence(timeout: 10))
         ten.tap()
-        XCTAssertTrue(app.buttons["live-lead-10"].isSelected || any(app, "10 minutes before").exists)
-        XCTAssertTrue(any(app, "Reminders").exists && any(app, "coming up").exists)
+        let chosen = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH %@", "10 minutes before"), object: remind)
+        XCTAssertEqual(XCTWaiter.wait(for: [chosen], timeout: 10), .completed)
+        XCTAssertTrue(app.buttons["playback-reminders"].label.contains("coming up"), app.buttons["playback-reminders"].label)
         snap("settings-live-tv")
     }
 
@@ -237,9 +242,9 @@ final class LiveExtrasTests: XCTestCase {
         let profile = app.buttons["Settings"].firstMatch
         XCTAssertTrue(profile.waitForExistence(timeout: 20))
         profile.tap()
-        XCTAssertTrue(app.buttons["settings-liveTV"].waitForExistence(timeout: 10))
-        app.buttons["settings-liveTV"].tap()
-        let notifications = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Notifications")).firstMatch
+        XCTAssertTrue(app.buttons["settings-playback"].waitForExistence(timeout: 10))
+        app.buttons["settings-playback"].tap()
+        let notifications = app.buttons["playback-notifications"]
         XCTAssertTrue(notifications.waitForExistence(timeout: 10))
         if notifications.label.contains("iOS asks") {
             notifications.tap()

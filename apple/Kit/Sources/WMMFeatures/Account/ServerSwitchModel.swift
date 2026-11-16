@@ -18,6 +18,11 @@ public final class ServerSwitchModel {
     public private(set) var outcome: Outcome?
     public private(set) var signIn: SignInModel?
     public private(set) var error: String?
+    /// The server and account it ended on, once switched.
+    public private(set) var switchedTo: Server?
+    public private(set) var switchedUser: User?
+    /// The server chosen was signed in to already, so Sign in was skipped.
+    public private(set) var skippedSignIn = false
 
     private let servers: any ServerRepository
     private let auth: any AuthRepository
@@ -28,10 +33,15 @@ public final class ServerSwitchModel {
         var valid = true
     }
 
-    public init?(servers: any ServerRepository, auth: any AuthRepository) {
+    /// Sign in starts on the pairing code, as Apple TV's does.
+    public let pairsByDefault: Bool
+
+    /// - Parameter pairsByDefault: Sign in starts on the pairing code (Apple TV), with the password as the other way.
+    public init?(servers: any ServerRepository, auth: any AuthRepository, pairsByDefault: Bool = false) {
         guard let original = servers.current, original.signedIn, let user = auth.user else { return nil }
         self.servers = servers
         self.auth = auth
+        self.pairsByDefault = pairsByDefault
         originalServer = original.server
         originalUser = user
         let permission = SelectionPermission()
@@ -69,8 +79,9 @@ public final class ServerSwitchModel {
         }
         target = current
         phase = .signingIn
-        signIn = SignInModel(servers: servers, auth: auth)
+        signIn = SignInModel(servers: servers, auth: auth, pairsByDefault: pairsByDefault)
         accountChanged()
+        if outcome == .switched { skippedSignIn = true }
     }
 
     /// Called when the repositories change. An unrelated account transition
@@ -124,7 +135,7 @@ public final class ServerSwitchModel {
         } catch {
             self.error = "Couldn't return to \(originalServer.name). \(error.displayMessage)"
             phase = .signingIn
-            signIn = SignInModel(servers: servers, auth: auth)
+            signIn = SignInModel(servers: servers, auth: auth, pairsByDefault: pairsByDefault)
             accountChanged()
         }
     }
@@ -138,6 +149,10 @@ public final class ServerSwitchModel {
     }
 
     private func finish(_ outcome: Outcome) {
+        if outcome == .switched {
+            switchedTo = servers.current?.server
+            switchedUser = auth.user
+        }
         signIn = nil
         self.outcome = outcome
         phase = .finished

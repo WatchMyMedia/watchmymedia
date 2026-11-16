@@ -3,67 +3,67 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings › Server (SettingsServer.dc.html): which server and account,
-/// Admin tools in the web app, and Switch server.
+/// Settings › Server (Settings2Server.dc.html, PLAN-APPLE-SETTINGS.md §5.6):
+/// which server this is, Switch server (a task of three steps), and, for
+/// admins only, Server settings, which opens the web app in Safari. Away from
+/// home it says the web app asks for the password; where the server keeps
+/// admins out away from home, it says so and what to do.
 struct ServerSettingsPage: View {
     let model: SettingsModel
     @Environment(AppFlow.self) private var flow
     @Environment(AppServices.self) private var services
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        List {
+        SettingsScroll(lede: model.serverLede) {
             if let server = model.server {
-                Section {
-                    fact("Name", server.name)
-                    fact("Address", server.displayAddress)
-                    fact("Version", server.versionAndAPI)
-                    fact("Signed in as", signedInAs(model.user))
+                SettingsSection(title: SettingsWords.thisServer) {
+                    FactRow(label: SettingsWords.name, value: server.name)
+                    FactRow(label: SettingsWords.address, value: server.displayAddress)
+                    FactRow(label: SettingsWords.version, value: server.versionAndAPI)
+                    FactRow(label: SettingsWords.signedInAs, value: signedInAs(model.user))
                 }
+            }
 
-                Section {
-                    Button { openURL(server.baseURL) } label: {
-                        HStack(spacing: 12) {
-                            TitleAndDetail(title: "Admin tools", detail: "Libraries, users, activity and server settings")
-                            Spacer(minLength: 8)
+            SettingsSection(title: SettingsWords.anotherServer) {
+                Button { startSwitch() } label: {
+                    LinkRowLabel(title: switchServerTitle)
+                }
+                .buttonStyle(SettingsRowStyle())
+                .accessibilityIdentifier("server-switch")
+            } note: {
+                SectionNote(SettingsWords.switchServerLine)
+            }
+
+            // Server settings: admins only, once the server has said where they stand (§5.6).
+            if let row = model.serverSettingsRow, let server = model.server {
+                SettingsSection(title: SettingsWords.serverSettings) {
+                    Button { openURL(serverSettingsURL(server)) } label: {
+                        AdaptiveRow {
+                            RowTitle(title: row.title, line: .plain(row.detail))
+                        } trailing: {
                             ExternalMark()
                         }
-                        .contentShape(Rectangle())
+                        .opacity(row.enabled ? 1 : 0.45)
                     }
-                    .accessibilityHint("Opens the web app in Safari")
-                    .accountRow()
-                } footer: {
-                    GroupFootnote("Opens the web app on this server. Managing the server stays there; the app is for watching.")
+                    .buttonStyle(SettingsRowStyle())
+                    .disabled(!row.enabled)
+                    .accessibilityHint(row.enabled ? "Opens the web app in Safari" : row.note)
+                    .accessibilityIdentifier("server-settings")
+                } note: {
+                    SectionNote(row.noteIsProblem ? .failed(row.note) : .plain(row.note))
                 }
-            }
-
-            Section {
-                Button { switchServer() } label: {
-                    HStack {
-                        Text(switchServerTitle)
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(Palette.gold)
-                        Spacer()
-                        RowChevron()
-                    }
-                    .contentShape(Rectangle())
-                }
-                .accountRow()
-            } footer: {
-                GroupFootnote("You stay signed in here; switching back needs no password.")
             }
         }
-        .accountList()
-        .navigationTitle("Server")
+        .navigationTitle(SettingsWords.server)
+        .task { await model.loadAdminAccess() }
         .task {
             guard ScreenshotLaunch.has("-switchServer"), !flow.appliedSwitchLaunch else { return }
             flow.appliedSwitchLaunch = true
-            switchServer()
+            startSwitch()
             if let address = ScreenshotLaunch.value(after: "-switchServerAddress"), let switching = flow.serverSwitch {
-                // This Server page is replaced by the switch pane at once.
-                // Its view-scoped task is cancelled then; the debug probe
-                // belongs to the retained switch model instead.
+                // The switch's model outlives this page's task, so the
+                // debug probe belongs to it rather than to this view.
                 Task {
                     switching.picker.address = address
                     await switching.connectToAddress()
@@ -72,25 +72,13 @@ struct ServerSettingsPage: View {
         }
     }
 
-    private func switchServer() {
-        if sizeClass.isWide {
-            flow.serverSwitch = ServerSwitchModel(servers: services.servers, auth: services.auth)
-        } else {
-            flow.choosingServer = true
-        }
-    }
-
-    private func fact(_ label: String, _ value: String) -> some View {
-        LabeledContent {
-            Text(value).foregroundStyle(Palette.muted).multilineTextAlignment(.trailing)
-        } label: {
-            Text(label).font(.body.weight(.medium)).foregroundStyle(Palette.text)
-        }
-        .accountRow()
+    /// Switch server keeps its steps in ``AppFlow``, so a resized window keeps its place.
+    private func startSwitch() {
+        flow.serverSwitch = ServerSwitchModel(servers: services.servers, auth: services.auth)
     }
 }
 
-/// Settings › About this app (SettingsAbout.dc.html): the version, the
+/// Settings › About WatchMyMedia (SettingsAbout.dc.html): the version, the
 /// privacy policy, Diagnostics under Help (Diagnostics.dc.html) and the
 /// credits the data sources ask for.
 struct AboutSettingsPage: View {
@@ -126,7 +114,7 @@ struct AboutSettingsPage: View {
             }
         }
         .accountList()
-        .navigationTitle("About")
+        .navigationTitle(SettingsWords.aboutApp)
     }
 
     private func webLink(_ title: String, _ url: URL) -> some View {
