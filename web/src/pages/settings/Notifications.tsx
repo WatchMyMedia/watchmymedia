@@ -35,50 +35,62 @@ export function NotificationsSettings() {
   )
 }
 
-const blockedWords: Partial<Record<BrowserState, [string, string]>> = {
-  blocked: ['Notifications are blocked for this site.', 'Allow them in your browser’s site settings.'],
+// In-tab notices need no permission, so blocked and missing notifications
+// say they still come. The second line of each is the web's own, not on
+// the boards: blocked adds it to the boards' line; a browser without
+// notifications (Safari on an iPhone outside a Home Screen app) isn't drawn.
+const STILL_IN_TAB = 'New episodes still show as a banner while WatchMyMedia is open in a tab.'
+const stateWords: Partial<Record<BrowserState, [string, string]>> = {
+  blocked: ['Notifications are blocked for this site.', `Allow them in your browser’s site settings. ${STILL_IN_TAB}`],
   http: ['This browser can’t show notifications from a plain http:// address.', 'Open WatchMyMedia over HTTPS to get them.'],
-  // Not on the boards: a browser with no notifications at all, such as Safari on an iPhone outside a Home Screen app.
-  unsupported: ['This browser can’t show notifications.', 'Your other devices still notify you, and new episodes show on Home.'],
+  unsupported: ['This browser can’t show notifications.', STILL_IN_TAB],
 }
 
 /**
- * The switch: on by default once the browser allows notifications. Not
- * asked yet, it shows off, and turning it on asks the browser at once.
- * Blocked, on a plain http:// address or without notifications, a message
- * says why in place of a working switch, and the limits line is left out.
+ * The switch: on by default, for this person in this browser. It governs
+ * the banner in a tab in front, which needs no permission, and a hidden
+ * tab's system notifications, which do. Not asked yet, turning it on asks
+ * the browser at once, and while it is on a line offers to ask. Not now or
+ * Block leaves it on. Blocked or without notifications, a message says the
+ * banner still comes; on a plain http:// address nothing can show, so the
+ * switch can't be changed and the limits line is left out.
  */
 function ThisBrowser() {
   const person = usePerson()
   const permission = useNotifyPermission()
   const on = useNotifySwitch(person)
   const [asking, setAsking] = useState(false)
-  const state = browserState(permission, on, typeof window !== 'undefined' && window.isSecureContext)
-  const why = blockedWords[state]
+  const state = browserState(permission, typeof window !== 'undefined' && window.isSecureContext)
+  const why = stateWords[state]
+  const ask = () => {
+    setAsking(true)
+    void askForNewEpisodes(person).finally(() => setAsking(false))
+  }
   const change = (next: boolean) => {
     if (!person) return
-    if (state === 'ask') {
-      if (!next) return
-      setAsking(true)
-      void askForNewEpisodes(person).finally(() => setAsking(false))
-      return
-    }
     setNotifySwitch(person, next)
     newEpisodesChanged()
+    if (next && state === 'ask') ask()
   }
   return (
     <div className="space-y-2.5">
       {why && <Message tone="warn" title={why[0]}>{why[1]}</Message>}
       <Card>
-        <div className={`flex items-center gap-4 px-5 py-3.5 ${why ? 'opacity-55' : ''}`}>
+        <div className={`flex items-center gap-4 px-5 py-3.5 ${state === 'http' ? 'opacity-55' : ''}`}>
           <div className="min-w-0 flex-1">
             <h4 className="font-medium">New episodes</h4>
             <p className="mt-0.5 text-sm text-neutral-400">A notification when a show you follow gets a new episode</p>
           </div>
-          <Switch label="New episodes" checked={state === 'on'} disabled={!!why || asking || !person} onChange={change} />
+          <Switch label="New episodes" checked={state !== 'http' && on} disabled={state === 'http' || asking || !person} onChange={change} />
         </div>
       </Card>
-      {!why && <p className="text-[13.5px] text-neutral-400">Only while WatchMyMedia is open in a tab.</p>}
+      {state === 'ask' && on && (
+        // Not on the boards: the switch is on by default, so asking needs its own button.
+        <Message actions={<Button small busy={asking} onClick={ask}>Allow notifications</Button>}>
+          Allow notifications to hear about new episodes from a background tab too.
+        </Message>
+      )}
+      {(state === 'granted' || state === 'ask') && <p className="text-[13.5px] text-neutral-400">Only while WatchMyMedia is open in a tab.</p>}
     </div>
   )
 }
