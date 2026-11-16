@@ -149,8 +149,11 @@ through candidate storage failure, retry on fresh format evidence and restart
 the playback service while recording capture continues. The default five-claim
 profile passed twice on macOS. `WMM_LIVE_QUALIFICATION_CLAIMS=3` selects one HD
 family, a shared peer and one separate single output plus recording, retaining
-all timeline, retention and cleanup assertions. Windows CI repeats this profile
-twice. Five claims did not remain stable on the hosted Windows runner, with
+all timeline, retention and cleanup assertions. Windows CI runs this profile in
+its own `windows-live-tv` job: twice on `main` and manual runs, and once on a
+pull request that changes code the test is built from. Other pull requests
+reuse `main`'s pass from Go's test cache, which is why CI runs it without
+`-count`. Five claims did not remain stable on the hosted Windows runner, with
 progress falling below real time and the bounded source/output guards stopping
 playback. The test does not increase those bounds or qualify five claims on that
 host. This is software evidence at the stated capacity, not Windows desktop/GPU

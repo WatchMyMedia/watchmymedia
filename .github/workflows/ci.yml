@@ -796,11 +796,11 @@ jobs:
             apple/build/TVUITests.xcresult
 
   # The Go tests on Windows, with the ffmpeg build the Windows app will ship
-  # (PLAN.md §7c). The Mac Studio cannot run Windows, so this and
-  # windows-app are GitHub's Windows runners; they run only when the server,
-  # the Windows app, the ffmpeg pin or this file changed. No GPU: they cover
-  # the software path, Windows file handling and the GPU pipelines'
-  # arguments, not the GPUs themselves.
+  # (PLAN.md §7c). The Mac Studio cannot run Windows, so this,
+  # windows-live-tv and windows-app are GitHub's Windows runners, side by
+  # side; they run only when the server, the Windows app, the ffmpeg pin or
+  # this file changed. No GPU: they cover the software path, Windows file
+  # handling and the GPU pipelines' arguments, not the GPUs themselves.
   windows-server:
     needs: changes
     if: needs.changes.outputs.windows == 'true'
@@ -861,18 +861,6 @@ jobs:
         run: |
           $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
           go test ./internal/playback -run '^TestRemuxSession$' -count=50
-      # Twice on main and manual runs, once on pull requests: a pass takes
-      # about 3.7 minutes, and the second catches an unsteady one.
-      - name: Qualify shared Live TV output, recovery and held readers
-        working-directory: server
-        shell: pwsh
-        env:
-          # Five simultaneous software claims were not stable on this runner.
-          # Keep HD, separate outputs, recording and the six-second failure guard.
-          WMM_LIVE_QUALIFICATION_CLAIMS: '3'
-        run: |
-          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          go test -tags streamingacceptance ./internal/livetv/dvr -run '^TestLiveLadder.*Qualification$' -count=${{ github.event_name == 'pull_request' && 1 || 2 }} -v
       - name: Report Windows transcoder diagnostics
         working-directory: server
         shell: pwsh
@@ -909,12 +897,15 @@ jobs:
         working-directory: server
         shell: pwsh
         run: go test -p 1 -run 'Speed$' ./...
+      # Without -count, which would turn Go's test cache off: a pull request
+      # that changes nothing this test is built from reuses main's pass, and
+      # main and manual runs, with the cache cleared above, run it.
       - name: Qualify complete software VOD rendition output
         working-directory: server
         shell: pwsh
         run: |
           $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
-          go test -tags streamingacceptance ./internal/playback -run '^TestVODLadder(FullFileQualification|RejectsUnboundedCopiedAudio)$' -count=1 -v
+          go test -tags streamingacceptance ./internal/playback -run '^TestVODLadder(FullFileQualification|RejectsUnboundedCopiedAudio)$' -v
       # Saved even when a test failed: Go keeps only passing results.
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
@@ -924,7 +915,88 @@ jobs:
             ${{ steps.go-cache.outputs.modules }}
           key: ${{ steps.go-cache.outputs.key }}
 
-  # The Windows app beside windows-server, at the same time: the tray app's
+  # The Live TV qualification, the longest Windows step at about 3.75
+  # minutes a pass, on a runner of its own beside windows-server and
+  # windows-app. Without -count, so a pull request that changes nothing the
+  # test is built from reuses main's pass from Go's test cache. main and
+  # manual runs clear the cache and run it twice: the first pass is the one
+  # main saves for pull requests, and the second catches an unsteady one.
+  windows-live-tv:
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache: false
+      # Go's caches, saved by main and restored everywhere, as in the server job.
+      - name: Name the Go caches
+        id: go-cache
+        if: runner.environment == 'github-hosted'
+        shell: bash
+        working-directory: server
+        env:
+          FFMPEG: ${{ hashFiles('deploy/macos/fetch-ffmpeg.sh') }}
+          SUMS: ${{ hashFiles('server/go.sum', 'windows/go.sum') }}
+        run: |
+          prefix="go-$GITHUB_JOB-$RUNNER_OS-$RUNNER_ARCH-$(go env GOVERSION)-$FFMPEG-"
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "ffmpeg-prefix=$prefix"
+            echo "sums-prefix=$prefix$SUMS-"
+            echo "key=$prefix$SUMS-$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.go-cache.outputs.sums-prefix }}
+            ${{ steps.go-cache.outputs.ffmpeg-prefix }}
+      - name: Fetch the ffmpeg build the Windows app will ship
+        shell: bash
+        run: |
+          deploy/macos/fetch-ffmpeg.sh windows-amd64
+          build/ffmpeg/windows-amd64/ffmpeg.exe -hide_banner -version | head -1
+      - name: Run every test again outside pull requests
+        if: github.event_name != 'pull_request'
+        working-directory: server
+        run: go clean -testcache
+      - name: Qualify shared Live TV output, recovery and held readers
+        working-directory: server
+        shell: pwsh
+        env:
+          # Five simultaneous software claims were not stable on this runner.
+          # Keep HD, separate outputs, recording and the six-second failure guard.
+          WMM_LIVE_QUALIFICATION_CLAIMS: '3'
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          go test -tags streamingacceptance ./internal/livetv/dvr -run '^TestLiveLadder.*Qualification$' -v
+      - name: Qualify them a second time outside pull requests
+        if: github.event_name != 'pull_request'
+        working-directory: server
+        shell: pwsh
+        env:
+          WMM_LIVE_QUALIFICATION_CLAIMS: '3'
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\build\ffmpeg\windows-amd64;$env:PATH"
+          go test -tags streamingacceptance ./internal/livetv/dvr -run '^TestLiveLadder.*Qualification$' -count=1 -v
+      # Saved even when a test failed: Go keeps only passing results.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: "!cancelled() && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.build }}
+            ${{ steps.go-cache.outputs.modules }}
+          key: ${{ steps.go-cache.outputs.key }}
+
+  # The Windows app beside windows-server and windows-live-tv: the tray app's
   # tests, the app and its installers built with this run's web build, and
   # the tray, installer and platform smoke tests on the hosted Windows Server.
   windows-app:
@@ -1020,13 +1092,32 @@ jobs:
       - name: Install the pinned installer compiler
         shell: pwsh
         run: choco install nsis --version=3.13.0 --yes --no-progress
-      - name: Build the development installer
+      # The CI-only app for the hosted Server tests, then both installers at
+      # once: each spends about 80 seconds compressing, and they read and
+      # write separate folders. Nothing runs the CI-only build until the
+      # normal build's rejection checks below have passed.
+      - name: Build the development installer, and the CI-only app and installer
         shell: bash
         run: |
+          windows/build.sh --ci-server-host
           if ! command -v makensis >/dev/null; then
             export PATH="/c/Program Files (x86)/NSIS:$PATH"
           fi
-          VERSION=development windows/installer.sh
+          mkdir -p build/installer-logs
+          VERSION=development windows/installer.sh > build/installer-logs/development.log 2>&1 &
+          development=$!
+          windows/installer.sh --ci-server-host > build/installer-logs/ci-server-host.log 2>&1 &
+          ci=$!
+          failed=
+          wait "$development" || failed="$failed development"
+          wait "$ci" || failed="$failed ci-server-host"
+          for log in development ci-server-host; do
+            echo "::group::The $log installer's log"
+            cat "build/installer-logs/$log.log"
+            echo "::endgroup::"
+          done
+          for log in $failed; do echo "::error::The $log installer failed: its log is above"; done
+          [ -z "$failed" ]
       - name: Reject publication of the unsigned installer
         shell: pwsh
         run: |
@@ -1044,14 +1135,6 @@ jobs:
       - name: Verify normal desktop app and installer reject Windows Server
         shell: pwsh
         run: windows/platform-smoke.ps1
-      - name: Build separate CI-only app and installer for hosted Server tests
-        shell: bash
-        run: |
-          windows/build.sh --ci-server-host
-          if ! command -v makensis >/dev/null; then
-            export PATH="/c/Program Files (x86)/NSIS:$PATH"
-          fi
-          windows/installer.sh --ci-server-host
       - name: Reject promotion and off-CI use of the CI-only build
         shell: pwsh
         run: windows/platform-smoke.ps1 -CIHost
