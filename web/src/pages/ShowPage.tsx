@@ -14,6 +14,8 @@ import { DeleteDialog, ReplaceFileDialog } from '../components/DeleteDialog'
 import { CastRow, FileTags, SideCard } from '../components/DetailHeader'
 import { RecordingProvenance } from '../components/liveTV/RecordingProvenance'
 import { MoreMenu, type MoreItem } from '../components/MoreMenu'
+import { useNotifyMe } from '../components/newEpisodeHooks'
+import { FollowExplainer, NotifyMeButton, NotifyMeFailure } from '../components/NotifyMe'
 import { Poster } from '../components/Poster'
 import { RematchDialog } from '../components/RematchDialog'
 import { ReportProblemDialog } from '../components/ReportProblemDialog'
@@ -606,6 +608,8 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
   const admin = (auth.user?.isAdmin ?? false) && auth.adminAllowed
   const navigate = useNavigate()
   const { pick } = usePickSeason(s)
+  // Notify me, on servers from API level 29 (PLAN-NEW-EPISODES.md §7.1).
+  const notify = useNotifyMe(s)
   const [acting, setActing] = useState<'fix' | 'poster' | 'request' | 'deleteSeason' | 'deleteShow' | null>(null)
   const today = new Date().toISOString().slice(0, 10)
   const askable = options.data?.shows ? askableSeasons(s.seasons, today) : []
@@ -652,25 +656,30 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
           </div>
         </div>
         {s.overview && <p className="-mt-2 text-sm leading-relaxed text-neutral-200 sm:hidden">{s.overview}</p>}
-        <div className="flex flex-wrap items-center gap-2">
-          {mark && (
-            <button type="button" disabled={markShow.isPending} onClick={() => markShow.mutate({ showId: s.id, watched: mark.watched })} className={secondaryBtn}>
-              {mark.label}
-            </button>
-          )}
-          {askable.length > 0 && (
-            <button type="button" onClick={() => setActing('request')} className={secondaryBtn}>
-              ＋ Request missing seasons
-            </button>
-          )}
-          {admin && (
-            <button type="button" onClick={() => setActing('fix')} className={secondaryBtn}>
-              Fix match
-            </button>
-          )}
-          <MoreMenu tall label={`More for ${s.title}`} items={items} />
-          {markShow.error && <span className="text-sm text-warn">{markShow.error.message}</span>}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            {notify.able && <NotifyMeButton show={s.title} following={notify.following} onPress={notify.press} />}
+            {mark && (
+              <button type="button" disabled={markShow.isPending} onClick={() => markShow.mutate({ showId: s.id, watched: mark.watched })} className={secondaryBtn}>
+                {mark.label}
+              </button>
+            )}
+            {askable.length > 0 && (
+              <button type="button" onClick={() => setActing('request')} className={secondaryBtn}>
+                ＋ Request missing seasons
+              </button>
+            )}
+            {admin && (
+              <button type="button" onClick={() => setActing('fix')} className={secondaryBtn}>
+                Fix match
+              </button>
+            )}
+            <MoreMenu tall label={`More for ${s.title}`} items={items} />
+            {markShow.error && <span className="text-sm text-warn">{markShow.error.message}</span>}
+          </div>
+          {notify.failure && <NotifyMeFailure failure={notify.failure} show={s.title} />}
         </div>
+        {notify.asking && <FollowExplainer show={s.title} onAnswer={notify.answer} />}
         <CastRow cast={s.credits} />
       </div>
       <aside className="space-y-4">

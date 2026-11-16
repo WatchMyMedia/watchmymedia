@@ -1,16 +1,19 @@
 import { pruneNotices } from './liveReminders'
 
 /**
- * The browser's part in Live TV reminders (PLAN-LIVE-TV-GUIDE.md §6.5): the
- * notification permission, the same-origin service worker that shows them
+ * The browser's part in Live TV reminders (PLAN-LIVE-TV-GUIDE.md §6.5) and
+ * new-episode notices (PLAN-NEW-EPISODES.md §7.5): the notification
+ * permission, the same-origin service worker that shows them
  * (public/reminders-sw.js; the CSP's worker-src 'self' allows it), the Web
  * Lock that lets one tab notify, and the record of what was shown. All of
  * them need a secure context; without one, reminders come as the in-app
- * banner only.
+ * banner only, and new episodes not at all.
  */
 
 export const REMINDER_WORKER = '/reminders-sw.js'
 const LOCK = 'watchmymedia.live-reminders'
+/** New episodes have their own lock: a tab holds both, and a second request for one lock would wait on itself. */
+export const NEW_EPISODES_LOCK = 'watchmymedia.new-episodes'
 const ASKED = 'wmm.liveReminders.asked'
 const NOTIFIED = 'wmm.liveReminders.notified'
 const DISMISSED = 'wmm.liveReminders.dismissed'
@@ -32,6 +35,11 @@ export function shouldExplain(): boolean {
 
 export async function askToNotify(): Promise<NotificationPermission | 'unsupported'> {
   try { localStorage.setItem(ASKED, '1') } catch { /* storage may be blocked */ }
+  return requestNotify()
+}
+
+/** The browser's own question, without the reminders' asked mark: new episodes keep their own. */
+export async function requestNotify(): Promise<NotificationPermission | 'unsupported'> {
   if (!canNotify()) return 'unsupported'
   const answer = await Notification.requestPermission()
   if (answer === 'granted') void reminderWorker()
@@ -51,7 +59,12 @@ export function reminderWorker(): Promise<ServiceWorkerRegistration | undefined>
 }
 
 /** Shows a reminder; its tag replaces one already showing for the same reminder. */
-export async function showReminder(o: { title: string; body: string; tag: string; path?: string }): Promise<boolean> {
+export function showReminder(o: { title: string; body: string; tag: string; path?: string }): Promise<boolean> {
+  return showNotice({ ...o, action: o.path ? 'Watch' : undefined })
+}
+
+/** Shows a notification through the worker; its tag replaces one already showing with the same tag. */
+export async function showNotice(o: { title: string; body: string; tag: string; path?: string; action?: string }): Promise<boolean> {
   if (notifyPermission() !== 'granted') return false
   const registration = await reminderWorker()
   if (!registration) return false
@@ -61,7 +74,7 @@ export async function showReminder(o: { title: string; body: string; tag: string
       tag: o.tag,
       icon: '/icon-192.png',
       data: { path: o.path },
-      ...(o.path ? { actions: [{ action: 'watch', title: 'Watch' }] } : {}),
+      ...(o.action ? { actions: [{ action: 'open', title: o.action }] } : {}),
     } as NotificationOptions)
     return true
   } catch {
@@ -69,12 +82,21 @@ export async function showReminder(o: { title: string; body: string; tag: string
   }
 }
 
-/** Calls open with a path when a reminder's notification is chosen in a tab already open. */
+/**
+ * The paths a notification may open in a tab already open: a channel
+ * (reminders), a show's page and Home (new episodes). Anything else the
+ * worker sends is ignored.
+ */
+export function openablePath(path: unknown): path is string {
+  return typeof path === 'string' && (path === '/' || path.startsWith('/live-tv') || path.startsWith('/shows/'))
+}
+
+/** Calls open with a path when a notification is chosen in a tab already open. */
 export function onReminderOpened(open: (path: string) => void): () => void {
   if (!canNotify()) return () => {}
   const listen = (event: MessageEvent) => {
     const data = event.data as { type?: string; path?: unknown } | undefined
-    if (data?.type === 'wmm.open' && typeof data.path === 'string' && data.path.startsWith('/live-tv')) open(data.path)
+    if (data?.type === 'wmm.open' && openablePath(data.path)) open(data.path)
   }
   navigator.serviceWorker.addEventListener('message', listen)
   return () => navigator.serviceWorker.removeEventListener('message', listen)
@@ -85,7 +107,7 @@ export function onReminderOpened(open: (path: string) => void): () => void {
  * to another tab when this one closes. Without Web Locks every tab may
  * notify, and the notifications' tags keep one each.
  */
-export function holdNotifierLock(held: () => void): () => void {
+export function holdNotifierLock(held: () => void, lock = LOCK): () => void {
   const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined
   if (!locks) {
     held()
@@ -93,7 +115,7 @@ export function holdNotifierLock(held: () => void): () => void {
   }
   const stop = new AbortController()
   let release: () => void = () => {}
-  locks.request(LOCK, { signal: stop.signal }, () => {
+  locks.request(lock, { signal: stop.signal }, () => {
     held()
     return new Promise<void>((resolve) => { release = resolve })
   }).catch(() => { /* aborted: this tab left before it held the lock */ })
