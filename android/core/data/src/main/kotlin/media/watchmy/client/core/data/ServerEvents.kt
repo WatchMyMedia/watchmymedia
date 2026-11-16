@@ -317,6 +317,13 @@ internal class ServerEvents(
      */
     val followChanges: Flow<Unit> = names.filter { it == RECONNECTED || it == FOLLOWS_CHANGED }.map { }
 
+    /**
+     * library.changed alone: a library's contents changed. The scan events
+     * aren't in it, so a scheduled scan that changes nothing doesn't put back
+     * what waits for a change (the new-episode check, PLAN-NEW-EPISODES.md §6.1).
+     */
+    val contentsChanged: Flow<Unit> = names.filter { it == LIBRARY_CHANGED }.map { }
+
     /** The raw events of one connection; completes when the server closes it. */
     private fun stream(session: Session): Flow<ServerEvent> = callbackFlow {
         val account = session.account ?: run { close(); return@callbackFlow }
@@ -345,7 +352,8 @@ internal class ServerEvents(
         const val RECONNECTED = "reconnected"
         const val WATCH_CHANGED = "watch.changed"
         // Refresh on transitions, never for every scan.progress event.
-        val LIBRARY_EVENTS = setOf("library.changed", "scan.started", "scan.finished", "scan.failed")
+        const val LIBRARY_CHANGED = "library.changed"
+        val LIBRARY_EVENTS = setOf(LIBRARY_CHANGED, "scan.started", "scan.finished", "scan.failed")
 
         /** How long a burst of library events gathers before pages hear of it. */
         const val COALESCE_MS = 250L

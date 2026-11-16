@@ -78,6 +78,26 @@ class ServerEventsTest {
     }
 
     @Test
+    fun `library contents changing is library changed alone, not the scans`() = runBlocking {
+        h.signIn()
+        h.server.on(
+            "GET /api/events",
+            stream(
+                "event: ping\ndata: {\"time\":\"t\"}\n\n" +
+                    "event: scan.started\ndata: {\"libraryId\":1}\n\n" +
+                    "event: scan.finished\ndata: {\"libraryId\":1}\n\n" +
+                    "event: library.changed\ndata: {\"libraryId\":2}\n\n" +
+                    "event: scan.failed\ndata: {\"libraryId\":1}\n\n",
+            ),
+        )
+        h.services.libraryContentsChanged.test(timeout = 5.seconds) {
+            awaitItem()
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `a burst comes as one change, naming what it touched`() = runBlocking {
         h.signIn()
         h.server.on(

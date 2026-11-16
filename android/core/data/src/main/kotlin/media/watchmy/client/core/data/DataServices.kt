@@ -144,6 +144,9 @@ class DataServices internal constructor(
     val requests: RequestRepository = RealRequestRepository(store, http, events, scope, clock)
     val rows: RowsRepository = RealRowsRepository(http, events)
     val follows: FollowsRepository = RealFollowsRepository(store, http, events)
+
+    /** library.changed alone, without the scans that change nothing: what the new-episode check waits for while the app is open. */
+    val libraryContentsChanged: kotlinx.coroutines.flow.Flow<Unit> get() = events.contentsChanged
     val preferences: PreferencesRepository = preferencesRepository
     val playbackGateway: PlaybackGateway =
         RealPlaybackGateway(SignedInAccess(http), { store.deviceName.value }, { deviceId }, { RealPlaybackGateway.signedInMediaToken(http) })
