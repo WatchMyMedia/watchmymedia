@@ -11,19 +11,26 @@ import WMMModel
 
     @Test func theNotificationSaysOneEpisodeByItsCodeAndTitle() {
         #expect(NewEpisodeWords.noticeTitle(show: "The Sleuth Files", count: 1) == "New episode · The Sleuth Files")
-        #expect(NewEpisodeWords.noticeBody([episode(3, 7, "The Long Night")]) == "S3 E7 · The Long Night")
-        #expect(NewEpisodeWords.noticeBody([episode(3, 7)]) == "S3 E7", "no title: the code alone")
-        #expect(NewEpisodeWords.noticeBody([episode(0, 3, "Holiday Special")]) == "S0 E3 · Holiday Special", "specials are season 0")
+        #expect(NewEpisodeWords.noticeBody([episode(3, 7, "The Long Night")], count: 1) == "S3 E7 · The Long Night")
+        #expect(NewEpisodeWords.noticeBody([episode(3, 7)], count: 1) == "S3 E7", "no title: the code alone")
+        #expect(NewEpisodeWords.noticeBody([episode(0, 3, "Holiday Special")], count: 1) == "S0 E3 · Holiday Special", "specials are season 0")
     }
 
     @Test func severalRunFromTheEarliestToTheLatestNamingTheSeasonOnlyWhenItChanges() {
         #expect(NewEpisodeWords.noticeTitle(show: "The Sleuth Files", count: 3) == "3 new episodes · The Sleuth Files")
-        #expect(NewEpisodeWords.noticeBody([episode(3, 7), episode(3, 8), episode(3, 9)]) == "S3 E7 to E9")
-        #expect(NewEpisodeWords.noticeBody([episode(2, 10), episode(3, 1), episode(3, 2)]) == "S2 E10 to S3 E2")
+        #expect(NewEpisodeWords.noticeBody([episode(3, 7), episode(3, 8), episode(3, 9)], count: 3) == "S3 E7 to E9")
+        #expect(NewEpisodeWords.noticeBody([episode(2, 10), episode(3, 1), episode(3, 2)], count: 3) == "S2 E10 to S3 E2")
         // A gap in a run: the count says how many.
         #expect(NewEpisodeWords.noticeTitle(show: "The Sleuth Files", count: 2) == "2 new episodes · The Sleuth Files")
-        #expect(NewEpisodeWords.noticeBody([episode(3, 7), episode(3, 9)]) == "S3 E7 to E9")
-        #expect(NewEpisodeWords.noticeBody([]) == "")
+        #expect(NewEpisodeWords.noticeBody([episode(3, 7), episode(3, 9)], count: 2) == "S3 E7 to E9")
+        #expect(NewEpisodeWords.noticeBody([], count: 0) == "")
+    }
+
+    @Test func moreThanTheServerListsReadsFromTheEarliest() {
+        let five = (1...5).map { episode(3, $0) }
+        #expect(NewEpisodeWords.noticeTitle(show: "The Sleuth Files", count: 10) == "10 new episodes · The Sleuth Files")
+        #expect(NewEpisodeWords.noticeBody(five, count: 10) == "From S3 E1")
+        #expect(NewEpisodeWords.noticeBody(five, count: 5) == "S3 E1 to E5")
     }
 
     @Test func pastFiveShowsOneMoreSaysHowManyMore() {
@@ -70,8 +77,10 @@ import WMMModel
         #expect(NewEpisodeWords.followLine(FollowedShow(tmdbID: 2, title: "Harbor Lights", followedAt: now - 9 * day, showID: 8, latest: yesterday), now: now)
             == "S3 E2 · yesterday")
         let hours = FollowedShow.Latest(season: 1, number: 4, arrivedAt: now - 5 * 3600)
-        #expect(NewEpisodeWords.followLine(FollowedShow(tmdbID: 3, title: "Northfield", followedAt: now, showID: 9, latest: hours), now: now) == "S1 E4 · 5 h ago")
+        #expect(NewEpisodeWords.followLine(FollowedShow(tmdbID: 3, title: "Northfield", followedAt: now - day, showID: 9, latest: hours), now: now) == "S1 E4 · 5 h ago")
         #expect(NewEpisodeWords.followLine(FollowedShow(tmdbID: 4, title: "Orbital Decay", followedAt: now, showID: 10), now: now) == "No new episodes yet")
+        #expect(NewEpisodeWords.followLine(FollowedShow(tmdbID: 6, title: "Copperline", followedAt: now - day, showID: 11, latest: latest), now: now)
+            == "No new episodes yet", "its latest arrived before it was followed")
         #expect(NewEpisodeWords.followLine(FollowedShow(tmdbID: 5, title: "Westward Signals", followedAt: now, latest: latest), now: now) == "Not in the library now")
         #expect(NewEpisodeWords.stopNotifyingLabel("Westward Signals") == "Stop notifying me of new episodes of Westward Signals")
         #expect(NewEpisodeWords.removeFailed("The Sleuth Files") == "Couldn’t stop notifying, so you still follow The Sleuth Files. Check your connection and try again.")

@@ -78,9 +78,12 @@ public enum NewEpisodeWords {
     /// One episode: "S3 E7 · The Long Night", or "S3 E7" with no title.
     /// Several: from the earliest to the latest, naming the season again only
     /// when it changes: "S3 E7 to E9", "S2 E10 to S3 E2". The count says how
-    /// many, so a gap in a run still reads "S3 E7 to E9".
-    public static func noticeBody(_ episodes: [ArrivedEpisode]) -> String {
+    /// many, so a gap in a run still reads "S3 E7 to E9". More arrived than
+    /// the server lists (it lists the earliest five): "From S3 E1", since
+    /// the latest isn't known (settled with the web, 2026-11-16).
+    public static func noticeBody(_ episodes: [ArrivedEpisode], count: Int) -> String {
         guard let first = episodes.first else { return "" }
+        if count > episodes.count { return "From \(episodeCode(season: first.season, number: first.number))" }
         guard let last = episodes.last, episodes.count > 1 else {
             return [episodeCode(season: first.season, number: first.number), first.title].compactMap { $0 }.joined(separator: " · ")
         }
@@ -124,10 +127,11 @@ public enum NewEpisodeWords {
     public static let followedTitle = "Shows you follow"
 
     /// A show's line: its latest new episode and when ("S3 E7 · 2 days ago"),
-    /// "No new episodes yet", or "Not in the library now".
+    /// "No new episodes yet", or "Not in the library now". The server's
+    /// latest can be from before the person followed: that is no new episode yet.
     public static func followLine(_ follow: FollowedShow, now: Date) -> String {
         guard follow.inLibrary else { return notInLibrary }
-        guard let latest = follow.latest else { return noNewYet }
+        guard let latest = follow.latest, latest.arrivedAt >= follow.followedAt else { return noNewYet }
         return "\(episodeCode(season: latest.season, number: latest.number)) · \(formatAgo(latest.arrivedAt, now: now))"
     }
 

@@ -51,7 +51,7 @@ public func newEpisodeNotices(_ page: NewEpisodesPage, serverID: String, limit: 
         return NewEpisodeNotice(
             id: "\(thread)-\(page.cursor)",
             title: NewEpisodeWords.noticeTitle(show: group.show.title, count: max(group.count, group.episodes.count, 1)),
-            body: NewEpisodeWords.noticeBody(group.episodes),
+            body: NewEpisodeWords.noticeBody(group.episodes, count: group.count),
             thread: thread,
             link: link.url(publishedFor: serverID, source: NewEpisodeNotice.linkSource)
         )

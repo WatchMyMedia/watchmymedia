@@ -27,7 +27,7 @@ import WMMModel
         let page = NewEpisodesPage(cursor: "9", shows: [arrivals(100, title: "Harbor Lights", [(1, 1), (1, 2), (1, 3), (1, 4), (1, 5)], count: 10)])
         let notice = newEpisodeNotices(page, serverID: "srv-a")[0]
         #expect(notice.title == "10 new episodes · Harbor Lights")
-        #expect(notice.body == "S1 E1 to E5")
+        #expect(notice.body == "From S1 E1", "the latest isn't listed")
     }
 
     @Test func pastFiveShowsTheFirstFiveThenOneThatOpensHomePostedFirst() {

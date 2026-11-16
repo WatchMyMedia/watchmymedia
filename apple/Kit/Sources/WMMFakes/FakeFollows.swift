@@ -37,7 +37,8 @@ public final class FakeFollowsRepository: FollowsRepository {
         return [
             show(100, followed: 3, latest: .init(season: 3, number: 2, title: "The Pilot Boat", arrivedAt: now - day)),
             show(103, followed: 10, latest: .init(season: 1, number: 5, title: "Squall Line", arrivedAt: now - 2 * day)),
-            show(104, followed: 12, latest: nil),
+            // Its latest arrived before Sam followed it: no new episode yet.
+            show(104, followed: 12, latest: .init(season: 1, number: 2, arrivedAt: now - 20 * day)),
             FollowedShow(tmdbID: 71_010, title: "The Tidewater Array", followedAt: now - 40 * day),
         ]
     }
@@ -128,13 +129,13 @@ public final class FakeFollowsRepository: FollowsRepository {
             return .init(id: id, tmdbID: FakeData.tmdbID(showID: id), title: s.title)
         }
         func one(_ id: Int, season: Int, number: Int, title: String) -> NewEpisodeGroup {
-            let episodeID = id * 1000 + season * 100 + number
+            let episodeID = id * 1000 + season * 10 + number
             return NewEpisodeGroup(show: show(id), count: 1,
                                    episodes: [ArrivedEpisode(id: episodeID, season: season, number: number, title: title, arrivedAt: now)],
                                    open: .init(episodeID: episodeID, season: season, number: number))
         }
         let harbor = [(2, 8, "Lantern Rock"), (3, 1, "Low Water"), (3, 2, "The Ferryman")].map { season, number, title in
-            ArrivedEpisode(id: 100_000 + season * 100 + number, season: season, number: number, title: title, arrivedAt: now)
+            ArrivedEpisode(id: 100_000 + season * 10 + number, season: season, number: number, title: title, arrivedAt: now)
         }
         return [
             NewEpisodeGroup(show: show(100), count: 3, episodes: harbor, open: .init(episodeID: harbor[0].id, season: 2, number: 8)),
