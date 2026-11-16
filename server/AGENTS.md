@@ -131,6 +131,10 @@ SQLite plans joins without statistics, and a plan that looks fine after
   of the largest real one (about 2,850 movies, 1,100 shows, 18,700 files),
   with ten 250-entry lists and three library lists on Home, and times each
   page alone and the web Home's requests as one burst, arranged and not;
+  `TestNewEpisodesSpeed` (`internal/api/follows_speed_test.go`) adds 500
+  follows and a week of arrivals to it and times the new-episodes feed, the
+  follows list and Home's followed row, alone and ten at once, and fails
+  when their plans read a whole table;
   `internal/activity`'s speed test seeds plays; `internal/livetv/dvr` measures list and guide-mark bursts over 10,000 recordings without statistics. `make bench` fails over budget;
   plain `go test` runs smaller versions with looser budgets. Name such a
   test `Test...Speed`: CI's `server` and `windows-server` jobs skip `Speed$` in the
@@ -138,6 +142,15 @@ SQLite plans joins without statistics, and a plan that looks fine after
   a time. Beside the other packages on a three-core runner,
   `TestHistorySpeed` went over its budget (PR #16, 2026-11-12) though alone
   it has six times the room.
+
+**Episode links and arrivals.** Link files to episodes only through
+`Matcher.record` (`internal/metadata/matcher.go`): in the same transaction it
+records each episode's arrival, which people following the show are told
+about, from `media_files.first_linked_at` and `episode_arrivals`
+([PLAN-NEW-EPISODES.md](../PLAN-NEW-EPISODES.md) §5.2). A file never linked
+before makes an arrival, a file linked before a quiet one, and an episode
+that has arrived nothing more, so better copies, renames and rematches stay
+silent. Inserting `episode_files` anywhere else skips that.
 
 **Watch state.** Change `watch_state` only through `internal/watchstate`, never
 with its queries directly: each change must also take a revision and leave a
