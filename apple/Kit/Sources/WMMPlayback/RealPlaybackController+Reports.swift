@@ -16,7 +16,7 @@ extension RealPlaybackController {
 
     func heartbeat(_ v: Viewing, _ status: PlayerStatus, _ pos: Int, _ buffered: Int, force: Bool) {
         let s = playState(for: status)
-        guard force || heartbeatDue(s, lastReported: v.lastReported, sinceLastBeatMs: clock.elapsedMs - v.lastBeatAt, auto: asked == .auto) else { return }
+        guard force || heartbeatDue(s, lastReported: v.lastReported, sinceLastBeatMs: clock.elapsedMs - v.lastBeatAt, auto: asked == .auto, seeked: v.seekLanded) else { return }
         report(v, s, pos, buffered)
     }
 
@@ -28,6 +28,7 @@ extension RealPlaybackController {
         if backgrounded && playState != .closed && playState != .stopped { return false }
         v.lastReported = playState
         v.lastBeatAt = clock.elapsedMs
+        v.seekLanded = false
         let position = v.finished ? duration(v, d) : pos
         let now = clock.elapsedMs
         let transfer = media?.transfer

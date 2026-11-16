@@ -278,6 +278,11 @@ public enum PlayerStatus: String, Hashable, Sendable { case loading, playing, pa
 /// How long auto-delay fills the Skip button before skipping.
 public let skipAutoDelayMs = 3_000
 
+/// How far before the saved position a resume starts, so people pick up the thread
+/// (PLAN-RESUME.md §3.8). The server's resumeMs already starts there; a device applies
+/// it to the positions it keeps itself, for offline plays.
+public let resumeRewindMs = 5_000
+
 /// The Skip button: the segment offered and, in auto-delay mode, how far its 3 s fill has run (0–1).
 public struct SkipPrompt: Hashable, Sendable {
     public var segment: Segment

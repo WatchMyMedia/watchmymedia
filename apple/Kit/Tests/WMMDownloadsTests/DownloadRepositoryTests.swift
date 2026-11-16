@@ -553,7 +553,8 @@ struct DownloadRepositoryTests {
         #expect(play.url == media)
         #expect(play.mimeType == nil)
         #expect(play.playID == "offline")
-        #expect(play.resumeMs == 120_000)
+        // 5 s before where this device was (PLAN-RESUME.md §3.8).
+        #expect(play.resumeMs == 115_000)
         #expect(play.next == nil && play.upNextMs == 0)
         #expect(play.audio.map(\.index) == [2])
         #expect(play.subtitles.map(\.option.id) == ["s3"])
@@ -564,6 +565,17 @@ struct DownloadRepositoryTests {
         #expect(withNext.next?.fileID == 43)
         #expect(withNext.subtitles.isEmpty)
         #expect(withNext.selectedSubtitleID == nil)
+    }
+
+    @Test func anOfflinePlayAtTheServersResumePointIsNotMovedAgain() {
+        var r = record("aaaaaaaaaaaaaaaa", fileID: 42)
+        // The download's decision said 120 s: the server's resume point, already 5 s back.
+        r.decision?.resumeMs = 120_000
+        let d = OfflineDownload(id: r.id, fileID: 42, item: r.item, quality: .original, mode: .direct, protocol: .file, sizeBytes: 1, sizeEstimated: false, status: .downloaded, watch: WatchProgress(positionMs: 120_000, durationMs: 3_000_000, completed: false))
+        let play = OfflinePlaybackGateway.offlineDecision(d, r.decision!, media: URL(fileURLWithPath: "/Library/x.mp4"), parts: [:], nextDownloaded: false)
+        #expect(play.resumeMs == 120_000)
+        let early = OfflineDownload(id: r.id, fileID: 42, item: r.item, quality: .original, mode: .direct, protocol: .file, sizeBytes: 1, sizeEstimated: false, status: .downloaded, watch: WatchProgress(positionMs: 3_000, durationMs: 3_000_000, completed: false))
+        #expect(OfflinePlaybackGateway.offlineDecision(early, r.decision!, media: URL(fileURLWithPath: "/Library/x.mp4"), parts: [:], nextDownloaded: false).resumeMs == 0)
     }
 
     @Test func theGatewayPlaysADownloadFromTheDeviceAndQueuesItsHeartbeats() async throws {
