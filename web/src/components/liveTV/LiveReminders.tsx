@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useGuideExtras, useReminders } from './useGuideExtras'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { liveTVChannelsQuery, useLiveReminder } from '../../api/queries'
 import type { LiveChannel, LiveProgramme } from '../../api/liveTV'
 import {
-  DISMISSED_KEY, askToNotify, claimNotice, dismissNotice, dismissedNotices, holdNotifierLock, noteAsked, notifyPermission, onReminderOpened, reminderWorker, shouldExplain,
+  DISMISSED_KEY, askToNotify, claimNotice, dismissNotice, dismissedNotices, holdNotifierLock, noteAsked, notifyPermission, reminderWorker, shouldExplain,
   showReminder,
 } from '../../lib/browserNotices'
 import {
@@ -111,13 +111,13 @@ function episodeOf(r: LiveReminder): string {
  * Delivers reminders while this page is open (§6.5): a banner with Watch
  * and Dismiss in a visible tab, and from the one tab holding the Web Lock a
  * system notification through the service worker once the person allowed
- * them. Mounted once in the layout; the banner shows off the players.
+ * them. Mounted once in the layout, which places the banner; it shows off
+ * the players.
  */
 export function ReminderNotices({ banner }: { banner: boolean }) {
   const extras = useGuideExtras()
   const { items, lead } = useReminders(extras)
   const channels = useQuery({ ...liveTVChannelsQuery, enabled: extras && items.length > 0 })
-  const navigate = useNavigate()
   const [now, setNow] = useState(() => Date.now())
   const [notifier, setNotifier] = useState(false)
   const [dismissed, setDismissed] = useState(dismissedNotices)
@@ -141,11 +141,10 @@ export function ReminderNotices({ banner }: { banner: boolean }) {
     return () => { document.removeEventListener('visibilitychange', seen); window.removeEventListener('storage', storage) }
   }, [])
   useEffect(() => (extras ? holdNotifierLock(() => setNotifier(true)) : undefined), [extras])
+  // A chosen notification opens its channel through useNotificationClicks in the layout.
   useEffect(() => {
-    if (!extras) return
-    if (notifyPermission() === 'granted') void reminderWorker()
-    return onReminderOpened((path) => void navigate({ to: path }))
-  }, [extras, navigate])
+    if (extras && notifyPermission() === 'granted') void reminderWorker()
+  }, [extras])
 
   const dueKeys = due.map(noticeKey).join(' ')
   useEffect(() => {
@@ -173,7 +172,7 @@ export function ReminderNotices({ banner }: { banner: boolean }) {
 
 function ReminderBanner({ heading, title, line, picture, logo, watch, onWatch, onDismiss }: { heading: string; title: string; line: string; picture?: string; logo?: string; watch?: { channelId: string; number: string }; onWatch: () => void; onDismiss: () => void }): ReactNode {
   const [broken, setBroken] = useState('')
-  return <section role="status" aria-live="polite" aria-label="Live TV reminder" className="fixed inset-x-4 top-16 z-40 flex flex-col gap-3.5 rounded-xl border border-line-2 bg-surface-2 p-4 shadow-2xl sm:left-auto sm:right-12 sm:w-100">
+  return <section role="status" aria-live="polite" aria-label="Live TV reminder" className="flex flex-col gap-3.5 rounded-xl border border-line-2 bg-surface-2 p-4 shadow-2xl">
     <div className="flex gap-3.5">
       {picture && broken !== picture ? <img key={picture} src={picture} alt="" onError={() => setBroken(picture)} className="aspect-video w-28 shrink-0 self-start rounded-md bg-surface object-cover" />
         : logo && <span aria-hidden="true" className="grid aspect-video w-28 shrink-0 place-items-center self-start rounded-md bg-surface"><img src={logo} alt="" className="h-1/2 w-1/2 object-contain" /></span>}

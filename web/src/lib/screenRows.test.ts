@@ -34,6 +34,14 @@ describe('which rows are drawn', () => {
     expect(drawable({ id: 'continue', style: 'continue', title: '', continue: [{} as never] })).toBe(true)
   })
 
+  it('draws New from shows you follow by its style, an id it was never told about, and leaves it out when empty', () => {
+    // PLAN-NEW-EPISODES.md §5.5: the server fills it; Home leaves it out when empty.
+    expect(drawable({ id: 'followed', style: 'episode', title: 'New from shows you follow', episodes: [{} as never] })).toBe(true)
+    expect(drawable({ id: 'followed', style: 'episode', title: 'New from shows you follow', episodes: [] })).toBe(false)
+    const rows = homeRows(home({ rows: [{ id: 'continue', style: 'continue', title: 'Continue watching' }, { id: 'followed', style: 'episode', title: 'New from shows you follow', episodes: [{} as never] }] }))
+    expect(rows.filter(drawable).map((r) => r.id)).toEqual(['followed'])
+  })
+
   it('draws nothing for live, which has no items, or a style it doesn’t know', () => {
     expect(drawable({ id: 'live', style: 'live', title: 'Live TV' })).toBe(false)
     expect(drawable({ id: 'x', style: 'carousel', title: '', items: [item()] })).toBe(false)
