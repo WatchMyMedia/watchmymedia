@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -251,10 +252,17 @@ internal class LocalStore(
         }
     }
 
-    /** Changes the state and returns once it is written. */
+    /**
+     * Changes the state and returns once it is written. The write runs in
+     * [scope], not the caller's: memory has the change at once, so a caller
+     * cancelled while it waits (a screen that closes because of the change)
+     * must not stop the write too. Sign out cleared the sign-in in memory,
+     * the app left Settings, and the cancelled write left the old sign-in on
+     * disk: the app signed straight back in after a restart (2026-11-16).
+     */
     suspend fun updateAndSave(transform: (Stored) -> Stored): Stored {
         val next = apply(transform)
-        save()
+        scope.launch(writes) { save() }.join()
         return next
     }
 
@@ -312,6 +320,8 @@ internal class LocalStore(
         val snapshot = state.value
         try {
             dataStore.edit { prefs -> encode(snapshot, prefs) }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "could not save settings", e)
         }

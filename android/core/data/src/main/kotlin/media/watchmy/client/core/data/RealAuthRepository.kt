@@ -2,6 +2,8 @@ package media.watchmy.client.core.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +32,8 @@ internal class RealAuthRepository(
     private val servers: RealServerRepository,
     private val client: () -> ClientInfo,
     private val clock: () -> Long,
+    /** The data layer's, which outlives the screens; [signOut] runs in it. */
+    private val scope: CoroutineScope,
     /** Waits between a pairing's claims; tests pass one that doesn't. */
     private val pause: suspend (ms: Long) -> Unit = { delay(it) },
 ) : AuthRepository {
@@ -126,7 +130,15 @@ internal class RealAuthRepository(
         }
     }
 
-    override suspend fun signOut() {
+    /**
+     * Runs in [scope], and the caller waits: Settings closes as soon as the
+     * sign-in clears, halfway through, and must not take the rest with it.
+     * Run in the screen's scope, the sign-out was kept in memory alone and the
+     * server never heard it, so the app signed back in after a restart.
+     */
+    override suspend fun signOut() = scope.async { endSession() }.await()
+
+    private suspend fun endSession() {
         val session = store.session() ?: return
         val account = session.account ?: return
         signOutHooks.forEach { hook ->
