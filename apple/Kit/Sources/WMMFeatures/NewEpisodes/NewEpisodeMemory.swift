@@ -4,7 +4,7 @@ import WMMModel
 
 /// What this device keeps for new-episode notifications (PLAN-NEW-EPISODES.md
 /// §6.1, §7.2): this device's switch, and the cursor into the server's feed
-/// for one server and person, with whether that person follows any show.
+/// for one server and person, keyed by their ids.
 /// One record: another server or person, or nobody signed in, forgets it, so
 /// a new sign-in starts from now. In UserDefaults, as the place each tab was
 /// left is.
@@ -14,10 +14,6 @@ public final class NewEpisodeMemory {
         /// "<server id>:<user id>" (``FollowsRepository/contextID``).
         var context: String
         var cursor: String?
-        /// Whether the person follows a show, as last known here.
-        var followsAny: Bool?
-        /// When the server last answered that it has no feed.
-        var unsupportedAt: Date?
     }
 
     static let switchKey = "newEpisodes.notifyHere"
@@ -65,9 +61,8 @@ public final class NewEpisodeMemory {
         record?.context == context ? record?.cursor : nil
     }
 
-    /// The server answered: its cursor is kept, and it has the feed after all.
     public func keep(cursor: String, for context: String) {
-        update(context) { $0.cursor = cursor; $0.unsupportedAt = nil }
+        update(context) { $0.cursor = cursor }
     }
 
     /// Drops the cursor, so the next check starts from now.
@@ -75,24 +70,6 @@ public final class NewEpisodeMemory {
         guard record?.cursor != nil else { return }
         record?.cursor = nil
         save()
-    }
-
-    /// Whether the person signed in as `context` follows a show; nil when not known here.
-    public func followsAny(for context: String) -> Bool? {
-        record?.context == context ? record?.followsAny : nil
-    }
-
-    public func setFollowsAny(_ value: Bool?, for context: String) {
-        update(context) { $0.followsAny = value }
-    }
-
-    /// When `context`'s server last answered that it has no feed; nil when it hasn't.
-    public func unsupportedAt(for context: String) -> Date? {
-        record?.context == context ? record?.unsupportedAt : nil
-    }
-
-    public func markUnsupported(at date: Date, for context: String) {
-        update(context) { $0.unsupportedAt = date }
     }
 
     /// Forgets everything kept for anyone other than `context` (nil: nobody is signed in).

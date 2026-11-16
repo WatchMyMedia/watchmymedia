@@ -5,18 +5,22 @@ import WMMModel
 /// ask the feed after this device's cursor, post one notification a show,
 /// then keep the new cursor. It runs in the background refresh after the
 /// downloads' sync, when the app opens or comes back, and three minutes after
-/// the last library change while it is open, but only when it has something
-/// to do: the server offers following, the person follows a show, this
-/// device's switch is on and the system lets the notifications through.
-/// Otherwise the cursor is forgotten, so the next check that may notify
-/// starts from now. A first check (no cursor yet) only keeps the cursor. A
-/// server that can't be reached changes nothing, and the next check catches
-/// up. A server whose feed isn't there (404) is left alone for
-/// ``unsupportedPause``, so the background refresh doesn't keep asking it.
-/// The server holds each arrival back two minutes; the check three minutes
-/// after a library change comes after that, and a check asked for while one
-/// runs runs again once it ends, so neither misses what a library change
-/// brought.
+/// the last library change while it is open, whenever this device could
+/// notify: someone is signed in to a server that offers following, this
+/// device's switch is on and the system lets the notifications through. It
+/// doesn't go by the follows this device last saw, since a show followed on
+/// another device (a TV) notifies here too; the feed for someone who follows
+/// nothing is empty, and the cursor kept from it catches a follow made
+/// elsewhere from when it was made. Turning the switch off forgets the
+/// cursor, so turning it on starts from now; so do a sign-out and another
+/// server or person (``accountChanged()``). A first check (no cursor yet)
+/// only keeps the cursor. A server that can't be reached, or answers 404 as
+/// a proxy does while it restarts, changes nothing, and the next check
+/// catches up. The server holds each arrival back two minutes; the check
+/// three minutes after a library change comes after that, and a check asked
+/// for while one runs runs again once it ends. A check stops when the task
+/// that asked is cancelled (the background refresh's time running out),
+/// keeping the cursor.
 @MainActor
 public final class NewEpisodeChecker {
     public enum Outcome: Hashable, Sendable {
@@ -26,73 +30,68 @@ public final class NewEpisodeChecker {
         case switchedOff
         /// The system doesn't let the notifications through.
         case notAllowed
-        /// The person follows no show.
-        case followsNothing
         /// No cursor yet: the server's is kept and nothing is posted.
         case started
         /// Asked after the cursor: `posted` notifications.
         case checked(posted: Int)
-        /// The server couldn't be reached, or the sign-in changed meanwhile: the cursor stays.
+        /// The server couldn't be reached, the check was cancelled, or the
+        /// sign-in or the switch changed meanwhile: the cursor stays.
         case unreachable
-        /// The server answered that it has no feed (404, 501), though its level says it should.
-        case unsupported
     }
 
     /// How long after the last library change an open app checks: past the
     /// two minutes the server holds an arrival back.
     public static let afterLibraryChange: Duration = .seconds(180)
-    /// How long a server without the feed is left alone.
-    public static let unsupportedPause: TimeInterval = 12 * 3600
 
     private let repository: any FollowsRepository
     private let memory: NewEpisodeMemory
     private let permission: @MainActor () async -> NotificationPermission
-    private let post: @MainActor ([NewEpisodeNotice]) async -> Void
+    private let post: @MainActor (NewEpisodeNotice) async -> Void
     private let sleep: @MainActor (Duration) async throws -> Void
-    private let now: @MainActor () -> Date
     private var running: Task<Outcome, Never>?
     /// A check was asked for while one ran: it runs again when that one ends.
     private var again = false
 
     /// - Parameters:
     ///   - permission: what the system says of the app's notifications now.
-    ///   - post: shows the notifications.
+    ///   - post: shows one notification; they come in the order to post them.
     ///   - sleep: waits out the library's three minutes; tests pass a clock they move.
     public init(repository: any FollowsRepository, memory: NewEpisodeMemory,
                 permission: @escaping @MainActor () async -> NotificationPermission,
-                post: @escaping @MainActor ([NewEpisodeNotice]) async -> Void,
-                sleep: @escaping @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
-                now: @escaping @MainActor () -> Date = { Date() }) {
+                post: @escaping @MainActor (NewEpisodeNotice) async -> Void,
+                sleep: @escaping @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
         self.repository = repository
         self.memory = memory
         self.permission = permission
         self.post = post
         self.sleep = sleep
-        self.now = now
     }
 
     /// Checks. A caller while a check runs shares it, and it runs once more
     /// when it ends, since what that caller wants checked may have come after
-    /// the running one asked the server.
+    /// the running one asked the server. Cancelling the caller cancels the
+    /// check, so a background task whose time is up isn't kept waiting on a
+    /// server that doesn't answer.
     @discardableResult
     public func check() async -> Outcome {
         if let running {
             again = true
-            return await running.value
+            return await withTaskCancellationHandler { await running.value } onCancel: { running.cancel() }
         }
         var outcome: Outcome
         repeat {
             again = false
             let task = Task { await self.run() }
             running = task
-            outcome = await task.value
-        } while again
+            outcome = await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
+        } while again && !Task.isCancelled
         running = nil
         return outcome
     }
 
-    /// Sign-out or another server: what was kept for anyone else goes, so
-    /// the next sign-in starts from now.
+    /// A real sign-out, or a sign-in to another server or as another person
+    /// (not a Switch server that was cancelled): what was kept for anyone
+    /// else goes, so the next sign-in starts from now.
     public func accountChanged() {
         memory.forget(unlessFor: repository.contextID)
     }
@@ -118,54 +117,42 @@ public final class NewEpisodeChecker {
     }
 
     private func run() async -> Outcome {
+        // Nobody signed in (a sign-out, or Switch server between servers):
+        // nothing is asked and nothing forgotten here; accountChanged() forgets.
         guard repository.available, let context = repository.contextID, let serverID = repository.serverID else {
-            memory.forget(unlessFor: repository.contextID)
             return .unavailable
         }
+        // Signed in to another server or as another person: theirs starts from now.
         memory.forget(unlessFor: context)
         guard memory.notifyHere else {
             memory.forgetCursor()
             return .switchedOff
         }
-        guard await permission() == .allowed else {
-            memory.forgetCursor()
-            return .notAllowed
-        }
-        if memory.followsAny(for: context) == nil {
-            do {
-                let follows = try await repository.follows()
-                guard context == repository.contextID else { return .unreachable }
-                memory.setFollowsAny(!follows.isEmpty, for: context)
-            } catch {
-                return .unreachable
-            }
-        }
-        guard memory.followsAny(for: context) == true else {
-            memory.forgetCursor()
-            return .followsNothing
-        }
-        if let at = memory.unsupportedAt(for: context), now().timeIntervalSince(at) < Self.unsupportedPause { return .unsupported }
+        guard await permission() == .allowed else { return .notAllowed }
+        guard !Task.isCancelled else { return .unreachable }
         let cursor = memory.cursor(for: context)
         let page: NewEpisodesPage
         do {
             page = try await repository.newEpisodes(after: cursor)
         } catch {
-            if let status = (error as? APIError)?.status, status == 404 || status == 501, context == repository.contextID {
-                memory.forgetCursor()
-                memory.markUnsupported(at: now(), for: context)
-                return .unsupported
-            }
             return .unreachable
         }
-        // The reply was for a sign-in that has gone, or the switch went off meanwhile.
-        guard context == repository.contextID, memory.notifyHere else { return .unreachable }
+        // Each time it comes back: the sign-in gone, the switch off, or the time up keeps the cursor and posts no more.
+        func stillWanted() -> Bool { context == repository.contextID && memory.notifyHere && !Task.isCancelled }
+        guard stillWanted() else { return .unreachable }
         guard let cursor else {
             memory.keep(cursor: page.cursor, for: context)
             return .started
         }
-        let notices = newEpisodeNotices(page, serverID: serverID)
-        if !notices.isEmpty { await post(notices) }
+        let notices = newEpisodePostingOrder(newEpisodeNotices(page, serverID: serverID))
+        var posted = 0
+        for notice in notices {
+            guard stillWanted() else { return .unreachable }
+            await post(notice)
+            posted += 1
+        }
+        guard stillWanted() else { return .unreachable }
         memory.keep(cursor: page.cursor, for: context)
-        return .checked(posted: notices.count)
+        return .checked(posted: posted)
     }
 }

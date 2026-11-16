@@ -14,23 +14,40 @@ final class SpyFollows: FollowsRepository {
     var pages: [String: NewEpisodesPage] = [:]
     /// Each call fails with this, until cleared.
     var failure: (any Error)?
-    /// Calls wait here until ``release()``.
+    /// Calls wait here until ``release()``, or until their task is cancelled,
+    /// as a request to a server that doesn't answer does.
     var holding = false
     private(set) var calls: [String] = []
-    private var waiting: [CheckedContinuation<Void, Never>] = []
+    private var waiting: [(id: Int, continuation: CheckedContinuation<Void, any Error>)] = []
+    private var nextWaiter = 0
     private var listeners: [UUID: AsyncStream<Void>.Continuation] = [:]
 
     func release() {
         holding = false
         let all = waiting
         waiting = []
-        all.forEach { $0.resume() }
+        all.forEach { $0.continuation.resume() }
     }
 
     private func call(_ name: String) async throws {
         calls.append(name)
-        if holding { await withCheckedContinuation { waiting.append($0) } }
+        if holding {
+            let id = nextWaiter
+            nextWaiter += 1
+            try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, any Error>) in
+                    if Task.isCancelled { c.resume(throwing: CancellationError()) } else { waiting.append((id, c)) }
+                }
+            } onCancel: {
+                Task { @MainActor in self.cancelWaiter(id) }
+            }
+        }
         if let failure { throw failure }
+    }
+
+    private func cancelWaiter(_ id: Int) {
+        guard let i = waiting.firstIndex(where: { $0.id == id }) else { return }
+        waiting.remove(at: i).continuation.resume(throwing: CancellationError())
     }
 
     func follow(showID: Int) async throws {
@@ -45,9 +62,11 @@ final class SpyFollows: FollowsRepository {
         list.removeAll { $0.showID == showID }
     }
 
+    /// The list as it was when asked for, as a server reads it before a change made meanwhile.
     func follows() async throws -> [FollowedShow] {
+        let snapshot = list
         try await call("follows")
-        return list
+        return snapshot
     }
 
     func remove(tmdbID: Int) async throws {

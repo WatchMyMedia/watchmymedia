@@ -38,7 +38,7 @@ final class NewEpisodeNotifier {
         checker = NewEpisodeChecker(
             repository: follows, memory: memory,
             permission: { await router.currentPermission() },
-            post: { notices in await Self.post(notices) }
+            post: { notice in await Self.post(notice) }
         )
     }
 
@@ -64,20 +64,19 @@ final class NewEpisodeNotifier {
         if !ours.isEmpty { center.removeDeliveredNotifications(withIdentifiers: ours) }
     }
 
-    private static func post(_ notices: [NewEpisodeNotice]) async {
-        let center = UNUserNotificationCenter.current()
-        // iOS lists the newest first: posted last to first, they read in the reply's order.
-        for notice in newEpisodePostingOrder(notices) {
-            let content = UNMutableNotificationContent()
-            content.title = notice.title
-            content.body = notice.body
-            content.sound = .default
-            content.threadIdentifier = notice.thread
-            content.relevanceScore = notice.relevance
-            content.categoryIdentifier = NewEpisodeNotice.category
-            content.userInfo = ["link": notice.link.absoluteString]
-            try? await center.add(UNNotificationRequest(identifier: notice.id, content: content, trigger: nil))
-        }
+    /// Shows one, now. The checker hands them over in the order to post
+    /// them: iOS lists the newest first, so last to first they read in the
+    /// reply's order, the "more shows" one after the five.
+    private static func post(_ notice: NewEpisodeNotice) async {
+        let content = UNMutableNotificationContent()
+        content.title = notice.title
+        content.body = notice.body
+        content.sound = .default
+        content.threadIdentifier = notice.thread
+        content.relevanceScore = notice.relevance
+        content.categoryIdentifier = NewEpisodeNotice.category
+        content.userInfo = ["link": notice.link.absoluteString]
+        try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: notice.id, content: content, trigger: nil))
     }
 
     /// What a tap opens: the show's page at its earliest new episode, or Home.

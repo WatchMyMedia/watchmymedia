@@ -89,9 +89,12 @@ struct RootView: View {
         .animation(.default, value: flow.choosingServer)
         .onChange(of: account) { old, _ in
             flow.forgetSignIn()
-            // Another account's reminders never notify here, nor are its new episodes kept.
+            // Another account's reminders never notify here.
             Task { await notifier.reschedule([]) }
-            Task { await newEpisodes.accountChanged() }
+            // Nor are its new episodes kept, once the change is real: Switch
+            // server picks the new server before signing in there, and Cancel
+            // goes back to the old one, whose cursor must still be there.
+            if flow.serverSwitch == nil { Task { await newEpisodes.accountChanged() } }
             if let switching = flow.serverSwitch {
                 switching.accountChanged()
             } else {
@@ -189,6 +192,7 @@ struct RootView: View {
     }
 
     private func endServerSwitch(_ outcome: ServerSwitchModel.Outcome) {
+        if outcome != .cancelled { Task { await newEpisodes.accountChanged() } }
         flow.serverSwitch = nil
         flow.choosingServer = false
         resetAccountViews(rebuild: outcome != .cancelled)

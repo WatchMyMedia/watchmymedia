@@ -118,14 +118,12 @@ import WMMModel
         let memory = NewEpisodeMemory(defaults: defaults)
         #expect(memory.notifyHere, "on by default")
         memory.keep(cursor: "5", for: "srv-a:1")
-        memory.setFollowsAny(true, for: "srv-a:1")
         let again = NewEpisodeMemory(defaults: defaults)
         #expect(again.cursor(for: "srv-a:1") == "5", "kept across launches")
         #expect(again.cursor(for: "srv-a:2") == nil)
         again.forget(unlessFor: "srv-a:1")
-        #expect(again.followsAny(for: "srv-a:1") == true)
+        #expect(again.cursor(for: "srv-a:1") == "5", "its own is kept")
         again.forget(unlessFor: nil)
         #expect(again.cursor(for: "srv-a:1") == nil)
-        #expect(again.followsAny(for: "srv-a:1") == nil)
     }
 }

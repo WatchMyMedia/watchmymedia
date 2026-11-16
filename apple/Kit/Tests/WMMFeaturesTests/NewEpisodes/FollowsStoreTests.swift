@@ -11,9 +11,8 @@ import WMMModel
 @Suite(.timeLimit(.minutes(1)))
 struct FollowsStoreTests {
     let repository = SpyFollows()
-    let memory = NewEpisodeMemory(defaults: scratchDefaults())
 
-    func store() -> FollowsStore { FollowsStore(repository: repository, memory: memory) }
+    func store() -> FollowsStore { FollowsStore(repository: repository) }
 
     @Test func theBellReadsTheShowsPageUntilTheListIsLoaded() async {
         let follows = store()
@@ -23,7 +22,6 @@ struct FollowsStoreTests {
         await follows.refresh()
         #expect(!follows.isFollowing(followedShow(100, following: true)), "the list, once loaded, says")
         #expect(follows.isFollowing(followedShow(101, following: false)))
-        #expect(memory.followsAny(for: "srv-a:1") == true)
     }
 
     @Test func notifyMeShowsAtOnceAndStaysWhenTheServerTakesIt() async {
@@ -40,7 +38,6 @@ struct FollowsStoreTests {
         #expect(follows.isFollowing(show))
         #expect(!follows.isSaving(show))
         #expect(follows.follows.map(\.tmdbID) == [70_100], "newest first in Settings' list")
-        #expect(memory.followsAny(for: "srv-a:1") == true)
     }
 
     @Test func aShowsPageReloadedFromBeforeTheFollowDoesntTurnTheBellBack() async {
@@ -109,7 +106,6 @@ struct FollowsStoreTests {
         #expect(follows.follows.map(\.tmdbID) == [70_100])
         await follows.remove(follows.follows[0])
         #expect(follows.follows.isEmpty)
-        #expect(memory.followsAny(for: "srv-a:1") == false, "the background check knows there is nothing to do")
     }
 
     @Test func anotherDevicesChangeRedrawsTheListButThisDevicesEchoAsksNothing() async {

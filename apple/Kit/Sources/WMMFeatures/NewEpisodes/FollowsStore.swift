@@ -8,9 +8,9 @@ import WMMModel
 /// refuses it, as stars and reminders do. The server's follows.changed from
 /// the person's other devices brings the list up to date (``listen()``), and
 /// a new server or sign-in forgets it. Only from servers at
-/// ``followsAPILevel``; otherwise it holds nothing and does nothing. What it
-/// learns of whether the person follows any show is kept for the background
-/// check (``NewEpisodeMemory``).
+/// ``followsAPILevel``; otherwise it holds nothing and does nothing. The
+/// new-episode check doesn't read it: a show followed on another device
+/// notifies too.
 @MainActor @Observable
 public final class FollowsStore {
     /// The list was loaded for this sign-in.
@@ -33,7 +33,6 @@ public final class FollowsStore {
     private var removeFailures: Set<Int> = []
     @ObservationIgnored private var context: String?
     @ObservationIgnored private let repository: any FollowsRepository
-    @ObservationIgnored private let memory: NewEpisodeMemory?
     @ObservationIgnored private let now: @MainActor () -> Date
     @ObservationIgnored private let flight = SingleFlight<Void>()
     /// Bumped by every load and change, so a slow load never undoes a newer change.
@@ -44,10 +43,8 @@ public final class FollowsStore {
     @ObservationIgnored private var echoes: [Date] = []
     static let echoWindow: TimeInterval = 30
 
-    /// - Parameter memory: where the background check learns whether the person follows anything (iPhone and iPad).
-    public init(repository: any FollowsRepository, memory: NewEpisodeMemory? = nil, now: @escaping @MainActor () -> Date = { Date() }) {
+    public init(repository: any FollowsRepository, now: @escaping @MainActor () -> Date = { Date() }) {
         self.repository = repository
-        self.memory = memory
         self.now = now
         context = repository.contextID
     }
@@ -123,7 +120,6 @@ public final class FollowsStore {
             } else {
                 items.removeAll { $0.tmdbID == tmdbID }
             }
-            noteFollowsAny(on ? true : (loaded ? !items.isEmpty : nil))
             return true
         } catch {
             forgetEcho(echo)
@@ -157,7 +153,6 @@ public final class FollowsStore {
             try await repository.remove(tmdbID: follow.tmdbID)
             guard identity == repository.contextID else { return }
             saving.remove(follow.tmdbID)
-            noteFollowsAny(!items.isEmpty)
         } catch {
             forgetEcho(echo)
             guard identity == repository.contextID else { return }
@@ -191,7 +186,6 @@ public final class FollowsStore {
             // What the list says replaces this device's changes, except those still saving.
             changed = changed.filter { saving.contains($0.key) }
             removeFailures = removeFailures.filter { id in list.contains { $0.tmdbID == id } }
-            noteFollowsAny(!list.isEmpty)
         } catch {
             guard mine == generation, identity == repository.contextID, !(error is CancellationError) else { return }
             self.error = error.displayMessage
@@ -216,11 +210,6 @@ public final class FollowsStore {
     @ObservationIgnored private(set) var eventsHeard = 0
 
     // MARK: Private
-
-    private func noteFollowsAny(_ value: Bool?) {
-        guard let memory, let context = repository.contextID else { return }
-        memory.setFollowsAny(value, for: context)
-    }
 
     private func expectEcho() -> Date {
         let date = now()

@@ -37,7 +37,7 @@ struct WatchMyMediaApp: App {
         }
         #endif
         let newEpisodes = NewEpisodeNotifier(follows: services.follows, router: NotificationRouter.shared, memory: memory)
-        _follows = State(initialValue: FollowsStore(repository: services.follows, memory: memory))
+        _follows = State(initialValue: FollowsStore(repository: services.follows))
         _newEpisodes = State(initialValue: newEpisodes)
         BackgroundSync.register(services, newEpisodes: newEpisodes)
         _cast = State(initialValue: CastServicesFactory.make(services: services, arguments: ProcessInfo.processInfo.arguments))

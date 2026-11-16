@@ -49,11 +49,36 @@ enum BackgroundSync {
     private static func run(_ task: BGTask) {
         schedule()
         guard let services else { return task.setTaskCompleted(success: false) }
+        let completion = BackgroundCompletion(task)
         let work = Task { @MainActor in
             await services.downloads.sync()
             if !Task.isCancelled { await newEpisodes?.check() }
-            task.setTaskCompleted(success: !Task.isCancelled)
+            completion.finish(success: !Task.isCancelled)
         }
-        task.expirationHandler = { work.cancel() }
+        // Time's up: the work is cancelled (the new-episode check stops at
+        // once, keeping its cursor), and the task ends now rather than when a
+        // server that doesn't answer gives up, so iOS keeps granting refreshes.
+        task.expirationHandler = { @Sendable in
+            work.cancel()
+            completion.finish(success: false)
+        }
+    }
+}
+
+/// Ends a background task once, from its work or from its expiry, whichever
+/// comes first; the expiry handler may run on any queue.
+final class BackgroundCompletion: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+    private let task: BGTask
+
+    init(_ task: BGTask) { self.task = task }
+
+    func finish(success: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !done else { return }
+        done = true
+        task.setTaskCompleted(success: success)
     }
 }
