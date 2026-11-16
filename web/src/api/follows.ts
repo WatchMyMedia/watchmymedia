@@ -32,10 +32,13 @@ export async function fetchNewEpisodes(after?: string): Promise<NewEpisodes | un
   }
 }
 
+/** A show's own reply, ['show', id], which carries following; not its seasons'. */
+const isShow = (key: readonly unknown[]) => key.length === 2 && key[0] === 'show'
+
 /** What shows follows: the list, a show's bell and Home's New from shows you follow. */
 export function invalidateFollows(qc: QueryClient) {
   void qc.invalidateQueries({ queryKey: ['follows'] })
-  void qc.invalidateQueries({ queryKey: ['show'] })
+  void qc.invalidateQueries({ predicate: (q) => isShow(q.queryKey) })
   void qc.invalidateQueries({ queryKey: ['home'] })
 }
 
@@ -44,7 +47,6 @@ type FollowsSnapshot = { shows: [readonly unknown[], ShowDetail | undefined][]; 
 /** Marks every cached reply at once: the show's pages with this TMDB id, and the list. */
 async function markFollowing(qc: QueryClient, tmdbId: number, following: boolean): Promise<FollowsSnapshot> {
   await qc.cancelQueries({ queryKey: ['follows'] })
-  const isShow = (key: readonly unknown[]) => key.length === 2 && key[0] === 'show'
   await qc.cancelQueries({ predicate: (q) => isShow(q.queryKey) })
   const shows = qc.getQueriesData<ShowDetail>({ predicate: (q) => isShow(q.queryKey) })
   const list = qc.getQueryData<FollowList>(followsQuery.queryKey)

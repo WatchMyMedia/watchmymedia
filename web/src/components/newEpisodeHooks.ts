@@ -11,7 +11,7 @@ import {
 } from '../lib/newEpisodes'
 
 // What new-episode notices read from the browser, kept current where it
-// changes: this tab's own writes (changed()), other tabs' (the storage
+// changes: this tab's own writes (newEpisodesChanged()), other tabs' (the storage
 // event), and the permission when the person comes back from the
 // browser's own settings (the Permissions API's change event, else
 // visibility and focus).
