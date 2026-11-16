@@ -476,12 +476,16 @@ Apple boards). The words are the Kit's (`NewEpisodeWords`), the rules too:
   runs in the background refresh after the downloads' sync, when the app
   opens or comes back, three minutes after the last library change while it
   is open, and once iOS allows notifications or a show is followed. It asks
-  the server's feed only when the person follows a show, the switch is on and
-  iOS allows notifications, keeps the server's cursor for one server and
-  person (`NewEpisodeMemory`, in UserDefaults), and forgets it on a sign-out
-  or another server. A first check only keeps the cursor. A check asked for
-  while one runs runs once more after it, and a server whose feed answers
-  404 is left alone for twelve hours. Each check posts
+  the server's feed whenever this device could notify (signed in at level
+  29, the switch on, iOS allowing), whatever this device last saw of the
+  follows, since a show followed on another device notifies here too. It
+  keeps the server's cursor for one server and person (`NewEpisodeMemory`,
+  in UserDefaults, keyed by their ids), and forgets it when the switch goes
+  off, on a sign-out, or after signing in elsewhere (not a Switch server
+  that was cancelled). A first check only keeps the cursor; an unreachable
+  server, or a 404 from a proxy in front of a restarting one, keeps it too.
+  A check asked for while one runs runs once more after it, and the
+  background refresh's expiry cancels it at once. Each check posts
   one notification a show at once, in the `new-episode` category, threaded
   by show, and past five shows one more that opens Home, which iOS lists after
   the five (`UITests/NewEpisodesTests.swift` checks). A tap opens the show
