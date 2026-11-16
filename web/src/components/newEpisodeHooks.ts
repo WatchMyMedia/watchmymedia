@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { ApiError } from '../api/client'
+import { useFollowShow } from '../api/follows'
 import { serverQuery } from '../api/queries'
 import { useAuth } from '../authContext'
 import { notifyPermission, onReminderOpened, requestNotify } from '../lib/browserNotices'
-import { bannerStorageKey, canFollow, loadBanner, notifySwitch, personKey, setNotifySwitch, type EpisodeBanner } from '../lib/newEpisodes'
+import {
+  bannerStorageKey, canFollow, followFailure, loadBanner, noteFollowAsked, notifySwitch, personKey, setNotifySwitch, shouldExplainFollow, type EpisodeBanner, type FollowFailure,
+} from '../lib/newEpisodes'
 
 // What new-episode notices read from the browser, kept current where it
 // changes: this tab's own writes (changed()), other tabs' (the storage
@@ -95,4 +99,37 @@ export async function askForNewEpisodes(person: string | undefined) {
   if (answer === 'granted' && person) setNotifySwitch(person, true)
   newEpisodesChanged()
   return answer
+}
+
+/**
+ * Notify me on a show's page (show-off, show-on, show-fail, explainer):
+ * pressing follows or stops at once, and a refused change goes back and
+ * says why until the next press. The first follow in a browser that can
+ * still ask opens the explainer, with the follow already made.
+ */
+export function useNotifyMe(show: { id: number; tmdbId: number; following?: boolean }) {
+  const able = useCanFollow()
+  const change = useFollowShow()
+  const permission = useNotifyPermission()
+  const person = usePerson()
+  const [asking, setAsking] = useState(false)
+  const following = !!show.following
+  const press = () => {
+    // One change at a time: the bell already shows the one being saved.
+    if (change.isPending) return
+    const follow = !following
+    change.mutate({ showId: show.id, tmdbId: show.tmdbId, follow })
+    if (follow && shouldExplainFollow(permission)) {
+      noteFollowAsked()
+      setAsking(true)
+    }
+  }
+  const answer = (allow: boolean) => {
+    setAsking(false)
+    if (allow) void askForNewEpisodes(person)
+  }
+  const failure: FollowFailure | undefined = change.isError && change.variables
+    ? followFailure(change.variables.follow, change.error instanceof ApiError ? change.error.status : undefined)
+    : undefined
+  return { able, following, press, asking, answer, failure }
 }

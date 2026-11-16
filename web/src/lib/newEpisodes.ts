@@ -111,6 +111,26 @@ export function bannerFor(groups: readonly NewEpisodeGroup[], cursor: string): E
   return { key: `new-episodes@${cursor}`, notice: groupNotice(groups[0]), more: groups.length - 1 }
 }
 
+// The bell on a show's page (show-off, show-on, show-fail).
+
+/** The bell's words: Notify me, or Notifications on while following. */
+export function bellWords(following: boolean, show: string): { label: string; name: string } {
+  return following
+    ? { label: 'Notifications on', name: `Notifications on for ${show}. Turn them off` }
+    : { label: 'Notify me', name: `Notify me of new episodes of ${show}` }
+}
+
+/** Why a change didn't stick: turning on, turning off, or the server's limit of 500 (a 409). */
+export type FollowFailure = 'on' | 'off' | 'limit'
+
+export function followFailure(follow: boolean, status: number | undefined): FollowFailure {
+  return follow && status === 409 ? 'limit' : follow ? 'on' : 'off'
+}
+
+export function followFailLine(failure: Exclude<FollowFailure, 'limit'>, show: string): string {
+  return `Couldn’t turn ${failure} notifications for ${show}. Check your connection and try again.`
+}
+
 /**
  * One check (§6.1). Without a cursor, the first call asks without after and
  * only keeps the cursor: a browser that has just turned notifications on

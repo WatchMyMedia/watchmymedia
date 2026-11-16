@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '../api/schema'
 import {
-  bannerFor, browserState, canFollow, followLine, stopFailLine, clearBanner, episodeNotices, forgetCursor, forgetOnSignOut, groupNotice, loadBanner, loadCursor, moreShowsNotice, noteFollowAsked,
+  bannerFor, bellWords, browserState, canFollow, followFailLine, followFailure, followLine, stopFailLine, clearBanner, episodeNotices, forgetCursor, forgetOnSignOut, groupNotice, loadBanner, loadCursor, moreShowsNotice, noteFollowAsked,
   notifySwitch, personKey, runCheck, saveBanner, saveCursor, setNotifySwitch, shouldCheck, shouldExplainFollow,
 } from './newEpisodes'
 
@@ -186,7 +186,12 @@ describe('Settings › Notifications’ list (settings-shows)', () => {
   it('says a show has left the library', () => {
     expect(followLine({ followedAt: ago(10), latest: { season: 3, number: 7, arrivedAt: ago(2) } })).toEqual({ text: 'Not in the library now', gone: true })
   })
-  it('words a refused Stop notifying', () => {
+  it('words a refused Stop notifying and the bell', () => {
     expect(stopFailLine('Copperline')).toBe('Couldn’t stop notifying, so you still follow Copperline. Check your connection and try again.')
+    expect(bellWords(false, 'The Sleuth Files')).toEqual({ label: 'Notify me', name: 'Notify me of new episodes of The Sleuth Files' })
+    expect(bellWords(true, 'The Sleuth Files')).toEqual({ label: 'Notifications on', name: 'Notifications on for The Sleuth Files. Turn them off' })
+    expect(followFailLine('on', 'The Sleuth Files')).toBe('Couldn’t turn on notifications for The Sleuth Files. Check your connection and try again.')
+    expect(followFailLine('off', 'The Sleuth Files')).toBe('Couldn’t turn off notifications for The Sleuth Files. Check your connection and try again.')
+    expect([followFailure(true, 409), followFailure(true, 500), followFailure(false, 409), followFailure(true, undefined)]).toEqual(['limit', 'on', 'off', 'on'])
   })
 })
