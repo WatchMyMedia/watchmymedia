@@ -4851,7 +4851,7 @@ public struct Client: APIProtocol {
     }
     /// Stop following a show by its TMDB id
     ///
-    /// Works for a show that is no longer in any library.
+    /// Works for a show that is no longer in any library, and for one not followed.
     ///
     /// - Remark: HTTP `DELETE /api/me/follows/{tmdbId}`.
     /// - Remark: Generated from `#/paths//api/me/follows/{tmdbId}/delete(removeFollow)`.
@@ -4912,7 +4912,7 @@ public struct Client: APIProtocol {
     }
     /// Episodes that arrived for the shows the signed-in person follows
     ///
-    /// What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting.
+    /// What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished since it arrived, with a file still present, at most 7 days ago, grouped by show. An episode arrives once, in whichever library it reaches first, and is listed only when the file it came with was added in the last 7 days (the New badge's measure); a copy in another library, or in a library removed and added again, is not new. Each episode named has a present file, in any library. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out.
     ///
     /// - Remark: HTTP `GET /api/me/new-episodes`.
     /// - Remark: Generated from `#/paths//api/me/new-episodes/get(listNewEpisodes)`.
@@ -6943,7 +6943,7 @@ public struct Client: APIProtocol {
     }
     /// Follow a show for the signed-in person
     ///
-    /// Following is kept by the show's TMDB id, so it covers the show in every library. At most 500 a person: past that the reply is 409.
+    /// Following is kept by the show's TMDB id, so it covers the show in every library. Only episodes that arrive from now on count. At most 500 a person: past that the reply is 409.
     ///
     /// - Remark: HTTP `PUT /api/shows/{id}/follow`.
     /// - Remark: Generated from `#/paths//api/shows/{id}/follow/put(followShow)`.

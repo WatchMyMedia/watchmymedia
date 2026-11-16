@@ -10,6 +10,67 @@ import (
 	"strings"
 )
 
+const claimMarkedSeasonWatchGuards = `-- name: ClaimMarkedSeasonWatchGuards :exec
+INSERT INTO watch_guards (user_id, item_type, item_id, owner, revision)
+SELECT ?1, 'episode', e.id, 'local', ?2 FROM episodes e
+WHERE e.season_id = ?3
+  AND ((e.air_date <> '' AND e.air_date <= ?4)
+    OR EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files f ON f.id = ef.media_file_id
+        WHERE ef.episode_id = e.id AND f.status = 'present'))
+ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
+    owner = 'local', import_run = NULL, revision = excluded.revision,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+`
+
+type ClaimMarkedSeasonWatchGuardsParams struct {
+	UserID   int64   `json:"user_id"`
+	Revision int64   `json:"revision"`
+	SeasonID int64   `json:"season_id"`
+	Today    *string `json:"today"`
+}
+
+// The guards for what MarkSeasonWatched marks, and only those: an episode
+// it leaves alone is not the person's choice, so an import may mark it.
+func (q *Queries) ClaimMarkedSeasonWatchGuards(ctx context.Context, arg ClaimMarkedSeasonWatchGuardsParams) error {
+	_, err := q.db.ExecContext(ctx, claimMarkedSeasonWatchGuards,
+		arg.UserID,
+		arg.Revision,
+		arg.SeasonID,
+		arg.Today,
+	)
+	return err
+}
+
+const claimMarkedShowWatchGuards = `-- name: ClaimMarkedShowWatchGuards :exec
+INSERT INTO watch_guards (user_id, item_type, item_id, owner, revision)
+SELECT ?1, 'episode', e.id, 'local', ?2 FROM episodes e
+WHERE e.show_id = ?3
+  AND ((e.air_date <> '' AND e.air_date <= ?4)
+    OR EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files f ON f.id = ef.media_file_id
+        WHERE ef.episode_id = e.id AND f.status = 'present'))
+ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
+    owner = 'local', import_run = NULL, revision = excluded.revision,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+`
+
+type ClaimMarkedShowWatchGuardsParams struct {
+	UserID   int64   `json:"user_id"`
+	Revision int64   `json:"revision"`
+	ShowID   int64   `json:"show_id"`
+	Today    *string `json:"today"`
+}
+
+// The guards for what MarkShowWatched marks.
+func (q *Queries) ClaimMarkedShowWatchGuards(ctx context.Context, arg ClaimMarkedShowWatchGuardsParams) error {
+	_, err := q.db.ExecContext(ctx, claimMarkedShowWatchGuards,
+		arg.UserID,
+		arg.Revision,
+		arg.ShowID,
+		arg.Today,
+	)
+	return err
+}
+
 const claimSeasonWatchGuards = `-- name: ClaimSeasonWatchGuards :exec
 INSERT INTO watch_guards (user_id, item_type, item_id, owner, revision)
 SELECT ?1, 'episode', id, 'local', ?2 FROM episodes WHERE season_id = ?3
@@ -539,6 +600,8 @@ const listShowWatchedCounts = `-- name: ListShowWatchedCounts :many
 SELECT e.show_id, COUNT(DISTINCT e.id) AS watched
 FROM watch_state w JOIN episodes e ON e.id = w.item_id
 WHERE w.user_id = ? AND w.item_type = 'episode' AND w.completed = 1
+  AND EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files f ON f.id = ef.media_file_id
+      WHERE ef.episode_id = e.id AND f.status = 'present')
 GROUP BY e.show_id
 `
 
@@ -547,6 +610,10 @@ type ListShowWatchedCountsRow struct {
 	Watched int64 `json:"watched"`
 }
 
+// Each show's watched episodes that have a file present, as
+// ListSeasonWatchedCounts counts them: a show card is watched when they
+// reach its episodes on disk, so an episode marked watched that never
+// came can't make up for a new one that did.
 func (q *Queries) ListShowWatchedCounts(ctx context.Context, userID int64) ([]ListShowWatchedCountsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listShowWatchedCounts, userID)
 	if err != nil {
@@ -732,35 +799,50 @@ func (q *Queries) ListWatchedMovieIDs(ctx context.Context, userID int64) ([]int6
 
 const markSeasonWatched = `-- name: MarkSeasonWatched :exec
 INSERT INTO watch_state (user_id, item_type, item_id, position_ms, completed)
-SELECT ?, 'episode', id, 0, 1 FROM episodes WHERE season_id = ?
+SELECT ?1, 'episode', e.id, 0, 1 FROM episodes e
+WHERE e.season_id = ?2
+  AND ((e.air_date <> '' AND e.air_date <= ?3)
+    OR EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files f ON f.id = ef.media_file_id
+        WHERE ef.episode_id = e.id AND f.status = 'present'))
 ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
     completed = 1, position_ms = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 `
 
 type MarkSeasonWatchedParams struct {
-	UserID   int64 `json:"user_id"`
-	SeasonID int64 `json:"season_id"`
+	UserID   int64   `json:"user_id"`
+	SeasonID int64   `json:"season_id"`
+	Today    *string `json:"today"`
 }
 
+// Marks the season's episodes that can have been watched: those that have
+// aired by today, and those with a file present. An episode TMDB lists
+// that hasn't aired and isn't here is left alone, so it is unwatched and
+// new when it comes (PLAN-NEW-EPISODES.md section 5.4).
 func (q *Queries) MarkSeasonWatched(ctx context.Context, arg MarkSeasonWatchedParams) error {
-	_, err := q.db.ExecContext(ctx, markSeasonWatched, arg.UserID, arg.SeasonID)
+	_, err := q.db.ExecContext(ctx, markSeasonWatched, arg.UserID, arg.SeasonID, arg.Today)
 	return err
 }
 
 const markShowWatched = `-- name: MarkShowWatched :exec
 INSERT INTO watch_state (user_id, item_type, item_id, position_ms, completed)
-SELECT ?, 'episode', id, 0, 1 FROM episodes WHERE show_id = ?
+SELECT ?1, 'episode', e.id, 0, 1 FROM episodes e
+WHERE e.show_id = ?2
+  AND ((e.air_date <> '' AND e.air_date <= ?3)
+    OR EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files f ON f.id = ef.media_file_id
+        WHERE ef.episode_id = e.id AND f.status = 'present'))
 ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
     completed = 1, position_ms = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 `
 
 type MarkShowWatchedParams struct {
-	UserID int64 `json:"user_id"`
-	ShowID int64 `json:"show_id"`
+	UserID int64   `json:"user_id"`
+	ShowID int64   `json:"show_id"`
+	Today  *string `json:"today"`
 }
 
+// MarkSeasonWatched for every season of a show, specials included.
 func (q *Queries) MarkShowWatched(ctx context.Context, arg MarkShowWatchedParams) error {
-	_, err := q.db.ExecContext(ctx, markShowWatched, arg.UserID, arg.ShowID)
+	_, err := q.db.ExecContext(ctx, markShowWatched, arg.UserID, arg.ShowID, arg.Today)
 	return err
 }
 

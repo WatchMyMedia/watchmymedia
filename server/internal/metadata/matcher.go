@@ -598,8 +598,49 @@ func (m *Matcher) record(ctx context.Context, fileID int64, status string, movie
 				return err
 			}
 		}
-		return nil
+		return recordArrivals(ctx, q, fileID, episodeIDs)
 	})
+}
+
+// NewWindow is how long a file counts as new after it was added (its
+// added_at: when a scan found it, or its date on disk in a library's first
+// scan). It is the New badge's window, and the window in which a file can
+// announce an episode (PLAN-NEW-EPISODES.md §4, decision 4).
+const NewWindow = 7 * 24 * time.Hour
+
+// recordArrivals notes the episodes a file is being linked to as arrived
+// (PLAN-NEW-EPISODES.md §5.2). An arrival belongs to the TMDB episode (the
+// show's TMDB id, season and number), not the episode row, and a TMDB
+// episode arrives once, the first time any file is linked to it in any
+// library. Followers hear of it only when that file is new by the New
+// badge's measure; an older file's arrival is quiet. So a better copy, a
+// second version, a rename, a copy in a second (4K) library and a library
+// removed and added again are silent (the last moves the arrival to the
+// new episode row), files that sat unmatched for long or a moved file
+// landing on another episode are quiet, and a new file first linked to
+// the wrong episode and then fixed is announced.
+func recordArrivals(ctx context.Context, q *db.Queries, fileID int64, episodeIDs []int64) error {
+	if len(episodeIDs) == 0 {
+		return nil
+	}
+	added, err := q.GetMediaFileAddedAt(ctx, fileID)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	var quiet int64
+	if now.Sub(db.ParseTime(added)) >= NewWindow {
+		quiet = 1
+	}
+	for _, id := range episodeIDs {
+		if err := q.RecordEpisodeArrival(ctx, db.RecordEpisodeArrivalParams{EpisodeID: id, ArrivedAt: db.FormatTime(now), Quiet: quiet}); err != nil {
+			return err
+		}
+		if err := q.AdoptEpisodeArrival(ctx, &id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // --- movies ---------------------------------------------------------------
