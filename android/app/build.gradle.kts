@@ -129,7 +129,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.process)
-    // Live TV reminders: the sync after a reboot waits for a network.
+    // Live TV reminders: the sync after a reboot waits for a network. New episodes: the hourly check.
     implementation(libs.androidx.work.runtime)
     // Installs the baseline profile on devices where Play doesn't (sideloads, other stores).
     implementation(libs.androidx.profileinstaller)
@@ -145,5 +145,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.robolectric)
+    // The new-episode check's periodic work, under Robolectric.
+    testImplementation(libs.androidx.work.testing)
     baselineProfile(project(":baselineprofile"))
 }
