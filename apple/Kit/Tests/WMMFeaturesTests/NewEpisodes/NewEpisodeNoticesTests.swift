@@ -41,6 +41,8 @@ import WMMModel
         #expect(more.thread == "new-episode-more")
         #expect(DeepLink.opening(more.link, signedInServer: "srv-a") == .home)
         #expect(newEpisodePostingOrder(notices).map(\.title).first == "4 more shows have new episodes", "iOS lists the newest first")
+        #expect(notices.map(\.relevance) == notices.map(\.relevance).sorted(by: >), "and a summary by relevance: the five, then more")
+        #expect(notices.last?.relevance == 0)
         #expect(newEpisodePostingOrder(notices).last?.title == "New episode · A")
 
         let six = NewEpisodesPage(cursor: "78", shows: Array(page.shows.prefix(6)))

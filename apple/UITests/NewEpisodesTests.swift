@@ -95,6 +95,38 @@ final class NewEpisodesTests: XCTestCase {
         app.terminate()
     }
 
+    /// Seven shows at once: five notifications, then "2 more shows have new
+    /// episodes" listed after them, in Notification Center as iOS orders it.
+    @MainActor
+    func testD_PastFiveShowsTheMoreShowsNotificationListsLast() throws {
+        let first = launch(["-newEpisodesReset", "-fakesManyNewEpisodes", "-tab", "home"])
+        XCTAssertTrue(first.tabBars.firstMatch.waitForExistence(timeout: 20) || first.buttons.firstMatch.exists)
+        _ = first.staticTexts["never"].waitForExistence(timeout: 4)
+        first.terminate()
+        let app = launch(["-fakesManyNewEpisodes", "-tab", "home"])
+        XCTAssertTrue(app.staticTexts["New from shows you follow"].waitForExistence(timeout: 20))
+        _ = app.staticTexts["never"].waitForExistence(timeout: 8)
+        XCUIDevice.shared.press(.home)
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        _ = springboard.staticTexts["never"].waitForExistence(timeout: 2)
+        let top = springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.001))
+        top.press(forDuration: 0.1, thenDragTo: springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.6)))
+        let cells = springboard.buttons.matching(NSPredicate(format: "identifier == 'ListCell' AND label CONTAINS 'WATCHMYMEDIA'"))
+        XCTAssertTrue(cells.firstMatch.waitForExistence(timeout: 5))
+        // A collapsed stack opens on a tap.
+        cells.firstMatch.tap()
+        _ = springboard.staticTexts["never"].waitForExistence(timeout: 2)
+        snap("Seven shows in Notification Center")
+        let labels = cells.allElementsBoundByIndex.sorted { $0.frame.minY < $1.frame.minY }.map(\.label)
+        let more = labels.firstIndex { $0.contains("2 more shows have new episodes") }
+        let harbor = labels.firstIndex { $0.contains("3 new episodes · Harbor Lights") }
+        XCTAssertNotNil(more, labels.joined(separator: "\n"))
+        XCTAssertNotNil(harbor, labels.joined(separator: "\n"))
+        if let more, let harbor { XCTAssertGreaterThan(more, harbor, "the more shows notification lists after the shows:\n\(labels.joined(separator: "\n"))") }
+        XCTAssertEqual(more, labels.count - 1, labels.joined(separator: "\n"))
+        XCUIDevice.shared.press(.home)
+    }
+
     @MainActor
     func testC_SettingsNotificationsListsTheShowsAndStopsOne() throws {
         let app = launch(["-tab", "settings"])

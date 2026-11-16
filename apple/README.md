@@ -479,9 +479,12 @@ Apple boards). The words are the Kit's (`NewEpisodeWords`), the rules too:
   the server's feed only when the person follows a show, the switch is on and
   iOS allows notifications, keeps the server's cursor for one server and
   person (`NewEpisodeMemory`, in UserDefaults), and forgets it on a sign-out
-  or another server. A first check only keeps the cursor. Each check posts
+  or another server. A first check only keeps the cursor. A check asked for
+  while one runs runs once more after it, and a server whose feed answers
+  404 is left alone for twelve hours. Each check posts
   one notification a show at once, in the `new-episode` category, threaded
-  by show, and past five shows one more that opens Home. A tap opens the show
+  by show, and past five shows one more that opens Home, which iOS lists after
+  the five (`UITests/NewEpisodesTests.swift` checks). A tap opens the show
   at its earliest new episode, only for the server it came from.
 - **Home's New from shows you follow** is the server's built-in `followed`
   row, drawn by its `episode` style like Recently aired: nothing in the apps

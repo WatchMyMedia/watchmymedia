@@ -20,10 +20,10 @@ struct NewEpisodeCheckerTests {
         repository.list = [FollowedShow(tmdbID: 70_100, title: "Harbor Lights", followedAt: .now, showID: 100)]
     }
 
-    func checker(permission: NotificationPermission = .allowed) -> NewEpisodeChecker {
+    func checker(permission: NotificationPermission = .allowed, now: @escaping @MainActor () -> Date = { Date() }) -> NewEpisodeChecker {
         let posted = posted, time = time
         return NewEpisodeChecker(repository: repository, memory: memory, permission: { permission },
-                                 post: { posted.batches.append($0) }, sleep: { try await time.sleep($0) })
+                                 post: { posted.batches.append($0) }, sleep: { try await time.sleep($0) }, now: now)
     }
 
     @Test func aFirstCheckKeepsTheServersCursorAndPostsNothing() async {
@@ -131,17 +131,55 @@ struct NewEpisodeCheckerTests {
         #expect(posted.batches.isEmpty)
     }
 
-    @Test func callersAtOnceShareOneCheck() async {
+    @Test func aCheckAskedForWhileOneRunsRunsAgainAfterIt() async {
         memory.keep(cursor: "1840", for: "srv-a:1")
         memory.setFollowsAny(true, for: "srv-a:1")
         repository.holding = true
         let check = checker()
         async let first = check.check()
-        async let second = check.check()
         #expect(await eventually { repository.calls.count == 1 })
+        // Asked while the first waits on the server: what it wants may have come after.
+        async let second = check.check()
+        async let third = check.check()
+        repository.pages["1840"] = NewEpisodesPage(cursor: "1846", shows: [arrivals(100, title: "Harbor Lights", [(3, 2)])])
         repository.release()
-        _ = await (first, second)
-        #expect(repository.calls == ["feed 1840"])
+        #expect(await eventually { repository.calls.count == 2 })
+        repository.release()
+        _ = await (first, second, third)
+        #expect(repository.calls == ["feed 1840", "feed 1846"], "once more, not once a caller")
+    }
+
+    @Test func aServerWithoutTheFeedIsLeftAloneForAWhile() async {
+        memory.keep(cursor: "1840", for: "srv-a:1")
+        memory.setFollowsAny(true, for: "srv-a:1")
+        var clock = Date(timeIntervalSince1970: 1_800_000_000)
+        repository.failure = APIError(status: 404, message: "Not Found")
+        #expect(await checker(now: { clock }).check() == .unsupported)
+        #expect(memory.cursor(for: "srv-a:1") == nil)
+        repository.failure = nil
+        clock += 3600
+        #expect(await checker(now: { clock }).check() == .unsupported)
+        #expect(repository.calls == ["feed 1840"], "the background refresh doesn't keep asking it")
+        clock += NewEpisodeChecker.unsupportedPause
+        repository.pages[""] = NewEpisodesPage(cursor: "1900")
+        #expect(await checker(now: { clock }).check() == .started, "later it asks again, from now")
+        #expect(memory.unsupportedAt(for: "srv-a:1") == nil)
+    }
+
+    @Test func aCheckWithinTheServersTwoMinutesIsFollowedByOneAfterThem() async {
+        memory.keep(cursor: "1840", for: "srv-a:1")
+        memory.setFollowsAny(true, for: "srv-a:1")
+        let check = checker()
+        let (changes, continuation) = AsyncStream.makeStream(of: LibraryChange.self)
+        let following = Task { await check.followLibrary(changes) }
+        defer { following.cancel() }
+        continuation.yield(.library(id: 2))
+        await time.advance(byMs: 30_000)
+        // The app came forward 30 s after the episode arrived: the server still holds it back.
+        #expect(await check.check() == .checked(posted: 0))
+        repository.pages["1840"] = NewEpisodesPage(cursor: "1846", shows: [arrivals(100, title: "Harbor Lights", [(3, 2)])])
+        await time.advance(byMs: 150_000)
+        #expect(await eventually { posted.batches.count == 1 }, "three minutes after the change, past the two")
     }
 
     @Test func anOpenAppChecksThreeMinutesAfterTheLastLibraryChange() async {

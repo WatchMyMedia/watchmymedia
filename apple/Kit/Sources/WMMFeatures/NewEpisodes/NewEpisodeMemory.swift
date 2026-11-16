@@ -16,6 +16,8 @@ public final class NewEpisodeMemory {
         var cursor: String?
         /// Whether the person follows a show, as last known here.
         var followsAny: Bool?
+        /// When the server last answered that it has no feed.
+        var unsupportedAt: Date?
     }
 
     static let switchKey = "newEpisodes.notifyHere"
@@ -63,8 +65,9 @@ public final class NewEpisodeMemory {
         record?.context == context ? record?.cursor : nil
     }
 
+    /// The server answered: its cursor is kept, and it has the feed after all.
     public func keep(cursor: String, for context: String) {
-        update(context) { $0.cursor = cursor }
+        update(context) { $0.cursor = cursor; $0.unsupportedAt = nil }
     }
 
     /// Drops the cursor, so the next check starts from now.
@@ -81,6 +84,15 @@ public final class NewEpisodeMemory {
 
     public func setFollowsAny(_ value: Bool?, for context: String) {
         update(context) { $0.followsAny = value }
+    }
+
+    /// When `context`'s server last answered that it has no feed; nil when it hasn't.
+    public func unsupportedAt(for context: String) -> Date? {
+        record?.context == context ? record?.unsupportedAt : nil
+    }
+
+    public func markUnsupported(at date: Date, for context: String) {
+        update(context) { $0.unsupportedAt = date }
     }
 
     /// Forgets everything kept for anyone other than `context` (nil: nobody is signed in).

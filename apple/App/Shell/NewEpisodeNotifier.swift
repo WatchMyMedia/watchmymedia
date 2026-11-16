@@ -27,9 +27,14 @@ final class NewEpisodeNotifier {
     @ObservationIgnored let checker: NewEpisodeChecker
     /// Background App Refresh as iOS last said; checked when Settings › Notifications appears and the app comes forward.
     private(set) var backgroundRefresh = true
+    @ObservationIgnored private let follows: any FollowsRepository
+    /// The server and person the delivered notifications were for.
+    @ObservationIgnored private var context: String?
 
     init(follows: any FollowsRepository, router: NotificationRouter, memory: NewEpisodeMemory = NewEpisodeMemory()) {
         self.memory = memory
+        self.follows = follows
+        context = follows.contextID
         checker = NewEpisodeChecker(
             repository: follows, memory: memory,
             permission: { await router.currentPermission() },
@@ -50,6 +55,9 @@ final class NewEpisodeNotifier {
     /// do the notifications the last one was shown, which name its shows.
     func accountChanged() async {
         checker.accountChanged()
+        // The same person on the same server (their name changed, say) keeps what they were shown.
+        guard follows.contextID != context else { return }
+        context = follows.contextID
         let center = UNUserNotificationCenter.current()
         let delivered = await center.deliveredNotifications()
         let ours = delivered.map(\.request).filter { $0.content.categoryIdentifier == NewEpisodeNotice.category }.map(\.identifier)
@@ -65,6 +73,7 @@ final class NewEpisodeNotifier {
             content.body = notice.body
             content.sound = .default
             content.threadIdentifier = notice.thread
+            content.relevanceScore = notice.relevance
             content.categoryIdentifier = NewEpisodeNotice.category
             content.userInfo = ["link": notice.link.absoluteString]
             try? await center.add(UNNotificationRequest(identifier: notice.id, content: content, trigger: nil))

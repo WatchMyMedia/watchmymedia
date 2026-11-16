@@ -28,13 +28,17 @@ public struct NewEpisodeNotice: Hashable, Sendable, Identifiable {
     /// What a tap opens: the show's page at the earliest new episode, or Home,
     /// published for the server signed in, so no other sign-in opens it.
     public var link: URL
+    /// iOS's relevance score, which orders a summary: the reply's order, the
+    /// "more shows" one last.
+    public var relevance: Double
 
-    public init(id: String, title: String, body: String, thread: String, link: URL) {
+    public init(id: String, title: String, body: String, thread: String, link: URL, relevance: Double = 0) {
         self.id = id
         self.title = title
         self.body = body
         self.thread = thread
         self.link = link
+        self.relevance = relevance
     }
 }
 
@@ -45,7 +49,7 @@ public struct NewEpisodeNotice: Hashable, Sendable, Identifiable {
 /// (``newEpisodePostingOrder(_:)``).
 public func newEpisodeNotices(_ page: NewEpisodesPage, serverID: String, limit: Int = NewEpisodeNotice.showLimit) -> [NewEpisodeNotice] {
     let shown = page.shows.prefix(limit)
-    var notices = shown.map { group in
+    var notices = shown.enumerated().map { index, group in
         let thread = NewEpisodeNotice.prefix + String(group.show.tmdbID)
         let link = DeepLink.show(id: group.show.id, season: group.open.season, episode: group.open.episodeID)
         return NewEpisodeNotice(
@@ -53,7 +57,8 @@ public func newEpisodeNotices(_ page: NewEpisodesPage, serverID: String, limit: 
             title: NewEpisodeWords.noticeTitle(show: group.show.title, count: max(group.count, group.episodes.count, 1)),
             body: NewEpisodeWords.noticeBody(group.episodes, count: group.count),
             thread: thread,
-            link: link.url(publishedFor: serverID, source: NewEpisodeNotice.linkSource)
+            link: link.url(publishedFor: serverID, source: NewEpisodeNotice.linkSource),
+            relevance: 1 - Double(index) * 0.1
         )
     }
     let more = page.shows.count - shown.count

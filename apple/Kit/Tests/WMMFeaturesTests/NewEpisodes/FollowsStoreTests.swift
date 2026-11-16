@@ -43,6 +43,25 @@ struct FollowsStoreTests {
         #expect(memory.followsAny(for: "srv-a:1") == true)
     }
 
+    @Test func aShowsPageReloadedFromBeforeTheFollowDoesntTurnTheBellBack() async {
+        let follows = store()
+        let show = followedShow(100, following: false)
+        #expect(await follows.toggle(show))
+        // The page's quiet reload began before the press, so its reply still says not following.
+        #expect(follows.isFollowing(followedShow(100, following: false)), "the change made here stands")
+        // A list load that began before the press is dropped, so it can't either.
+        repository.holding = true
+        let loading = Task { await follows.refresh() }
+        #expect(await eventually { repository.calls.last == "follows" })
+        repository.list = []
+        let stopping = Task { await follows.toggle(show) }
+        #expect(await eventually { repository.calls.last == "unfollow 100" })
+        repository.list = [FollowedShow(tmdbID: 70_100, title: "Harbor Lights", followedAt: .now, showID: 100)]
+        repository.release()
+        _ = await (loading.value, stopping.value)
+        #expect(!follows.isFollowing(show), "the stop, made after the load began, wins")
+    }
+
     @Test func aRefusedFollowGoesBackAndSaysWhyUntilPressedAgain() async {
         let follows = store()
         let show = followedShow(100, title: "The Sleuth Files")
