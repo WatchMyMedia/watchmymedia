@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '../api/schema'
 import {
-  bannerFor, bellWords, browserState, canFollow, followFailLine, followFailure, followLine, stopFailLine, clearBanner, episodeNotices, forgetCursor, forgetOnSignOut, groupNotice, loadBanner, loadCursor, moreShowsNotice, noteFollowAsked,
+  bannerFor, bellWords, browserState, forgetPlace, lastLibraryChange, noteLibraryChange, noteSignedIn, signedInHere, canFollow, followFailLine, followFailure, followLine, stopFailLine, clearBanner, episodeNotices, forgetCursor, forgetOnSignOut, groupNotice, loadBanner, loadCursor, moreShowsNotice, noteFollowAsked,
   notifySwitch, personKey, runCheck, saveBanner, saveCursor, setNotifySwitch, shouldCheck, shouldExplainFollow,
 } from './newEpisodes'
 
@@ -199,5 +199,31 @@ describe('Settings › Notifications’ list (settings-shows)', () => {
     expect(followFailLine('on', 'The Sleuth Files')).toBe('Couldn’t turn on notifications for The Sleuth Files. Check your connection and try again.')
     expect(followFailLine('off', 'The Sleuth Files')).toBe('Couldn’t turn off notifications for The Sleuth Files. Check your connection and try again.')
     expect([followFailure(true, 409), followFailure(true, 500), followFailure(false, 409), followFailure(true, undefined)]).toEqual(['limit', 'on', 'off', 'on'])
+  })
+})
+
+describe('what goes with the switch and the sign-in (review fixes)', () => {
+  it('forgets the banner with the cursor, so an old one doesn’t come back when the switch goes on', () => {
+    const p = personKey('srv-1', 1)
+    saveCursor(p, '10')
+    saveBanner(p, bannerFor([group('The Sleuth Files', [[3, 7]])], '10')!)
+    forgetPlace(p)
+    expect([loadCursor(p), loadBanner(p)]).toEqual([undefined, undefined])
+  })
+  it('shares when a library last changed between tabs', () => {
+    expect(lastLibraryChange()).toBeUndefined()
+    noteLibraryChange(1000)
+    expect(lastLibraryChange()).toBe(1000)
+    localStorage.setItem('wmm.newEpisodes.libraryChangedAt', '5000')
+    expect(lastLibraryChange()).toBe(5000)
+  })
+  it('lets only the person the browser is signed in as now check', () => {
+    expect(signedInHere(1)).toBe(true)
+    noteSignedIn(2)
+    expect(signedInHere(1)).toBe(false)
+    expect(signedInHere(2)).toBe(true)
+    expect(signedInHere(undefined)).toBe(false)
+    noteSignedIn(undefined)
+    expect(signedInHere(1)).toBe(true)
   })
 })

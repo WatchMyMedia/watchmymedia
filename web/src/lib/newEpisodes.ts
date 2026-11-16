@@ -158,6 +158,8 @@ const CURSOR = 'wmm.newEpisodes.cursor:'
 const OFF = 'wmm.newEpisodes.off:'
 const BANNER = 'wmm.newEpisodes.banner:'
 const ASKED = 'wmm.newEpisodes.asked'
+const CHANGED = 'wmm.newEpisodes.libraryChangedAt'
+const SIGNED_IN = 'wmm.newEpisodes.signedIn'
 
 /** Who the browser keeps these for: a server and a person on it. */
 export function personKey(serverId: string, userId: number): string {
@@ -194,6 +196,43 @@ export function loadBanner(person: string): EpisodeBanner | undefined {
 }
 export const saveBanner = (person: string, banner: EpisodeBanner) => write(BANNER + person, JSON.stringify(banner))
 export const clearBanner = (person: string) => write(BANNER + person, undefined)
+
+/**
+ * The switch turned off, or notifications no longer allowed: the cursor
+ * goes, so turning them on starts from now, and so does the banner, so an
+ * old one doesn't come back with them.
+ */
+export function forgetPlace(person: string) {
+  forgetCursor(person)
+  clearBanner(person)
+}
+
+// When a library last changed, shared by this browser's tabs so the one that
+// takes the lock still checks when the window ends; kept in the page too
+// where storage is blocked.
+let changedHere: number | undefined
+export function noteLibraryChange(at: number) {
+  changedHere = at
+  write(CHANGED, String(at))
+}
+export function lastLibraryChange(): number | undefined {
+  const stored = Number(read(CHANGED))
+  return Number.isFinite(stored) && stored > 0 ? Math.max(stored, changedHere ?? 0) : changedHere
+}
+
+/**
+ * Who the browser is signed in as now, by the last tab to ask the server.
+ * A tab still showing an earlier person after another tab signed in as
+ * someone else lets the lock go and checks nothing, so it never keeps the
+ * new person's cursor under the old one.
+ */
+export const signedInStorageKey = SIGNED_IN
+export const noteSignedIn = (userId: number | undefined) => write(SIGNED_IN, userId === undefined ? undefined : String(userId))
+export function signedInHere(userId: number | undefined): boolean {
+  if (userId === undefined) return false
+  const now = read(SIGNED_IN)
+  return now === undefined || now === String(userId)
+}
 
 /** Signing out forgets every cursor and banner this browser kept: the next sign-in starts from now. */
 export function forgetOnSignOut() {

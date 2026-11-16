@@ -7,7 +7,8 @@ import { serverQuery } from '../api/queries'
 import { useAuth } from '../authContext'
 import { notifyPermission, onReminderOpened, requestNotify } from '../lib/browserNotices'
 import {
-  bannerStorageKey, canFollow, followFailure, loadBanner, noteFollowAsked, notifySwitch, personKey, setNotifySwitch, shouldExplainFollow, type EpisodeBanner, type FollowFailure,
+  bannerStorageKey, canFollow, followFailure, loadBanner, noteFollowAsked, notifySwitch, personKey, setNotifySwitch, shouldExplainFollow, signedInHere, type EpisodeBanner,
+  type FollowFailure,
 } from '../lib/newEpisodes'
 
 // What new-episode notices read from the browser, kept current where it
@@ -59,6 +60,12 @@ export function usePerson(): string | undefined {
 /** This browser's New episodes switch for the person: on unless turned off here. */
 export function useNotifySwitch(person: string | undefined): boolean {
   const read = useCallback(() => (person ? notifySwitch(person) : false), [person])
+  return useSyncExternalStore(subscribe, read, () => false)
+}
+
+/** Whether the browser is still signed in as this person, by the last tab to ask the server. */
+export function useSignedInHere(userId: number | undefined): boolean {
+  const read = useCallback(() => signedInHere(userId), [userId])
   return useSyncExternalStore(subscribe, read, () => false)
 }
 
