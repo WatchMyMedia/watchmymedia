@@ -78,6 +78,13 @@ server, and on iPad in both a regular and a compact width.
   rather than a page-wide error. A new such control gets a `SettingKey`, a
   Saved line that says what the change did and a failed line that names
   what it is still, with a test that moves the save's sleep.
+- **Notifications have one delegate**, `NotificationRouter`
+  (`App/Shell/NotificationRouter.swift`): it hands each category to its
+  owner (`LiveReminderNotifier`, `NewEpisodeNotifier`) and registers every
+  category at once, since `setNotificationCategories` replaces them all. A
+  new kind of notification gets its own category, a case in the Kit's
+  `NotificationOwner`, and its owner; a tap opens only a link the app
+  published for the server signed in.
 - **A 401 that isn't a lost sign-in** (a wrong current password) needs its
   operation in `ServerAPI.credentialOperations`, or the 401 signs the device
   out: `changePassword` is there.
@@ -288,6 +295,11 @@ didn't start.
   Settings row says Saved for 4 s (`SaveStates.linger`), which a press with
   the simulator tool followed by its screenshot can outlast: capture with
   `xcrun simctl io` straight after the press, or read the row in a UI test.
+- A UI test can't open the app from a notification on the Lock Screen or in
+  Notification Center (iOS 27.2 simulator): the first tap opens the app's
+  stack and the next opens nothing. With the app open, iOS shows the
+  notification as a banner, and a tap on that reaches the app
+  (`UITests/NewEpisodesTests.swift`).
 - Run `make apple-e2e` against your own server copy on its own port
   (`E2E_SERVER=localhost:<port>`), not a fixture server another session runs.
 - Typing into the in-app Safari (`SFSafariViewController`) arrives late and
