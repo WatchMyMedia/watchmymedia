@@ -87,6 +87,9 @@ func registerEvents(h huma.API, deps Deps) {
 		// list's audience (API level 22).
 		RowsChangedEvent:  RowsChanged{},
 		ListsChangedEvent: ListsChanged{},
+		// To a person's own devices: they followed or stopped following a
+		// show (API level 29).
+		FollowsChangedEvent: FollowsChanged{},
 	}, func(ctx context.Context, _ *struct{}, send sse.Sender) {
 		if deps.Bus == nil {
 			return

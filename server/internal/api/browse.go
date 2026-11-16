@@ -125,6 +125,8 @@ type ShowDetail struct {
 	// NextEpisode is the first unwatched episode on disk, for "Play next".
 	NextEpisode *NextEpisode `json:"nextEpisode,omitempty"`
 	ManagedBy   string       `json:"managedBy,omitempty" required:"false" doc:"The Sonarr connection that has the show."`
+	// Following is PLAN-NEW-EPISODES.md §5.3, API level 29.
+	Following bool `json:"following" required:"false" doc:"The signed-in person follows the show (followShow). Absent on servers below API level 29."`
 }
 
 type NextEpisode struct {

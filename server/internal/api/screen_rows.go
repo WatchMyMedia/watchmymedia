@@ -34,7 +34,7 @@ const (
 // §6.1). Only rows with something to show are sent, except live, which the
 // app fills.
 type ScreenRow struct {
-	ID       string           `json:"id" doc:"On Home: continue, live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>."`
+	ID       string           `json:"id" doc:"On Home: continue, followed (from API level 29), live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>."`
 	Style    string           `json:"style" doc:"How to draw it: poster (items), wide (items as 16:9 cards), episode (episodes), continue (continue) or live (no items: draw the app's Live TV row in this place). A plain string: skip a row whose style you don't know."`
 	Title    string           `json:"title" example:"Recently added · Movies"`
 	Subtitle string           `json:"subtitle,omitempty" required:"false" example:"18 of 50 · From TMDB" doc:"Lists: how many of the list's titles the library has, and where it is from."`

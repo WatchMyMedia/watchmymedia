@@ -353,6 +353,25 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /api/live-tv/sessions/{id}`.
     /// - Remark: Generated from `#/paths//api/live-tv/sessions/{id}/delete(stopLiveTV)`.
     func stopLiveTV(_ input: Operations.StopLiveTV.Input) async throws -> Operations.StopLiveTV.Output
+    /// The shows the signed-in person follows
+    ///
+    /// - Remark: HTTP `GET /api/me/follows`.
+    /// - Remark: Generated from `#/paths//api/me/follows/get(listFollows)`.
+    func listFollows(_ input: Operations.ListFollows.Input) async throws -> Operations.ListFollows.Output
+    /// Stop following a show by its TMDB id
+    ///
+    /// Works for a show that is no longer in any library.
+    ///
+    /// - Remark: HTTP `DELETE /api/me/follows/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/follows/{tmdbId}/delete(removeFollow)`.
+    func removeFollow(_ input: Operations.RemoveFollow.Input) async throws -> Operations.RemoveFollow.Output
+    /// Episodes that arrived for the shows the signed-in person follows
+    ///
+    /// What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting.
+    ///
+    /// - Remark: HTTP `GET /api/me/new-episodes`.
+    /// - Remark: Generated from `#/paths//api/me/new-episodes/get(listNewEpisodes)`.
+    func listNewEpisodes(_ input: Operations.ListNewEpisodes.Input) async throws -> Operations.ListNewEpisodes.Output
     /// Get the signed-in user's playback preferences
     ///
     /// - Remark: HTTP `GET /api/me/preferences`.
@@ -501,6 +520,18 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /api/shows/{id}`.
     /// - Remark: Generated from `#/paths//api/shows/{id}/get(getShow)`.
     func getShow(_ input: Operations.GetShow.Input) async throws -> Operations.GetShow.Output
+    /// Follow a show for the signed-in person
+    ///
+    /// Following is kept by the show's TMDB id, so it covers the show in every library. At most 500 a person: past that the reply is 409.
+    ///
+    /// - Remark: HTTP `PUT /api/shows/{id}/follow`.
+    /// - Remark: Generated from `#/paths//api/shows/{id}/follow/put(followShow)`.
+    func followShow(_ input: Operations.FollowShow.Input) async throws -> Operations.FollowShow.Output
+    /// Stop following a show for the signed-in person
+    ///
+    /// - Remark: HTTP `DELETE /api/shows/{id}/follow`.
+    /// - Remark: Generated from `#/paths//api/shows/{id}/follow/delete(unfollowShow)`.
+    func unfollowShow(_ input: Operations.UnfollowShow.Input) async throws -> Operations.UnfollowShow.Output
     /// Monitor or unmonitor a season or some episodes in Sonarr
     ///
     /// - Remark: HTTP `POST /api/shows/{id}/monitor`.
@@ -1329,6 +1360,43 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// The shows the signed-in person follows
+    ///
+    /// - Remark: HTTP `GET /api/me/follows`.
+    /// - Remark: Generated from `#/paths//api/me/follows/get(listFollows)`.
+    public func listFollows(headers: Operations.ListFollows.Input.Headers = .init()) async throws -> Operations.ListFollows.Output {
+        try await listFollows(Operations.ListFollows.Input(headers: headers))
+    }
+    /// Stop following a show by its TMDB id
+    ///
+    /// Works for a show that is no longer in any library.
+    ///
+    /// - Remark: HTTP `DELETE /api/me/follows/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/follows/{tmdbId}/delete(removeFollow)`.
+    public func removeFollow(
+        path: Operations.RemoveFollow.Input.Path,
+        headers: Operations.RemoveFollow.Input.Headers = .init()
+    ) async throws -> Operations.RemoveFollow.Output {
+        try await removeFollow(Operations.RemoveFollow.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Episodes that arrived for the shows the signed-in person follows
+    ///
+    /// What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting.
+    ///
+    /// - Remark: HTTP `GET /api/me/new-episodes`.
+    /// - Remark: Generated from `#/paths//api/me/new-episodes/get(listNewEpisodes)`.
+    public func listNewEpisodes(
+        query: Operations.ListNewEpisodes.Input.Query = .init(),
+        headers: Operations.ListNewEpisodes.Input.Headers = .init()
+    ) async throws -> Operations.ListNewEpisodes.Output {
+        try await listNewEpisodes(Operations.ListNewEpisodes.Input(
+            query: query,
+            headers: headers
+        ))
+    }
     /// Get the signed-in user's playback preferences
     ///
     /// - Remark: HTTP `GET /api/me/preferences`.
@@ -1641,6 +1709,34 @@ extension APIProtocol {
         headers: Operations.GetShow.Input.Headers = .init()
     ) async throws -> Operations.GetShow.Output {
         try await getShow(Operations.GetShow.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Follow a show for the signed-in person
+    ///
+    /// Following is kept by the show's TMDB id, so it covers the show in every library. At most 500 a person: past that the reply is 409.
+    ///
+    /// - Remark: HTTP `PUT /api/shows/{id}/follow`.
+    /// - Remark: Generated from `#/paths//api/shows/{id}/follow/put(followShow)`.
+    public func followShow(
+        path: Operations.FollowShow.Input.Path,
+        headers: Operations.FollowShow.Input.Headers = .init()
+    ) async throws -> Operations.FollowShow.Output {
+        try await followShow(Operations.FollowShow.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Stop following a show for the signed-in person
+    ///
+    /// - Remark: HTTP `DELETE /api/shows/{id}/follow`.
+    /// - Remark: Generated from `#/paths//api/shows/{id}/follow/delete(unfollowShow)`.
+    public func unfollowShow(
+        path: Operations.UnfollowShow.Input.Path,
+        headers: Operations.UnfollowShow.Input.Headers = .init()
+    ) async throws -> Operations.UnfollowShow.Output {
+        try await unfollowShow(Operations.UnfollowShow.Input(
             path: path,
             headers: headers
         ))

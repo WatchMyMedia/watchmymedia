@@ -3021,6 +3021,163 @@ extension Components {
                 case _type = "type"
             }
         }
+        /// - Remark: Generated from `#/components/schemas/Follow`.
+        public struct Follow: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/Follow/followedAt`.
+            public var followedAt: Foundation.Date
+            /// The newest episode that arrived for it, announced or not. Absent when none has.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Follow/latest`.
+            public var latest: Components.Schemas.FollowLatest?
+            /// The show, while it is in a library. Absent once it has left every library.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Follow/show`.
+            public var show: Components.Schemas.FollowedShow?
+            /// The show's title, kept for a show that has left the library.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Follow/title`.
+            public var title: Swift.String
+            /// The show's TMDB id: what removeFollow takes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Follow/tmdbId`.
+            public var tmdbId: Swift.Int64
+            /// Creates a new `Follow`.
+            ///
+            /// - Parameters:
+            ///   - followedAt:
+            ///   - latest: The newest episode that arrived for it, announced or not. Absent when none has.
+            ///   - show: The show, while it is in a library. Absent once it has left every library.
+            ///   - title: The show's title, kept for a show that has left the library.
+            ///   - tmdbId: The show's TMDB id: what removeFollow takes.
+            public init(
+                followedAt: Foundation.Date,
+                latest: Components.Schemas.FollowLatest? = nil,
+                show: Components.Schemas.FollowedShow? = nil,
+                title: Swift.String,
+                tmdbId: Swift.Int64
+            ) {
+                self.followedAt = followedAt
+                self.latest = latest
+                self.show = show
+                self.title = title
+                self.tmdbId = tmdbId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case followedAt
+                case latest
+                case show
+                case title
+                case tmdbId
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/FollowLatest`.
+        public struct FollowLatest: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/FollowLatest/arrivedAt`.
+            public var arrivedAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/FollowLatest/number`.
+            public var number: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/FollowLatest/season`.
+            public var season: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/FollowLatest/title`.
+            public var title: Swift.String?
+            /// Creates a new `FollowLatest`.
+            ///
+            /// - Parameters:
+            ///   - arrivedAt:
+            ///   - number:
+            ///   - season:
+            ///   - title:
+            public init(
+                arrivedAt: Foundation.Date,
+                number: Swift.Int64,
+                season: Swift.Int64,
+                title: Swift.String? = nil
+            ) {
+                self.arrivedAt = arrivedAt
+                self.number = number
+                self.season = season
+                self.title = title
+            }
+            public enum CodingKeys: String, CodingKey {
+                case arrivedAt
+                case number
+                case season
+                case title
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/FollowList`.
+        public struct FollowList: Codable, Hashable, Sendable {
+            /// Newest follow first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FollowList/follows`.
+            public var follows: [Components.Schemas.Follow]
+            /// Creates a new `FollowList`.
+            ///
+            /// - Parameters:
+            ///   - follows: Newest follow first.
+            public init(follows: [Components.Schemas.Follow]) {
+                self.follows = follows
+            }
+            public enum CodingKeys: String, CodingKey {
+                case follows
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/FollowedShow`.
+        public struct FollowedShow: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/FollowedShow/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/FollowedShow/posterPath`.
+            public var posterPath: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/FollowedShow/title`.
+            public var title: Swift.String
+            /// Creates a new `FollowedShow`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - posterPath:
+            ///   - title:
+            public init(
+                id: Swift.Int64,
+                posterPath: Swift.String? = nil,
+                title: Swift.String
+            ) {
+                self.id = id
+                self.posterPath = posterPath
+                self.title = title
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case posterPath
+                case title
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/FollowsChanged`.
+        public struct FollowsChanged: Codable, Hashable, Sendable {
+            /// Whether the person follows it now.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FollowsChanged/following`.
+            public var following: Swift.Bool
+            /// The show's TMDB id, as in listFollows.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FollowsChanged/tmdbId`.
+            public var tmdbId: Swift.Int64
+            /// Creates a new `FollowsChanged`.
+            ///
+            /// - Parameters:
+            ///   - following: Whether the person follows it now.
+            ///   - tmdbId: The show's TMDB id, as in listFollows.
+            public init(
+                following: Swift.Bool,
+                tmdbId: Swift.Int64
+            ) {
+                self.following = following
+                self.tmdbId = tmdbId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case following
+                case tmdbId
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/Growing`.
         public struct Growing: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/Growing/endsAt`.
@@ -8028,6 +8185,189 @@ extension Components {
                 case source
             }
         }
+        /// - Remark: Generated from `#/components/schemas/NewEpisode`.
+        public struct NewEpisode: Codable, Hashable, Sendable {
+            /// When its first file was linked to it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewEpisode/arrivedAt`.
+            public var arrivedAt: Foundation.Date
+            /// The episode's ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewEpisode/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/NewEpisode/number`.
+            public var number: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/NewEpisode/season`.
+            public var season: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/NewEpisode/stillPath`.
+            public var stillPath: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NewEpisode/title`.
+            public var title: Swift.String?
+            /// Creates a new `NewEpisode`.
+            ///
+            /// - Parameters:
+            ///   - arrivedAt: When its first file was linked to it.
+            ///   - id: The episode's ID.
+            ///   - number:
+            ///   - season:
+            ///   - stillPath:
+            ///   - title:
+            public init(
+                arrivedAt: Foundation.Date,
+                id: Swift.Int64,
+                number: Swift.Int64,
+                season: Swift.Int64,
+                stillPath: Swift.String? = nil,
+                title: Swift.String? = nil
+            ) {
+                self.arrivedAt = arrivedAt
+                self.id = id
+                self.number = number
+                self.season = season
+                self.stillPath = stillPath
+                self.title = title
+            }
+            public enum CodingKeys: String, CodingKey {
+                case arrivedAt
+                case id
+                case number
+                case season
+                case stillPath
+                case title
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/NewEpisodeGroup`.
+        public struct NewEpisodeGroup: Codable, Hashable, Sendable {
+            /// How many episodes arrived, which may be more than episodes lists.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewEpisodeGroup/count`.
+            public var count: Swift.Int64
+            /// Earliest first (by season, specials last, then episode), at most 5.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewEpisodeGroup/episodes`.
+            public var episodes: [Components.Schemas.NewEpisode]
+            /// The earliest of them, for the notification to open.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewEpisodeGroup/open`.
+            public var open: Components.Schemas.NewEpisodeOpen
+            /// - Remark: Generated from `#/components/schemas/NewEpisodeGroup/show`.
+            public var show: Components.Schemas.NewEpisodeShow
+            /// Creates a new `NewEpisodeGroup`.
+            ///
+            /// - Parameters:
+            ///   - count: How many episodes arrived, which may be more than episodes lists.
+            ///   - episodes: Earliest first (by season, specials last, then episode), at most 5.
+            ///   - open: The earliest of them, for the notification to open.
+            ///   - show:
+            public init(
+                count: Swift.Int64,
+                episodes: [Components.Schemas.NewEpisode],
+                open: Components.Schemas.NewEpisodeOpen,
+                show: Components.Schemas.NewEpisodeShow
+            ) {
+                self.count = count
+                self.episodes = episodes
+                self.open = open
+                self.show = show
+            }
+            public enum CodingKeys: String, CodingKey {
+                case count
+                case episodes
+                case open
+                case show
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/NewEpisodeOpen`.
+        public struct NewEpisodeOpen: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/NewEpisodeOpen/episodeId`.
+            public var episodeId: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/NewEpisodeOpen/number`.
+            public var number: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/NewEpisodeOpen/season`.
+            public var season: Swift.Int64
+            /// Creates a new `NewEpisodeOpen`.
+            ///
+            /// - Parameters:
+            ///   - episodeId:
+            ///   - number:
+            ///   - season:
+            public init(
+                episodeId: Swift.Int64,
+                number: Swift.Int64,
+                season: Swift.Int64
+            ) {
+                self.episodeId = episodeId
+                self.number = number
+                self.season = season
+            }
+            public enum CodingKeys: String, CodingKey {
+                case episodeId
+                case number
+                case season
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/NewEpisodeShow`.
+        public struct NewEpisodeShow: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/NewEpisodeShow/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/NewEpisodeShow/posterPath`.
+            public var posterPath: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/NewEpisodeShow/title`.
+            public var title: Swift.String
+            /// - Remark: Generated from `#/components/schemas/NewEpisodeShow/tmdbId`.
+            public var tmdbId: Swift.Int64
+            /// Creates a new `NewEpisodeShow`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - posterPath:
+            ///   - title:
+            ///   - tmdbId:
+            public init(
+                id: Swift.Int64,
+                posterPath: Swift.String? = nil,
+                title: Swift.String,
+                tmdbId: Swift.Int64
+            ) {
+                self.id = id
+                self.posterPath = posterPath
+                self.title = title
+                self.tmdbId = tmdbId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case posterPath
+                case title
+                case tmdbId
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/NewEpisodes`.
+        public struct NewEpisodes: Codable, Hashable, Sendable {
+            /// Keep it and send it as after next time. An opaque string.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewEpisodes/cursor`.
+            public var cursor: Swift.String
+            /// One a show, the show with the newest arrival first; at most 50.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NewEpisodes/shows`.
+            public var shows: [Components.Schemas.NewEpisodeGroup]
+            /// Creates a new `NewEpisodes`.
+            ///
+            /// - Parameters:
+            ///   - cursor: Keep it and send it as after next time. An opaque string.
+            ///   - shows: One a show, the show with the newest arrival first; at most 50.
+            public init(
+                cursor: Swift.String,
+                shows: [Components.Schemas.NewEpisodeGroup]
+            ) {
+                self.cursor = cursor
+                self.shows = shows
+            }
+            public enum CodingKeys: String, CodingKey {
+                case cursor
+                case shows
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/NextEpisode`.
         public struct NextEpisode: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/NextEpisode/episodeId`.
@@ -10903,7 +11243,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ScreenRow/episodes`.
             public var episodes: [Components.Schemas.EpisodeCard]?
-            /// On Home: continue, live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>.
+            /// On Home: continue, followed (from API level 29), live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>.
             ///
             /// - Remark: Generated from `#/components/schemas/ScreenRow/id`.
             public var id: Swift.String
@@ -10938,7 +11278,7 @@ extension Components {
             /// - Parameters:
             ///   - _continue: Style continue.
             ///   - episodes: Style episode.
-            ///   - id: On Home: continue, live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>.
+            ///   - id: On Home: continue, followed (from API level 29), live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>.
             ///   - items: Styles poster and wide.
             ///   - listId: Lists: the list's ID.
             ///   - seeAll: Where the row's See all goes.
@@ -12139,6 +12479,10 @@ extension Components {
             public var fileCount: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/ShowDetail/firstAirDate`.
             public var firstAirDate: Swift.String?
+            /// The signed-in person follows the show (followShow). Absent on servers below API level 29.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ShowDetail/following`.
+            public var following: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/ShowDetail/genres`.
             public var genres: [Swift.String]
             /// - Remark: Generated from `#/components/schemas/ShowDetail/hdr`.
@@ -12287,6 +12631,7 @@ extension Components {
             ///   - episodeCount: Episodes with a present file.
             ///   - fileCount:
             ///   - firstAirDate:
+            ///   - following: The signed-in person follows the show (followShow). Absent on servers below API level 29.
             ///   - genres:
             ///   - hdr:
             ///   - id:
@@ -12316,6 +12661,7 @@ extension Components {
                 episodeCount: Swift.Int64,
                 fileCount: Swift.Int64,
                 firstAirDate: Swift.String? = nil,
+                following: Swift.Bool? = nil,
                 genres: [Swift.String],
                 hdr: Swift.Bool,
                 id: Swift.Int64,
@@ -12345,6 +12691,7 @@ extension Components {
                 self.episodeCount = episodeCount
                 self.fileCount = fileCount
                 self.firstAirDate = firstAirDate
+                self.following = following
                 self.genres = genres
                 self.hdr = hdr
                 self.id = id
@@ -12375,6 +12722,7 @@ extension Components {
                 case episodeCount
                 case fileCount
                 case firstAirDate
+                case following
                 case genres
                 case hdr
                 case id

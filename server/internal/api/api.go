@@ -251,6 +251,7 @@ func New(deps Deps) (*chi.Mux, huma.API) {
 	registerBrowse(h, deps)
 	registerRows(h, deps)
 	registerScreenRows(h, deps)
+	registerFollows(h, deps)
 	registerMediaLists(h, deps)
 	registerPlayback(h, r, deps)
 	registerSubtitles(h, deps)
