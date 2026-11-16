@@ -52,7 +52,7 @@ class WorkflowIsolationTest(unittest.TestCase):
         hosted = dict.fromkeys(('changes', 'web', 'contract', 'docker', 'scripts', 'android', 'server', 'server-race'), 'ubuntu-latest')
         # macOS runners are the scarce ones: only what needs a Mac runs there.
         hosted.update(dict.fromkeys(('server-macos', 'apple', 'apple-tv'), 'macos-26'))
-        hosted['windows-server'] = hosted['windows-app'] = hosted['windows-signing'] = 'windows-latest'
+        hosted.update(dict.fromkeys(('windows-server', 'windows-live-tv', 'windows-app', 'windows-signing'), 'windows-latest'))
         self.assertEqual(set(hosted), set(jobs))
         studio = ['self-hosted', 'macOS', 'ARM64', 'mac-studio']
         # Exercise the actual runs-on expressions, not a second routing helper.
@@ -86,7 +86,8 @@ class WorkflowIsolationTest(unittest.TestCase):
                                workflow.split('jobs:\n', 1)[1]))
         gated = {'server': 'server', 'server-macos': 'server', 'server-race': 'race', 'contract': 'contract', 'web': 'web',
                  'docker': 'docker', 'scripts': 'scripts', 'android': 'android', 'apple': 'apple',
-                 'apple-tv': 'apple-tv', 'windows-server': 'windows', 'windows-app': 'windows'}
+                 'apple-tv': 'apple-tv', 'windows-server': 'windows', 'windows-live-tv': 'windows',
+                 'windows-app': 'windows'}
         self.assertEqual(set(gated) | {'changes', 'windows-signing'}, set(jobs))
         for job, output in gated.items():
             with self.subTest(job=job):
@@ -117,9 +118,10 @@ class WorkflowIsolationTest(unittest.TestCase):
         self.assertIn('path: server/internal/webui/dist', jobs['windows-app'])
         self.assertNotIn('windows/build.sh --smoke', jobs['windows-app'])
         # The server's tests need no web build, so they don't wait for one.
-        for name in ('server', 'windows-server'):
+        for name in ('server', 'windows-server', 'windows-live-tv'):
             self.assertNotIn('actions/download-artifact@', jobs[name])
-        self.assertRegex(jobs['windows-server'], r'(?m)^    needs: changes$')
+        for name in ('windows-server', 'windows-live-tv'):
+            self.assertRegex(jobs[name], r'(?m)^    needs: changes$')
 
     def test_server_tests_run_on_linux_and_macos_keeps_its_own_code(self):
         # Every Go test, the lint and the generated-code check run on Linux;
@@ -147,28 +149,51 @@ class WorkflowIsolationTest(unittest.TestCase):
         # The image is built from what the Linux job tested.
         self.assertIn('needs: [changes, server, web]', jobs['docker'])
 
-    def test_windows_server_and_app_split_the_work_once(self):
-        # Two jobs at once instead of one after the other: the Go tests and
-        # qualifications in windows-server, the app, its installers and their
-        # smoke tests in windows-app, each step in exactly one of them.
+    def test_windows_jobs_split_the_work_once(self):
+        # Three jobs at once instead of one after the other: the Go tests and
+        # the VOD qualification in windows-server, the Live TV qualification in
+        # windows-live-tv, the app, its installers and their smoke tests in
+        # windows-app, each step in exactly one of them.
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
-        server, app = jobs['windows-server'], jobs['windows-app']
-        for marker in ("go test -skip 'Speed$' ./...", "go test -p 1 -run 'Speed$' ./...",
-                       "-run '^TestRemuxSession$' -count=50", 'TestLiveLadder', 'TestVODLadder',
-                       'probe-transcoder', 'windows-transcoder-report'):
-            with self.subTest(marker=marker):
-                self.assertIn(marker, server)
-                self.assertNotIn(marker, app)
-        for marker in ('hardware-check-test.ps1', 'signing-test.ps1', 'windows/build.sh', 'TestPinnedUpdaterDLL',
-                       'hardware-check.ps1 -AppDir', 'installer.sh', 'platform-smoke.ps1', 'windows/smoke.ps1',
-                       'installer-smoke.ps1', 'windows-development-installer', 'windows-tray-logs'):
-            with self.subTest(marker=marker):
-                self.assertIn(marker, app)
-                self.assertNotIn(marker, server)
-        # The Live TV qualification runs twice on main and manual runs, once on PRs.
-        self.assertIn("-run '^TestLiveLadder.*Qualification$' -count=${{ github.event_name == 'pull_request' && 1 || 2 }} -v", server)
+        owners = {
+            'windows-server': ("go test -skip 'Speed$' ./...", "go test -p 1 -run 'Speed$' ./...",
+                               "-run '^TestRemuxSession$' -count=50", 'TestVODLadder',
+                               'probe-transcoder', 'windows-transcoder-report'),
+            'windows-live-tv': ('TestLiveLadder', 'WMM_LIVE_QUALIFICATION_CLAIMS'),
+            'windows-app': ('hardware-check-test.ps1', 'signing-test.ps1', 'windows/build.sh', 'TestPinnedUpdaterDLL',
+                            'hardware-check.ps1 -AppDir', 'installer.sh', 'platform-smoke.ps1', 'windows/smoke.ps1',
+                            'installer-smoke.ps1', 'windows-development-installer', 'windows-tray-logs'),
+        }
+        for owner, markers in owners.items():
+            for marker in markers:
+                for name in owners:
+                    with self.subTest(marker=marker, job=name):
+                        (self.assertIn if name == owner else self.assertNotIn)(marker, jobs[name])
+
+    def test_windows_qualifications_use_the_test_cache_on_pull_requests(self):
+        # -count turns Go's test cache off. Without it, a pull request that
+        # changes nothing a qualification is built from reuses main's pass;
+        # main and manual runs clear the cache first, so they always run it.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        live = "go test -tags streamingacceptance ./internal/livetv/dvr -run '^TestLiveLadder.*Qualification$'"
+        vod = ("go test -tags streamingacceptance ./internal/playback "
+               "-run '^TestVODLadder(FullFileQualification|RejectsUnboundedCopiedAudio)$'")
+        live_tv, server = jobs['windows-live-tv'], jobs['windows-server']
+        # Once on every run, cacheable; then once more, uncached, outside pull requests.
+        self.assertEqual(2, live_tv.count(live))
+        first, second = re.findall(r'(?m)^      - name: (.+)\n((?:        .*\n)+)', live_tv.split('go clean -testcache', 1)[1])[:2]
+        self.assertIn(live + ' -v\n', first[1])
+        self.assertNotIn('if:', first[1])
+        self.assertIn(live + ' -count=1 -v\n', second[1])
+        self.assertIn("        if: github.event_name != 'pull_request'\n", second[1])
+        self.assertEqual(1, server.count(vod))
+        self.assertIn(vod + ' -v\n', server)
+        for job in (live_tv, server):
+            self.assertLess(job.index('go clean -testcache'), job.index('streamingacceptance'))
 
     def test_workflow_keeps_read_only_permissions_and_fork_boundary(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
@@ -276,12 +301,12 @@ class WorkflowIsolationTest(unittest.TestCase):
                                workflow.split('jobs:\n', 1)[1]))
         self.assertNotIn('actions/cache@', workflow)
         setups = re.findall(r'(?m)uses: actions/setup-go@[^\n]*\n        with:\n((?:          .*\n)+)', workflow)
-        self.assertEqual(7, len(setups))
+        self.assertEqual(8, len(setups))
         for setup in setups:
             self.assertIn('          cache: false\n', setup)
         save_if = ("if: \"!cancelled() && runner.environment == 'github-hosted' && "
                    "github.event_name == 'push' && github.ref == 'refs/heads/main'\"")
-        cached = {'server', 'server-macos', 'server-race', 'contract', 'windows-server', 'windows-app'}
+        cached = {'server', 'server-macos', 'server-race', 'contract', 'windows-server', 'windows-live-tv', 'windows-app'}
         for name, job in jobs.items():
             with self.subTest(job=name):
                 if name not in cached:

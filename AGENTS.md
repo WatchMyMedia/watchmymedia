@@ -109,8 +109,8 @@ to keep both working.
 2. **One PR per change and platform**, on a branch named `taimoorq/<kebab-name>`.
    A batch of fixes, such as a review's findings, is one change: put it in
    one PR with a commit per fix, not one PR each, since every PR runs the CI
-   jobs for what it touches (the Windows and Apple jobs take 12–20 minutes
-   each, plus any wait for a macOS runner). Split only when a
+   jobs for what it touches (the Apple jobs take 10–30 minutes each and the
+   Windows jobs 5–10, plus any wait for a macOS runner). Split only when a
    fix needs a different reviewer, could hold the rest back, or is on
    another platform. Small direct commits to `main` have also been normal;
    ask when unsure whether the user wants a PR. Bring a branch up to date by
@@ -185,7 +185,11 @@ package with a `_darwin.go` file is among them), since GitHub's macOS runners
 are the scarce ones. The Go jobs restore Go's build and test caches from the newest
 push to `main`, so a PR reruns only the Go packages it changes and those that
 depend on them. Only `main` saves those caches, and `main` and manual runs run
-every test again (`go clean -testcache`). A change to the pinned ffmpeg starts
+every test again (`go clean -testcache`). Pass `-count` to a `go test` that
+pull requests run only when repeating is the point: any `-count` turns the
+cache off. The Windows qualifications had `-count=1` and re-ran for about six
+minutes on pull requests that changed nothing they test; they now run without
+it (`security_test.py` checks). A change to the pinned ffmpeg starts
 from an empty cache, since Go can't see the ffmpeg its tests run. The
 `android` job's Gradle caches, kept by Gradle's setup-gradle action, work the
 same way: restored everywhere, saved only by `main`. Its configuration cache
