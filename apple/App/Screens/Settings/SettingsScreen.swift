@@ -165,7 +165,12 @@ struct SettingsPageView: View {
             } else {
                 LanguageSettingsPage(model: model)
             }
-        case .notifications: NotificationSettingsPage(model: model)
+        case .notifications:
+            if let reason = services.keptOut(.notifications) {
+                KeptOutPage(title: NewEpisodeWords.title, reason: reason)
+            } else {
+                NotificationSettingsPage(model: model)
+            }
         case .account: AccountSettingsPage(model: model)
         case .server: ServerSettingsPage(model: model)
         case .about: AboutSettingsPage(model: model)

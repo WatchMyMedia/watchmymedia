@@ -73,7 +73,7 @@ extension SettingsModel {
 
 /// What a page needs from the server that it doesn't have.
 public enum SettingsFeature: Hashable, Sendable, CaseIterable {
-    case languages, requests, downloads, homeRows
+    case languages, requests, downloads, homeRows, notifications
 
     /// The API level it comes with.
     public var level: Int {
@@ -82,6 +82,7 @@ public enum SettingsFeature: Hashable, Sendable, CaseIterable {
         case .requests: ServerFeatures.Level.requests
         case .downloads: ServerFeatures.Level.offline
         case .homeRows: ServerFeatures.Level.rows
+        case .notifications: ServerFeatures.Level.follows
         }
     }
 
@@ -94,6 +95,8 @@ public enum SettingsFeature: Hashable, Sendable, CaseIterable {
         case .requests: "0.4.6"
         case .downloads: "0.5.0"
         case .homeRows: "1.2.0"
+        // The release after 1.4.7, the last before API level 29.
+        case .notifications: "1.5.0"
         }
     }
 
@@ -104,6 +107,7 @@ public enum SettingsFeature: Hashable, Sendable, CaseIterable {
         case .requests: "Asking for movies and shows"
         case .downloads: "Downloading to watch offline"
         case .homeRows: "Arranging Home’s rows"
+        case .notifications: "Getting notified of new episodes"
         }
     }
 
@@ -114,6 +118,7 @@ public enum SettingsFeature: Hashable, Sendable, CaseIterable {
         case .requests: nil
         case .downloads: "Streaming works as usual."
         case .homeRows: "Until then, Home shows its usual rows."
+        case .notifications: nil
         }
     }
 }
@@ -163,7 +168,7 @@ public func keptOutReason(_ destination: SettingsDestination, server: Server?, r
     case .playback, .account, .server, .inbox, .about:
         return nil
     case .notifications:
-        // Its row is left out below API level 29, and nothing links to the page.
-        return nil
+        // `-settingsPage notifications` and an iPad's kept selection can still open it.
+        return features.follows ? nil : tooOld(.notifications)
     }
 }

@@ -68,7 +68,7 @@ import WMMModel
     }
 
     @Test func aPageThatIsntOfferedSaysWhyAndWhoCanChangeIt() {
-        let current = server(level: ServerFeatures.Level.tokenWithDecision)
+        let current = server(level: ServerFeatures.Level.follows)
         let requests = RequestOptions(movies: true, shows: true)
         for destination in SettingsDestination.allCases {
             #expect(keptOutReason(destination, server: current, requests: requests, downloadsEnabled: true) == nil, "\(destination)")
@@ -89,5 +89,9 @@ import WMMModel
         #expect(keptOutReason(.homeRows, server: old)?.words.body.contains("needs v1.2.0 or newer") == true)
         #expect(keptOutReason(.requests, server: server(level: 2))?.words.body == "Living room server is on v0.9.3. Asking for movies and shows needs v0.4.6 or newer.")
         #expect(keptOutReason(.requests, server: nil) == nil)
+        // Notifications: its row is left out below API level 29, and the page
+        // (`-settingsPage notifications`, an iPad's kept selection) says why.
+        #expect(keptOutReason(.notifications, server: server(level: ServerFeatures.Level.tokenWithDecision))?.words.body
+            == "Living room server is on v0.9.3. Getting notified of new episodes needs v1.5.0 or newer.")
     }
 }
