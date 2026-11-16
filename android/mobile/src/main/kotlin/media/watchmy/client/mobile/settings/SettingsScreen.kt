@@ -60,7 +60,7 @@ import media.watchmy.client.mobile.components.ListRow
 import media.watchmy.client.mobile.components.MainTopBar
 import media.watchmy.client.mobile.components.MobileTab
 import media.watchmy.client.mobile.components.PhoneIcons
-import media.watchmy.client.mobile.live.openReminderChannel
+import media.watchmy.client.mobile.live.openReminderNotifications
 import media.watchmy.client.mobile.live.rememberReminderSettings
 import media.watchmy.client.mobile.navigation.MobileRoutes
 import media.watchmy.client.mobile.navigation.OnTabReselected
@@ -241,7 +241,7 @@ fun SettingsScreen(
                     NoteTone.Warn,
                     Modifier.cardInset(false),
                     action = "Turn on notifications",
-                    onAction = { openReminderChannel(context) },
+                    onAction = { openReminderNotifications(context) },
                 )
             }
         }
