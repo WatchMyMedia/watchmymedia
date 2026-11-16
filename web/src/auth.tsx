@@ -4,7 +4,7 @@ import { api, UNAUTHORIZED_EVENT, unwrap } from './api/client'
 import { AuthContext, type AuthState } from './authContext'
 import { PasswordConfirmationHost } from './components/ConfirmPasswordDialog'
 import { changeAuthScope } from './lib/authScope'
-import { forgetOnSignOut } from './lib/newEpisodes'
+import { forgetOnSignOut, noteSignedIn } from './lib/newEpisodes'
 import { forgetGrant, grantUntil, parseGrant, setGrantUntil } from './lib/passwordGrant'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -18,6 +18,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const until = parseGrant(s.adminConfirmedUntil)
       if (until > grantUntil()) setGrantUntil(until)
       const common = { adminAllowed: s.adminAllowed, adminLimit: s.adminLimit, onAdminNetwork: s.onAdminNetwork, turnstileSiteKey: s.turnstileSiteKey }
+      // Who this browser is signed in as now, for the other tabs' new-episode checks.
+      noteSignedIn(s.user?.id)
       if (s.setupRequired) setState({ status: 'setup', user: null, ...common })
       else if (s.user) setState({ status: 'ready', user: s.user, ...common })
       else setState({ status: 'login', user: null, ...common })

@@ -60,7 +60,11 @@ the user asks in this conversation; see Authority in the root file.
   notification opens only the paths `openablePath` in
   `src/lib/browserNotices.ts` lists. New episodes hold a lock of their own
   (a tab asking twice for one lock waits on itself); their check, cursor and
-  words are `src/lib/newEpisodes.ts` (PLAN-NEW-EPISODES.md §6.1, §7.5). A
+  words are `src/lib/newEpisodes.ts`, and when the holding tab checks is
+  `src/lib/newEpisodeSchedule.ts`, outside React and with the last change in
+  storage, so a redraw, a reload or another tab taking the lock still checks
+  when the window ends (PLAN-NEW-EPISODES.md §6.1, §7.5). The layout draws
+  the banners from one place in every page. A
   show's line is its one episode, the first to the last listed ("S3 E7 to
   E9"), or "From S3 E1" when more arrived than the feed lists, as on
   Android and Apple.

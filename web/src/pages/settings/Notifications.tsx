@@ -86,7 +86,7 @@ function ThisBrowser() {
 /** Newest follow first; Stop notifying removes a row at once, with no dialog, and puts it back if the server refuses. */
 function FollowedShows() {
   const follows = useQuery(followsQuery)
-  const remove = useRemoveFollow()
+  // Refusals by show, from the hook's own callbacks, which come for every press.
   const [failed, setFailed] = useState<ReadonlySet<number>>(new Set())
   const mark = (tmdbId: number, on: boolean) =>
     setFailed((s) => {
@@ -95,9 +95,10 @@ function FollowedShows() {
       else next.delete(tmdbId)
       return next
     })
+  const remove = useRemoveFollow({ onFailed: (tmdbId) => mark(tmdbId, true) })
   const stop = (f: Follow) => {
     mark(f.tmdbId, false)
-    remove.mutate(f.tmdbId, { onError: () => mark(f.tmdbId, true) })
+    remove.mutate(f.tmdbId)
   }
 
   if (follows.isPending) return <LoadingFollows />

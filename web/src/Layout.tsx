@@ -66,12 +66,14 @@ function Shell() {
   const pill = (active: boolean) =>
     `min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${active ? 'bg-neutral-100 text-black' : 'text-neutral-300 hover:text-neutral-100'}`
 
-  // Reminders and new episodes come on every page; their banners stay off the players.
-  if (player) return <><Outlet /><Notices banner={false} /></>
+  // Reminders and new episodes come on every page, from one place in each so
+  // moving between them keeps their timers; their banners stay off the players.
+  const notices = <Notices banner={!player} />
+  if (player) return <><Outlet />{notices}</>
   // A Settings task is focused: it draws its own bar with Exit (PLAN-ADMIN-SETTINGS.md §3.2).
-  if (isSettingsFlow(path)) return <><Outlet /><CastBar /><Notices banner /></>
+  if (isSettingsFlow(path)) return <><><Outlet /><CastBar /></>{notices}</>
 
-  return (
+  return <>
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-30 border-b border-line bg-ground/90 backdrop-blur">
         <div className="relative flex items-center gap-3 px-4 py-2 md:px-12">
@@ -186,19 +188,21 @@ function Shell() {
         <Outlet />
       </main>
       <CastBar />
-      <Notices banner />
     </div>
-  )
+    {notices}
+  </>
 }
 
 /**
  * Live TV reminders and new episodes of followed shows come on every page
  * (PLAN-NEW-EPISODES.md §7.5): their banners stack under the app bar on the
- * right, a new episode's below a reminder's, and stay off the players.
+ * right, a new episode's below a reminder's, and stay off the players. The
+ * stack scrolls when the window is too short for both (a phone on its side,
+ * a page zoomed in), so every button stays reachable.
  */
 function Notices({ banner }: { banner: boolean }) {
   return (
-    <div className="pointer-events-none fixed inset-x-4 top-16 z-40 flex flex-col gap-3 *:pointer-events-auto sm:left-auto sm:right-12 sm:w-100">
+    <div className="pointer-events-none fixed inset-x-4 top-16 z-40 flex max-h-[calc(100dvh-5rem)] flex-col gap-3 overflow-y-auto overscroll-contain *:pointer-events-auto *:shrink-0 sm:left-auto sm:right-12 sm:w-100">
       <ReminderNotices banner={banner} />
       <NewEpisodeNotices banner={banner} />
     </div>

@@ -1,46 +1,66 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { onLibraryChanged } from '../api/events'
 import { fetchNewEpisodes, followsQuery } from '../api/follows'
 import { serverQuery } from '../api/queries'
+import { useAuth } from '../authContext'
 import { authScope } from '../lib/authScope'
 import { NEW_EPISODES_LOCK, dismissNotice, holdNotifierLock, reminderWorker, showNotice } from '../lib/browserNotices'
 import { img } from '../lib/images'
 import {
-  SETTLE_MS, bannerFor, canFollow, clearBanner, episodeNotices, forgetCursor, loadCursor, moreShowsLine, runCheck, saveBanner, saveCursor, shouldCheck,
-  type EpisodeBanner,
+  bannerFor, canFollow, clearBanner, episodeNotices, forgetPlace, lastLibraryChange, loadCursor, moreShowsLine, noteLibraryChange, runCheck, saveBanner, saveCursor,
+  shouldCheck, signedInHere, type EpisodeBanner,
 } from '../lib/newEpisodes'
-import { newEpisodesChanged, useNotifyPermission, useNotifySwitch, usePerson, useStoredBanner } from './newEpisodeHooks'
+import { createCheckSchedule } from '../lib/newEpisodeSchedule'
+import { newEpisodesChanged, useNotifyPermission, useNotifySwitch, usePerson, useSignedInHere, useStoredBanner } from './newEpisodeHooks'
 
 const quietAction = 'inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-md border border-line-2 bg-surface px-3.5 text-[13.5px] font-medium hover:bg-surface-2'
+
+// One schedule a page, outside the component, so a redraw keeps its timer;
+// the last change is in the browser's storage, so another tab keeps it too.
+const schedule = createCheckSchedule({
+  now: () => Date.now(),
+  setTimer: (run, ms) => window.setTimeout(run, ms),
+  clearTimer: (timer) => window.clearTimeout(timer as number),
+  lastChange: lastLibraryChange,
+  noteChange: noteLibraryChange,
+})
 
 /**
  * Checks for new episodes of the shows this person follows while a tab is
  * open (PLAN-NEW-EPISODES.md §6.1, §7.5), from the one tab holding the
- * new episodes' Web Lock: on load and 3 minutes after the last
- * library.changed, only while they follow a show, this browser's switch is
- * on and notifications are allowed. A tab in front shows one banner a
+ * new episodes' Web Lock: when it takes the lock and 3 minutes after the
+ * last library.changed (lib/newEpisodeSchedule.ts), only while they follow
+ * a show, this browser's switch is on, notifications are allowed and the
+ * browser is still signed in as them. A tab in front shows one banner a
  * check, which every tab of the browser shows until it is opened or
- * dismissed; a hidden one shows system notifications, one a show. Mounted
- * once in the layout; the banner shows off the players.
+ * dismissed; a hidden one shows system notifications, one a show. Then the
+ * cursor moves on. Mounted once in the layout, at one place in every page,
+ * and the banner shows off the players.
  */
 export function NewEpisodeNotices({ banner }: { banner: boolean }) {
   const server = useQuery(serverQuery)
   const able = canFollow(server.data?.apiLevel)
+  const userId = useAuth().user?.id
   const person = usePerson()
+  const here = useSignedInHere(userId)
   const follows = useQuery({ ...followsQuery, enabled: able })
   const on = useNotifySwitch(person)
   const permission = useNotifyPermission()
   const stored = useStoredBanner(person)
   const [holder, setHolder] = useState(false)
-  const running = useRef(false)
-  const active = able && !!person && shouldCheck({ follows: follows.data?.follows.length ?? 0, on, permission })
+  const active = able && !!person && here && shouldCheck({ follows: follows.data?.follows.length ?? 0, on, permission })
 
-  // Off here, or not allowed: the cursor goes, so turning them on starts from now.
+  // Off here, or not allowed: the cursor and the banner go, so turning them on starts from now.
   useEffect(() => {
-    if (able && person && (!on || permission !== 'granted')) forgetCursor(person)
+    if (!able || !person || (on && permission === 'granted')) return
+    forgetPlace(person)
+    newEpisodesChanged()
   }, [able, person, on, permission])
+
+  // Every tab records changes, so the one that takes the lock knows when the window ends.
+  useEffect(() => onLibraryChanged((reason) => schedule.libraryChanged(reason)), [])
 
   useEffect(() => {
     if (!active) return
@@ -53,42 +73,29 @@ export function NewEpisodeNotices({ banner }: { banner: boolean }) {
   }, [active])
 
   const check = useCallback(async () => {
-    if (!person || running.current) return
-    running.current = true
-    try {
-      const scope = authScope()
-      const before = loadCursor(person)
-      const reply = await runCheck(before, fetchNewEpisodes)
-      // Signed out meanwhile, or another tab (without Web Locks) checked first.
-      if (!reply || scope !== authScope() || loadCursor(person) !== before) return
-      saveCursor(person, reply.cursor)
-      if (!reply.shows.length) return
-      if (document.visibilityState === 'visible') {
-        const next = bannerFor(reply.shows, reply.cursor)
-        if (next) {
-          saveBanner(person, next)
-          newEpisodesChanged()
-        }
-      } else {
-        for (const n of episodeNotices(reply.shows)) void showNotice({ title: n.title, body: n.body, tag: n.key, path: n.path })
+    if (!person || !signedInHere(userId)) return
+    const scope = authScope()
+    const before = loadCursor(person)
+    const reply = await runCheck(before, fetchNewEpisodes)
+    // Signed out or in as someone else meanwhile, or another tab (without Web Locks) checked first.
+    if (!reply || scope !== authScope() || !signedInHere(userId) || loadCursor(person) !== before) return
+    // Show, then keep the cursor (§6.1).
+    if (reply.shows.length && document.visibilityState === 'visible') {
+      const next = bannerFor(reply.shows, reply.cursor)
+      if (next) {
+        saveBanner(person, next)
+        newEpisodesChanged()
       }
-    } finally {
-      running.current = false
+    } else if (reply.shows.length) {
+      await Promise.all(episodeNotices(reply.shows).map((n) => showNotice({ title: n.title, body: n.body, tag: n.key, path: n.path })))
     }
-  }, [person])
+    saveCursor(person, reply.cursor)
+  }, [person, userId])
 
   useEffect(() => {
     if (!holder) return
-    void check()
-    let timer: number | undefined
-    const stop = onLibraryChanged(() => {
-      window.clearTimeout(timer)
-      timer = window.setTimeout(() => void check(), SETTLE_MS)
-    })
-    return () => {
-      stop()
-      window.clearTimeout(timer)
-    }
+    schedule.start(check)
+    return () => schedule.stop()
   }, [holder, check])
 
   // Off here, or not allowed: no banner either (settings-shows, settings-blocked).
@@ -109,11 +116,13 @@ export function NewEpisodeNotices({ banner }: { banner: boolean }) {
  */
 function NewEpisodeBanner({ banner, onClose }: { banner: EpisodeBanner; onClose: () => void }) {
   const n = banner.notice
-  const [broken, setBroken] = useState(false)
-  const poster = broken ? undefined : img(n.posterPath, 'w92')
+  // The picture that failed, not a flag, so the next banner's still loads.
+  const [broken, setBroken] = useState('')
+  const src = img(n.posterPath, 'w92')
+  const poster = src && src !== broken ? src : undefined
   return <section role="status" aria-live="polite" aria-label="New episodes" className="flex flex-col gap-3 rounded-xl border border-line-2 bg-surface-2 p-3.5 shadow-2xl">
     <div className="flex gap-3">
-      {poster ? <img src={poster} alt="" onError={() => setBroken(true)} className="aspect-[2/3] w-[42px] shrink-0 self-start rounded bg-surface object-cover" />
+      {poster ? <img key={poster} src={poster} alt="" onError={() => setBroken(poster)} className="aspect-[2/3] w-[42px] shrink-0 self-start rounded bg-surface object-cover" />
         : <span aria-hidden="true" className="aspect-[2/3] w-[42px] shrink-0 self-start rounded bg-surface ring-1 ring-line-2" />}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[11.5px] font-bold uppercase tracking-wider text-accent">{n.heading}</span>
