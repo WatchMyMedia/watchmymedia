@@ -5,6 +5,57 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 1.5.0
+
+Follow a show and hear when a new episode of it reaches your library. Press Notify me on a
+show's page: phones and tablets send a notification, the web app tells you while it's open, and
+Home gets a row of new episodes from the shows you follow.
+
+- This release changes the server's database. Back up before updating: Settings › Backups ›
+  Back up now, or `watchmymedia backup`. Going back to 1.4.7 afterwards needs that backup.
+- Notify me is on every show's page, on the web, phones, tablets, Android TV and Apple TV. The
+  shows you follow are kept on the server, so a show followed on the TV notifies your phone.
+  Settings › Notifications lists them, with Stop notifying, and has each phone's, tablet's or
+  browser's own switch.
+- An episode is announced once, when it first reaches any of your libraries, and only if its
+  file came in during the past week. A better copy from Sonarr, a second version, a copy in a
+  4K library, a renamed file or a library added again doesn't announce it again, and nothing
+  already in your library is announced. Episodes that come in together, such as a whole season,
+  are one notification: "10 new episodes".
+- On Android phones and tablets the app checks about once an hour, and later while the phone is
+  idle. On iPhone and iPad, iOS decides when the app checks, which can take a few hours, and
+  checks stop if you close the app from the app switcher, until you open it again. Opening the
+  app checks at once. The phone has to reach your server, so a server you reach only at home
+  notifies when the phone is next home.
+- The web app shows a banner in a tab you're looking at, and a system notification from a tab
+  in the background when the browser allows notifications. It needs an `https://` address or
+  `localhost`; from a plain `http://` address it can't, and Settings › Notifications says so.
+- Home has a new row, New from shows you follow, with the past week's new episodes. It comes
+  after Continue watching, can be moved or hidden like any row, and stays away while it's
+  empty. The TVs show new episodes there rather than notifying.
+- Mark show watched and Mark season watched no longer mark episodes that haven't aired and
+  aren't in your library. Before, an episode that came in after you had caught up arrived
+  already watched, with no Play next. The update clears such marks already made, but only on
+  episodes that had no air date or hadn't aired when they were marked, and have never been in
+  a library.
+- On Android phones, tablets and TVs, Sign out now stays signed out after the app restarts, and
+  ends the session on the server. Before, the app could sign itself back in on its next start.
+- On Android, when the app's notifications are off, Turn on notifications now opens Android's
+  notification settings for the app, where they can be turned on. Before, it opened a screen
+  whose switch did nothing. Settings shows one card for Live TV reminders and new episodes.
+- The server's API only gained routes and optional fields, so every app version works with it.
+  Apps from before this release can't follow a show, but show the new Home row to someone who
+  follows shows from another device. The new apps work with older servers too, without Notify
+  me. The Cast receiver is unchanged.
+- The server, the Docker image, the Mac app, the Windows app and the Android app are 1.5.0. The
+  Mac app and the Windows app of 1.4.7 offer the update under Check for updates. The iPhone,
+  iPad and Apple TV apps are 1.9.0 once the App Store approves them.
+- All of this has been tried in tests, against a test server in a browser, on an Android
+  emulator and on an iPhone simulator, and with sample data on Android TV, iPad and Apple TV.
+  It has not yet been tried on real phones and TVs. How late a notification comes on a real
+  Android phone left idle, or on a real iPhone, is still to be measured, and so is a real
+  browser's system notification.
+
 ## 1.4.7
 
 Resume picks up where you left off, every Home row ends in a See all card, and the iPhone,
