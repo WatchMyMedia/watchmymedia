@@ -132,7 +132,7 @@ class DataServices internal constructor(
     private fun reconnected() {
         scope.launch { runCatching { serverRepository.refreshCurrent() } }
     }
-    private val authRepository = RealAuthRepository(store, http, serverRepository, { client }, clock)
+    private val authRepository = RealAuthRepository(store, http, serverRepository, { client }, clock, scope)
     private val preferencesRepository = RealPreferencesRepository(store, http)
 
     val servers: ServerRepository = serverRepository

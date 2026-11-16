@@ -1,9 +1,15 @@
 package media.watchmy.client.core.data
 
 import app.cash.turbine.test
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import media.watchmy.client.core.data.TestServer.Companion.json
@@ -17,6 +23,7 @@ import media.watchmy.client.model.User
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -336,6 +343,42 @@ class AuthRepositoryTest {
         h.services.auth.signOut()
         assertNull(h.services.auth.user.value)
         assertEquals("Bearer tok-viewer", server.last("POST /api/auth/logout").getHeader("Authorization"))
+    }
+
+    @Test
+    fun `a sign-out whose screen closes halfway still tells the server and stays signed out`() = runBlocking {
+        h.signIn()
+        // The sign-in's own checks write behind; once landed, none can write the sign-out down by chance.
+        h.services.awaitIdle()
+        server.on("POST /api/auth/logout", noContent())
+        // Settings closes as soon as the sign-in clears, which cancels what it started.
+        val caller = cancelledOnSignOut { h.services.auth.signOut() }
+        caller.join()
+        assertTrue(caller.isCancelled)
+        assertNull(h.services.auth.user.value)
+
+        val heard = withTimeoutOrNull(5_000) { while (server.requests("POST /api/auth/logout").isEmpty()) delay(10) }
+        assertNotNull("the server never heard the sign-out", heard)
+        assertEquals("Bearer tok-viewer", server.last("POST /api/auth/logout").getHeader("Authorization"))
+        assertNull("signed in again after a restart", h.reopen().auth.user.value)
+    }
+
+    @Test
+    fun `signing this device out from the list is kept when the screen closes`() = runBlocking {
+        h.signIn()
+        h.services.awaitIdle()
+        server.on("DELETE /api/auth/sessions/86e0d90b273fc14a", noContent())
+        cancelledOnSignOut { h.services.auth.revoke("86e0d90b273fc14a") }.join()
+        assertNull(h.services.auth.user.value)
+        assertNull("signed in again after a restart", h.reopen().auth.user.value)
+    }
+
+    /** Runs [block] as a screen would, cancelled the moment the sign-in clears, as the screen closing does. */
+    private fun CoroutineScope.cancelledOnSignOut(block: suspend () -> Unit): Job {
+        val caller = launch(start = CoroutineStart.LAZY) { block() }
+        h.services.onSessionChange { caller.cancel() }
+        caller.start()
+        return caller
     }
 
     @Test

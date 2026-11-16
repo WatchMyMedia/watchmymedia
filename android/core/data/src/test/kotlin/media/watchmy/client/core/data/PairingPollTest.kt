@@ -39,7 +39,7 @@ class PairingPollTest {
     private val pauses = mutableListOf<Long>()
     private var onPause: () -> Unit = {}
     private val client = ClientInfo("dev-1", "Living room TV", "WatchMyMedia for Android TV", "androidtv", "0.1.0")
-    private val auth = RealAuthRepository(store, http, servers, { client }, { now }) { ms ->
+    private val auth = RealAuthRepository(store, http, servers, { client }, { now }, scope) { ms ->
         pauses += ms
         onPause()
     }

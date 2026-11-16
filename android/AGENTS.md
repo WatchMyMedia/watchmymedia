@@ -67,6 +67,15 @@ Lint warnings that were already on `main` are not yours to fix in passing.
 - **Live TV polling.** The channel list is polled only while a screen that
   shows channels is on screen: such a screen or row calls
   `ShowsLiveChannels()` (core:ui) once. Nothing else polls it.
+- **Work that outlives its screen.** A change can close the screen that
+  made it: Sign out clears the sign-in and Settings gives way to sign-in at
+  once, which cancels its ViewModel's scope. What must finish once started
+  (a write to storage, telling the server) runs in the data layer's scope
+  while the caller waits: `LocalStore.updateAndSave` writes in the store's
+  scope and `RealAuthRepository.signOut` runs in `DataServices`'. Never catch
+  `CancellationException` as a failure: `LocalStore.save` logged a cancelled
+  write as "could not save settings", and a sign-out kept in memory alone
+  signed back in after a restart.
 - **Stored settings in tests.** `LocalStore` writes behind: a change is in
   memory at once and on disk a moment later. In `core:data` tests, write
   storage with `Harness.editStorage`, not `dataStore.edit`, and reopen with
