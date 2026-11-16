@@ -5,6 +5,48 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 1.4.7
+
+Resume picks up where you left off, every Home row ends in a See all card, and the iPhone,
+iPad, Apple TV and Android apps get Settings in the web's groups and words.
+
+- The server's database is the same as 1.4.2's through 1.4.5's, so updating needs no backup to
+  go back.
+- A film or episode left partway could resume several seconds after where you stopped. This
+  happened most often on its first play, while the server was still reading the file's
+  keyframes, and was seen on Android TV. The server now starts such a play on the keyframe at
+  or before the moment asked for, and keeps time exact from one stretch of the stream to the
+  next, so nothing is skipped or played twice.
+- Resume starts 5 seconds before where you stopped, so you see the last moment again. This
+  applies in the web app, on a Chromecast and in every app, and to downloads played offline.
+  Continue watching and the saved position stay exact.
+- Resuming asks the server once where it asked twice, so playback starts sooner. A seek is
+  saved as soon as it lands. Before, it could wait up to 30 seconds while paused, so a step
+  back just before leaving could be lost.
+- Every Home row with a library behind it ends in a See all card. The card opens that library
+  sorted the row's way, such as TV shows by last aired. A list's row ends in a card that opens
+  the whole list, titles you don't have included. This is on the web, phones, tablets, Android
+  TV and Apple TV.
+- The iPhone, iPad, Apple TV and Android apps open Settings on the web's groups, in its order
+  and with its names, each saying what is chosen. A setting says Saving, then Saved, or why it
+  didn't save and what it is still set to, in its own row.
+- In the apps, linking a TV, switching server and changing your password go one step at a
+  time and end on what changed. Signing out, signing another device out and removing all
+  downloads ask first, and say what is deleted and what stays.
+- Change password is new in the apps, and names the devices it signs out. On iPhone, iPad and
+  Apple TV, Switch server can sign in with a code from a device that is already signed in. On
+  Google TV the skip settings open in a side panel, so getting through Settings takes far fewer
+  presses.
+- The server's API is unchanged for the apps: older apps work with it as before. These apps
+  work with older servers too; there, a resume still asks twice. The Cast receiver already has
+  these changes.
+- The server, the Docker image, the Mac app, the Windows app and the Android app are 1.4.7. The
+  Mac app and the Windows app of 1.4.5 offer the update under Check for updates. The iPhone,
+  iPad and Apple TV apps are 1.8.7 once the App Store approves them.
+- All of this has been tried in tests, in a browser against a test server, on Android
+  emulators and on iPhone, iPad and Apple TV simulators. It has not yet been tried on real
+  phones, TVs and remotes, a Chromecast, or Safari's own video player.
+
 ## 1.4.5
 
 Settings on the web, redesigned. Each tab opens on a page that says how things stand and what
