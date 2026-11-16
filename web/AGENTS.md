@@ -56,7 +56,10 @@ the user asks in this conversation; see Authority in the root file.
   fetches, so nothing of the app is cached or served from it; keep it that
   way. Notifications, the worker and the Web Lock that lets one tab notify
   need a secure context: on plain `http://` LAN addresses reminders come as
-  the in-app banner only, and new episodes not at all. A chosen
+  the in-app banner only, and new episodes not at all. New episodes'
+  banner needs no permission, only a secure context; a hidden tab shows
+  system notifications when they are allowed, and otherwise leaves the
+  banner for when it is seen. A chosen
   notification opens only the paths `openablePath` in
   `src/lib/browserNotices.ts` lists. New episodes hold a lock of their own
   (a tab asking twice for one lock waits on itself); their check, cursor and

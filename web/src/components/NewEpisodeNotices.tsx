@@ -6,10 +6,10 @@ import { fetchNewEpisodes, followsQuery } from '../api/follows'
 import { serverQuery } from '../api/queries'
 import { useAuth } from '../authContext'
 import { authScope } from '../lib/authScope'
-import { NEW_EPISODES_LOCK, dismissNotice, holdNotifierLock, reminderWorker, showNotice } from '../lib/browserNotices'
+import { NEW_EPISODES_LOCK, dismissNotice, holdNotifierLock, notifyPermission, reminderWorker, showNotice } from '../lib/browserNotices'
 import { img } from '../lib/images'
 import {
-  bannerFor, canFollow, clearBanner, episodeNotices, forgetPlace, lastLibraryChange, loadCursor, moreShowsLine, noteLibraryChange, runCheck, saveBanner, saveCursor,
+  bannerFor, canFollow, clearBanner, deliveryFor, episodeNotices, forgetPlace, lastLibraryChange, loadCursor, moreShowsLine, noteLibraryChange, runCheck, saveBanner, saveCursor,
   shouldCheck, signedInHere, type EpisodeBanner,
 } from '../lib/newEpisodes'
 import { createCheckSchedule } from '../lib/newEpisodeSchedule'
@@ -32,12 +32,14 @@ const schedule = createCheckSchedule({
  * open (PLAN-NEW-EPISODES.md §6.1, §7.5), from the one tab holding the
  * new episodes' Web Lock: when it takes the lock and 3 minutes after the
  * last library.changed (lib/newEpisodeSchedule.ts), only while they follow
- * a show, this browser's switch is on, notifications are allowed and the
- * browser is still signed in as them. A tab in front shows one banner a
- * check, which every tab of the browser shows until it is opened or
- * dismissed; a hidden one shows system notifications, one a show. Then the
- * cursor moves on. Mounted once in the layout, at one place in every page,
- * and the banner shows off the players.
+ * a show, this browser's switch is on, the page is a secure context and
+ * the browser is still signed in as them. The browser's permission isn't
+ * needed: a tab in front shows one banner a check, which every tab of the
+ * browser shows until it is opened or dismissed; a hidden one shows system
+ * notifications, one a show, when they are allowed, and otherwise leaves
+ * the banner for when it is seen. Then the cursor moves on. Mounted once in
+ * the layout, at one place in every page, and the banner shows off the
+ * players.
  */
 export function NewEpisodeNotices({ banner }: { banner: boolean }) {
   const server = useQuery(serverQuery)
@@ -48,23 +50,28 @@ export function NewEpisodeNotices({ banner }: { banner: boolean }) {
   const follows = useQuery({ ...followsQuery, enabled: able })
   const on = useNotifySwitch(person)
   const permission = useNotifyPermission()
+  const secure = typeof window !== 'undefined' && window.isSecureContext
   const stored = useStoredBanner(person)
   const [holder, setHolder] = useState(false)
-  const active = able && !!person && here && shouldCheck({ follows: follows.data?.follows.length ?? 0, on, permission })
+  const active = able && !!person && here && shouldCheck({ follows: follows.data?.follows.length ?? 0, on, secure })
 
-  // Off here, or not allowed: the cursor and the banner go, so turning them on starts from now.
+  // Off here: the cursor and the banner go, so turning it on starts from now.
   useEffect(() => {
-    if (!able || !person || (on && permission === 'granted')) return
+    if (!able || !person || on) return
     forgetPlace(person)
     newEpisodesChanged()
-  }, [able, person, on, permission])
+  }, [able, person, on])
+
+  // The worker shows a hidden tab's notifications, once they are allowed.
+  useEffect(() => {
+    if (active && permission === 'granted') void reminderWorker()
+  }, [active, permission])
 
   // Every tab records changes, so the one that takes the lock knows when the window ends.
   useEffect(() => onLibraryChanged((reason) => schedule.libraryChanged(reason)), [])
 
   useEffect(() => {
     if (!active) return
-    void reminderWorker()
     const release = holdNotifierLock(() => setHolder(true), NEW_EPISODES_LOCK)
     return () => {
       release()
@@ -79,8 +86,8 @@ export function NewEpisodeNotices({ banner }: { banner: boolean }) {
     const reply = await runCheck(before, fetchNewEpisodes)
     // Signed out or in as someone else meanwhile, or another tab (without Web Locks) checked first.
     if (!reply || scope !== authScope() || !signedInHere(userId) || loadCursor(person) !== before) return
-    // Show, then keep the cursor (§6.1).
-    if (reply.shows.length && document.visibilityState === 'visible') {
+    // Show, then keep the cursor (§6.1). A hidden tab without the permission leaves the banner for when it is seen.
+    if (reply.shows.length && deliveryFor(document.visibilityState === 'visible', notifyPermission()) === 'banner') {
       const next = bannerFor(reply.shows, reply.cursor)
       if (next) {
         saveBanner(person, next)
@@ -98,8 +105,8 @@ export function NewEpisodeNotices({ banner }: { banner: boolean }) {
     return () => schedule.stop()
   }, [holder, check])
 
-  // Off here, or not allowed: no banner either (settings-shows, settings-blocked).
-  if (!banner || !stored || !person || !on || permission !== 'granted') return null
+  // Off here, or on a plain http:// address: no banner (settings-shows, settings-http).
+  if (!banner || !stored || !person || !on || !secure) return null
   const close = () => {
     dismissNotice(stored.key)
     clearBanner(person)

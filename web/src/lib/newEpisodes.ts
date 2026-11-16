@@ -31,10 +31,18 @@ export const MAX_SHOW_NOTICES = 5
 
 /**
  * The check runs only when it has something to do (§6.1): the person
- * follows a show, this browser's switch is on and notifications are allowed.
+ * follows a show, this browser's switch is on and the page is a secure
+ * context (the Web Lock needs one). It doesn't need the browser's
+ * permission: a tab in front shows the banner without it, and only a hidden
+ * tab's system notifications need it (§7.5).
  */
-export function shouldCheck(o: { follows: number; on: boolean; permission: NotificationPermission | 'unsupported' }): boolean {
-  return o.follows > 0 && o.on && o.permission === 'granted'
+export function shouldCheck(o: { follows: number; on: boolean; secure: boolean }): boolean {
+  return o.follows > 0 && o.on && o.secure
+}
+
+/** What a check that found something shows: the banner in a tab in front, system notifications from a hidden one when allowed, else the banner when the tab is next seen. */
+export function deliveryFor(visible: boolean, permission: NotificationPermission | 'unsupported'): 'banner' | 'system' {
+  return !visible && permission === 'granted' ? 'system' : 'banner'
 }
 
 /** "S3 E7"; a special is S0 E3, by the same rule. */
@@ -198,9 +206,10 @@ export const saveBanner = (person: string, banner: EpisodeBanner) => write(BANNE
 export const clearBanner = (person: string) => write(BANNER + person, undefined)
 
 /**
- * The switch turned off, or notifications no longer allowed: the cursor
- * goes, so turning them on starts from now, and so does the banner, so an
- * old one doesn't come back with them.
+ * The switch turned off: the cursor goes, so turning it on again starts
+ * from now, and so does the banner, so an old one doesn't come back with
+ * it. The browser's permission changing keeps both: the banner never
+ * needed it.
  */
 export function forgetPlace(person: string) {
   forgetCursor(person)
@@ -273,16 +282,17 @@ export function stopFailLine(show: string): string {
 }
 
 /**
- * What Settings › Notifications shows for this browser (the settings-*
- * boards): on or off; not asked yet; blocked; a plain http:// address; or a
- * browser without notifications at all, which the boards don't draw.
+ * What Settings › Notifications says about this browser's system
+ * notifications (the settings-* boards): allowed; not asked yet; blocked;
+ * a plain http:// address, where nothing shows at all; or a browser with no
+ * notifications, which the boards don't draw. The switch is apart from it:
+ * on by default, it also governs the banner, which needs no permission.
  */
-export type BrowserState = 'on' | 'off' | 'ask' | 'blocked' | 'http' | 'unsupported'
+export type BrowserState = 'granted' | 'ask' | 'blocked' | 'http' | 'unsupported'
 
-export function browserState(permission: NotificationPermission | 'unsupported', on: boolean, secure: boolean): BrowserState {
+export function browserState(permission: NotificationPermission | 'unsupported', secure: boolean): BrowserState {
   if (!secure) return 'http'
   if (permission === 'unsupported') return 'unsupported'
   if (permission === 'denied') return 'blocked'
-  if (permission === 'default') return 'ask'
-  return on ? 'on' : 'off'
+  return permission === 'default' ? 'ask' : 'granted'
 }
