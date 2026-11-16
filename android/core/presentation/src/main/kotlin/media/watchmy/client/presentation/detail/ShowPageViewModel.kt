@@ -235,6 +235,9 @@ class ShowPageViewModel(
     /** A follow or a stop on its way to the server; presses meanwhile are ignored. */
     private var following: Job? = null
 
+    /** Counts the bell's presses: a reload that began before the latest one keeps the bell as it is. */
+    private var followPresses = 0
+
     init {
         load()
         loadOptions()
@@ -266,6 +269,7 @@ class ShowPageViewModel(
         val now = _state.value.following ?: return
         if (following?.isActive == true) return
         val title = _state.value.show?.title.orEmpty()
+        followPresses++
         setFollowing(!now)
         following = viewModelScope.launch {
             attempt { follows.setFollowing(showId, !now) }
@@ -528,6 +532,7 @@ class ShowPageViewModel(
      */
     private fun load(quiet: Boolean = false) {
         if (!quiet || _state.value.page !is Load.Ready) _state.update { it.copy(page = Load.Loading) }
+        val presses = followPresses
         loads.launch {
             attempt {
                 val show = library.show(showId)
@@ -547,8 +552,9 @@ class ShowPageViewModel(
                 .onSuccess { (loaded, season, top) ->
                     seasons.clear()
                     seasons[season.season.number] = season
-                    // A press still on its way to the server outlives a reload.
-                    val show = if (following?.isActive == true) loaded.copy(following = _state.value.show?.following ?: loaded.following) else loaded
+                    // A press on its way to the server, or one made since this reload began, outlives the reply.
+                    val pressed = following?.isActive == true || followPresses != presses
+                    val show = if (pressed) loaded.copy(following = _state.value.show?.following ?: loaded.following) else loaded
                     _state.update {
                         it.copy(
                             followable = follows.supported,

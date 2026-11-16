@@ -101,4 +101,29 @@ class ShowPageFollowTest {
         advanceUntilIdle()
         assertFalse(follows.following(101))
     }
+
+    @Test
+    fun `a reload that began before a press doesn't put the bell back`() = runTest(main.dispatcher) {
+        // The show is read (not followed yet), then the reply waits, as on a slow server.
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var holding = false
+        val slow = object : media.watchmy.client.model.LibraryRepository by library {
+            override suspend fun show(id: Long): media.watchmy.client.model.ShowDetail {
+                val read = library.show(id)
+                if (holding) gate.await()
+                return read
+            }
+        }
+        val vm = ShowPageViewModel(slow, 101, ShowArrival.Show, follows = follows)
+        advanceUntilIdle()
+        holding = true
+        follows.changedElsewhere(105, following = false) // Another device's change: a quiet reload, held.
+        runCurrent()
+        vm.toggleFollow()
+        advanceUntilIdle()
+        assertTrue("followed on the server", follows.following(101))
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals("the stale reply leaves the bell on", true, vm.state.value.following)
+    }
 }
