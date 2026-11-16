@@ -70,7 +70,7 @@ private suspend fun latency() {
  * feature. A fake server at a lower level hides what its level lacks, as a
  * real one does.
  */
-const val FAKE_SERVER_API_LEVEL = 22
+const val FAKE_SERVER_API_LEVEL = 29
 
 /** The asset URL of one of the fakes' fictional backdrops ([FakeData.backdrop]); null for any other path. */
 fun fakeArtUrl(path: String?): String? =

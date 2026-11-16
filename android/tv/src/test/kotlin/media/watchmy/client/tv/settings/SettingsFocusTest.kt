@@ -86,6 +86,9 @@ class SettingsFocusTest {
         assertEquals("Home rows", focused())
         compose.onNodeWithText("Reset Home rows").assertExists()
         press(Key.DirectionDown)
+        assertEquals("Notifications", focused())
+        compose.onNodeWithText("Shows you follow".uppercase()).assertExists()
+        press(Key.DirectionDown)
         assertEquals("Account & devices", focused())
         compose.onNodeWithText("Device name").assertExists()
     }

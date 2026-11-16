@@ -35,8 +35,10 @@ class FakeLevelsTest {
 
     @Test
     fun `the fake servers are at the current level, with everything on`() = runBlocking {
-        assertEquals(listOf(22, 22, 22), listOf(LivingRoom, OfficeMini, RemoteHome).map { it.apiLevel })
+        assertEquals(listOf(29, 29, 29), listOf(LivingRoom, OfficeMini, RemoteHome).map { it.apiLevel })
         assertTrue("rows", services.rows.supported)
+        assertTrue("following shows", services.follows.supported)
+        assertEquals("a followed show's page says so", true, services.library.show(100).following)
         assertTrue("trailers", services.library.movie(500).trailers.isNotEmpty())
         assertTrue("favourites, search and reminders", services.live.refreshReminders() != null)
         assertTrue(services.live.capabilities().available)

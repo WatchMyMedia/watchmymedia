@@ -93,9 +93,12 @@ class FakeRowsData(
 
     /** Each screen's default order; lists made on a screen are placed on it, the others hidden. */
     private fun defaults(screen: String): List<Pair<String, Boolean>> = when (screen) {
+        // The server puts New from shows you follow after Continue watching; the fakes put it after the
+        // rows the focus and See all tests walk through, which were drawn before it existed.
         RowScreens.HOME -> listOfNotNull(
-            RowIds.CONTINUE to false, (RowIds.FOLLOWED to false).takeIf { follows?.supported == true }, RowIds.LIVE to false, RowIds.RECENTLY_ADDED_SHOWS to false, RowIds.list(SCI_FI) to false,
+            RowIds.CONTINUE to false, RowIds.LIVE to false, RowIds.RECENTLY_ADDED_SHOWS to false, RowIds.list(SCI_FI) to false,
             RowIds.RECENTLY_AIRED to false, RowIds.RECENTLY_ADDED_MOVIES to false, RowIds.list(FESTIVAL) to false, RowIds.RECENTLY_RELEASED to false,
+            (RowIds.FOLLOWED to false).takeIf { follows?.supported == true },
             RowIds.list(WATCHLIST) to true, RowIds.list(UNWATCHED_4K) to true,
         )
         RowScreens.library(FakeData.MOVIE_LIBRARY) -> listOf(
