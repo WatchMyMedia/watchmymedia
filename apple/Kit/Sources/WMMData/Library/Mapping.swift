@@ -346,7 +346,8 @@ extension Components.Schemas.ShowDetail {
             cast: credits.map(\.model),
             contentRating: Mapping.nonBlank(contentRating),
             tmdbID: Mapping.positive(tmdbId),
-            managedBy: Mapping.nonBlank(managedBy)
+            managedBy: Mapping.nonBlank(managedBy),
+            following: following
         )
     }
 }

@@ -286,15 +286,19 @@ extension AppServices {
     /// `admin` false signs in as Alex, a member (`-fakesMember`): requests wait for an admin.
     /// `liveGuide` adds the guide boards' listings to Live TV (it implies `liveTV`).
     /// `downloads` gives the iPhone and iPad app its fake downloads; the Apple TV app has none.
-    public static func fake(signedIn: Bool = true, chosen: Bool = true, client: ClientInfo = .fakePhone, admin: Bool = true, seerr: Bool = false, seerrLinked: Bool = true, liveTV: Bool = false, liveGuide: FakeLiveGuide? = nil, downloads: Bool = false, apiLevel: Int? = nil, recordings: Bool = false, liveAutomatic: Bool = false, rows: Bool = false) -> AppServices {
+    public static func fake(signedIn: Bool = true, chosen: Bool = true, client: ClientInfo = .fakePhone, admin: Bool = true, seerr: Bool = false, seerrLinked: Bool = true, liveTV: Bool = false, liveGuide: FakeLiveGuide? = nil, downloads: Bool = false, apiLevel: Int? = nil, recordings: Bool = false, liveAutomatic: Bool = false, rows: Bool = false, follows: Bool = false) -> AppServices {
         let liveTV = liveTV || liveGuide != nil || liveAutomatic
         let servers = FakeServerRepository(signedIn: signedIn, chosen: chosen, admin: admin, liveTV: liveTV, liveGuide: liveGuide != nil,
-                                           liveExtras: liveGuide?.extras ?? false, apiLevel: apiLevel ?? (rows ? ServerFeatures.Level.rows : nil))
+                                           liveExtras: liveGuide?.extras ?? false,
+                                           apiLevel: apiLevel ?? (follows ? ServerFeatures.Level.follows : rows ? ServerFeatures.Level.rows : nil))
         let library = FakeLibraryRepository()
         // Read here rather than passed, so both apps' fakes take it with no change to their factories.
         library.largeLibrary = ProcessInfo.processInfo.arguments.contains("-fakesLargeLibrary")
         let rowsRepository = FakeRowsRepository(servers: servers, admin: admin)
         library.rows = rowsRepository
+        let followsRepository = FakeFollowsRepository(servers: servers)
+        library.follows = followsRepository
+        rowsRepository.follows = followsRepository
         let downloadRepository: any DownloadRepository = downloads ? FakeDownloadRepository() : UnavailableDownloads()
         let liveRepository = liveTV ? FakeLiveTVRepository(servers: servers, guide: liveGuide) : nil
         if liveAutomatic { liveRepository?.offered.automatic = true }
@@ -311,7 +315,8 @@ extension AppServices {
             liveTV: liveRepository,
             livePlayback: liveTV ? FakeLivePlaybackFactory(automatic: liveAutomatic && ServerFeatures(apiLevel: servers.current?.server.apiLevel).liveAutomatic) : nil,
             downloads: downloadRepository,
-            rows: rowsRepository
+            rows: rowsRepository,
+            follows: followsRepository
         )
         // `-fakesSaveFails` and `-fakesPasswordFails`, read here as `-fakesLargeLibrary` is.
         services.applyFakeRefusals(ProcessInfo.processInfo.arguments)

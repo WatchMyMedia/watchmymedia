@@ -95,8 +95,8 @@ struct SSEParser {
 
 /// What a listener hears about: watch state and the library (watch.changed,
 /// library.changed), requests and problem reports (requests.changed,
-/// problems.changed), the person's Live TV favourites and reminders, or
-/// their row layouts and lists.
+/// problems.changed), the person's Live TV favourites and reminders, their
+/// row layouts and lists, or the shows they follow.
 enum EventTopic: Hashable, Sendable {
     case library, requests
     /// The person's Live TV favourites, reminders and the household's recordings
@@ -104,6 +104,8 @@ enum EventTopic: Hashable, Sendable {
     case liveTV
     /// The person's row layouts and lists (rows.changed, lists.changed).
     case rows
+    /// The shows the person follows (follows.changed, API level 29).
+    case follows
 }
 
 /// A change this device made, whose echo from the server is not news
@@ -147,7 +149,7 @@ final class ServerEvents {
         "ping", "watch.changed", "library.changed", "scan.started", "scan.finished", "scan.failed",
         "requests.changed", "problems.changed",
         "live.favourites.changed", "live.reminders.changed", "live.recordings.changed",
-        "rows.changed", "lists.changed",
+        "rows.changed", "lists.changed", "follows.changed",
     ]
 
     /// How long a change made here waits for its echo.
@@ -390,7 +392,7 @@ final class ServerEvents {
             guard !pinged else { break }
             pinged = true
             if connectedBefore {
-                for topic in [EventTopic.library, .requests, .liveTV, .rows] { received[topic, default: 0] += 1 }
+                for topic in [EventTopic.library, .requests, .liveTV, .rows, .follows] { received[topic, default: 0] += 1 }
                 // A restart is usually an upgrade: its level first, so what
                 // listeners load next uses what the server now offers.
                 Task { [weak self] in
@@ -433,6 +435,9 @@ final class ServerEvents {
         case "rows.changed", "lists.changed":
             received[.rows, default: 0] += 1
             notify(.rows)
+        case "follows.changed":
+            received[.follows, default: 0] += 1
+            notify(.follows)
         default:
             break
         }

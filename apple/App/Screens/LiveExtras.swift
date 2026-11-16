@@ -35,7 +35,7 @@ private struct LiveReminderAsk: Identifiable {
 /// the explainer comes over the sheet that asked.
 private struct LiveRemindFlow: ViewModifier {
     @Environment(LiveExtrasStore.self) private var extras
-    @Environment(LiveReminderNotifier.self) private var notifier
+    @Environment(NotificationRouter.self) private var notifier
     @State private var ask: LiveReminderAsk?
 
     func body(content: Content) -> some View {

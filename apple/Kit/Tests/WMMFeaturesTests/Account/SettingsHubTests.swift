@@ -121,6 +121,33 @@ import WMMModel
         #expect(less.last(where: { $0.destination == .server })?.about == "The server this Apple TV uses, and switching to another.")
     }
 
+    @Test func fromLevel29NotificationsComesAfterAudioAndSubtitlesWithTheShowsFollowed() {
+        var facts = admin()
+        facts.server = server(level: ServerFeatures.Level.follows)
+        facts.followsAvailable = true
+        facts.followCount = 3
+        let hub = settingsHub(facts, locale: en)
+        #expect(hub[0].rows.map(\.title) == ["Playback", "Audio & subtitles", "Notifications", "Home rows", "Account & devices", "Your requests"])
+        #expect(hub[0].rows[2].destination == .notifications)
+        #expect(hub[0].rows[2].value == "3 shows")
+        facts.followCount = 1
+        #expect(settingsHub(facts, locale: en)[0].rows[2].value == "1 show")
+        facts.followCount = 0
+        #expect(settingsHub(facts, locale: en)[0].rows[2].value == "None")
+        facts.followCount = nil
+        #expect(settingsHub(facts, locale: en)[0].rows[2].value == nil, "not loaded yet")
+
+        facts.device = "Apple TV"
+        facts.followCount = 3
+        let groups = tvSettingsGroups(facts, locale: en)
+        #expect(groups.map(\.title).prefix(4) == ["Playback", "Audio & subtitles", "Notifications", "Home rows"])
+        #expect(groups[2].value == "3 shows you follow")
+        #expect(groups[2].about == "The shows you follow. Your phone or tablet notifies you. This TV shows new episodes on Home.")
+
+        facts.followsAvailable = false
+        #expect(!settingsHub(facts, locale: en)[0].rows.contains { $0.destination == .notifications }, "below 29 the row isn't there")
+    }
+
     // MARK: Next step
 
     @Test func aLanguageToWatchInComesFirst() {

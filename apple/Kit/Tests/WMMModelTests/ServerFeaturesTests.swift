@@ -29,6 +29,7 @@ import WMMModel
         ("liveAutomatic", 26, "Live TV Automatic", { $0.liveAutomatic }),
         ("tokenWithDecision", 28, "mediaToken", { $0.tokenWithDecision }),
         ("liveStatusWaits", 28, "mediaToken", { $0.liveStatusWaits }),
+        ("follows", 29, "following shows", { $0.follows }),
     ]
 
     @Test(arguments: table.indices)

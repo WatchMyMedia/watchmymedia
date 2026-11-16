@@ -17,6 +17,9 @@ struct WatchMyMediaApp: App {
     /// Live TV favourites and reminders, shared by every screen (PLAN-LIVE-TV-GUIDE.md §6.5).
     @State private var extras: LiveExtrasStore
     @State private var recordings: LiveRecordingsStore
+    /// The shows the person follows, and this device's new-episode check (PLAN-NEW-EPISODES.md §7).
+    @State private var follows: FollowsStore
+    @State private var newEpisodes: NewEpisodeNotifier
 
     init() {
         // Launch to Home's first content, and MetricKit's reports for Copy diagnostics (PLAN-APPLE-REVIEW.md §4.3.1, §6.4).
@@ -24,7 +27,19 @@ struct WatchMyMediaApp: App {
         Diagnostics.start()
         let services = ServicesFactory.make(arguments: ProcessInfo.processInfo.arguments)
         _services = State(initialValue: services)
-        BackgroundSync.register(services)
+        let memory = NewEpisodeMemory()
+        #if DEBUG
+        // `-newEpisodesReset`: this device starts as if it had never checked or explained (UI tests).
+        if ProcessInfo.processInfo.arguments.contains("-newEpisodesReset") {
+            memory.forget(unlessFor: nil)
+            memory.explained = false
+            memory.notifyHere = true
+        }
+        #endif
+        let newEpisodes = NewEpisodeNotifier(follows: services.follows, router: NotificationRouter.shared, memory: memory)
+        _follows = State(initialValue: FollowsStore(repository: services.follows))
+        _newEpisodes = State(initialValue: newEpisodes)
+        BackgroundSync.register(services, newEpisodes: newEpisodes)
         _cast = State(initialValue: CastServicesFactory.make(services: services, arguments: ProcessInfo.processInfo.arguments))
         _extras = State(initialValue: LiveExtrasStore(repository: services.liveTV))
         _recordings = State(initialValue: LiveRecordingsStore(repository: services.liveTV))
@@ -38,23 +53,26 @@ struct WatchMyMediaApp: App {
                 .environment(navigator)
                 .environment(extras)
                 .environment(recordings)
-                .environment(LiveReminderNotifier.shared)
+                .environment(NotificationRouter.shared)
+                .environment(follows)
+                .environment(newEpisodes)
                 .environment(\.imageLoader, services.images)
                 .preferredColorScheme(.dark)
                 .tint(Palette.gold)
                 // A play or channel link acts only when the app published it for this server.
                 .onOpenURL { url in open(url) }
                 .task { await navigator.applyLaunchArguments(ProcessInfo.processInfo.arguments, library: services.library, liveTV: services.liveTV) }
-                // A reminder's notification opens its channel.
+                // A reminder's notification opens its channel; a new episode's, its show.
                 .task {
-                    LiveReminderNotifier.shared.open = { url in open(url) }
+                    NotificationRouter.shared.open = { url in open(url) }
                 }
                 // A quick action on the app's icon, or an App Shortcut.
                 .task {
                     QuickActions.shared.open = { url in open(url) }
                 }
-                // The person's other devices change favourites and reminders too.
+                // The person's other devices change favourites, reminders and follows too.
                 .task { await extras.follow() }
+                .task { await follows.listen() }
                 .task { await recordings.follow() }
                 // Once at launch and on each return to the app.
                 .task(id: scenePhase) { if scenePhase == .active { await cast.refresh() } }
@@ -79,9 +97,9 @@ extension WatchMyMediaApp {
 final class AppDelegate: NSObject, UIApplicationDelegate {
     @MainActor static var orientations: UIInterfaceOrientationMask = UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
 
-    /// Set before launch finishes, so a tap on a reminder that opened the app reaches it.
+    /// Set before launch finishes, so a tap on a notification that opened the app reaches it.
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        MainActor.assumeIsolated { UNUserNotificationCenter.current().delegate = LiveReminderNotifier.shared }
+        MainActor.assumeIsolated { UNUserNotificationCenter.current().delegate = NotificationRouter.shared }
         return true
     }
 

@@ -29,8 +29,10 @@ public final class AppServices {
     public let casting: any CastGateway
     /// Arranged rows and lists (PLAN-ROWS.md); ``UnavailableRows`` below ``rowsAPILevel``.
     public let rows: any RowsRepository
+    /// Following shows and their new episodes (PLAN-NEW-EPISODES.md); ``UnavailableFollows`` below ``followsAPILevel``.
+    public let follows: any FollowsRepository
 
-    public init(servers: any ServerRepository, auth: any AuthRepository, library: any LibraryRepository, requests: any RequestsRepository, preferences: any PreferencesRepository, playback: any PlaybackControllerFactory, images: any ImageLoader, client: ClientInfo, liveTV: (any LiveTVRepository)? = nil, livePlayback: (any LivePlaybackControllerFactory)? = nil, downloads: any DownloadRepository = UnavailableDownloads(), casting: any CastGateway = UnavailableCastGateway(), rows: (any RowsRepository)? = nil) {
+    public init(servers: any ServerRepository, auth: any AuthRepository, library: any LibraryRepository, requests: any RequestsRepository, preferences: any PreferencesRepository, playback: any PlaybackControllerFactory, images: any ImageLoader, client: ClientInfo, liveTV: (any LiveTVRepository)? = nil, livePlayback: (any LivePlaybackControllerFactory)? = nil, downloads: any DownloadRepository = UnavailableDownloads(), casting: any CastGateway = UnavailableCastGateway(), rows: (any RowsRepository)? = nil, follows: (any FollowsRepository)? = nil) {
         self.servers = servers
         self.auth = auth
         self.library = library
@@ -44,5 +46,6 @@ public final class AppServices {
         self.downloads = downloads
         self.casting = casting
         self.rows = rows ?? UnavailableRows()
+        self.follows = follows ?? UnavailableFollows()
     }
 }

@@ -47,6 +47,8 @@ public final class DataServices {
     public let offline: any OfflineGateway
     public let casting: any CastGateway
     public let rows: any RowsRepository
+    /// Following shows and their new episodes (PLAN-NEW-EPISODES.md).
+    public let follows: any FollowsRepository
 
     let store: LocalStore
     let serverRepository: RealServerRepository
@@ -101,6 +103,7 @@ public final class DataServices {
         offline = RealOfflineGateway(store: store, auth: authRepository)
         casting = RealCastGateway(store: store, reader: serverInfo)
         rows = RealRowsRepository(store: store, events: events)
+        follows = RealFollowsRepository(store: store, events: events)
         images = CachedImageLoader(
             session: imageSession ?? session,
             current: { [weak store] in try? store?.signedIn() }
@@ -199,7 +202,7 @@ public final class DataServices {
 
     /// The services for the screens, with `playback` from WMMPlayback and `downloads` from WMMDownloads.
     public func makeAppServices(playback: any PlaybackControllerFactory, livePlayback: (any LivePlaybackControllerFactory)? = nil, downloads: any DownloadRepository = UnavailableDownloads()) -> AppServices {
-        AppServices(servers: servers, auth: auth, library: library, requests: requests, preferences: preferences, playback: playback, images: images, client: client, liveTV: liveTV, livePlayback: livePlayback, downloads: downloads, casting: casting, rows: rows)
+        AppServices(servers: servers, auth: auth, library: library, requests: requests, preferences: preferences, playback: playback, images: images, client: client, liveTV: liveTV, livePlayback: livePlayback, downloads: downloads, casting: casting, rows: rows, follows: follows)
     }
 
     /// The account and its playback settings, side by side (PLAN-APPLE-REVIEW.md §4.1.4).

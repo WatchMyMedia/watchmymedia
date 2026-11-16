@@ -23,7 +23,11 @@ import WMMPlayback
 /// 21); followed by a list ("es,en") the person has saved those, with
 /// subtitles for foreign audio, as the server sets them. `-fakesRows` puts
 /// the server at API level 22: Home and the library screens come arranged,
-/// with list rows and list pages (PLAN-ROWS.md).
+/// with list rows and list pages (PLAN-ROWS.md). `-fakesFollows` puts it at
+/// API level 29: Notify me on a show's page, Settings › Notifications with
+/// three shows followed and one that left the library, Home's New from shows
+/// you follow, and a second new-episode check that finds two shows' arrivals
+/// (PLAN-NEW-EPISODES.md). `-fakesManyNewEpisodes` makes it seven shows.
 @MainActor
 enum ServicesFactory {
     static func make(arguments: [String]) -> AppServices {
@@ -71,7 +75,8 @@ enum ServicesFactory {
             apiLevel: arguments.contains("-fakesLiveAutomatic") ? liveAutomaticAPILevel : arguments.contains("-fakesAudioLanguages") ? audioPreferencesAPILevel : arguments.contains("-fakesLiveRecordings") ? liveRecordingAPILevel : arguments.contains("-fakesSubtitlePreferences") ? subtitlePreferencesAPILevel : nil,
             recordings: arguments.contains("-fakesLiveRecordings"),
             liveAutomatic: arguments.contains("-fakesLiveAutomatic"),
-            rows: arguments.contains("-fakesRows")
+            rows: arguments.contains("-fakesRows"),
+            follows: arguments.contains("-fakesFollows")
         )
         (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
         if let i = arguments.firstIndex(of: "-fakesAudioLanguages"), arguments.indices.contains(i + 1), !arguments[i + 1].hasPrefix("-") {
@@ -79,6 +84,7 @@ enum ServicesFactory {
         }
         (services.library as? FakeLibraryRepository)?.offline = arguments.contains("-fakesOffline")
         (services.rows as? FakeRowsRepository)?.twoMovieLibraries = arguments.contains("-fakesTwoMovieLibraries")
+        (services.follows as? FakeFollowsRepository)?.manyShows = arguments.contains("-fakesManyNewEpisodes")
         if let i = arguments.firstIndex(of: "-fakesTrailerKeys"), arguments.indices.contains(i + 1) {
             (services.library as? FakeLibraryRepository)?.trailerKeys = arguments[i + 1].split(separator: ",").map(String.init)
         }

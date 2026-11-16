@@ -42,6 +42,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(Navigator.self) private var navigator
     @Environment(LiveExtrasStore.self) private var extras
+    @Environment(FollowsStore.self) private var follows
     @State private var accountGeneration = 0
     @State private var flow = AppFlow()
 
@@ -98,11 +99,13 @@ struct RootView: View {
         .task(id: Refresh(account: account, active: scenePhase == .active)) {
             guard scenePhase == .active else { return }
             await services.servers.refreshCurrent()
-            let services = services, extras = extras
+            let services = services, extras = extras, follows = follows
             await together(
                 { await services.requests.refreshOptions() },
                 // Live TV's access, then its reminders, which need it.
-                { try? await services.liveTV.refresh(); await extras.refresh() }
+                { try? await services.liveTV.refresh(); await extras.refresh() },
+                // The shows followed, for the bell and Settings (PLAN-NEW-EPISODES.md §7.4).
+                { await follows.refresh() }
             )
         }
     }

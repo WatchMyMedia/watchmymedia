@@ -16,59 +16,29 @@ import WMMModel
 /// first Remind me, after the app's own explainer; Not now keeps the
 /// reminder on the server. The notification offers Watch (as a tap) and
 /// Remind again, which notifies once more five minutes later
-/// (PLAN-APPLE-REVIEW.md §6.3).
-@MainActor @Observable
-final class LiveReminderNotifier: NSObject, UNUserNotificationCenterDelegate {
+/// (PLAN-APPLE-REVIEW.md §6.3). ``NotificationRouter`` is the delegate and
+/// hands the reminders' category here.
+@MainActor
+final class LiveReminderNotifier {
     static let shared = LiveReminderNotifier()
 
     /// Every request this app schedules starts so; others are left alone.
-    nonisolated static let prefix = "live-reminder-"
+    nonisolated static let prefix = NotificationOwner.liveReminderPrefix
     /// A Remind again: kept through rescheduling while its server is the one signed in.
     nonisolated static let againPrefix = "live-reminder-again-"
-    nonisolated static let category = "live-reminder"
+    nonisolated static let category = NotificationOwner.liveReminderCategory
     nonisolated static let watchAction = "watch"
     nonisolated static let remindAgainAction = "remind-again"
     nonisolated static let remindAgainSeconds: TimeInterval = 5 * 60
 
-    override init() {
-        super.init()
-        let watch = UNNotificationAction(identifier: Self.watchAction, title: "Watch", options: [.foreground])
-        let again = UNNotificationAction(identifier: Self.remindAgainAction, title: "Remind again", options: [])
-        UNUserNotificationCenter.current().setNotificationCategories([
-            UNNotificationCategory(identifier: Self.category, actions: [watch, again], intentIdentifiers: [])
-        ])
+    /// Watch and Remind again, registered by the router with the other categories.
+    nonisolated static var categoryDefinition: UNNotificationCategory {
+        let watch = UNNotificationAction(identifier: watchAction, title: "Watch", options: [.foreground])
+        let again = UNNotificationAction(identifier: remindAgainAction, title: "Remind again", options: [])
+        return UNNotificationCategory(identifier: category, actions: [watch, again], intentIdentifiers: [])
     }
 
-    /// What iOS last said; nil until asked.
-    private(set) var status: UNAuthorizationStatus?
-    /// The explainer was answered this launch, so it doesn't come again at once.
-    private(set) var askedThisLaunch = false
-    /// Opens a `watchmymedia://live-tv/<channel>` link the app published; set once the app's navigator exists.
-    var open: ((URL) -> Void)? {
-        didSet { if let open, let pending { self.pending = nil; open(pending) } }
-    }
-    private var pending: URL?
     private var center: UNUserNotificationCenter { .current() }
-
-    /// The explainer shows before iOS's own ask, while iOS hasn't asked yet.
-    func shouldAsk() async -> Bool {
-        await refreshStatus()
-        return status == .notDetermined && !askedThisLaunch
-    }
-
-    func refreshStatus() async {
-        status = await center.notificationSettings().authorizationStatus
-    }
-
-    /// Continue in the explainer: iOS's own ask.
-    func requestAuthorization() async {
-        askedThisLaunch = true
-        _ = try? await center.requestAuthorization(options: [.alert, .sound])
-        await refreshStatus()
-    }
-
-    /// Not now: the reminder stays on the server and in Live TV › Reminders.
-    func declined() { askedThisLaunch = true }
 
     /// Replaces this app's pending reminders with `alerts`, for `serverID`'s sign-in.
     func reschedule(_ alerts: [LiveReminderAlert], serverID: String? = nil) async {
@@ -112,36 +82,23 @@ final class LiveReminderNotifier: NSObject, UNUserNotificationCenterDelegate {
             && request.content.categoryIdentifier == category
     }
 
-    // MARK: UNUserNotificationCenterDelegate
-
-    /// In the app, the system's banner still shows.
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        notification.request.identifier.hasPrefix(Self.prefix) ? [.banner, .list, .sound] : []
-    }
-
-    /// A tap or Watch opens the channel in the player; Remind again notifies once more in five minutes.
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+    /// A tap or Watch: the channel's link, for the router to open. Remind
+    /// again notifies once more in five minutes and opens nothing.
+    nonisolated static func respond(to response: UNNotificationResponse, center: UNUserNotificationCenter) async -> URL? {
         let request = response.notification.request
-        guard request.identifier.hasPrefix(Self.prefix) else { return }
-        if response.actionIdentifier == Self.remindAgainAction {
+        if response.actionIdentifier == remindAgainAction {
             let again = UNNotificationRequest(
-                identifier: Self.againPrefix + UUID().uuidString, content: request.content,
-                trigger: UNTimeIntervalNotificationTrigger(timeInterval: Self.remindAgainSeconds, repeats: false)
+                identifier: againPrefix + UUID().uuidString, content: request.content,
+                trigger: UNTimeIntervalNotificationTrigger(timeInterval: remindAgainSeconds, repeats: false)
             )
             try? await center.add(again)
-            return
+            return nil
         }
-        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier || response.actionIdentifier == Self.watchAction else { return }
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier || response.actionIdentifier == watchAction else { return nil }
         let info = request.content.userInfo
         let channelID = info["channelID"] as? String
         let serverID = info["serverID"] as? String
-        await MainActor.run {
-            let link = DeepLink.liveTV(channelID: channelID)
-            self.handle(serverID.map { link.url(publishedFor: $0, source: "reminder") } ?? link.url)
-        }
-    }
-
-    private func handle(_ url: URL) {
-        if let open { open(url) } else { pending = url }
+        let link = DeepLink.liveTV(channelID: channelID)
+        return serverID.map { link.url(publishedFor: $0, source: "reminder") } ?? link.url
     }
 }

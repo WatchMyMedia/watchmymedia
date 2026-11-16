@@ -10,7 +10,10 @@ import WMMUI
 /// season tabs (the specials last; one season is a plain heading) with the
 /// season's line, Mark season watched and Show missing, the season's
 /// episodes in a row with the one on top outlined in gold, then About the
-/// show (Mark show watched, Request missing seasons, the cast and details).
+/// show (Notify me, Mark show watched, Request missing seasons, the cast and
+/// details). Notify me (PLAN-NEW-EPISODES.md §7.1, the boards' `show-bell`)
+/// follows at once; the first on this device, while iOS hasn't asked, then
+/// explains before iOS's question.
 ///
 /// The show's, a season's and an episode's routes all open it; only the
 /// episode on top differs (`ShowPageRule`). Picking a tab or a card changes
@@ -40,8 +43,14 @@ private struct ShowPageView: View {
     @State var model: ShowPageModel
     @State private var scrolled = false
     @State private var seasonDownload: SeasonDownloadModel?
+    /// The explainer before iOS's question, for this show's title.
+    @State private var explaining: ShowDetail?
     @Environment(AppServices.self) private var services
+    @Environment(FollowsStore.self) private var follows
+    @Environment(NotificationRouter.self) private var router
+    @Environment(NewEpisodeNotifier.self) private var newEpisodes
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.openURL) private var openURL
 
     private var wide: Bool { sizeClass.isWide }
 
@@ -90,9 +99,37 @@ private struct ShowPageView: View {
                 seasonDownload = nil
             }
         }
+        .sheet(item: $explaining) { show in
+            NewEpisodeAskSheet(show: show.title, device: liveDeviceNoun) { allow in
+                explaining = nil
+                guard allow else { return }
+                Task { if await router.requestAuthorization() == .allowed { await newEpisodes.check() } }
+            }
+        }
         .task { await model.run() }
+        .task { await router.refreshStatus() }
+        // The line under the actions says why the bell went back until it is pressed again or the page is left.
+        .onDisappear { follows.clearFailure() }
         .background { DownloadsChangeWatcher(downloads: services.downloads) { model.refreshOffline() } }
         .messageToast($model.message)
+    }
+
+    /// Notify me follows at once, before anything opens; the first on this
+    /// device while iOS hasn't asked opens the explainer over the show,
+    /// already followed, so Not now keeps it. Notifications on stops at once.
+    private func bellPressed(_ show: ShowDetail) {
+        let turningOn = !follows.isFollowing(show)
+        let saving = Task { await follows.toggle(show) }
+        guard turningOn else { return }
+        Task {
+            await router.refreshStatus()
+            if newEpisodes.memory.shouldExplain(router.permission) {
+                newEpisodes.memory.explained = true
+                explaining = show
+            }
+            // Followed, and this device may notify: the check starts its cursor from now.
+            if await saving.value, router.permission == .allowed { await newEpisodes.check() }
+        }
     }
 
     private func url(_ path: String?, _ size: ImageSize) -> URL? {
@@ -589,7 +626,7 @@ private struct ShowPageView: View {
                 HStack(alignment: .top, spacing: 32) {
                     VStack(alignment: .leading, spacing: 14) {
                         showHeader(show)
-                        showButtons
+                        showButtons(show)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     detailsCard(show).frame(width: 340)
@@ -599,7 +636,7 @@ private struct ShowPageView: View {
             } else {
                 VStack(alignment: .leading, spacing: 14) {
                     showHeader(show)
-                    showButtons
+                    showButtons(show)
                 }
                 .padding(.horizontal, margin)
                 CastRow(cast: show.cast, margin: margin, large: wide)
@@ -630,22 +667,70 @@ private struct ShowPageView: View {
         }
     }
 
-    /// Mark show watched and Request missing seasons.
-    @ViewBuilder private var showButtons: some View {
-        if model.canMarkShow || model.canRequestMissingSeasons {
-            HStack(spacing: wide ? 10 : 8) {
-                if model.canMarkShow {
-                    Button(model.showToggleLabel) { Task { await model.toggleShowWatched() } }
-                        .lineLimit(1)
-                        .buttonStyle(GhostButtonStyle(height: 46, fullWidth: !wide))
-                        .disabled(model.busy)
+    /// Notify me, Mark show watched and Request missing seasons, then what
+    /// the bell needs said. On iPhone the bell is a row of its own, at full
+    /// width, above the other two as they were: three don't fit one row, and
+    /// "Notifications on" mustn't be cut short. On iPad it is first in a row
+    /// that wraps rather than squeezing.
+    @ViewBuilder private func showButtons(_ show: ShowDetail) -> some View {
+        let bell = follows.canFollow(show)
+        if bell || model.canMarkShow || model.canRequestMissingSeasons {
+            VStack(alignment: .leading, spacing: 8) {
+                if wide {
+                    FlowLayout(spacing: 10, lineSpacing: 10) {
+                        if bell { bellButton(show) }
+                        otherShowButtons
+                    }
+                } else {
+                    if bell { bellButton(show) }
+                    if model.canMarkShow || model.canRequestMissingSeasons {
+                        HStack(spacing: 8) { otherShowButtons }
+                    }
                 }
-                if model.canRequestMissingSeasons {
-                    Button("Request missing seasons") { model.requestMissingSeasons() }
-                        .lineLimit(1)
-                        .buttonStyle(GhostButtonStyle(height: 46, fullWidth: !wide))
-                }
+                followLines(show)
             }
+        }
+    }
+
+    @ViewBuilder private var otherShowButtons: some View {
+        if model.canMarkShow {
+            Button(model.showToggleLabel) { Task { await model.toggleShowWatched() } }
+                .lineLimit(1)
+                .buttonStyle(GhostButtonStyle(height: 46, fullWidth: !wide))
+                .disabled(model.busy)
+        }
+        if model.canRequestMissingSeasons {
+            Button("Request missing seasons") { model.requestMissingSeasons() }
+                .lineLimit(1)
+                .buttonStyle(GhostButtonStyle(height: 46, fullWidth: !wide))
+        }
+    }
+
+    private func bellButton(_ show: ShowDetail) -> some View {
+        let following = follows.isFollowing(show)
+        return Button(NewEpisodeWords.bell(following: following)) { bellPressed(show) }
+            .buttonStyle(BellButtonStyle(on: following, fullWidth: !wide))
+            .accessibilityLabel(NewEpisodeWords.bellLabel(following: following, show: show.title))
+            .accessibilityIdentifier("show-notify")
+    }
+
+    /// Under the actions: why the bell went back, in orange; or, while the
+    /// bell is on and iOS refuses, the refused message with Open Settings
+    /// (not while iOS hasn't asked, nor when this device's switch is off).
+    @ViewBuilder private func followLines(_ show: ShowDetail) -> some View {
+        if let failure = follows.failureLine(for: show) {
+            Text(failure)
+                .font(.subheadline)
+                .foregroundStyle(Palette.warning)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 2)
+                .padding(.top, 2)
+                .accessibilityIdentifier("show-notify-failed")
+        } else if bellShowsSystemRefused(following: follows.isFollowing(show), permission: router.permission, notifyHere: newEpisodes.memory.notifyHere) {
+            NoticeBox(systemImage: "bell.slash", message: NewEpisodeWords.systemRefused,
+                      action: (NewEpisodeWords.openSettings, { openAppNotificationSettings(openURL) }))
+                .frame(maxWidth: wide ? 640 : .infinity, alignment: .leading)
+                .accessibilityIdentifier("show-notify-refused")
         }
     }
 

@@ -442,7 +442,7 @@ On iPhone and iPad (`App/Screens/Settings/`; `Settings2*` and `Pad2Settings2*` b
   Downloads and Audio & subtitles opened by a link or `-settingsPage` when the
   server or the account keeps them out.
 
-`-settingsPage` takes `playback`, `subtitles`, `account`, `requests`,
+`-settingsPage` takes `playback`, `subtitles`, `notifications`, `account`, `requests`,
 `downloads`, `server`, `inbox` and `about` (and the old `skip`, `liveTV`,
 `thisDevice` and `devices`, which open the page they moved into);
 `-open 'watchmymedia://link?code=K7M4PQ'` opens Link a TV at its second step,
@@ -454,6 +454,78 @@ above reach a row's failed line and Change password's errors.
 fakes, with Back and Cancel, a row that saves and one that fails, Rename,
 Change password and its errors, and both sign-outs; on an iPad, a task
 across a window resize and the pages' two columns in landscape.
+
+## New episodes
+
+From API level 29 a person follows a show and hears when a new episode of it
+reaches the library (PLAN-NEW-EPISODES.md §7.1, §7.2, §7.4; the new-episodes
+Apple boards). The words are the Kit's (`NewEpisodeWords`), the rules too:
+
+- **Notify me** is first in About the show on every Apple device
+  (`FollowsStore`, shared by every screen): it follows at once and goes back
+  if the server refuses, with the line under the actions saying why. On
+  iPhone and iPad the first Notify me on the device, while iOS hasn't asked,
+  opens the explainer (once, with its own mark) before iOS's question; Not
+  now keeps the follow. On Apple TV, while the bell has focus, the line under
+  the buttons says the phone or tablet notifies.
+- **Settings › Notifications**, in the You group: this iPhone's or iPad's
+  switch (kept on the device) and iOS's states, then the shows followed with
+  Stop notifying; on Apple TV the shows alone, Select offering Go to show and
+  Stop notifying.
+- **The check** (`NewEpisodeChecker`, `App/Shell/NewEpisodeNotifier.swift`)
+  runs in the background refresh after the downloads' sync, when the app
+  opens or comes back, three minutes after the last library change while it
+  is open, and once iOS allows notifications or a show is followed. It asks
+  the server's feed whenever this device could notify (signed in at level
+  29, the switch on, iOS allowing), whatever this device last saw of the
+  follows, since a show followed on another device notifies here too. It
+  keeps the server's cursor for one server and person (`NewEpisodeMemory`,
+  in UserDefaults, keyed by their ids), and forgets it when the switch goes
+  off, on a sign-out, or after signing in elsewhere (not a Switch server
+  that was cancelled). A first check only keeps the cursor; an unreachable
+  server, or a 404 from a proxy in front of a restarting one, keeps it too.
+  A check asked for while one runs runs once more after it, and the
+  background refresh's expiry cancels it at once. Each check posts
+  one notification a show at once, in the `new-episode` category, threaded
+  by show, and past five shows one more that opens Home, which iOS lists after
+  the five (`UITests/NewEpisodesTests.swift` checks). A tap opens the show
+  at its earliest new episode, only for the server it came from.
+- **Home's New from shows you follow** is the server's built-in `followed`
+  row, drawn by its `episode` style like Recently aired: nothing in the apps
+  knows its id.
+
+`-fakesFollows` puts the fakes at level 29: Sam follows Harbor Lights,
+Northfield Precinct, Orbital Decay and The Tidewater Array, which has left
+the library; Home has the row; a first check keeps the cursor and the next
+finds Harbor Lights' three episodes and one of Northfield Precinct's
+(`-fakesManyNewEpisodes`: seven shows). `-newEpisodesReset` (debug builds)
+forgets the device's cursor, switch and explainer mark at launch. On a
+device, the background task can be started from the debugger while the app
+is paused in the background:
+
+```
+e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"media.watchmy.client.sync"]
+```
+
+The iOS 27.2 Simulator doesn't keep the request (the app logs its submit,
+then "No task request with identifier media.watchmy.client.sync has been
+scheduled"), so on a simulator bring the app forward instead.
+
+`UITests/NewEpisodesTests.swift` and `TVUITests/NewEpisodesTests.swift` run
+the bell, the explainer, the notifications and Settings on the fakes.
+`UITests/NewEpisodesServerTests.swift` runs them against a real server, one
+step at a time with the server's side done between steps: on a throwaway
+server (its own port and data folder, `WATCHMYMEDIA_UPDATES_ENABLED=false`)
+with a TV library and a small fake TMDB on loopback
+(`WATCHMYMEDIA_TMDB_BASE_URL`), sign in and follow (`test1`), add an
+episode file and scan, wait out the server's two minutes, then open the app
+(`test2`, with `WMM_NE_TITLE`, `WMM_NE_BODY` and `WMM_NE_CODE` saying what
+to expect); `test3` reads Notification Center, `test4` turns the switch
+(`WMM_NE_SWITCH`), `test5` expects nothing (`WMM_NE_ABSENT`) and `test6`
+signs out. Pass the variables to xcodebuild as `TEST_RUNNER_…`, build once
+with `build-for-testing` and run each with `-only-testing` and
+`test-without-building`, on a fresh simulator (the first step expects iOS
+not to have asked for notifications).
 
 ## First run, audio languages and subtitles
 
@@ -617,7 +689,8 @@ refuses it, and the server's `live.favourites.changed` and
 `live.reminders.changed` bring other devices' changes. Settings › Live TV
 sets the lead time, kept on the server.
 
-On iPhone and iPad a reminder is a local notification (`LiveReminderNotifier`):
+On iPhone and iPad a reminder is a local notification (`LiveReminderNotifier`,
+handed its taps by `NotificationRouter`, the app's one notification delegate):
 the soonest 64, scheduled again at launch, on foreground, on the event and
 after every change. The first Remind me explains before iOS asks; Not now
 keeps the reminder on the server. A tap opens the channel's player. tvOS
@@ -877,9 +950,10 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
   spinner.
 - **Pull to refresh** on Downloads syncs them.
 - **A background refresh** (`App/Shell/BackgroundSync.swift`) sends what was
-  watched offline. It stays off until `project.yml` gives the app
+  watched offline, then checks for new episodes of the shows the person
+  follows (New episodes, above). `project.yml` gives the app
   `BGTaskSchedulerPermittedIdentifiers: [media.watchmy.client.sync]` and
-  `UIBackgroundModes: [fetch]`.
+  `UIBackgroundModes: [fetch]`; without them it does nothing.
 
 ## Top Shelf
 
