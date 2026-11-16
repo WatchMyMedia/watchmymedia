@@ -346,6 +346,8 @@ public final class RealPlaybackController: PlaybackController {
         /// A growing recording's length once its stream ended (an event playlist with its end tag).
         var grownMs: Int?
         var lastBeatAt = 0
+        /// A seek has landed since the last report: the next tick sends one (PLAN-RESUME.md §3.6).
+        var seekLanded = false
         var recoveries = 0
         var recoveredAt = 0
         /// The latest decision's start and stalls.
@@ -428,12 +430,14 @@ public final class RealPlaybackController: PlaybackController {
                 if overtaken(v, d) { return }
                 PerformanceSignposts.shared.playDecided()
                 var start = request.startMs ?? 0
-                // No explicit start: pick up where the viewer left off. A VOD
-                // playlist (or the file) just starts there; an event playlist
-                // is restarted there, as the web does.
+                // No explicit start: pick up where the server resumes, 5 s
+                // before where the viewer left off. A VOD playlist (or the
+                // file) just starts there. An event session from a server of
+                // PLAN-RESUME.md §3.7 starts there already; one an older
+                // server started at 0 is restarted there, as the web does.
                 if request.startMs == nil && d.resumeMs > resumeMinMs {
                     start = d.resumeMs
-                    if StreamClock.of(d).event {
+                    if StreamClock.of(d).event && !d.startsAt(start) {
                         let first = d
                         do {
                             d = try await decide(v, startMs: start, playID: d.playID)
@@ -748,6 +752,7 @@ public final class RealPlaybackController: PlaybackController {
 
     func seekWithin(_ v: Viewing, _ target: Int) {
         guard let p = media else { return }
+        v.seekLanded = true
         if v.loading {
             v.pendingPositionMs = target
         } else if v.streamClock.canSeekLocally(target, bufferedPlayerMs: p.bufferedPositionMs) {

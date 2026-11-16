@@ -45,6 +45,16 @@ import WMMModel
         #expect(h.state.positionMs == 300_000)
     }
 
+    @Test func anEventSessionThatStartsAtTheResumePointNeedsNoSecondRequest() async {
+        // The server started where the play resumes, on the keyframe 5 s before it (PLAN-RESUME.md §3.7).
+        await h.start(resumeRequest) { _ in decision(vod: false, startMs: 295_000, resumeMs: 300_000) }
+        #expect(h.gateway.decisions.count == 1)
+        #expect(h.gateway.decisions.first?.startMs == nil)
+        #expect(h.gateway.stoppedSessions.isEmpty)
+        #expect(h.player.loads.map(\.startPositionMs) == [5_000])
+        #expect(h.state.positionMs == 300_000)
+    }
+
     @Test func anExplicitStartOrAShortResumeDoesNotResume() async {
         await h.start(PlayRequest(fileID: 1, startMs: 0, title: "Lighthouse"), decision(resumeMs: 300_000))
         #expect(h.player.loads.last?.startPositionMs == 0)

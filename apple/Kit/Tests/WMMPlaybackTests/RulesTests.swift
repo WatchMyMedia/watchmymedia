@@ -120,6 +120,21 @@ import WMMModel
         #expect(heartbeatDue(.paused, lastReported: .paused, sinceLastBeatMs: 30_000))
         #expect(!heartbeatDue(.buffering, lastReported: .buffering, sinceLastBeatMs: 10_000))
         #expect(heartbeatDue(.buffering, lastReported: .buffering, sinceLastBeatMs: 30_000))
+        // A landed seek: at once, at most once a second while scrubbing.
+        #expect(heartbeatDue(.paused, lastReported: .paused, sinceLastBeatMs: 1_000, seeked: true))
+        #expect(!heartbeatDue(.paused, lastReported: .paused, sinceLastBeatMs: 999, seeked: true))
+    }
+
+    @Test func anEventDecisionStartsAtTheResumePointOnTheKeyframeBeforeIt() {
+        #expect(decisionStarting(at: 295_000).startsAt(300_000))
+        #expect(decisionStarting(at: 300_000).startsAt(300_000))
+        #expect(decisionStarting(at: 285_000).startsAt(300_000))
+        #expect(!decisionStarting(at: 0).startsAt(300_000))
+        #expect(!decisionStarting(at: 301_000).startsAt(300_000))
+    }
+
+    private func decisionStarting(at startMs: Int) -> PlaybackDecision {
+        PlaybackDecision(mode: .remux, protocol: .hls, vod: false, url: URL(string: "http://srv/x.m3u8")!, playID: "a1", durationMs: 3_000_000, startMs: startMs)
     }
 
     @Test func playerFailuresAreWorded() {

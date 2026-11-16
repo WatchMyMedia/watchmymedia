@@ -64,6 +64,31 @@ import WMMModel
         #expect(r.first { $0.state == .paused }?.bufferedMs == 30_000)
     }
 
+    @Test func aLandedSeekIsReportedAtOnceEvenWhilePaused() async {
+        await startPlaying()
+        await h.advance(60_000)
+        h.controller.pause()
+        await h.run()
+        let before = h.gateway.reports.count
+        await h.advance(2_000)
+        // Back 30 s while paused: saved within a second, not at the next 30 s beat.
+        h.controller.seek(toMs: 30_000)
+        await h.advance(250)
+        #expect(h.gateway.reports.count == before + 1)
+        #expect(h.gateway.reports.last?.positionMs == 30_000)
+        #expect(h.states.last == .paused)
+        // Scrubbing reports at most once a second, then the pause's own cadence again.
+        h.controller.seek(toMs: 20_000)
+        h.controller.seek(toMs: 10_000)
+        await h.advance(500)
+        #expect(h.gateway.reports.count == before + 1)
+        await h.advance(250)
+        #expect(h.gateway.reports.count == before + 2)
+        #expect(h.gateway.reports.last?.positionMs == 10_000)
+        await h.advance(28_000)
+        #expect(h.gateway.reports.count == before + 2)
+    }
+
     @Test func aNewPlayIDReplacesTheOld() async {
         h.gateway.reply = { r in ProgressReply(completed: false, newPlayID: r.playID == "a1" ? "b2" : nil) }
         await startPlaying()

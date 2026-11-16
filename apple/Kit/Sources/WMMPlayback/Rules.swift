@@ -39,8 +39,12 @@ let tokenMinLifetimeMs = 30 * 60_000
 /// Event playlists: a seek this far past the buffer still plays in the session.
 let eventSeekSlackMs = 500
 
-/// Event playlists: a session started this close to where the viewer seeked meanwhile is close enough.
+/// Event playlists: a session started this close to where the viewer seeked meanwhile is close enough,
+/// as is one that starts this far before the start asked for, on the keyframe before it (PLAN-RESUME.md §3.1).
 let eventStartToleranceMs = 15_000
+
+/// A landed seek is reported at once, at most this often while scrubbing (PLAN-RESUME.md §3.6).
+let seekBeatGapMs = 1_000
 
 /// The player's tick: state, prompts and heartbeats.
 let tickMs = 250
@@ -138,9 +142,20 @@ func playState(for status: PlayerStatus) -> PlayState {
 /// A heartbeat goes out at every change of state, then every 10 s while
 /// playing and every 30 s while paused or buffering; at Automatic quality,
 /// every 5 s while playing or buffering.
-func heartbeatDue(_ state: PlayState, lastReported: PlayState?, sinceLastBeatMs: Int, auto: Bool = false) -> Bool {
+func heartbeatDue(_ state: PlayState, lastReported: PlayState?, sinceLastBeatMs: Int, auto: Bool = false, seeked: Bool = false) -> Bool {
+    if seeked && sinceLastBeatMs >= seekBeatGapMs { return true }
     let every = auto && (state == .playing || state == .buffering) ? beatAutoMs : state == .playing ? beatPlayingMs : beatIdleMs
     return state != lastReported || sinceLastBeatMs >= every
+}
+
+extension PlaybackDecision {
+    /// Whether an event decision already starts at `fileMs`, on the keyframe up to
+    /// `eventStartToleranceMs` before it. A server from PLAN-RESUME.md §3.7 starts an
+    /// event play that asked for no start where it resumes; an older one started it
+    /// at 0, and the player asked again.
+    func startsAt(_ fileMs: Int) -> Bool {
+        (0...eventStartToleranceMs).contains(fileMs - startMs)
+    }
 }
 
 /// After a seek or a pause, buffering is the seek's or the resume's until the video has played this long.

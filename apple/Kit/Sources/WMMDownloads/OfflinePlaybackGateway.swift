@@ -114,7 +114,10 @@ public final class OfflinePlaybackGateway: PlaybackGateway, @unchecked Sendable 
         decision.sessionID = nil
         decision.startMs = 0
         decision.vod = true
-        decision.resumeMs = d.watch.flatMap { $0.completed ? nil : $0.positionMs } ?? 0
+        // A position kept here resumes 5 s back, as the server's resumeMs does. One that
+        // is the stored decision's resumeMs came from the server, already back.
+        let saved = d.watch.flatMap { $0.completed ? nil : $0.positionMs } ?? 0
+        decision.resumeMs = saved == stored.resumeMs ? saved : max(saved - resumeRewindMs, 0)
         decision.next = nextDownloaded ? stored.next : nil
         decision.upNextMs = nextDownloaded ? stored.upNextMs : 0
         decision.autoStep = nil
