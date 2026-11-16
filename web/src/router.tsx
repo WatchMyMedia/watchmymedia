@@ -39,6 +39,7 @@ const MyRequestsSettings = lazyRouteComponent(() => import('./pages/settings/MyR
 const InboxSettings = lazyRouteComponent(() => import('./pages/settings/Inbox'), 'InboxSettings')
 const ListsSettings = lazyRouteComponent(() => import('./pages/settings/Lists'), 'ListsSettings')
 const AboutSettings = lazyRouteComponent(() => import('./pages/settings/About'), 'AboutSettings')
+const NotificationsSettings = lazyRouteComponent(() => import('./pages/settings/Notifications'), 'NotificationsSettings')
 const ListPage = lazyRouteComponent(() => import('./pages/ListPage'), 'ListPage')
 const MakeListPage = lazyRouteComponent(() => import('./pages/MakeList'), 'MakeListPage')
 const EditListPage = lazyRouteComponent(() => import('./pages/MakeList'), 'EditListPage')
@@ -132,6 +133,7 @@ const settingsTranscodingRoute = createRoute({ getParentRoute: () => settingsRou
 const settingsTranscodingSubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/transcoding/$', beforeLoad: settingsSubpageGuard, component: TranscodingSettings })
 const settingsSubtitlesRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/subtitles', component: AudioSubtitlesSettings })
 const settingsSubtitlesSubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/subtitles/$', beforeLoad: settingsSubpageGuard, component: AudioSubtitlesSettings })
+const settingsNotificationsRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/notifications', component: NotificationsSettings })
 const settingsSignInRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/sign-in', beforeLoad: () => { throw redirect({ to: '/settings/security', replace: true }) } })
 const settingsSecurityRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/security', component: SecuritySettings })
 const settingsSecuritySubRoute = createRoute({ getParentRoute: () => settingsRoute, path: '/security/$', beforeLoad: settingsSubpageGuard, component: SecuritySettings })
@@ -394,6 +396,7 @@ const routeTree = rootRoute.addChildren([
     settingsUsersSubRoute,
     settingsTranscodingSubRoute,
     settingsSubtitlesSubRoute,
+    settingsNotificationsRoute,
     settingsSecuritySubRoute,
     settingsBackupsSubRoute,
     settingsIntegrationsSubRoute,

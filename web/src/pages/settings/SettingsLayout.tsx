@@ -5,6 +5,7 @@ import { healthQuery, librariesQuery } from '../../api/queries'
 import { settingsQuery } from '../../api/settings'
 import { requestOptionsQuery } from '../../api/requests'
 import { useEventState } from '../../api/events'
+import { useCanFollow } from '../../components/newEpisodeHooks'
 import { adminAwayWording } from '../../lib/adminAway'
 import { parseSettingsPath, settingsCrumbs, settingsHref, type SettingsTab } from '../../lib/settingsRoutes'
 import { Breadcrumb, HrefLink } from '../../components/settings/Frame'
@@ -24,6 +25,7 @@ type SettingsPath =
   | '/settings/history'
   | '/settings/transcoding'
   | '/settings/subtitles'
+  | '/settings/notifications'
   | '/settings/security'
   | '/settings/backups'
   | '/settings/lists'
@@ -58,10 +60,13 @@ function SettingsWithTabs({ path }: { path: string }) {
   const options = useQuery(requestOptionsQuery)
   const canRequest = !!(options.data?.movies || options.data?.shows)
   const inbox = options.data?.inbox ?? 0
+  // Following shows comes with API level 29 (PLAN-NEW-EPISODES.md §7.2).
+  const follows = useCanFollow()
 
   const you: Tab[] = [
     { to: '/settings/playback', label: 'Playback' },
     { to: '/settings/subtitles', label: 'Audio & subtitles' },
+    ...(follows ? [{ to: '/settings/notifications' as const, label: 'Notifications' }] : []),
     { to: '/settings/account', label: 'Account & devices' },
     ...(canRequest ? [{ to: '/settings/requests' as const, label: 'Your requests' }] : []),
     { to: '/settings/about', label: 'About' },

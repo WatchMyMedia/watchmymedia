@@ -2074,7 +2074,7 @@ export interface paths {
         post?: never;
         /**
          * Stop following a show by its TMDB id
-         * @description Works for a show that is no longer in any library.
+         * @description Works for a show that is no longer in any library, and for one not followed.
          */
         delete: operations["removeFollow"];
         options?: never;
@@ -2091,7 +2091,7 @@ export interface paths {
         };
         /**
          * Episodes that arrived for the shows the signed-in person follows
-         * @description What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting.
+         * @description What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished since it arrived, with a file still present, at most 7 days ago, grouped by show. An episode arrives once, in whichever library it reaches first, and is listed only when the file it came with was added in the last 7 days (the New badge's measure); a copy in another library, or in a library removed and added again, is not new. Each episode named has a present file, in any library. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out.
          */
         get: operations["listNewEpisodes"];
         put?: never;
@@ -3217,7 +3217,7 @@ export interface paths {
         get?: never;
         /**
          * Follow a show for the signed-in person
-         * @description Following is kept by the show's TMDB id, so it covers the show in every library. At most 500 a person: past that the reply is 409.
+         * @description Following is kept by the show's TMDB id, so it covers the show in every library. Only episodes that arrive from now on count. At most 500 a person: past that the reply is 409.
          */
         put: operations["followShow"];
         post?: never;
@@ -6681,7 +6681,7 @@ export interface components {
         NewEpisode: {
             /**
              * Format: date-time
-             * @description When its first file was linked to it.
+             * @description When its first file was linked to it, in any library.
              */
             arrivedAt: string;
             /**

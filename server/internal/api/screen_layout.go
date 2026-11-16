@@ -27,6 +27,7 @@ const (
 // Built-in row IDs (PLAN-ROWS.md 6.1).
 const (
 	rowContinue            = "continue"
+	rowFollowed            = "followed"
 	rowLive                = "live"
 	rowRecentlyAddedShows  = "recentlyAddedShows"
 	rowRecentlyAired       = "recentlyAired"
@@ -50,6 +51,7 @@ type rowDef struct {
 var (
 	homeBuiltins = []rowDef{
 		{ID: rowContinue, Title: "Continue watching", Style: RowStyleContinue},
+		{ID: rowFollowed, Title: "New from shows you follow", Style: RowStyleEpisode},
 		{ID: rowLive, Title: "Live TV", Style: RowStyleLive},
 		{ID: rowRecentlyAddedShows, Title: "Recently added · TV Shows", Style: RowStylePoster},
 		{ID: rowRecentlyAired, Title: "Recently aired · Episodes", Style: RowStyleEpisode},
@@ -161,7 +163,7 @@ func catalogue(ctx context.Context, deps Deps, ref screenRef, user *auth.User) (
 				if !liveRowAvailable(ctx, deps, user) {
 					continue
 				}
-			case rowRecentlyAddedShows, rowRecentlyAired:
+			case rowFollowed, rowRecentlyAddedShows, rowRecentlyAired:
 				if !has[library.TypeTV] {
 					continue
 				}
@@ -417,7 +419,9 @@ func checkPlacements(c screenCat, rows []RowPlacement) error {
 // layoutEntries says, for each row in order, whether it is drawn: not
 // hidden, something to show (for lists; built-in rows are assumed to have
 // some, as filling them is the screen's work) and within the screen's 30
-// rows.
+// rows. New from shows you follow doesn't count toward the 30: it is empty
+// for everyone who follows nothing, and must not push their 30th row out
+// (PLAN-NEW-EPISODES.md section 5.5), so Home draws at most 31.
 func layoutEntries(rows []placedRow, counts map[int64]listCounts) []RowLayoutEntry {
 	out := make([]RowLayoutEntry, 0, len(rows))
 	drawn := 0
@@ -435,6 +439,8 @@ func layoutEntries(rows []placedRow, counts map[int64]listCounts) []RowLayoutEnt
 			e.Note = "This list couldn't be fetched: " + *r.List.Error
 		case r.List != nil && n.inLibrary == 0:
 			e.Note = "Nothing from this list is in your library yet"
+		case r.ID == rowFollowed && r.Kind == rowKindBuiltin:
+			e.Shown = true
 		case drawn >= maxRowsOnScreen:
 			e.Note = "Not shown: too many rows"
 		default:
@@ -499,7 +505,7 @@ func builtinLink(c screenCat, id string) *ScreenRowLink {
 // rowWants says which of a screen's fixed rows are drawn, so only those
 // are filled.
 type rowWants struct {
-	continueWatching, released, aired bool
+	continueWatching, released, aired, followed bool
 }
 
 var allRows = rowWants{continueWatching: true, released: true, aired: true}
@@ -517,6 +523,8 @@ func wantsOf(entries []RowLayoutEntry) rowWants {
 			w.released = true
 		case rowRecentlyAired:
 			w.aired = true
+		case rowFollowed:
+			w.followed = true
 		}
 	}
 	return w
@@ -576,12 +584,14 @@ func signedInUser(ctx context.Context) *auth.User {
 }
 
 // homeRows is Home's arranged rows from the fixed rows in h, which were
-// filled for wants.
-func homeRows(ctx context.Context, deps Deps, c screenCat, rows []placedRow, entries []RowLayoutEntry, h HomeData, data listData) ([]ScreenRow, error) {
+// filled for wants, and the person's followed episodes.
+func homeRows(ctx context.Context, deps Deps, c screenCat, rows []placedRow, entries []RowLayoutEntry, h HomeData, followed []EpisodeCard, data listData) ([]ScreenRow, error) {
 	return arrangedRows(ctx, deps, c, rows, entries, data, func(id string) (ScreenRow, bool) {
 		switch id {
 		case rowContinue:
 			return ScreenRow{Continue: h.ContinueWatching}, len(h.ContinueWatching) > 0
+		case rowFollowed:
+			return ScreenRow{Episodes: followed}, len(followed) > 0
 		case rowLive:
 			return ScreenRow{}, true
 		case rowRecentlyAddedShows:

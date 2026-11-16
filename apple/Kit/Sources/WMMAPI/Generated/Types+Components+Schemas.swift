@@ -8187,7 +8187,7 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/NewEpisode`.
         public struct NewEpisode: Codable, Hashable, Sendable {
-            /// When its first file was linked to it.
+            /// When its first file was linked to it, in any library.
             ///
             /// - Remark: Generated from `#/components/schemas/NewEpisode/arrivedAt`.
             public var arrivedAt: Foundation.Date
@@ -8206,7 +8206,7 @@ extension Components {
             /// Creates a new `NewEpisode`.
             ///
             /// - Parameters:
-            ///   - arrivedAt: When its first file was linked to it.
+            ///   - arrivedAt: When its first file was linked to it, in any library.
             ///   - id: The episode's ID.
             ///   - number:
             ///   - season:

@@ -4,6 +4,7 @@ import { api, UNAUTHORIZED_EVENT, unwrap } from './api/client'
 import { AuthContext, type AuthState } from './authContext'
 import { PasswordConfirmationHost } from './components/ConfirmPasswordDialog'
 import { changeAuthScope } from './lib/authScope'
+import { forgetOnSignOut } from './lib/newEpisodes'
 import { forgetGrant, grantUntil, parseGrant, setGrantUntil } from './lib/passwordGrant'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -30,6 +31,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const onUnauthorized = () => {
       changeAuthScope()
       forgetGrant()
+      // Signed out: the next sign-in starts new episodes from now (PLAN-NEW-EPISODES.md §6.1).
+      forgetOnSignOut()
       setState((s) => (s.status === 'ready' ? { ...s, status: 'login', user: null } : s))
       // Sign-in may need Turnstile now, if it was turned on since.
       void refresh()
@@ -66,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     changeAuthScope()
     forgetGrant()
+    forgetOnSignOut()
     await api.POST('/api/auth/logout')
     qc.clear()
     setState((s) => ({ ...s, status: 'login', user: null }))

@@ -5,7 +5,7 @@
 export type SettingsGroup = 'you' | 'server'
 
 export type SettingsTab =
-  | 'playback' | 'subtitles' | 'account' | 'requests' | 'about'
+  | 'playback' | 'subtitles' | 'notifications' | 'account' | 'requests' | 'about'
   | 'general' | 'inbox' | 'libraries' | 'lists' | 'live-tv' | 'users'
   | 'integrations' | 'plex' | 'history' | 'transcoding' | 'security' | 'backups'
 
@@ -16,6 +16,7 @@ export type SettingsPageKind = 'hub' | 'item' | 'flow'
 export const SETTINGS_TABS: readonly { tab: SettingsTab; label: string; group: SettingsGroup }[] = [
   { tab: 'playback', label: 'Playback', group: 'you' },
   { tab: 'subtitles', label: 'Audio & subtitles', group: 'you' },
+  { tab: 'notifications', label: 'Notifications', group: 'you' },
   { tab: 'account', label: 'Account & devices', group: 'you' },
   { tab: 'requests', label: 'Your requests', group: 'you' },
   { tab: 'about', label: 'About', group: 'you' },

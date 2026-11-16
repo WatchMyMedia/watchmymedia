@@ -11,6 +11,8 @@ import { Login } from './pages/Login'
 import { startCasting } from './cast/sender'
 import { CastBar, CastButton } from './components/Cast'
 import { ReminderNotices } from './components/liveTV/LiveReminders'
+import { NewEpisodeNotices } from './components/NewEpisodeNotices'
+import { useNotificationClicks } from './components/newEpisodeHooks'
 import { serverCastsLive } from './lib/liveCast'
 import { isSettingsFlow } from './lib/settingsRoutes'
 
@@ -24,6 +26,7 @@ export function Layout() {
 
 function Shell() {
   useServerEvents()
+  useNotificationClicks()
   const auth = useAuth()
   const [status, setStatus] = useState(false)
   const [menu, setMenu] = useState(false)
@@ -63,10 +66,10 @@ function Shell() {
   const pill = (active: boolean) =>
     `min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${active ? 'bg-neutral-100 text-black' : 'text-neutral-300 hover:text-neutral-100'}`
 
-  // Live TV reminders come on every page; their banner stays off the players.
-  if (player) return <><Outlet /><ReminderNotices banner={false} /></>
+  // Reminders and new episodes come on every page; their banners stay off the players.
+  if (player) return <><Outlet /><Notices banner={false} /></>
   // A Settings task is focused: it draws its own bar with Exit (PLAN-ADMIN-SETTINGS.md §3.2).
-  if (isSettingsFlow(path)) return <><Outlet /><CastBar /><ReminderNotices banner /></>
+  if (isSettingsFlow(path)) return <><Outlet /><CastBar /><Notices banner /></>
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -183,7 +186,21 @@ function Shell() {
         <Outlet />
       </main>
       <CastBar />
-      <ReminderNotices banner />
+      <Notices banner />
+    </div>
+  )
+}
+
+/**
+ * Live TV reminders and new episodes of followed shows come on every page
+ * (PLAN-NEW-EPISODES.md §7.5): their banners stack under the app bar on the
+ * right, a new episode's below a reminder's, and stay off the players.
+ */
+function Notices({ banner }: { banner: boolean }) {
+  return (
+    <div className="pointer-events-none fixed inset-x-4 top-16 z-40 flex flex-col gap-3 *:pointer-events-auto sm:left-auto sm:right-12 sm:w-100">
+      <ReminderNotices banner={banner} />
+      <NewEpisodeNotices banner={banner} />
     </div>
   )
 }

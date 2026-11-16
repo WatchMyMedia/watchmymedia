@@ -8238,7 +8238,7 @@
         "additionalProperties": false,
         "properties": {
           "arrivedAt": {
-            "description": "When its first file was linked to it.",
+            "description": "When its first file was linked to it, in any library.",
             "format": "date-time",
             "type": "string"
           },
@@ -22273,7 +22273,7 @@
     },
     "/api/me/follows/{tmdbId}": {
       "delete": {
-        "description": "Works for a show that is no longer in any library.",
+        "description": "Works for a show that is no longer in any library, and for one not followed.",
         "operationId": "removeFollow",
         "parameters": [
           {
@@ -22311,7 +22311,7 @@
     },
     "/api/me/new-episodes": {
       "get": {
-        "description": "What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting.",
+        "description": "What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished since it arrived, with a file still present, at most 7 days ago, grouped by show. An episode arrives once, in whichever library it reaches first, and is listed only when the file it came with was added in the last 7 days (the New badge's measure); a copy in another library, or in a library removed and added again, is not new. Each episode named has a present file, in any library. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out.",
         "operationId": "listNewEpisodes",
         "parameters": [
           {
@@ -25529,7 +25529,7 @@
         ]
       },
       "put": {
-        "description": "Following is kept by the show's TMDB id, so it covers the show in every library. At most 500 a person: past that the reply is 409.",
+        "description": "Following is kept by the show's TMDB id, so it covers the show in every library. Only episodes that arrive from now on count. At most 500 a person: past that the reply is 409.",
         "operationId": "followShow",
         "parameters": [
           {

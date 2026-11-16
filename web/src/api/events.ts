@@ -5,6 +5,7 @@ import { watchEventInvalidator } from './watch'
 import { invalidatePlexState, plexHistoryEventInvalidator, resetPlexHistoryPages, type PlexHistoryChanged } from './plex'
 import { authScope } from '../lib/authScope'
 import { invalidatePersonalLiveTV, invalidateRecordings, invalidateRowsAndLists } from './queries'
+import { invalidateFollows } from './follows'
 
 export type ScanProgress = components['schemas']['ScanProgress']
 export type ScanFinished = components['schemas']['ScanFinished']
@@ -53,6 +54,16 @@ export function onPlayStopped(fn: (e: ActivityStopped) => void): () => void {
   stopListeners.add(fn)
   return () => {
     stopListeners.delete(fn)
+  }
+}
+
+const libraryListeners = new Set<() => void>()
+
+/** Calls fn whenever a library's contents change (library.changed); returns the unsubscribe function. */
+export function onLibraryChanged(fn: () => void): () => void {
+  libraryListeners.add(fn)
+  return () => {
+    libraryListeners.delete(fn)
   }
 }
 
@@ -112,7 +123,11 @@ function connect(qc: QueryClient) {
     set({ matches: without(state.matches, r.libraryId), lastMatch: { ...state.lastMatch, [r.libraryId]: { finished: r, at: Date.now() } } })
     void qc.invalidateQueries({ queryKey: ['libraries'] })
   })
-  on<{ libraryId: number }>('library.changed', (e) => invalidateLibrary(qc, e.libraryId))
+  on<{ libraryId: number }>('library.changed', (e) => {
+    invalidateLibrary(qc, e.libraryId)
+    // New episodes are checked for a while after the last change (PLAN-NEW-EPISODES.md §6.1).
+    libraryListeners.forEach((l) => l())
+  })
   // Plays starting, changing and ending: Now playing refetches; history and
   // statistics change only when a play ends.
   on('activity.started', () => void qc.invalidateQueries({ queryKey: ['activity', 'live'] }))
@@ -144,6 +159,10 @@ function connect(qc: QueryClient) {
   // changed what is on it (PLAN-ROWS.md §6.2, §6.3).
   on('rows.changed', () => invalidateRowsAndLists(qc))
   on('lists.changed', () => invalidateRowsAndLists(qc))
+  // This person followed or stopped following a show, here or on another
+  // device: the bell, Settings › Notifications and Home's row redraw
+  // (PLAN-NEW-EPISODES.md §5.3).
+  on('follows.changed', () => invalidateFollows(qc))
   // A file's seek thumbnails are made (sent to admins): Settings › Transcoding's count moves on.
   on('trickplay.ready', () => void qc.invalidateQueries({ queryKey: ['trickplay'] }))
 }
