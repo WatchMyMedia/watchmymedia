@@ -65,14 +65,21 @@ export type EpisodeNotice = {
   posterPath?: string
 }
 
-/** One show's notice, opening its page at the earliest new episode (§6.2). */
+/**
+ * One show's notice, opening its page at the earliest new episode (§6.2).
+ * The line is the episode, the first to the last listed, or, when more
+ * arrived than the feed lists (it sends the earliest five), "From" the
+ * earliest.
+ */
 export function groupNotice(g: NewEpisodeGroup): EpisodeNotice {
   const first = g.episodes[0]
   const last = g.episodes[g.episodes.length - 1]
   const heading = g.count === 1 ? 'New episode' : `${g.count} new episodes`
-  const line = !first || !last || (first.season === last.season && first.number === last.number)
-    ? [episodeCode(first ?? g.open), first?.title].filter(Boolean).join(' · ')
-    : episodeRange(first, last)
+  const line = g.count > 1 && first && g.count > g.episodes.length
+    ? `From ${episodeCode(first)}`
+    : !first || !last || (first.season === last.season && first.number === last.number)
+      ? [episodeCode(first ?? g.open), first?.title].filter(Boolean).join(' · ')
+      : episodeRange(first, last)
   return {
     key: `new-episodes:${g.show.id}`,
     heading,

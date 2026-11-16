@@ -79,6 +79,12 @@ describe('what a notification says (notify-system, notify-many)', () => {
     const across = groupNotice(group('Harbor Lights', [[2, 10], [3, 1], [3, 2]]))
     expect([across.title, across.body]).toEqual(['3 new episodes · Harbor Lights', 'S2 E10 to S3 E2'])
   })
+  it('starts from the earliest when more arrived than the feed lists', () => {
+    const many = group('Night Ferry', [[1, 1], [1, 2], [1, 3], [1, 4], [1, 5]], { count: 10 })
+    expect([groupNotice(many).title, groupNotice(many).body]).toEqual(['10 new episodes · Night Ferry', 'From S1 E1'])
+    expect(groupNotice(group('Night Ferry', [[1, 1], [1, 2], [1, 3], [1, 4], [1, 5]])).body).toBe('S1 E1 to E5')
+    expect(bannerFor([many], '1850')!.notice.line).toBe('From S1 E1')
+  })
   it('reads a special by the same rule', () => {
     expect(groupNotice(group('Copperline', [[0, 3]])).body).toBe('S0 E3')
     expect(groupNotice(group('Copperline', [[4, 1], [0, 1]])).body).toBe('S4 E1 to S0 E1')

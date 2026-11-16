@@ -60,7 +60,10 @@ the user asks in this conversation; see Authority in the root file.
   notification opens only the paths `openablePath` in
   `src/lib/browserNotices.ts` lists. New episodes hold a lock of their own
   (a tab asking twice for one lock waits on itself); their check, cursor and
-  words are `src/lib/newEpisodes.ts` (PLAN-NEW-EPISODES.md §6.1, §7.5).
+  words are `src/lib/newEpisodes.ts` (PLAN-NEW-EPISODES.md §6.1, §7.5). A
+  show's line is its one episode, the first to the last listed ("S3 E7 to
+  E9"), or "From S3 E1" when more arrived than the feed lists, as on
+  Android and Apple.
 - **YouTube trailers** (`src/pages/Trailer.tsx`, PLAN-TRAILERS.md §6.1) are the
   app's one outside frame: a plain `<iframe>` of `www.youtube-nocookie.com`,
   never YouTube's IFrame API script, and nothing drawn over it. Keep its
