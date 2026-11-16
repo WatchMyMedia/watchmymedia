@@ -37,17 +37,17 @@ func (q *Queries) DeleteShowFollow(ctx context.Context, arg DeleteShowFollowPara
 	return result.RowsAffected()
 }
 
-const getMediaFileFirstLinked = `-- name: GetMediaFileFirstLinked :one
-SELECT first_linked_at FROM media_files WHERE id = ?
+const getMediaFileAddedAt = `-- name: GetMediaFileAddedAt :one
+SELECT added_at FROM media_files WHERE id = ?
 `
 
-// When a file was first linked to an episode, for the arrival rule
-// (PLAN-NEW-EPISODES.md section 5.2); empty for a file never linked.
-func (q *Queries) GetMediaFileFirstLinked(ctx context.Context, id int64) (*string, error) {
-	row := q.db.QueryRowContext(ctx, getMediaFileFirstLinked, id)
-	var first_linked_at *string
-	err := row.Scan(&first_linked_at)
-	return first_linked_at, err
+// When a file counts as added, as the New badge reads it, for the arrival
+// rule (PLAN-NEW-EPISODES.md section 5.2).
+func (q *Queries) GetMediaFileAddedAt(ctx context.Context, id int64) (string, error) {
+	row := q.db.QueryRowContext(ctx, getMediaFileAddedAt, id)
+	var added_at string
+	err := row.Scan(&added_at)
+	return added_at, err
 }
 
 const insertShowFollow = `-- name: InsertShowFollow :execrows
@@ -128,7 +128,8 @@ WHERE f.user_id = ?3 AND a.quiet = 0 AND a.arrived_at >= ?4
   AND NOT EXISTS (SELECT 1 FROM shows s3
       CROSS JOIN seasons se3 ON se3.show_id = s3.id AND se3.number = a.season
       CROSS JOIN episodes e3 ON e3.season_id = se3.id AND e3.number = a.number
-      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id AND w.completed = 1
+      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id
+          AND w.completed = 1 AND w.updated_at > a.arrived_at
       WHERE s3.tmdb_id = a.tmdb_id)
 ORDER BY a.id
 LIMIT ?5
@@ -159,11 +160,14 @@ type ListFollowedArrivalsRow struct {
 // What a person hears about (section 5.4), in the order it arrived: the
 // announced arrivals of shows they follow, after both the device's cursor
 // and the follow and up to upto, since a date (the week, or the wait),
-// that they haven't finished in any library. Each comes with an episode
-// row of its TMDB episode that has a present file, in any library: its own
-// row first. One with none is left out. The join is pinned: the person's
-// follows (tens of rows), then each one's arrivals from (tmdb_id, id); an
-// episode row is found by show TMDB id, season and number.
+// that they haven't finished in any library since it arrived. (Mark show
+// watched also marks the episodes TMDB lists that have no file yet, which
+// must not hide them when they come. Both times are TimeLayout strings,
+// which compare as times.) Each comes with an episode row of its TMDB
+// episode that has a present file, in any library: its own row first. One
+// with none is left out. The join is pinned: the person's follows (tens of
+// rows), then each one's arrivals from (tmdb_id, id); an episode row is
+// found by show TMDB id, season and number.
 func (q *Queries) ListFollowedArrivals(ctx context.Context, arg ListFollowedArrivalsParams) ([]ListFollowedArrivalsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listFollowedArrivals,
 		arg.After,
@@ -228,7 +232,8 @@ WHERE f.user_id = ?1 AND a.quiet = 0 AND a.arrived_at >= ?2
   AND NOT EXISTS (SELECT 1 FROM shows s3
       CROSS JOIN seasons se3 ON se3.show_id = s3.id AND se3.number = a.season
       CROSS JOIN episodes e3 ON e3.season_id = se3.id AND e3.number = a.number
-      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id AND w.completed = 1
+      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id
+          AND w.completed = 1 AND w.updated_at > a.arrived_at
       WHERE s3.tmdb_id = a.tmdb_id)
 ORDER BY a.id DESC
 LIMIT ?3
@@ -386,20 +391,5 @@ type RecordEpisodeArrivalParams struct {
 // arrival whose episode row has gone, with its library, moves to this one.
 func (q *Queries) RecordEpisodeArrival(ctx context.Context, arg RecordEpisodeArrivalParams) error {
 	_, err := q.db.ExecContext(ctx, recordEpisodeArrival, arg.ArrivedAt, arg.Quiet, arg.EpisodeID)
-	return err
-}
-
-const setMediaFileFirstLinked = `-- name: SetMediaFileFirstLinked :exec
-UPDATE media_files SET first_linked_at = ?1
-WHERE id = ?2 AND first_linked_at IS NULL
-`
-
-type SetMediaFileFirstLinkedParams struct {
-	FirstLinkedAt *string `json:"first_linked_at"`
-	ID            int64   `json:"id"`
-}
-
-func (q *Queries) SetMediaFileFirstLinked(ctx context.Context, arg SetMediaFileFirstLinkedParams) error {
-	_, err := q.db.ExecContext(ctx, setMediaFileFirstLinked, arg.FirstLinkedAt, arg.ID)
 	return err
 }

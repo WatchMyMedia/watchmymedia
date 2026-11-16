@@ -99,7 +99,7 @@ func (q *Queries) GetFileEpisode(ctx context.Context, mediaFileID int64) (GetFil
 }
 
 const getMediaFile = `-- name: GetMediaFile :one
-SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of, first_linked_at FROM media_files WHERE id = ?
+SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of FROM media_files WHERE id = ?
 `
 
 func (q *Queries) GetMediaFile(ctx context.Context, id int64) (MediaFile, error) {
@@ -138,13 +138,12 @@ func (q *Queries) GetMediaFile(ctx context.Context, id int64) (MediaFile, error)
 		&i.DvProfile,
 		&i.ExtraKind,
 		&i.ExtraOf,
-		&i.FirstLinkedAt,
 	)
 	return i, err
 }
 
 const getMediaFileByPath = `-- name: GetMediaFileByPath :one
-SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of, first_linked_at FROM media_files WHERE path = ?
+SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of FROM media_files WHERE path = ?
 `
 
 func (q *Queries) GetMediaFileByPath(ctx context.Context, path string) (MediaFile, error) {
@@ -183,7 +182,6 @@ func (q *Queries) GetMediaFileByPath(ctx context.Context, path string) (MediaFil
 		&i.DvProfile,
 		&i.ExtraKind,
 		&i.ExtraOf,
-		&i.FirstLinkedAt,
 	)
 	return i, err
 }
@@ -274,7 +272,7 @@ func (q *Queries) ListLinkTargets(ctx context.Context, ids []int64) ([]ListLinkT
 }
 
 const listMediaFiles = `-- name: ListMediaFiles :many
-SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of, first_linked_at FROM media_files
+SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of FROM media_files
 WHERE library_id = ?1 AND extra_kind IS NULL
   AND (?2 IS NULL OR status = ?2)
   AND (?3 IS NULL OR match_status = ?3)
@@ -339,7 +337,6 @@ func (q *Queries) ListMediaFiles(ctx context.Context, arg ListMediaFilesParams) 
 			&i.DvProfile,
 			&i.ExtraKind,
 			&i.ExtraOf,
-			&i.FirstLinkedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -776,7 +773,7 @@ ON CONFLICT (path) DO UPDATE SET
     dv_profile   = excluded.dv_profile,
     extra_kind   = excluded.extra_kind,
     updated_at   = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-RETURNING id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of, first_linked_at
+RETURNING id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of
 `
 
 type UpsertMediaFileParams struct {
@@ -859,7 +856,6 @@ func (q *Queries) UpsertMediaFile(ctx context.Context, arg UpsertMediaFileParams
 		&i.DvProfile,
 		&i.ExtraKind,
 		&i.ExtraOf,
-		&i.FirstLinkedAt,
 	)
 	return i, err
 }

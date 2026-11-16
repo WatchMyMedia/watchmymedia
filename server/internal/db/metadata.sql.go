@@ -533,7 +533,7 @@ func (q *Queries) ListFilesNeedingMatch(ctx context.Context, libraryID int64) ([
 }
 
 const listFilesToRematch = `-- name: ListFilesToRematch :many
-SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of, first_linked_at FROM media_files
+SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of FROM media_files
 WHERE library_id = ? AND status = 'present' AND match_locked = 0 AND match_ignored = 0
   AND match_status IN ('pending', 'unmatched', 'failed') AND extra_kind IS NULL
 ORDER BY path
@@ -581,7 +581,6 @@ func (q *Queries) ListFilesToRematch(ctx context.Context, libraryID int64) ([]Me
 			&i.DvProfile,
 			&i.ExtraKind,
 			&i.ExtraOf,
-			&i.FirstLinkedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -629,7 +628,7 @@ func (q *Queries) ListMatchOverrides(ctx context.Context, libraryID int64) ([]Ma
 }
 
 const listMovieFiles = `-- name: ListMovieFiles :many
-SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of, first_linked_at FROM media_files WHERE movie_id = ? ORDER BY path
+SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of FROM media_files WHERE movie_id = ? ORDER BY path
 `
 
 func (q *Queries) ListMovieFiles(ctx context.Context, movieID *int64) ([]MediaFile, error) {
@@ -674,7 +673,6 @@ func (q *Queries) ListMovieFiles(ctx context.Context, movieID *int64) ([]MediaFi
 			&i.DvProfile,
 			&i.ExtraKind,
 			&i.ExtraOf,
-			&i.FirstLinkedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -849,7 +847,7 @@ func (q *Queries) ListMoviesWithoutContentRating(ctx context.Context, libraryID 
 }
 
 const listPendingMatches = `-- name: ListPendingMatches :many
-SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of, first_linked_at FROM media_files
+SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of FROM media_files
 WHERE library_id = ? AND status = 'present' AND match_status = 'pending' AND extra_kind IS NULL
   AND match_locked = 0 AND match_ignored = 0
 ORDER BY path
@@ -899,7 +897,6 @@ func (q *Queries) ListPendingMatches(ctx context.Context, libraryID int64) ([]Me
 			&i.DvProfile,
 			&i.ExtraKind,
 			&i.ExtraOf,
-			&i.FirstLinkedAt,
 		); err != nil {
 			return nil, err
 		}

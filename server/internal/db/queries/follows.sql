@@ -1,11 +1,7 @@
--- name: GetMediaFileFirstLinked :one
--- When a file was first linked to an episode, for the arrival rule
--- (PLAN-NEW-EPISODES.md section 5.2); empty for a file never linked.
-SELECT first_linked_at FROM media_files WHERE id = ?;
-
--- name: SetMediaFileFirstLinked :exec
-UPDATE media_files SET first_linked_at = sqlc.arg(first_linked_at)
-WHERE id = sqlc.arg(id) AND first_linked_at IS NULL;
+-- name: GetMediaFileAddedAt :one
+-- When a file counts as added, as the New badge reads it, for the arrival
+-- rule (PLAN-NEW-EPISODES.md section 5.2).
+SELECT added_at FROM media_files WHERE id = ?;
 
 -- name: RecordEpisodeArrival :exec
 -- An episode's arrival, unless its TMDB episode (the show's TMDB id, the
@@ -60,11 +56,14 @@ ORDER BY f.created_at DESC, f.since_arrival DESC, f.tmdb_id DESC;
 -- What a person hears about (section 5.4), in the order it arrived: the
 -- announced arrivals of shows they follow, after both the device's cursor
 -- and the follow and up to upto, since a date (the week, or the wait),
--- that they haven't finished in any library. Each comes with an episode
--- row of its TMDB episode that has a present file, in any library: its own
--- row first. One with none is left out. The join is pinned: the person's
--- follows (tens of rows), then each one's arrivals from (tmdb_id, id); an
--- episode row is found by show TMDB id, season and number.
+-- that they haven't finished in any library since it arrived. (Mark show
+-- watched also marks the episodes TMDB lists that have no file yet, which
+-- must not hide them when they come. Both times are TimeLayout strings,
+-- which compare as times.) Each comes with an episode row of its TMDB
+-- episode that has a present file, in any library: its own row first. One
+-- with none is left out. The join is pinned: the person's follows (tens of
+-- rows), then each one's arrivals from (tmdb_id, id); an episode row is
+-- found by show TMDB id, season and number.
 SELECT a.id, a.tmdb_id, a.arrived_at, a.season AS season_number, a.number AS episode_number,
     e.id AS episode_id, e.show_id, e.title, e.still_path, s.title AS show_title, s.poster_path AS show_poster_path
 FROM show_follows f
@@ -84,7 +83,8 @@ WHERE f.user_id = sqlc.arg(user_id) AND a.quiet = 0 AND a.arrived_at >= sqlc.arg
   AND NOT EXISTS (SELECT 1 FROM shows s3
       CROSS JOIN seasons se3 ON se3.show_id = s3.id AND se3.number = a.season
       CROSS JOIN episodes e3 ON e3.season_id = se3.id AND e3.number = a.number
-      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id AND w.completed = 1
+      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id
+          AND w.completed = 1 AND w.updated_at > a.arrived_at
       WHERE s3.tmdb_id = a.tmdb_id)
 ORDER BY a.id
 LIMIT sqlc.arg(max_rows);
@@ -115,7 +115,8 @@ WHERE f.user_id = sqlc.arg(user_id) AND a.quiet = 0 AND a.arrived_at >= sqlc.arg
   AND NOT EXISTS (SELECT 1 FROM shows s3
       CROSS JOIN seasons se3 ON se3.show_id = s3.id AND se3.number = a.season
       CROSS JOIN episodes e3 ON e3.season_id = se3.id AND e3.number = a.number
-      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id AND w.completed = 1
+      CROSS JOIN watch_state w ON w.user_id = f.user_id AND w.item_type = 'episode' AND w.item_id = e3.id
+          AND w.completed = 1 AND w.updated_at > a.arrived_at
       WHERE s3.tmdb_id = a.tmdb_id)
 ORDER BY a.id DESC
 LIMIT sqlc.arg(max_rows);

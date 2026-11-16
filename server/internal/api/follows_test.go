@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -47,8 +48,8 @@ func (e followEnv) show(lib, tmdbID int64, title string, n int) (int64, []int64)
 func (e followEnv) episode(lib, show, season int64, number int) int64 {
 	e.t.Helper()
 	ep := e.exec(`INSERT INTO episodes (season_id, show_id, number, title, still_path) VALUES (?, ?, ?, ?, '/still.jpg')`, season, show, number, fmt.Sprintf("Chapter %d", number))
-	f := e.exec(`INSERT INTO media_files (library_id, path, size, mtime, status, parsed, height, added_at, match_status, first_linked_at)
-		VALUES (?, ?, 500, '2026-01-01T00:00:00.000Z', 'present', '{"kind":"episode"}', 1080, '2026-01-01T00:00:00.000Z', 'matched', '2026-01-01T00:00:00.000Z')`,
+	f := e.exec(`INSERT INTO media_files (library_id, path, size, mtime, status, parsed, height, added_at, match_status)
+		VALUES (?, ?, 500, '2026-01-01T00:00:00.000Z', 'present', '{"kind":"episode"}', 1080, '2026-01-01T00:00:00.000Z', 'matched')`,
 		lib, fmt.Sprintf("/t/%d/%d/%d.mkv", show, season, number))
 	e.exec(`INSERT INTO episode_files (episode_id, media_file_id) VALUES (?, ?)`, ep, f)
 	return ep
@@ -412,6 +413,101 @@ func TestNewEpisodesAcrossLibraries(t *testing.T) {
 		list.Follows[0].Latest == nil || list.Follows[0].Latest.Number != 2 || list.Follows[0].Latest.Title != "" {
 		t.Errorf("follows = %+v", list.Follows)
 	}
+}
+
+// Marking a show watched marks the episodes TMDB lists that have no file
+// yet. That must not hide them when they arrive: only finishing an episode
+// after it arrived does, in the feed and on Home.
+func TestFollowedAfterMarkShowWatched(t *testing.T) {
+	t.Parallel()
+	e := newFollowEnv(t)
+	tide, tideEps := e.show(e.tv, 7001, "Tidewater", 2)
+	// E02 is listed by TMDB but not out yet: no file.
+	e.exec(`DELETE FROM media_files WHERE id IN (SELECT media_file_id FROM episode_files WHERE episode_id = ?)`, tideEps[1])
+	// Mid-season, the person marks the show watched, an hour ago.
+	if res := e.admin(http.MethodPost, fmt.Sprintf("/api/shows/%d/watched", tide), "", nil); res.StatusCode >= 300 {
+		t.Fatalf("mark show watched = %d %s", res.StatusCode, res.Body)
+	}
+	var marked int
+	if err := e.conn.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM watch_state WHERE user_id = 1 AND item_id = ? AND completed = 1`, tideEps[1]).Scan(&marked); err != nil || marked != 1 {
+		t.Fatalf("the unaired episode marked: %d, %v", marked, err)
+	}
+	e.exec(`UPDATE watch_state SET updated_at = ? WHERE user_id = 1`, db.FormatTime(time.Now().Add(-time.Hour)))
+	e.follow(e.admin, tide)
+	start := e.feed(e.admin, "").Cursor
+	// E02 comes out.
+	f := e.exec(`INSERT INTO media_files (library_id, path, size, mtime, status, parsed, height, added_at, match_status)
+		VALUES (?, '/t/Tidewater/S01E02.mkv', 500, '2026-01-01T00:00:00.000Z', 'present', '{"kind":"episode"}', 1080, ?, 'matched')`, e.tv, db.FormatTime(time.Now()))
+	e.exec(`INSERT INTO episode_files (episode_id, media_file_id) VALUES (?, ?)`, tideEps[1], f)
+	e.arrive(tideEps[1], 5*time.Minute, false)
+
+	if g := groups(e.feed(e.admin, start)); len(g) != 1 || g[0] != "Tidewater: S1E2 (1) open S1E2" {
+		t.Errorf("feed = %q", g)
+	}
+	var home HomeData
+	e.admin(http.MethodGet, "/api/home?arranged=true", "", &home)
+	if at := slices.Index(rowIDs(home.Rows), rowFollowed); at < 0 || len(home.Rows[at].Episodes) != 1 || home.Rows[at].Episodes[0].EpisodeID != tideEps[1] {
+		t.Errorf("home rows = %v", rowIDs(home.Rows))
+	}
+	// Watching it now finishes it.
+	e.admin(http.MethodPost, fmt.Sprintf("/api/shows/%d/watched", tide), "", nil)
+	if g := groups(e.feed(e.admin, start)); len(g) != 0 {
+		t.Errorf("feed after watching = %q", g)
+	}
+	e.admin(http.MethodGet, "/api/home?arranged=true", "", &home)
+	if slices.Contains(rowIDs(home.Rows), rowFollowed) {
+		t.Errorf("home after watching = %v", rowIDs(home.Rows))
+	}
+}
+
+// New from shows you follow never takes one of the screen's 30 rows: a
+// person with 30 rows, saved before it existed, keeps all 30 whether it is
+// empty or not.
+func TestFollowedRowTakesNoSlot(t *testing.T) {
+	t.Parallel()
+	e := newFollowEnv(t)
+	order := []string{`{"id":"continue"}`, `{"id":"recentlyAddedShows"}`, `{"id":"recentlyAired"}`, `{"id":"recentlyAddedMovies"}`, `{"id":"recentlyReleased"}`}
+	var last string
+	for i := range maxRowsOnScreen - len(order) {
+		l, err := e.q.CreateMediaList(t.Context(), db.CreateMediaListParams{Screen: "home", Name: fmt.Sprint("List ", i), SourceKind: "import", Params: "{}", MediaType: "all", EntryLimit: 50})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tmdbID := int64(9001)
+		if err := e.q.InsertMediaListEntry(t.Context(), db.InsertMediaListEntryParams{ListID: l.ID, Rank: 1, MediaType: "movie", TmdbID: &tmdbID, Title: "Lantern 0"}); err != nil {
+			t.Fatal(err)
+		}
+		last = listRowID(l.ID)
+		order = append(order, fmt.Sprintf(`{"id":%q}`, last))
+	}
+	if res := e.admin(http.MethodPut, "/api/me/rows/home", `{"rows":[`+strings.Join(order, ",")+`]}`, nil); res.StatusCode != http.StatusOK {
+		t.Fatalf("save = %d %s", res.StatusCode, res.Body)
+	}
+	check := func(followed bool) {
+		t.Helper()
+		var home HomeData
+		e.admin(http.MethodGet, "/api/home?arranged=true", "", &home)
+		ids := rowIDs(home.Rows)
+		want := maxRowsOnScreen
+		if followed {
+			want++
+		}
+		if len(ids) != want || ids[len(ids)-1] != last || slices.Contains(ids, rowFollowed) != followed {
+			t.Errorf("following %v: %d rows, last %q: %v", followed, len(ids), ids[len(ids)-1], ids)
+		}
+		var l RowLayout
+		e.admin(http.MethodGet, "/api/me/rows/home", "", &l)
+		for _, r := range l.Rows {
+			if r.ID == last && !r.Shown {
+				t.Errorf("following %v: the 30th row isn't shown: %q", followed, r.Note)
+			}
+		}
+	}
+	check(false)
+	tide, tideEps := e.show(e.tv, 7001, "Tidewater", 1)
+	e.follow(e.admin, tide)
+	e.arrive(tideEps[0], time.Hour, false)
+	check(true)
 }
 
 // Home's row "New from shows you follow" (PLAN-NEW-EPISODES.md section

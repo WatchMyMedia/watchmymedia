@@ -612,14 +612,16 @@ func TestListLimits(t *testing.T) {
 	e.admin(http.MethodGet, "/api/me/rows/home", "", &l)
 	shown, tooMany := 0, 0
 	for _, r := range l.Rows {
-		if r.Shown {
+		// New from shows you follow is drawn beside the 30, when it has
+		// anything (PLAN-NEW-EPISODES.md section 5.5).
+		if r.Shown && r.ID != rowFollowed {
 			shown++
 		}
 		if r.Note == "Not shown: too many rows" {
 			tooMany++
 		}
 	}
-	if shown != maxRowsOnScreen || tooMany != 40+6-maxRowsOnScreen {
+	if shown != maxRowsOnScreen || tooMany != 40+5-maxRowsOnScreen {
 		t.Errorf("%d rows shown, %d too many", shown, tooMany)
 	}
 	var home HomeData

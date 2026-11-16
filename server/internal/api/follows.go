@@ -89,7 +89,7 @@ type NewEpisode struct {
 	Number    int64     `json:"number"`
 	Title     string    `json:"title,omitempty" required:"false"`
 	StillPath string    `json:"stillPath,omitempty" required:"false"`
-	ArrivedAt time.Time `json:"arrivedAt" doc:"When its first file was linked to it."`
+	ArrivedAt time.Time `json:"arrivedAt" doc:"When its first file was linked to it, in any library."`
 }
 
 // NewEpisodeOpen is the episode a notification opens: the earliest of the
@@ -223,7 +223,7 @@ func registerFollows(h huma.API, deps Deps) {
 			return nil, unfollow(ctx, deps, u.ID, in.TMDBID)
 		})
 	huma.Register(h, op("listNewEpisodes", http.MethodGet, "/me/new-episodes", "Episodes that arrived for the shows the signed-in person follows",
-		"What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished, with a file still present, at most 7 days ago, grouped by show. An episode arrives once, in whichever library it reaches first; a copy in another library, or in a library removed and added again, is not new. Each episode named has a present file, in any library. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out."),
+		"What a device notifies about. Episodes that arrived after the cursor and after the person followed the show, that they haven't finished since it arrived, with a file still present, at most 7 days ago, grouped by show. An episode arrives once, in whichever library it reaches first, and is listed only when the file it came with was added in the last 7 days (the New badge's measure); a copy in another library, or in a library removed and added again, is not new. Each episode named has a present file, in any library. An arrival waits 2 minutes before it is listed, so episodes copied in together come as one group; the cursor never passes one that is waiting, nor one a full reply left out."),
 		func(ctx context.Context, in *NewEpisodesInput) (*NewEpisodesOutput, error) {
 			u, err := currentUser(ctx)
 			if err != nil {

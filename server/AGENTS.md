@@ -145,15 +145,18 @@ SQLite plans joins without statistics, and a plan that looks fine after
 
 **Episode links and arrivals.** Link files to episodes only through
 `Matcher.record` (`internal/metadata/matcher.go`): in the same transaction it
-records each episode's arrival, which people following the show are told
-about, from `media_files.first_linked_at` and `episode_arrivals`
+records each episode's arrival in `episode_arrivals`, which people
+following the show are told about
 ([PLAN-NEW-EPISODES.md](../PLAN-NEW-EPISODES.md) §5.2). An arrival belongs
 to the TMDB episode (show TMDB id, season, number), not the episode row, so
-it is once across libraries and outlives a library removed. A file never
-linked before makes an arrival, a file linked before a quiet one, and a
-TMDB episode that has arrived nothing more, so better copies, renames,
-rematches, a 4K library's copy and a library added again stay silent.
-Inserting `episode_files` anywhere else skips that.
+it is made once across libraries, the first time any file is linked to
+it, and outlives a library removed. It is announced only when that file's
+`added_at` is within the New badge's 7 days (`metadata.NewWindow`, which
+`newWindow` in `internal/api` is), and is quiet otherwise. So better
+copies, renames, a 4K library's copy and a library added again are silent,
+old files matched late or moved onto another episode are quiet, and a new
+file fixed onto the right episode is announced. Inserting `episode_files`
+anywhere else skips that.
 
 **Watch state.** Change `watch_state` only through `internal/watchstate`, never
 with its queries directly: each change must also take a revision and leave a

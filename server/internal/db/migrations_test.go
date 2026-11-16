@@ -618,9 +618,9 @@ func TestMigrationCustomPosters(t *testing.T) {
 // The library as it stands when following arrives has arrived already,
 // quietly: nobody is told about it (PLAN-NEW-EPISODES.md section 5.1).
 // Each TMDB episode with a link in any library gets one quiet arrival, on
-// the episode row linked first and in the order the files came, and each
-// linked file counts as linked; nothing else does. An arrival outlives its
-// episode row.
+// the episode row linked first and in the order the files came; an
+// unmatched file and a movie's give none. An arrival outlives its episode
+// row.
 func TestMigrationShowFollows(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -690,29 +690,6 @@ func TestMigrationShowFollows(t *testing.T) {
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("arrivals:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
-	}
-	for id, want := range map[int64]string{
-		100: "2026-03-06T00:00:00.000Z", // when it was matched
-		101: "2026-04-02T00:00:00.000Z",
-		102: "2026-03-10T00:00:00.000Z", // never matched since the column came: when it was added
-		103: "2026-02-02T00:00:00.000Z",
-		104: "", // never linked
-		105: "", // a movie's
-		106: "2026-01-16T00:00:00.000Z",
-		107: "2026-05-02T00:00:00.000Z",
-	} {
-		var at *string
-		if err := conn.QueryRowContext(ctx, `SELECT first_linked_at FROM media_files WHERE id = ?`, id).Scan(&at); err != nil {
-			t.Fatal(err)
-		}
-		if got := ""; at != nil {
-			got = *at
-			if got != want {
-				t.Errorf("file %d first linked %q, want %q", id, got, want)
-			}
-		} else if want != "" {
-			t.Errorf("file %d first linked never, want %q", id, want)
-		}
 	}
 	// A follow keeps to its person; an arrival outlives its episode row
 	// and its library.

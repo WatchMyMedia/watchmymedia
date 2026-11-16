@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"testing"
+	"time"
 
 	"watchmymedia/server/internal/db"
 	"watchmymedia/server/internal/parser"
@@ -52,33 +53,40 @@ func matchTV(t *testing.T, e env) {
 
 const pilot = `{"kind":"episode","title":"Breaking Bad","year":2008,"season":1,"episodes":[1]}`
 
-func firstLinked(t *testing.T, e env, id int64) *string {
+// age makes a file count as added long ago: found by a scan then, or in a
+// library's first scan by its date on disk.
+func age(t *testing.T, e env, f db.MediaFile, by time.Duration) {
 	t.Helper()
-	at, err := e.q.GetMediaFileFirstLinked(e.ctx, id)
-	if err != nil {
+	if _, err := e.conn.ExecContext(e.ctx, `UPDATE media_files SET added_at = ? WHERE id = ?`, db.FormatTime(time.Now().Add(-by)), f.ID); err != nil {
 		t.Fatal(err)
 	}
-	return at
 }
 
-// Each row of PLAN-NEW-EPISODES.md section 5.2's table, and what follows
-// from it: an episode arrives once, the first time a file never linked
-// before is linked to it.
+// PLAN-NEW-EPISODES.md section 5.2's cases: a TMDB episode arrives once,
+// in any library, the first time a file is linked to it, and the arrival
+// is announced only when that file is new by the New badge's measure.
 func TestEpisodeArrivals(t *testing.T) {
 	t.Parallel()
 
 	t.Run("a first file is an arrival", func(t *testing.T) {
 		t.Parallel()
 		e := setup(t)
-		f := e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E01.mkv", pilot)
-		if firstLinked(t, e, f.ID) != nil {
-			t.Fatal("a new file counts as linked")
-		}
+		e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E01.mkv", pilot)
 		matchTV(t, e)
 		wantArrivals(t, e, map[string]int64{"1396 S01E01": 0})
-		if firstLinked(t, e, f.ID) == nil {
-			t.Error("the matched file doesn't count as linked")
-		}
+	})
+
+	t.Run("an old first file is quiet", func(t *testing.T) {
+		t.Parallel()
+		e := setup(t)
+		// A library added with files from years ago, or a file a week and
+		// a day old matched only now.
+		old := e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E01.mkv", pilot)
+		age(t, e, old, 3*365*24*time.Hour)
+		late := e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E02.mkv", `{"kind":"episode","title":"Breaking Bad","year":2008,"season":1,"episodes":[2]}`)
+		age(t, e, late, NewWindow+24*time.Hour)
+		matchTV(t, e)
+		wantArrivals(t, e, map[string]int64{"1396 S01E01": 1, "1396 S01E02": 1})
 	})
 
 	t.Run("a better copy before the old file is deleted is silent", func(t *testing.T) {
@@ -115,13 +123,10 @@ func TestEpisodeArrivals(t *testing.T) {
 		t.Parallel()
 		e := setup(t)
 		// Both in one scan: one arrival, not two.
-		a := e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E01 - Theatrical.mkv", pilot)
-		b := e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E01 - Extended.mkv", pilot)
+		e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E01 - Theatrical.mkv", pilot)
+		e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E01 - Extended.mkv", pilot)
 		matchTV(t, e)
 		wantArrivals(t, e, map[string]int64{"1396 S01E01": 0})
-		if firstLinked(t, e, a.ID) == nil || firstLinked(t, e, b.ID) == nil {
-			t.Error("a version doesn't count as linked")
-		}
 	})
 
 	t.Run("a renamed file is silent", func(t *testing.T) {
@@ -153,20 +158,35 @@ func TestEpisodeArrivals(t *testing.T) {
 		if after := wantArrivals(t, e, map[string]int64{"1396 S01E01": 0}); !maps.Equal(after, before) {
 			t.Errorf("the arrival was made again: %v, was %v", after, before)
 		}
-		// Fix match onto another episode of the show moves a linked file:
-		// quiet.
-		if err := e.m.Apply(e.ctx, e.tv, f, 1396, new(1), []int{2}); err != nil {
+	})
+
+	t.Run("a new file linked to the wrong episode and fixed is an arrival", func(t *testing.T) {
+		t.Parallel()
+		e := setup(t)
+		e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E01.mkv", pilot)
+		matchTV(t, e)
+		// This week's E02, named as E01: it lands on an episode that has
+		// arrived, so nothing is announced yet.
+		wrong := e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking.Bad.S01E01.REPACK.mkv", pilot)
+		matchTV(t, e)
+		before := wantArrivals(t, e, map[string]int64{"1396 S01E01": 0})
+		if err := e.m.Apply(e.ctx, e.tv, wrong, 1396, new(1), []int{2}); err != nil {
 			t.Fatal(err)
 		}
-		wantArrivals(t, e, map[string]int64{"1396 S01E01": 0, "1396 S01E02": 1})
+		after := wantArrivals(t, e, map[string]int64{"1396 S01E01": 0, "1396 S01E02": 0})
+		if after["1396 S01E01"] != before["1396 S01E01"] {
+			t.Errorf("E01's arrival was made again: %v, was %v", after, before)
+		}
 	})
 
 	t.Run("a rematch to another show is quiet", func(t *testing.T) {
 		t.Parallel()
 		e := setup(t)
-		e.file(e.tv, "/t/BB/Season 01/BB - S01E01.mkv", `{"kind":"episode","title":"Breaking Bad","season":1,"episodes":[1]}`)
+		f := e.file(e.tv, "/t/BB/Season 01/BB - S01E01.mkv", `{"kind":"episode","title":"Breaking Bad","season":1,"episodes":[1]}`)
 		matchTV(t, e)
 		wantArrivals(t, e, map[string]int64{"1396 S01E01": 0})
+		// Months later the show is found to be another of the same name.
+		age(t, e, f, 90*24*time.Hour)
 		old, err := e.q.GetShowByTMDB(e.ctx, db.GetShowByTMDBParams{LibraryID: e.tv.ID, TmdbID: 1396})
 		if err != nil {
 			t.Fatal(err)
@@ -178,17 +198,48 @@ func TestEpisodeArrivals(t *testing.T) {
 		wantArrivals(t, e, map[string]int64{"1396 S01E01": 0, "1397 S01E01": 1})
 	})
 
-	t.Run("season mapping onto an episode that never had a file is quiet", func(t *testing.T) {
+	t.Run("season mapping of files that sat unmatched is quiet", func(t *testing.T) {
 		t.Parallel()
 		e := setupWith(t, seasonTMDB(t).Client())
-		f := episodeFile(e, "Harbor Lights", 1, 1, "")
+		// Harbor Lights' fourth season is a show of its own on TMDB, so
+		// these sat unmatched for years ("past the end").
+		a := episodeFile(e, "Harbor Lights", 4, 1, "")
+		b := episodeFile(e, "Harbor Lights", 4, 2, "")
+		age(t, e, a, 2*365*24*time.Hour)
+		age(t, e, b, 2*365*24*time.Hour)
 		matchTV(t, e)
-		wantArrivals(t, e, map[string]int64{"500 S01E01": 0})
-		rule := SeasonRule{FromSeason: 1, FromEpisode: 1, TMDBID: 501, ToSeason: 1, ToEpisode: 2}
-		if res, err := e.m.ApplySeasons(e.ctx, e.tv, []SeasonApply{{Rule: rule, Files: []db.MediaFile{f}}}, false); err != nil || res.Matched != 1 {
+		wantArrivals(t, e, map[string]int64{})
+		rule := SeasonRule{FromSeason: 4, FromEpisode: 1, TMDBID: 501, ToSeason: 1, ToEpisode: 1}
+		if res, err := e.m.ApplySeasons(e.ctx, e.tv, []SeasonApply{{Rule: rule, Files: []db.MediaFile{a, b}}}, false); err != nil || res.Matched != 2 {
 			t.Fatalf("apply = %+v, %v", res, err)
 		}
-		wantArrivals(t, e, map[string]int64{"500 S01E01": 0, "501 S01E02": 1})
+		wantArrivals(t, e, map[string]int64{"501 S01E01": 1, "501 S01E02": 1})
+		// The line-up kept: this week's next file follows it, announced.
+		episodeFile(e, "Harbor Lights", 4, 3, "")
+		if _, err := e.m.ApplySeasons(e.ctx, e.tv, []SeasonApply{{Rule: rule, Files: []db.MediaFile{a, b}}}, true); err != nil {
+			t.Fatal(err)
+		}
+		matchTV(t, e)
+		wantArrivals(t, e, map[string]int64{"501 S01E01": 1, "501 S01E02": 1, "501 S01E03": 0})
+	})
+
+	t.Run("a moved file landing on another episode is quiet", func(t *testing.T) {
+		t.Parallel()
+		e := setup(t)
+		f := e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E01.mkv", pilot)
+		matchTV(t, e)
+		wantArrivals(t, e, map[string]int64{"1396 S01E01": 0})
+		age(t, e, f, 200*24*time.Hour)
+		// Renamed to the episode it really is: the scanner sees the old
+		// path go missing and keeps the file's added date for the new one
+		// (keepMovedDates).
+		if _, err := e.conn.ExecContext(e.ctx, `UPDATE media_files SET status = 'missing' WHERE id = ?`, f.ID); err != nil {
+			t.Fatal(err)
+		}
+		moved := e.file(e.tv, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E02.mkv", `{"kind":"episode","title":"Breaking Bad","year":2008,"season":1,"episodes":[2]}`)
+		age(t, e, moved, 200*24*time.Hour)
+		matchTV(t, e)
+		wantArrivals(t, e, map[string]int64{"1396 S01E01": 0, "1396 S01E02": 1})
 	})
 
 	t.Run("a file for two episodes is two arrivals", func(t *testing.T) {
@@ -212,6 +263,13 @@ func TestEpisodeArrivals(t *testing.T) {
 			t.Fatal(err)
 		}
 		wantArrivals(t, e, map[string]int64{"1396 S01E02": 0})
+		// One that sat unmatched for months is quiet.
+		old := e.file(e.tv, "/t/Breaking Bad/another weird name.mkv", `{"kind":"unknown","title":"another weird name"}`)
+		age(t, e, old, 120*24*time.Hour)
+		if err := e.m.Apply(e.ctx, e.tv, old, 1396, new(2), []int{1}); err != nil {
+			t.Fatal(err)
+		}
+		wantArrivals(t, e, map[string]int64{"1396 S01E02": 0, "1396 S02E01": 1})
 	})
 
 	t.Run("a copy in a second library is silent", func(t *testing.T) {

@@ -38,7 +38,6 @@ func seedFollows(tb testing.TB, conn *sql.DB, tv int64, follows, fresh int, now 
 		JOIN seasons se ON se.id = e.season_id JOIN shows s ON s.id = e.show_id
 		JOIN episode_files ef ON ef.episode_id = e.id JOIN media_files f ON f.id = ef.media_file_id
 		GROUP BY s.tmdb_id, se.number, e.number ORDER BY arrived, s.tmdb_id, se.number, e.number`)
-	exec(`UPDATE media_files SET first_linked_at = added_at WHERE id IN (SELECT media_file_id FROM episode_files)`)
 	var before int64
 	if err := tx.QueryRowContext(ctx, `SELECT MAX(id) FROM episode_arrivals`).Scan(&before); err != nil {
 		tb.Fatal(err)
@@ -72,8 +71,8 @@ func seedFollows(tb testing.TB, conn *sql.DB, tv int64, follows, fresh int, now 
 	}()
 	for i, id := range eps {
 		at := db.FormatTime(now.Add(-7*24*time.Hour + time.Duration(i+1)*7*24*time.Hour/time.Duration(len(eps)+1)).Add(-3 * time.Minute))
-		exec(`INSERT INTO media_files (library_id, path, size, mtime, status, parsed, height, added_at, match_status, first_linked_at)
-			VALUES (?, ?, 1, ?, 'present', '{"kind":"episode"}', 1080, ?, 'matched', ?)`, tv, fmt.Sprintf("/t/new/%d.mkv", id), at, at, at)
+		exec(`INSERT INTO media_files (library_id, path, size, mtime, status, parsed, height, added_at, match_status)
+			VALUES (?, ?, 1, ?, 'present', '{"kind":"episode"}', 1080, ?, 'matched')`, tv, fmt.Sprintf("/t/new/%d.mkv", id), at, at)
 		exec(`INSERT INTO episode_files (episode_id, media_file_id) VALUES (?, last_insert_rowid())`, id)
 		exec(`INSERT INTO episode_arrivals (tmdb_id, season, number, episode_id, arrived_at, quiet)
 			SELECT s.tmdb_id, se.number, e.number, e.id, ?, 0 FROM episodes e JOIN seasons se ON se.id = e.season_id JOIN shows s ON s.id = e.show_id

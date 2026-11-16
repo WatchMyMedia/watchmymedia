@@ -131,7 +131,7 @@ func (q *Queries) ListFileMatchStates(ctx context.Context, ids []int64) ([]ListF
 }
 
 const listMediaFilesByIDs = `-- name: ListMediaFilesByIDs :many
-SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of, first_linked_at FROM media_files WHERE id IN (/*SLICE:ids*/?)
+SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of FROM media_files WHERE id IN (/*SLICE:ids*/?)
 `
 
 // Several files at once, for acting on a selection.
@@ -187,7 +187,6 @@ func (q *Queries) ListMediaFilesByIDs(ctx context.Context, ids []int64) ([]Media
 			&i.DvProfile,
 			&i.ExtraKind,
 			&i.ExtraOf,
-			&i.FirstLinkedAt,
 		); err != nil {
 			return nil, err
 		}

@@ -342,7 +342,6 @@ type MediaFile struct {
 	DvProfile       *int64  `json:"dv_profile"`
 	ExtraKind       *string `json:"extra_kind"`
 	ExtraOf         *int64  `json:"extra_of"`
-	FirstLinkedAt   *string `json:"first_linked_at"`
 }
 
 type MediaList struct {
