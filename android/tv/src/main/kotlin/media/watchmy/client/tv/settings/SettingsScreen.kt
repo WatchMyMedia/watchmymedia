@@ -410,6 +410,7 @@ fun SettingsScreen(
                         onStop = notifications::stop,
                         onRetry = notifications::retry,
                         onEmptied = { panes.toGroup() },
+                        onShown = notifications::setShown,
                     )
                     SettingsGroup.Account -> AccountPane(state, server?.let { "${it.name} · ${displayAddress(it.baseUrl)}" }, panes.first, calls)
                     SettingsGroup.Requests -> RequestsPane(requestsLine, panes.first, calls)

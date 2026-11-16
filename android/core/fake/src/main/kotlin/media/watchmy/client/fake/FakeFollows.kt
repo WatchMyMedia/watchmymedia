@@ -43,6 +43,15 @@ class FakeFollowsRepository(
     private val events = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
     override val changes: Flow<Unit> = events
 
+    private val library = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+    override val libraryChanged: Flow<Unit> = library
+
+    /** An episode of [showId] arrived: its follow's latest is now it, and library.changed comes. */
+    fun arrived(showId: Long, season: Int, number: Int, title: String? = null) {
+        kept.value = kept.value.map { if (it.showId == showId) it.copy(latest = FollowLatest(season, number, title, System.currentTimeMillis())) else it }
+        library.tryEmit(Unit)
+    }
+
     private suspend fun <T> call(block: () -> T): T {
         latencyMs().takeIf { it > 0 }?.let { delay(it) }
         if (!supported) throw ApiException(404, FOLLOWS_UPDATE_SERVER)

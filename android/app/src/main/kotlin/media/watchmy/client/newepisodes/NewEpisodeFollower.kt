@@ -7,6 +7,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -172,7 +174,8 @@ class NewEpisodeFollower(
         try {
             block()
         } catch (e: CancellationException) {
-            throw e
+            // The data layer's own, when the account changed while it asked: thrown on, it would end the collector that asked.
+            currentCoroutineContext().ensureActive()
         } catch (_: Exception) {
             // Unreachable: the next foreground or event reads it again.
         }

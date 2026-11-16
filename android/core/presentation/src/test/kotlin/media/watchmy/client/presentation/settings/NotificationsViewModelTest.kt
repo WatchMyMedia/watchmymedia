@@ -5,6 +5,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import media.watchmy.client.fake.FakeFollowsRepository
 import media.watchmy.client.model.FOLLOWS_API_LEVEL
+import media.watchmy.client.model.FollowLatest
 import media.watchmy.client.model.FollowedShow
 import media.watchmy.client.model.FollowsRepository
 import media.watchmy.client.model.NewEpisodes
@@ -95,5 +96,62 @@ class NotificationsViewModelTest {
         follows.changedElsewhere(101, following = true)
         advanceUntilIdle()
         assertEquals("The Quiet Meridian", vm.state.value.list.value!!.first().title)
+    }
+
+    @Test
+    fun `a new episode updates the open page's lines on library changed`() = runTest(main.dispatcher) {
+        val vm = NotificationsViewModel(follows)
+        advanceUntilIdle()
+        vm.setShown(true)
+        advanceUntilIdle()
+        follows.arrived(100, 3, 8, "Squall Line")
+        advanceUntilIdle()
+        assertEquals(FollowLatest(3, 8, "Squall Line", vm.state.value.list.value!![0].latest?.arrivedAtMs), vm.state.value.list.value!![0].latest)
+    }
+
+    @Test
+    fun `reopening the page reads the list again`() = runTest(main.dispatcher) {
+        var reads = 0
+        val counting = object : FollowsRepository by follows {
+            override suspend fun refresh(): List<FollowedShow> = this@NotificationsViewModelTest.follows.refresh().also { reads++ }
+        }
+        val vm = NotificationsViewModel(counting)
+        advanceUntilIdle()
+        val first = reads
+        vm.setShown(true)
+        advanceUntilIdle()
+        vm.setShown(false)
+        follows.arrived(100, 3, 8)
+        advanceUntilIdle()
+        assertEquals("opened once, closed for the change", first + 1, reads)
+        vm.setShown(true)
+        advanceUntilIdle()
+        assertEquals("opened again: read again", first + 2, reads)
+    }
+
+    @Test
+    fun `an account change while it reads doesn't stop it reading for later changes`() = runTest(main.dispatcher) {
+        // The data layer throws a CancellationException of its own when the account changed while it asked.
+        var cancelOnce = true
+        var reads = 0
+        val flaky = object : FollowsRepository by follows {
+            override suspend fun refresh(): List<FollowedShow> {
+                reads++
+                if (cancelOnce) {
+                    cancelOnce = false
+                    throw kotlinx.coroutines.CancellationException("The signed-in account changed.")
+                }
+                return this@NotificationsViewModelTest.follows.refresh()
+            }
+        }
+        val vm = NotificationsViewModel(flaky)
+        advanceUntilIdle()
+        follows.changedElsewhere(101, following = true)
+        advanceUntilIdle()
+        assertEquals(2, reads)
+        follows.changedElsewhere(103, following = true)
+        advanceUntilIdle()
+        assertEquals("still listening", 3, reads)
+        assertEquals("Northfield Precinct", vm.state.value.list.value!!.first().title)
     }
 }

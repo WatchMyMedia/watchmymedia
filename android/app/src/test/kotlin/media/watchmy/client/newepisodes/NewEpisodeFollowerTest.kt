@@ -261,6 +261,23 @@ class NewEpisodeFollowerTest {
     }
 
     @Test
+    fun `an account change while it reads the list doesn't stop it reading the next time`() = with(test) {
+        // The data layer throws a CancellationException of its own when the account changed while it asked.
+        var reads = 0
+        val flaky = object : FollowsRepository by follows {
+            override suspend fun refresh(): List<media.watchmy.client.model.FollowedShow> {
+                if (reads++ == 0) throw kotlinx.coroutines.CancellationException("The signed-in account changed.")
+                return this@NewEpisodeFollowerTest.follows.refresh()
+            }
+        }
+        NewEpisodeFollower(flaky, library, session, { account }, { account }, cursors, schedule, notices, scope, io = dispatcher).also { it.start(owner.lifecycle) }
+        foreground()
+        session.value = 1
+        runCurrent()
+        assertEquals("the session's collector still reads", 2, reads)
+    }
+
+    @Test
     fun `cancelling work that was never scheduled doesn't start WorkManager`() {
         val context = RuntimeEnvironment.getApplication()
         var started = 0

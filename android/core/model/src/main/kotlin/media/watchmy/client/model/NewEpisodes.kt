@@ -89,6 +89,9 @@ interface FollowsRepository {
     /** follows.changed, from the person's other devices, and a reconnection, after which the list may differ. */
     val changes: Flow<Unit>
 
+    /** library.changed: each followed show's latest new episode may have changed. */
+    val libraryChanged: Flow<Unit> get() = emptyFlow()
+
     /**
      * This device's switch for new-episode notifications (§7.2), kept on the
      * device and on by default; the system's own permission is apart from it.

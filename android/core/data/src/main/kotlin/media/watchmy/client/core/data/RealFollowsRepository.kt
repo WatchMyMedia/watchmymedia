@@ -93,6 +93,8 @@ internal class RealFollowsRepository(
 
     override val changes: Flow<Unit> = events.followChanges.map { }
 
+    override val libraryChanged: Flow<Unit> = events.contentsChanged
+
     override fun setNotifyHere(on: Boolean) {
         val next = store.update { s ->
             val server = s.current ?: return@update s

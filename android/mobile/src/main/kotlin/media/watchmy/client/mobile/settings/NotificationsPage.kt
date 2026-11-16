@@ -70,6 +70,7 @@ import media.watchmy.client.presentation.Load
 import media.watchmy.client.presentation.settings.NotificationsViewModel
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.ReportShown
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.WmmIcons
@@ -101,6 +102,8 @@ internal fun NotificationsPage(
     modifier: Modifier = Modifier,
 ) {
     val vm = notificationsModel()
+    // The model outlives the page: the list is read again each time it opens, and for changes while it is on screen.
+    ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val device = deviceWord()
     val context = LocalContext.current

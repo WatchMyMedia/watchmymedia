@@ -44,6 +44,7 @@ import media.watchmy.client.presentation.settings.NotificationsViewModel
 import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.focusMemory
 import media.watchmy.client.tv.components.inter
+import media.watchmy.client.ui.ReportShown
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.WmmIcons
@@ -70,7 +71,10 @@ internal fun ColumnScope.NotificationsPane(
     onStop: (FollowedShow) -> Unit,
     onRetry: () -> Unit,
     onEmptied: () -> Unit,
+    onShown: (Boolean) -> Unit,
 ) {
+    // The list is read again each time the pane opens, and for changes while it is on screen.
+    ReportShown(onShown)
     Note(FOLLOW_TV_LINE, Modifier.padding(top = 4.dp, bottom = 6.dp))
     val list = state.list
     if (list is Load.Failed) {
