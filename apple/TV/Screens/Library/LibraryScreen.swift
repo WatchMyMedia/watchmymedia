@@ -401,10 +401,29 @@ private struct LibraryView: View {
     }
 
     /// Scrolls the poster into the grid (it may not be drawn yet), then focuses it.
+    /// tvOS 26.5 drops, unanswered, focus asked of a poster the grid hasn't
+    /// drawn yet (Menu from the index once a letter's jump had scrolled the
+    /// poster away, on a loaded simulator), so it scrolls the poster in at
+    /// once and asks again until focus lands there, for up to two seconds,
+    /// unless the remote moves focus first.
     private func focusItem(_ id: Int, _ proxy: ScrollViewProxy) async {
-        withAnimation { proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.32)) }
+        let anchor = UnitPoint(x: 0.5, y: 0.32)
+        withAnimation { proxy.scrollTo(id, anchor: anchor) }
         await Task.yield()
+        let from = focus
         place(.item(id))
+        guard from != .item(id) else { return }
+        // Still waiting: not landed (`focusMoved` clears what was placed), nor moved elsewhere.
+        func waiting() -> Bool { !Task.isCancelled && placedFocus == .item(id) && focus == from }
+        for _ in 0..<20 {
+            try? await Task.sleep(for: .milliseconds(100))
+            guard waiting() else { return }
+            proxy.scrollTo(id, anchor: anchor)
+            await Task.yield()
+            guard waiting() else { return }
+            place(.item(id))
+        }
+        if waiting() { placedFocus = nil }
     }
 
     private func place(_ target: GridFocus) {

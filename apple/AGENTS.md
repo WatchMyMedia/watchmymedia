@@ -192,6 +192,13 @@ server, and on iPad in both a regular and a compact width.
     focused on CI's tvOS 26.5 simulator (never on this Mac's, loaded or
     not), so it moves focus itself when the way in changes
     (`onChange(of: signIn.codeSignIn)` in `SwitchServerScreen.swift`).
+  - On tvOS 26.5 focus asked through a `@FocusState` of a view a lazy grid
+    hasn't drawn yet is dropped without a word, and no `onChange` follows
+    (the library grid's Menu from the letter index, once a letter's jump
+    had scrolled the poster away; on a loaded simulator, and on CI). The
+    grid's `focusItem` (`TV/Screens/Library/LibraryScreen.swift`) scrolls
+    the poster in and asks again until focus lands; ask that way wherever
+    focus goes to something that may be off screen.
   - On Apple TV a focused button that becomes disabled keeps focus, dimmed,
     until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
     up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable
