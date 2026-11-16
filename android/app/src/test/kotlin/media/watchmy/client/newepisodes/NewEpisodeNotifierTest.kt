@@ -81,6 +81,19 @@ class NewEpisodeNotifierTest {
         assertEquals("3 more shows have new episodes", more.extras.getString(Notification.EXTRA_TITLE))
         assertEquals(null, more.extras.getCharSequence(Notification.EXTRA_TEXT))
         assertEquals((1L..5L).map { "Show $it" }.toSet(), (shown - more).map { it.extras.getString(Notification.EXTRA_TITLE)!!.substringAfter(" · ") }.toSet())
+        // Android lists a key before none, so every one has a key, and "more" sorts last.
+        val byKey = shown.sortedBy { it.sortKey }
+        assertEquals((1L..5L).map { "Show $it" }, byKey.dropLast(1).map { it.extras.getString(Notification.EXTRA_TITLE)!!.substringAfter(" · ") })
+        assertEquals(more, byKey.last())
+    }
+
+    @Test
+    fun `a sign-out takes away what is showing, and only this kind`() {
+        notifier.post((1L..7L).map { group(it, "Show $it") }, "acct-a")
+        val other = Notification.Builder(context, NEW_EPISODES_CHANNEL).setSmallIcon(android.R.drawable.ic_dialog_info).build()
+        manager.notify("live-reminder", 9, other)
+        notifier.cancelShown()
+        assertEquals(listOf("live-reminder"), shadowOf(manager).activeNotifications.map { it.tag })
     }
 
     @Test

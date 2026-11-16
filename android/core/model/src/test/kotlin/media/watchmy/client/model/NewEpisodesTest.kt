@@ -96,15 +96,26 @@ class NewEpisodesTest {
     }
 
     @Test
-    fun `the check runs only with follows, the switch on and the notifications allowed`() {
-        val one = listOf(FollowedShow(1399, "The Sleuth Files", showId = 1))
-        assertEquals(NewEpisodeChecks.Run, newEpisodeChecks(supported = true, follows = one, notifyHere = true, allowed = true))
-        assertEquals(NewEpisodeChecks.Stop, newEpisodeChecks(supported = true, follows = emptyList(), notifyHere = true, allowed = true))
-        assertEquals(NewEpisodeChecks.Stop, newEpisodeChecks(supported = true, follows = one, notifyHere = false, allowed = true))
-        assertEquals(NewEpisodeChecks.Stop, newEpisodeChecks(supported = true, follows = one, notifyHere = true, allowed = false))
-        assertEquals("a server below level 29", NewEpisodeChecks.Stop, newEpisodeChecks(supported = false, follows = one, notifyHere = true, allowed = true))
-        assertEquals("not read yet: left as it is", NewEpisodeChecks.Unknown, newEpisodeChecks(supported = true, follows = null, notifyHere = true, allowed = true))
-        assertEquals("not read yet, but switched off", NewEpisodeChecks.Stop, newEpisodeChecks(supported = true, follows = null, notifyHere = false, allowed = true))
+    fun `the check runs whenever this device could notify, whatever it last saw of the list`() {
+        assertEquals(NewEpisodeChecks.Run, newEpisodeChecks(supported = true, notifyHere = true, allowed = true))
+        assertEquals(NewEpisodeChecks.Stop, newEpisodeChecks(supported = true, notifyHere = false, allowed = true))
+        assertEquals(NewEpisodeChecks.Stop, newEpisodeChecks(supported = true, notifyHere = true, allowed = false))
+        assertEquals("signed out, or a server below level 29", NewEpisodeChecks.Stop, newEpisodeChecks(supported = false, notifyHere = true, allowed = true))
+        assertEquals("Android not asked yet: left as it is", NewEpisodeChecks.Unknown, newEpisodeChecks(supported = true, notifyHere = true, allowed = null))
+        assertEquals("not asked yet, but switched off", NewEpisodeChecks.Stop, newEpisodeChecks(supported = true, notifyHere = false, allowed = null))
+    }
+
+    @Test
+    fun `the cursor's account is the server and the person, not their name`() {
+        val server = Server("srv-living", "Living room", "http://192.168.1.20:27587", "1.5.0", FOLLOWS_API_LEVEL)
+        val sam = User(2, "Sam", isAdmin = false)
+        val account = followsAccount(server, sam)!!
+        assertEquals("renamed by an admin", account, followsAccount(server, sam.copy(name = "Samuel")))
+        assertEquals("another address for the same server", account, followsAccount(server.copy(baseUrl = "https://home.example.net"), sam))
+        assertTrue("another person", account != followsAccount(server, User(3, "Alex", isAdmin = false)))
+        assertTrue("another server", account != followsAccount(server.copy(id = "srv-office"), sam))
+        assertNull(followsAccount(server, null))
+        assertTrue("opaque", "Sam" !in account && "srv" !in account)
     }
 
     @Test

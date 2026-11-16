@@ -295,22 +295,31 @@ themselves (`app/newepisodes/`; the rule is `checkNewEpisodes` in
 `core:model`):
 
 - **When:** the app's one periodic work, hourly with a network
-  (`NewEpisodeWorker`), scheduled only while the person follows a show, the
-  switch is on and Android allows the notifications, and cancelled
-  otherwise; at each foreground; and three minutes after the last library
-  change while the app is open (`NewEpisodeFollower`). A process started in
-  the background leaves the work as it is. WorkManager still starts on
-  first use; each foreground schedules the work again with
+  (`NewEpisodeWorker`), its first run a period after it is scheduled. It is
+  scheduled whenever this device could notify (signed in to a server at
+  level 29, this device's switch on, Android allowing the channel), whatever
+  this device last saw of the list, since a show followed on another device
+  notifies here too; and cancelled otherwise. The app also checks at each
+  foreground and three minutes after the last `library.changed` while it is
+  open (scans that change nothing don't put it back; `NewEpisodeFollower`).
+  A process started in the background leaves the work as it is. WorkManager
+  still starts on first use: whether the work is scheduled is kept in the
+  `new-episodes` preferences, so a start with nothing to cancel doesn't
+  start it. Each foreground schedules the work again with
   `ExistingPeriodicWorkPolicy.UPDATE`, which keeps its timing.
-- **The cursor** is kept per server and person in the `new-episodes`
-  preferences (out of backups); the first check keeps only the cursor, an
-  unreachable server keeps it, and a sign-out or another account cancels
-  the work and forgets it.
+- **The cursor** is kept per server and person, by their ids
+  (`followsAccount`, so a rename keeps it), in the `new-episodes` preferences
+  (out of backups). The first check keeps only the cursor; an unreachable
+  server, or a 404 or 501 from the feed, keeps it and the work. Turning the
+  switch off, or Android no longer allowing the channel, forgets it, so on
+  again starts from now. A sign-out or another account cancels the work,
+  forgets the cursor and takes away the notifications showing.
 - **The notifications** are on the `new-episodes` channel ("New episodes",
   default importance), one a show under its own tag, each opening
   `watchmymedia://shows/{id}?season=&episode=&source=new-episodes&account=`
   for that account alone; past five shows, one more opens Home
-  (`watchmymedia://home`). Two or more share a silent group summary.
+  (`watchmymedia://home`) and sorts last (every one has a sort key). Two or
+  more share a silent group summary.
 - **Turn on notifications** (`openNotifications(context, channel)`) opens
   Android's app screen while the app's notifications are off, else the
   channel's; Settings shows one card for reminders and new episodes

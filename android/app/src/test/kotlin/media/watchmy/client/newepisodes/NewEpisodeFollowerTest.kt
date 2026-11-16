@@ -23,8 +23,10 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import media.watchmy.client.fake.FakeFollowsRepository
+import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.FOLLOWS_API_LEVEL
-import media.watchmy.client.model.LibraryChange
+import media.watchmy.client.model.FollowsRepository
+import media.watchmy.client.model.NewEpisodes
 import media.watchmy.client.model.NewEpisodeGroup
 import media.watchmy.client.model.NewEpisodesCursor
 import media.watchmy.client.model.NewEpisodesCursors
@@ -41,10 +43,12 @@ import org.robolectric.annotation.Config
 
 /**
  * When the app checks for new episodes and keeps the periodic work
- * (PLAN-NEW-EPISODES.md §6.1, §7.3): scheduled only while the person follows
- * a show, this device's switch is on and Android allows the notifications;
- * cancelled otherwise and on a sign-out; a check at each foreground and
- * three minutes after the last library change.
+ * (PLAN-NEW-EPISODES.md §6.1, §7.3): scheduled whenever this device could
+ * notify (signed in to a server at level 29, the switch on, Android allowing
+ * them), whatever it last saw of the list; cancelled otherwise and on a
+ * sign-out; a check at each foreground and three minutes after the last
+ * library.changed. Turning the switch or Android's permission off forgets
+ * the cursor, so on again starts from now.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -55,7 +59,7 @@ class NewEpisodeFollowerTest {
     private val scope = CoroutineScope(dispatcher)
     private var level = FOLLOWS_API_LEVEL
     private val follows = FakeFollowsRepository(level = { level }, latencyMs = { 0 })
-    private val library = MutableSharedFlow<LibraryChange>(extraBufferCapacity = 8)
+    private val library = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
     private val session = MutableStateFlow<Any?>(0)
     private var account: String? = "acct-a"
     private val owner = object : LifecycleOwner {
@@ -77,9 +81,14 @@ class NewEpisodeFollowerTest {
 
     private class Notices(var allowed: Boolean = true) : NewEpisodeNotices {
         val posted = mutableListOf<Pair<List<NewEpisodeGroup>, String>>()
+        var taken = 0
         override fun allowed() = allowed
         override fun post(shows: List<NewEpisodeGroup>, account: String) {
             posted += shows to account
+        }
+
+        override fun cancelShown() {
+            taken++
         }
     }
 
@@ -101,7 +110,7 @@ class NewEpisodeFollowerTest {
         Dispatchers.resetMain()
     }
 
-    private fun follower() = NewEpisodeFollower(follows, library, session, { account }, cursors, schedule, notices, scope).also { it.start(owner.lifecycle) }
+    private fun follower() = NewEpisodeFollower(follows, library, session, { account }, { account }, cursors, schedule, notices, scope, io = dispatcher).also { it.start(owner.lifecycle) }
 
     /** In front, and past the moment checks asked for together gather in. */
     private fun foreground() {
@@ -146,47 +155,53 @@ class NewEpisodeFollowerTest {
     }
 
     @Test
-    fun `following nothing cancels the work`() = with(test) {
+    fun `following nothing here still checks, since a show followed on another device notifies here`() = with(test) {
         follower()
         foreground()
-        assertTrue(schedule.scheduled)
-        kotlinx.coroutines.runBlocking {
-            follows.remove(follows.follows.value!![0].tmdbId)
-            follows.remove(follows.follows.value!![0].tmdbId)
-            follows.remove(follows.follows.value!![0].tmdbId)
-        }
+        kotlinx.coroutines.runBlocking { follows.follows.value!!.map { it.tmdbId }.forEach { follows.remove(it) } }
         runCurrent()
-        assertEquals(false, schedule.scheduled)
+        assertTrue("the work stays", schedule.scheduled)
+        follows.changedElsewhere(100, following = true)
+        cursors.kept = NewEpisodesCursor("acct-a", "1841")
+        background()
+        foreground()
+        assertEquals("followed on the TV: notified here", listOf("Harbor Lights"), notices.posted.single().first.map { it.title })
     }
 
     @Test
-    fun `this device's switch turns the work off and on`() {
+    fun `turning this device's switch off cancels the work and forgets the cursor, so on again starts from now`() {
         follower()
         foreground()
+        cursors.kept = NewEpisodesCursor("acct-a", "1841")
         follows.setNotifyHere(false)
         test.runCurrent()
         assertEquals(false, schedule.scheduled)
+        assertNull("forgotten", cursors.kept)
+        // An episode arrives while it is off, then it is turned on again.
         follows.setNotifyHere(true)
         test.runCurrent()
         assertTrue(schedule.scheduled)
         test.advanceTimeBy(NewEpisodeFollower.GATHER_MS + 1)
         test.runCurrent()
-        assertEquals("turned on with the app open: one check, from the cursor kept", 1, notices.posted.size)
+        assertTrue("what arrived while off isn't announced", notices.posted.isEmpty())
+        assertEquals("one check, starting from now", NewEpisodesCursor("acct-a", "1841"), cursors.kept)
     }
 
     @Test
-    fun `notifications Android doesn't allow cancel the work, and allowing them in its settings brings it back`() {
+    fun `notifications Android doesn't allow cancel the work and forget the cursor, and allowing them brings it back from now`() {
         notices.allowed = false
+        cursors.kept = NewEpisodesCursor("acct-a", "1841")
         follower()
         foreground()
         assertEquals(false, schedule.scheduled)
-        assertNull("no check without the notifications", cursors.kept)
+        assertNull("no check, and the cursor forgotten", cursors.kept)
         // Back from Android's settings.
         notices.allowed = true
         background()
         foreground()
         assertTrue(schedule.scheduled)
         assertEquals("1841", cursors.kept?.cursor)
+        assertTrue("from now", notices.posted.isEmpty())
     }
 
     @Test
@@ -204,8 +219,10 @@ class NewEpisodeFollowerTest {
         foreground()
         assertTrue(schedule.scheduled)
         f.sessionChanged()
+        test.runCurrent()
         assertEquals(false, schedule.scheduled)
         assertNull(cursors.kept)
+        assertEquals("what is showing goes", 1, notices.taken)
         account = null
         session.value = 1
         test.runCurrent()
@@ -218,10 +235,10 @@ class NewEpisodeFollowerTest {
         follower()
         foreground()
         cursors.kept = NewEpisodesCursor("acct-a", "1841")
-        library.tryEmit(LibraryChange(libraries = setOf(2)))
+        library.tryEmit(Unit)
         runCurrent()
         advanceTimeBy(2 * 60_000L)
-        library.tryEmit(LibraryChange(libraries = setOf(2)))
+        library.tryEmit(Unit)
         runCurrent()
         advanceTimeBy(2 * 60_000L)
         runCurrent()
@@ -232,15 +249,23 @@ class NewEpisodeFollowerTest {
     }
 
     @Test
-    fun `a change to watch state alone checks nothing`() = with(test) {
-        cursors.kept = NewEpisodesCursor("acct-a", "1842")
-        follower()
-        foreground()
+    fun `a 404 or 501 from the feed keeps the cursor and the work`() = with(test) {
         cursors.kept = NewEpisodesCursor("acct-a", "1841")
-        library.tryEmit(LibraryChange(episodes = setOf(100037)))
-        advanceTimeBy(4 * 60_000L)
-        runCurrent()
-        assertTrue(notices.posted.isEmpty())
+        val refusing = object : FollowsRepository by follows {
+            override suspend fun newEpisodes(after: String?): NewEpisodes = throw ApiException(404, "no route")
+        }
+        NewEpisodeFollower(refusing, library, session, { account }, { account }, cursors, schedule, notices, scope, io = dispatcher).also { it.start(owner.lifecycle) }
+        foreground()
+        assertTrue("a proxy answers 404 while the server restarts", schedule.scheduled)
+        assertEquals(NewEpisodesCursor("acct-a", "1841"), cursors.kept)
+    }
+
+    @Test
+    fun `cancelling work that was never scheduled doesn't start WorkManager`() {
+        val context = RuntimeEnvironment.getApplication()
+        var started = 0
+        WorkManagerNewEpisodeSchedule(context) { started++; error("not started") }.cancel()
+        assertEquals(0, started)
     }
 
     @Test
@@ -253,6 +278,7 @@ class NewEpisodeFollowerTest {
         assertEquals(WorkInfo.State.ENQUEUED, info.state)
         assertEquals(TimeUnit.HOURS.toMillis(1), info.periodicityInfo?.repeatIntervalMillis)
         assertEquals(NetworkType.CONNECTED, info.constraints.requiredNetworkType)
+        assertEquals("its first run a period on: the app has just checked", TimeUnit.HOURS.toMillis(1), info.initialDelayMillis)
         // Scheduled again at each foreground: still one.
         work.schedule()
         assertEquals(1, WorkManager.getInstance(context).getWorkInfosForUniqueWork(WorkManagerNewEpisodeSchedule.NAME).get().count { !it.state.isFinished })

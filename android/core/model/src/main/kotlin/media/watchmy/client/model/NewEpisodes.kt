@@ -116,15 +116,16 @@ const val FOLLOWS_UPDATE_SERVER = "Update the server to follow shows."
 // --- the check (§6.1) ---
 
 /**
- * Whether this device checks for new episodes: the server can, the person
- * follows at least one show, this device's switch is on and the system lets
- * the notifications show. [follows] null (not read yet) is not a reason to
- * stop, since a process started for the check itself hasn't read it.
+ * Whether this device checks for new episodes: whenever it could notify.
+ * Someone is signed in to a server that can ([supported]), this device's
+ * switch is on and the system lets the channel show ([allowed]; null when it
+ * hasn't been asked, as in a process started for the check itself). Not
+ * whether the person follows a show: a show followed on another device must
+ * notify here too (decision 1), and the feed answers an empty reply cheaply.
  */
-fun newEpisodeChecks(supported: Boolean, follows: List<FollowedShow>?, notifyHere: Boolean, allowed: Boolean): NewEpisodeChecks = when {
-    !supported || !notifyHere || !allowed -> NewEpisodeChecks.Stop
-    follows == null -> NewEpisodeChecks.Unknown
-    follows.isEmpty() -> NewEpisodeChecks.Stop
+fun newEpisodeChecks(supported: Boolean, notifyHere: Boolean, allowed: Boolean?): NewEpisodeChecks = when {
+    !supported || !notifyHere || allowed == false -> NewEpisodeChecks.Stop
+    allowed == null -> NewEpisodeChecks.Unknown
     else -> NewEpisodeChecks.Run
 }
 
@@ -132,14 +133,25 @@ enum class NewEpisodeChecks {
     /** Schedule the check. */
     Run,
 
-    /** Cancel it: nothing to do. */
+    /** Cancel it: this device can't notify. */
     Stop,
 
-    /** Leave it as it is until the list is read. */
+    /** Leave it as it is: Android hasn't been asked yet in this process. */
     Unknown,
 }
 
-/** The cursor a device keeps, and the account ([watchNextAccount]) it is for: one server and person. */
+/**
+ * Who a [NewEpisodesCursor] is for: the server's id and the person's, so an
+ * admin renaming someone doesn't drop what arrived (unlike [watchNextAccount],
+ * which names them too). Opaque: never a credential or an address.
+ */
+fun followsAccount(server: Server?, user: User?): String? {
+    if (server == null || user == null) return null
+    val identity = "${server.id}\u0000${user.id}"
+    return java.security.MessageDigest.getInstance("SHA-256").digest(identity.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+}
+
+/** The cursor a device keeps, and the account ([followsAccount]) it is for: one server and person. */
 data class NewEpisodesCursor(val account: String, val cursor: String)
 
 /** Where a device keeps its [NewEpisodesCursor]; one at a time, for the account signed in. */

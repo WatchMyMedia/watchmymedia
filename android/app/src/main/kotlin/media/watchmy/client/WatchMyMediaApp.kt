@@ -189,14 +189,17 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
 
     /**
      * New episodes of the shows the person follows (PLAN-NEW-EPISODES.md
-     * §6.1): the check's periodic work follows the list, this device's switch
-     * and the permission, and a sign-out or another account cancels it.
+     * §6.1): the check's periodic work follows this device's switch and the
+     * permission, and a sign-out or another account cancels it and takes
+     * away what is showing.
      */
     private fun followNewEpisodes(data: DataServices, account: () -> String?) {
         val notifier = NewEpisodeNotifier(this).also { it.createChannel() }
         val session = combine(data.auth.user, data.servers.current) { user, server -> user to server }
+        // The cursor is keyed by the server's and the person's ids, so a rename keeps it; links name the account as Watch Next does.
+        val cursorAccount = { media.watchmy.client.model.followsAccount(data.servers.current.value?.server, data.auth.user.value) }
         val follower = NewEpisodeFollower(
-            data.follows, data.library.libraryChanges, session, account,
+            data.follows, data.libraryContentsChanged, session, account, cursorAccount,
             StoredNewEpisodesCursors(this), WorkManagerNewEpisodeSchedule(this), notifier, appScope,
         ).also { newEpisodes = it }
         data.onSessionChange(follower::sessionChanged)

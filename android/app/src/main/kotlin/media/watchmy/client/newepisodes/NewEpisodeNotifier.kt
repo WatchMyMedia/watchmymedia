@@ -54,10 +54,12 @@ class NewEpisodeNotifier(private val context: Context) : NewEpisodeNotices {
         if (shows.isEmpty() || !allowed()) return
         val notices = shows.notices()
         val manager = NotificationManagerCompat.from(context)
-        notices.shows.forEach { group ->
+        notices.shows.forEachIndexed { i, group ->
             val notification = builder()
                 .setContentTitle(group.noticeTitle())
                 .setContentText(group.noticeText())
+                // Every one has a key, in the feed's order (newest arrival first): Android lists one with a key before one without.
+                .setSortKey("a$i")
                 .setContentIntent(activity(group.tmdbId.toInt(), group.link(account)))
                 .build()
             notify(manager, tagFor(group.tmdbId), notification)
@@ -80,6 +82,11 @@ class NewEpisodeNotifier(private val context: Context) : NewEpisodeNotices {
                 .build()
             notify(manager, SUMMARY_TAG, summary)
         }
+    }
+
+    override fun cancelShown() {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        manager.activeNotifications.filter { it.tag?.startsWith("$TAG:") == true }.forEach { manager.cancel(it.tag, it.id) }
     }
 
     /** This app's new-episode notifications showing now. */
