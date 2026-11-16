@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -77,7 +78,12 @@ import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleSize
 import media.watchmy.client.model.aboutSummary
 import media.watchmy.client.model.accountSettingsUrl
+import media.watchmy.client.model.GO_TO_SHOW
+import media.watchmy.client.model.SHOWS_YOU_FOLLOW
+import media.watchmy.client.model.STOP_NOTIFYING
 import media.watchmy.client.model.accountSummary
+import media.watchmy.client.model.line
+import media.watchmy.client.model.notificationsTvSummary
 import media.watchmy.client.model.displayAddress
 import media.watchmy.client.model.explanation
 import media.watchmy.client.model.label
@@ -104,6 +110,8 @@ import media.watchmy.client.presentation.rows.RowLayoutViewModel
 import media.watchmy.client.presentation.settings.AccountLoad
 import media.watchmy.client.presentation.settings.LanguageAction
 import media.watchmy.client.presentation.settings.LanguageList
+import media.watchmy.client.presentation.settings.NotificationsViewModel
+import media.watchmy.client.tv.navigation.TvRoutes
 import media.watchmy.client.presentation.settings.SettingKey
 import media.watchmy.client.presentation.settings.SettingsViewModel
 import media.watchmy.client.tv.components.BackClosesNote
@@ -128,8 +136,11 @@ import media.watchmy.client.ui.onBack
 /** Settings' panels and confirmations; one is open at a time. */
 internal enum class Overlay {
     Quality, Passthrough, SubtitleSize, SubtitleChoice, AddLanguage, LanguageActions, DeviceName, Privacy, Licences, ReminderLead, Diagnostics,
-    Skip, ChangePassword, SignOut, Revoke,
+    Skip, ChangePassword, SignOut, Revoke, FollowedShow,
 }
+
+/** A followed show's side panel (the boards' `tv-settings`): its page, or stop notifying. */
+private enum class FollowAction(val label: String) { GoToShow(GO_TO_SHOW), Stop(STOP_NOTIFYING) }
 
 /** What a quality does, under it in Settings (SettingsQuality.dc.html). */
 internal fun qualityDescription(quality: StreamQuality): String = when (quality) {
@@ -226,6 +237,11 @@ fun SettingsScreen(
     val homeRowsState = homeRows?.state?.collectAsStateWithLifecycle()?.value
     val myRequests = if (badge.requests) viewModel(key = "tv-settings-requests") { MyRequestsViewModel(services.requests) } else null
     val myRequestsState = myRequests?.state?.collectAsStateWithLifecycle()?.value
+    // Following shows (PLAN-NEW-EPISODES.md §7.2): the list, for the group's line and its pane; this TV doesn't notify.
+    val followsAvailable = ServerFeatures(apiLevel).follows
+    val notifications = if (followsAvailable) viewModel(key = "tv-notifications") { NotificationsViewModel(services.follows) } else null
+    val notificationsState = notifications?.state?.collectAsStateWithLifecycle()?.value
+    var followedShow by rememberSaveable { mutableStateOf<Long?>(null) }
 
     // Your requests' line, in the group and on its pane; "Where each one stands" until they have loaded.
     val requestsLine = (myRequestsState?.mine as? Load.Ready)?.data?.let { requestsSummary(it) } ?: "Where each one stands"
@@ -237,6 +253,14 @@ fun SettingsScreen(
         if (rowsAvailable) {
             val rows = homeRowsState?.takeIf { it.layout is Load.Ready }?.entries
             add(GroupLine(SettingsGroup.HomeRows, SettingsGroup.HomeRows.title, rows?.let { r -> rowsSummary(r.count { !it.hidden }, r.count { it.hidden }, onHome = false) } ?: "The rows on Home"))
+        }
+        if (notificationsState != null) {
+            val line = when (notificationsState.list) {
+                is Load.Ready -> notificationsTvSummary(notificationsState.count ?: 0)
+                is Load.Failed -> "Didn’t load"
+                Load.Loading -> SHOWS_YOU_FOLLOW
+            }
+            add(GroupLine(SettingsGroup.Notifications, SettingsGroup.Notifications.title, line))
         }
         add(GroupLine(SettingsGroup.Account, SettingsGroup.Account.title, accountSummary(user?.name.orEmpty(), (state.sessions as? Load.Ready)?.data?.size)))
         if (badge.requests) {
@@ -375,6 +399,19 @@ fun SettingsScreen(
                     )
                     SettingsGroup.Languages -> LanguagesPane(state, displayLocale, languageFocus, notLoadedDetail, retryingAccount, panes.first, calls)
                     SettingsGroup.HomeRows -> HomeRowsSettings(rowsScreen, rowsFocus, panes.first)
+                    SettingsGroup.Notifications -> if (notifications != null && notificationsState != null) NotificationsPane(
+                        notificationsState,
+                        services.library,
+                        panes.first,
+                        onShow = {
+                            followedShow = it.tmdbId
+                            overlay = Overlay.FollowedShow
+                        },
+                        onStop = notifications::stop,
+                        onRetry = notifications::retry,
+                        onEmptied = { panes.toGroup() },
+                        onShown = notifications::setShown,
+                    )
                     SettingsGroup.Account -> AccountPane(state, server?.let { "${it.name} · ${displayAddress(it.baseUrl)}" }, panes.first, calls)
                     SettingsGroup.Requests -> RequestsPane(requestsLine, panes.first, calls)
                     SettingsGroup.About -> AboutPane(
@@ -572,6 +609,37 @@ fun SettingsScreen(
         }
         Overlay.Privacy -> PrivacyDialog(onDismiss = { overlay = null })
         Overlay.Licences -> LicencesDialog(onDismiss = { overlay = null })
+        Overlay.FollowedShow -> {
+            val show = (notificationsState?.list as? Load.Ready)?.data?.firstOrNull { it.tmdbId == followedShow }
+            if (show == null || notifications == null) {
+                // The show went (stopped on another device): the panel goes with it.
+                SideEffect { overlay = null }
+            } else {
+                // A show no longer in the library has only Stop notifying.
+                val actions = if (show.showId == null) listOf(FollowAction.Stop) else FollowAction.entries
+                OptionsDialog(
+                    title = show.title,
+                    kicker = SHOWS_YOU_FOLLOW,
+                    context = show.line(),
+                    options = actions,
+                    // Actions, not a choice: no check; focus starts on the first, Go to show.
+                    selected = null,
+                    label = { it.label },
+                    onSelect = {
+                        overlay = null
+                        when (it) {
+                            FollowAction.GoToShow -> show.showId?.let { id -> onNavigate(TvRoutes.Show(id)) }
+                            FollowAction.Stop -> notifications.stop(show)
+                        }
+                    },
+                    onDismiss = { overlay = null },
+                    footer = {
+                        Box(Modifier.weight(1f))
+                        BackClosesNote()
+                    },
+                )
+            }
+        }
         Overlay.Diagnostics -> DiagnosticsPanel(
             services.diagnostics,
             app = "${services.client.product} ${services.client.version} · Android ${Build.VERSION.RELEASE} · ${Build.MODEL}",

@@ -17,6 +17,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import media.watchmy.client.newepisodes.NewEpisodeFollower
+import media.watchmy.client.newepisodes.NewEpisodeNotifier
+import media.watchmy.client.newepisodes.StoredNewEpisodesCursors
+import media.watchmy.client.newepisodes.WorkManagerNewEpisodeSchedule
 import media.watchmy.client.reminders.LiveReminderAlarms
 import media.watchmy.client.reminders.ReminderFollower
 import media.watchmy.client.core.cast.CastConnectLive
@@ -36,6 +40,7 @@ import media.watchmy.client.model.CastService
 import media.watchmy.client.model.ClientInfo
 import media.watchmy.client.model.Diagnostics
 import media.watchmy.client.model.DownloadRepository
+import media.watchmy.client.model.FollowsRepository
 import media.watchmy.client.model.LIVE_CAST_API_LEVEL
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.LivePlaybackControllerFactory
@@ -91,6 +96,9 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
 
     /** Live TV reminders, on phones and tablets with the real data layer; null on TVs (a banner) and the fakes. */
     private var reminders: ReminderFollower? = null
+
+    /** New-episode notifications, on phones and tablets with the real data layer; null on TVs (a Home row) and the fakes. */
+    private var newEpisodes: NewEpisodeFollower? = null
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -161,6 +169,7 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
         }
         val receiver = if (castable && isTv) traced("WMM castConnect") { castConnect(data, playback) }.also { castConnect = it } else CastReceiver.None
         if (!isTv) traced("WMM followReminders") { followReminders(data, ::account) }
+        if (!isTv) traced("WMM followNewEpisodes") { followNewEpisodes(data, ::account) }
         return RealAppServices(data, playback, cast, receiver, library = playback.screensLibrary(library), downloads = downloads?.repository ?: DownloadRepository.Unavailable, seekThumbnails = CoilSeekThumbnails(this), livePlayback = playback.live(data.livePlaybackGateway), diagnostics = AndroidDiagnostics(this))
     }
 
@@ -176,6 +185,30 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
             }
             ReminderFollower(alarms, data.live, session, account, appScope)
         }.also { it.start(ProcessLifecycleOwner.get().lifecycle) }
+    }
+
+    /**
+     * New episodes of the shows the person follows (PLAN-NEW-EPISODES.md
+     * §6.1): the check's periodic work follows this device's switch and the
+     * permission, and a sign-out or another account cancels it and takes
+     * away what is showing.
+     */
+    private fun followNewEpisodes(data: DataServices, account: () -> String?) {
+        val notifier = NewEpisodeNotifier(this).also { it.createChannel() }
+        val session = combine(data.auth.user, data.servers.current) { user, server -> user to server }
+        // The cursor is keyed by the server's and the person's ids, so a rename keeps it; links name the account as Watch Next does.
+        val cursorAccount = { media.watchmy.client.model.followsAccount(data.servers.current.value?.server, data.auth.user.value) }
+        val follower = NewEpisodeFollower(
+            data.follows, data.libraryContentsChanged, session, account, cursorAccount,
+            StoredNewEpisodesCursors(this), WorkManagerNewEpisodeSchedule(this), notifier, appScope,
+        ).also { newEpisodes = it }
+        data.onSessionChange(follower::sessionChanged)
+        follower.start(ProcessLifecycleOwner.get().lifecycle)
+    }
+
+    /** One check for new episodes, from the periodic work (NewEpisodeWorker). */
+    suspend fun checkNewEpisodes() {
+        newEpisodes?.check()
     }
 
     /** Reads the reminders again, which sets the alarms; false when the server couldn't be asked (LiveReminderSync). */
@@ -259,4 +292,5 @@ private class RealAppServices(
     override val requests: RequestRepository get() = data.requests
     override val live: LiveRepository get() = data.live
     override val rows: RowsRepository get() = data.rows
+    override val follows: FollowsRepository get() = data.follows
 }

@@ -10,7 +10,8 @@ import java.net.URLDecoder
  * it loads), `shows/{id}` (optionally `?season=`, and `&episode=` for an
  * episode's page), `movies/{id}`, `link?code=` (a TV's pairing code) and
  * `live/{channelId}` (a Live TV reminder's Watch; `live` alone opens the
- * guide), and the phone launcher's shortcuts' `search` and `downloads`.
+ * guide), the phone launcher's shortcuts' `search` and `downloads`, and
+ * `home` (the new-episode notifications' "more shows").
  * Open links with [open],
  * which plays only what a launcher or reminder published for the account
  * signed in.
@@ -40,6 +41,9 @@ sealed interface DeepLink {
     /** Downloads, from the phone launcher's shortcut (`downloads`). The TV opens nothing for it. */
     data object Downloads : DeepLink
 
+    /** Home, from the notification for the shows past the first five (PLAN-NEW-EPISODES.md §6.2, `home`). */
+    data object Home : DeepLink
+
     companion object {
         const val SCHEME = "watchmymedia"
 
@@ -57,6 +61,7 @@ sealed interface DeepLink {
                 "link" -> LinkTv(query["code"])
                 "search" -> Search
                 "downloads" -> Downloads
+                "home" -> Home
                 else -> null
             }
         }
@@ -86,18 +91,33 @@ sealed interface DeepLink {
         fun live(channelId: String, account: String): String =
             "$SCHEME://live/${java.net.URLEncoder.encode(channelId, "UTF-8")}?source=reminder&account=${java.net.URLEncoder.encode(account, "UTF-8")}"
 
+        /**
+         * A new-episode notification's link (PLAN-NEW-EPISODES.md §6.2): the
+         * show's page with [episodeId] of [season] on top, for [account]
+         * ([watchNextAccount]) alone.
+         */
+        fun newEpisode(showId: Long, season: Int, episodeId: Long, account: String): String =
+            "$SCHEME://shows/$showId?season=$season&episode=$episodeId&source=new-episodes&account=${java.net.URLEncoder.encode(account, "UTF-8")}"
+
+        /** The notification for the shows past the first five opens Home, for [account] alone. */
+        fun home(account: String): String = "$SCHEME://home?source=new-episodes&account=${java.net.URLEncoder.encode(account, "UTF-8")}"
+
         private const val MAX_CHANNEL_ID = 128
+
+        /** The sources whose links open only for the account they name. */
+        private val LAUNCHER_SOURCES = setOf("watch-next", "reminder", "new-episodes")
 
         /**
          * The account a launcher's link was published for (Watch Next marks
          * its links `source=watch-next` and `account=`, a reminder
-         * `source=reminder` and `account=`), "" when it names
+         * `source=reminder` and `account=`, a new-episode notification
+         * `source=new-episodes` and `account=`), "" when it names
          * none; null for any other link. The TV opens such a link only for
          * the account signed in now.
          */
         fun launcherAccount(link: String?): String? {
             val (_, query) = read(link) ?: return null
-            if (query["source"] != "watch-next" && query["source"] != "reminder" && "account" !in query) return null
+            if (query["source"] !in LAUNCHER_SOURCES && "account" !in query) return null
             return query["account"].orEmpty()
         }
 

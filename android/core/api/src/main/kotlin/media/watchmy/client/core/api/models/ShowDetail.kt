@@ -54,6 +54,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param backdropPath
  * @param contentRating US certification from TMDB; empty when it has none.
  * @param firstAirDate
+ * @param following The signed-in person follows the show (followShow). Absent on servers below API level 29.
  * @param lastAirDate
  * @param managedBy The Sonarr connection that has the show.
  * @param nextAirDate
@@ -123,6 +124,10 @@ data class ShowDetail (
 
     @SerialName(value = "firstAirDate")
     val firstAirDate: kotlin.String? = null,
+
+    /* The signed-in person follows the show (followShow). Absent on servers below API level 29. */
+    @SerialName(value = "following")
+    val following: kotlin.Boolean? = null,
 
     @SerialName(value = "lastAirDate")
     val lastAirDate: kotlin.String? = null,

@@ -66,6 +66,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param listsMdblistKeyHint Last four characters of the stored MDBList key.
  * @param remoteAdmin
  * @param storage
+ * @param tmdbKeyFromConfig config.yaml or the environment (tmdb.api_key, WATCHMYMEDIA_TMDB_API_KEY) has a TMDB key too. A saved key overrides it; after the saved key is removed, the server uses that one again from its next restart.
  * @param tmdbKeyHint Last four characters of the stored key.
  * @param trailersYouTube Movie pages offer TMDB's trailers, which play from YouTube (on by default). Absent on older servers.
  * @param trickplay
@@ -142,6 +143,10 @@ data class Settings (
 
     @SerialName(value = "storage")
     val storage: PlaybackCacheLoad? = null,
+
+    /* config.yaml or the environment (tmdb.api_key, WATCHMYMEDIA_TMDB_API_KEY) has a TMDB key too. A saved key overrides it; after the saved key is removed, the server uses that one again from its next restart. */
+    @SerialName(value = "tmdbKeyFromConfig")
+    val tmdbKeyFromConfig: kotlin.Boolean? = null,
 
     /* Last four characters of the stored key. */
     @SerialName(value = "tmdbKeyHint")

@@ -60,6 +60,8 @@ fun TvButton(
     size: TvButtonSize = TvButtonSize.Large,
     icon: ImageVector? = null,
     enabled: Boolean = true,
+    /** The icon's colour: gold for a state that is on (a show's Notifications on). */
+    iconTint: Color = Color.White,
 ) {
     val shape = RoundedCornerShape(size.radius)
     FocusableBox(
@@ -88,7 +90,7 @@ fun TvButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (icon != null) Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(size.icon))
+            if (icon != null) Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(size.icon))
             Text(
                 text,
                 style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = size.fontSize),

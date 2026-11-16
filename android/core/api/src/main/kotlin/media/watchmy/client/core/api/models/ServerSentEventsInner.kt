@@ -27,6 +27,7 @@ import media.watchmy.client.core.api.models.EventActivityStarted
 import media.watchmy.client.core.api.models.EventActivityStartedId
 import media.watchmy.client.core.api.models.EventActivityStopped
 import media.watchmy.client.core.api.models.EventActivityUpdated
+import media.watchmy.client.core.api.models.EventFollowsChanged
 import media.watchmy.client.core.api.models.EventLibraryChanged
 import media.watchmy.client.core.api.models.EventListsChanged
 import media.watchmy.client.core.api.models.EventLiveFavouritesChanged

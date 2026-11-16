@@ -35,6 +35,7 @@ object MobileRoutes {
     @Serializable data object SettingsPlayback
     @Serializable data object SettingsLanguages
     @Serializable data object SettingsDownloads
+    @Serializable data object SettingsNotifications
     @Serializable data object SettingsAccount
     @Serializable data object SettingsAbout
     /** Change password (§5.3): full screen on a phone. */

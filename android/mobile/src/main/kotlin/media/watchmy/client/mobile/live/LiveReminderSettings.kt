@@ -1,8 +1,5 @@
 package media.watchmy.client.mobile.live
 
-import android.content.Context
-import android.content.Intent
-import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,7 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -37,7 +33,16 @@ import media.watchmy.client.mobile.settings.NoteTone
 import media.watchmy.client.mobile.settings.StatusCard
 import media.watchmy.client.mobile.settings.SubHeading
 import media.watchmy.client.mobile.settings.cardInset
+import media.watchmy.client.mobile.settings.notificationsAllowed
+import media.watchmy.client.mobile.settings.openNotifications
+import media.watchmy.client.mobile.settings.rememberChannelsAllowed
+import media.watchmy.client.model.LIVE_REMINDERS_ROW_LINE
 import media.watchmy.client.model.LIVE_REMINDER_CHANNEL
+import media.watchmy.client.model.NotificationsBlocked
+import media.watchmy.client.model.OTHER_DEVICES_STILL
+import media.watchmy.client.model.TURN_ON_NOTIFICATIONS
+import media.watchmy.client.model.remindersBlockedTitle
+import media.watchmy.client.model.text
 import media.watchmy.client.model.LIVE_REMINDER_LEADS
 import media.watchmy.client.model.liveLeadShort
 import media.watchmy.client.model.liveReminderSettingsNote
@@ -59,8 +64,8 @@ internal data class ReminderSettings(
 internal fun rememberReminderSettings(): ReminderSettings {
     val state by reminderModel().state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var allowed by remember { mutableStateOf(remindersAllowed(context)) }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { allowed = remindersAllowed(context) }
+    var allowed by remember { mutableStateOf(notificationsAllowed(context, LIVE_REMINDER_CHANNEL)) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { allowed = notificationsAllowed(context, LIVE_REMINDER_CHANNEL) }
     return ReminderSettings(shown = state.available && state.liveTv, allowed = allowed)
 }
 
@@ -95,13 +100,15 @@ internal fun LiveRemindersBlock(enabled: Boolean, tablet: Boolean, modifier: Mod
     Column(modifier.fillMaxWidth()) {
         SubHeading("Live TV reminders", Modifier.padding(top = 4.dp))
         if (!reminders.allowed) {
+            // Its own card: the app's notifications off, or only the reminders' channel (the boards' `off`).
+            val blocked = NotificationsBlocked(app = !rememberChannelsAllowed().app, reminders = true, newEpisodes = false)
             StatusCard(
-                "Reminders can’t show on this $device",
-                "Notifications are off for WatchMyMedia in Android’s settings. Your other devices still get them.",
+                remindersBlockedTitle(device),
+                blocked.text() + " " + OTHER_DEVICES_STILL,
                 NoteTone.Warn,
                 Modifier.cardInset(tablet = false),
-                action = "Turn on notifications",
-                onAction = { openReminderNotifications(context) },
+                action = TURN_ON_NOTIFICATIONS,
+                onAction = { openNotifications(context, LIVE_REMINDER_CHANNEL) },
             )
         }
         ListRow("Reminder time", subtitle = "How long before a programme starts", minHeight = 44.dp)
@@ -127,43 +134,10 @@ internal fun LiveRemindersBlock(enabled: Boolean, tablet: Boolean, modifier: Mod
         if (retry != null && error != null) FailureLine("Couldn’t save, so it’s still ${liveLeadShort(state.leadMinutes)}. $error", onRetry = { pick(retry) })
         ListRow(
             "Notifications",
-            subtitle = "Opens the Live TV reminders channel in Android’s settings",
-            modifier = Modifier.clickable { openReminderNotifications(context) },
+            subtitle = LIVE_REMINDERS_ROW_LINE,
+            modifier = Modifier.clickable { openNotifications(context, LIVE_REMINDER_CHANNEL) },
             trailing = { RowValue(if (reminders.allowed) "Allowed" else "Off") },
         )
         FootNote(liveReminderSettingsNote(state.leadMinutes))
     }
-}
-
-/** Whether reminders can show: notifications are on for the app and for the channel. */
-private fun remindersAllowed(context: Context): Boolean {
-    val manager = NotificationManagerCompat.from(context)
-    if (!manager.areNotificationsEnabled()) return false
-    val channel = manager.getNotificationChannelCompat(LIVE_REMINDER_CHANNEL) ?: return true
-    return channel.importance != NotificationManagerCompat.IMPORTANCE_NONE
-}
-
-/**
- * Android's screen where reminders are turned on (PLAN-ANDROID-SETTINGS.md
- * §4.7). With the app's notifications off, as they are on Android 13 and
- * later until the permission is given, that is the app's notifications
- * screen: the reminders channel's own screen says the channel is blocked
- * and its switch does nothing until the app's switch is on. With only the
- * channel off, it is the channel's screen. The app's screen also stands in
- * where Android has no channel screen.
- */
-internal fun openReminderNotifications(context: Context) {
-    val app = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    val intent = if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
-        app
-    } else {
-        Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
-            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-            .putExtra(Settings.EXTRA_CHANNEL_ID, LIVE_REMINDER_CHANNEL)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    runCatching { context.startActivity(intent) }
-        .recoverCatching { context.startActivity(app) }
 }

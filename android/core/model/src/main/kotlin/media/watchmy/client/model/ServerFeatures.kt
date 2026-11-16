@@ -85,4 +85,7 @@ value class ServerFeatures(val level: Int) {
 
     /** 28: the Live TV status call waits (waitMs) while the channel tunes, so the player needn't poll. */
     val liveStatusWaits: Boolean get() = level >= DECISION_TOKEN_API_LEVEL
+
+    /** 29: following shows, the feed of their new episodes and Home's `followed` row (PLAN-NEW-EPISODES.md). */
+    val follows: Boolean get() = level >= FOLLOWS_API_LEVEL
 }

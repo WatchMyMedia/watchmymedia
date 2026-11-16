@@ -68,6 +68,8 @@ import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.rememberTabletLayout
+import media.watchmy.client.mobile.live.rememberLiveDevice
+import androidx.compose.ui.platform.LocalContext
 import media.watchmy.client.ui.ReportShown
 
 /**
@@ -92,7 +94,7 @@ fun ShowPageScreen(
     onOpenDownloads: () -> Unit = {},
 ) {
     val services = LocalAppServices.current
-    val vm = viewModel { ShowPageViewModel(services.library, showId, arrival, services.requests, services.downloads, createSavedStateHandle()) }
+    val vm = viewModel { ShowPageViewModel(services.library, showId, arrival, services.requests, services.downloads, services.follows, createSavedStateHandle()) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val downloadsVm = viewModel { DownloadsViewModel(services.downloads) }
@@ -107,6 +109,8 @@ fun ShowPageScreen(
     val twoPane = rememberTabletLayout().twoPane
     val show = state.show
     val ep = state.episode
+    val context = LocalContext.current
+    val followAsk = rememberFollowAsk()
 
     Box(modifier.fillMaxSize().background(WmmColors.Ground)) {
         when {
@@ -120,6 +124,12 @@ fun ShowPageScreen(
                     onReplace = { replacing = true },
                     onOpenSettings = onOpenSettings,
                     onDownloadSeason = { ids, number -> downloadsVm.downloadAll(ids, downloadSeasonStarted(ids.count { id -> downloads.all.none { it.fileId == id } }, number)) },
+                    onFollow = {
+                        // Followed at once; the first time, the explainer, then Android's question.
+                        val turningOn = vm.state.value.following == false
+                        vm.toggleFollow()
+                        if (turningOn) followAsk.after(context, show.title)
+                    },
                 )
                 if (twoPane) TabletContent(show, ep, state, vm, downloads, scroll, page) else PhoneContent(show, ep, state, vm, downloads, scroll, page)
             }
@@ -129,6 +139,7 @@ fun ShowPageScreen(
         ViewSnackbar(downloads.message, onView = onOpenDownloads, onShown = downloadsVm::messageShown, Modifier.align(Alignment.BottomCenter).padding(WindowInsets.navigationBars.asPaddingValues()))
     }
 
+    FollowAskDialog(followAsk, rememberLiveDevice())
     if (show == null || ep == null) return
     val subject = vm.requestSubject()
     if (asking != null && subject != null) {
@@ -183,6 +194,8 @@ internal class PageActions(
     val onReplace: () -> Unit,
     val onOpenSettings: () -> Unit,
     val onDownloadSeason: (fileIds: List<Long>, season: Int) -> Unit,
+    /** Notify me, which may open the explainer. */
+    val onFollow: () -> Unit = {},
 )
 
 /** How far the page scrolls before the bar turns solid: about where the still meets it. */

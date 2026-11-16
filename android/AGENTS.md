@@ -205,6 +205,13 @@ didn't start.
   speed` does not throttle; use a proxy (root file, Test environments).
 - Measure motion (bounces, jumps) with `adb shell screenrecord`, frames from
   ffmpeg, and per-row comparisons between frames.
+- Run periodic WorkManager work, such as the hourly new-episode check, by
+  hand: WorkManager won't run it before its period is up, even when forced. Move
+  the emulator's clock past the period (`adb shell cmd alarm set-time <ms>`),
+  then force the job in WorkManager's namespace: `adb shell cmd jobscheduler
+  run -f -n androidx.work.systemjobscheduler <package> <jobId>`, with the id
+  from `dumpsys jobscheduler` (it changes each time the work is scheduled).
+  Without `-n` it says "Could not find job".
 - YouTube's embedded player (the phone's trailer screen) never draws on these
   emulators: the WebView area stays black on `android-35` with any `-gpu`
   mode, though the video plays (`getPlayerState()` is 1), and on

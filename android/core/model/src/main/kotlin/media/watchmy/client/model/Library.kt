@@ -241,6 +241,8 @@ data class ShowDetail(
     val tmdbId: Long? = null,
     /** The Sonarr connection that manages the show's files, by name. */
     val managedBy: String? = null,
+    /** The person follows the show (Notify me); null from a server below [FOLLOWS_API_LEVEL]. */
+    val following: Boolean? = null,
 )
 
 /** One version (file) of a movie or episode. */

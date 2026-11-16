@@ -33,7 +33,11 @@ import media.watchmy.client.model.ItemSort
  * page). Every title is fictional; the missing ones are [FakeRequestRepository]'s,
  * so Request goes through the fake request flow.
  */
-class FakeRowsData(private val requestState: (MediaType, Long) -> RequestableState? = { _, _ -> null }) {
+class FakeRowsData(
+    private val requestState: (MediaType, Long) -> RequestableState? = { _, _ -> null },
+    /** New from shows you follow, a Home row from [media.watchmy.client.model.FOLLOWS_API_LEVEL]; none without it. */
+    private val follows: FakeFollowsRepository? = null,
+) {
     private class Entry(val type: MediaType, val title: String, val year: Int, val tmdbId: Long? = null, val found: Boolean = true)
 
     private class FakeList(
@@ -78,6 +82,7 @@ class FakeRowsData(private val requestState: (MediaType, Long) -> RequestableSta
 
     private val builtinTitles = mapOf(
         RowIds.CONTINUE to (RowStyle.Continue to "Continue watching"),
+        RowIds.FOLLOWED to (RowStyle.Episode to "New from shows you follow"),
         RowIds.LIVE to (RowStyle.Live to "Live TV"),
         RowIds.RECENTLY_ADDED_SHOWS to (RowStyle.Poster to "Recently added · TV Shows"),
         RowIds.RECENTLY_AIRED to (RowStyle.Episode to "Recently aired · Episodes"),
@@ -88,9 +93,12 @@ class FakeRowsData(private val requestState: (MediaType, Long) -> RequestableSta
 
     /** Each screen's default order; lists made on a screen are placed on it, the others hidden. */
     private fun defaults(screen: String): List<Pair<String, Boolean>> = when (screen) {
-        RowScreens.HOME -> listOf(
+        // The server puts New from shows you follow after Continue watching; the fakes put it after the
+        // rows the focus and See all tests walk through, which were drawn before it existed.
+        RowScreens.HOME -> listOfNotNull(
             RowIds.CONTINUE to false, RowIds.LIVE to false, RowIds.RECENTLY_ADDED_SHOWS to false, RowIds.list(SCI_FI) to false,
             RowIds.RECENTLY_AIRED to false, RowIds.RECENTLY_ADDED_MOVIES to false, RowIds.list(FESTIVAL) to false, RowIds.RECENTLY_RELEASED to false,
+            (RowIds.FOLLOWED to false).takeIf { follows?.supported == true },
             RowIds.list(WATCHLIST) to true, RowIds.list(UNWATCHED_4K) to true,
         )
         RowScreens.library(FakeData.MOVIE_LIBRARY) -> listOf(
@@ -141,6 +149,7 @@ class FakeRowsData(private val requestState: (MediaType, Long) -> RequestableSta
         val row = ScreenRow(id, style(id), title(id))
         when (id) {
             RowIds.CONTINUE -> row.copy(continueItems = home.continueWatching)
+            RowIds.FOLLOWED -> row.copy(episodes = follows?.row(FakeData.recentlyAired(System.currentTimeMillis())).orEmpty())
             RowIds.LIVE -> row
             RowIds.RECENTLY_ADDED_SHOWS -> row.copy(items = home.recentlyAddedShows, seeAll = RowLink.Library(FakeData.TV_LIBRARY, sort = ItemSort.Added))
             RowIds.RECENTLY_AIRED -> row.copy(episodes = home.recentlyAired, seeAll = RowLink.Library(FakeData.TV_LIBRARY, sort = ItemSort.Aired))

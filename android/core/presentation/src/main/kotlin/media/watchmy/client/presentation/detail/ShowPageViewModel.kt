@@ -3,12 +3,16 @@ package media.watchmy.client.presentation.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.DeletePreview
+import media.watchmy.client.model.FOLLOW_LIMIT
+import media.watchmy.client.model.FollowsRepository
 import media.watchmy.client.model.DownloadRepository
 import media.watchmy.client.model.EPISODE_GONE_NOTE
 import media.watchmy.client.model.EpisodeDetail
@@ -34,6 +38,7 @@ import media.watchmy.client.model.asRequestable
 import media.watchmy.client.model.attempt
 import media.watchmy.client.model.deletedMessage
 import media.watchmy.client.model.errorMessage
+import media.watchmy.client.model.followRefused
 import media.watchmy.client.model.inTabOrder
 import media.watchmy.client.model.isUnreachable
 import media.watchmy.client.model.markWatched
@@ -79,6 +84,9 @@ interface ShowPageActions {
     fun cancelRequest(requestId: Long)
     fun askDelete()
     fun say(message: String)
+
+    /** Notify me: follows the show, or stops (PLAN-NEW-EPISODES.md §7.1). */
+    fun toggleFollow()
 }
 
 /**
@@ -100,6 +108,8 @@ class ShowPageViewModel(
     private val arrival: ShowArrival,
     private val requests: RequestRepository = RequestRepository.Unavailable,
     private val downloads: DownloadRepository = DownloadRepository.Unavailable,
+    /** Following the show (Notify me), from [media.watchmy.client.model.FOLLOWS_API_LEVEL]. */
+    private val follows: FollowsRepository = FollowsRepository.Unavailable,
     /** From `createSavedStateHandle()`; tests pass their own or none. */
     private val saved: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel(), ShowPageActions, ShownPage {
@@ -133,6 +143,8 @@ class ShowPageViewModel(
         val deleting: Deleting? = null,
         /** The server can't be reached: the page is the season's downloads (PLAN-DOWNLOADS.md §6). */
         val offline: Boolean = false,
+        /** The server can follow shows (Notify me), from [media.watchmy.client.model.FOLLOWS_API_LEVEL]. */
+        val followable: Boolean = false,
     ) {
         val show: ShowDetail? get() = page.value?.show
         val season: SeasonDetail? get() = page.value?.season
@@ -184,6 +196,13 @@ class ShowPageViewModel(
         /** Mark show watched, with About the show. */
         val canMarkShow: Boolean get() = !offline && show?.seasons?.any { it.availableCount > 0 } == true
 
+        /**
+         * Notify me, first of About the show's actions: whether the person
+         * follows the show; null where the bell is hidden (a server below
+         * the level, a reply without it, or offline).
+         */
+        val following: Boolean? get() = show?.following?.takeIf { followable && !offline }
+
         /** Request missing seasons, with About the show. */
         val missingSeasons: Boolean get() = !offline && show?.hasMissingSeasons(options) == true
 
@@ -196,7 +215,11 @@ class ShowPageViewModel(
     }
 
     private val _state = MutableStateFlow(
-        State(episodeId = saved[EPISODE] ?: (arrival as? ShowArrival.Episode)?.id ?: 0, reason = saved.get<String>(REASON)?.let { r -> OnTopReason.entries.firstOrNull { it.name == r } }),
+        State(
+            episodeId = saved[EPISODE] ?: (arrival as? ShowArrival.Episode)?.id ?: 0,
+            reason = saved.get<String>(REASON)?.let { r -> OnTopReason.entries.firstOrNull { it.name == r } },
+            followable = follows.supported,
+        ),
     )
     val state: StateFlow<State> = _state.asStateFlow()
 
@@ -208,6 +231,12 @@ class ShowPageViewModel(
 
     /** Seasons fetched since the last full load, so going back to a tab is at once. */
     private val seasons = mutableMapOf<Int, SeasonDetail>()
+
+    /** A follow or a stop on its way to the server; presses meanwhile are ignored. */
+    private var following: Job? = null
+
+    /** Counts the bell's presses: a reload that began before the latest one keeps the bell as it is. */
+    private var followPresses = 0
 
     init {
         load()
@@ -228,6 +257,33 @@ class ShowPageViewModel(
                 load(quiet = true)
             }
         }
+        // Followed or stopped on another device: the bell follows.
+        viewModelScope.launch { follows.changes.collect { if (following?.isActive != true) load(quiet = true) } }
+    }
+
+    /**
+     * Notify me, or Notifications on: follows the show, or stops, at once,
+     * and puts the bell back with a message if the server refuses (§7.1).
+     */
+    override fun toggleFollow() {
+        val now = _state.value.following ?: return
+        if (following?.isActive == true) return
+        val title = _state.value.show?.title.orEmpty()
+        followPresses++
+        setFollowing(!now)
+        following = viewModelScope.launch {
+            attempt { follows.setFollowing(showId, !now) }
+                .onFailure { e ->
+                    setFollowing(now)
+                    val text = if (!now && (e as? ApiException)?.status == 409) FOLLOW_LIMIT else followRefused(!now, title)
+                    _state.update { it.copy(message = text) }
+                }
+        }
+    }
+
+    private fun setFollowing(on: Boolean) = _state.update { s ->
+        val page = s.page as? Load.Ready ?: return@update s
+        s.copy(page = Load.Ready(page.data.copy(show = page.data.show.copy(following = on))))
     }
 
     override fun setShown(shown: Boolean) = freshness.setShown(shown)
@@ -476,6 +532,7 @@ class ShowPageViewModel(
      */
     private fun load(quiet: Boolean = false) {
         if (!quiet || _state.value.page !is Load.Ready) _state.update { it.copy(page = Load.Loading) }
+        val presses = followPresses
         loads.launch {
             attempt {
                 val show = library.show(showId)
@@ -492,11 +549,15 @@ class ShowPageViewModel(
                     Triple(show, season, onTop(show, season, arrival))
                 }
             }
-                .onSuccess { (show, season, top) ->
+                .onSuccess { (loaded, season, top) ->
                     seasons.clear()
                     seasons[season.season.number] = season
+                    // A press on its way to the server, or one made since this reload began, outlives the reply.
+                    val pressed = following?.isActive == true || followPresses != presses
+                    val show = if (pressed) loaded.copy(following = _state.value.show?.following ?: loaded.following) else loaded
                     _state.update {
                         it.copy(
+                            followable = follows.supported,
                             page = Load.Ready(Page(show, season)),
                             pendingSeason = it.pendingSeason?.takeIf { p -> p != season.season.number },
                             offline = false,

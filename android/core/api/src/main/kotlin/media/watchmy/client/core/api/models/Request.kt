@@ -45,7 +45,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param playId The playId an earlier request for this file returned. The new request continues that play and replaces its session (seeking, track and quality changes); omit it to start a new play.
  * @param playlist HLS playlist kind: event (default) or vod (the whole file, for native players).
  * @param quality The quality the viewer picked: original, 2160, 1080, 720, 480 or 360, shown in activity, with its caps already in the profile; or auto, with the device's own profile, for the server to pick the step and lower it when the connection cannot keep up (API level 3).
- * @param startMs Position to start from; only used by HLS sessions.
+ * @param startMs Position to start from; only used by HLS sessions. Omitted, a play of something partway through starts preparing where it resumes (resumeMs); 0 starts at the beginning.
  * @param subtitleId
  * @param subtitleMode From API level 18: auto uses the person's subtitle preferences; off explicitly disables them. A subtitleId takes precedence. Omitted, older players keep their existing behavior.
  * @param switchGeneration Generation of a quality directive this request accepts. Omit for a new play or an unrelated seek/track change.
@@ -86,7 +86,7 @@ data class Request (
     @SerialName(value = "quality")
     val quality: kotlin.String? = null,
 
-    /* Position to start from; only used by HLS sessions. */
+    /* Position to start from; only used by HLS sessions. Omitted, a play of something partway through starts preparing where it resumes (resumeMs); 0 starts at the beginning. */
     @SerialName(value = "startMs")
     val startMs: kotlin.Long? = null,
 

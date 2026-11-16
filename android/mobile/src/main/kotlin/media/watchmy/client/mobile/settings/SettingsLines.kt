@@ -3,6 +3,10 @@ package media.watchmy.client.mobile.settings
 import androidx.compose.runtime.Immutable
 import media.watchmy.client.mobile.downloads.usedSize
 import media.watchmy.client.model.MediaRequest
+import media.watchmy.client.model.NEW_EPISODES_BLOCKED_SHORT
+import media.watchmy.client.model.newEpisodesBlocked
+import media.watchmy.client.model.notificationsShort
+import media.watchmy.client.model.notificationsSummary
 import media.watchmy.client.model.RowLayoutEntry
 import media.watchmy.client.model.SettingsGroup
 import media.watchmy.client.model.StreamQuality
@@ -48,6 +52,12 @@ internal data class OverviewFacts(
     val serverVersion: String?,
     /** Live TV reminders are on here, and Android won't show them. */
     val remindersBlocked: Boolean,
+    /** The shows the person follows, or null where the server can't follow shows (PLAN-NEW-EPISODES.md §7.2). */
+    val follows: Load<Int>? = null,
+    /** This device's switch for new-episode notifications. */
+    val notifyHere: Boolean = true,
+    /** New episodes are on here (a show followed, the switch on), and Android won't show them. */
+    val newEpisodesBlocked: Boolean = false,
 )
 
 /** Each group's line, from [facts]; a group the overview leaves out may be missing. */
@@ -79,6 +89,14 @@ internal fun groupLines(facts: OverviewFacts): Map<SettingsGroup, GroupLine> {
             }
             is Load.Failed -> GroupLine(gone, gone)
             Load.Loading -> GroupLine(if (failed) gone else "Order, hide and add the rows on Home", null)
+        }
+    }
+    facts.follows?.let { follows ->
+        lines[SettingsGroup.Notifications] = when {
+            facts.newEpisodesBlocked -> GroupLine(newEpisodesBlocked(facts.device), NEW_EPISODES_BLOCKED_SHORT, warn = true)
+            follows is Load.Ready -> GroupLine(notificationsSummary(follows.data, facts.notifyHere, facts.device), notificationsShort(follows.data, facts.notifyHere))
+            follows is Load.Failed -> GroupLine(gone, gone)
+            else -> GroupLine(null, null)
         }
     }
     lines[SettingsGroup.Account] = when {

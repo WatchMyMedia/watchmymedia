@@ -77,7 +77,7 @@ fun ShowPageScreen(
     onNavigate: (Any) -> Unit = {},
 ) {
     val services = LocalAppServices.current
-    val vm = viewModel(key = "show-$showId") { ShowPageViewModel(services.library, showId, arrival, services.requests, saved = createSavedStateHandle()) }
+    val vm = viewModel(key = "show-$showId") { ShowPageViewModel(services.library, showId, arrival, services.requests, follows = services.follows, saved = createSavedStateHandle()) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val memory = rememberFocusMemory()

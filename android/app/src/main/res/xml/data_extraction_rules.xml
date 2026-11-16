@@ -5,8 +5,10 @@
      backed up) are listed in Media3's database, which would be wrong without them. The
      SharedPreferences are about this device too: a declined local network question
      (local_network), which on a new phone would keep it from being asked; this phone's
-     reminder alarms (live-tv-reminders); and the decoders that failed on this system build
-     (playback_profile). Nothing else is worth keeping. -->
+     reminder alarms (live-tv-reminders); this phone's place in the new-episodes feed
+     (new-episodes), which on another phone would skip what arrived meanwhile; and the
+     decoders that failed on this system build (playback_profile). Nothing else is worth
+     keeping. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="datastore/" />

@@ -57,11 +57,13 @@ fun TonalButton(
     busy: Boolean = false,
     icon: ImageVector? = null,
     compact: Boolean = false,
+    /** Gold for a state that is on (a show's Notifications on), as a downloaded episode's button is. */
+    contentColor: Color = WmmColors.Text,
 ) = PillButton(
     text, onClick, modifier, large, enabled, busy, icon,
     ButtonDefaults.buttonColors(
         containerColor = WmmColors.Line2,
-        contentColor = WmmColors.Text,
+        contentColor = contentColor,
         disabledContainerColor = WmmColors.Line2.copy(alpha = 0.5f),
         disabledContentColor = WmmColors.TextMuted,
     ),

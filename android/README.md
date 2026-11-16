@@ -73,7 +73,7 @@ local requests and resolve local reports in the Inbox. Its Open Seerr link
 uses the reserved `seerr.example` hostname. The fake servers are at the current API
 level (`FAKE_SERVER_API_LEVEL`); a test that selects one at a lower level
 gets what that level offers, as from a real server: no requests below 5, no
-Delete below 6, no Automatic quality below 3, no seek thumbnails below 9, no Live TV listings below 13, no casting a channel below 14, no trailers below 20, no arranged rows or lists below 22.
+Delete below 6, no Automatic quality below 3, no seek thumbnails below 9, no Live TV listings below 13, no casting a channel below 14, no trailers below 20, no arranged rows or lists below 22, no Notify me below 29.
 
 Requests, missing episodes' state and Report a problem need a server at API
 level 5 and the corresponding `getRequestOptions` capability. Requests can
@@ -275,6 +275,61 @@ first row's first card. Movies and TV get their rows above the grid.
 On the fakes Home has two list rows (TMDB, and MDBList with a failed
 refresh), a hidden import list with a Not found title, and Movies a library
 list; the missing titles are the fake request flow's, in each request state.
+
+### Following shows: new-episode notifications
+
+From API level 29 ([PLAN-NEW-EPISODES.md](../PLAN-NEW-EPISODES.md) §7.1–§7.3)
+a show's About has **Notify me** first, on the phone, the tablet and the TV:
+it follows the show on the server at once, for the person on every device,
+and goes back with the page's message if the server refuses
+(`ShowPageViewModel.toggleFollow`). On Android 13 and later the first Notify
+me on a phone or tablet explains, then asks for the notification permission
+(`FollowAskDialog`, once a process); Not now keeps the follow. Settings ›
+Notifications lists the shows with Stop notifying (`NotificationsViewModel`),
+and on phones and tablets has this device's switch, kept on the device for
+each account. TVs don't notify: the bell, the list and Home's `followed` row,
+New from shows you follow, which Home draws by its episode style.
+
+Phones and tablets check the server's feed (`GET /api/me/new-episodes`)
+themselves (`app/newepisodes/`; the rule is `checkNewEpisodes` in
+`core:model`):
+
+- **When:** the app's one periodic work, hourly with a network
+  (`NewEpisodeWorker`), its first run a period after it is scheduled. It is
+  scheduled whenever this device could notify (signed in to a server at
+  level 29, this device's switch on, Android allowing the channel), whatever
+  this device last saw of the list, since a show followed on another device
+  notifies here too; and cancelled otherwise. The app also checks at each
+  foreground and three minutes after the last `library.changed` while it is
+  open (scans that change nothing don't put it back; `NewEpisodeFollower`).
+  A process started in the background leaves the work as it is. WorkManager
+  still starts on first use: whether the work is scheduled is kept in the
+  `new-episodes` preferences, so a start with nothing to cancel doesn't
+  start it. Each foreground schedules the work again with
+  `ExistingPeriodicWorkPolicy.UPDATE`, which keeps its timing.
+- **The cursor** is kept per server and person, by their ids
+  (`followsAccount`, so a rename keeps it), in the `new-episodes` preferences
+  (out of backups). The first check keeps only the cursor; an unreachable
+  server, or a 404 or 501 from the feed, keeps it and the work. Turning the
+  switch off, or Android no longer allowing the channel, forgets it, so on
+  again starts from now. A sign-out or another account cancels the work,
+  forgets the cursor and takes away the notifications showing.
+- **The notifications** are on the `new-episodes` channel ("New episodes",
+  default importance), one a show under its own tag, each opening
+  `watchmymedia://shows/{id}?season=&episode=&source=new-episodes&account=`
+  for that account alone; past five shows, one more opens Home
+  (`watchmymedia://home`) and sorts last (every one has a sort key). Two or
+  more share a silent group summary.
+- **Turn on notifications** (`openNotifications(context, channel)`) opens
+  Android's app screen while the app's notifications are off, else the
+  channel's; Settings shows one card for reminders and new episodes
+  together, naming what can't show.
+
+On the fakes Sam follows Harbor Lights, Copperline and Ashgrove, which has
+left the library; the fake feed has Harbor Lights' S3 E7 once after the first
+check. Run the work by hand on a device with `adb shell cmd jobscheduler run
+-f <package> <job id>` (`adb shell dumpsys jobscheduler | grep -A3 <package>`
+lists the id).
 
 ### First-run Home and subtitles
 

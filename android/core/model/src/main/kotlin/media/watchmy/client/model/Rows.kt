@@ -23,6 +23,9 @@ object RowScreens {
 /** The built-in rows' IDs; a list's row is `list:<id>`. */
 object RowIds {
     const val CONTINUE = "continue"
+
+    /** New from shows you follow (from [FOLLOWS_API_LEVEL]): an episode row the server fills. */
+    const val FOLLOWED = "followed"
     const val LIVE = "live"
     const val RECENTLY_ADDED_SHOWS = "recentlyAddedShows"
     const val RECENTLY_AIRED = "recentlyAired"

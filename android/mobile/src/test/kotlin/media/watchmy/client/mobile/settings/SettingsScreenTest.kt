@@ -155,7 +155,7 @@ class SettingsScreenTest {
     }
 
     @Test fun `About says which settings an older server is too old for`() {
-        assertEquals(listOf("Audio languages", "Home rows"), settingsTheServerLacks(ServerFeatures(20)))
+        assertEquals(listOf("Audio languages", "Home rows", "Notifications"), settingsTheServerLacks(ServerFeatures(20)))
         assertTrue(settingsTheServerLacks(ServerFeatures(99)).isEmpty())
     }
 }
