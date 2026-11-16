@@ -598,8 +598,38 @@ func (m *Matcher) record(ctx context.Context, fileID int64, status string, movie
 				return err
 			}
 		}
-		return nil
+		return recordArrivals(ctx, q, fileID, episodeIDs)
 	})
+}
+
+// recordArrivals notes the episodes a file is being linked to as arrived
+// (PLAN-NEW-EPISODES.md §5.2). An episode arrives once, the first time a
+// file that was never linked before is linked to it: that is an arrival,
+// which followers hear about. An episode with an arrival already gets
+// nothing, so a better copy, a second version, a rename or a file back
+// after going missing is silent. A file linked before that lands on an
+// episode with none (a rematch, Fix match or season mapping moved it)
+// gives a quiet arrival, which is never announced. Then the file counts as
+// linked.
+func recordArrivals(ctx context.Context, q *db.Queries, fileID int64, episodeIDs []int64) error {
+	if len(episodeIDs) == 0 {
+		return nil
+	}
+	first, err := q.GetMediaFileFirstLinked(ctx, fileID)
+	if err != nil {
+		return err
+	}
+	var quiet int64
+	if first != nil {
+		quiet = 1
+	}
+	now := db.FormatTime(time.Now())
+	for _, id := range episodeIDs {
+		if err := q.RecordEpisodeArrival(ctx, db.RecordEpisodeArrivalParams{EpisodeID: id, ArrivedAt: now, Quiet: quiet}); err != nil {
+			return err
+		}
+	}
+	return q.SetMediaFileFirstLinked(ctx, db.SetMediaFileFirstLinkedParams{FirstLinkedAt: &now, ID: fileID})
 }
 
 // --- movies ---------------------------------------------------------------

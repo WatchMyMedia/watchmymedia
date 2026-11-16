@@ -257,7 +257,7 @@ func (q *Queries) HasDVRFiles(ctx context.Context) (bool, error) {
 }
 
 const listDVRAdCandidates = `-- name: ListDVRAdCandidates :many
-SELECT f.id, f.library_id, f.path, f.size, f.mtime, f.status, f.parsed, f.probe, f.probe_error, f.container, f.video_codec, f.audio_codec, f.width, f.height, f.duration_ms, f.first_seen_at, f.last_seen_at, f.seen_in_scan, f.created_at, f.updated_at, f.movie_id, f.match_status, f.match_locked, f.match_candidates, f.match_error, f.matched_at, f.hdr, f.added_at, f.match_ignored, f.dv_profile, f.extra_kind, f.extra_of FROM live_tv_recordings r INDEXED BY live_tv_recording_state
+SELECT f.id, f.library_id, f.path, f.size, f.mtime, f.status, f.parsed, f.probe, f.probe_error, f.container, f.video_codec, f.audio_codec, f.width, f.height, f.duration_ms, f.first_seen_at, f.last_seen_at, f.seen_in_scan, f.created_at, f.updated_at, f.movie_id, f.match_status, f.match_locked, f.match_candidates, f.match_error, f.matched_at, f.hdr, f.added_at, f.match_ignored, f.dv_profile, f.extra_kind, f.extra_of, f.first_linked_at FROM live_tv_recordings r INDEXED BY live_tv_recording_state
 CROSS JOIN media_files f ON f.id=r.media_file_id AND f.status='present'
 LEFT JOIN segment_analyses a ON a.media_file_id=f.id AND a.source='blackframe'
 WHERE r.state IN ('done','partial') AND r.id > ?1
@@ -315,6 +315,7 @@ func (q *Queries) ListDVRAdCandidates(ctx context.Context, arg ListDVRAdCandidat
 			&i.DvProfile,
 			&i.ExtraKind,
 			&i.ExtraOf,
+			&i.FirstLinkedAt,
 		); err != nil {
 			return nil, err
 		}

@@ -614,3 +614,110 @@ func TestMigrationCustomPosters(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// The library as it stands when following arrives has arrived already,
+// quietly: nobody is told about it (PLAN-NEW-EPISODES.md section 5.1).
+// Each episode with a link gets one quiet arrival, in the order its files
+// came, and each linked file counts as linked; nothing else does.
+func TestMigrationShowFollows(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	p, q := migrateTo(t, 41)
+	conn := q.db
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := conn.ExecContext(ctx, query, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`INSERT INTO libraries (id, type, name, path) VALUES (1, 'tv', 'TV', '/tv'), (2, 'movie', 'Movies', '/m')`)
+	exec(`INSERT INTO shows (id, library_id, tmdb_id, title, genres) VALUES (3, 1, 77, 'Inspector Vane', '[]')`)
+	exec(`INSERT INTO seasons (id, show_id, number, name, overview, episode_count) VALUES (4, 3, 1, 'Season 1', '', 4)`)
+	exec(`INSERT INTO episodes (id, season_id, show_id, number, title) VALUES
+		(10, 4, 3, 1, 'Low Tide'), (11, 4, 3, 2, 'Neap'), (12, 4, 3, 3, 'Flood'), (13, 4, 3, 4, 'Not Out Yet')`)
+	exec(`INSERT INTO movies (id, library_id, tmdb_id, title, genres) VALUES (7, 2, 949, 'Harbor Lights', '[]')`)
+	file := func(id int64, lib int64, path, status, added, matched string) {
+		t.Helper()
+		var m any
+		if matched != "" {
+			m = matched
+		}
+		exec(`INSERT INTO media_files (id, library_id, path, size, mtime, status, added_at, first_seen_at, matched_at)
+			VALUES (?, ?, ?, 1, '', ?, ?, '2026-01-01T00:00:00.000Z', ?)`, id, lib, path, status, added, m)
+	}
+	// E01 has two copies, the older first; E02 one that has gone missing;
+	// E03 a file covering it and E02, added before either; E04 none.
+	file(100, 1, "/tv/Vane/S01E01.mkv", "present", "2026-03-05T00:00:00.000Z", "2026-03-06T00:00:00.000Z")
+	file(101, 1, "/tv/Vane/S01E01.2160p.mkv", "present", "2026-04-01T00:00:00.000Z", "2026-04-02T00:00:00.000Z")
+	file(102, 1, "/tv/Vane/S01E02.mkv", "missing", "2026-03-10T00:00:00.000Z", "")
+	file(103, 1, "/tv/Vane/S01E02E03.mkv", "present", "2026-02-01T00:00:00.000Z", "2026-02-02T00:00:00.000Z")
+	file(104, 1, "/tv/Vane/unmatched.mkv", "present", "2026-03-01T00:00:00.000Z", "")
+	file(105, 2, "/m/Harbor Lights.mkv", "present", "2026-03-01T00:00:00.000Z", "2026-03-01T00:00:00.000Z")
+	exec(`UPDATE media_files SET movie_id = 7 WHERE id = 105`)
+	exec(`INSERT INTO episode_files (episode_id, media_file_id) VALUES (10, 100), (10, 101), (11, 102), (11, 103), (12, 103)`)
+	if _, err := p.UpTo(ctx, 42); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := conn.QueryContext(ctx, `SELECT episode_id, show_id, arrived_at, quiet FROM episode_arrivals ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var got []string
+	for rows.Next() {
+		var episode, show, quiet int64
+		var at string
+		if err := rows.Scan(&episode, &show, &at, &quiet); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, fmt.Sprintf("%d/%d %s quiet=%d", episode, show, at, quiet))
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"11/3 2026-02-01T00:00:00.000Z quiet=1", // by the two-episode file, the first to come
+		"12/3 2026-02-01T00:00:00.000Z quiet=1",
+		"10/3 2026-03-05T00:00:00.000Z quiet=1", // its first copy, not the better one
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("arrivals:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	for id, want := range map[int64]string{
+		100: "2026-03-06T00:00:00.000Z", // when it was matched
+		101: "2026-04-02T00:00:00.000Z",
+		102: "2026-03-10T00:00:00.000Z", // never matched since the column came: when it was added
+		103: "2026-02-02T00:00:00.000Z",
+		104: "", // never linked
+		105: "", // a movie's
+	} {
+		var at *string
+		if err := conn.QueryRowContext(ctx, `SELECT first_linked_at FROM media_files WHERE id = ?`, id).Scan(&at); err != nil {
+			t.Fatal(err)
+		}
+		if got := ""; at != nil {
+			got = *at
+			if got != want {
+				t.Errorf("file %d first linked %q, want %q", id, got, want)
+			}
+		} else if want != "" {
+			t.Errorf("file %d first linked never, want %q", id, want)
+		}
+	}
+	// A follow keeps to its person; the arrivals keep to their episodes.
+	exec(`INSERT INTO users (id, name, password_hash) VALUES (5, 'Casey', 'x')`)
+	exec(`INSERT INTO show_follows (user_id, tmdb_id, title, since_arrival) VALUES (5, 77, 'Inspector Vane', 3)`)
+	exec(`DELETE FROM episodes WHERE id = 12`)
+	exec(`DELETE FROM users WHERE id = 5`)
+	var follows, arrivals int
+	if err := conn.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM show_follows), (SELECT COUNT(*) FROM episode_arrivals)`).Scan(&follows, &arrivals); err != nil || follows != 0 || arrivals != 2 {
+		t.Errorf("after deleting: %d follows, %d arrivals, %v", follows, arrivals, err)
+	}
+	if _, err := p.DownTo(ctx, 41); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Up(ctx); err != nil {
+		t.Fatal(err)
+	}
+}

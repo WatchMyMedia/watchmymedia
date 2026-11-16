@@ -634,7 +634,7 @@ func (q *Queries) ListRecentlyReleasedMovieItems(ctx context.Context, arg ListRe
 }
 
 const listSeasonFiles = `-- name: ListSeasonFiles :many
-SELECT ef.episode_id, f.id, f.library_id, f.path, f.size, f.mtime, f.status, f.parsed, f.probe, f.probe_error, f.container, f.video_codec, f.audio_codec, f.width, f.height, f.duration_ms, f.first_seen_at, f.last_seen_at, f.seen_in_scan, f.created_at, f.updated_at, f.movie_id, f.match_status, f.match_locked, f.match_candidates, f.match_error, f.matched_at, f.hdr, f.added_at, f.match_ignored, f.dv_profile, f.extra_kind, f.extra_of
+SELECT ef.episode_id, f.id, f.library_id, f.path, f.size, f.mtime, f.status, f.parsed, f.probe, f.probe_error, f.container, f.video_codec, f.audio_codec, f.width, f.height, f.duration_ms, f.first_seen_at, f.last_seen_at, f.seen_in_scan, f.created_at, f.updated_at, f.movie_id, f.match_status, f.match_locked, f.match_candidates, f.match_error, f.matched_at, f.hdr, f.added_at, f.match_ignored, f.dv_profile, f.extra_kind, f.extra_of, f.first_linked_at
 FROM episode_files ef
 JOIN media_files f ON f.id = ef.media_file_id
 JOIN episodes e ON e.id = ef.episode_id
@@ -691,6 +691,7 @@ func (q *Queries) ListSeasonFiles(ctx context.Context, seasonID int64) ([]ListSe
 			&i.MediaFile.DvProfile,
 			&i.MediaFile.ExtraKind,
 			&i.MediaFile.ExtraOf,
+			&i.MediaFile.FirstLinkedAt,
 		); err != nil {
 			return nil, err
 		}
