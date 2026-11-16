@@ -2,10 +2,10 @@ package xmltv
 
 import (
 	"bytes"
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"reflect"
 	"regexp"
 	"slices"
@@ -58,13 +58,16 @@ func titles(ps []Programme) []string {
 	return out
 }
 
+// A feed in the form SiliconDust serves, compiled into the test binary so
+// that a fresh checkout's new modification times don't make Go's test cache
+// re-run the package.
+//
+//go:embed testdata/silicondust.xml
+var silicondust string
+
 func TestParseCommonForms(t *testing.T) {
 	t.Parallel()
-	raw, err := os.ReadFile("testdata/silicondust.xml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	f, err := Parse(bytes.NewReader(raw), Options{})
+	f, err := Parse(strings.NewReader(silicondust), Options{})
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -284,11 +287,7 @@ func TestParseRefusesEntities(t *testing.T) {
 
 func TestParseFailsOnBrokenFeeds(t *testing.T) {
 	t.Parallel()
-	raw, err := os.ReadFile("testdata/silicondust.xml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(raw)
+	s := silicondust
 	end := strings.LastIndex(s, "</tv>")
 	cuts := map[string]int{
 		"nothing":             0,

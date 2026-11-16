@@ -189,7 +189,8 @@ every test again (`go clean -testcache`). Pass `-count` to a `go test` that
 pull requests run only when repeating is the point: any `-count` turns the
 cache off. The Windows qualifications had `-count=1` and re-ran for about six
 minutes on pull requests that changed nothing they test; they now run without
-it (`security_test.py` checks). A change to the pinned ffmpeg starts
+it (`security_test.py` checks). Tests read their `testdata/` through
+`//go:embed` for the same reason ([server/AGENTS.md](server/AGENTS.md)). A change to the pinned ffmpeg starts
 from an empty cache, since Go can't see the ffmpeg its tests run. The
 `android` job's Gradle caches, kept by Gradle's setup-gradle action, work the
 same way: restored everywhere, saved only by `main`. Its configuration cache

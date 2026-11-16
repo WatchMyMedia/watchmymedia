@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -25,7 +24,7 @@ func authTestClient(t *testing.T, srv *httptest.Server, token, clientID string) 
 
 func authFixture(t *testing.T, name string) []byte {
 	t.Helper()
-	b, err := os.ReadFile("testdata/auth-" + name)
+	b, err := fixtures.ReadFile("testdata/auth-" + name)
 	if err != nil {
 		t.Fatal(err)
 	}

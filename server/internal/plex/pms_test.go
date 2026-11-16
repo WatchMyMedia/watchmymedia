@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -31,7 +30,7 @@ func pmsClient(t *testing.T, token string, handler http.HandlerFunc) *Client {
 
 func pmsFixture(t *testing.T, name string) string {
 	t.Helper()
-	data, err := os.ReadFile("testdata/pms-" + name + ".json")
+	data, err := fixtures.ReadFile("testdata/pms-" + name + ".json")
 	if err != nil {
 		t.Fatal(err)
 	}
