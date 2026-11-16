@@ -59,6 +59,26 @@ struct FollowsStoreTests {
         #expect(!follows.isFollowing(show), "the stop, made after the load began, wins")
     }
 
+    /// The list was read on the server before the follow there, but its reply
+    /// came after the follow's; the follow's echo is taken as this device's own.
+    @Test func aListReadBeforeAFollowLandedDoesntUndoIt() async {
+        let follows = store()
+        let show = followedShow(100)
+        repository.holding = true
+        let following = Task { await follows.toggle(show) }
+        #expect(await eventually { repository.calls == ["follow 100"] })
+        let loading = Task { await follows.refresh() }
+        #expect(await eventually { repository.calls == ["follow 100", "follows"] }, "read while the follow is on its way: without it")
+        repository.release()
+        _ = await (following.value, loading.value)
+        #expect(follows.loaded)
+        #expect(follows.isFollowing(show), "the bell stays on")
+        #expect(follows.follows.map(\.tmdbID) == [70_100], "and Settings lists it")
+        // The next list, read after, is the server's word.
+        await follows.refresh()
+        #expect(follows.follows.map(\.tmdbID) == [70_100])
+    }
+
     @Test func aRefusedFollowGoesBackAndSaysWhyUntilPressedAgain() async {
         let follows = store()
         let show = followedShow(100, title: "The Sleuth Files")

@@ -175,16 +175,26 @@ public final class FollowsStore {
         guard available else { return }
         generation += 1
         let mine = generation, identity = context
+        // Changes on their way to the server as this asks: the list may be from before them.
+        let racing = saving
         loads += 1
         defer { loads -= 1 }
         do {
-            let list = try await repository.follows()
+            var list = try await repository.follows()
             guard mine == generation, identity == repository.contextID else { return }
+            // What the list says replaces this device's changes, except those
+            // still saving and those that were saving when it was asked for,
+            // which it may have been read before (their echo from the server
+            // is taken as this device's own, so it asks for nothing more).
+            let kept = changed.filter { saving.contains($0.key) || racing.contains($0.key) }
+            for (id, on) in kept {
+                if on, !list.contains(where: { $0.tmdbID == id }), let item = items.first(where: { $0.tmdbID == id }) { list.insert(item, at: 0) }
+                if !on { list.removeAll { $0.tmdbID == id } }
+            }
             items = list
+            changed = kept
             listLoaded = true
             error = nil
-            // What the list says replaces this device's changes, except those still saving.
-            changed = changed.filter { saving.contains($0.key) }
             removeFailures = removeFailures.filter { id in list.contains { $0.tmdbID == id } }
         } catch {
             guard mine == generation, identity == repository.contextID, !(error is CancellationError) else { return }
