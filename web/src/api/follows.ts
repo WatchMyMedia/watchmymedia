@@ -42,23 +42,54 @@ export function invalidateFollows(qc: QueryClient) {
   void qc.invalidateQueries({ queryKey: ['home'] })
 }
 
-type FollowsSnapshot = { shows: [readonly unknown[], ShowDetail | undefined][]; list: FollowList | undefined }
+/** What an optimistic change set aside, to put back on its own if the server refuses. */
+export type FollowUndo = { tmdbId: number; following: boolean; removed?: Follow }
 
-/** Marks every cached reply at once: the show's pages with this TMDB id, and the list. */
-async function markFollowing(qc: QueryClient, tmdbId: number, following: boolean): Promise<FollowsSnapshot> {
-  await qc.cancelQueries({ queryKey: ['follows'] })
-  await qc.cancelQueries({ predicate: (q) => isShow(q.queryKey) })
-  const shows = qc.getQueriesData<ShowDetail>({ predicate: (q) => isShow(q.queryKey) })
-  const list = qc.getQueryData<FollowList>(followsQuery.queryKey)
-  for (const [key, show] of shows) if (show?.tmdbId === tmdbId) qc.setQueryData<ShowDetail>(key, { ...show, following })
-  if (list && !following) qc.setQueryData<FollowList>(followsQuery.queryKey, { ...list, follows: list.follows.filter((f) => f.tmdbId !== tmdbId) })
-  return { shows: shows.map(([key, show]) => [key, show]), list }
+/** Follows and removes share a key, so a refetch waits for the last of several quick presses. */
+const followMutation = ['follows', 'change'] as const
+
+/** Newest follow first, as the server lists them. */
+function insertFollow(follows: Follow[], f: Follow): Follow[] {
+  const at = follows.findIndex((x) => Date.parse(x.followedAt) < Date.parse(f.followedAt))
+  return at < 0 ? [...follows, f] : [...follows.slice(0, at), f, ...follows.slice(at)]
 }
 
-function restore(qc: QueryClient, snapshot: FollowsSnapshot | undefined) {
-  if (!snapshot) return
-  for (const [key, show] of snapshot.shows) qc.setQueryData(key, show)
-  qc.setQueryData(followsQuery.queryKey, snapshot.list)
+/** Marks every cached reply at once: the show's pages with this TMDB id, and the list. */
+export async function applyFollowing(qc: QueryClient, tmdbId: number, following: boolean): Promise<FollowUndo> {
+  await qc.cancelQueries({ queryKey: followsQuery.queryKey, exact: true })
+  await qc.cancelQueries({ predicate: (q) => isShow(q.queryKey) })
+  for (const [key, show] of qc.getQueriesData<ShowDetail>({ predicate: (q) => isShow(q.queryKey) })) {
+    if (show?.tmdbId === tmdbId) qc.setQueryData<ShowDetail>(key, { ...show, following })
+  }
+  let removed: Follow | undefined
+  if (!following) {
+    qc.setQueryData<FollowList>(followsQuery.queryKey, (list) => {
+      removed = list?.follows.find((f) => f.tmdbId === tmdbId)
+      return list && { ...list, follows: list.follows.filter((f) => f.tmdbId !== tmdbId) }
+    })
+  }
+  return { tmdbId, following, removed }
+}
+
+/**
+ * Puts back one refused change and nothing else: this show's bell, and its
+ * row where it belongs, so a second refusal doesn't take back the first's.
+ */
+export function undoFollowing(qc: QueryClient, undo: FollowUndo | undefined) {
+  if (!undo) return
+  for (const [key, show] of qc.getQueriesData<ShowDetail>({ predicate: (q) => isShow(q.queryKey) })) {
+    if (show?.tmdbId === undo.tmdbId) qc.setQueryData<ShowDetail>(key, { ...show, following: !undo.following })
+  }
+  const removed = undo.removed
+  if (removed) {
+    qc.setQueryData<FollowList>(followsQuery.queryKey, (list) =>
+      list && !list.follows.some((f) => f.tmdbId === removed.tmdbId) ? { ...list, follows: insertFollow(list.follows, removed) } : list)
+  }
+}
+
+/** Refetches once the last of several quick changes has settled, so an earlier one's reply doesn't bring back a row a later one took away. */
+function settled(qc: QueryClient) {
+  if (qc.isMutating({ mutationKey: followMutation }) <= 1) invalidateFollows(qc)
 }
 
 /**
@@ -68,23 +99,37 @@ function restore(qc: QueryClient, snapshot: FollowsSnapshot | undefined) {
 export function useFollowShow() {
   const qc = useQueryClient()
   return useMutation({
+    mutationKey: followMutation,
     mutationFn: async ({ showId, follow }: { showId: number; tmdbId: number; follow: boolean }) => {
       const path = { params: { path: { id: showId } } }
       unwrap(follow ? await api.PUT('/api/shows/{id}/follow', path) : await api.DELETE('/api/shows/{id}/follow', path))
     },
-    onMutate: ({ tmdbId, follow }) => markFollowing(qc, tmdbId, follow),
-    onError: (_e, _v, snapshot) => restore(qc, snapshot),
-    onSettled: () => invalidateFollows(qc),
+    onMutate: ({ tmdbId, follow }) => applyFollowing(qc, tmdbId, follow),
+    onError: (_e, _v, undo) => undoFollowing(qc, undo),
+    onSettled: () => settled(qc),
   })
 }
 
-/** Remove in Settings › Notifications, by TMDB id, so a show that left the library goes too. */
-export function useRemoveFollow() {
-  const qc = useQueryClient()
-  return useMutation({
+/**
+ * Stop notifying in Settings › Notifications, by TMDB id, so a show that
+ * left the library goes too. onFailed and onRemoved are the hook's own, so
+ * they come for every press, not only the latest (mutate's callbacks do).
+ */
+export function removeFollowOptions(qc: QueryClient, o: { onFailed?: (tmdbId: number) => void; onRemoved?: (tmdbId: number) => void } = {}) {
+  return {
+    mutationKey: followMutation,
     mutationFn: async (tmdbId: number) => unwrap(await api.DELETE('/api/me/follows/{tmdbId}', { params: { path: { tmdbId } } })),
-    onMutate: (tmdbId) => markFollowing(qc, tmdbId, false),
-    onError: (_e, _v, snapshot) => restore(qc, snapshot),
-    onSettled: () => invalidateFollows(qc),
-  })
+    onMutate: (tmdbId: number) => applyFollowing(qc, tmdbId, false),
+    onError: (_e: Error, tmdbId: number, undo: FollowUndo | undefined) => {
+      undoFollowing(qc, undo)
+      o.onFailed?.(tmdbId)
+    },
+    onSuccess: (_d: unknown, tmdbId: number) => o.onRemoved?.(tmdbId),
+    onSettled: () => settled(qc),
+  }
+}
+
+export function useRemoveFollow(o?: { onFailed?: (tmdbId: number) => void; onRemoved?: (tmdbId: number) => void }) {
+  const qc = useQueryClient()
+  return useMutation(removeFollowOptions(qc, o))
 }
