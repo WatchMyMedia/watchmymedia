@@ -35,6 +35,11 @@ export function shouldExplain(): boolean {
 
 export async function askToNotify(): Promise<NotificationPermission | 'unsupported'> {
   try { localStorage.setItem(ASKED, '1') } catch { /* storage may be blocked */ }
+  return requestNotify()
+}
+
+/** The browser's own question, without the reminders' asked mark: new episodes keep their own. */
+export async function requestNotify(): Promise<NotificationPermission | 'unsupported'> {
   if (!canNotify()) return 'unsupported'
   const answer = await Notification.requestPermission()
   if (answer === 'granted') void reminderWorker()

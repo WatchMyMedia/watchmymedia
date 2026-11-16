@@ -1,4 +1,5 @@
 import type { components } from '../api/schema'
+import { relativeTime } from './format'
 import { episodePath } from './showPage'
 
 /**
@@ -10,6 +11,7 @@ import { episodePath } from './showPage'
  * its own place in the feed.
  */
 
+type Follow = components['schemas']['Follow']
 type NewEpisodes = components['schemas']['NewEpisodes']
 type NewEpisodeGroup = components['schemas']['NewEpisodeGroup']
 type Numbered = { season: number; number: number }
@@ -187,6 +189,22 @@ export function shouldExplainFollow(permission: NotificationPermission | 'unsupp
   return permission === 'default' && !read(ASKED)
 }
 export const noteFollowAsked = () => write(ASKED, '1')
+
+/**
+ * A followed show's line in Settings › Notifications: the newest episode
+ * that arrived since the person followed it, and when; or none yet; or, for
+ * a show that has left the library, that it has.
+ */
+export function followLine(f: Pick<Follow, 'show' | 'latest' | 'followedAt'>): { text: string; gone: boolean } {
+  if (!f.show) return { text: 'Not in the library now', gone: true }
+  if (!f.latest || Date.parse(f.latest.arrivedAt) < Date.parse(f.followedAt)) return { text: 'No new episodes yet', gone: false }
+  return { text: `${episodeCode(f.latest)} · ${relativeTime(f.latest.arrivedAt)}`, gone: false }
+}
+
+/** Why Stop notifying didn't stick, on the show's row. */
+export function stopFailLine(show: string): string {
+  return `Couldn’t stop notifying, so you still follow ${show}. Check your connection and try again.`
+}
 
 /**
  * What Settings › Notifications shows for this browser (the settings-*

@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { serverQuery } from '../api/queries'
 import { useAuth } from '../authContext'
-import { notifyPermission, onReminderOpened } from '../lib/browserNotices'
-import { bannerStorageKey, canFollow, loadBanner, notifySwitch, personKey, type EpisodeBanner } from '../lib/newEpisodes'
+import { notifyPermission, onReminderOpened, requestNotify } from '../lib/browserNotices'
+import { bannerStorageKey, canFollow, loadBanner, notifySwitch, personKey, setNotifySwitch, type EpisodeBanner } from '../lib/newEpisodes'
 
 // What new-episode notices read from the browser, kept current where it
 // changes: this tab's own writes (changed()), other tabs' (the storage
@@ -83,4 +83,16 @@ export function useCanFollow(): boolean {
 export function useNotificationClicks() {
   const navigate = useNavigate()
   useEffect(() => onReminderOpened((path) => void navigate({ to: path })), [navigate])
+}
+
+/**
+ * Asks the browser, as Continue in the explainer and the switch while not
+ * asked yet do. Allow turns on this browser's New episodes switch for the
+ * person; either answer redraws what reads the permission.
+ */
+export async function askForNewEpisodes(person: string | undefined) {
+  const answer = await requestNotify()
+  if (answer === 'granted' && person) setNotifySwitch(person, true)
+  newEpisodesChanged()
+  return answer
 }

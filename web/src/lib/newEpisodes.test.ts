@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '../api/schema'
 import {
-  bannerFor, browserState, canFollow, clearBanner, episodeNotices, forgetCursor, forgetOnSignOut, groupNotice, loadBanner, loadCursor, moreShowsNotice, noteFollowAsked,
+  bannerFor, browserState, canFollow, followLine, stopFailLine, clearBanner, episodeNotices, forgetCursor, forgetOnSignOut, groupNotice, loadBanner, loadCursor, moreShowsNotice, noteFollowAsked,
   notifySwitch, personKey, runCheck, saveBanner, saveCursor, setNotifySwitch, shouldCheck, shouldExplainFollow,
 } from './newEpisodes'
 
@@ -169,5 +169,24 @@ describe('this browser in Settings › Notifications', () => {
     expect(browserState('denied', true, true)).toBe('blocked')
     expect(browserState('unsupported', true, false)).toBe('http')
     expect(browserState('unsupported', true, true)).toBe('unsupported')
+  })
+})
+
+describe('Settings › Notifications’ list (settings-shows)', () => {
+  const day = 86_400_000
+  const ago = (days: number) => new Date(Date.now() - days * day).toISOString()
+  const show = { id: 7, title: 'The Sleuth Files' }
+  it('gives the newest episode since following, and when', () => {
+    expect(followLine({ show, followedAt: ago(10), latest: { season: 3, number: 7, arrivedAt: ago(2) } })).toEqual({ text: 'S3 E7 · 2 days ago', gone: false })
+  })
+  it('says no new episodes yet before any arrived since following', () => {
+    expect(followLine({ show, followedAt: ago(10) })).toEqual({ text: 'No new episodes yet', gone: false })
+    expect(followLine({ show, followedAt: ago(1), latest: { season: 3, number: 6, arrivedAt: ago(9) } })).toEqual({ text: 'No new episodes yet', gone: false })
+  })
+  it('says a show has left the library', () => {
+    expect(followLine({ followedAt: ago(10), latest: { season: 3, number: 7, arrivedAt: ago(2) } })).toEqual({ text: 'Not in the library now', gone: true })
+  })
+  it('words a refused Stop notifying', () => {
+    expect(stopFailLine('Copperline')).toBe('Couldn’t stop notifying, so you still follow Copperline. Check your connection and try again.')
   })
 })

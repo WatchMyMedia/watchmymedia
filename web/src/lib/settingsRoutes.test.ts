@@ -6,6 +6,7 @@ describe('parseSettingsPath', () => {
     expect(parseSettingsPath('/settings')).toMatchObject({ tab: 'playback', kind: 'hub' })
     expect(parseSettingsPath('/settings/plex/')).toMatchObject({ tab: 'plex', kind: 'hub', group: 'server', label: 'Plex' })
     expect(parseSettingsPath('/settings/account')).toMatchObject({ tab: 'account', group: 'you' })
+    expect(parseSettingsPath('/settings/notifications')).toMatchObject({ tab: 'notifications', kind: 'hub', group: 'you', label: 'Notifications' })
   })
 
   it('reads every address in §4', () => {
