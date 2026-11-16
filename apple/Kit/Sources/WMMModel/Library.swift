@@ -475,8 +475,10 @@ public struct ShowDetail: Hashable, Sendable, Identifiable {
     public var tmdbID: Int?
     /// The Sonarr connection that has the show.
     public var managedBy: String?
+    /// The signed-in person follows the show (Notify me); nil from servers below API level 29.
+    public var following: Bool?
 
-    public init(id: Int, libraryID: Int, title: String, year: Int?, overview: String, status: String?, genres: [String], rating: Double?, posterPath: String?, backdropPath: String?, quality: QualityLabel?, hdr: Bool, seasons: [SeasonSummary], totalEpisodes: Int, episodesOnDisk: Int, totalSizeBytes: Int64, nextAirDate: String?, nextUp: NextUp?, cast: [Person], contentRating: String? = nil, tmdbID: Int? = nil, managedBy: String? = nil) {
+    public init(id: Int, libraryID: Int, title: String, year: Int?, overview: String, status: String?, genres: [String], rating: Double?, posterPath: String?, backdropPath: String?, quality: QualityLabel?, hdr: Bool, seasons: [SeasonSummary], totalEpisodes: Int, episodesOnDisk: Int, totalSizeBytes: Int64, nextAirDate: String?, nextUp: NextUp?, cast: [Person], contentRating: String? = nil, tmdbID: Int? = nil, managedBy: String? = nil, following: Bool? = nil) {
         self.id = id
         self.libraryID = libraryID
         self.title = title
@@ -499,6 +501,7 @@ public struct ShowDetail: Hashable, Sendable, Identifiable {
         self.contentRating = contentRating
         self.tmdbID = tmdbID
         self.managedBy = managedBy
+        self.following = following
     }
 
     /// Not ended: the server says "Returning Series", "In Production" and so on.

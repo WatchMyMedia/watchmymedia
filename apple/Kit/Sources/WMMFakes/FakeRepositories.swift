@@ -304,6 +304,8 @@ public final class FakeLibraryRepository: LibraryRepository {
     public var largeLibrary = false
     /// Arranged rows (PLAN-ROWS.md): from ``rowsAPILevel``, Home comes as its rows in order.
     public var rows: FakeRowsRepository?
+    /// Follows, so a show's page says whether Sam follows it (API level 29).
+    public var follows: FakeFollowsRepository?
     /// Watched marks set here, by target, so the fake reflects a mark after a refetch.
     public private(set) var marks: [WatchTarget: Bool] = [:]
     /// Requests by show and season, set by ``FakeRequestsRepository``.
@@ -421,6 +423,7 @@ public final class FakeLibraryRepository: LibraryRepository {
                 .filter { $0.hasFile && $0.watched }.count
             return copy
         }
+        if let follows, follows.available { show.following = follows.following(showID: id) }
         return show
     }
 

@@ -57,6 +57,8 @@ public struct ServerFeatures: Hashable, Sendable {
         /// A play's decision carries its media token (`Decision.mediaToken`), and the
         /// Live TV status call waits while a channel tunes (PLAN-APPLE-REVIEW.md §4.2).
         public static let tokenWithDecision = 28
+        /// Following shows and their new episodes (PLAN-NEW-EPISODES.md).
+        public static let follows = 29
     }
 
     /// The server's API level; 0 when it isn't known.
@@ -111,6 +113,8 @@ public struct ServerFeatures: Hashable, Sendable {
     public var tokenWithDecision: Bool { apiLevel >= Level.tokenWithDecision }
     /// 28: the Live TV status call waits while the channel tunes, so the player needn't poll.
     public var liveStatusWaits: Bool { apiLevel >= Level.tokenWithDecision }
+    /// 29: following shows (Notify me), the new-episode feed and Home's row for them.
+    public var follows: Bool { apiLevel >= Level.follows }
 }
 
 extension Server {
@@ -160,3 +164,5 @@ public let liveProfileAPILevel = ServerFeatures.Level.liveProfile
 public let liveAutomaticAPILevel = ServerFeatures.Level.liveAutomatic
 /// ``ServerFeatures/Level/tokenWithDecision``.
 public let decisionTokenAPILevel = ServerFeatures.Level.tokenWithDecision
+/// ``ServerFeatures/Level/follows``.
+public let followsAPILevel = ServerFeatures.Level.follows

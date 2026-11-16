@@ -22,6 +22,8 @@ public final class FakeRowsRepository: RowsRepository {
     /// Home's movie rows mix two movie libraries (`-fakesTwoMovieLibraries`), so,
     /// as the server does, they carry no See all link (PLAN-SEE-ALL.md decision 6).
     public var twoMovieLibraries = false
+    /// From API level 29, Home's New from shows you follow is filled from these follows.
+    public var follows: FakeFollowsRepository?
 
     public init(servers: FakeServerRepository? = nil, admin: Bool = true, now: Date = .now) {
         self.servers = servers
@@ -144,8 +146,11 @@ public final class FakeRowsRepository: RowsRepository {
         }
         switch screen {
         case .home:
+            let followed = follows.map { ServerFeatures(apiLevel: servers?.current?.server.apiLevel).follows && $0.available } ?? false
             return [
-                builtin("continue", "Continue watching", .continue), builtin("live", "Live TV", .live),
+                builtin("continue", "Continue watching", .continue),
+                followed ? builtin("followed", "New from shows you follow", .episode) : nil,
+                builtin("live", "Live TV", .live),
                 builtin("recentlyAddedShows", "Recently added · TV Shows", .poster), listRow(Self.sciFi),
                 builtin("recentlyAired", "Recently aired · Episodes", .episode), builtin("recentlyAddedMovies", "Recently added · Movies", .poster),
                 listRow(Self.rainySunday), builtin("recentlyReleased", "Recently released · Movies", .wide), listRow(Self.trending, hidden: true),
@@ -193,6 +198,10 @@ public final class FakeRowsRepository: RowsRepository {
             let row: ScreenRow? = switch (screen, entry.id) {
             case (.home, "continue"): ScreenRow(id: entry.id, style: .continue, title: entry.title, continueItems: home.continueWatching)
             case (.home, "live"): ScreenRow(id: entry.id, style: .live, title: entry.title)
+            case (.home, "followed"):
+                // As the server fills it: the followed shows' new episodes, newest first.
+                ScreenRow(id: entry.id, style: .episode, title: entry.title,
+                          episodes: home.recentlyAired.filter { follows?.followedShowIDs.contains($0.showID) == true && $0.hasFile && !$0.watched })
             case (.home, "recentlyAddedShows"):
                 ScreenRow(id: entry.id, style: .poster, title: entry.title, items: home.recentlyAddedShows, seeAll: link(FakeData.tvLibrary, .added))
             case (_, "recentlyAired"):
