@@ -15,12 +15,14 @@ import WMMUI
 struct NotificationSettingsPage: View {
     let model: SettingsModel
     @State private var deviceSwitch: NewEpisodeSwitch?
+    /// The show a row opened. Pushed here rather than through the navigator,
+    /// so it opens in the iPad's detail column as on iPhone.
+    @State private var openedShow: Int?
     @Environment(FollowsStore.self) private var follows
     @Environment(NotificationRouter.self) private var router
     @Environment(NewEpisodeNotifier.self) private var newEpisodes
     @Environment(LiveExtrasStore.self) private var extras
     @Environment(AppServices.self) private var services
-    @Environment(Navigator.self) private var navigator
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
 
@@ -35,6 +37,7 @@ struct NotificationSettingsPage: View {
             }
         }
         .navigationTitle(NewEpisodeWords.title)
+        .navigationDestination(item: $openedShow) { ShowScreen(id: $0) }
         .task { if deviceSwitch == nil { deviceSwitch = NewEpisodeSwitch(memory: newEpisodes.memory, device: device) } }
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
@@ -123,7 +126,7 @@ struct NotificationSettingsPage: View {
                     ForEach(follows.follows) { follow in
                         FollowedShowRow(follow: follow, line: follows.line(for: follow),
                                         posterURL: services.library.imageURL(follow.posterPath, size: .w185)) {
-                            if let id = follow.showID { navigator.open(.show(id: id)) }
+                            if let id = follow.showID { openedShow = id }
                         } stop: {
                             Task { await follows.remove(follow) }
                         }
