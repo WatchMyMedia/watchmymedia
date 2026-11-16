@@ -19,6 +19,9 @@ interface AppServices {
     /** Arranging rows and reading lists (PLAN-ROWS.md); [RowsRepository.Unavailable] where there are none. */
     val rows: RowsRepository get() = RowsRepository.Unavailable
 
+    /** Following shows and their new episodes (PLAN-NEW-EPISODES.md); [FollowsRepository.Unavailable] where there is none. */
+    val follows: FollowsRepository get() = FollowsRepository.Unavailable
+
     /** Requests and problem reports; [RequestRepository.Unavailable] where there are none. */
     val requests: RequestRepository get() = RequestRepository.Unavailable
 

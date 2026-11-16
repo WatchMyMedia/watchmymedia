@@ -279,6 +279,8 @@ fun MobileNavHost(
             DeepLink.LiveGuide -> nav.openTabRoot(MobileTab.LiveTV)
             DeepLink.Search -> nav.openTabRoot(MobileTab.Search)
             DeepLink.Downloads -> nav.openTabRoot(MobileTab.Downloads)
+            // The new-episode notification for the shows past the first five.
+            DeepLink.Home -> nav.openTabRoot(MobileTab.Home)
         }
         onDeepLinkHandled()
     }

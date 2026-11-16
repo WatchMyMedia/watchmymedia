@@ -53,6 +53,7 @@ import media.watchmy.client.model.Server
 import media.watchmy.client.model.ServerRepository
 import media.watchmy.client.model.SkipMode
 import media.watchmy.client.model.StreamQuality
+import media.watchmy.client.model.FOLLOWS_API_LEVEL
 import media.watchmy.client.model.SubtitleSize
 import media.watchmy.client.model.User
 
@@ -195,6 +196,8 @@ class FakeLibraryRepository(
     private val level: () -> Int = { FAKE_SERVER_API_LEVEL },
     /** The layouts and lists the arranged rows come from, shared with [FakeRowsRepository]. */
     private val rows: FakeRowsData = FakeRowsData(),
+    /** The person follows the show (Notify me), from [FOLLOWS_API_LEVEL]; null leaves `following` out, as an older server does. */
+    private val following: ((showId: Long) -> Boolean)? = null,
     private val user: () -> String? = { "Sam" },
 ) : LibraryRepository {
     /** The server can't be reached: Home and the pages fail as with no connection, for the offline Home (-PfakesOffline=true). */
@@ -278,7 +281,9 @@ class FakeLibraryRepository(
         )
     }
 
-    override suspend fun show(id: Long) = FakeData.show(id, arr, user()).also { latency(); unreachable() }
+    override suspend fun show(id: Long) = FakeData.show(id, arr, user())
+        .let { s -> if (level() >= FOLLOWS_API_LEVEL && following != null) s.copy(following = following(s.id)) else s }
+        .also { latency(); unreachable() }
 
     override suspend fun season(showId: Long, number: Int) = FakeData.season(showId, number, arr, user()).also { latency(); unreachable() }
 

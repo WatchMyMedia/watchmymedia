@@ -29,8 +29,9 @@ class FakeAppServices(signedIn: Boolean = true, tv: Boolean = false, seerr: Bool
     private val arr = FakeArr()
     private val level = { servers.current.value?.server?.apiLevel ?: 0 }
     override val requests = FakeRequestRepository({ auth.user.value }, arr, backend = if (seerr) RequestBackend.Seerr else RequestBackend.Arr, level = level)
-    private val rowsData = FakeRowsData(requestState = requests::requestState)
-    override val library = FakeLibraryRepository(arr, level, rowsData) { auth.user.value?.name }.also { it.offline = offline }
+    override val follows = FakeFollowsRepository(level)
+    private val rowsData = FakeRowsData(requestState = requests::requestState, follows = follows)
+    override val library = FakeLibraryRepository(arr, level, rowsData, user = { auth.user.value?.name }, following = follows::following).also { it.offline = offline }
     override val rows = FakeRowsRepository(rowsData, level)
     override val live = FakeLiveRepository(level, { auth.user.value }).also { it.offline = offline }
     override val livePlayback = LivePlaybackControllerFactory {

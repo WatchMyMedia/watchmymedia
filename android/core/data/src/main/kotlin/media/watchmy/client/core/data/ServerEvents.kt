@@ -171,7 +171,8 @@ internal class EventStreamException(val status: Int) : IOException("event stream
  * [changes] emit for watch.changed, library.changed and the scan events,
  * [requestChanges] for requests.changed
  * and problems.changed, [liveChanges] for the Live TV ones, [rowChanges] for
- * rows.changed and lists.changed. Connected only while collected (shared by every
+ * rows.changed and lists.changed, [followChanges] for follows.changed.
+ * Connected only while collected (shared by every
  * collector, and kept 5 s after the last one leaves so moving between screens
  * does not reconnect), and only while the app is in front ([setInFront]) and
  * the device has a default network ([network]): PLAN-ANDROID-REVIEW.md
@@ -254,7 +255,7 @@ internal class ServerEvents(
                                     connected = gate.revision
                                 }
                             }
-                            WATCH_CHANGED, in LIBRARY_EVENTS, in REQUEST_EVENTS, in LIVE_EVENTS, in ROW_EVENTS -> {
+                            WATCH_CHANGED, in LIBRARY_EVENTS, in REQUEST_EVENTS, in LIVE_EVENTS, in ROW_EVENTS, FOLLOWS_CHANGED -> {
                                 listeners.forEach { it(e.event) }
                                 emit(e)
                             }
@@ -309,6 +310,13 @@ internal class ServerEvents(
     val liveChanges: Flow<String> = names.filter { it == RECONNECTED || it in LIVE_EVENTS }
         .transform { if (it == RECONNECTED) LIVE_EVENTS.forEach { e -> emit(e) } else emit(it) }
 
+    /**
+     * follows.changed, private to the person signed in (PLAN-NEW-EPISODES.md
+     * §5.3): they followed or stopped following a show on another device. A
+     * reconnection emits too, since one may have been missed.
+     */
+    val followChanges: Flow<Unit> = names.filter { it == RECONNECTED || it == FOLLOWS_CHANGED }.map { }
+
     /** The raw events of one connection; completes when the server closes it. */
     private fun stream(session: Session): Flow<ServerEvent> = callbackFlow {
         val account = session.account ?: run { close(); return@callbackFlow }
@@ -349,6 +357,7 @@ internal class ServerEvents(
         const val ROWS_CHANGED = "rows.changed"
         const val LISTS_CHANGED = "lists.changed"
         private val ROW_EVENTS = setOf(ROWS_CHANGED, LISTS_CHANGED)
+        const val FOLLOWS_CHANGED = "follows.changed"
 
         /**
          * The longest line and event data this reads, 1 MB each. The server's

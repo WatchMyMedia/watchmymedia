@@ -270,6 +270,7 @@ internal fun ApiShowDetail.toModel() = ShowDetail(
     contentRating = contentRating.orNullIfBlank(),
     tmdbId = tmdbId.takeIf { it > 0 },
     managedBy = managedBy.orNullIfBlank(),
+    following = following,
 )
 
 internal fun ApiSeasonDetail.toModel() = SeasonDetail(
