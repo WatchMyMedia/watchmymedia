@@ -188,6 +188,10 @@ server, and on iPad in both a regular and a compact width.
     focus after the switch (tvOS 27.2 simulator, `BusyFocusTests`), so the
     pieces sign-in and Switch server share are `@ViewBuilder` functions
     (`pairingCodeArea(_:)` in `TV/Screens/SignIn/SignInScreen.swift`).
+    Even built in the same body, Switch server's form was left with nothing
+    focused on CI's tvOS 26.5 simulator (never on this Mac's, loaded or
+    not), so it moves focus itself when the way in changes
+    (`onChange(of: signIn.codeSignIn)` in `SwitchServerScreen.swift`).
   - On Apple TV a focused button that becomes disabled keeps focus, dimmed,
     until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
     up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable

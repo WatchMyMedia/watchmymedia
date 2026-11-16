@@ -258,7 +258,7 @@ private struct SwitchSignIn: View {
     @Bindable var signIn: SignInModel
     @FocusState private var field: Field?
 
-    private enum Field: Hashable { case name, password }
+    private enum Field: Hashable { case name, password, codeOtherWay }
 
     var body: some View {
         HStack(alignment: .top, spacing: 80) {
@@ -275,6 +275,7 @@ private struct SwitchSignIn: View {
                         Button(other) { model.usePassword() }
                             .buttonStyle(TVButtonStyle())
                             .padding(.top, 10)
+                            .focused($field, equals: .codeOtherWay)
                             .accessibilityIdentifier("switch-other-way")
                     }
                 } else {
@@ -287,6 +288,9 @@ private struct SwitchSignIn: View {
         }
         // The code is followed until it is approved, runs out or the form takes its place.
         .task(id: signIn.codeSignIn ? signIn.pairingRun : -1) { await signIn.pair() }
+        // The button pressed goes with the way in it named. The form's defaultFocus alone left
+        // nothing focused after it on CI's tvOS 26.5 simulator, so focus is moved here.
+        .onChange(of: signIn.codeSignIn) { _, code in field = code ? .codeOtherWay : .name }
     }
 
     private var password: some View {

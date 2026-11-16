@@ -269,6 +269,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(move(.right, to: otherWay, in: app, presses: 3))
         remote.press(.select)
         XCTAssertTrue(otherWay.waitForLabel(containing: "with a password"), "back to the code: \(otherWay.label)")
+        XCTAssertTrue(focused(otherWay), "with focus on the other way in again")
         // The fakes approve the pairing code by themselves after a few seconds.
         XCTAssertTrue(app.staticTexts["You’re on Office Mac mini"].waitUntilExists(timeout: 30), "the last step says where this Apple TV is now")
         XCTAssertEqual(steps.label, "Switched", "the last step is named alone")
