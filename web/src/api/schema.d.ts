@@ -2243,6 +2243,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/movies/{id}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The rows at the end of a movie's page: its collection and More like this
+         * @description Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
+         */
+        get: operations["getMovieRelated"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/movies/{id}/rematch": {
         parameters: {
             query?: never;
@@ -3298,6 +3318,26 @@ export interface paths {
          * @description The poster shown now, the match's own, and TMDB's other posters. Admins only.
          */
         get: operations["getShowPosters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shows/{id}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The row at the end of a show's page: More like this
+         * @description Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
+         */
+        get: operations["getShowRelated"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7802,6 +7842,10 @@ export interface components {
             progress: number;
             /** @enum {string} */
             state: "queued" | "downloading" | "importing" | "failed";
+        };
+        RelatedRows: {
+            /** @description In order: collection (movies only, when the library has another film of the movie's TMDB collection; titled with the collection's name, in release order) and similar (More like this, best first, when at least 3 titles qualify). Both style poster, with items. Empty when neither has anything. */
+            rows: components["schemas"]["ScreenRow"][];
         };
         RematchInputBody: {
             /** @description Use it for new files in the files' shared folder. */
@@ -14356,6 +14400,37 @@ export interface operations {
             };
         };
     };
+    getMovieRelated: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedRows"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     previewMovieRematch: {
         parameters: {
             query?: {
@@ -16596,6 +16671,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PosterOptions"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getShowRelated: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedRows"];
                 };
             };
             /** @description Error */
