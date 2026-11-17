@@ -62,14 +62,20 @@ private struct VerticalBarEdgeClip: ViewModifier {
     @Environment(\.toolbarVerticalEdge) private var edge
 
     func body(content: Content) -> some View {
-        // Always masked, so the row keeps its identity (and its scroll) when
-        // the bar comes and goes with a fold; without a bar the mask reaches
-        // far past both edges. Up and down it never clips a card's shadow.
-        content.mask {
-            Rectangle()
-                .padding(.vertical, -60)
-                .padding(.horizontal, edge == nil ? -4000 : 0)
-        }
+        // Always clipped, so the row keeps its identity (and its scroll) when
+        // the bar comes and goes with a fold; without a bar the clip reaches
+        // far past both edges. Up and down it never clips a card's shadow. A
+        // clip, not a mask, which would draw every row offscreen.
+        content.clipShape(RowClip(outset: edge == nil ? 4000 : 0))
+    }
+}
+
+/// The row's own frame, `outset` past it at each side and 60 pt above and below.
+private struct RowClip: Shape {
+    var outset: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        Path(rect.insetBy(dx: -outset, dy: -60))
     }
 }
 #endif

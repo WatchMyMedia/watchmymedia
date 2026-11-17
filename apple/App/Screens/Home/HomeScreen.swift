@@ -48,9 +48,12 @@ private struct HomeView: View {
     private var margin: CGFloat { wide ? PadLayout.margin : 16 }
     /// A 16:9 card's width: four Continue watching cards across the iPad.
     private var wideCardWidth: CGFloat { wide ? 248 : 220 }
-    /// Continue watching beside the hero: 362 pt on the iPad held wide, about
-    /// a third of the page on the iPhone Duo's inner screen (DuoOpenHome).
-    private var continueWidth: CGFloat { min(362, ((width - 2 * margin) * 0.36).rounded()) }
+    /// Continue watching beside the hero: 362 pt on the iPad held wide (from
+    /// `PadLayout.landscape`), about a third of the page below that, as on
+    /// the iPhone Duo's inner screen (DuoOpenHome).
+    private var continueWidth: CGFloat {
+        width >= PadLayout.landscape ? 362 : min(362, ((width - 2 * margin) * 0.36).rounded())
+    }
     private var liveAvailable: Bool { services.liveTV.capabilities?.available == true }
     /// A tab bar along the bottom (the iPhone Duo upright, DuoTallHome), which
     /// each screen keeps clear of; on iPad only the home indicator is there,

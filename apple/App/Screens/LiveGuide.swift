@@ -43,9 +43,12 @@ struct LiveGuideScreen: View {
     private var wide: Bool { sizeClass.isWide }
     /// The panel beside the grid, from the width the board draws it at.
     private var panelBeside: Bool { wide && width >= PadLayout.sideBySide }
-    /// 380 pt on the iPad held wide; about a third of the page beside the
-    /// iPhone Duo's vertical bar (DuoOpenGuide), so the grid keeps two hours.
-    private var panelWidth: CGFloat { min(380, ((width - 2 * PadLayout.margin) * 0.34).rounded()) }
+    /// 380 pt on the iPad held wide (from `PadLayout.landscape`); about a
+    /// third of the page below that, as beside the iPhone Duo's vertical bar
+    /// (DuoOpenGuide), so the grid keeps two hours.
+    private var panelWidth: CGFloat {
+        width >= PadLayout.landscape ? 380 : min(380, ((width - 2 * PadLayout.margin) * 0.34).rounded())
+    }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
