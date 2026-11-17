@@ -8,7 +8,6 @@ final class TabReselectTests: XCTestCase {
     func testTappingTheSelectedTabGoesBackToItsRoot() {
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
-        // Settings › Downloads keeps the tab bar on iPhone (a show or movie page hides it).
         app.launchArguments = ["-fakes", "-open", "watchmymedia://downloads"]
         app.launch()
         defer { app.terminate() }

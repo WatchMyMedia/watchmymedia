@@ -120,10 +120,12 @@ struct CardRow<Content: View>: View {
     var seeAllLabel: String?
     var counter: String?
     var leading: Binding<String?>?
+    /// The page's side margin, where it isn't the iPhone's 16 or the iPad's 24.
+    var margin: CGFloat?
     @ViewBuilder var content: () -> Content
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    init(_ title: String, detail: String? = nil, subtitle: String? = nil, spacing: CGFloat = 12, seeAll: (() -> Void)? = nil, seeAllTitle: String = "See all", seeAllLabel: String? = nil, counter: String? = nil, leading: Binding<String?>? = nil, @ViewBuilder content: @escaping () -> Content) {
+    init(_ title: String, detail: String? = nil, subtitle: String? = nil, spacing: CGFloat = 12, seeAll: (() -> Void)? = nil, seeAllTitle: String = "See all", seeAllLabel: String? = nil, counter: String? = nil, leading: Binding<String?>? = nil, margin: CGFloat? = nil, @ViewBuilder content: @escaping () -> Content) {
         self.title = title
         self.detail = detail
         self.subtitle = subtitle
@@ -133,11 +135,12 @@ struct CardRow<Content: View>: View {
         self.seeAllLabel = seeAllLabel
         self.counter = counter
         self.leading = leading
+        self.margin = margin
         self.content = content
     }
 
     var body: some View {
-        let margin = sizeClass.isWide ? PadLayout.margin : 16
+        let margin = margin ?? (sizeClass.isWide ? PadLayout.margin : 16)
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {

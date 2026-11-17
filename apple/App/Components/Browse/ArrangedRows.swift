@@ -34,6 +34,8 @@ struct ArrangedRow: View {
     let actions: RowActions
     var counter: String?
     var leading: Binding<String?>?
+    /// The page's side margin, where it isn't the iPhone's or the iPad's own (a show page's 40).
+    var margin: CGFloat?
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var wide: Bool { sizeClass.isWide }
@@ -87,7 +89,7 @@ struct ArrangedRow: View {
             }
             .accessibilityIdentifier("row-\(row.id)")
         case .wide:
-            CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 18 : 12, seeAll: seeAll?.open, seeAllLabel: seeAll?.words.accessibilityLabel, counter: counter, leading: leadingCard) {
+            CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 18 : 12, seeAll: seeAll?.open, seeAllLabel: seeAll?.words.accessibilityLabel, counter: counter, leading: leadingCard, margin: margin) {
                 ForEach(row.items, id: \.cardID) { item in
                     WideItemCard(item: item, actions: actions, width: wideCardWidth, leading: isLeading(item.cardID, first: row.items.first?.cardID))
                 }
@@ -95,7 +97,7 @@ struct ArrangedRow: View {
             }
             .accessibilityIdentifier("row-\(row.id)")
         case .poster:
-            CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 16 : 10, seeAll: seeAll?.open, seeAllLabel: seeAll?.words.accessibilityLabel, counter: counter, leading: leadingCard) {
+            CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 16 : 10, seeAll: seeAll?.open, seeAllLabel: seeAll?.words.accessibilityLabel, counter: counter, leading: leadingCard, margin: margin) {
                 ForEach(row.items, id: \.cardID) { item in
                     PosterItemCard(item: item, actions: actions, width: posterSize.width, leading: isLeading(item.cardID, first: row.items.first?.cardID))
                 }

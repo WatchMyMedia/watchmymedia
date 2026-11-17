@@ -13,7 +13,9 @@ import WMMUI
 /// show (Notify me, Mark show watched, Request missing seasons, the cast and
 /// details). Notify me (PLAN-NEW-EPISODES.md §7.1, the boards' `show-bell`)
 /// follows at once; the first on this device, while iOS hasn't asked, then
-/// explains before iOS's question.
+/// explains before iOS's question. The page ends with More like this
+/// (ShowRelated and Pad2ShowRelated.dc.html, PLAN-RELATED.md §7), with the
+/// tab bar.
 ///
 /// The show's, a season's and an episode's routes all open it; only the
 /// episode on top differs (`ShowPageRule`). Picking a tab or a card changes
@@ -79,7 +81,6 @@ private struct ShowPageView: View {
         .navigationTitle(scrolled ? (model.episode?.displayTitle ?? model.showTitle) : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(scrolled ? .automatic : .hidden, for: .navigationBar)
-        .tabBarHiddenOnPhone(sizeClass)
         .alert(
             model.dialog?.title ?? "",
             isPresented: dialogShown(asActionSheet: false),
@@ -177,6 +178,7 @@ private struct ShowPageView: View {
                 if !model.offline {
                     about(show, margin: margin, beside: wide && width >= PadLayout.sideBySide)
                         .padding(.top, wide ? 28 : 22)
+                    related(margin: margin, top: wide ? 28 : 24)
                 }
             }
             .padding(.bottom, 32)
@@ -211,6 +213,7 @@ private struct ShowPageView: View {
                     if !model.offline {
                         about(show, margin: PadLayout.margin, beside: false)
                             .padding(.top, 28)
+                        related(margin: PadLayout.margin, top: 28)
                     }
                 }
                 .padding(.top, 12)
@@ -797,6 +800,11 @@ private struct ShowPageView: View {
     }
 
     // MARK: About the show
+
+    /// More like this, at the very end, when the server has any.
+    private func related(margin: CGFloat, top: CGFloat) -> some View {
+        RelatedSection(rows: model.relatedRows, margin: margin, top: top, open: { model.open($0) }) { await model.setWatched($0, $1) }
+    }
 
     @ViewBuilder private func about(_ show: ShowDetail, margin: CGFloat, beside: Bool) -> some View {
         VStack(alignment: .leading, spacing: 14) {

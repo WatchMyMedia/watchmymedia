@@ -6,9 +6,11 @@ import WMMUI
 /// A movie (Movie.dc.html): backdrop, poster, facts and tags; Resume or
 /// Play, From the start, Trailer (MovieTrailer.dc.html) and Mark watched;
 /// each version with how it would play here and Play this; the chosen
-/// version's tracks; cast and details.
+/// version's tracks; cast and details; then the movie's collection and More
+/// like this (MovieRelated.dc.html, PLAN-RELATED.md §7), with the tab bar.
 /// On iPad (Pad2Movie.dc.html) the information column scrolls independently
-/// from versions, tracks and cast. Portrait stacks the same content.
+/// from versions, tracks, cast and the related rows (Pad2MovieRelated.dc.html).
+/// Portrait stacks the same content.
 struct MovieScreen: View {
     let id: Int
     @Environment(AppServices.self) private var services
@@ -47,7 +49,6 @@ private struct MovieView: View {
         .navigationTitle(scrolled ? (model.movie?.title ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(scrolled ? .automatic : .hidden, for: .navigationBar)
-        .tabBarHiddenOnPhone(sizeClass)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 // Report a problem (ReportProblem.dc.html), from API level 5.
@@ -104,18 +105,22 @@ private struct MovieView: View {
                 .frame(width: PadLayout.detailColumn)
                 .overlay(alignment: .trailing) { Rectangle().fill(Palette.separator).frame(width: 1) }
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        if !movie.overview.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                DetailHeading(title: "Overview")
-                                OverviewText(text: movie.overview, lines: 6, size: 15)
+                    VStack(alignment: .leading, spacing: 0) {
+                        VStack(alignment: .leading, spacing: 24) {
+                            if !movie.overview.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    DetailHeading(title: "Overview")
+                                    OverviewText(text: movie.overview, lines: 6, size: 15)
+                                }
                             }
+                            if !movie.versions.isEmpty { versions(movie, tiled: true) }
+                            tracks
+                            CastRow(cast: movie.cast, margin: 0, large: true)
                         }
-                        if !movie.versions.isEmpty { versions(movie, tiled: true) }
-                        tracks
-                        CastRow(cast: movie.cast, margin: 0, large: true)
+                        .padding(PadLayout.margin)
+                        // The rows run to the column's edge, so they sit outside its padding.
+                        related(margin: PadLayout.margin, top: 2, bottom: PadLayout.margin)
                     }
-                    .padding(PadLayout.margin)
                     .padding(.bottom, 8)
                 }
                 .frame(maxWidth: .infinity)
@@ -165,6 +170,7 @@ private struct MovieView: View {
             details(movie)
                 .padding(.horizontal, 16)
                 .padding(.top, 24)
+            related(margin: 16)
         }
     }
 
@@ -190,7 +196,13 @@ private struct MovieView: View {
             }
             .padding(.horizontal, PadLayout.margin)
             .padding(.top, 24)
+            related(margin: PadLayout.margin, top: 26)
         }
+    }
+
+    /// The collection and More like this, at the very end, when the server has any.
+    private func related(margin: CGFloat, top: CGFloat = 24, bottom: CGFloat = 0) -> some View {
+        RelatedSection(rows: model.relatedRows, margin: margin, top: top, bottom: bottom, open: { model.open($0) }) { await model.setWatched($0, $1) }
     }
 
     @ViewBuilder private func details(_ movie: MovieDetail) -> some View {
