@@ -83,6 +83,8 @@ function invalidateLibrary(qc: QueryClient, libraryId: number) {
   // An open movie or show page: files came or went (an import, a delete).
   void qc.invalidateQueries({ queryKey: ['movie'] })
   void qc.invalidateQueries({ queryKey: ['show'] })
+  // Its related rows: a title came, or one they list went (PLAN-RELATED.md §7).
+  void qc.invalidateQueries({ queryKey: ['related'] })
 }
 
 function connect(qc: QueryClient) {
