@@ -109,6 +109,34 @@ server, and on iPad in both a regular and a compact width.
   window). iOS 27.1 APIs (`UIHingeInteraction`, `verticalBarEdge`) sit
   behind `#if compiler(>=6.4.1)` as well as `#available`, because CI may
   build with an older Xcode.
+  - Pages go side by side from `PadLayout.sideBySide` (860 pt, so the Duo
+    held wide gets two panes and the 11-inch iPad in portrait, 834 pt,
+    still stacks); `PadLayout.landscape` (1000 pt) is where a page's
+    controls fit in one row. Sideways rows end with `stopsAtVerticalBar()`.
+  - Players turn by the window, not the device (`PlayerWindow`: wide only
+    when regular both ways, since a Pro Max turned is regular width). The
+    inner screen ignores the app's orientation mask and refuses any request
+    to turn ("The current windowing mode does not allow…"), and a turn the
+    outer screen granted stays with the scene after unfolding, so
+    `OrientationLock` puts the request back to every way once a phone's
+    window has turned and leaves `AppDelegate`'s mask to hold it. The outer
+    screen also refuses a turn while the player's cover is presenting, so
+    the request is retried every 250 ms a few times.
+  - A fold must never rebuild the video: the video view stays at one place
+    in the view tree and the layout only frames and moves it
+    (`PlayerArrangement`). The same goes for anything open across a fold: a
+    question shown as an alert when wide and an action sheet when compact
+    keeps the form it opened in, or the fold drops it.
+  - Upright, the tab bar's bottom inset (83 pt) reads 0 inside a view that
+    ignores the safe area; read it outside with `onGeometryChange`.
+  - Simulator: the Duo needs the runtime
+    `com.apple.CoreSimulator.SimRuntime.iOS-27-2-iPhone19-4` (plain
+    `iOS-27-2` refuses the device type). `simctl io <id> screenshot` takes
+    `--display=1` for the outer screen and `--display=3` for the inner one.
+    The simulator panel's screenshots can lag an action behind on the Duo,
+    so wait and use `simctl io` before tapping from one. Closing straight
+    after opening can black out the inner screen while SpringBoard restarts;
+    the app keeps running.
 - **Layout traps.** On Apple TV a focused `.borderless` button lifts and
   enlarges any `Image` in its label, so put a small icon inside the `Text`
   (`Text("\(Image(systemName: …)) …")`). On iPad a `.presentationSizing(.fitted)`
