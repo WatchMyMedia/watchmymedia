@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The full-screen player, landscape while it shows: the video, subtitles,
+/// The full-screen player, landscape in a phone's window: the video, subtitles,
 /// the touch controls, Skip, the Next Episode card, the picker, Still
 /// watching and the stopped and can't-play states (design/mockups/ios/
 /// Player*.dc.html). It renders a ``PlaybackController`` from the app's
@@ -50,10 +50,22 @@ struct PlayerScreen: View {
 /// model's steady state, which changes when something other than the
 /// position does; what ticks is read only by the small views that draw it
 /// (``PlayerClock``).
+///
+/// On the iPhone Duo (PLAN-IPHONE-DUO.md §4.4) the same picture moves and
+/// resizes as the window does: beside a panel on the inner screen held wide,
+/// above the fold half open on a table, over the season held upright. The
+/// video view keeps its place in this view's tree whatever the layout, so a
+/// fold never rebuilds the player layer, pauses or rebuffers.
 private struct PlayerContent: View {
     let model: PlayerChromeModel
     let episodes: PlayerEpisodesModel
+    /// The Episodes panel over the video (an iPad full screen, the Duo's outer screen turned).
     @State private var showsEpisodes = false
+    /// The panel beside the picture, which is the tab under the fold.
+    @State private var panels = PlayerPanelChoice()
+    /// Tabletop by itself when half open on a table, until Use the whole screen.
+    @State private var fold = PlayerFold(hasBook: false)
+    @Environment(\.foldPosture) private var posture
     @Environment(AppServices.self) private var services
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontal
@@ -61,11 +73,15 @@ private struct PlayerContent: View {
 
     var body: some View {
         let metrics = PlayerMetrics.for(horizontal: horizontal, vertical: vertical)
+        let tabletop = fold.layout == .tabletop
         PlayerShell(model: model, orientations: .landscape) { frame in
             content(frame)
         }
-        .task(id: "\(model.request.fileID)-\(metrics.sidePanelPicker)") {
-            if metrics.sidePanelPicker { await episodes.load(for: model.request) }
+        .onChange(of: posture, initial: true) { _, posture in fold.follow(posture) }
+        // Under the fold the controls are always there: they don't hide by themselves.
+        .onChange(of: tabletop, initial: true) { _, tabletop in
+            model.hold("tabletop", tabletop)
+            if tabletop { showsEpisodes = false }
         }
         .onChange(of: metrics.sidePanelPicker) { _, tablet in
             if !tablet { showsEpisodes = false }
@@ -77,22 +93,51 @@ private struct PlayerContent: View {
         .onChange(of: model.overlay) { _, overlay in
             if overlay != nil { showsEpisodes = false }
         }
+        #if DEBUG
+        .onAppear { if let panel = PlayerLaunchArguments.panel { panels.open(panel) } }
+        #endif
     }
 
     private func content(_ frame: PlayerFrame) -> some View {
         let state = model.state
         let metrics = frame.metrics
         let pictureInPicture = frame.pictureInPicture
-        let portrait = metrics.sidePanelPicker && frame.tall
-        let insets = frame.insets(portrait: portrait)
-        return ZStack(alignment: .top) {
-            VStack(spacing: 0) {
-                video(in: frame, insets: insets, portrait: portrait)
-                    .frame(height: portrait ? frame.size.width * 9 / 16 : frame.size.height)
-                    .clipped()
-                if portrait {
-                    PlayerPortraitDetails(model: model, episodes: episodes)
+        let tabletop = fold.layout == .tabletop
+        let arrangement = PlayerArrangement.film(size: frame.size, safe: frame.safeInsets, wide: metrics.sidePanelPicker,
+                                                 fold: fold.layout, panelOpen: panels.panel != nil)
+        let picture = frame.piece(arrangement.picture)
+        // Where the options and episodes open beside the picture or under the fold, not over it.
+        let inPlace = tabletop || PlayerArrangement.panelsBeside(size: frame.size, wide: metrics.sidePanelPicker)
+        // A phone's window tall enough for a row of buttons under the scrubber (the Duo's outer screen turned).
+        let chips = PlayerArrangement.chipRow(size: frame.size, wide: metrics.sidePanelPicker)
+        let needsEpisodes = metrics.sidePanelPicker || tabletop || chips
+        let options: PlayerOptionsRow = !metrics.sidePanelPicker ? (chips ? .chips : .more)
+            : inPlace ? .panels(panels, toggle: { panels.toggle($0) }) : .tabs
+        let insets = frame.insets(portrait: arrangement.kind == .portrait)
+        return ZStack(alignment: .topLeading) {
+            (arrangement.kind == .full || arrangement.kind == .beside ? Color.black : Palette.ground)
+            // Always first and always the same view: only its frame changes.
+            video(in: picture, kind: arrangement.kind, options: options)
+                .frame(width: arrangement.picture.width, height: arrangement.picture.height)
+                .clipped()
+                .offset(x: arrangement.picture.minX, y: arrangement.picture.minY)
+            if arrangement.kind == .portrait, let below = arrangement.below {
+                PlayerPortraitDetails(model: model, episodes: episodes)
+                    .frame(width: below.width, height: below.height)
+                    .offset(x: below.minX, y: below.minY)
+            }
+            if arrangement.kind == .tabletop, let below = arrangement.below {
+                TabletopPlayerControls(model: model, episodes: episodes, panels: $panels, safe: frame.piece(below).safeArea) {
+                    fold.useWholeScreen()
                 }
+                .frame(width: below.width, height: below.height)
+                .offset(x: below.minX, y: below.minY)
+            }
+            if arrangement.kind == .beside, let rect = arrangement.panel, let panel = panels.panel {
+                PlayerSidePanelView(model: model, episodes: episodes, panel: panel, safe: frame.piece(rect).safeArea) { panels.close() }
+                    .frame(width: rect.width, height: rect.height)
+                    .offset(x: rect.minX, y: rect.minY)
+                    .transition(slide(.trailing))
             }
             if !pictureInPicture.isActive {
                 overlay(state, insets: insets, metrics: metrics, safe: frame.safeArea)
@@ -101,6 +146,19 @@ private struct PlayerContent: View {
                 }
             }
         }
+        .frame(width: frame.size.width, height: frame.size.height, alignment: .topLeading)
+        .task(id: "\(model.request.fileID)-\(needsEpisodes)") {
+            if needsEpisodes { await episodes.load(for: model.request) }
+        }
+        // The options opened over the picture (the sheet carried from the outer
+        // screen, or a launch argument) become the panel beside it, or the tab
+        // under the fold, where those are drawn; closing the sheet plays on if it paused.
+        .onChange(of: inPlace ? model.picker : nil, initial: true) { _, tab in
+            guard let tab else { return }
+            panels.open(.options(tab))
+            model.closePicker()
+        }
+        .animation(.easeInOut(duration: 0.25), value: arrangement)
         .animation(.easeInOut(duration: 0.2), value: model.showsControls)
         .animation(.easeInOut(duration: 0.2), value: model.showsUpNext)
         .animation(.easeInOut(duration: 0.2), value: model.showsSkip)
@@ -116,10 +174,21 @@ private struct PlayerContent: View {
         reduceMotion ? .opacity : .opacity.combined(with: .move(edge: edge))
     }
 
-    private func video(in frame: PlayerFrame, insets: PlayerInsets, portrait: Bool) -> some View {
+    /// The picture and what is drawn over it, in `frame` (the picture's piece
+    /// of the screen). Above the fold that is only the subtitles, Skip, the
+    /// Next Episode card and the notes; the controls are under the fold.
+    private func video(in frame: PlayerFrame, kind: PlayerArrangement.Kind, options: PlayerOptionsRow) -> some View {
         let state = model.state
         let metrics = frame.metrics
         let pictureInPicture = frame.pictureInPicture
+        let portrait = kind == .portrait
+        let tabletop = kind == .tabletop
+        let insets = frame.insets(portrait: false)
+        let controlsOver = model.showsControls && !tabletop
+        // Over the controls' bottom bar, and the row of buttons under it where there is one.
+        let chipRow: CGFloat = if case .chips = options { 52 } else { 0 }
+        let lift = (portrait ? 56 : metrics.skipLift) + chipRow
+        let upNext = tabletop ? state.upNext != nil && model.overlay == nil && !pictureInPicture.isActive : model.showsUpNext
         return ZStack {
                 PlayerVideo(
                     player: model.controller.player,
@@ -130,14 +199,14 @@ private struct PlayerContent: View {
                 )
 
                 if !pictureInPicture.isActive {
-                    PlayerCues(clock: model.clock, bottomPadding: model.showsControls ? insets.bottom + (portrait ? 56 : metrics.skipLift) + 8 : insets.bottom + 8, sidePadding: insets.leading)
+                    PlayerCues(clock: model.clock, bottomPadding: controlsOver ? insets.bottom + lift + 8 : insets.bottom + 8, sidePadding: insets.leading)
 
                     // Taps on the video: show or hide the controls; double taps on a side seek;
                     // a pinch fills or fits.
                     Color.clear
                         .contentShape(Rectangle())
                         .onTapGesture(coordinateSpace: .local) { model.tap(x: $0.x, width: frame.fullWidth) }
-                        .pinchToFit(frame, area: frame.videoArea(portrait: portrait))
+                        .pinchToFit(frame, area: frame.size)
                         .accessibilityHidden(true)
 
                     if let ripple = model.ripple {
@@ -147,9 +216,10 @@ private struct PlayerContent: View {
                             .transition(.opacity)
                     }
 
-                    if model.showsControls {
-                        PlayerControlsView(model: model, pictureInPicture: pictureInPicture, insets: insets, metrics: metrics, portrait: portrait, onEpisodes: episodes.season == nil && episodes.error == nil ? nil : { showsEpisodes = true },
-                                           fitButton: VideoFitButton(frame: frame, area: frame.videoArea(portrait: portrait), metrics: metrics) { model.showControls() })
+                    if controlsOver {
+                        PlayerControlsView(model: model, pictureInPicture: pictureInPicture, insets: insets, metrics: metrics, portrait: portrait, options: options,
+                                           onEpisodes: episodes.season == nil && episodes.error == nil ? nil : { showsEpisodes = true },
+                                           fitButton: VideoFitButton(frame: frame, area: frame.size, metrics: metrics) { model.showControls() })
                             .transition(.opacity)
                     } else if model.isWaiting, model.overlay == nil {
                         SpinnerRing()
@@ -158,12 +228,12 @@ private struct PlayerContent: View {
                     if let skip = state.skip, model.showsSkip {
                         SkipButton(prompt: skip, clock: model.clock, metrics: metrics) { model.skip() }
                             .padding(.trailing, insets.trailing)
-                            .padding(.bottom, model.showsControls ? insets.bottom + (portrait ? 56 : metrics.skipLift) : insets.bottom)
+                            .padding(.bottom, controlsOver ? insets.bottom + lift : insets.bottom)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                             .transition(.opacity)
                     }
 
-                    if model.showsMiniProgress {
+                    if model.showsMiniProgress, !tabletop {
                         ClockMiniProgress(clock: model.clock)
                             .opacity(model.overlay == .stillWatching ? 0.7 : 1)
                             .padding(.leading, insets.leading)
@@ -172,12 +242,12 @@ private struct PlayerContent: View {
                             .transition(.opacity)
                     }
 
-                    if let upNext = state.upNext, model.showsUpNext {
+                    if let next = state.upNext, upNext {
                         NextEpisodeCard(
-                            prompt: upNext,
+                            prompt: next,
                             clock: model.clock,
-                            width: metrics.sidePanelPicker ? min(400, frame.size.width * 0.48) : 320,
-                            still: services.library.imageURL(upNext.next.stillPath, size: .w342),
+                            width: metrics.sidePanelPicker && !tabletop ? min(400, frame.size.width * 0.48) : 320,
+                            still: services.library.imageURL(next.next.stillPath, size: .w342),
                             onPlay: { model.playNext() },
                             onWatchCredits: { model.watchCredits() }
                         )
@@ -189,7 +259,7 @@ private struct PlayerContent: View {
 
                     if let note = state.qualityNote, model.overlay == nil {
                         QualityNote(text: note, large: metrics.streamChip)
-                            .padding(.top, insets.top + metrics.button + (metrics.streamChip ? 52 : 16))
+                            .padding(.top, insets.top + (tabletop ? 0 : metrics.button) + (metrics.streamChip ? 52 : 16))
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                             .allowsHitTesting(false)
                             .transition(.opacity)

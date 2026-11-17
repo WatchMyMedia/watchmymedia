@@ -3,22 +3,37 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Portrait keeps the video above the title, track controls and the current season.
+/// Portrait keeps the video above the title, track controls and the current
+/// season, the episode playing scrolled into view (`DuoTallPlayer`): the show
+/// and the episode's code over the episode's name, as under the fold.
 struct PlayerPortraitDetails: View {
     let model: PlayerChromeModel
     let episodes: PlayerEpisodesModel
 
+    private var playingEpisode: EpisodeDetail.ID? {
+        episodes.season?.episodes.first { $0.versions.contains { $0.fileID == model.request.fileID } }?.id
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+        let state = model.state
+        let title = tabletopTitle(title: state.title.isEmpty ? model.request.title : state.title, subtitle: state.subtitle)
+        VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(model.state.title).font(.title2.bold()).foregroundStyle(Palette.text)
-                    if let subtitle = model.state.subtitle {
-                        Text(subtitle).font(.body).foregroundStyle(Palette.muted)
+                    if let kicker = title.kicker {
+                        Text(kicker.uppercased())
+                            .font(.system(size: 13, weight: .bold))
+                            .tracking(1.04)
+                            .foregroundStyle(Palette.gold)
+                            .lineLimit(1)
                     }
-                    if let line = streamLine(model.state) {
-                        Text(line).font(.footnote).foregroundStyle(Palette.muted)
+                    Text(title.name).font(.system(size: 28, weight: .heavy)).foregroundStyle(Palette.text)
+                        .accessibilityAddTraits(.isHeader)
+                    HStack(spacing: 8) {
+                        if let chip = autoChip(state) { AutoChip(text: chip, size: 12).fixedSize() }
+                        if let line = streamLine(state) { Text(line).lineLimit(1) }
                     }
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.muted)
                 }
                 HStack(spacing: 12) {
                     ForEach(PickerTab.allCases, id: \.self) { tab in
@@ -38,12 +53,24 @@ struct PlayerPortraitDetails: View {
                         .accessibilityValue(value(for: tab))
                     }
                 }
-                PlayerEpisodeRows(model: model, episodes: episodes)
-            }
-            .padding(24)
-            .frame(maxWidth: 1000)
-            .frame(maxWidth: .infinity, alignment: .top)
+                if let season = episodes.season {
+                    Text("Season \(season.season.number)").font(.title3.bold()).foregroundStyle(Palette.text)
+                        .accessibilityAddTraits(.isHeader)
+                        .padding(.bottom, -12)
+                }
+                // Only the season scrolls, to the one playing as it loads and as the next one starts.
+                ScrollViewReader { proxy in
+                    ScrollView { PlayerEpisodeRows(model: model, episodes: episodes, heading: false) }
+                        .scrollIndicators(.hidden)
+                        .onChange(of: playingEpisode, initial: true) { _, id in
+                            if let id { proxy.scrollTo(id, anchor: .center) }
+                        }
+                }
         }
+        .padding(.horizontal, 24)
+        .padding(.top, 20)
+        .frame(maxWidth: 1000, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, alignment: .top)
         .background(Palette.ground)
     }
 
@@ -90,11 +117,21 @@ struct PlayerEpisodesPanel: View {
     }
 }
 
-private struct PlayerEpisodeRows: View {
+/// The season's episodes, the one playing marked; a tap plays another in
+/// place. `upNext` starts at the one playing and leaves out the heading (the
+/// tab under the fold on the iPhone Duo names them).
+struct PlayerEpisodeRows: View {
     let model: PlayerChromeModel
     let episodes: PlayerEpisodesModel
     var onPlay: () -> Void = {}
     var compact = false
+    var upNext = false
+    /// "Season 3" over the rows; off where the page or tab names them already.
+    var heading = true
+    /// The iPhone Duo's panel beside the picture and its tab under the fold:
+    /// smaller stills, a line each, and the one playing scrolled into view
+    /// (`DuoOpenPlayer`, `DuoTabletopPlayer`).
+    var dense = false
     @Environment(AppServices.self) private var services
 
     var body: some View {
@@ -106,14 +143,22 @@ private struct PlayerEpisodeRows: View {
                 Button("Try again") { Task { await episodes.load(for: model.request) } }
                     .buttonStyle(GoldTextButtonStyle())
             } else if let season = episodes.season {
-                Text("Season \(season.season.number)").font(.title3.bold()).foregroundStyle(Palette.text)
-                    .accessibilityAddTraits(.isHeader)
-                ForEach(season.episodes) { episode in
-                    episodeRow(episode)
+                if heading && !upNext {
+                    Text("Season \(season.season.number)").font(.title3.bold()).foregroundStyle(Palette.text)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                ForEach(shown(season.episodes)) { episode in
+                    episodeRow(episode).id(episode.id)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Up next: the one playing and those after it (all of them if none is playing).
+    private func shown(_ all: [EpisodeDetail]) -> [EpisodeDetail] {
+        guard upNext, let playing = all.firstIndex(where: { $0.versions.contains { $0.fileID == model.request.fileID } }) else { return all }
+        return Array(all[playing...])
     }
 
     private func episodeRow(_ episode: EpisodeDetail) -> some View {
@@ -123,25 +168,28 @@ private struct PlayerEpisodeRows: View {
             model.play(request)
             onPlay()
         } label: {
-            HStack(spacing: 14) {
+            HStack(spacing: dense ? 12 : 14) {
                 Artwork(url: services.library.imageURL(episode.stillPath, size: .w300), seed: episode.title)
-                    .frame(width: compact ? 112 : 160, height: compact ? 63 : 90)
+                    .frame(width: dense ? 104 : compact ? 112 : 160, height: dense ? 58 : compact ? 63 : 90)
                     .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .clipShape(RoundedRectangle(cornerRadius: dense ? 8 : 10))
                     .overlay(alignment: .topTrailing) {
-                        if episode.watched { Image(systemName: "checkmark.circle.fill").foregroundStyle(Palette.gold).padding(6) }
+                        if episode.watched { Image(systemName: "checkmark.circle.fill").foregroundStyle(Palette.gold).padding(dense ? 4 : 6) }
                     }
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("\(episode.number). \(episode.title)").font(.body.weight(.semibold)).foregroundStyle(Palette.text)
+                VStack(alignment: .leading, spacing: dense ? 3 : 5) {
+                    Text("\(episode.number). \(episode.title)")
+                        .font(dense ? .system(size: 15, weight: .bold) : .body.weight(.semibold))
+                        .foregroundStyle(Palette.text)
+                        .lineLimit(dense ? 1 : nil)
                     if let minutes = episode.runtimeMin {
-                        Text(formatDuration(ms: minutes * 60_000)).font(.footnote).foregroundStyle(Palette.muted)
+                        Text(formatDuration(ms: minutes * 60_000)).font(dense ? .caption : .footnote).foregroundStyle(Palette.muted)
                     }
                     if playing { Text("Playing").font(.caption.weight(.semibold)).foregroundStyle(Palette.gold) }
                 }
                 Spacer(minLength: 0)
                 Image(systemName: playing ? "speaker.wave.2.fill" : "play.fill").foregroundStyle(playing ? Palette.gold : Palette.text)
             }
-            .padding(10)
+            .padding(dense ? 8 : 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(playing ? Palette.surfaceRaised : .clear, in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(playing ? Palette.gold : .clear, lineWidth: 2))

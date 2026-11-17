@@ -4,7 +4,9 @@ import WMMModel
 import WMMUI
 
 /// Tablet playback options stack in a trailing panel while the video plays.
-/// Compact widths retain the pausing bottom sheet. Both reuse the same choices.
+/// Compact widths retain the pausing bottom sheet. Both reuse the same
+/// choices (``PlayerOptionSections``), as do the panel beside the picture and
+/// the tabs under the fold on the iPhone Duo.
 struct PlayerPickerSheet: View {
     let model: PlayerChromeModel
     let tab: PickerTab
@@ -40,7 +42,7 @@ struct PlayerPickerSheet: View {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 24) {
                                 ForEach(model.pickerTabs, id: \.self) { section in
-                                    sectionContent(section, model.state, large: true)
+                                    PlayerOptionSections(model: model, tab: section, large: true)
                                         .id(section)
                                 }
                                 Text(pickerFootnote(device: UIDevice.current.model, offline: model.state.isOffline))
@@ -155,18 +157,35 @@ struct PlayerPickerSheet: View {
     }
 
     private func column(_ tab: PickerTab, _ state: PlayerState, large: Bool = false) -> some View {
-        ScrollView { sectionContent(tab, state, large: large) }
+        ScrollView { PlayerOptionSections(model: model, tab: tab, large: large) }
+    }
+}
+
+/// One tab's choices, under its heading: the audio tracks, the subtitles
+/// (with OpenSubtitles' results to download), or the qualities. Picking
+/// applies at once.
+struct PlayerOptionSections: View {
+    let model: PlayerChromeModel
+    let tab: PickerTab
+    var large = false
+    /// The heading over the choices; off where a tab or panel names them already.
+    var heading = true
+
+    var body: some View {
+        sectionContent(tab, model.state, large: large)
     }
 
     private func sectionContent(_ tab: PickerTab, _ state: PlayerState, large: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(tab.title.uppercased())
-                .font(.system(size: large ? 12 : 11, weight: .semibold))
-                .tracking(large ? 0.72 : 0.66)
-                .foregroundStyle(Palette.muted)
-                .padding(.horizontal, large ? 12 : 0)
-                .padding(.bottom, large ? 6 : 4)
-                .accessibilityAddTraits(.isHeader)
+            if heading {
+                Text(tab.title.uppercased())
+                    .font(.system(size: large ? 12 : 11, weight: .semibold))
+                    .tracking(large ? 0.72 : 0.66)
+                    .foregroundStyle(Palette.muted)
+                    .padding(.horizontal, large ? 12 : 0)
+                    .padding(.bottom, large ? 6 : 4)
+                    .accessibilityAddTraits(.isHeader)
+            }
             switch tab {
             case .audio: audio(state, large: large)
             case .subtitles: subtitles(state, large: large)

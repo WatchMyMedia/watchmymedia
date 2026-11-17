@@ -2,6 +2,7 @@ import AVFoundation
 import SwiftUI
 import UIKit
 import WMMFeatures
+import WMMUI
 
 /// What the player shell asks of a player's model: the film player's
 /// ``PlayerChromeModel`` and the Live TV player's ``LivePlayerModel`` both
@@ -89,11 +90,24 @@ struct PlayerFrame {
 
     /// The full width, past the safe area, for where a tap lands.
     var fullWidth: CGFloat { size.width + safeArea.leading + safeArea.trailing }
+
+    var safeInsets: SafeInsets {
+        SafeInsets(top: safeArea.top, leading: safeArea.leading, bottom: safeArea.bottom, trailing: safeArea.trailing)
+    }
+
+    /// The part of the screen at `rect` (a ``PlayerArrangement``'s piece),
+    /// with only the safe area that falls inside it: the picture above the
+    /// fold has none at its foot, the panel beside it none on its leading side.
+    func piece(_ rect: CGRect) -> PlayerFrame {
+        let inside = safeInsets.within(rect, of: size)
+        return PlayerFrame(size: rect.size, safeArea: EdgeInsets(top: inside.top, leading: inside.leading, bottom: inside.bottom, trailing: inside.trailing),
+                           metrics: metrics, pictureInPicture: pictureInPicture, fit: fit, videoSize: videoSize)
+    }
 }
 
 /// The one shell the film and Live TV players share on iPhone and iPad
 /// (PLAN-APPLE-REVIEW.md §5.3): black under the whole screen, the status bar
-/// and home indicator hidden, the iPhone turned while it shows, the scene
+/// and home indicator hidden, a phone's window turned while it shows, the scene
 /// phase and Picture in Picture passed to the model (which gives Picture in
 /// Picture its moment to start), the controls held up for VoiceOver, and
 /// Escape for VoiceOver's scrub, and a hardware keyboard's keys (space,
@@ -102,7 +116,8 @@ struct PlayerFrame {
 /// controls, as its own boards draw them.
 struct PlayerShell<Content: View>: View {
     let model: any PlayerShellModel
-    /// What an iPhone may turn to while the player shows; an iPad turns freely.
+    /// What a phone's window may turn to while the player shows; a wide one
+    /// (an iPad's, the iPhone Duo's inner screen) turns freely.
     var orientations: UIInterfaceOrientationMask = .landscape
     @ViewBuilder let content: (PlayerFrame) -> Content
     @State private var pictureInPicture = PictureInPicture()
