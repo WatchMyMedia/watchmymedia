@@ -85,7 +85,12 @@ the user asks in this conversation; see Authority in the root file.
   hook (`src/components/rows/useRowDrag.ts`), not a drag library. Edit rows and
   Add a row live in the address (`?edit`, `&add`) so Make a list
   (`/lists/new`) can come back to them; the unsaved order waits in
-  `src/components/rows/rowDrafts.ts` for the visit.
+  `src/components/rows/rowDrafts.ts` for the visit. A movie's and a show's
+  page end with their related rows (PLAN-RELATED.md §7):
+  `src/components/rows/RelatedRows.tsx` draws them with `ScreenRows`, never
+  with See all, once the details have loaded. Their query keys start with
+  `related`, apart from the details', so refetching a page's details doesn't
+  work the rows out again.
 - **Row cards** (PLAN-HOME.md §6): a card is a `div` of parts that are
   links of their own, drawn from `src/lib/cardLinks.ts` by
   `src/components/CardParts.tsx`: the title opens the title; a Recently
