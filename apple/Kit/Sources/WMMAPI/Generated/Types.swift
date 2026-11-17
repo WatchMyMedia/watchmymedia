@@ -413,6 +413,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /api/movies/{id}/delete`.
     /// - Remark: Generated from `#/paths//api/movies/{id}/delete/post(deleteMovie)`.
     func deleteMovie(_ input: Operations.DeleteMovie.Input) async throws -> Operations.DeleteMovie.Output
+    /// The rows at the end of a movie's page: its collection and More like this
+    ///
+    /// Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
+    ///
+    /// - Remark: HTTP `GET /api/movies/{id}/related`.
+    /// - Remark: Generated from `#/paths//api/movies/{id}/related/get(getMovieRelated)`.
+    func getMovieRelated(_ input: Operations.GetMovieRelated.Input) async throws -> Operations.GetMovieRelated.Output
     /// Get a token for one download's media
     ///
     /// With the device's session. The token opens this download's routes only, for a few hours; ask again while the download stands. 403 when it was revoked or this person may no longer download, 410 when its file was replaced or deleted.
@@ -537,6 +544,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /api/shows/{id}/monitor`.
     /// - Remark: Generated from `#/paths//api/shows/{id}/monitor/post(monitorEpisodes)`.
     func monitorEpisodes(_ input: Operations.MonitorEpisodes.Input) async throws -> Operations.MonitorEpisodes.Output
+    /// The row at the end of a show's page: More like this
+    ///
+    /// Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
+    ///
+    /// - Remark: HTTP `GET /api/shows/{id}/related`.
+    /// - Remark: Generated from `#/paths//api/shows/{id}/related/get(getShowRelated)`.
+    func getShowRelated(_ input: Operations.GetShowRelated.Input) async throws -> Operations.GetShowRelated.Output
     /// Have Sonarr look for a season's or some episodes' files now
     ///
     /// Monitors the episodes first, since Sonarr only grabs monitored ones.
@@ -1492,6 +1506,21 @@ extension APIProtocol {
             body: body
         ))
     }
+    /// The rows at the end of a movie's page: its collection and More like this
+    ///
+    /// Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
+    ///
+    /// - Remark: HTTP `GET /api/movies/{id}/related`.
+    /// - Remark: Generated from `#/paths//api/movies/{id}/related/get(getMovieRelated)`.
+    public func getMovieRelated(
+        path: Operations.GetMovieRelated.Input.Path,
+        headers: Operations.GetMovieRelated.Input.Headers = .init()
+    ) async throws -> Operations.GetMovieRelated.Output {
+        try await getMovieRelated(Operations.GetMovieRelated.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// Get a token for one download's media
     ///
     /// With the device's session. The token opens this download's routes only, for a few hours; ask again while the download stands. 403 when it was revoked or this person may no longer download, 410 when its file was replaced or deleted.
@@ -1754,6 +1783,21 @@ extension APIProtocol {
             path: path,
             headers: headers,
             body: body
+        ))
+    }
+    /// The row at the end of a show's page: More like this
+    ///
+    /// Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
+    ///
+    /// - Remark: HTTP `GET /api/shows/{id}/related`.
+    /// - Remark: Generated from `#/paths//api/shows/{id}/related/get(getShowRelated)`.
+    public func getShowRelated(
+        path: Operations.GetShowRelated.Input.Path,
+        headers: Operations.GetShowRelated.Input.Headers = .init()
+    ) async throws -> Operations.GetShowRelated.Output {
+        try await getShowRelated(Operations.GetShowRelated.Input(
+            path: path,
+            headers: headers
         ))
     }
     /// Have Sonarr look for a season's or some episodes' files now

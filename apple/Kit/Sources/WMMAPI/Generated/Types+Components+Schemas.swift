@@ -10211,6 +10211,23 @@ extension Components {
                 case state
             }
         }
+        /// - Remark: Generated from `#/components/schemas/RelatedRows`.
+        public struct RelatedRows: Codable, Hashable, Sendable {
+            /// In order: collection (movies only, when the library has another film of the movie's TMDB collection; titled with the collection's name, in release order) and similar (More like this, best first, when at least 3 titles qualify). Both style poster, with items. Empty when neither has anything.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RelatedRows/rows`.
+            public var rows: [Components.Schemas.ScreenRow]
+            /// Creates a new `RelatedRows`.
+            ///
+            /// - Parameters:
+            ///   - rows: In order: collection (movies only, when the library has another film of the movie's TMDB collection; titled with the collection's name, in release order) and similar (More like this, best first, when at least 3 titles qualify). Both style poster, with items. Empty when neither has anything.
+            public init(rows: [Components.Schemas.ScreenRow]) {
+                self.rows = rows
+            }
+            public enum CodingKeys: String, CodingKey {
+                case rows
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/ReplaceResult`.
         public struct ReplaceResult: Codable, Hashable, Sendable {
             /// The release that brought the file in is marked failed, so the app won't grab it again.
