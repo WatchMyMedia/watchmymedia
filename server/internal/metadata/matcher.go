@@ -21,6 +21,7 @@ import (
 	"watchmymedia/server/internal/library"
 	"watchmymedia/server/internal/memo"
 	"watchmymedia/server/internal/parser"
+	"watchmymedia/server/internal/related"
 	"watchmymedia/server/internal/scanner"
 	"watchmymedia/server/internal/tmdb"
 	"watchmymedia/server/internal/trailers"
@@ -701,32 +702,42 @@ func (m *Matcher) storeMovie(ctx context.Context, lib db.Library, tmdbID int) (i
 		return 0, err
 	}
 	genres, _ := json.Marshal(genreNames(mv.Genres))
-	row, err := m.q.UpsertMovie(ctx, db.UpsertMovieParams{
-		LibraryID:     lib.ID,
-		TmdbID:        int64(mv.ID),
-		ImdbID:        nilIfEmpty(mv.IMDBID),
-		Title:         mv.Title,
-		OriginalTitle: nilIfEmpty(mv.OriginalTitle),
-		Year:          yearPtr(mv.ReleaseDate),
-		ReleaseDate:   nilIfEmpty(mv.ReleaseDate),
-		Overview:      mv.Overview,
-		Tagline:       nilIfEmpty(mv.Tagline),
-		RuntimeMin:    intPtrNonZero(mv.Runtime),
-		Genres:        string(genres),
-		Rating:        floatPtrNonZero(mv.VoteAverage),
-		PosterPath:    nilIfEmpty(mv.PosterPath),
-		BackdropPath:  nilIfEmpty(mv.BackdropPath),
-		Credits:       creditsJSON(mv.Credits),
-		ContentRating: new(mv.ReleaseDates.Certification(RatingCountry)),
-		// The videos came with the details, so the trailers are checked
-		// now too (PLAN-TRAILERS.md §5.1).
-		Trailers:          trailers.Encode(trailers.Choose(mv.Videos.Results)),
-		TrailersCheckedAt: new(db.FormatTime(time.Now())),
+	// The details came with what related titles need too, so the movie's
+	// tags are stored with it (PLAN-RELATED.md §3.9).
+	var id int64
+	err = m.q.Transaction(ctx, func(q *db.Queries) error {
+		row, err := q.UpsertMovie(ctx, db.UpsertMovieParams{
+			LibraryID:     lib.ID,
+			TmdbID:        int64(mv.ID),
+			ImdbID:        nilIfEmpty(mv.IMDBID),
+			Title:         mv.Title,
+			OriginalTitle: nilIfEmpty(mv.OriginalTitle),
+			Year:          yearPtr(mv.ReleaseDate),
+			ReleaseDate:   nilIfEmpty(mv.ReleaseDate),
+			Overview:      mv.Overview,
+			Tagline:       nilIfEmpty(mv.Tagline),
+			RuntimeMin:    intPtrNonZero(mv.Runtime),
+			Genres:        string(genres),
+			Rating:        floatPtrNonZero(mv.VoteAverage),
+			PosterPath:    nilIfEmpty(mv.PosterPath),
+			BackdropPath:  nilIfEmpty(mv.BackdropPath),
+			Credits:       creditsJSON(mv.Credits),
+			ContentRating: new(mv.ReleaseDates.Certification(RatingCountry)),
+			// The videos came with the details, so the trailers are checked
+			// now too (PLAN-TRAILERS.md §5.1).
+			Trailers:          trailers.Encode(trailers.Choose(mv.Videos.Results)),
+			TrailersCheckedAt: new(db.FormatTime(time.Now())),
+		})
+		if err != nil {
+			return err
+		}
+		id = row.ID
+		return related.StoreMovie(ctx, q, row.ID, mv, time.Now())
 	})
 	if err != nil {
 		return 0, err
 	}
-	return row.ID, nil
+	return id, nil
 }
 
 // Credit is a top-billed cast member kept with a movie or show.
@@ -916,6 +927,11 @@ func (m *Matcher) storeShow(ctx context.Context, lib db.Library, tmdbID int) (db
 			ContentRating: new(tv.ContentRatings.Certification(RatingCountry)),
 		})
 		if err != nil {
+			return err
+		}
+		// The details came with what related titles need too
+		// (PLAN-RELATED.md §3.9).
+		if err := related.StoreShow(ctx, q, show.ID, tv, time.Now()); err != nil {
 			return err
 		}
 		for i, s := range tv.Seasons {

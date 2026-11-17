@@ -183,7 +183,7 @@ func TestVerifySharesTheLimiter(t *testing.T) {
 func TestCertifications(t *testing.T) {
 	f := tmdbtest.New(t)
 	f.Handle("/movie/603", func(r *http.Request) any {
-		if r.URL.Query().Get("append_to_response") != "credits,release_dates,videos" {
+		if r.URL.Query().Get("append_to_response") != "credits,release_dates,videos,keywords,recommendations" {
 			t.Errorf("append_to_response = %q", r.URL.Query().Get("append_to_response"))
 		}
 		return tmdbtest.Reply{Body: `{"id":603,"title":"The Matrix","release_dates":{"results":[
@@ -264,7 +264,7 @@ func TestMovieVideos(t *testing.T) {
 		"official": true, "iso_639_1": "en", "size": 2160, "published_at": "2024-06-01T16:00:00.000Z"}
 	f.Handle("/movie/700", func(r *http.Request) any {
 		q := r.URL.Query()
-		if q.Get("append_to_response") != "credits,release_dates,videos" || q.Get("include_video_language") != "en,null" {
+		if q.Get("append_to_response") != "credits,release_dates,videos,keywords,recommendations" || q.Get("include_video_language") != "en,null" {
 			t.Errorf("unexpected request %s", r.URL)
 		}
 		return map[string]any{"id": 700, "title": "Film", "videos": map[string]any{"results": []any{video}}}
