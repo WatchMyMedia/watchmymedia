@@ -88,6 +88,27 @@ export const showQuery = (id: number) =>
     queryFn: async () => unwrap(await api.GET('/api/shows/{id}', { params: { path: { id } } })),
   })
 
+/**
+ * The rows at the end of a movie's or a show's page (PLAN-RELATED.md §6): a
+ * request of their own, made once the page's details have arrived, so the
+ * details stay quick. Kept apart from the details' keys, so refetching them
+ * doesn't work the rows out again; watched marks and library changes
+ * refetch them as they do Home's.
+ */
+export const movieRelatedQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['related', 'movie', id],
+    queryFn: async () => unwrap(await api.GET('/api/movies/{id}/related', { params: { path: { id } } })),
+    staleTime: 5 * 60_000,
+  })
+
+export const showRelatedQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['related', 'show', id],
+    queryFn: async () => unwrap(await api.GET('/api/shows/{id}/related', { params: { path: { id } } })),
+    staleTime: 5 * 60_000,
+  })
+
 export const seasonQuery = (id: number, number: number) =>
   queryOptions({
     queryKey: ['show', id, 'season', number],

@@ -12,6 +12,7 @@ export type ScreenRowSource = components['schemas']['ScreenRowSource']
 type BrowseItem = components['schemas']['BrowseItem']
 type HomeData = components['schemas']['HomeData']
 type LibraryRows = components['schemas']['LibraryRows']
+type RelatedRows = components['schemas']['RelatedRows']
 type LibraryRef = { id: number; type: string }
 
 /** The screen key the layout routes take: home, or library-<id>. */
@@ -75,6 +76,16 @@ export function libraryRows(r: LibraryRows, type: 'movie' | 'tv'): ScreenRow[] {
       ]
 }
 
+/**
+ * The rows a movie's or a show's page ends with (PLAN-RELATED.md §7): the
+ * collection, then More like this, as the server sends them, those the web
+ * can draw. None before the reply arrives or when it failed, and never a
+ * See all (§3.7), so the page ends as it did.
+ */
+export function relatedRows(reply: RelatedRows | undefined): ScreenRow[] {
+  return (reply?.rows ?? []).filter(drawable).map((row) => ({ ...row, seeAll: undefined }))
+}
+
 export function isListRow(row: Pick<ScreenRow, 'id'>): boolean {
   return row.id.startsWith('list:')
 }
@@ -82,10 +93,10 @@ export function isListRow(row: Pick<ScreenRow, 'id'>): boolean {
 /**
  * A row's heading and its muted part: built-in rows' titles split at the
  * first " · " ("Recently added", "Movies"), as the rows have always looked.
- * A list's name is its own and is never split.
+ * A list's name and a movie's collection's are their own and never split.
  */
 export function titleParts(row: Pick<ScreenRow, 'id' | 'title'>): [string, string | undefined] {
-  if (isListRow(row)) return [row.title, undefined]
+  if (isListRow(row) || row.id === 'collection') return [row.title, undefined]
   const at = row.title.indexOf(' · ')
   return at > 0 ? [row.title.slice(0, at), row.title.slice(at + 3)] : [row.title, undefined]
 }

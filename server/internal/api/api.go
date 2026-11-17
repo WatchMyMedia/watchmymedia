@@ -38,6 +38,7 @@ import (
 	"watchmymedia/server/internal/playback"
 	"watchmymedia/server/internal/plexsync"
 	"watchmymedia/server/internal/probe"
+	"watchmymedia/server/internal/related"
 	"watchmymedia/server/internal/scanner"
 	"watchmymedia/server/internal/settings"
 	"watchmymedia/server/internal/subtitles"
@@ -132,6 +133,9 @@ type Deps struct {
 	// Trailers refreshes movies' TMDB trailers and says whether YouTube
 	// trailers are on; nil makes one that reads the setting but doesn't run.
 	Trailers *trailers.Refresher
+	// Related fetches titles' related data from TMDB in the background
+	// (PLAN-RELATED.md); nil fetches nothing.
+	Related *related.Refresher
 	// Offline keeps the offline downloads being fetched now; nil makes one.
 	Offline      *offline.Transfers
 	LiveTV       *livetv.Service
