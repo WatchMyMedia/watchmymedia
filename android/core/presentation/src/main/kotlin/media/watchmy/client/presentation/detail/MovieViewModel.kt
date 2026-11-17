@@ -16,6 +16,7 @@ import media.watchmy.client.model.PlaybackPlan
 import media.watchmy.client.model.ProblemKind
 import media.watchmy.client.model.RequestOptions
 import media.watchmy.client.model.RequestRepository
+import media.watchmy.client.model.ScreenRow
 import media.watchmy.client.model.Trailer
 import media.watchmy.client.model.WatchProgress
 import media.watchmy.client.model.WatchTarget
@@ -25,6 +26,7 @@ import media.watchmy.client.model.isUnreachable
 import media.watchmy.client.model.markWatched
 import media.watchmy.client.model.markedMessage
 import media.watchmy.client.model.playRequest
+import media.watchmy.client.model.relatedDrawn
 import media.watchmy.client.model.toMovieDetail
 import media.watchmy.client.model.trailer
 import media.watchmy.client.model.trailerRequest
@@ -69,6 +71,12 @@ class MovieViewModel(
         val offline: Boolean = false,
         /** This device can play a YouTube trailer. */
         val youTube: Boolean = true,
+        /**
+         * The rows at the end of the page (PLAN-RELATED.md): the movie's
+         * collection, then More like this. Empty until they arrive, and
+         * on servers without them or when they couldn't be had.
+         */
+        val related: List<ScreenRow> = emptyList(),
     ) {
         val watched: Boolean get() = movie.value?.watch?.completed == true
 
@@ -86,6 +94,9 @@ class MovieViewModel(
     val state: StateFlow<State> = _state.asStateFlow()
 
     private val loads = Latest(viewModelScope)
+
+    /** The related rows were asked for, or are on their way: once a page, so a quiet reload keeps them. */
+    private var relatedAsked = false
 
     /** Its own movie's marks and progress, and library changes that may have rematched it. */
     private val freshness = Freshness(viewModelScope) { load(quiet = true) }
@@ -187,6 +198,7 @@ class MovieViewModel(
             attempt { library.movie(movieId) }
                 .onSuccess { movie ->
                     _state.update { it.copy(movie = Load.Ready(movie), offline = false) }
+                    loadRelated()
                     // A version list without the play mode is still right; a failure here is not shown.
                     attempt { plans(movie.versions.map { v -> v.fileId }) }.onSuccess { p -> _state.update { it.copy(plans = p) } }
                 }
@@ -200,6 +212,22 @@ class MovieViewModel(
                         }
                     }
                 }
+        }
+    }
+
+    /**
+     * The related rows, once the movie is in (PLAN-RELATED.md §6): on their
+     * own, so the page never waits for them, and kept with the page. A
+     * failure leaves the page as it is, without rows; the next load that
+     * brings the movie asks again.
+     */
+    private fun loadRelated() {
+        if (relatedAsked) return
+        relatedAsked = true
+        viewModelScope.launch {
+            attempt { library.movieRelated(movieId) }
+                .onSuccess { rows -> _state.update { it.copy(related = rows.relatedDrawn()) } }
+                .onFailure { relatedAsked = false }
         }
     }
 

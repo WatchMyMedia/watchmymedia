@@ -22,6 +22,9 @@ import media.watchmy.client.model.Person
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.PlaybackMode
 import media.watchmy.client.model.PlaybackPlan
+import media.watchmy.client.model.RelatedRowIds
+import media.watchmy.client.model.RowStyle
+import media.watchmy.client.model.ScreenRow
 import media.watchmy.client.model.SeasonDetail
 import media.watchmy.client.model.SeasonSummary
 import media.watchmy.client.model.ShowDetail
@@ -353,6 +356,39 @@ object FakeData {
 
     /** The Paper Kite's trailer file. */
     const val TRAILER_FILE = 9601L
+
+    /** The one fictional TMDB collection in the library, in release order: Cold Harbour Road, Low Tide at Carrow, Dead Reckoning Bay. */
+    val carrowCollection = listOf(508L, 505L, 500L)
+
+    const val COLLECTION_NAME = "The Carrow Coast Collection"
+
+    /** Tin Sky and Midnight Cartography: nothing in the library is like them, so their pages end as they always have. */
+    val unlike = setOf(507L, 109L)
+
+    /**
+     * The rows at the end of a movie's page, as the server sends them
+     * (PLAN-RELATED.md §3): the collection's other films in release order,
+     * then More like this, those sharing a genre first, without the
+     * collection's; none for a title nothing is like.
+     */
+    fun movieRelated(id: Long): List<ScreenRow> {
+        if (id in unlike || movies.none { it.id == id }) return emptyList()
+        val genres = movies.first { it.id == id }.genres
+        val collection = if (id in carrowCollection) carrowCollection.filter { it != id }.map { m -> movies.first { it.id == m } } else emptyList()
+        val similar = movies.filter { it.id != id && it.id !in unlike && it !in collection }.sortedByDescending { m -> m.genres.count { it in genres } }
+        return listOfNotNull(
+            collection.takeIf { it.isNotEmpty() }?.let { ScreenRow(RelatedRowIds.COLLECTION, RowStyle.Poster, COLLECTION_NAME, items = it) },
+            similar.takeIf { it.size >= 3 }?.let { ScreenRow(RelatedRowIds.SIMILAR, RowStyle.Poster, "More like this", items = it.take(20)) },
+        )
+    }
+
+    /** The row at the end of a show's page: More like this, shows sharing a genre first; none for a show nothing is like. */
+    fun showRelated(id: Long): List<ScreenRow> {
+        if (id in unlike || shows.none { it.id == id }) return emptyList()
+        val genres = shows.first { it.id == id }.genres
+        val similar = shows.filter { it.id != id && it.id !in unlike }.sortedByDescending { s -> s.genres.count { it in genres } }.take(12)
+        return listOf(ScreenRow(RelatedRowIds.SIMILAR, RowStyle.Poster, "More like this", items = similar))
+    }
 
     /** Names a file the way the server's records would, for a bare play link. */
     fun playRequest(fileId: Long, now: Long = System.currentTimeMillis()): PlayRequest {

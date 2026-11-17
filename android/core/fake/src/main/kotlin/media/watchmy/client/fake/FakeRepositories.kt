@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.update
 import media.watchmy.client.model.AUTO_API_LEVEL
 import media.watchmy.client.model.TRAILERS_API_LEVEL
 import media.watchmy.client.model.ROWS_API_LEVEL
+import media.watchmy.client.model.RELATED_API_LEVEL
 import media.watchmy.client.model.RowScreens
 import media.watchmy.client.model.ScreenRow
 import media.watchmy.client.model.ApiException
@@ -70,7 +71,7 @@ private suspend fun latency() {
  * feature. A fake server at a lower level hides what its level lacks, as a
  * real one does.
  */
-const val FAKE_SERVER_API_LEVEL = 29
+const val FAKE_SERVER_API_LEVEL = 30
 
 /** The asset URL of one of the fakes' fictional backdrops ([FakeData.backdrop]); null for any other path. */
 fun fakeArtUrl(path: String?): String? =
@@ -288,6 +289,19 @@ class FakeLibraryRepository(
     override suspend fun season(showId: Long, number: Int) = FakeData.season(showId, number, arr, user()).also { latency(); unreachable() }
 
     override suspend fun movie(id: Long) = FakeData.movie(id).let { if (level() >= TRAILERS_API_LEVEL) it else it.copy(trailers = emptyList()) }.also { latency(); unreachable() }
+
+    /** From [RELATED_API_LEVEL] ([FakeData.movieRelated]); an older fake server has none. */
+    override suspend fun movieRelated(id: Long): List<ScreenRow> {
+        latency()
+        unreachable()
+        return if (level() >= RELATED_API_LEVEL) FakeData.movieRelated(id) else emptyList()
+    }
+
+    override suspend fun showRelated(id: Long): List<ScreenRow> {
+        latency()
+        unreachable()
+        return if (level() >= RELATED_API_LEVEL) FakeData.showRelated(id) else emptyList()
+    }
 
     override suspend fun search(text: String): SearchResults {
         latency()

@@ -88,4 +88,7 @@ value class ServerFeatures(val level: Int) {
 
     /** 29: following shows, the feed of their new episodes and Home's `followed` row (PLAN-NEW-EPISODES.md). */
     val follows: Boolean get() = level >= FOLLOWS_API_LEVEL
+
+    /** 30: related titles at the end of movie and show pages (PLAN-RELATED.md). */
+    val related: Boolean get() = level >= RELATED_API_LEVEL
 }

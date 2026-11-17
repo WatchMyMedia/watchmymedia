@@ -26,6 +26,7 @@ import media.watchmy.client.model.ProblemKind
 import media.watchmy.client.model.RequestOptions
 import media.watchmy.client.model.RequestRepository
 import media.watchmy.client.model.Requestable
+import media.watchmy.client.model.ScreenRow
 import media.watchmy.client.model.SeasonDetail
 import media.watchmy.client.model.SeasonMissing
 import media.watchmy.client.model.SeasonSummary
@@ -50,6 +51,7 @@ import media.watchmy.client.model.onTop
 import media.watchmy.client.model.pageEpisodes
 import media.watchmy.client.model.playRequest
 import media.watchmy.client.model.playable
+import media.watchmy.client.model.relatedDrawn
 import media.watchmy.client.model.seasonMissing
 import media.watchmy.client.model.seasonName
 import media.watchmy.client.model.seasonStart
@@ -145,6 +147,12 @@ class ShowPageViewModel(
         val offline: Boolean = false,
         /** The server can follow shows (Notify me), from [media.watchmy.client.model.FOLLOWS_API_LEVEL]. */
         val followable: Boolean = false,
+        /**
+         * The row at the end of the page, More like this (PLAN-RELATED.md).
+         * Empty until it arrives, and on servers without it or when it
+         * couldn't be had.
+         */
+        val related: List<ScreenRow> = emptyList(),
     ) {
         val show: ShowDetail? get() = page.value?.show
         val season: SeasonDetail? get() = page.value?.season
@@ -237,6 +245,9 @@ class ShowPageViewModel(
 
     /** Counts the bell's presses: a reload that began before the latest one keeps the bell as it is. */
     private var followPresses = 0
+
+    /** The related row was asked for, or is on its way: once a page, so a quiet reload keeps it. */
+    private var relatedAsked = false
 
     init {
         load()
@@ -565,6 +576,7 @@ class ShowPageViewModel(
                         )
                     }
                     if (top != null) select(top.episodeId, top.reason)
+                    loadRelated()
                 }
                 .onFailure { e ->
                     val text = if (e is NoSuchElementException) "No episodes of this show are here yet." else errorMessage(e)
@@ -582,6 +594,22 @@ class ShowPageViewModel(
                         select(id, reason = null)
                     }
                 }
+        }
+    }
+
+    /**
+     * The related row, once the show is in (PLAN-RELATED.md §6): on its
+     * own, so the page never waits for it, and kept with the page. A
+     * failure leaves the page as it is, without the row; the next load that
+     * brings the show asks again.
+     */
+    private fun loadRelated() {
+        if (relatedAsked) return
+        relatedAsked = true
+        viewModelScope.launch {
+            attempt { library.showRelated(showId) }
+                .onSuccess { rows -> _state.update { it.copy(related = rows.relatedDrawn()) } }
+                .onFailure { relatedAsked = false }
         }
     }
 
