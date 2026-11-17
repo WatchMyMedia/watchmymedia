@@ -742,6 +742,19 @@ public enum FilePage: Hashable, Sendable {
 extension LibraryRepository {
     /// A repository that can't tell has no page for any file.
     public func filePage(fileID: Int) async throws -> FilePage? { nil }
+
+    /// A repository that can't ask offers no related titles.
+    public var offersRelated: Bool { false }
+
+    /// A repository that can't ask has none.
+    public func relatedRows(_ title: RelatedTitle) async throws -> [ScreenRow] { [] }
+}
+
+/// The page whose related titles are asked for (PLAN-RELATED.md §6): a
+/// movie's lists movies, a show's lists shows.
+public enum RelatedTitle: Hashable, Sendable {
+    case movie(id: Int)
+    case show(id: Int)
 }
 
 /// Browsing the current server's libraries. Methods throw ``APIError``; a
@@ -776,6 +789,17 @@ public protocol LibraryRepository: AnyObject {
     /// app didn't publish, which opens the page rather than playing
     /// (PLAN-APPLE-REVIEW.md §3.4.7); nil for a file without one.
     func filePage(fileID: Int) async throws -> FilePage?
+
+    /// The server works out related titles (``ServerFeatures/related``):
+    /// below it a page asks for none and ends as it did.
+    var offersRelated: Bool { get }
+
+    /// The rows at the end of a movie's or a show's page (PLAN-RELATED.md
+    /// §6), as ``ScreenRow``s Home's rows draw: the movie's collection
+    /// (`collection`, titled with its name, in release order), then More like
+    /// this (`similar`, best first), each with `items`. Empty when nothing
+    /// qualifies, and below ``ServerFeatures/related``.
+    func relatedRows(_ title: RelatedTitle) async throws -> [ScreenRow]
 
     /// The full URL of a TMDB image path at `size`, or nil for no image. The
     /// image loader adds the sign-in, so the URL carries no token.

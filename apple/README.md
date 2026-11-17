@@ -530,6 +530,41 @@ with `build-for-testing` and run each with `-only-testing` and
 `test-without-building`, on a fresh simulator (the first step expects iOS
 not to have asked for notifications).
 
+## Related titles
+
+From API level 30 a movie's page ends with the films of its TMDB collection
+that the library has, in release order, then More like this, and a show's
+page with More like this (PLAN-RELATED.md §7; the boards are
+`MovieRelated` and `ShowRelated` in `ios/`, `Pad2MovieRelated` and
+`Pad2ShowRelated` in `ipad-revised/`, and `TvMovieRelated` and
+`TvShowRelated` in `apple-tv/`). The server works the rows out and sends
+them as `ScreenRow`s (`getMovieRelated`, `getShowRelated`), so they are
+drawn with Home's poster rows and cards, without See all.
+
+- **When they are asked for.** `RelatedRows` (WMMFeatures), held by
+  `MovieModel` and `ShowPageModel`, asks once the page's details are in,
+  beside the movie's plans or the show's season, so the page never waits;
+  an older server is asked nothing. The reply is kept with the page:
+  reloads (a mark, the player's progress) ask again only after pull to
+  refresh or a mark on a title in the rows. A failed reply changes
+  nothing, and a page read from a download has none.
+- **iPhone and iPad** (`RelatedSection`): after Details on a movie, at the
+  end of the iPad's right-hand column, and after About the show. Both
+  pages keep the tab bar on iPhone, as the boards draw them. A card opens
+  its page over this one, and Back comes back to the row.
+- **Apple TV** (`RelatedShelves`): the movie page's first screen ends with
+  the shelves' names along its bottom edge (`PageFold` from `TabPage`)
+  and the shelves wait below it; Down from the versions reaches them. On a
+  show, Down from About the show reaches More like this. Up leaves them,
+  and Menu from a card's page comes back to the card.
+
+`-fakesRelated` puts the fakes' server at level 30 (`FakeRelated`): Cold
+Harbour Road, Low Tide at Carrow and Dead Reckoning Bay (`movies/500`) are
+the Carrow Coast Collection, every other movie and show has More like this,
+and Tin Sky (`movies/507`) and Glass Country (`shows/108`) have nothing.
+`UITests/RelatedTitlesTests.swift` and `TVUITests/RelatedTitlesTests.swift`
+drive them.
+
 ## First run, audio languages and subtitles
 
 Empty Home explains whether the server has no libraries, is scanning, could not

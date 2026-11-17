@@ -43,6 +43,8 @@ filter:
     - listNewEpisodes
     - getSeason
     - getMovie
+    - getMovieRelated
+    - getShowRelated
     - search
     - listContinueWatching
     - markWatched

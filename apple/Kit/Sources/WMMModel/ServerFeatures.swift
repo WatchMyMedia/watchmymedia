@@ -59,6 +59,8 @@ public struct ServerFeatures: Hashable, Sendable {
         public static let tokenWithDecision = 28
         /// Following shows and their new episodes (PLAN-NEW-EPISODES.md).
         public static let follows = 29
+        /// Related titles at the end of movie and show pages (PLAN-RELATED.md).
+        public static let related = 30
     }
 
     /// The server's API level; 0 when it isn't known.
@@ -115,6 +117,8 @@ public struct ServerFeatures: Hashable, Sendable {
     public var liveStatusWaits: Bool { apiLevel >= Level.tokenWithDecision }
     /// 29: following shows (Notify me), the new-episode feed and Home's row for them.
     public var follows: Bool { apiLevel >= Level.follows }
+    /// 30: related titles, the rows at the end of a movie's or a show's page.
+    public var related: Bool { apiLevel >= Level.related }
 }
 
 extension Server {
@@ -166,3 +170,5 @@ public let liveAutomaticAPILevel = ServerFeatures.Level.liveAutomatic
 public let decisionTokenAPILevel = ServerFeatures.Level.tokenWithDecision
 /// ``ServerFeatures/Level/follows``.
 public let followsAPILevel = ServerFeatures.Level.follows
+/// ``ServerFeatures/Level/related``.
+public let relatedAPILevel = ServerFeatures.Level.related

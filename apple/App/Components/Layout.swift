@@ -27,13 +27,6 @@ extension Optional where Wrapped == UserInterfaceSizeClass {
 }
 
 extension View {
-    /// The tab bar hides under a pushed page on iPhone; on iPad it stays at the top, as the artboards draw it.
-    func tabBarHiddenOnPhone(_ sizeClass: UserInterfaceSizeClass?) -> some View {
-        toolbar(sizeClass.isWide ? .automatic : .hidden, for: .tabBar)
-    }
-}
-
-extension View {
     /// A row that scrolls sideways stops at the system's vertical bar (the
     /// iPhone Duo's tab bar down one edge, DuoOuterHome) instead of running on
     /// under its glass. Where there is no such bar (an iPhone in landscape, by

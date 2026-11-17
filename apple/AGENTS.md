@@ -289,6 +289,11 @@ server, and on iPad in both a regular and a compact width.
   element inside it, so its own `hasFocus` stays false, and its items are
   cells with each item's identifier on a view inside: find what has focus
   (`hasFocus == true`) and compare frames (`TVUITests/FirstRunAndSubtitleTests.swift`).
+  A poster card's Button still lists its title as a `StaticText` to XCUI
+  (iOS 27.2), though the card ignores its children for VoiceOver, so a
+  page's title also matches a card of it in a related row: tell pages
+  apart by something only the page shows, as the show page's eyebrow
+  (`UITests/RelatedTitlesTests.swift`).
 
 ## Simulators
 

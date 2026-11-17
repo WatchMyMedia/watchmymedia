@@ -28,6 +28,8 @@ import WMMPlayback
 /// three shows followed and one that left the library, Home's New from shows
 /// you follow, and a second new-episode check that finds two shows' arrivals
 /// (PLAN-NEW-EPISODES.md). `-fakesManyNewEpisodes` makes it seven shows.
+/// `-fakesRelated` puts it at API level 30: movie and show pages end in their
+/// collection and More like this (PLAN-RELATED.md).
 @MainActor
 enum ServicesFactory {
     static func make(arguments: [String]) -> AppServices {
@@ -76,7 +78,8 @@ enum ServicesFactory {
             recordings: arguments.contains("-fakesLiveRecordings"),
             liveAutomatic: arguments.contains("-fakesLiveAutomatic"),
             rows: arguments.contains("-fakesRows"),
-            follows: arguments.contains("-fakesFollows")
+            follows: arguments.contains("-fakesFollows"),
+            related: arguments.contains("-fakesRelated")
         )
         (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
         if let i = arguments.firstIndex(of: "-fakesAudioLanguages"), arguments.indices.contains(i + 1), !arguments[i + 1].hasPrefix("-") {

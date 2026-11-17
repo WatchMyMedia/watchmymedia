@@ -27,6 +27,12 @@ final class TestLibrary: LibraryRepository {
     private(set) var queries: [ItemQuery] = []
     private(set) var searches: [String] = []
     private(set) var watchCalls: [String] = []
+    /// Each page whose related titles were asked for, in order.
+    private(set) var relatedCalls: [RelatedTitle] = []
+    /// Thrown by relatedRows alone while set.
+    var relatedFailure: (any Error)?
+    /// Holds relatedRows until it returns, for a reply still on its way.
+    var relatedGate: (@MainActor () async -> Void)?
     private var listeners: [UUID: AsyncStream<Void>.Continuation] = [:]
     private var typedListeners: [UUID: AsyncStream<LibraryChange>.Continuation] = [:]
 
@@ -107,6 +113,17 @@ final class TestLibrary: LibraryRepository {
     func playRequest(fileID: Int) async throws -> PlayRequest {
         try check()
         return try await fake.playRequest(fileID: fileID)
+    }
+
+    /// The fake's: offered unless its server is below API level 30.
+    var offersRelated: Bool { fake.offersRelated }
+
+    func relatedRows(_ title: RelatedTitle) async throws -> [ScreenRow] {
+        relatedCalls.append(title)
+        try check()
+        await relatedGate?()
+        if let relatedFailure { throw relatedFailure }
+        return try await fake.relatedRows(title)
     }
 
     func imageURL(_ path: String?, size: ImageSize) -> URL? { nil }
