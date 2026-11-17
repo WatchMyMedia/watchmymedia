@@ -120,8 +120,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         MainActor.assumeIsolated {
             guard let window else { return Self.orientations }
-            let traits = window.traitCollection.horizontalSizeClass == .unspecified ? window.windowScene?.traitCollection : window.traitCollection
-            return traits.map(PlayerWindow.init) == .wide ? .all : Self.orientations
+            let own = window.traitCollection
+            let traits = own.horizontalSizeClass == .unspecified ? window.windowScene?.traitCollection ?? own : own
+            // Before the window has its size classes (at launch), an iPad
+            // turns freely, as it always has, so one held sideways starts sideways.
+            guard traits.horizontalSizeClass != .unspecified else {
+                return traits.userInterfaceIdiom == .pad ? .all : Self.orientations
+            }
+            return PlayerWindow(traits) == .wide ? .all : Self.orientations
         }
     }
 

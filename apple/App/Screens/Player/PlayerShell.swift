@@ -32,9 +32,18 @@ extension LivePlayerModel: PlayerShellModel {
 @MainActor
 enum PlayerEscape {
     static weak var current: (any PlayerShellModel)?
+    /// Closes the panel open beside the picture (the iPhone Duo's, ``PlayerPanelChoice``),
+    /// which Escape closes ahead of the player, as it does the options over the picture.
+    static var closePanel: (@MainActor () -> Void)?
 
     /// True when a player took it.
-    static func press() -> Bool { current?.handle(.escape) ?? false }
+    static func press() -> Bool {
+        if let closePanel {
+            closePanel()
+            return true
+        }
+        return current?.handle(.escape) ?? false
+    }
 }
 
 /// Adds Escape, ahead of the system's own use of it, to the view controller

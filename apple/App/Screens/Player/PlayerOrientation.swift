@@ -68,7 +68,18 @@ enum OrientationLock {
                 }
             }
         }
-        if kind == .phone { request(mask, tries: 8) } else { asked = nil }
+        if kind == .phone { request(mask, tries: 8) } else { settleWide() }
+    }
+
+    /// A wide window asks for nothing. An ask made in a phone's window that
+    /// hasn't been put back yet (the Duo unfolded within ``request(_:tries:)``'s
+    /// 400 ms) is put back to every way now, rather than going with the scene
+    /// to the inner screen; iOS may refuse it there, which leaves things no worse.
+    private static func settleWide() {
+        guard let pending = asked else { return }
+        asked = nil
+        guard pending != .all else { return }
+        for scene in scenes { scene.requestGeometryUpdate(.iOS(interfaceOrientations: .all)) }
     }
 
     private static var scenes: [UIWindowScene] {
@@ -88,6 +99,8 @@ enum OrientationLock {
         for scene in scenes {
             scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { _ in
                 Task { @MainActor in
+                    // One retry for the attempt, however many scenes refused it.
+                    guard refused != this else { return }
                     refused = this
                     guard tries > 1 else { return }
                     try? await Task.sleep(for: .milliseconds(250))

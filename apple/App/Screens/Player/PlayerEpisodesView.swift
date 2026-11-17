@@ -62,6 +62,8 @@ struct PlayerPortraitDetails: View {
                 ScrollViewReader { proxy in
                     ScrollView { PlayerEpisodeRows(model: model, episodes: episodes, heading: false) }
                         .scrollIndicators(.hidden)
+                        // The last episode clear of the bottom edge and the home indicator.
+                        .contentMargins(.bottom, 24, for: .scrollContent)
                         .onChange(of: playingEpisode, initial: true) { _, id in
                             if let id { proxy.scrollTo(id, anchor: .center) }
                         }

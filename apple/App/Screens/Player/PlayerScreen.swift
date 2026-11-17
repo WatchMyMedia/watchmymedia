@@ -98,6 +98,18 @@ private struct PlayerContent: View {
         #endif
     }
 
+    /// A panel beside the picture stands for the options over it: the
+    /// controls stay up while it shows, and Escape closes it first.
+    private func panelBesideChanged(_ open: Bool) {
+        model.hold("panelBeside", open)
+        guard open else {
+            PlayerEscape.closePanel = nil
+            return
+        }
+        let panels = $panels
+        PlayerEscape.closePanel = { panels.wrappedValue.close() }
+    }
+
     private func content(_ frame: PlayerFrame) -> some View {
         let state = model.state
         let metrics = frame.metrics
@@ -114,6 +126,7 @@ private struct PlayerContent: View {
         let options: PlayerOptionsRow = !metrics.sidePanelPicker ? (chips ? .chips : .more)
             : inPlace ? .panels(panels, toggle: { panels.toggle($0) }) : .tabs
         let insets = frame.insets(portrait: arrangement.kind == .portrait)
+        let besideOpen = arrangement.kind == .beside && panels.panel != nil
         return ZStack(alignment: .topLeading) {
             (arrangement.kind == .full || arrangement.kind == .beside ? Color.black : Palette.ground)
             // Always first and always the same view: only its frame changes.
@@ -158,6 +171,10 @@ private struct PlayerContent: View {
             panels.open(.options(tab))
             model.closePicker()
         }
+        // A panel beside the picture stands for the options over it: the
+        // controls stay up while it shows, and Escape closes it first.
+        .onChange(of: besideOpen, initial: true) { _, open in panelBesideChanged(open) }
+        .onDisappear { PlayerEscape.closePanel = nil }
         .animation(.easeInOut(duration: 0.25), value: arrangement)
         .animation(.easeInOut(duration: 0.2), value: model.showsControls)
         .animation(.easeInOut(duration: 0.2), value: model.showsUpNext)
