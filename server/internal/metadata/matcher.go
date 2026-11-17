@@ -377,7 +377,8 @@ func (m *Matcher) matchLibrary(ctx context.Context, lib db.Library, rematch, ann
 		// Still report completion so a "Match" click in the UI gets an answer.
 		m.bus.Publish(events.Event{Type: "match.finished", Data: summary})
 		rated := m.fillContentRatings(ctx, lib)
-		if m.linkTrailers(ctx, lib)+rated > 0 || announce {
+		swept := m.sweepFileNamed(ctx, lib)
+		if m.linkTrailers(ctx, lib)+rated > 0 || swept || announce {
 			changed()
 		}
 		return summary, nil
@@ -478,7 +479,8 @@ func (m *Matcher) matchLibrary(ctx context.Context, lib db.Library, rematch, ann
 	// Unmatched files change what lists show too: they appear by file name.
 	rated := m.fillContentRatings(ctx, lib)
 	linked := m.linkTrailers(ctx, lib)
-	if announce || summary.Matched+summary.Unmatched+summary.Failed > 0 || rated+linked > 0 {
+	swept := m.sweepFileNamed(ctx, lib)
+	if announce || summary.Matched+summary.Unmatched+summary.Failed > 0 || rated+linked > 0 || swept {
 		changed()
 	}
 	return summary, nil
@@ -547,6 +549,9 @@ type noMatchError struct {
 	// noShow is set when no show could be found for an episode, rather
 	// than the show lacking it.
 	noShow bool
+	// unlisted is set when the show is known and TMDB lists neither the
+	// file's season nor its episodes there (see filenamed.go).
+	unlisted bool
 }
 
 func (e *noMatchError) Error() string { return e.msg }
@@ -576,9 +581,20 @@ func (m *Matcher) record(ctx context.Context, fileID int64, status string, movie
 	if locked {
 		lockedInt = 1
 	}
+	// The episodes named after the file that it plays as now. Left unmatched
+	// with no episodes of its own (TMDB still lacks them, or did not answer,
+	// or a line-up's show lacks them too), it keeps playing as them; given
+	// others, they hand their watch state on and go (retireFileNamed).
+	was, err := m.q.ListFileNamedEpisodesForFile(ctx, fileID)
+	if err != nil {
+		return err
+	}
+	if status != StatusMatched && movieID == nil && len(episodeIDs) == 0 {
+		episodeIDs = was
+	}
 	// One transaction: a failure part way must not leave a file matched with
 	// its old episodes gone and only some of the new ones linked.
-	return m.q.Transaction(ctx, func(q *db.Queries) error {
+	err = m.q.Transaction(ctx, func(q *db.Queries) error {
 		if err := q.SetMediaFileMatch(ctx, db.SetMediaFileMatchParams{
 			MatchStatus: status, MovieID: movieID, MatchCandidates: cand, MatchError: errMsg,
 			MatchedAt: matchedAt, MatchLocked: lockedInt, ID: fileID,
@@ -601,6 +617,15 @@ func (m *Matcher) record(ctx context.Context, fileID int64, status string, movie
 		}
 		return recordArrivals(ctx, q, fileID, episodeIDs)
 	})
+	if err != nil || len(was) == 0 {
+		return err
+	}
+	// The match is recorded; an episode left behind is removed by the next
+	// sweep instead, without its watch state.
+	if err := m.retireFileNamed(ctx, was, episodeIDs); err != nil && ctx.Err() == nil {
+		m.log.Warn("hand on file-named episodes", "file", fileID, "err", err)
+	}
+	return nil
 }
 
 // NewWindow is how long a file counts as new after it was added (its
@@ -780,7 +805,7 @@ func (m *Matcher) matchEpisode(ctx context.Context, lib db.Library, f db.MediaFi
 		return ids, nil, err
 	}
 	if override != nil {
-		ids, err := m.linkGuess(ctx, lib, *override, g)
+		ids, err := m.linkOrName(ctx, lib, f, *override, g)
 		return ids, nil, err
 	}
 	if name, _ := splitCountry(g.Title); strings.TrimSpace(name) == "" {
@@ -800,7 +825,7 @@ func (m *Matcher) matchEpisode(ctx context.Context, lib db.Library, f db.MediaFi
 		// ("American Sports Story/American.Sports.Story.S01E03", whose
 		// sibling "…Aaron.Hernandez.S01E01" names the show in full).
 		if id, ok := m.folderShow(ctx, lib, f); ok {
-			ids, err := m.linkGuess(ctx, lib, id, g)
+			ids, err := m.linkOrName(ctx, lib, f, id, g)
 			return ids, candidates, err
 		}
 		if len(candidates) == 0 {
@@ -808,7 +833,7 @@ func (m *Matcher) matchEpisode(ctx context.Context, lib db.Library, f db.MediaFi
 		}
 		return nil, candidates, noShow("no confident match for show %q; best was %q (%d)", g.Title, candidates[0].Title, candidates[0].Year)
 	}
-	ids, err := m.linkGuess(ctx, lib, best.TMDBID, g)
+	ids, err := m.linkOrName(ctx, lib, f, best.TMDBID, g)
 	return ids, candidates, err
 }
 
@@ -824,7 +849,9 @@ func (m *Matcher) linkEpisodes(ctx context.Context, lib db.Library, tmdbShowID, 
 		}
 	}
 	seasonRow, err := m.q.GetSeasonByNumber(ctx, db.GetSeasonByNumberParams{ShowID: show.ID, Number: int64(season)})
-	fetch := err != nil
+	// A season made for files named after them is asked of TMDB each time,
+	// as one with no row is: TMDB may list it now.
+	fetch := err != nil || seasonRow.FileNamed != 0
 	if !fetch {
 		// A season row with no episodes yet still needs its episode list.
 		eps, _ := m.q.ListSeasonEpisodes(ctx, seasonRow.ID)
@@ -838,7 +865,9 @@ func (m *Matcher) linkEpisodes(ctx context.Context, lib db.Library, tmdbShowID, 
 	lookup := func() (ids []int64, missing []int) {
 		for _, n := range episodes {
 			ep, err := m.q.GetEpisodeByNumber(ctx, db.GetEpisodeByNumberParams{SeasonID: seasonRow.ID, Number: int64(n)})
-			if err != nil {
+			// An episode named after a file is not TMDB's: only the file's
+			// own fallback links to it (filenamed.go).
+			if err != nil || ep.FileNamed != 0 {
 				missing = append(missing, n)
 				continue
 			}
@@ -855,7 +884,7 @@ func (m *Matcher) linkEpisodes(ctx context.Context, lib db.Library, tmdbShowID, 
 		ids, missing = lookup()
 	}
 	if len(ids) == 0 {
-		return nil, noMatch("season %d of %q has no episode %v on TMDB", season, show.Title, missing)
+		return nil, unlisted("season %d of %q has no episode %v on TMDB", season, show.Title, missing)
 	}
 	return ids, nil
 }
@@ -968,7 +997,7 @@ func (m *Matcher) storeSeason(ctx context.Context, show db.Show, number int) (db
 	s, err := m.tmdb.GetSeason(ctx, int(show.TmdbID), number)
 	if err != nil {
 		if errors.Is(err, tmdb.ErrNotFound) {
-			return db.Season{}, noMatch("%q has no season %d on TMDB", show.Title, number)
+			return db.Season{}, unlisted("%q has no season %d on TMDB", show.Title, number)
 		}
 		return db.Season{}, err
 	}

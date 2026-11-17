@@ -105,7 +105,7 @@ type Season struct {
 	AirDate        string `json:"airDate,omitempty"`
 	PosterPath     string `json:"posterPath,omitempty"`
 	PosterSource   string `json:"posterSource,omitempty" required:"false" enum:"tmdb,upload,url" doc:"Set when an admin chose the poster; absent for the match's own."`
-	EpisodeCount   int64  `json:"episodeCount" doc:"Episodes TMDB lists for the season."`
+	EpisodeCount   int64  `json:"episodeCount" doc:"Episodes TMDB lists for the season, and those named after files because TMDB does not list them."`
 	AvailableCount int64  `json:"availableCount" doc:"Episodes with a present file."`
 	WatchedCount   int64  `json:"watchedCount" doc:"Episodes the signed-in user has watched."`
 	// Monitored and Request come from Sonarr and requests (PLAN-ARR.md §6).
@@ -116,7 +116,7 @@ type Season struct {
 type ShowDetail struct {
 	Show
 	Seasons       []Season   `json:"seasons" nullable:"false"`
-	TotalEpisodes int64      `json:"totalEpisodes" doc:"Episodes TMDB lists across all seasons."`
+	TotalEpisodes int64      `json:"totalEpisodes" doc:"Episodes across all seasons, as the seasons' episodeCount counts them."`
 	Quality       string     `json:"quality,omitempty" enum:",4K,1080p,720p,SD"`
 	HDR           bool       `json:"hdr"`
 	TotalSize     int64      `json:"totalSize"`
@@ -149,7 +149,7 @@ type Episode struct {
 	Rating     float64     `json:"rating,omitempty"`
 	Files      []MediaFile `json:"files" nullable:"false"`
 	HasFile    bool        `json:"hasFile"`
-	Aired      bool        `json:"aired" doc:"Air date is today or earlier."`
+	Aired      bool        `json:"aired" doc:"Air date is today or earlier; always for an episode named after a file, which has no air date."`
 	AddedAt    *time.Time  `json:"addedAt,omitempty" doc:"When its newest file was added: its date on disk when first found."`
 	IsNew      bool        `json:"isNew"`
 	Watch      *WatchState `json:"watch,omitempty"`
@@ -346,6 +346,9 @@ func registerBrowse(h huma.API, deps Deps) {
 		}
 		out := &GetShowOutput{Body: ShowDetail{Show: showFromDB(row), Seasons: make([]Season, 0, len(seasons))}}
 		for _, s := range seasons {
+			// Episodes named after files are the season's too, though TMDB's
+			// count leaves them out: "6 of 3" would read as nonsense.
+			s.Season.EpisodeCount += s.FileNamedCount
 			out.Body.Seasons = append(out.Body.Seasons, seasonFromDB(s.Season, s.AvailableCount))
 			out.Body.EpisodeCount += s.AvailableCount
 			out.Body.TotalEpisodes += s.Season.EpisodeCount
@@ -447,7 +450,7 @@ func registerBrowse(h huma.API, deps Deps) {
 		}
 
 		out := &GetSeasonOutput{Body: SeasonDetail{Show: showFromDB(show), Episodes: make([]Episode, 0, len(episodes))}}
-		available := int64(0)
+		available, fileNamed := int64(0), int64(0)
 		today := time.Now().UTC().Format("2006-01-02")
 		watch := map[int64]WatchState{}
 		if user, ok := auth.UserFrom(ctx); ok {
@@ -477,6 +480,12 @@ func registerBrowse(h huma.API, deps Deps) {
 				Files: files, HasFile: len(files) > 0,
 			}
 			ep.Aired = ep.AirDate != "" && ep.AirDate <= today
+			if e.FileNamed != 0 {
+				// Named after a file because TMDB doesn't list it: it has no
+				// air date, but the file says it is out, not coming.
+				ep.Aired = true
+				fileNamed++
+			}
 			for _, f := range files {
 				if f.Status != "present" {
 					continue
@@ -496,6 +505,7 @@ func registerBrowse(h huma.API, deps Deps) {
 			}
 			out.Body.Episodes = append(out.Body.Episodes, ep)
 		}
+		season.EpisodeCount += fileNamed // TMDB's count leaves them out, as on the show
 		out.Body.Season = seasonFromDB(season, available)
 		if s := deps.Integrations; s != nil {
 			req := seasonRequests(ctx, s, show.TmdbID)[int(season.Number)]

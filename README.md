@@ -732,6 +732,13 @@ and episode the first file is and see what every file becomes first. The choice 
 for the folder, so later episodes of that season match on their own. Matching is done on the
 web; the apps have no screen for it.
 
+Until then, an episode whose show is found but whose season or episode TMDB doesn't list yet
+still plays: it appears on the show's page in its place, named after its file, in every app,
+with resume and watched marks like any other. It stays in the Unmatched view and is looked
+up on TMDB again each day. Once TMDB lists the episode it takes TMDB's title and picture,
+keeping everyone's progress; lining it up elsewhere carries the progress with it. Files named
+by air date, specials and files with no numbers still need a person.
+
 "Recently added" rows, the added sort and the NEW badge use each file's modified date
 from when a scan first found it, so the first scan of an existing collection keeps the
 order the files arrived in. A file that changes later keeps its place. Files copied

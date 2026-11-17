@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"strings"
 )
 
 const countMediaFilesByMatch = `-- name: CountMediaFilesByMatch :many
@@ -89,12 +90,54 @@ func (q *Queries) CountShows(ctx context.Context, libraryID int64) (int64, error
 	return count, err
 }
 
+const deleteEmptyFileNamedSeasons = `-- name: DeleteEmptyFileNamedSeasons :exec
+DELETE FROM seasons
+WHERE seasons.file_named = 1 AND seasons.id IN (/*SLICE:ids*/?)
+  AND NOT EXISTS (SELECT 1 FROM episodes e WHERE e.season_id = seasons.id)
+`
+
+func (q *Queries) DeleteEmptyFileNamedSeasons(ctx context.Context, ids []int64) error {
+	query := deleteEmptyFileNamedSeasons
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	return err
+}
+
 const deleteEpisodeFilesForFile = `-- name: DeleteEpisodeFilesForFile :exec
 DELETE FROM episode_files WHERE media_file_id = ?
 `
 
 func (q *Queries) DeleteEpisodeFilesForFile(ctx context.Context, mediaFileID int64) error {
 	_, err := q.db.ExecContext(ctx, deleteEpisodeFilesForFile, mediaFileID)
+	return err
+}
+
+const deleteFilelessFileNamedEpisodes = `-- name: DeleteFilelessFileNamedEpisodes :exec
+DELETE FROM episodes
+WHERE episodes.file_named = 1 AND episodes.id IN (/*SLICE:ids*/?)
+  AND NOT EXISTS (SELECT 1 FROM episode_files ef WHERE ef.episode_id = episodes.id)
+`
+
+func (q *Queries) DeleteFilelessFileNamedEpisodes(ctx context.Context, ids []int64) error {
+	query := deleteFilelessFileNamedEpisodes
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	_, err := q.db.ExecContext(ctx, query, queryParams...)
 	return err
 }
 
@@ -131,7 +174,7 @@ func (q *Queries) DeleteWatchStatesForItem(ctx context.Context, arg DeleteWatchS
 }
 
 const getEpisode = `-- name: GetEpisode :one
-SELECT id, season_id, show_id, number, title, overview, air_date, still_path, runtime_min, rating FROM episodes WHERE id = ?
+SELECT id, season_id, show_id, number, title, overview, air_date, still_path, runtime_min, rating, file_named FROM episodes WHERE id = ?
 `
 
 func (q *Queries) GetEpisode(ctx context.Context, id int64) (Episode, error) {
@@ -148,12 +191,13 @@ func (q *Queries) GetEpisode(ctx context.Context, id int64) (Episode, error) {
 		&i.StillPath,
 		&i.RuntimeMin,
 		&i.Rating,
+		&i.FileNamed,
 	)
 	return i, err
 }
 
 const getEpisodeByNumber = `-- name: GetEpisodeByNumber :one
-SELECT id, season_id, show_id, number, title, overview, air_date, still_path, runtime_min, rating FROM episodes WHERE season_id = ? AND number = ?
+SELECT id, season_id, show_id, number, title, overview, air_date, still_path, runtime_min, rating, file_named FROM episodes WHERE season_id = ? AND number = ?
 `
 
 type GetEpisodeByNumberParams struct {
@@ -175,6 +219,7 @@ func (q *Queries) GetEpisodeByNumber(ctx context.Context, arg GetEpisodeByNumber
 		&i.StillPath,
 		&i.RuntimeMin,
 		&i.Rating,
+		&i.FileNamed,
 	)
 	return i, err
 }
@@ -234,7 +279,7 @@ func (q *Queries) GetMovie(ctx context.Context, id int64) (Movie, error) {
 }
 
 const getSeason = `-- name: GetSeason :one
-SELECT id, show_id, number, name, overview, air_date, poster_path, episode_count, poster_tmdb, poster_source FROM seasons WHERE id = ?
+SELECT id, show_id, number, name, overview, air_date, poster_path, episode_count, poster_tmdb, poster_source, file_named FROM seasons WHERE id = ?
 `
 
 func (q *Queries) GetSeason(ctx context.Context, id int64) (Season, error) {
@@ -251,12 +296,13 @@ func (q *Queries) GetSeason(ctx context.Context, id int64) (Season, error) {
 		&i.EpisodeCount,
 		&i.PosterTmdb,
 		&i.PosterSource,
+		&i.FileNamed,
 	)
 	return i, err
 }
 
 const getSeasonByNumber = `-- name: GetSeasonByNumber :one
-SELECT id, show_id, number, name, overview, air_date, poster_path, episode_count, poster_tmdb, poster_source FROM seasons WHERE show_id = ? AND number = ?
+SELECT id, show_id, number, name, overview, air_date, poster_path, episode_count, poster_tmdb, poster_source, file_named FROM seasons WHERE show_id = ? AND number = ?
 `
 
 type GetSeasonByNumberParams struct {
@@ -278,6 +324,7 @@ func (q *Queries) GetSeasonByNumber(ctx context.Context, arg GetSeasonByNumberPa
 		&i.EpisodeCount,
 		&i.PosterTmdb,
 		&i.PosterSource,
+		&i.FileNamed,
 	)
 	return i, err
 }
@@ -418,6 +465,49 @@ func (q *Queries) InsertEpisodeFile(ctx context.Context, arg InsertEpisodeFilePa
 	return err
 }
 
+const insertFileNamedEpisode = `-- name: InsertFileNamedEpisode :exec
+INSERT INTO episodes (season_id, show_id, number, title, file_named) VALUES (?, ?, ?, ?, 1)
+ON CONFLICT (season_id, number) DO NOTHING
+`
+
+type InsertFileNamedEpisodeParams struct {
+	SeasonID int64  `json:"season_id"`
+	ShowID   int64  `json:"show_id"`
+	Number   int64  `json:"number"`
+	Title    string `json:"title"`
+}
+
+// An episode TMDB does not list, named after the file numbered as it, so
+// the file plays in its place on the show's page. One that exists (TMDB's,
+// or made for another copy of the file) stays as it is.
+func (q *Queries) InsertFileNamedEpisode(ctx context.Context, arg InsertFileNamedEpisodeParams) error {
+	_, err := q.db.ExecContext(ctx, insertFileNamedEpisode,
+		arg.SeasonID,
+		arg.ShowID,
+		arg.Number,
+		arg.Title,
+	)
+	return err
+}
+
+const insertFileNamedSeason = `-- name: InsertFileNamedSeason :exec
+INSERT INTO seasons (show_id, number, name, file_named) VALUES (?, ?, ?, 1)
+ON CONFLICT (show_id, number) DO NOTHING
+`
+
+type InsertFileNamedSeasonParams struct {
+	ShowID int64  `json:"show_id"`
+	Number int64  `json:"number"`
+	Name   string `json:"name"`
+}
+
+// A season TMDB does not list, for files numbered in it (see
+// InsertFileNamedEpisode). One that exists, TMDB's or not, stays as it is.
+func (q *Queries) InsertFileNamedSeason(ctx context.Context, arg InsertFileNamedSeasonParams) error {
+	_, err := q.db.ExecContext(ctx, insertFileNamedSeason, arg.ShowID, arg.Number, arg.Name)
+	return err
+}
+
 const listCustomPosters = `-- name: ListCustomPosters :many
 SELECT poster_path FROM movies WHERE poster_source IN ('upload', 'url')
 UNION
@@ -477,8 +567,89 @@ func (q *Queries) ListEpisodeIDsForFile(ctx context.Context, mediaFileID int64) 
 	return items, nil
 }
 
+const listFileNamedEpisodesForFile = `-- name: ListFileNamedEpisodesForFile :many
+SELECT e.id
+FROM episode_files ef
+JOIN episodes e ON e.id = ef.episode_id
+JOIN seasons se ON se.id = e.season_id
+WHERE ef.media_file_id = ? AND e.file_named = 1
+ORDER BY se.number, e.number
+`
+
+// The file-named episodes a file is linked to, in order.
+func (q *Queries) ListFileNamedEpisodesForFile(ctx context.Context, mediaFileID int64) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listFileNamedEpisodesForFile, mediaFileID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFilelessFileNamedEpisodes = `-- name: ListFilelessFileNamedEpisodes :many
+SELECT episodes.id, episodes.season_id FROM episodes
+WHERE episodes.file_named = 1 AND episodes.id IN (/*SLICE:ids*/?)
+  AND NOT EXISTS (SELECT 1 FROM episode_files ef WHERE ef.episode_id = episodes.id)
+ORDER BY episodes.id
+`
+
+type ListFilelessFileNamedEpisodesRow struct {
+	ID       int64 `json:"id"`
+	SeasonID int64 `json:"season_id"`
+}
+
+// Of these episodes, the file-named ones that no file is linked to now.
+func (q *Queries) ListFilelessFileNamedEpisodes(ctx context.Context, ids []int64) ([]ListFilelessFileNamedEpisodesRow, error) {
+	query := listFilelessFileNamedEpisodes
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFilelessFileNamedEpisodesRow{}
+	for rows.Next() {
+		var i ListFilelessFileNamedEpisodesRow
+		if err := rows.Scan(&i.ID, &i.SeasonID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listFilesNeedingMatch = `-- name: ListFilesNeedingMatch :many
-SELECT id, path, size, parsed, height, duration_ms, added_at, match_status, match_error, match_candidates, match_ignored
+SELECT id, path, size, parsed, height, duration_ms, added_at, match_status, match_error, match_candidates, match_ignored,
+    EXISTS (SELECT 1 FROM episode_files ef JOIN episodes e ON e.id = ef.episode_id
+            WHERE ef.media_file_id = media_files.id AND e.file_named = 1) AS file_named
 FROM media_files INDEXED BY media_files_match_idx
 WHERE library_id = ? AND match_status IN ('pending', 'unmatched', 'failed') AND extra_kind IS NULL AND status = 'present'
 ORDER BY path
@@ -496,13 +667,15 @@ type ListFilesNeedingMatchRow struct {
 	MatchError      *string `json:"match_error"`
 	MatchCandidates *string `json:"match_candidates"`
 	MatchIgnored    int64   `json:"match_ignored"`
+	FileNamed       bool    `json:"file_named"`
 }
 
 // The files the unmatched groups are made of, with the columns they show:
 // not each file's probe, which is the largest. Without statistics SQLite
 // would read the whole library off its (library_id, status) index rather
 // than the few files the match index finds, hence INDEXED BY. Trailers are
-// left out on the index too.
+// left out on the index too. file_named is set for a file that plays as
+// episodes named after it while TMDB does not list its episodes.
 func (q *Queries) ListFilesNeedingMatch(ctx context.Context, libraryID int64) ([]ListFilesNeedingMatchRow, error) {
 	rows, err := q.db.QueryContext(ctx, listFilesNeedingMatch, libraryID)
 	if err != nil {
@@ -524,6 +697,7 @@ func (q *Queries) ListFilesNeedingMatch(ctx context.Context, libraryID int64) ([
 			&i.MatchError,
 			&i.MatchCandidates,
 			&i.MatchIgnored,
+			&i.FileNamed,
 		); err != nil {
 			return nil, err
 		}
@@ -961,7 +1135,7 @@ func (q *Queries) ListSeasonEpisodeFiles(ctx context.Context, seasonID int64) ([
 }
 
 const listSeasonEpisodes = `-- name: ListSeasonEpisodes :many
-SELECT id, season_id, show_id, number, title, overview, air_date, still_path, runtime_min, rating FROM episodes WHERE season_id = ? ORDER BY number
+SELECT id, season_id, show_id, number, title, overview, air_date, still_path, runtime_min, rating, file_named FROM episodes WHERE season_id = ? ORDER BY number
 `
 
 func (q *Queries) ListSeasonEpisodes(ctx context.Context, seasonID int64) ([]Episode, error) {
@@ -984,6 +1158,7 @@ func (q *Queries) ListSeasonEpisodes(ctx context.Context, seasonID int64) ([]Epi
 			&i.StillPath,
 			&i.RuntimeMin,
 			&i.Rating,
+			&i.FileNamed,
 		); err != nil {
 			return nil, err
 		}
@@ -999,7 +1174,7 @@ func (q *Queries) ListSeasonEpisodes(ctx context.Context, seasonID int64) ([]Epi
 }
 
 const listSeasons = `-- name: ListSeasons :many
-SELECT s.id, s.show_id, s.number, s.name, s.overview, s.air_date, s.poster_path, s.episode_count, s.poster_tmdb, s.poster_source,
+SELECT s.id, s.show_id, s.number, s.name, s.overview, s.air_date, s.poster_path, s.episode_count, s.poster_tmdb, s.poster_source, s.file_named,
     (SELECT COUNT(DISTINCT e.id) FROM episodes e
        JOIN episode_files ef ON ef.episode_id = e.id
        JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
@@ -1020,6 +1195,7 @@ type ListSeasonsRow struct {
 	EpisodeCount   int64   `json:"episode_count"`
 	PosterTmdb     *string `json:"poster_tmdb"`
 	PosterSource   string  `json:"poster_source"`
+	FileNamed      int64   `json:"file_named"`
 	AvailableCount int64   `json:"available_count"`
 }
 
@@ -1043,6 +1219,7 @@ func (q *Queries) ListSeasons(ctx context.Context, showID int64) ([]ListSeasonsR
 			&i.EpisodeCount,
 			&i.PosterTmdb,
 			&i.PosterSource,
+			&i.FileNamed,
 			&i.AvailableCount,
 		); err != nil {
 			return nil, err
@@ -1059,7 +1236,7 @@ func (q *Queries) ListSeasons(ctx context.Context, showID int64) ([]ListSeasonsR
 }
 
 const listShowEpisodesByAirDate = `-- name: ListShowEpisodesByAirDate :many
-SELECT id, season_id, show_id, number, title, overview, air_date, still_path, runtime_min, rating FROM episodes WHERE show_id = ? AND air_date = ? ORDER BY number
+SELECT id, season_id, show_id, number, title, overview, air_date, still_path, runtime_min, rating, file_named FROM episodes WHERE show_id = ? AND air_date = ? ORDER BY number
 `
 
 type ListShowEpisodesByAirDateParams struct {
@@ -1087,6 +1264,7 @@ func (q *Queries) ListShowEpisodesByAirDate(ctx context.Context, arg ListShowEpi
 			&i.StillPath,
 			&i.RuntimeMin,
 			&i.Rating,
+			&i.FileNamed,
 		); err != nil {
 			return nil, err
 		}
@@ -1462,7 +1640,7 @@ UPDATE seasons SET
         ELSE poster_tmdb END,
     poster_source = ?1
 WHERE id = ?3
-RETURNING id, show_id, number, name, overview, air_date, poster_path, episode_count, poster_tmdb, poster_source
+RETURNING id, show_id, number, name, overview, air_date, poster_path, episode_count, poster_tmdb, poster_source, file_named
 `
 
 type SetSeasonPosterParams struct {
@@ -1485,6 +1663,7 @@ func (q *Queries) SetSeasonPoster(ctx context.Context, arg SetSeasonPosterParams
 		&i.EpisodeCount,
 		&i.PosterTmdb,
 		&i.PosterSource,
+		&i.FileNamed,
 	)
 	return i, err
 }
@@ -1552,13 +1731,48 @@ func (q *Queries) SetShowPoster(ctx context.Context, arg SetShowPosterParams) (S
 	return i, err
 }
 
+const sweepFileNamedEpisodes = `-- name: SweepFileNamedEpisodes :execrows
+DELETE FROM episodes
+WHERE episodes.file_named = 1
+  AND episodes.show_id IN (SELECT shows.id FROM shows WHERE shows.library_id = ?)
+  AND NOT EXISTS (SELECT 1 FROM episode_files ef WHERE ef.episode_id = episodes.id)
+`
+
+// A library's file-named episodes that no file is linked to any more (a
+// person deleted the file). The partial index holds only file-named rows,
+// so the rest of the library's episodes are not read.
+func (q *Queries) SweepFileNamedEpisodes(ctx context.Context, libraryID int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, sweepFileNamedEpisodes, libraryID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const sweepFileNamedSeasons = `-- name: SweepFileNamedSeasons :execrows
+DELETE FROM seasons
+WHERE seasons.file_named = 1
+  AND seasons.show_id IN (SELECT shows.id FROM shows WHERE shows.library_id = ?)
+  AND NOT EXISTS (SELECT 1 FROM episodes e WHERE e.season_id = seasons.id)
+`
+
+// A library's file-named seasons left without episodes.
+func (q *Queries) SweepFileNamedSeasons(ctx context.Context, libraryID int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, sweepFileNamedSeasons, libraryID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const upsertEpisode = `-- name: UpsertEpisode :one
 INSERT INTO episodes (season_id, show_id, number, title, overview, air_date, still_path, runtime_min, rating)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (season_id, number) DO UPDATE SET
     title = excluded.title, overview = excluded.overview, air_date = excluded.air_date,
-    still_path = excluded.still_path, runtime_min = excluded.runtime_min, rating = excluded.rating
-RETURNING id, season_id, show_id, number, title, overview, air_date, still_path, runtime_min, rating
+    still_path = excluded.still_path, runtime_min = excluded.runtime_min, rating = excluded.rating,
+    file_named = 0
+RETURNING id, season_id, show_id, number, title, overview, air_date, still_path, runtime_min, rating, file_named
 `
 
 type UpsertEpisodeParams struct {
@@ -1573,6 +1787,8 @@ type UpsertEpisodeParams struct {
 	Rating     *float64 `json:"rating"`
 }
 
+// An episode as TMDB lists it. One named after a file (file_named) becomes
+// TMDB's in place, so the files linked to it and its watch state stay.
 func (q *Queries) UpsertEpisode(ctx context.Context, arg UpsertEpisodeParams) (Episode, error) {
 	row := q.db.QueryRowContext(ctx, upsertEpisode,
 		arg.SeasonID,
@@ -1597,6 +1813,7 @@ func (q *Queries) UpsertEpisode(ctx context.Context, arg UpsertEpisodeParams) (E
 		&i.StillPath,
 		&i.RuntimeMin,
 		&i.Rating,
+		&i.FileNamed,
 	)
 	return i, err
 }
@@ -1716,8 +1933,8 @@ ON CONFLICT (show_id, number) DO UPDATE SET
     name = excluded.name, overview = excluded.overview, air_date = excluded.air_date,
     poster_tmdb = excluded.poster_path,
     poster_path = CASE WHEN seasons.poster_source = '' THEN excluded.poster_path ELSE seasons.poster_path END,
-    episode_count = excluded.episode_count
-RETURNING id, show_id, number, name, overview, air_date, poster_path, episode_count, poster_tmdb, poster_source
+    episode_count = excluded.episode_count, file_named = 0
+RETURNING id, show_id, number, name, overview, air_date, poster_path, episode_count, poster_tmdb, poster_source, file_named
 `
 
 type UpsertSeasonParams struct {
@@ -1730,6 +1947,7 @@ type UpsertSeasonParams struct {
 	EpisodeCount int64   `json:"episode_count"`
 }
 
+// A season as TMDB lists it. One made for files (file_named) becomes TMDB's.
 func (q *Queries) UpsertSeason(ctx context.Context, arg UpsertSeasonParams) (Season, error) {
 	row := q.db.QueryRowContext(ctx, upsertSeason,
 		arg.ShowID,
@@ -1752,6 +1970,7 @@ func (q *Queries) UpsertSeason(ctx context.Context, arg UpsertSeasonParams) (Sea
 		&i.EpisodeCount,
 		&i.PosterTmdb,
 		&i.PosterSource,
+		&i.FileNamed,
 	)
 	return i, err
 }

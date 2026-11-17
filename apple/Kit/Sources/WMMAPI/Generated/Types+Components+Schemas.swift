@@ -2695,7 +2695,7 @@ extension Components {
             public var addedAt: Foundation.Date?
             /// - Remark: Generated from `#/components/schemas/Episode/airDate`.
             public var airDate: Swift.String?
-            /// Air date is today or earlier.
+            /// Air date is today or earlier; always for an episode named after a file, which has no air date.
             ///
             /// - Remark: Generated from `#/components/schemas/Episode/aired`.
             public var aired: Swift.Bool
@@ -2740,7 +2740,7 @@ extension Components {
             /// - Parameters:
             ///   - addedAt: When its newest file was added: its date on disk when first found.
             ///   - airDate:
-            ///   - aired: Air date is today or earlier.
+            ///   - aired: Air date is today or earlier; always for an episode named after a file, which has no air date.
             ///   - download: Its download in Sonarr's queue.
             ///   - files:
             ///   - hasFile:
@@ -11549,7 +11549,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Season/availableCount`.
             public var availableCount: Swift.Int64
-            /// Episodes TMDB lists for the season.
+            /// Episodes TMDB lists for the season, and those named after files because TMDB does not list them.
             ///
             /// - Remark: Generated from `#/components/schemas/Season/episodeCount`.
             public var episodeCount: Swift.Int64
@@ -11629,7 +11629,7 @@ extension Components {
             /// - Parameters:
             ///   - airDate:
             ///   - availableCount: Episodes with a present file.
-            ///   - episodeCount: Episodes TMDB lists for the season.
+            ///   - episodeCount: Episodes TMDB lists for the season, and those named after files because TMDB does not list them.
             ///   - id:
             ///   - monitored: Sonarr monitors the season; absent when no Sonarr has the show.
             ///   - name:
@@ -11693,7 +11693,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SeasonDetail/availableCount`.
             public var availableCount: Swift.Int64
-            /// Episodes TMDB lists for the season.
+            /// Episodes TMDB lists for the season, and those named after files because TMDB does not list them.
             ///
             /// - Remark: Generated from `#/components/schemas/SeasonDetail/episodeCount`.
             public var episodeCount: Swift.Int64
@@ -11777,7 +11777,7 @@ extension Components {
             /// - Parameters:
             ///   - airDate:
             ///   - availableCount: Episodes with a present file.
-            ///   - episodeCount: Episodes TMDB lists for the season.
+            ///   - episodeCount: Episodes TMDB lists for the season, and those named after files because TMDB does not list them.
             ///   - episodes:
             ///   - id:
             ///   - monitored: Sonarr monitors the season; absent when no Sonarr has the show.
@@ -12630,7 +12630,7 @@ extension Components {
             public var title: Swift.String
             /// - Remark: Generated from `#/components/schemas/ShowDetail/tmdbId`.
             public var tmdbId: Swift.Int64
-            /// Episodes TMDB lists across all seasons.
+            /// Episodes across all seasons, as the seasons' episodeCount counts them.
             ///
             /// - Remark: Generated from `#/components/schemas/ShowDetail/totalEpisodes`.
             public var totalEpisodes: Swift.Int64
@@ -12667,7 +12667,7 @@ extension Components {
             ///   - status:
             ///   - title:
             ///   - tmdbId:
-            ///   - totalEpisodes: Episodes TMDB lists across all seasons.
+            ///   - totalEpisodes: Episodes across all seasons, as the seasons' episodeCount counts them.
             ///   - totalSize:
             ///   - year:
             public init(

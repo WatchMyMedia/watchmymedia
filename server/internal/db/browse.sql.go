@@ -454,7 +454,7 @@ func (q *Queries) ListRecentlyAddedMovieItems(ctx context.Context, arg ListRecen
 }
 
 const listRecentlyAiredEpisodes = `-- name: ListRecentlyAiredEpisodes :many
-SELECT e.id, e.season_id, e.show_id, e.number, e.title, e.overview, e.air_date, e.still_path, e.runtime_min, e.rating, top.season_number, top.show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
+SELECT e.id, e.season_id, e.show_id, e.number, e.title, e.overview, e.air_date, e.still_path, e.runtime_min, e.rating, e.file_named, top.season_number, top.show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
     COALESCE((SELECT f.id FROM episode_files ef JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
        WHERE ef.episode_id = e.id ORDER BY f.height DESC LIMIT 1), 0) AS file_id,
     COALESCE((SELECT MAX(f.added_at) FROM episode_files ef JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
@@ -491,6 +491,7 @@ type ListRecentlyAiredEpisodesRow struct {
 	StillPath        *string     `json:"still_path"`
 	RuntimeMin       *int64      `json:"runtime_min"`
 	Rating           *float64    `json:"rating"`
+	FileNamed        int64       `json:"file_named"`
 	SeasonNumber     int64       `json:"season_number"`
 	ShowTitle        string      `json:"show_title"`
 	ShowPosterPath   *string     `json:"show_poster_path"`
@@ -529,6 +530,7 @@ func (q *Queries) ListRecentlyAiredEpisodes(ctx context.Context, arg ListRecentl
 			&i.StillPath,
 			&i.RuntimeMin,
 			&i.Rating,
+			&i.FileNamed,
 			&i.SeasonNumber,
 			&i.ShowTitle,
 			&i.ShowPosterPath,
@@ -897,11 +899,12 @@ func (q *Queries) ListShowItemsByIDs(ctx context.Context, arg ListShowItemsByIDs
 }
 
 const listShowSeasons = `-- name: ListShowSeasons :many
-SELECT s.id, s.show_id, s.number, s.name, s.overview, s.air_date, s.poster_path, s.episode_count, s.poster_tmdb, s.poster_source,
+SELECT s.id, s.show_id, s.number, s.name, s.overview, s.air_date, s.poster_path, s.episode_count, s.poster_tmdb, s.poster_source, s.file_named,
     (SELECT COUNT(DISTINCT e.id) FROM episodes e
        JOIN episode_files ef ON ef.episode_id = e.id
        JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
-     WHERE e.season_id = s.id) AS available_count
+     WHERE e.season_id = s.id) AS available_count,
+    (SELECT COUNT(*) FROM episodes e WHERE e.season_id = s.id AND e.file_named = 1) AS file_named_count
 FROM seasons s
 WHERE s.show_id = ?
 ORDER BY s.number
@@ -910,9 +913,12 @@ ORDER BY s.number
 type ListShowSeasonsRow struct {
 	Season         Season `json:"season"`
 	AvailableCount int64  `json:"available_count"`
+	FileNamedCount int64  `json:"file_named_count"`
 }
 
-// A show's seasons, each with how many of its episodes have a present file.
+// A show's seasons, each with how many of its episodes have a present file,
+// and how many are named after files because TMDB does not list them (they
+// are not in the season's episode_count, which is TMDB's).
 func (q *Queries) ListShowSeasons(ctx context.Context, showID int64) ([]ListShowSeasonsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listShowSeasons, showID)
 	if err != nil {
@@ -933,7 +939,9 @@ func (q *Queries) ListShowSeasons(ctx context.Context, showID int64) ([]ListShow
 			&i.Season.EpisodeCount,
 			&i.Season.PosterTmdb,
 			&i.Season.PosterSource,
+			&i.Season.FileNamed,
 			&i.AvailableCount,
+			&i.FileNamedCount,
 		); err != nil {
 			return nil, err
 		}

@@ -3157,7 +3157,7 @@
             "type": "string"
           },
           "aired": {
-            "description": "Air date is today or earlier.",
+            "description": "Air date is today or earlier; always for an episode named after a file, which has no air date.",
             "type": "boolean"
           },
           "download": {
@@ -12263,7 +12263,7 @@
             "type": "integer"
           },
           "episodeCount": {
-            "description": "Episodes TMDB lists for the season.",
+            "description": "Episodes TMDB lists for the season, and those named after files because TMDB does not list them.",
             "format": "int64",
             "type": "integer"
           },
@@ -12360,7 +12360,7 @@
             "type": "integer"
           },
           "episodeCount": {
-            "description": "Episodes TMDB lists for the season.",
+            "description": "Episodes TMDB lists for the season, and those named after files because TMDB does not list them.",
             "format": "int64",
             "type": "integer"
           },
@@ -13326,7 +13326,7 @@
             "type": "integer"
           },
           "totalEpisodes": {
-            "description": "Episodes TMDB lists across all seasons.",
+            "description": "Episodes across all seasons, as the seasons' episodeCount counts them.",
             "format": "int64",
             "type": "integer"
           },
