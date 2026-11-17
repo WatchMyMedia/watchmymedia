@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
@@ -280,12 +281,14 @@ fun BoxScope.PlayMark() {
 /**
  * A horizontal row of cards that starts at [start], keeps the
  * focused card in view with the least scroll, and gives focus back to the
- * card it had when focus comes back to the row. Its cards grow while it has
- * focus, so the row in focus is the tallest on screen ([CardRowFocus]).
+ * card it had when focus comes back to the row; the first time, to [enter]
+ * when given, else the card nearest where focus came from. Its cards grow
+ * while it has focus, so the row in focus is the tallest on screen
+ * ([CardRowFocus]).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun CardRow(modifier: Modifier = Modifier, start: Dp = ContentStart, content: LazyListScope.() -> Unit) {
+fun CardRow(modifier: Modifier = Modifier, start: Dp = ContentStart, enter: FocusRequester = FocusRequester.Default, content: LazyListScope.() -> Unit) {
     val density = LocalDensity.current
     val spec = remember(density) { with(density) { KeepInViewSpec(leading = 12.dp.toPx(), trailing = (ContentEnd + 12.dp).toPx()) } }
     val leading = with(density) { 12.dp.toPx() }
@@ -301,7 +304,7 @@ fun CardRow(modifier: Modifier = Modifier, start: Dp = ContentStart, content: La
                 .padding(start = start - 12.dp)
                 .onPlaced { rowFocus.viewport = it }
                 .onFocusChanged { hasFocus = it.hasFocus }
-                .focusRestorer(),
+                .focusRestorer(enter),
             state = list,
             contentPadding = PaddingValues(start = 12.dp, end = ContentEnd, top = 12.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),

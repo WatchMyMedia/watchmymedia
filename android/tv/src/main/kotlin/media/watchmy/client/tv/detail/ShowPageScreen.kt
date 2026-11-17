@@ -66,8 +66,10 @@ import media.watchmy.client.ui.ReportShown
  * watched at their end; ▼ again the episode row, where the episode on top
  * follows focus and OK moves focus back up to its Play (it never plays).
  * ▼ past the row scrolls to About the show: Mark show watched, Show missing
- * episodes, Request missing seasons and Cast & details. Back leaves the
- * show in one step; the delete confirmation opens on Cancel.
+ * episodes, Request missing seasons and Cast & details; ▼ again More like
+ * this (ShowRelated.dc.html), whose cards open their page through
+ * [onOpenShow]. Back leaves the show in one step; the delete confirmation
+ * opens on Cancel.
  */
 @Composable
 fun ShowPageScreen(
@@ -75,6 +77,8 @@ fun ShowPageScreen(
     arrival: ShowArrival,
     onPlay: (PlayRequest) -> Unit,
     onNavigate: (Any) -> Unit = {},
+    onOpenShow: (Long) -> Unit = {},
+    onOpenMovie: (Long) -> Unit = {},
 ) {
     val services = LocalAppServices.current
     val vm = viewModel(key = "show-$showId") { ShowPageViewModel(services.library, showId, arrival, services.requests, follows = services.follows, saved = createSavedStateHandle()) }
@@ -95,7 +99,9 @@ fun ShowPageScreen(
             (show == null || ep == null) && state.page is Load.Failed -> ErrorState((state.page as Load.Failed).message, vm::retry, title = "Couldn't load this show")
             show == null || ep == null -> LoadingState()
             else -> {
-                PageContent(show, ep, state, vm, services.library, memory, onPlay, onMore = { more = true }, onAsk = { asking = it }, onDetails = { details = true })
+                PageContent(show, ep, state, vm, services.library, memory, onPlay, onMore = { more = true }, onAsk = { asking = it }, onDetails = { details = true }) {
+                    RelatedRows(state.related, services.library, memory, onOpenMovie, onOpenShow, Modifier.padding(top = 60.dp))
+                }
                 LaunchedEffect(Unit) {
                     withFrameNanos { }
                     // Play, or whatever the episode offers first; with nothing to press, the season tabs.
@@ -186,6 +192,7 @@ private fun PageContent(
     onMore: () -> Unit,
     onAsk: (Int) -> Unit,
     onDetails: () -> Unit,
+    related: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
     val spec = remember(density) { with(density) { KeepInViewSpec(leading = 72.dp.toPx(), trailing = 48.dp.toPx()) } }
@@ -214,6 +221,7 @@ private fun PageContent(
             state.seasonBar()?.let { bar -> SeasonTabs(bar, vm, memory, episodeFocus, onAsk, Modifier.onFocusChanged { if (it.hasFocus) toTop() }) }
             EpisodeRow(show, state, vm, library, memory, onOpen = backToPlay, Modifier.onFocusChanged { if (it.hasFocus) toTop() })
             About(show, state.aboutFlags(), vm, library, memory, episodeFocus, onAsk, onDetails)
+            related()
         }
     }
 }
