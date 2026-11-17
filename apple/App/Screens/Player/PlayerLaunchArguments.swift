@@ -20,6 +20,7 @@ import WMMModel
 ///     -playerScrub 0.4                         hold the scrubber's thumb at 40 %
 ///     -playerTaps 3                            three quick taps on the right (a "+20 s" run)
 ///     -playerAutomatic slowed|recovered|failed  Automatic quality note and current step
+///     -playerPanel episodes|audio|subtitles|quality  that panel beside the picture, or its tab under the fold (the iPhone Duo)
 @MainActor
 enum PlayerLaunchArguments {
     private static var arguments: [String] { ProcessInfo.processInfo.arguments }
@@ -27,6 +28,13 @@ enum PlayerLaunchArguments {
     private static func value(after flag: String) -> String? {
         guard let i = arguments.firstIndex(of: flag), arguments.indices.contains(i + 1) else { return nil }
         return arguments[i + 1]
+    }
+
+    /// `-playerPanel`: the panel chosen beside the picture, which is the tab under the fold.
+    static var panel: PlayerSidePanel? {
+        guard arguments.contains("-fakes"), let value = value(after: "-playerPanel") else { return nil }
+        if value == "episodes" { return .episodes }
+        return PickerTab(rawValue: value).map(PlayerSidePanel.options)
     }
 
     static func wrap(_ controller: any PlaybackController) -> any PlaybackController {

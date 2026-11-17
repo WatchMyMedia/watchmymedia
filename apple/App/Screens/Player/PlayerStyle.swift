@@ -116,6 +116,29 @@ struct OutlineButtonStyle: ButtonStyle {
     }
 }
 
+/// A button over the video that opens a panel, gold while its panel is
+/// open (`DuoOpenPlayer`'s Audio & subtitles and Episodes).
+struct PanelToggleStyle: ButtonStyle {
+    let on: Bool
+    var height: CGFloat = 38
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: height > 36 ? 14 : 13, weight: .semibold))
+            .foregroundStyle(on ? Palette.gold : Palette.text)
+            .lineLimit(1)
+            .padding(.horizontal, height > 36 ? 14 : 13)
+            .frame(minHeight: max(height, 44))
+            .background {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Palette.ground.opacity(configuration.isPressed ? 0.8 : 0.6))
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(on ? Palette.gold : .white.opacity(0.35)))
+                    .frame(height: height)
+            }
+            .contentShape(Rectangle())
+    }
+}
+
 /// A small label on artwork, as written ("48 min"); ``Badge`` uppercases.
 struct PlainBadge: View {
     let text: String

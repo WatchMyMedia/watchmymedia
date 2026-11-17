@@ -115,6 +115,7 @@ struct HomeOfflineView: View {
                 }
                 .padding(.horizontal, margin)
             }
+            .stopsAtVerticalBar()
         }
     }
 
@@ -145,6 +146,7 @@ struct HomeOfflineView: View {
                 }
                 .padding(.horizontal, margin)
             }
+            .stopsAtVerticalBar()
         }
     }
 

@@ -195,6 +195,7 @@ struct LiveHomeRow: View {
                         }
                     }.padding(.horizontal, 16)
                 }
+                .stopsAtVerticalBar()
             }.padding(.vertical, 12)
         }
     }

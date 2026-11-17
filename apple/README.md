@@ -95,6 +95,9 @@ sample's, then made-up ones), for measuring the grid.
 `-search harbor` searches at launch. The fake player has seek thumbnails drawn in
 code, so `-open watchmymedia://play/9101 -playerKeepControls -playerScrub 0.44`
 holds the scrubber at 44 % with its tile up (PLAN-TRICKPLAY.md T4).
+`-playerPanel episodes|audio|subtitles|quality` opens that panel beside the
+picture, or its tab under the fold, on the iPhone Duo's inner screen
+(PLAN-IPHONE-DUO.md).
 
 The fakes' server is at API level 6, so requests, missing episodes
 (PLAN-ARR.md) and deleting (PLAN-EPISODE-PAGE.md) show: Harbor Lights' season 2

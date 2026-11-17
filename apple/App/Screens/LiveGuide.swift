@@ -43,6 +43,12 @@ struct LiveGuideScreen: View {
     private var wide: Bool { sizeClass.isWide }
     /// The panel beside the grid, from the width the board draws it at.
     private var panelBeside: Bool { wide && width >= PadLayout.sideBySide }
+    /// 380 pt on the iPad held wide (from `PadLayout.landscape`); about a
+    /// third of the page below that, as beside the iPhone Duo's vertical bar
+    /// (DuoOpenGuide), so the grid keeps two hours.
+    private var panelWidth: CGFloat {
+        width >= PadLayout.landscape ? 380 : min(380, ((width - 2 * PadLayout.margin) * 0.34).rounded())
+    }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -58,7 +64,7 @@ struct LiveGuideScreen: View {
                                 .refreshable { await refresh() }
                                 .background(Palette.surface, in: RoundedRectangle(cornerRadius: 14))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                            panel(now: now).frame(width: 380)
+                            panel(now: now).frame(width: panelWidth)
                         }
                     }
                     .padding(.horizontal, PadLayout.margin)
@@ -198,8 +204,11 @@ struct LiveGuideScreen: View {
     private var controls: some View {
         VStack(alignment: .leading, spacing: 12) {
             if !panelBeside { search }
-            if panelBeside {
+            if panelBeside && width >= PadLayout.landscape {
                 HStack(spacing: 10) { days; nowControls; filters; search.frame(maxWidth: 260) }
+            } else if panelBeside {
+                HStack(spacing: 10) { days; nowControls; Spacer(minLength: 0); search.frame(maxWidth: 260) }
+                filters
             } else {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) { days; Spacer(minLength: 0); nowControls }

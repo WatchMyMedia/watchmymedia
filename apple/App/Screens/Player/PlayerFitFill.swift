@@ -25,12 +25,6 @@ extension PlayerFrame {
             ? VideoLayout(gravity: .resizeAspectFill)
             : VideoLayout(gravity: .resizeAspect, insets: EdgeInsets(top: 0, leading: safeArea.leading, bottom: 0, trailing: safeArea.trailing))
     }
-
-    /// Where the picture is drawn: the whole screen, or the 16:9 box at the
-    /// top of a tall screen (`portrait`).
-    func videoArea(portrait: Bool) -> CGSize {
-        portrait ? CGSize(width: size.width, height: size.width * 9 / 16) : size
-    }
 }
 
 /// The round Fill button beside Close: arrows out while fitted; gold, with

@@ -52,7 +52,8 @@ final class TabletLayoutTests: XCTestCase {
         XCTAssertTrue(playPause.waitForExistence(timeout: 5))
         XCTAssertEqual(playPause.label, "Pause")
         app.buttons["Episode 1, Low Water"].tap()
-        XCTAssertTrue(app.staticTexts["S03 E01 · Low Water"].waitForExistence(timeout: 10))
+        // The episode's name under the show and its code (DuoTallPlayer).
+        XCTAssertTrue(app.staticTexts["Low Water"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Episode 1, Low Water, playing"].exists)
         shot(app, "Tablet player selected episode")
         app.terminate()

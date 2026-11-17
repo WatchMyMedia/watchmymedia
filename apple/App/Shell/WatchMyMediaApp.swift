@@ -48,6 +48,7 @@ struct WatchMyMediaApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .readsFoldPosture()
                 .environment(services)
                 .environment(cast)
                 .environment(navigator)
@@ -92,10 +93,13 @@ extension WatchMyMediaApp {
 }
 
 /// Holds what UIKit still decides: which orientations the app allows now
-/// (the player asks for landscape while it is on screen; the rest of the
-/// iPhone app stays portrait), and the download sessions' background events.
+/// (in a phone's window the player asks for landscape while it is on
+/// screen and the rest of the app stays portrait; a wide window, an iPad's
+/// or the iPhone Duo's inner screen, turns freely), and the download
+/// sessions' background events.
 final class AppDelegate: NSObject, UIApplicationDelegate {
-    @MainActor static var orientations: UIInterfaceOrientationMask = UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
+    /// What a phone's window allows now (``OrientationLock``).
+    @MainActor static var orientations: UIInterfaceOrientationMask = .portrait
 
     /// Set before launch finishes, so a tap on a notification that opened the app reaches it.
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
@@ -110,8 +114,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         return configuration
     }
 
+    /// By the window's size classes (its scene's, before the window has its
+    /// own), so the Duo's outer screen is a phone's and its inner screen,
+    /// held either way, a wide one.
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        MainActor.assumeIsolated { Self.orientations }
+        MainActor.assumeIsolated {
+            guard let window else { return Self.orientations }
+            let own = window.traitCollection
+            let traits = own.horizontalSizeClass == .unspecified ? window.windowScene?.traitCollection ?? own : own
+            // Before the window has its size classes (at launch), an iPad
+            // turns freely, as it always has, so one held sideways starts sideways.
+            guard traits.horizontalSizeClass != .unspecified else {
+                return traits.userInterfaceIdiom == .pad ? .all : Self.orientations
+            }
+            return PlayerWindow(traits) == .wide ? .all : Self.orientations
+        }
     }
 
     /// A download session finished its work while the app was away; the downloads take its events.

@@ -21,6 +21,21 @@ struct PlayerInsets: Equatable {
     }
 }
 
+/// The buttons under the scrubber that open the player's options.
+enum PlayerOptionsRow {
+    /// "…" beside the times, for the sheet (an iPhone).
+    case more
+    /// Audio, Subtitles, Quality and Episodes under the scrubber, where a
+    /// phone's window is tall enough (the iPhone Duo's outer screen turned,
+    /// `DuoOuterPlayer`).
+    case chips
+    /// A button a tab and Episodes, the panel over the picture (an iPad).
+    case tabs
+    /// Audio & subtitles and Episodes, each opening or closing its panel
+    /// beside the picture (the Duo's inner screen held wide, `DuoOpenPlayer`).
+    case panels(PlayerPanelChoice, toggle: (PlayerSidePanel) -> Void)
+}
+
 /// The touch controls (PlayerControls.dc.html): Close, the title, AirPlay
 /// and Picture in Picture along the top; back 10 s, play/pause and forward
 /// 10 s in the middle; the scrubber, the times and "…" (the picker) along
@@ -36,6 +51,7 @@ struct PlayerControlsView: View {
     let insets: PlayerInsets
     var metrics: PlayerMetrics = .phone
     var portrait = false
+    var options = PlayerOptionsRow.more
     var onEpisodes: (() -> Void)?
     /// Fit and fill, beside Close (PlayerFitFill.dc.html).
     var fitButton: VideoFitButton?
@@ -162,27 +178,60 @@ struct PlayerControlsView: View {
                     .font(metrics.time)
                     .frame(minWidth: 48, alignment: .trailing)
                     .accessibilityHidden(true)
-                if !metrics.sidePanelPicker {
+                if case .more = options {
                     RoundIconButton(systemImage: "ellipsis", label: model.pickerTitle, iconSize: metrics.buttonIcon + 2, background: .clear) {
                         model.openPicker(.subtitles)
                     }
                 }
             }
-            if metrics.sidePanelPicker && !portrait {
-                HStack(spacing: 16) {
-                    Spacer()
-                    ForEach(model.pickerTabs, id: \.self) { tab in
-                        Button(tab.title) { model.openPicker(tab, pausesPlayback: false) }
-                            .buttonStyle(OutlineButtonStyle())
-                    }
-                    if let onEpisodes {
-                        Button(action: onEpisodes) { Label("Episodes", systemImage: "list.bullet") }
-                            .buttonStyle(OutlineButtonStyle())
-                    }
+            if !portrait { optionButtons }
+        }
+        .foregroundStyle(Palette.text)
+    }
+
+    @ViewBuilder
+    private var optionButtons: some View {
+        switch options {
+        case .more:
+            EmptyView()
+        case .chips:
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                ForEach(model.pickerTabs, id: \.self) { tab in
+                    Button(tab.title) { model.openPicker(tab) }
+                        .buttonStyle(PanelToggleStyle(on: false, height: 36))
+                }
+                if let onEpisodes {
+                    Button("Episodes", action: onEpisodes)
+                        .buttonStyle(PanelToggleStyle(on: false, height: 36))
+                }
+            }
+        case .tabs:
+            HStack(spacing: 16) {
+                Spacer()
+                ForEach(model.pickerTabs, id: \.self) { tab in
+                    Button(tab.title) { model.openPicker(tab, pausesPlayback: false) }
+                        .buttonStyle(OutlineButtonStyle())
+                }
+                if let onEpisodes {
+                    Button(action: onEpisodes) { Label("Episodes", systemImage: "list.bullet") }
+                        .buttonStyle(OutlineButtonStyle())
+                }
+            }
+        case .panels(let choice, let toggle):
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                let tracks = PlayerSidePanel.options(.audio)
+                Button(tracks.title) { toggle(tracks) }
+                    .buttonStyle(PanelToggleStyle(on: choice.isOpen(tracks)))
+                    .accessibilityAddTraits(choice.isOpen(tracks) ? .isSelected : [])
+                if onEpisodes != nil {
+                    Button { toggle(.episodes) } label: { Label("Episodes", systemImage: "list.bullet") }
+                        .buttonStyle(PanelToggleStyle(on: choice.isOpen(.episodes)))
+                        .accessibilityAddTraits(choice.isOpen(.episodes) ? .isSelected : [])
                 }
             }
         }
-        .foregroundStyle(Palette.text)
     }
 
 }
@@ -260,7 +309,7 @@ struct PlayerScrubber: View {
 
 /// The elapsed time, or what is left, beside the scrubber: views of their
 /// own, since they change with every tick and the controls around them don't.
-private struct PlayerTime: View {
+struct PlayerTime: View {
     let model: PlayerChromeModel
     let remaining: Bool
 
@@ -271,7 +320,7 @@ private struct PlayerTime: View {
 }
 
 /// "Go to now" on a recording that is still recording, once the play is more than 10 s behind it.
-private struct GoToNowButton: View {
+struct GoToNowButton: View {
     let model: PlayerChromeModel
 
     var body: some View {

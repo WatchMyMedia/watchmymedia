@@ -16,6 +16,20 @@ struct RequestSheet: View {
         return centred && !sheet.settled ? nil : sheet
     }
 
+    /// What a page presents with `.sheet(item:)`: the sheet once it may show.
+    /// Unfolding the iPhone Duo while the lookup runs takes it down until the
+    /// lookup answers; that isn't closing it, so only a sheet that was showing
+    /// is cleared when it goes.
+    static func presenting(_ sheet: Binding<RequestSheetModel?>, centred: Bool) -> Binding<RequestSheetModel?> {
+        Binding(
+            get: { presented(sheet.wrappedValue, centred: centred) },
+            set: { new in
+                if new == nil && presented(sheet.wrappedValue, centred: centred) == nil { return }
+                sheet.wrappedValue = new
+            }
+        )
+    }
+
     @State var model: RequestSheetModel
     var centred = false
     let onClose: () -> Void

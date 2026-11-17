@@ -4,11 +4,16 @@ import WMMModel
 import WMMUI
 
 /// Tablet playback options stack in a trailing panel while the video plays.
-/// Compact widths retain the pausing bottom sheet. Both reuse the same choices.
+/// Compact widths retain the pausing bottom sheet. Both reuse the same
+/// choices (``PlayerOptionSections``), as do the panel beside the picture and
+/// the tabs under the fold on the iPhone Duo.
 struct PlayerPickerSheet: View {
     let model: PlayerChromeModel
     let tab: PickerTab
     let insets: PlayerInsets
+    /// The window's safe area, each edge read on its own: the trailing panel
+    /// keeps its content clear of whatever is on its side.
+    var safe = EdgeInsets()
     var sidePanel = false
     @State private var drag: CGFloat = 0
 
@@ -37,7 +42,7 @@ struct PlayerPickerSheet: View {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 24) {
                                 ForEach(model.pickerTabs, id: \.self) { section in
-                                    sectionContent(section, model.state, large: true)
+                                    PlayerOptionSections(model: model, tab: section, large: true)
                                         .id(section)
                                 }
                                 Text(pickerFootnote(device: UIDevice.current.model, offline: model.state.isOffline))
@@ -50,10 +55,12 @@ struct PlayerPickerSheet: View {
                         }
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, max(geo.safeAreaInsets.top, 20))
-                .padding(.bottom, max(geo.safeAreaInsets.bottom, 20))
-                .frame(width: min(420, max(geo.size.width - 32, 0)), height: geo.size.height)
+                // Inside the player's shell the reader sees no safe area: the shell's own, edge by edge.
+                .padding(.leading, 24)
+                .padding(.trailing, 24 + safe.trailing)
+                .padding(.top, max(safe.top, 20))
+                .padding(.bottom, max(safe.bottom, 20))
+                .frame(width: min(420 + safe.trailing, max(geo.size.width - 32, 0)), height: geo.size.height)
                 .background(Palette.surface)
                 .overlay(alignment: .leading) { Rectangle().fill(Palette.outline).frame(width: 1) }
                 .accessibilityElement(children: .contain)
@@ -71,6 +78,7 @@ struct PlayerPickerSheet: View {
             let height = min(geo.size.height - 47, 560)
             ZStack(alignment: .bottom) {
                 Color.black.opacity(0.5)
+                    .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture { model.closePicker() }
                     .accessibilityHidden(true)
@@ -80,7 +88,8 @@ struct PlayerPickerSheet: View {
                         .foregroundStyle(PlayerStyle.light)
                         .lineLimit(1)
                         .padding(.top, max(insets.top - 4, 12))
-                        .padding(.horizontal, insets.leading)
+                        .padding(.leading, insets.leading)
+                        .padding(.trailing, insets.trailing)
                         .opacity(0.7)
                         .allowsHitTesting(false)
                     Spacer()
@@ -90,7 +99,6 @@ struct PlayerPickerSheet: View {
                     .offset(y: max(drag, 0))
             }
         }
-        .ignoresSafeArea()
         .accessibilityAction(.escape) { model.closePicker() }
     }
 
@@ -132,7 +140,8 @@ struct PlayerPickerSheet: View {
                 .frame(maxWidth: .infinity)
         }
         .padding(.top, 8)
-        .padding(.horizontal, insets.leading)
+        .padding(.leading, insets.leading)
+        .padding(.trailing, insets.trailing)
         .padding(.bottom, max(insets.bottom - 6, 12))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Palette.surface, in: UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16))
@@ -148,18 +157,35 @@ struct PlayerPickerSheet: View {
     }
 
     private func column(_ tab: PickerTab, _ state: PlayerState, large: Bool = false) -> some View {
-        ScrollView { sectionContent(tab, state, large: large) }
+        ScrollView { PlayerOptionSections(model: model, tab: tab, large: large) }
+    }
+}
+
+/// One tab's choices, under its heading: the audio tracks, the subtitles
+/// (with OpenSubtitles' results to download), or the qualities. Picking
+/// applies at once.
+struct PlayerOptionSections: View {
+    let model: PlayerChromeModel
+    let tab: PickerTab
+    var large = false
+    /// The heading over the choices; off where a tab or panel names them already.
+    var heading = true
+
+    var body: some View {
+        sectionContent(tab, model.state, large: large)
     }
 
     private func sectionContent(_ tab: PickerTab, _ state: PlayerState, large: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(tab.title.uppercased())
-                .font(.system(size: large ? 12 : 11, weight: .semibold))
-                .tracking(large ? 0.72 : 0.66)
-                .foregroundStyle(Palette.muted)
-                .padding(.horizontal, large ? 12 : 0)
-                .padding(.bottom, large ? 6 : 4)
-                .accessibilityAddTraits(.isHeader)
+            if heading {
+                Text(tab.title.uppercased())
+                    .font(.system(size: large ? 12 : 11, weight: .semibold))
+                    .tracking(large ? 0.72 : 0.66)
+                    .foregroundStyle(Palette.muted)
+                    .padding(.horizontal, large ? 12 : 0)
+                    .padding(.bottom, large ? 6 : 4)
+                    .accessibilityAddTraits(.isHeader)
+            }
             switch tab {
             case .audio: audio(state, large: large)
             case .subtitles: subtitles(state, large: large)
