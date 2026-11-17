@@ -7,7 +7,10 @@ import WMMUI
 /// A movie (TvMovie.dc.html): the poster, facts and tags; Resume (with how
 /// far it was watched) or Play, Play from start, Trailer (TvMovieTrailer.dc.html)
 /// and Mark watched; each version with how it would play on this Apple TV
-/// and Play this; the tracks of the version in focus, and the cast.
+/// and Play this; the tracks of the version in focus, and the cast. Below the
+/// first screen wait the movie's collection and More like this
+/// (TvMovieRelated.dc.html, PLAN-RELATED.md §7), named along its bottom
+/// edge until the page scrolls; Down from the versions reaches them.
 struct MovieScreen: View {
     let id: Int
     let tab: AppTab
@@ -30,6 +33,8 @@ private struct MovieView: View {
     /// The YouTube app takes `youtube://` links (`youtube` is in LSApplicationQueriesSchemes).
     @State private var youTubeApp = false
     @State private var report: ReportProblemModel?
+    /// How tall the first screen is, which the related shelves wait below.
+    @State private var fold = PageFold()
     @Environment(AppServices.self) private var services
 
     var body: some View {
@@ -57,23 +62,42 @@ private struct MovieView: View {
     }
 
     private func page(_ movie: MovieDetail) -> some View {
-        TabPage {
-            VStack(alignment: .leading, spacing: 40) {
-                header(movie)
-                HStack(alignment: .top, spacing: 70) {
-                    if !movie.versions.isEmpty {
-                        versions(movie).frame(width: 1080, alignment: .leading)
-                    }
-                    VStack(alignment: .leading, spacing: 14) {
-                        tracks
-                        if !movie.cast.isEmpty {
-                            Text("Cast").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text).padding(.top, 14)
-                            CastRow(cast: movie.cast)
+        let related = model.relatedRows
+        return TabPage(fold: $fold) {
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 40) {
+                    header(movie)
+                    HStack(alignment: .top, spacing: 70) {
+                        if !movie.versions.isEmpty {
+                            versions(movie).frame(width: 1080, alignment: .leading)
                         }
+                        VStack(alignment: .leading, spacing: 14) {
+                            tracks
+                            if !movie.cast.isEmpty {
+                                Text("Cast").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text).padding(.top, 14)
+                                CastRow(cast: movie.cast)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, TVLayout.gutter)
                 }
-                .padding(.horizontal, TVLayout.gutter)
+                // With shelves, the first screen ends with their names and they wait below it.
+                .padding(.bottom, related.isEmpty ? 0 : 110)
+                .frame(maxWidth: .infinity, minHeight: related.isEmpty ? nil : fold.height, alignment: .topLeading)
+                .overlay(alignment: .bottomLeading) {
+                    if let line = model.relatedLine {
+                        ShelvesBelowLine(text: line)
+                            .opacity(fold.scrolled ? 0 : 1)
+                            .animation(.easeOut(duration: 0.2), value: fold.scrolled)
+                            .padding(.horizontal, TVLayout.gutter)
+                            .padding(.bottom, 28)
+                    }
+                }
+                if !related.isEmpty {
+                    RelatedShelves(rows: related, owner: model, open: { model.open($0) }, setWatched: { await model.setWatched($0, $1) })
+                        .equatable()
+                }
             }
             .padding(.bottom, 60)
             .background(alignment: .top) {

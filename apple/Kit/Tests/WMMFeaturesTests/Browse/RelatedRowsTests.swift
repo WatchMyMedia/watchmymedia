@@ -47,6 +47,7 @@ import WMMModel
         #expect(model.relatedRows.allSatisfy { $0.style == .poster && $0.seeAll == nil })
         #expect(model.relatedRows.flatMap(\.items).allSatisfy { $0.kind == .movie && $0.id != 500 }, "movies only, never the page's own")
         #expect(Set(similar.items.map(\.id)).isDisjoint(with: collection.items.map(\.id)), "the collection isn't listed again")
+        #expect(model.relatedLine == "Carrow Coast Collection · More like this")
     }
 
     @Test func aShowsPageEndsWithMoreLikeThis() async throws {
@@ -85,6 +86,7 @@ import WMMModel
         #expect(library.relatedCalls == [.movie(id: 507), .show(id: 108)])
         #expect(movie.movie?.title == "Tin Sky")
         #expect(movie.relatedRows.isEmpty)
+        #expect(movie.relatedLine == nil)
         #expect(show.relatedRows.isEmpty)
     }
 

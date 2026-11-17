@@ -19,7 +19,8 @@ import WMMPlayback
 /// the server at API level 22, with arranged rows and lists (PLAN-ROWS.md).
 /// `-fakesFollows` puts it at API level 29: the bell on a show's page,
 /// Settings › Notifications' list and Home's New from shows you follow
-/// (PLAN-NEW-EPISODES.md).
+/// (PLAN-NEW-EPISODES.md). `-fakesRelated` puts it at API level 30: movie
+/// and show pages end in their collection and More like this (PLAN-RELATED.md).
 @MainActor
 enum ServicesFactory {
     static func make(arguments: [String]) -> AppServices {
@@ -60,7 +61,8 @@ enum ServicesFactory {
             recordings: arguments.contains("-fakesLiveRecordings"),
             liveAutomatic: arguments.contains("-fakesLiveAutomatic"),
             rows: arguments.contains("-fakesRows"),
-            follows: arguments.contains("-fakesFollows")
+            follows: arguments.contains("-fakesFollows"),
+            related: arguments.contains("-fakesRelated")
         )
         (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
         if let i = arguments.firstIndex(of: "-fakesAudioLanguages"), arguments.indices.contains(i + 1), !arguments[i + 1].hasPrefix("-") {

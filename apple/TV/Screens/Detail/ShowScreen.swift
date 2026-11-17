@@ -9,7 +9,9 @@ import WMMUI
 /// Replace file, the file's versions, Delete episode…); the season tabs (the
 /// specials last) with the season's line and Mark season watched at the end;
 /// the season's episodes in a row; then About the show (Notify me, Mark show
-/// watched, Request missing seasons, Show missing, the cast).
+/// watched, Request missing seasons, Show missing, the cast); then More like
+/// this (TvShowRelated.dc.html, PLAN-RELATED.md §7), which Down from About
+/// the show reaches and Up leaves.
 ///
 /// Focus starts on Play. Moving focus along the row changes the episode on
 /// top, as Home's rows change their backdrop; Select on a card moves focus
@@ -166,6 +168,14 @@ private struct ShowPageView: View {
                 .equatable()
                 .padding(.horizontal, TVLayout.gutter)
                 .padding(.top, 70)
+                // Across the page: Up from More like this's first cards, under the poster, comes back here.
+                .focusSection()
+                let related = model.relatedRows
+                if !related.isEmpty {
+                    RelatedShelves(rows: related, owner: model, open: { model.open($0) }, setWatched: { await model.setWatched($0, $1) })
+                        .equatable()
+                        .padding(.top, 40)
+                }
             }
             .padding(.bottom, 60)
             .background(alignment: .top) {

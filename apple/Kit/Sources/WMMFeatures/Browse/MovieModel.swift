@@ -86,6 +86,13 @@ public final class MovieModel {
     /// The rows at the end of the page, in order; none from a download, with no server.
     public var relatedRows: [ScreenRow] { offline ? [] : related.rows }
 
+    /// Along the bottom of Apple TV's first screen while the shelves wait
+    /// below it (TvMovieRelated.dc.html): their names, "Carrow Coast
+    /// Collection · More like this"; nil with none.
+    public var relatedLine: String? {
+        relatedRows.isEmpty ? nil : relatedRows.map(\.title).joined(separator: " · ")
+    }
+
     /// What Apple TV says under its button row while Trailer has the focus
     /// (TvMovieTrailer.dc.html); nil for a trailer file, which plays here.
     public func trailerHint(youTubeApp: Bool) -> String? {

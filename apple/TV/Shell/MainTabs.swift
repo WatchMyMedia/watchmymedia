@@ -141,8 +141,10 @@ struct TabBarAccessories: View {
 /// A page under the tab bar: a vertical scroll view whose content runs
 /// from the screen's edges (the artboards' 90 pt gutter is from the edge, not
 /// tvOS's safe area), with the lockup and the account's initial beside the
-/// tab bar, scrolling away with it.
+/// tab bar, scrolling away with it. A page that keeps something below the
+/// fold passes `fold`, which says how tall the first screen is.
 struct TabPage<Content: View>: View {
+    var fold: Binding<PageFold>?
     @ViewBuilder var content: () -> Content
     /// How far below the screen's top the content starts: the tab bar's room.
     @State private var topInset: CGFloat = 0
@@ -154,7 +156,23 @@ struct TabPage<Content: View>: View {
                 .overlay(alignment: .top) { TabBarAccessories().offset(y: -topInset) }
         }
         .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.top } action: { _, top in topInset = top }
+        .onScrollGeometryChange(for: PageFold.self) { geometry in
+            PageFold(height: geometry.containerSize.height - geometry.contentInsets.top,
+                     scrolled: geometry.contentOffset.y + geometry.contentInsets.top > 40)
+        } action: { _, new in
+            if let fold, fold.wrappedValue != new { fold.wrappedValue = new }
+        }
         .scrollClipDisabled()
         .ignoresSafeArea(edges: .horizontal)
     }
+}
+
+/// What a page's first screen shows below the tab bar, and whether the page
+/// has scrolled from its top: for a page that keeps something below the fold,
+/// as the movie page keeps its related shelves (TvMovieRelated.dc.html).
+struct PageFold: Equatable {
+    /// The height of the first screen, under the tab bar.
+    var height: CGFloat = 0
+    /// Scrolled down, as focus moving down the page does.
+    var scrolled = false
 }
