@@ -97,6 +97,18 @@ server, and on iPad in both a regular and a compact width.
   publishes goes through `DeepLink.url(publishedFor:source:)`. Code the
   extension runs must not use a required-reason API (file dates,
   UserDefaults) unless `TopShelf/PrivacyInfo.xcprivacy` declares it.
+- **The iPhone Duo** (PLAN-IPHONE-DUO.md). Its inner screen reports a
+  regular width held either way (951 × 669, 669 × 951) and its outer screen
+  a compact one (466 × 678), so `isWide` already picks the right screens;
+  decide a layout by the size class or the view's own width, never by
+  `userInterfaceIdiom` (which stays for words: "This iPhone"). In apps iOS
+  puts the tab bar in a vertical bar about 84 pt wide down one edge, as a
+  safe area inset on that edge only, so a wide inner screen leaves 867 pt.
+  The hinge reaches the screens as `\.foldPosture` (`readsFoldPosture()` at
+  the root; `.tabletop` or `.book`, the fold through the middle of the
+  window). iOS 27.1 APIs (`UIHingeInteraction`, `verticalBarEdge`) sit
+  behind `#if compiler(>=6.4.1)` as well as `#available`, because CI may
+  build with an older Xcode.
 - **Layout traps.** On Apple TV a focused `.borderless` button lifts and
   enlarges any `Image` in its label, so put a small icon inside the `Text`
   (`Text("\(Image(systemName: …)) …")`). On iPad a `.presentationSizing(.fitted)`

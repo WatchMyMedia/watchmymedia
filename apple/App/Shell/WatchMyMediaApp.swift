@@ -48,6 +48,7 @@ struct WatchMyMediaApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .readsFoldPosture()
                 .environment(services)
                 .environment(cast)
                 .environment(navigator)
