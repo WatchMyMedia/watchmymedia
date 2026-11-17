@@ -66,6 +66,21 @@ final class RealLibraryRepository: LibraryRepository {
         try await store.call { try await $0.getMovie(path: .init(id: Int64(id))).ok.body.json }.model
     }
 
+    var offersRelated: Bool { store.features.related && store.currentCredential != nil }
+
+    /// Below ``ServerFeatures/related`` nothing is asked. Rows of a style
+    /// this app doesn't draw, and rows with nothing in them, are left out.
+    func relatedRows(_ title: RelatedTitle) async throws -> [ScreenRow] {
+        guard offersRelated else { return [] }
+        let reply = try await store.call { api in
+            switch title {
+            case .movie(let id): try await api.getMovieRelated(path: .init(id: Int64(id))).ok.body.json
+            case .show(let id): try await api.getShowRelated(path: .init(id: Int64(id))).ok.body.json
+            }
+        }
+        return reply.rows.compactMap(\.model)
+    }
+
     func search(_ text: String) async throws -> SearchResults {
         let q = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxSearch))
         guard !q.isEmpty else { return SearchResults() }

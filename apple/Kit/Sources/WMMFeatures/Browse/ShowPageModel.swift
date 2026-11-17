@@ -20,6 +20,9 @@ import WMMModel
 /// and season with why it is missing, and the season gets Request season N
 /// and, for admins, Search now and Monitor. Opened from Downloads with the
 /// server away, the page is the downloaded copy and its downloaded siblings.
+///
+/// The page ends with More like this (``RelatedRows``, PLAN-RELATED.md),
+/// asked for once the show is in.
 @MainActor
 @Observable
 public final class ShowPageModel {
@@ -54,6 +57,8 @@ public final class ShowPageModel {
     public private(set) var showMissing: Bool
     /// The page comes from a finished download because the server is away.
     public private(set) var offline = false
+    /// The rows at the end of the page: More like this.
+    public let related: RelatedRows
 
     @ObservationIgnored private let library: any LibraryRepository
     @ObservationIgnored private let requests: (any RequestsRepository)?
@@ -83,6 +88,7 @@ public final class ShowPageModel {
         self.showMissing = preferences?.showsMissing(showID: showID) ?? false
         self.showID = showID
         self.arrival = arrival
+        related = RelatedRows(.show(id: showID), library: library)
     }
 
     // MARK: What the page shows
@@ -151,6 +157,9 @@ public final class ShowPageModel {
     /// The chip by the eyebrow.
     public var chip: String? { reason?.label }
 
+    /// The rows at the end of the page, in order; none from a download, with no server.
+    public var relatedRows: [ScreenRow] { offline ? [] : related.rows }
+
     /// "Mark watched" or "Mark unwatched"; nil before the episode airs.
     public var watchToggleLabel: String? { episode?.actions().watchToggle }
 
@@ -167,8 +176,14 @@ public final class ShowPageModel {
             hasContent: loadedShow.value != nil,
             load: { quiet in await load(quiet: quiet) },
             apply: { changes in
-                guard changes.contains(where: affects) else { return }
-                await load(quiet: true)
+                // A related show marked elsewhere: its card is asked for again, with the page or alone.
+                let related = changes.contains { self.related.touches($0) }
+                if related { self.related.expire() }
+                if changes.contains(where: affects) {
+                    await load(quiet: true)
+                } else if related {
+                    await self.related.load()
+                }
             }
         )
     }
@@ -192,9 +207,21 @@ public final class ShowPageModel {
     }
 
     /// Pull to refresh: keeps the page as it is, and says why if it fails.
+    /// More like this is asked for again.
     public func refresh() async {
+        related.expire()
         await load(quiet: true)
         changes.loaded()
+    }
+
+    /// A related show's card: its page, over this one, so Back comes back here.
+    public func open(_ item: BrowseItem) {
+        _ = navigator.open(item)
+    }
+
+    /// A related show's long press: Mark watched or unwatched, with its note.
+    public func setWatched(_ target: WatchTarget, _ watched: Bool) async {
+        message = await markWatched(target, watched, in: library)
     }
 
     public func retrySeason() async {
@@ -250,22 +277,31 @@ public final class ShowPageModel {
         case .loaded(let full):
             loadedShow = result
             offline = false
-            let visible = missingShown ? full : full.seasonsOnDisk(keep: selectedSeason)
-            let numbers = visible.seasons.map(\.number)
-            if let selectedSeason, numbers.contains(selectedSeason) {
-                await loadSeason(selectedSeason, quiet: quiet && loadedSeason?.value != nil, place: placed ? nil : .arrival)
-            } else if !placed {
-                if let number = ShowPageRule.season(for: arrival, show: full) {
-                    selectedSeason = number
-                    await loadSeason(number, quiet: false, place: .arrival)
-                } else {
-                    await findSeason(full, load: load)
-                }
-            } else if let first = ShowPageRule.firstSeason(visible) {
-                // The chosen season went (deleted, or only Show missing listed it).
-                selectedSeason = first
-                await loadSeason(first, quiet: false, place: .season)
+            // Asked beside the season, with nothing waiting on it.
+            async let rows: Void = related.load()
+            await placeSeason(full, load: load, quiet: quiet)
+            await rows
+        }
+    }
+
+    /// The show is in: loads the chosen season, or the one the arrival
+    /// names, or the first left when the chosen one went.
+    private func placeSeason(_ full: ShowDetail, load: LoadController<ShowDetail>.Load, quiet: Bool) async {
+        let visible = missingShown ? full : full.seasonsOnDisk(keep: selectedSeason)
+        let numbers = visible.seasons.map(\.number)
+        if let selectedSeason, numbers.contains(selectedSeason) {
+            await loadSeason(selectedSeason, quiet: quiet && loadedSeason?.value != nil, place: placed ? nil : .arrival)
+        } else if !placed {
+            if let number = ShowPageRule.season(for: arrival, show: full) {
+                selectedSeason = number
+                await loadSeason(number, quiet: false, place: .arrival)
+            } else {
+                await findSeason(full, load: load)
             }
+        } else if let first = ShowPageRule.firstSeason(visible) {
+            // The chosen season went (deleted, or only Show missing listed it).
+            selectedSeason = first
+            await loadSeason(first, quiet: false, place: .season)
         }
     }
 

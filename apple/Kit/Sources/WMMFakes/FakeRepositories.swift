@@ -306,6 +306,9 @@ public final class FakeLibraryRepository: LibraryRepository {
     public var rows: FakeRowsRepository?
     /// Follows, so a show's page says whether Sam follows it (API level 29).
     public var follows: FakeFollowsRepository?
+    /// The fake server, whose API level says whether related titles are
+    /// offered (``ServerFeatures/related``); without one they are.
+    public var servers: FakeServerRepository?
     /// Watched marks set here, by target, so the fake reflects a mark after a refetch.
     public private(set) var marks: [WatchTarget: Bool] = [:]
     /// Requests by show and season, set by ``FakeRequestsRepository``.
@@ -468,6 +471,33 @@ public final class FakeLibraryRepository: LibraryRepository {
             movie.watch = mark ? WatchProgress(positionMs: 0, durationMs: (movie.runtimeMin ?? 100) * 60_000, completed: true) : nil
         }
         return movie
+    }
+
+    public var offersRelated: Bool {
+        guard let servers else { return true }
+        return ServerFeatures(apiLevel: servers.current?.server.apiLevel).related && servers.currentUser != nil
+    }
+
+    /// ``FakeRelated``'s rows, with the marks made here on their cards.
+    public func relatedRows(_ title: RelatedTitle) async throws -> [ScreenRow] {
+        await FakeLatency.wait()
+        try checkOnline()
+        guard offersRelated else { return [] }
+        return FakeRelated.rows(for: title).map { row in
+            var marked = row
+            marked.items = row.items.map(applied)
+            return marked
+        }
+    }
+
+    /// A title as the marks made here leave it.
+    private func applied(_ item: BrowseItem) -> BrowseItem {
+        let target: WatchTarget = item.kind == .movie ? .movie(id: item.id) : .show(id: item.id)
+        guard let mark = marks[target] else { return item }
+        var copy = item
+        copy.watched = mark
+        copy.progress = nil
+        return copy
     }
 
     public func search(_ text: String) async throws -> SearchResults {

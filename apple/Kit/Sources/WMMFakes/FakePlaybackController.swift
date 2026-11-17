@@ -286,12 +286,15 @@ extension AppServices {
     /// `admin` false signs in as Alex, a member (`-fakesMember`): requests wait for an admin.
     /// `liveGuide` adds the guide boards' listings to Live TV (it implies `liveTV`).
     /// `downloads` gives the iPhone and iPad app its fake downloads; the Apple TV app has none.
-    public static func fake(signedIn: Bool = true, chosen: Bool = true, client: ClientInfo = .fakePhone, admin: Bool = true, seerr: Bool = false, seerrLinked: Bool = true, liveTV: Bool = false, liveGuide: FakeLiveGuide? = nil, downloads: Bool = false, apiLevel: Int? = nil, recordings: Bool = false, liveAutomatic: Bool = false, rows: Bool = false, follows: Bool = false) -> AppServices {
+    /// `related` puts the server at API level 30: movie and show pages end in ``FakeRelated``'s rows.
+    public static func fake(signedIn: Bool = true, chosen: Bool = true, client: ClientInfo = .fakePhone, admin: Bool = true, seerr: Bool = false, seerrLinked: Bool = true, liveTV: Bool = false, liveGuide: FakeLiveGuide? = nil, downloads: Bool = false, apiLevel: Int? = nil, recordings: Bool = false, liveAutomatic: Bool = false, rows: Bool = false, follows: Bool = false, related: Bool = false) -> AppServices {
         let liveTV = liveTV || liveGuide != nil || liveAutomatic
+        let level = related ? ServerFeatures.Level.related : follows ? ServerFeatures.Level.follows : rows ? ServerFeatures.Level.rows : nil
         let servers = FakeServerRepository(signedIn: signedIn, chosen: chosen, admin: admin, liveTV: liveTV, liveGuide: liveGuide != nil,
                                            liveExtras: liveGuide?.extras ?? false,
-                                           apiLevel: apiLevel ?? (follows ? ServerFeatures.Level.follows : rows ? ServerFeatures.Level.rows : nil))
+                                           apiLevel: apiLevel ?? level)
         let library = FakeLibraryRepository()
+        library.servers = servers
         // Read here rather than passed, so both apps' fakes take it with no change to their factories.
         library.largeLibrary = ProcessInfo.processInfo.arguments.contains("-fakesLargeLibrary")
         let rowsRepository = FakeRowsRepository(servers: servers, admin: admin)

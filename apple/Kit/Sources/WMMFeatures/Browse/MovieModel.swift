@@ -5,7 +5,9 @@ import WMMModel
 /// A movie (Movie.dc.html) with its versions, how each would play on this
 /// device (``PlaybackControllerFactory/plans(fileIDs:)``), and the selected
 /// version's tracks. Play and Resume play the selected version (the first
-/// unless another was picked); each version's Play this plays that one.
+/// unless another was picked); each version's Play this plays that one. The
+/// page ends with its related titles (``RelatedRows``, PLAN-RELATED.md): the
+/// movie's collection and More like this, asked for once the movie is in.
 @MainActor
 @Observable
 public final class MovieModel {
@@ -21,6 +23,8 @@ public final class MovieModel {
     public var trailerPlayer: TrailerPlayerModel?
     /// Apple TV's code to scan for a YouTube trailer, while it shows (TvTrailerQR.dc.html).
     public var trailerCode: YouTubeTrailer?
+    /// The rows at the end of the page: the collection, then More like this.
+    public let related: RelatedRows
 
     @ObservationIgnored private let library: any LibraryRepository
     @ObservationIgnored private let playback: any PlaybackControllerFactory
@@ -41,6 +45,7 @@ public final class MovieModel {
         self.movieID = movieID
         self.device = device
         self.downloads = downloads
+        related = RelatedRows(.movie(id: movieID), library: library)
     }
 
     /// This movie's finished download, of any version.
@@ -78,6 +83,9 @@ public final class MovieModel {
     /// button, as on servers before API level 20, which list none.
     public var trailer: MovieTrailer? { movie?.trailer }
 
+    /// The rows at the end of the page, in order; none from a download, with no server.
+    public var relatedRows: [ScreenRow] { offline ? [] : related.rows }
+
     /// What Apple TV says under its button row while Trailer has the focus
     /// (TvMovieTrailer.dc.html); nil for a trailer file, which plays here.
     public func trailerHint(youTubeApp: Bool) -> String? {
@@ -96,8 +104,14 @@ public final class MovieModel {
             hasContent: state.value != nil,
             load: { quiet in await load(quiet: quiet) },
             apply: { changes in
-                guard changes.contains(where: affects) else { return }
-                await load(quiet: true)
+                // A related title marked elsewhere: its card is asked for again, with the page or alone.
+                let related = changes.contains { self.related.touches($0) }
+                if related { self.related.expire() }
+                if changes.contains(where: affects) {
+                    await load(quiet: true)
+                } else if related {
+                    await self.related.load()
+                }
             }
         )
     }
@@ -117,12 +131,24 @@ public final class MovieModel {
     }
 
     /// Pull to refresh: keeps the page as it is, and says why if it fails.
+    /// The related titles are asked for again.
     public func refresh() async {
+        related.expire()
         await load(quiet: true)
         changes.loaded()
     }
 
     // MARK: Taps
+
+    /// A related title's card: its page, over this one, so Back comes back here.
+    public func open(_ item: BrowseItem) {
+        _ = navigator.open(item)
+    }
+
+    /// A related title's long press: Mark watched or unwatched, with its note.
+    public func setWatched(_ target: WatchTarget, _ watched: Bool) async {
+        message = await markWatched(target, watched, in: library)
+    }
 
     /// Shows a version's tracks, and makes it the one Play plays.
     public func select(_ version: MediaVersion) {
@@ -210,8 +236,11 @@ public final class MovieModel {
         state = result
         guard let movie = result.value else { return }
         if let selectedVersionID, !movie.versions.contains(where: { $0.id == selectedVersionID }) { self.selectedVersionID = nil }
+        // Asked beside the plans, with the page already drawn; neither can fail the page.
+        async let rows: Void = related.load()
         // A version list without the play mode is still right, so this cannot fail the page.
         let found = await playback.plans(fileIDs: movie.versions.map(\.fileID))
         if loads.isCurrent(load) { plans = found }
+        await rows
     }
 }
