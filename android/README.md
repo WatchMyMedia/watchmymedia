@@ -73,7 +73,7 @@ local requests and resolve local reports in the Inbox. Its Open Seerr link
 uses the reserved `seerr.example` hostname. The fake servers are at the current API
 level (`FAKE_SERVER_API_LEVEL`); a test that selects one at a lower level
 gets what that level offers, as from a real server: no requests below 5, no
-Delete below 6, no Automatic quality below 3, no seek thumbnails below 9, no Live TV listings below 13, no casting a channel below 14, no trailers below 20, no arranged rows or lists below 22, no Notify me below 29.
+Delete below 6, no Automatic quality below 3, no seek thumbnails below 9, no Live TV listings below 13, no casting a channel below 14, no trailers below 20, no arranged rows or lists below 22, no Notify me below 29, no related titles below 30.
 
 Requests, missing episodes' state and Report a problem need a server at API
 level 5 and the corresponding `getRequestOptions` capability. Requests can
@@ -330,6 +330,34 @@ left the library; the fake feed has Harbor Lights' S3 E7 once after the first
 check. Run the work by hand on a device with `adb shell cmd jobscheduler run
 -f <package> <job id>` (`adb shell dumpsys jobscheduler | grep -A3 <package>`
 lists the id).
+
+### Related titles at the end of movie and show pages
+
+From API level 30 ([PLAN-RELATED.md](../PLAN-RELATED.md) §6–§7) a movie's page
+ends with its collection (the collection's other films in the library, in
+release order, named as TMDB names it) and More like this, and a show's page
+with More like this (`LibraryRepository.movieRelated` and `showRelated`,
+`getMovieRelated` and `getShowRelated`). `MovieViewModel` and
+`ShowPageViewModel` ask once the details are in, on their own, so the page
+never waits; the rows stay with the page, and a quiet reload doesn't ask
+again. An older server is not asked, and a failure leaves the page without
+rows; either way the page ends as before. The rows are Home's poster rows:
+
+- **Phones and tablets** (`mobile/detail/RelatedRows.kt`): under the cast or
+  About the show, named as the page's sections are; the tablet's movie page
+  puts them in its right pane, its show page across the bottom under the
+  season's row. A card opens its title on top; its long-press has no menu.
+- **TV** (`tv/detail/RelatedRows.kt`, `TvArrangedRow`): the page's last rows,
+  the collection with "In release order" beside its name. The movie page's
+  cast takes focus (OK does nothing), and ▼ from the cast or About the show
+  comes to the row's first card (`CardRow`'s `enter`); ▲ goes back. The row is
+  kept whole in view as it grows, Hold OK marks nothing, and Back from the
+  title a card opened puts focus back on that card. For TalkBack the heading
+  is a heading and the row carries its name.
+
+On the fakes Cold Harbour Road, Low Tide at Carrow and Dead Reckoning Bay are
+the Carrow Coast Collection, every other movie and show has More like this,
+and Tin Sky and Midnight Cartography have nothing like them.
 
 ### First-run Home and subtitles
 
