@@ -97,9 +97,19 @@ import media.watchmy.client.ui.ReportShown
  * the default version's audio and the cast. [onNavigate] goes to a rail
  * section. A trailer file plays in the player; a YouTube trailer opens the
  * YouTube app, and without an app to open it there is no Trailer for it.
+ * The page ends with its related titles (MovieRelated.dc.html): ▼ from the
+ * cast or the versions reaches them, and a card opens its page through
+ * [onOpenMovie].
  */
 @Composable
-fun MovieScreen(movieId: Long, onPlay: (PlayRequest) -> Unit, onBack: () -> Unit, onNavigate: (Any) -> Unit = {}) {
+fun MovieScreen(
+    movieId: Long,
+    onPlay: (PlayRequest) -> Unit,
+    onBack: () -> Unit,
+    onNavigate: (Any) -> Unit = {},
+    onOpenMovie: (Long) -> Unit = {},
+    onOpenShow: (Long) -> Unit = {},
+) {
     val services = LocalAppServices.current
     val context = LocalContext.current
     val youTube = remember(context) { context.canOpenYouTube() }
@@ -135,7 +145,9 @@ fun MovieScreen(movieId: Long, onPlay: (PlayRequest) -> Unit, onBack: () -> Unit
                     onMore = if (state.canReport) ({ more = true }) else null,
                     trailer = state.trailer,
                     onTrailer = onTrailer,
-                )
+                ) {
+                    RelatedRows(state.related, services.library, memory, onOpenMovie, onOpenShow, Modifier.padding(bottom = 60.dp))
+                }
                 LaunchedEffect(Unit) {
                     withFrameNanos { }
                     memory.restore(fallback = "play")
@@ -186,6 +198,7 @@ private fun MovieContent(
     onMore: (() -> Unit)?,
     trailer: Trailer?,
     onTrailer: () -> Unit,
+    related: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
     val spec = remember(density) { with(density) { KeepInViewSpec(leading = 140.dp.toPx(), trailing = 60.dp.toPx()) } }
@@ -269,12 +282,16 @@ private fun MovieContent(
                     }
                     if (movie.cast.isNotEmpty()) {
                         Text("Cast", style = inter(24.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.padding(top = 14.dp))
+                        // Focus stops on each member, so ▼ from the cast reaches the related rows (MovieRelated.dc.html).
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp), maxLines = 2) {
-                            for (p in movie.cast.take(10)) CastMember(p, library.imageUrl(p.profilePath, ImageSize.W185))
+                            movie.cast.take(10).forEachIndexed { i, p ->
+                                CastMember(p, library.imageUrl(p.profilePath, ImageSize.W185), Modifier.focusMemory(memory, "cast:$i"), focusable = true)
+                            }
                         }
                     }
                 }
             }
+            related()
         }
     }
 }

@@ -93,6 +93,8 @@ import media.watchmy.client.ui.ReportShown
  * each version with Play this. [onOpenSettings] is Settings › Downloads.
  * Trailer (MovieTrailer.dc.html) plays a trailer file through [onPlay], and
  * opens YouTube's trailers in the trailer screen through [onOpenTrailer].
+ * The page ends with its related titles (MovieRelated.dc.html), whose cards
+ * open their page through [onOpenMovie].
  */
 @Composable
 fun MovieScreen(
@@ -101,6 +103,8 @@ fun MovieScreen(
     onBack: () -> Unit,
     onOpenSettings: () -> Unit = {},
     onOpenTrailer: (TrailerPlay.YouTube) -> Unit = {},
+    onOpenMovie: (Long) -> Unit = {},
+    onOpenShow: (Long) -> Unit = {},
 ) {
     val layout = rememberTabletLayout()
     val services = LocalAppServices.current
@@ -120,12 +124,15 @@ fun MovieScreen(
         }
     }
 
+    // The rows at the page's end, the collection then More like this (PLAN-RELATED.md §7).
+    val related: @Composable () -> Unit = { RelatedRows(state.related, onOpenMovie, onOpenShow, layout.isTablet, Modifier.padding(top = 24.dp)) }
+
     Box(Modifier.fillMaxSize().background(WmmColors.Ground)) {
         when {
             movie == null && state.movie is Load.Failed -> ErrorState((state.movie as Load.Failed).message, vm::retry)
             movie == null -> LoadingState()
-            layout.isTablet -> TabletMovieContent(movie, state, vm, onPlay, scroll, layout.twoPane, onOpenSettings, onTrailer)
-            else -> MovieContent(movie, state, vm, onPlay, scroll, onOpenSettings, onTrailer)
+            layout.isTablet -> TabletMovieContent(movie, state, vm, onPlay, scroll, layout.twoPane, onOpenSettings, onTrailer, related)
+            else -> MovieContent(movie, state, vm, onPlay, scroll, onOpenSettings, onTrailer, related)
         }
         DetailBar(
             onBack = onBack,
@@ -160,7 +167,16 @@ fun MovieScreen(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MovieContent(movie: MovieDetail, state: MovieViewModel.State, vm: MovieViewModel, onPlay: (PlayRequest) -> Unit, scroll: ScrollState, onOpenSettings: () -> Unit, onTrailer: () -> Unit) {
+private fun MovieContent(
+    movie: MovieDetail,
+    state: MovieViewModel.State,
+    vm: MovieViewModel,
+    onPlay: (PlayRequest) -> Unit,
+    scroll: ScrollState,
+    onOpenSettings: () -> Unit,
+    onTrailer: () -> Unit,
+    related: @Composable () -> Unit,
+) {
     val library = LocalAppServices.current.library
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(bottom = bottom + 24.dp)) {
@@ -186,6 +202,7 @@ private fun MovieContent(movie: MovieDetail, state: MovieViewModel.State, vm: Mo
         MovieActions(movie, state, vm, onPlay, onOpenSettings, onTrailer)
 
         MovieExtras(movie, state, vm, onPlay)
+        related()
     }
 }
 
@@ -290,6 +307,7 @@ private fun TabletMovieContent(
     twoPane: Boolean,
     onOpenSettings: () -> Unit,
     onTrailer: () -> Unit,
+    related: @Composable () -> Unit,
 ) {
     val library = LocalAppServices.current.library
     val details: @Composable () -> Unit = {
@@ -306,6 +324,8 @@ private fun TabletMovieContent(
             Column(Modifier.width(TabletLayout.detailColumn).verticalScroll(scroll).padding(bottom = 24.dp)) { details() }
             LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 24.dp, bottom = 24.dp)) {
                 item { MovieExtras(movie, state, vm, onPlay, sideBySide = true) }
+                // In the right pane, under the cast (TabMovieRelated.dc.html).
+                item { related() }
             }
         }
     } else {
@@ -313,6 +333,7 @@ private fun TabletMovieContent(
             Column(Modifier.widthIn(max = TabletLayout.singleColumnMax).fillMaxWidth().verticalScroll(scroll).padding(bottom = 24.dp)) {
                 details()
                 MovieExtras(movie, state, vm, onPlay)
+                related()
             }
         }
     }

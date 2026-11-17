@@ -361,7 +361,7 @@ private fun ArrangedLibrary(
                             item = item,
                             imageUrl = services.library.imageUrl(item.posterPath, ImageSize.W342),
                             onClick = { onOpen(item) },
-                            onLongClick = if (item.kind == ItemKind.Movie) ({ actions.onToggleWatched(item) }) else null,
+                            onLongClick = actions.onToggleWatched?.takeIf { item.kind == ItemKind.Movie }?.let { toggle -> { toggle(item) } },
                             narrow = byTitle,
                             modifier = Modifier.focusMemory(memory, "item:${item.id}").toStrip(jumps, byTitle && i % COLUMNS == COLUMNS - 1).onFocusChanged {
                                 if (it.isFocused) {

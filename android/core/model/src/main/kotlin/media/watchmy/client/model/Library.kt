@@ -385,6 +385,16 @@ interface LibraryRepository {
 
     suspend fun movie(id: Long): MovieDetail
 
+    /**
+     * The rows at the end of a movie's page (PLAN-RELATED.md §6): its
+     * collection, then More like this, as the server sends them; empty when
+     * neither has anything, and below [RELATED_API_LEVEL], which is not asked.
+     */
+    suspend fun movieRelated(id: Long): List<ScreenRow> = emptyList()
+
+    /** The row at the end of a show's page: More like this; empty as [movieRelated]'s. */
+    suspend fun showRelated(id: Long): List<ScreenRow> = emptyList()
+
     suspend fun search(text: String): SearchResults
 
     suspend fun setWatched(kind: ContinueItem.Kind, id: Long, watched: Boolean)

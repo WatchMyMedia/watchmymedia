@@ -9,7 +9,9 @@ import kotlinx.coroutines.test.setMain
 import media.watchmy.client.model.AUTO_API_LEVEL
 import media.watchmy.client.model.DELETE_API_LEVEL
 import media.watchmy.client.model.PlayRequest
+import media.watchmy.client.model.RELATED_API_LEVEL
 import media.watchmy.client.model.REQUESTS_API_LEVEL
+import media.watchmy.client.model.RelatedRowIds
 import media.watchmy.client.model.RequestOptions
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.TRAILERS_API_LEVEL
@@ -35,11 +37,12 @@ class FakeLevelsTest {
 
     @Test
     fun `the fake servers are at the current level, with everything on`() = runBlocking {
-        assertEquals(listOf(29, 29, 29), listOf(LivingRoom, OfficeMini, RemoteHome).map { it.apiLevel })
+        assertEquals(listOf(30, 30, 30), listOf(LivingRoom, OfficeMini, RemoteHome).map { it.apiLevel })
         assertTrue("rows", services.rows.supported)
         assertTrue("following shows", services.follows.supported)
         assertEquals("a followed show's page says so", true, services.library.show(100).following)
         assertTrue("trailers", services.library.movie(500).trailers.isNotEmpty())
+        assertTrue("related titles", services.library.movieRelated(500).isNotEmpty() && services.library.showRelated(100).isNotEmpty())
         assertTrue("favourites, search and reminders", services.live.refreshReminders() != null)
         assertTrue(services.live.capabilities().available)
         assertTrue(services.live.capabilities().guide)
@@ -139,5 +142,28 @@ class FakeLevelsTest {
         assertTrue(services.library.movie(501).trailers.isEmpty())
         at(TRAILERS_API_LEVEL)
         assertEquals(2, services.library.movie(500).trailers.size)
+    }
+
+    @Test
+    fun `below the related titles' level the pages end as before`() = runBlocking {
+        at(RELATED_API_LEVEL - 1)
+        assertTrue(services.library.movieRelated(500).isEmpty())
+        assertTrue(services.library.showRelated(100).isEmpty())
+        at(RELATED_API_LEVEL)
+        assertEquals(listOf(RelatedRowIds.COLLECTION, RelatedRowIds.SIMILAR), services.library.movieRelated(500).map { it.id })
+        assertEquals(listOf(RelatedRowIds.SIMILAR), services.library.showRelated(100).map { it.id })
+    }
+
+    @Test
+    fun `the fake collection lists its other films in release order, and More like this leaves them out`() {
+        val rows = FakeData.movieRelated(505)
+        assertEquals(FakeData.COLLECTION_NAME, rows[0].title)
+        assertEquals(listOf(508L, 500L), rows[0].items.map { it.id })
+        val similar = rows[1].items.map { it.id }
+        assertTrue(similar.none { it == 505L || it in FakeData.carrowCollection || it in FakeData.unlike })
+        assertEquals("a movie outside the collection has More like this alone", listOf(RelatedRowIds.SIMILAR), FakeData.movieRelated(501).map { it.id })
+        assertTrue("nothing is like Tin Sky", FakeData.movieRelated(507).isEmpty())
+        assertTrue(FakeData.showRelated(109).isEmpty())
+        assertTrue(FakeData.showRelated(100).single().items.none { it.id == 100L })
     }
 }

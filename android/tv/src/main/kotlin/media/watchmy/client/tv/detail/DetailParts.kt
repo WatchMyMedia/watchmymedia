@@ -1,7 +1,12 @@
 package media.watchmy.client.tv.detail
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,12 +24,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,6 +45,7 @@ import media.watchmy.client.tv.components.TextBright
 import media.watchmy.client.tv.components.TvButton
 import media.watchmy.client.tv.components.TvButtonStyle
 import media.watchmy.client.tv.components.TvDialog
+import media.watchmy.client.tv.components.focusRing
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.Artwork
@@ -93,14 +102,30 @@ fun StatusPill(text: String, gold: Boolean) {
     }
 }
 
-/** A cast member: a 72 dp circle, the name and the role. */
+/**
+ * A cast member: a 72 dp circle, the name and the role. [focusable] lets
+ * focus stop on it (the movie page's cast, MovieRelated.dc.html): the
+ * circle takes the gold ring and grows, and TalkBack reads the name and the
+ * role as one. OK does nothing.
+ */
 @Composable
-fun CastMember(person: Person, imageUrl: String?) {
-    Column(Modifier.width(96.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+fun CastMember(person: Person, imageUrl: String?, modifier: Modifier = Modifier, focusable: Boolean = false) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val scale by animateFloatAsState(if (focused) 1.12f else 1f, tween(140), label = "castFocus")
+    val stop = if (focusable) Modifier.focusable(interactionSource = interaction).semantics(mergeDescendants = true) {} else Modifier
+    Column(modifier.then(stop).width(96.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val face = Modifier
+            .size(72.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .focusRing(focused, cornerRadius = 36.dp, offset = 0.dp)
         if (imageUrl != null) {
-            Artwork(imageUrl, seed = person.name, contentDescription = person.name, modifier = Modifier.size(72.dp), shape = CircleShape)
+            Artwork(imageUrl, seed = person.name, contentDescription = person.name.takeIf { !focusable }, modifier = face, shape = CircleShape)
         } else {
-            Box(Modifier.size(72.dp).background(placeholderColor(person.name), CircleShape))
+            Box(face.background(placeholderColor(person.name), CircleShape))
         }
         Text(person.name, style = inter(15.sp, FontWeight.SemiBold, lineHeight = 18.sp), color = WmmColors.Text, textAlign = TextAlign.Center, maxLines = 2)
         person.role?.let { Text(it, style = inter(13.sp, lineHeight = 16.sp), color = WmmColors.TextMuted, textAlign = TextAlign.Center, maxLines = 2) }

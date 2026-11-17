@@ -176,6 +176,13 @@ Lint warnings that were already on `main` are not yours to fix in passing.
 - **Passwords in fields.** `rememberModelTextField` keeps its text across
   process death, so password fields use a plain `remember`ed state
   (`ChangePasswordScreen`): a password never outlives the process.
+- **A row's way in.** `focusRestorer(fallback)` hands every focus request
+  for one of its children to the fallback until a child has had focus, so
+  a page's own restore after Back (`FocusMemory.restore`) landed on the
+  related rows' first card instead of the card that opened the title. A
+  row with an `enter` card (`CardRow`) takes the remembered card as its way
+  in when it is composed again
+  (`tv/src/main/kotlin/media/watchmy/client/tv/detail/RelatedRows.kt`).
 - **Focus tests and cleared semantics.** `HomeFocusTest` finds the focused
   element by its `Focused` semantics. A card that `clearAndSetSemantics` to
   read as one thing must set `focused` itself (as `TvOnNowCard` does), or the

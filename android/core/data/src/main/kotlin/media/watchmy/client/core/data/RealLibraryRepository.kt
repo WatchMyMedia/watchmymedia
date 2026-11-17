@@ -103,6 +103,17 @@ internal class RealLibraryRepository(
 
     override suspend fun movie(id: Long): MovieDetail = http.signedIn { base, client -> browse(base, client).getMovie(id) }.toModel()
 
+    /** Asked only from [media.watchmy.client.model.RELATED_API_LEVEL]: an older server has no such route. */
+    override suspend fun movieRelated(id: Long): List<ScreenRow> {
+        if (!http.features().related) return emptyList()
+        return http.signedIn { base, client -> browse(base, client).getMovieRelated(id) }.rows.toRows()
+    }
+
+    override suspend fun showRelated(id: Long): List<ScreenRow> {
+        if (!http.features().related) return emptyList()
+        return http.signedIn { base, client -> browse(base, client).getShowRelated(id) }.rows.toRows()
+    }
+
     override suspend fun search(text: String): SearchResults {
         val q = text.trim().take(MAX_SEARCH)
         if (q.isEmpty()) return SearchResults(emptyList(), emptyList(), emptyList())

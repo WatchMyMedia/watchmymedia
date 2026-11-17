@@ -11,9 +11,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,14 +65,14 @@ import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.open
 
-/** What a row's cards do on the TV: open, play, say a file isn't matched, and Hold OK's mark on a movie. */
+/** What a row's cards do on the TV: open, play, say a file isn't matched, and Hold OK's mark on a movie (none without [onToggleWatched]). */
 internal class TvRowActions(
     val onPlay: (PlayRequest) -> Unit,
     val onOpenShow: (Long) -> Unit,
     val onOpenMovie: (Long) -> Unit,
     val onOpenEpisode: (showId: Long, season: Int, episodeId: Long) -> Unit,
     val onNotMatched: () -> Unit,
-    val onToggleWatched: (BrowseItem) -> Unit,
+    val onToggleWatched: ((BrowseItem) -> Unit)?,
     val onOpenList: (Long) -> Unit,
 )
 
@@ -144,7 +146,9 @@ internal fun Modifier.rowCard(memory: FocusMemory, key: String, index: Int, onFo
  * ([seeAll]: a list's page, or its library's grid, PLAN-SEE-ALL.md). The
  * Live TV row is the screen's to draw. Home's row screens pass [counter]
  * ("Row 2 of 7") and [onFocusItem], so the panel above the row follows the
- * focused card.
+ * focused card. [enter] is the card focus first comes to from outside the
+ * row ([CardRow]). [named] makes the heading a heading and names the row
+ * after it, so TalkBack says which row focus has come into.
  */
 @Composable
 internal fun TvArrangedRow(
@@ -156,11 +160,13 @@ internal fun TvArrangedRow(
     counter: String? = null,
     onFocusItem: OnFocusItem? = null,
     seeAll: TvSeeAll? = null,
+    enter: FocusRequester = FocusRequester.Default,
+    named: Boolean = false,
 ) {
     val (title, small) = row.heading()
     Column(modifier) {
-        SectionHeader(title, small = small, trailing = counter)
-        CardRow {
+        SectionHeader(title, small = small, trailing = counter, modifier = if (named) Modifier.semantics(mergeDescendants = true) { heading() } else Modifier)
+        CardRow(Modifier.then(if (named) Modifier.semantics { contentDescription = title } else Modifier), enter = enter) {
             when (row.style) {
                 RowStyle.Continue -> itemsIndexed(row.continueItems, key = { _, it -> it.fileId }) { i, c ->
                     MediaCard(
@@ -204,7 +210,7 @@ internal fun TvArrangedRow(
                         artWidth = 160.dp,
                         artHeight = 240.dp,
                         onClick = { item.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched, actions.onOpenEpisode) },
-                        onLongClick = if (item.kind == ItemKind.Movie) ({ actions.onToggleWatched(item) }) else null,
+                        onLongClick = actions.onToggleWatched?.takeIf { item.kind == ItemKind.Movie }?.let { toggle -> { toggle(item) } },
                         modifier = Modifier.rowCard(memory, "${row.id}:${item.kind}${item.id}", i, onFocusItem),
                     ) {
                         if (item.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(8.dp), BadgeStyle.Gold)
@@ -220,7 +226,7 @@ internal fun TvArrangedRow(
                         artWidth = 320.dp,
                         artHeight = 180.dp,
                         onClick = { if (m.kind == ItemKind.Movie) actions.onOpenMovie(m.id) else m.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched) },
-                        onLongClick = if (m.kind == ItemKind.Movie) ({ actions.onToggleWatched(m) }) else null,
+                        onLongClick = actions.onToggleWatched?.takeIf { m.kind == ItemKind.Movie }?.let { toggle -> { toggle(m) } },
                         modifier = Modifier.rowCard(memory, "${row.id}:${m.kind}${m.id}", i, onFocusItem),
                     ) {
                         formatDate(m.releaseDate)?.let { ArtBadge(it, Modifier.align(Alignment.BottomStart).padding(10.dp)) }

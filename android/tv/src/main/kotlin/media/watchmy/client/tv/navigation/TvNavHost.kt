@@ -91,6 +91,8 @@ private fun ShowPage(nav: NavHostController, showId: Long, arrival: ShowArrival)
         arrival = arrival,
         onPlay = nav::play,
         onNavigate = { r -> nav.navigateSection(r) },
+        onOpenShow = { id -> nav.navigate(TvRoutes.Show(id)) },
+        onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id)) },
     )
 }
 
@@ -234,6 +236,8 @@ fun TvNavHost(
                         onPlay = nav::play,
                         onBack = { nav.popBackStack() },
                         onNavigate = { r -> nav.navigateSection(r) },
+                        onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id)) },
+                        onOpenShow = { id -> nav.navigate(TvRoutes.Show(id)) },
                     )
                 }
                 composable<TvRoutes.Search> {

@@ -33,6 +33,7 @@ import media.watchmy.client.core.api.models.ItemList
 import media.watchmy.client.core.api.models.LibraryRows
 import media.watchmy.client.core.api.models.MovieDetail
 import media.watchmy.client.core.api.models.MovieList
+import media.watchmy.client.core.api.models.RelatedRows
 import media.watchmy.client.core.api.models.RowLayout
 import media.watchmy.client.core.api.models.SearchResults
 import media.watchmy.client.core.api.models.SeasonDetail
@@ -374,6 +375,79 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * GET /api/movies/{id}/related
+     * The rows at the end of a movie&#39;s page: its collection and More like this
+     * Titles from this server&#39;s libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page&#39;s details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home&#39;s are. From API level 30.
+     * @param id 
+     * @return RelatedRows
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun getMovieRelated(id: kotlin.Long) : RelatedRows = withContext(Dispatchers.IO) {
+        val localVarResponse = getMovieRelatedWithHttpInfo(id = id)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as RelatedRows
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /api/movies/{id}/related
+     * The rows at the end of a movie&#39;s page: its collection and More like this
+     * Titles from this server&#39;s libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page&#39;s details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home&#39;s are. From API level 30.
+     * @param id 
+     * @return ApiResponse<RelatedRows?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun getMovieRelatedWithHttpInfo(id: kotlin.Long) : ApiResponse<RelatedRows?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = getMovieRelatedRequestConfig(id = id)
+
+        return@withContext request<Unit, RelatedRows>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getMovieRelated
+     *
+     * @param id 
+     * @return RequestConfig
+     */
+    fun getMovieRelatedRequestConfig(id: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/api/movies/{id}/related".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /api/me/rows/{screen}
      * Every row the signed-in person can place on a screen, in their order
      * Hidden rows are listed too: Add a row offers them. From API level 22.
@@ -588,6 +662,79 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/api/shows/{id}".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /api/shows/{id}/related
+     * The row at the end of a show&#39;s page: More like this
+     * Titles from this server&#39;s libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page&#39;s details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home&#39;s are. From API level 30.
+     * @param id 
+     * @return RelatedRows
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun getShowRelated(id: kotlin.Long) : RelatedRows = withContext(Dispatchers.IO) {
+        val localVarResponse = getShowRelatedWithHttpInfo(id = id)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as RelatedRows
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /api/shows/{id}/related
+     * The row at the end of a show&#39;s page: More like this
+     * Titles from this server&#39;s libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page&#39;s details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home&#39;s are. From API level 30.
+     * @param id 
+     * @return ApiResponse<RelatedRows?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun getShowRelatedWithHttpInfo(id: kotlin.Long) : ApiResponse<RelatedRows?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = getShowRelatedRequestConfig(id = id)
+
+        return@withContext request<Unit, RelatedRows>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getShowRelated
+     *
+     * @param id 
+     * @return RequestConfig
+     */
+    fun getShowRelatedRequestConfig(id: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/api/shows/{id}/related".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,
