@@ -3,8 +3,12 @@ package api
 import (
 	"context"
 	"net/http"
+	"slices"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+
+	"watchmymedia/server/internal/related"
 )
 
 // RelatedRows are the rows at the end of a movie's or a show's page
@@ -47,11 +51,60 @@ func registerRelated(h huma.API, deps Deps) {
 		})
 }
 
-// relatedRows works out a title's related rows. Filled in below.
+// similarTitle names More like this (PLAN-RELATED.md §3.1).
+const similarTitle = "More like this"
+
+// relatedRows works out a title's related rows for the signed-in person,
+// from what is stored: the collection's other films (movies), then More
+// like this when at least 3 of its titles have a card. A title whose
+// related data is old is fetched again in the background.
 func relatedRows(ctx context.Context, deps Deps, kind string, id int64) ([]ScreenRow, error) {
-	_ = ctx
-	_ = deps
-	_ = kind
-	_ = id
-	return []ScreenRow{}, nil
+	var res related.Result
+	var err error
+	if kind == "movie" {
+		res, err = related.Movie(ctx, deps.Queries, id, time.Now())
+	} else {
+		res, err = related.Show(ctx, deps.Queries, id, time.Now())
+	}
+	if err != nil {
+		return nil, notFound(err, kind+" not found")
+	}
+	if res.Due {
+		deps.Related.Want(kind, id)
+	}
+	ids := append(slices.Clone(res.Collection), res.Similar...)
+	rows := []ScreenRow{}
+	if len(ids) == 0 {
+		return rows, nil
+	}
+	var cards map[int64]BrowseItem
+	if kind == "movie" {
+		cards, err = movieCardsByID(ctx, deps, ids)
+	} else {
+		cards, err = showCardsByID(ctx, deps, ids)
+	}
+	if err != nil {
+		return nil, err
+	}
+	marks, err := loadWatchMarks(ctx, deps)
+	if err != nil {
+		return nil, err
+	}
+	pick := func(ids []int64, limit int) []BrowseItem {
+		items := make([]BrowseItem, 0, min(len(ids), limit))
+		for _, id := range ids {
+			if c, ok := cards[id]; ok && len(items) < limit {
+				items = append(items, c)
+			}
+		}
+		marks.apply(items)
+		return items
+	}
+	if items := pick(res.Collection, rowItems); len(items) > 0 {
+		rows = append(rows, ScreenRow{ID: "collection", Style: "poster", Title: res.CollectionName, Items: items})
+	}
+	if items := pick(res.Similar, related.SimilarMax); len(items) >= related.SimilarMin {
+		rows = append(rows, ScreenRow{ID: "similar", Style: "poster", Title: similarTitle, Items: items})
+	}
+	return rows, nil
 }

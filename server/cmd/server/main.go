@@ -49,6 +49,7 @@ import (
 	"watchmymedia/server/internal/playback"
 	"watchmymedia/server/internal/plexsync"
 	"watchmymedia/server/internal/probe"
+	"watchmymedia/server/internal/related"
 	"watchmymedia/server/internal/scanner"
 	"watchmymedia/server/internal/segments"
 	"watchmymedia/server/internal/settings"
@@ -248,6 +249,8 @@ func serve() error {
 	// this asks again for those matched before, and for recent films.
 	trailerJob := trailers.New(queries, tmdbClient, log, api.TrailersYouTube(ctx, store))
 	go trailerJob.Run(ctx)
+	relatedJob := related.New(queries, tmdbClient, log)
+	go relatedJob.Run(ctx)
 	// Lists that rows come from are fetched again in the background, from
 	// TMDB and, with the admin's key, MDBList (PLAN-ROWS.md 7.2).
 	mdbKey, _ := store.Get(ctx, settings.KeyListsMDBListKey, "")
@@ -479,7 +482,7 @@ func serve() error {
 		HSTS:   cfg.Auth.SecureCookies, Activity: tracker, Discovery: discoveryDep(advertiser), Turnstile: bot,
 		Cast: api.CastOptions{Enabled: cfg.Cast.Enabled, AppID: cfg.Cast.AppID, URL: cfg.Cast.URL, ReceiverOrigins: cfg.Cast.ReceiverOrigins,
 			Host: cfg.Host, Port: cfg.Port},
-		LiveTV: liveSources, LiveSessions: liveSessions, Recordings: recordings, Guide: listings, Updates: checker, Integrations: links, Watch: watch, Plex: plexLink, Trickplay: thumbs, Trailers: trailerJob, Lists: listService})
+		LiveTV: liveSources, LiveSessions: liveSessions, Recordings: recordings, Guide: listings, Updates: checker, Integrations: links, Watch: watch, Plex: plexLink, Trickplay: thumbs, Trailers: trailerJob, Related: relatedJob, Lists: listService})
 	log.Info("network", "trusted_proxies", cfg.Network.TrustedProxies, "admin_networks", cfg.Network.AdminNetworks, "secure_cookies", cfg.Auth.SecureCookies)
 	log.Info("sign-in", "turnstile", bot.Required(), "turnstile_from_config", bot.Fixed, "turnstile_disabled", bot.Disabled)
 	log.Info("updates", "enabled", cfg.Updates.Enabled, "url", cfg.Updates.URL, "install", cfg.Updates.Install, "host", cfg.Updates.Host)
