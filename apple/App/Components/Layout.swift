@@ -9,9 +9,13 @@ enum PadLayout {
     static let margin: CGFloat = 24
     /// Posters retain a readable minimum as the library pane changes width.
     static let posterMinimum: CGFloat = 170
-    /// From this width Show and Movie put their parts side by side, as in
-    /// landscape (1194 pt on the 11-inch iPad); narrower, they stack, as in portrait.
-    static let sideBySide: CGFloat = 1000
+    /// From this width a page puts its parts side by side, as in landscape
+    /// (1194 pt on the 11-inch iPad, 867 pt beside the iPhone Duo's vertical
+    /// bar); narrower, they stack, as in portrait (834 pt on the 11-inch iPad).
+    static let sideBySide: CGFloat = 860
+    /// From this width, the iPad held wide: room for a page's controls in one
+    /// row. Side by side but narrower (the iPhone Duo's 867 pt), they take two.
+    static let landscape: CGFloat = 1000
     static let detailColumn: CGFloat = 440
     static let singleColumn: CGFloat = 720
     static let homeMaximum: CGFloat = 1440
