@@ -50,6 +50,7 @@ private struct ShowPageView: View {
     @Environment(NotificationRouter.self) private var router
     @Environment(NewEpisodeNotifier.self) private var newEpisodes
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.foldPosture) private var posture
     @Environment(\.openURL) private var openURL
 
     private var wide: Bool { sizeClass.isWide }
@@ -62,8 +63,14 @@ private struct ShowPageView: View {
             case .failed(let message):
                 ErrorState(message: message, retry: model.retry)
             case .loaded(let show):
-                page(show, topInset: geo.safeAreaInsets.top, width: geo.size.width)
-                    .refreshable { await model.refresh() }
+                let layout = ShowPageLayout.of(regularWidth: wide, width: geo.size.width, posture: posture)
+                if let side = layout.episodeSide(width: geo.size.width, leadingInset: geo.safeAreaInsets.leading, trailingInset: geo.safeAreaInsets.trailing) {
+                    panes(show, book: layout == .book, episodeSide: side)
+                        .refreshable { await model.refresh() }
+                } else {
+                    page(show, topInset: geo.safeAreaInsets.top, width: geo.size.width)
+                        .refreshable { await model.refresh() }
+                }
             }
         }
         .groundBackground()
@@ -175,6 +182,157 @@ private struct ShowPageView: View {
         }
     }
 
+    // MARK: Side by side (the iPhone Duo)
+
+    /// The episode on one side and its season on the other, each scrolling on
+    /// its own: beside each other on the Duo held open (DuoOpenShow), or a
+    /// page each side of the fold half open like a book (DuoBookShow), where
+    /// `episodeSide` ends at the fold. About the show follows the episode.
+    private func panes(_ show: ShowDetail, book: Bool, episodeSide: CGFloat) -> some View {
+        // DuoOpenShow: 24 pt from the edge, 24 between the two, 16 to the bar.
+        // DuoBookShow: 28 pt either side of the fold.
+        let inner: CGFloat = book ? 28 : 12
+        return HStack(alignment: .top, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if let episode = model.episode {
+                        VStack(alignment: .leading, spacing: 16) {
+                            still(episode, topInset: 0)
+                            onTop(episode, column: true)
+                        }
+                        .padding(.leading, PadLayout.margin)
+                        .padding(.trailing, inner)
+                    }
+                    if !model.offline {
+                        about(show, margin: PadLayout.margin, beside: false)
+                            .padding(.top, 28)
+                    }
+                }
+                .padding(.top, 12)
+                .padding(.bottom, 32)
+            }
+            .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 300 } action: { _, past in
+                scrolled = past
+            }
+            .frame(width: episodeSide)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(book ? "show-page-left" : "show-page-episode")
+            seasonPane(show, leading: inner)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier(book ? "show-page-right" : "show-page-season")
+        }
+    }
+
+    /// The season's tabs, its line and buttons over its episodes in a list,
+    /// the one on top outlined in gold and scrolled into view.
+    private func seasonPane(_ show: ShowDetail, leading: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if model.singleSeason || model.offline {
+                seasonHeading.padding(.leading, leading).padding(.trailing, 16)
+            } else {
+                // The tabs scroll sideways inside the pane, the first starting where its text does.
+                tabs(margin: leading)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                if let line = model.seasonLine {
+                    Text(line).scaledFont(13).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                }
+                FlowLayout(spacing: 10, lineSpacing: 8) {
+                    if model.canMarkSeason {
+                        Button(model.seasonToggleLabel) { Task { await model.toggleSeasonWatched() } }
+                            .lineLimit(1)
+                            .buttonStyle(GhostButtonStyle(height: 36, fullWidth: false))
+                            .fixedSize()
+                            .disabled(model.busy)
+                    }
+                    seasonMenu
+                    if model.canShowMissing {
+                        ShowMissingSwitch(on: model.showMissing) { on in Task { await model.setShowMissing(on) } }
+                    }
+                }
+                if model.missingShown { seasonMissingActions }
+                if let note = model.note { seasonNote(note) }
+            }
+            .padding(.leading, leading)
+            .padding(.trailing, 16)
+            episodeList(leading: leading)
+        }
+        .padding(.top, 12)
+    }
+
+    /// The season's episodes one under another (DuoOpenShow, DuoBookShow).
+    @ViewBuilder private func episodeList(leading: CGFloat) -> some View {
+        switch model.rowState {
+        case .loading:
+            ProgressView().tint(Palette.muted).frame(maxWidth: .infinity, minHeight: 150)
+        case .failed(let message):
+            VStack(spacing: 8) {
+                Text(message).scaledFont(13).foregroundStyle(Palette.muted).multilineTextAlignment(.center)
+                Button("Try again") { Task { await model.retrySeason() } }
+                    .buttonStyle(GhostButtonStyle(height: 44, fullWidth: false))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(24)
+        case .loaded(let episodes):
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(episodes) { episode in
+                            listRow(episode, current: episode.id == model.episodeID).id(episode.id)
+                        }
+                    }
+                    .padding(.leading, leading - 8)
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 24)
+                }
+                .onAppear { if let id = model.episodeID { proxy.scrollTo(id, anchor: .center) } }
+                .onChange(of: model.episodeID) { _, id in
+                    if let id { withAnimation { proxy.scrollTo(id, anchor: .center) } }
+                }
+                .onChange(of: model.selectedSeason) {
+                    if let id = model.episodeID { proxy.scrollTo(id, anchor: .center) }
+                }
+            }
+        }
+    }
+
+    /// An episode in the list: its still, "7. The Long Dark" and the card's line.
+    private func listRow(_ episode: EpisodeDetail, current: Bool) -> some View {
+        let missing = episode.aired && !episode.hasFile
+        let line = episode.rowCardLine()
+        return Button { model.select(episode) } label: {
+            HStack(spacing: 12) {
+                episodeStill(episode)
+                    .frame(width: 128, height: 72)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(episode.rowTitle)
+                        .scaledFont(15, weight: .bold)
+                        .foregroundStyle(episode.hasFile ? Palette.text : Palette.muted)
+                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        if missing { Circle().fill(episode.missingLine().tone.color).frame(width: 6, height: 6) }
+                        Text(line).scaledFont(12).foregroundStyle(missing ? episode.missingLine().tone.color : Palette.muted).lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(8)
+            .background {
+                if current {
+                    RoundedRectangle(cornerRadius: 12).fill(Palette.surfaceRaised)
+                    RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.gold, lineWidth: 2)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(CardButtonStyle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(seasonName(episode.season)), episode \(episode.number): \(episode.displayTitle), \(line)")
+        .accessibilityAddTraits(current ? [.isButton, .isSelected] : .isButton)
+        .accessibilityIdentifier("episode-card-\(episode.id)")
+    }
+
     // MARK: The episode on top
 
     /// The still: edge to edge under the bar on iPhone, a rounded card on
@@ -220,7 +378,9 @@ private struct ShowPageView: View {
 
     /// The eyebrow and its chip, the title, the facts, the synopsis, the
     /// file, then the episode's buttons.
-    @ViewBuilder private func onTop(_ episode: EpisodeDetail) -> some View {
+    /// `column`: in the episode's column beside the season, where Play keeps
+    /// to its label so the episode's buttons fit one row.
+    @ViewBuilder private func onTop(_ episode: EpisodeDetail, column: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: wide ? 10 : 8) {
             if model.offline {
                 Label("You’re offline · Downloaded on this \(downloadsDevice(services.client))", systemImage: "wifi.slash")
@@ -279,7 +439,7 @@ private struct ShowPageView: View {
                 Text(watchedItAllLine).scaledFont(14).foregroundStyle(Palette.textSecondary)
             }
             if episode.hasFile {
-                buttons(episode).padding(.top, wide ? 6 : 8)
+                buttons(episode, column: column).padding(.top, wide ? 6 : 8)
             } else if !episode.aired {
                 Label(episode.actions().unavailable ?? "Not aired yet", systemImage: "circle.fill")
                     .labelStyle(DotLabelStyle())
@@ -295,10 +455,10 @@ private struct ShowPageView: View {
 
     /// Play (or Resume) across, then From the start, Mark watched and ⋯ under
     /// it on iPhone; on iPad all in one row.
-    @ViewBuilder private func buttons(_ episode: EpisodeDetail) -> some View {
+    @ViewBuilder private func buttons(_ episode: EpisodeDetail, column: Bool = false) -> some View {
         let actions = episode.actions()
         let play = Button { model.play() } label: {
-            Label(episode.pagePlayLabel ?? "Play", systemImage: "play.fill").lineLimit(1).frame(minWidth: wide ? 188 : nil)
+            Label(episode.pagePlayLabel ?? "Play", systemImage: "play.fill").lineLimit(1).frame(minWidth: wide && !column ? 188 : nil)
         }
         .buttonStyle(PrimaryButtonStyle(height: wide ? 46 : 50, fullWidth: !wide))
         VStack(alignment: .leading, spacing: 8) {
@@ -388,14 +548,7 @@ private struct ShowPageView: View {
     @ViewBuilder private func seasons(_ show: ShowDetail, margin: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if model.singleSeason || model.offline {
-                Text(seasonName(model.selectedSeason ?? 1))
-                    .scaledFont(wide ? 19 : 17, weight: .bold)
-                    .foregroundStyle(Palette.text)
-                    .padding(.bottom, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(alignment: .bottom) { RowSeparator() }
-                    .accessibilityAddTraits(.isHeader)
-                    .padding(.horizontal, margin)
+                seasonHeading.padding(.horizontal, margin)
             } else {
                 tabs(margin: margin)
             }
@@ -409,18 +562,7 @@ private struct ShowPageView: View {
                 .padding(.horizontal, margin)
             }
             if model.missingShown { seasonMissingActions.padding(.horizontal, margin) }
-            if let note = model.note {
-                Text(note)
-                    .scaledFont(14, weight: .medium)
-                    .foregroundStyle(Color(hex: 0x86EFAC))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(hex: 0x052E16).opacity(0.7), in: RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color(hex: 0x14532D)))
-                    .padding(.horizontal, margin)
-                    .accessibilityIdentifier("show-page-note")
-            }
+            if let note = model.note { seasonNote(note).padding(.horizontal, margin) }
             row(margin: margin)
         }
     }
@@ -571,27 +713,8 @@ private struct ShowPageView: View {
         let line = episode.rowCardLine()
         return Button { model.select(episode) } label: {
             VStack(alignment: .leading, spacing: 5) {
-                Group {
-                    if !episode.aired || missing {
-                        DashedPlaceholder(text: episode.aired ? "Missing" : "Not aired yet", cornerRadius: 8)
-                            .overlay {
-                                if let progress = missing ? episode.missingLine().progress : nil {
-                                    ProgressStrip(progress: progress, height: 4).pinned(.bottom, padding: 0)
-                                }
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    } else {
-                        Color.clear
-                            .overlay { Artwork(url: url(episode.stillPath, .w300), seed: seed(episode)) }
-                            .overlay {
-                                if episode.watched { WatchedCheck(size: 18).pinned(.topTrailing, padding: 5) }
-                                if episode.isNew && !episode.watched { Badge("New", style: .gold).pinned(.topLeading, padding: 5) }
-                                if episode.resumable, let watch = episode.watch { ProgressStrip(progress: watch.progress, height: 4).pinned(.bottom, padding: 0) }
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                }
-                .frame(width: width, height: height)
+                episodeStill(episode)
+                    .frame(width: width, height: height)
                 Text(episode.rowTitle)
                     .scaledFont(wide ? 14 : 13, weight: .semibold)
                     .foregroundStyle(episode.hasFile ? Palette.text : Palette.muted)
@@ -617,6 +740,55 @@ private struct ShowPageView: View {
         // Collapsing the label drops the button role, so it is added back.
         .accessibilityAddTraits(current ? [.isButton, .isSelected] : .isButton)
         .accessibilityIdentifier("episode-card-\(episode.id)")
+    }
+
+    /// An episode's still in the row or the list: a dashed box for one yet to
+    /// air or missing, else the picture with its check, New and progress.
+    @ViewBuilder private func episodeStill(_ episode: EpisodeDetail) -> some View {
+        let missing = episode.aired && !episode.hasFile
+        Group {
+            if !episode.aired || missing {
+                DashedPlaceholder(text: episode.aired ? "Missing" : "Not aired yet", cornerRadius: 8)
+                    .overlay {
+                        if let progress = missing ? episode.missingLine().progress : nil {
+                            ProgressStrip(progress: progress, height: 4).pinned(.bottom, padding: 0)
+                        }
+                    }
+            } else {
+                Color.clear
+                    .overlay { Artwork(url: url(episode.stillPath, .w300), seed: seed(episode)) }
+                    .overlay {
+                        if episode.watched { WatchedCheck(size: 18).pinned(.topTrailing, padding: 5) }
+                        if episode.isNew && !episode.watched { Badge("New", style: .gold).pinned(.topLeading, padding: 5) }
+                        if episode.resumable, let watch = episode.watch { ProgressStrip(progress: watch.progress, height: 4).pinned(.bottom, padding: 0) }
+                    }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    /// One season's name as its heading, where there are no tabs to choose.
+    private var seasonHeading: some View {
+        Text(seasonName(model.selectedSeason ?? 1))
+            .scaledFont(wide ? 19 : 17, weight: .bold)
+            .foregroundStyle(Palette.text)
+            .padding(.bottom, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .bottom) { RowSeparator() }
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    /// What a season action did ("Marked watched"), in green.
+    private func seasonNote(_ note: String) -> some View {
+        Text(note)
+            .scaledFont(14, weight: .medium)
+            .foregroundStyle(Color(hex: 0x86EFAC))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(hex: 0x052E16).opacity(0.7), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color(hex: 0x14532D)))
+            .accessibilityIdentifier("show-page-note")
     }
 
     // MARK: About the show
