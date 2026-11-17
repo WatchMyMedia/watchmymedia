@@ -19,6 +19,7 @@ import { FollowExplainer, NotifyMeButton, NotifyMeFailure } from '../components/
 import { Poster } from '../components/Poster'
 import { RematchDialog } from '../components/RematchDialog'
 import { ReportProblemDialog } from '../components/ReportProblemDialog'
+import { RelatedRows } from '../components/rows/RelatedRows'
 import { RequestDialog } from '../components/RequestDialog'
 import { SegmentEditorDialog } from '../components/SegmentEditorDialog'
 import { episodeActions, episodeFacts, episodeLine, episodeMinutes, isPartlyWatched, pageEpisodes, rowCode, showYears, trackSummary } from '../lib/episode'
@@ -147,6 +148,7 @@ function Loaded({ show: s, number, arrival }: { show: ShowDetail; number?: numbe
       </div>
       <div className="relative -mt-24">{body}</div>
       <AboutShow show={s} number={season.data?.number} showMissing={showMissing} />
+      <RelatedRows kind="show" id={s.id} />
     </div>
   )
 }

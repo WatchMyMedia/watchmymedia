@@ -122,7 +122,11 @@ type HealthOutput struct {
 // the follows.changed event to the person's own devices; and Home's built-in
 // row followed ("New from shows you follow", style episode). Apps offer
 // Notify me only from this level.
-const APILevel = 29
+// 30: related titles (PLAN-RELATED.md §6): GET /movies/{id}/related and
+// GET /shows/{id}/related, the rows at the end of a movie's or a show's
+// page as ScreenRows (collection, movies only, then similar, More like
+// this). Apps ask for them, and draw the rows, only from this level.
+const APILevel = 30
 
 // ServerInfo identifies the server to apps before anyone signs in.
 type ServerInfo struct {

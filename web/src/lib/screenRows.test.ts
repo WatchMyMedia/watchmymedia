@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { components } from '../api/schema'
 import {
-  attribution, drawable, homeRows, isListRow, libraryRows, libraryScreen, posterSubtitle, screenLibraryId, screenTarget, seeAllTarget, seeAllWords, titleParts, webLink,
+  attribution, drawable, homeRows, isListRow, libraryRows, libraryScreen, posterSubtitle, relatedRows, screenLibraryId, screenTarget, seeAllTarget, seeAllWords, titleParts, webLink,
   type ScreenRow,
 } from './screenRows'
 
@@ -67,6 +67,16 @@ describe('rows from a reply', () => {
     expect(libraryRows({ recentlyAdded: [], recentlyAired: [], recentlyReleased: [] }, 'tv').map((r) => r.id)).toEqual(['recentlyAdded', 'recentlyAired'])
     expect(libraryRows({ recentlyAdded: [], recentlyAired: [], recentlyReleased: [] }, 'movie').map((r) => r.style)).toEqual(['poster', 'wide'])
   })
+
+  it('ends a movie’s or a show’s page with the related rows that have titles, in the server’s order and without See all', () => {
+    const collection: ScreenRow = { id: 'collection', style: 'poster', title: 'The Fathoms Collection', items: [item()] }
+    const similar: ScreenRow = { id: 'similar', style: 'poster', title: 'More like this', items: [item({ id: 2 })], seeAll: { kind: 'library', libraryId: 2 } }
+    expect(relatedRows({ rows: [collection, similar] }).map((r) => [r.id, r.seeAll])).toEqual([['collection', undefined], ['similar', undefined]])
+    expect(relatedRows({ rows: [{ ...collection, items: [] }, similar] }).map((r) => r.id)).toEqual(['similar'])
+    expect(relatedRows({ rows: [] })).toEqual([])
+    // Not arrived yet, or failed.
+    expect(relatedRows(undefined)).toEqual([])
+  })
 })
 
 describe('headings', () => {
@@ -78,6 +88,10 @@ describe('headings', () => {
   it('keeps a list’s name whole', () => {
     expect(isListRow({ id: 'list:5' })).toBe(true)
     expect(titleParts({ id: 'list:5', title: 'Sci-fi · the 1980s' })).toEqual(['Sci-fi · the 1980s', undefined])
+  })
+
+  it('keeps a movie’s collection’s name whole', () => {
+    expect(titleParts({ id: 'collection', title: 'Night · Day Collection' })).toEqual(['Night · Day Collection', undefined])
   })
 
   it('says when a title was added or released under its poster; a show card’s episode code is the card’s own links', () => {

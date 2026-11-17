@@ -196,7 +196,7 @@ func (q *Queries) GetMatchOverride(ctx context.Context, arg GetMatchOverridePara
 }
 
 const getMovie = `-- name: GetMovie :one
-SELECT id, library_id, tmdb_id, imdb_id, title, original_title, year, release_date, overview, tagline, runtime_min, genres, rating, poster_path, backdrop_path, created_at, updated_at, credits, content_rating, trailers, trailers_checked_at, poster_tmdb, poster_source FROM movies WHERE id = ?
+SELECT id, library_id, tmdb_id, imdb_id, title, original_title, year, release_date, overview, tagline, runtime_min, genres, rating, poster_path, backdrop_path, created_at, updated_at, credits, content_rating, trailers, trailers_checked_at, poster_tmdb, poster_source, collection_id, collection_name, related_checked_at FROM movies WHERE id = ?
 `
 
 func (q *Queries) GetMovie(ctx context.Context, id int64) (Movie, error) {
@@ -226,6 +226,9 @@ func (q *Queries) GetMovie(ctx context.Context, id int64) (Movie, error) {
 		&i.TrailersCheckedAt,
 		&i.PosterTmdb,
 		&i.PosterSource,
+		&i.CollectionID,
+		&i.CollectionName,
+		&i.RelatedCheckedAt,
 	)
 	return i, err
 }
@@ -280,7 +283,7 @@ func (q *Queries) GetSeasonByNumber(ctx context.Context, arg GetSeasonByNumberPa
 }
 
 const getShow = `-- name: GetShow :one
-SELECT id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source FROM shows WHERE id = ?
+SELECT id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source, related_checked_at FROM shows WHERE id = ?
 `
 
 func (q *Queries) GetShow(ctx context.Context, id int64) (Show, error) {
@@ -308,12 +311,13 @@ func (q *Queries) GetShow(ctx context.Context, id int64) (Show, error) {
 		&i.ContentRating,
 		&i.PosterTmdb,
 		&i.PosterSource,
+		&i.RelatedCheckedAt,
 	)
 	return i, err
 }
 
 const getShowByTMDB = `-- name: GetShowByTMDB :one
-SELECT id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source FROM shows WHERE library_id = ? AND tmdb_id = ?
+SELECT id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source, related_checked_at FROM shows WHERE library_id = ? AND tmdb_id = ?
 `
 
 type GetShowByTMDBParams struct {
@@ -346,12 +350,13 @@ func (q *Queries) GetShowByTMDB(ctx context.Context, arg GetShowByTMDBParams) (S
 		&i.ContentRating,
 		&i.PosterTmdb,
 		&i.PosterSource,
+		&i.RelatedCheckedAt,
 	)
 	return i, err
 }
 
 const getShowForFolder = `-- name: GetShowForFolder :one
-SELECT s.id, s.library_id, s.tmdb_id, s.title, s.original_title, s.year, s.first_air_date, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path, s.created_at, s.updated_at, s.last_air_date, s.next_air_date, s.credits, s.content_rating, s.poster_tmdb, s.poster_source FROM media_files f
+SELECT s.id, s.library_id, s.tmdb_id, s.title, s.original_title, s.year, s.first_air_date, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path, s.created_at, s.updated_at, s.last_air_date, s.next_air_date, s.credits, s.content_rating, s.poster_tmdb, s.poster_source, s.related_checked_at FROM media_files f
 CROSS JOIN episode_files ef ON ef.media_file_id = f.id
 CROSS JOIN episodes e ON e.id = ef.episode_id
 CROSS JOIN shows s ON s.id = e.show_id
@@ -394,6 +399,7 @@ func (q *Queries) GetShowForFolder(ctx context.Context, arg GetShowForFolderPara
 		&i.ContentRating,
 		&i.PosterTmdb,
 		&i.PosterSource,
+		&i.RelatedCheckedAt,
 	)
 	return i, err
 }
@@ -688,7 +694,7 @@ func (q *Queries) ListMovieFiles(ctx context.Context, movieID *int64) ([]MediaFi
 }
 
 const listMovies = `-- name: ListMovies :many
-SELECT m.id, m.library_id, m.tmdb_id, m.imdb_id, m.title, m.original_title, m.year, m.release_date, m.overview, m.tagline, m.runtime_min, m.genres, m.rating, m.poster_path, m.backdrop_path, m.created_at, m.updated_at, m.credits, m.content_rating, m.trailers, m.trailers_checked_at, m.poster_tmdb, m.poster_source, COUNT(f.id) AS file_count
+SELECT m.id, m.library_id, m.tmdb_id, m.imdb_id, m.title, m.original_title, m.year, m.release_date, m.overview, m.tagline, m.runtime_min, m.genres, m.rating, m.poster_path, m.backdrop_path, m.created_at, m.updated_at, m.credits, m.content_rating, m.trailers, m.trailers_checked_at, m.poster_tmdb, m.poster_source, m.collection_id, m.collection_name, m.related_checked_at, COUNT(f.id) AS file_count
 FROM movies m
 JOIN media_files f ON f.movie_id = m.id AND f.status = 'present'
 WHERE m.library_id = ?
@@ -741,6 +747,9 @@ func (q *Queries) ListMovies(ctx context.Context, arg ListMoviesParams) ([]ListM
 			&i.Movie.TrailersCheckedAt,
 			&i.Movie.PosterTmdb,
 			&i.Movie.PosterSource,
+			&i.Movie.CollectionID,
+			&i.Movie.CollectionName,
+			&i.Movie.RelatedCheckedAt,
 			&i.FileCount,
 		); err != nil {
 			return nil, err
@@ -1211,7 +1220,7 @@ func (q *Queries) ListShowWatchedEpisodes(ctx context.Context, showID int64) ([]
 }
 
 const listShows = `-- name: ListShows :many
-SELECT s.id, s.library_id, s.tmdb_id, s.title, s.original_title, s.year, s.first_air_date, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path, s.created_at, s.updated_at, s.last_air_date, s.next_air_date, s.credits, s.content_rating, s.poster_tmdb, s.poster_source, COUNT(DISTINCT e.id) AS episode_count
+SELECT s.id, s.library_id, s.tmdb_id, s.title, s.original_title, s.year, s.first_air_date, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path, s.created_at, s.updated_at, s.last_air_date, s.next_air_date, s.credits, s.content_rating, s.poster_tmdb, s.poster_source, s.related_checked_at, COUNT(DISTINCT e.id) AS episode_count
 FROM shows s
 JOIN episodes e ON e.show_id = s.id
 JOIN episode_files ef ON ef.episode_id = e.id
@@ -1264,6 +1273,7 @@ func (q *Queries) ListShows(ctx context.Context, arg ListShowsParams) ([]ListSho
 			&i.Show.ContentRating,
 			&i.Show.PosterTmdb,
 			&i.Show.PosterSource,
+			&i.Show.RelatedCheckedAt,
 			&i.EpisodeCount,
 		); err != nil {
 			return nil, err
@@ -1381,7 +1391,7 @@ UPDATE movies SET
     poster_source = ?1,
     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE id = ?3
-RETURNING id, library_id, tmdb_id, imdb_id, title, original_title, year, release_date, overview, tagline, runtime_min, genres, rating, poster_path, backdrop_path, created_at, updated_at, credits, content_rating, trailers, trailers_checked_at, poster_tmdb, poster_source
+RETURNING id, library_id, tmdb_id, imdb_id, title, original_title, year, release_date, overview, tagline, runtime_min, genres, rating, poster_path, backdrop_path, created_at, updated_at, credits, content_rating, trailers, trailers_checked_at, poster_tmdb, poster_source, collection_id, collection_name, related_checked_at
 `
 
 type SetMoviePosterParams struct {
@@ -1421,6 +1431,9 @@ func (q *Queries) SetMoviePoster(ctx context.Context, arg SetMoviePosterParams) 
 		&i.TrailersCheckedAt,
 		&i.PosterTmdb,
 		&i.PosterSource,
+		&i.CollectionID,
+		&i.CollectionName,
+		&i.RelatedCheckedAt,
 	)
 	return i, err
 }
@@ -1500,7 +1513,7 @@ UPDATE shows SET
     poster_source = ?1,
     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE id = ?3
-RETURNING id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source
+RETURNING id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source, related_checked_at
 `
 
 type SetShowPosterParams struct {
@@ -1534,6 +1547,7 @@ func (q *Queries) SetShowPoster(ctx context.Context, arg SetShowPosterParams) (S
 		&i.ContentRating,
 		&i.PosterTmdb,
 		&i.PosterSource,
+		&i.RelatedCheckedAt,
 	)
 	return i, err
 }
@@ -1618,7 +1632,7 @@ ON CONFLICT (library_id, tmdb_id) DO UPDATE SET
     credits = excluded.credits, content_rating = excluded.content_rating,
     trailers = excluded.trailers, trailers_checked_at = excluded.trailers_checked_at,
     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-RETURNING id, library_id, tmdb_id, imdb_id, title, original_title, year, release_date, overview, tagline, runtime_min, genres, rating, poster_path, backdrop_path, created_at, updated_at, credits, content_rating, trailers, trailers_checked_at, poster_tmdb, poster_source
+RETURNING id, library_id, tmdb_id, imdb_id, title, original_title, year, release_date, overview, tagline, runtime_min, genres, rating, poster_path, backdrop_path, created_at, updated_at, credits, content_rating, trailers, trailers_checked_at, poster_tmdb, poster_source, collection_id, collection_name, related_checked_at
 `
 
 type UpsertMovieParams struct {
@@ -1688,6 +1702,9 @@ func (q *Queries) UpsertMovie(ctx context.Context, arg UpsertMovieParams) (Movie
 		&i.TrailersCheckedAt,
 		&i.PosterTmdb,
 		&i.PosterSource,
+		&i.CollectionID,
+		&i.CollectionName,
+		&i.RelatedCheckedAt,
 	)
 	return i, err
 }
@@ -1751,7 +1768,7 @@ ON CONFLICT (library_id, tmdb_id) DO UPDATE SET
     backdrop_path = excluded.backdrop_path, last_air_date = excluded.last_air_date,
     next_air_date = excluded.next_air_date, credits = excluded.credits, content_rating = excluded.content_rating,
     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-RETURNING id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source
+RETURNING id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source, related_checked_at
 `
 
 type UpsertShowParams struct {
@@ -1815,6 +1832,7 @@ func (q *Queries) UpsertShow(ctx context.Context, arg UpsertShowParams) (Show, e
 		&i.ContentRating,
 		&i.PosterTmdb,
 		&i.PosterSource,
+		&i.RelatedCheckedAt,
 	)
 	return i, err
 }

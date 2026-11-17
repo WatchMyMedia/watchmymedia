@@ -9,6 +9,7 @@ import { useAuth } from '../authContext'
 import { useCanDelete, useCanManage } from '../api/delete'
 import { DeleteDialog, ReplaceFileDialog } from '../components/DeleteDialog'
 import { MoreMenu } from '../components/MoreMenu'
+import { RelatedRows } from '../components/rows/RelatedRows'
 import { CastRow, DetailHeader, FileTags, PrimaryButton, SecondaryButton, SideCard } from '../components/DetailHeader'
 import { fileType, formatBytes, formatDate, formatDuration, formatRuntime, relativeTime } from '../lib/format'
 import { useMarkWatched } from '../api/watch'
@@ -226,6 +227,7 @@ export function Movie({ movieId }: { movieId: number }) {
           />
         </aside>
       </div>
+      <RelatedRows kind="movie" id={m.id} />
     </div>
   )
 }

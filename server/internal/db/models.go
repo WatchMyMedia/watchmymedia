@@ -414,6 +414,16 @@ type Movie struct {
 	TrailersCheckedAt *string  `json:"trailers_checked_at"`
 	PosterTmdb        *string  `json:"poster_tmdb"`
 	PosterSource      string   `json:"poster_source"`
+	CollectionID      *int64   `json:"collection_id"`
+	CollectionName    *string  `json:"collection_name"`
+	RelatedCheckedAt  *string  `json:"related_checked_at"`
+}
+
+type MovieTag struct {
+	MovieID int64  `json:"movie_id"`
+	Kind    string `json:"kind"`
+	Value   string `json:"value"`
+	Rank    int64  `json:"rank"`
 }
 
 type OfflineDownload struct {
@@ -739,27 +749,28 @@ type Setting struct {
 }
 
 type Show struct {
-	ID            int64    `json:"id"`
-	LibraryID     int64    `json:"library_id"`
-	TmdbID        int64    `json:"tmdb_id"`
-	Title         string   `json:"title"`
-	OriginalTitle *string  `json:"original_title"`
-	Year          *int64   `json:"year"`
-	FirstAirDate  *string  `json:"first_air_date"`
-	Overview      string   `json:"overview"`
-	Status        *string  `json:"status"`
-	Genres        string   `json:"genres"`
-	Rating        *float64 `json:"rating"`
-	PosterPath    *string  `json:"poster_path"`
-	BackdropPath  *string  `json:"backdrop_path"`
-	CreatedAt     string   `json:"created_at"`
-	UpdatedAt     string   `json:"updated_at"`
-	LastAirDate   *string  `json:"last_air_date"`
-	NextAirDate   *string  `json:"next_air_date"`
-	Credits       string   `json:"credits"`
-	ContentRating *string  `json:"content_rating"`
-	PosterTmdb    *string  `json:"poster_tmdb"`
-	PosterSource  string   `json:"poster_source"`
+	ID               int64    `json:"id"`
+	LibraryID        int64    `json:"library_id"`
+	TmdbID           int64    `json:"tmdb_id"`
+	Title            string   `json:"title"`
+	OriginalTitle    *string  `json:"original_title"`
+	Year             *int64   `json:"year"`
+	FirstAirDate     *string  `json:"first_air_date"`
+	Overview         string   `json:"overview"`
+	Status           *string  `json:"status"`
+	Genres           string   `json:"genres"`
+	Rating           *float64 `json:"rating"`
+	PosterPath       *string  `json:"poster_path"`
+	BackdropPath     *string  `json:"backdrop_path"`
+	CreatedAt        string   `json:"created_at"`
+	UpdatedAt        string   `json:"updated_at"`
+	LastAirDate      *string  `json:"last_air_date"`
+	NextAirDate      *string  `json:"next_air_date"`
+	Credits          string   `json:"credits"`
+	ContentRating    *string  `json:"content_rating"`
+	PosterTmdb       *string  `json:"poster_tmdb"`
+	PosterSource     string   `json:"poster_source"`
+	RelatedCheckedAt *string  `json:"related_checked_at"`
 }
 
 type ShowFollow struct {
@@ -768,6 +779,13 @@ type ShowFollow struct {
 	Title        string `json:"title"`
 	SinceArrival int64  `json:"since_arrival"`
 	CreatedAt    string `json:"created_at"`
+}
+
+type ShowTag struct {
+	ShowID int64  `json:"show_id"`
+	Kind   string `json:"kind"`
+	Value  string `json:"value"`
+	Rank   int64  `json:"rank"`
 }
 
 type Trickplay struct {

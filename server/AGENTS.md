@@ -41,6 +41,7 @@ Under `internal/`:
 | `library`, `scanner`, `parser`, `probe`, `metadata`, `tmdb`, `images` | Finding files, naming them, matching them on TMDB, artwork. Season line-ups, for seasons TMDB numbers differently from the files, are in `internal/metadata/seasonmap.go` ([PLAN-SEASON-MAPPING.md](../PLAN-SEASON-MAPPING.md)) |
 | `artwork` | The pictures admins chose in place of TMDB's posters ([PLAN-POSTERS.md](../PLAN-POSTERS.md)): uploads and links copied once, re-encoded as JPEG and named `c-<hash>.jpg` under `<data_dir>/artwork`, the address check on links, and the sweep. `images` serves them scaled on the TMDB image route; the routes are `internal/api/posters.go`. `poster_path` stays the poster to show: change it only through `SetMoviePoster`, `SetShowPoster` and `SetSeasonPoster`, and keep the upserts' `poster_source` guard, or a refresh overwrites an admin's choice |
 | `trailers` | Movies' YouTube trailers from TMDB: choosing the best three, `movies.trailers`, the background refresh (`Refresher`) and whether the Trailers from YouTube setting is on ([PLAN-TRAILERS.md](../PLAN-TRAILERS.md)) |
+| `related` | Related titles at the end of movie and show pages ([PLAN-RELATED.md](../PLAN-RELATED.md)): each title's tags from TMDB (`movie_tags`, `show_tags`: recommendations, keywords, genres, billed cast, director or creator, language) and a movie's collection, written when the matcher stores a title (`StoreMovie`, `StoreShow`, in its transaction); the scoring (`Similar`, weights in `score.go`); and the background job (`Refresher`) that fills in titles matched before and refetches a title whose page was opened with data older than 30 or 90 days. Pages never wait on TMDB. The routes are `internal/api/related.go` |
 | `lists` | The lists rows are made from ([PLAN-ROWS.md](../PLAN-ROWS.md)): a `Source` per kind (TMDB's trending, charts, discover, lists and collections; MDBList with the admin's key; a saved library filter; an import of an IMDb or Letterboxd export or pasted lines), what they fetched in `media_lists` and `media_list_entries`, and the refresh job (`Service.Run`), with a fake MDBList in `internal/lists/mdblisttest`. Each person's row layouts (`user_preferences` `rows.*`, the household's in `settings` `rows.default.*`), their merge, the arranged screens and matching entries to the library are in `api` (`screen_layout.go`, `media_list_rows.go`) |
 | `playback` | Direct play, remux and transcode decisions, bounded event and VOD HLS sessions, owned temporary-storage accounting, hardware encoders, Automatic quality's policy (`auto.go`) |
 | `streamtest` | Test-only aggregate/per-viewer HTTP media shaper for `cmd/livetvfixture`; never wire it into the production server. `make streaming-check` runs the isolated F0/F1 harness. |
@@ -131,7 +132,7 @@ SQLite plans joins without statistics, and a plan that looks fine after
   of the largest real one (about 2,850 movies, 1,100 shows, 18,700 files),
   with ten 250-entry lists and three library lists on Home, and times each
   page alone and the web Home's requests as one burst, arranged and not;
-  `TestNewEpisodesSpeed` (`internal/api/follows_speed_test.go`) adds 500
+  `TestRelatedSpeed` (`internal/api/related_speed_test.go`) gives it TMDB-like tags and times a movie's and a show's related rows, alone and ten at once, and checks their plans; `TestNewEpisodesSpeed` (`internal/api/follows_speed_test.go`) adds 500
   follows and a week of arrivals to it and times the new-episodes feed, the
   follows list and Home's followed row, alone and ten at once, and fails
   when their plans read a whole table;
@@ -171,6 +172,10 @@ have a file present, so a new episode isn't already watched when it comes.
 with `-- +goose Up` and `-- +goose Down` and a comment saying why. Never edit
 one that has shipped. Test data-moving migrations in `migrations_test.go` by
 migrating up to the version before, inserting rows, then migrating on.
+Use raw SQL until the database is at the latest version: the generated
+queries list every column of today's schema, so one run at an older version
+fails once a later migration adds a column to its table (`TestMigrationCustomPosters`
+broke that way when `00043` added columns to `movies`).
 Migrations land on `main` in increasing number order: the goose provider
 refuses to start a server whose database has a migration newer than one it
 has not applied, so renumber a branch's migration above `main`'s latest

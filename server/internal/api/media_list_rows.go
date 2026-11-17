@@ -330,48 +330,13 @@ func (d listData) cards(ctx context.Context, deps Deps, listIDs []int64, limit i
 			}
 		}
 	}
-	gen, live := generation(deps)
-	movieCards, showCards := map[int64]BrowseItem{}, map[int64]BrowseItem{}
-	var needMovies, needShows []int64
-	for _, id := range movies {
-		if it, ok := deps.listsState.movieCards.get(gen, id); live && ok {
-			movieCards[id] = it
-		} else {
-			needMovies = append(needMovies, id)
-		}
+	movieCards, err := movieCardsByID(ctx, deps, movies)
+	if err != nil {
+		return nil, err
 	}
-	for _, id := range shows {
-		if it, ok := deps.listsState.showCards.get(gen, id); live && ok {
-			showCards[id] = it
-		} else {
-			needShows = append(needShows, id)
-		}
-	}
-	if len(needMovies) > 0 {
-		rows, err := deps.Queries.ListMovieCardsByIDs(ctx, slices.Compact(slices.Sorted(slices.Values(needMovies))))
-		if err != nil {
-			return nil, err
-		}
-		for _, r := range rows {
-			it := movieItem(db.ListMovieItemsRow(r))
-			movieCards[r.ID] = it
-			if live {
-				deps.listsState.movieCards.put(gen, r.ID, it)
-			}
-		}
-	}
-	if len(needShows) > 0 {
-		rows, err := deps.Queries.ListShowCardsByIDs(ctx, slices.Compact(slices.Sorted(slices.Values(needShows))))
-		if err != nil {
-			return nil, err
-		}
-		for _, r := range rows {
-			it := showItem(db.ListShowItemsRow(r))
-			showCards[r.ID] = it
-			if live {
-				deps.listsState.showCards.put(gen, r.ID, it)
-			}
-		}
+	showCards, err := showCardsByID(ctx, deps, shows)
+	if err != nil {
+		return nil, err
 	}
 	out := map[int64][]rankedItem{}
 	for _, id := range listIDs {
@@ -397,6 +362,66 @@ func (d listData) cards(ctx context.Context, deps Deps, listIDs []int64, limit i
 			ranked[i] = rankedItem{rank: ranks[i], item: items[i]}
 		}
 		out[id] = ranked
+	}
+	return out, nil
+}
+
+// movieCardsByID are some movies' cards, unmarked, from the cache when it
+// has them. Movies with no file present have none.
+func movieCardsByID(ctx context.Context, deps Deps, ids []int64) (map[int64]BrowseItem, error) {
+	gen, live := generation(deps)
+	out := map[int64]BrowseItem{}
+	var need []int64
+	for _, id := range ids {
+		if it, ok := deps.listsState.movieCards.get(gen, id); live && ok {
+			out[id] = it
+		} else {
+			need = append(need, id)
+		}
+	}
+	if len(need) == 0 {
+		return out, nil
+	}
+	rows, err := deps.Queries.ListMovieCardsByIDs(ctx, slices.Compact(slices.Sorted(slices.Values(need))))
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		it := movieItem(db.ListMovieItemsRow(r))
+		out[r.ID] = it
+		if live {
+			deps.listsState.movieCards.put(gen, r.ID, it)
+		}
+	}
+	return out, nil
+}
+
+// showCardsByID are some shows' cards, unmarked, from the cache when it has
+// them. Shows with no episode file present have none.
+func showCardsByID(ctx context.Context, deps Deps, ids []int64) (map[int64]BrowseItem, error) {
+	gen, live := generation(deps)
+	out := map[int64]BrowseItem{}
+	var need []int64
+	for _, id := range ids {
+		if it, ok := deps.listsState.showCards.get(gen, id); live && ok {
+			out[id] = it
+		} else {
+			need = append(need, id)
+		}
+	}
+	if len(need) == 0 {
+		return out, nil
+	}
+	rows, err := deps.Queries.ListShowCardsByIDs(ctx, slices.Compact(slices.Sorted(slices.Values(need))))
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		it := showItem(db.ListShowItemsRow(r))
+		out[r.ID] = it
+		if live {
+			deps.listsState.showCards.put(gen, r.ID, it)
+		}
 	}
 	return out, nil
 }

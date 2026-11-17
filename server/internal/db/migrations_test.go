@@ -578,6 +578,11 @@ func TestMigrationCustomPosters(t *testing.T) {
 	exec(`INSERT INTO movies (id, library_id, tmdb_id, title, genres, poster_path) VALUES (7, 1, 949, 'Harbor Lights', '[]', '/tmdb.jpg'), (8, 1, 950, 'Quiet Field', '[]', '/plain.jpg')`)
 	exec(`INSERT INTO shows (id, library_id, tmdb_id, title, genres, poster_path) VALUES (3, 2, 77, 'Inspector Vane', '[]', '/show.jpg')`)
 	exec(`INSERT INTO seasons (id, show_id, number, name, overview, poster_path, episode_count) VALUES (4, 3, 1, 'Season 1', '', '/season.jpg', 6)`)
+	// The generated queries select every column of today's schema, so they
+	// run at the latest version, not at 41.
+	if _, err := p.Up(ctx); err != nil {
+		t.Fatal(err)
+	}
 	custom := "/c-0123456789abcdef01234567.jpg"
 	if m, err := q.SetMoviePoster(ctx, SetMoviePosterParams{ID: 7, Path: &custom, Source: "upload"}); err != nil || *m.PosterPath != custom || *m.PosterTmdb != "/tmdb.jpg" {
 		t.Fatalf("a chosen poster: %+v, %v", m, err)

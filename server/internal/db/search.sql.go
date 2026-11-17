@@ -83,7 +83,7 @@ func (q *Queries) SearchEpisodes(ctx context.Context, arg SearchEpisodesParams) 
 }
 
 const searchMovies = `-- name: SearchMovies :many
-SELECT m.id, m.library_id, m.tmdb_id, m.imdb_id, m.title, m.original_title, m.year, m.release_date, m.overview, m.tagline, m.runtime_min, m.genres, m.rating, m.poster_path, m.backdrop_path, m.created_at, m.updated_at, m.credits, m.content_rating, m.trailers, m.trailers_checked_at, m.poster_tmdb, m.poster_source FROM movies m
+SELECT m.id, m.library_id, m.tmdb_id, m.imdb_id, m.title, m.original_title, m.year, m.release_date, m.overview, m.tagline, m.runtime_min, m.genres, m.rating, m.poster_path, m.backdrop_path, m.created_at, m.updated_at, m.credits, m.content_rating, m.trailers, m.trailers_checked_at, m.poster_tmdb, m.poster_source, m.collection_id, m.collection_name, m.related_checked_at FROM movies m
 JOIN media_files f ON f.movie_id = m.id AND f.status = 'present'
 WHERE m.title LIKE ? OR m.original_title LIKE ?
 GROUP BY m.id
@@ -130,6 +130,9 @@ func (q *Queries) SearchMovies(ctx context.Context, arg SearchMoviesParams) ([]M
 			&i.TrailersCheckedAt,
 			&i.PosterTmdb,
 			&i.PosterSource,
+			&i.CollectionID,
+			&i.CollectionName,
+			&i.RelatedCheckedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -145,7 +148,7 @@ func (q *Queries) SearchMovies(ctx context.Context, arg SearchMoviesParams) ([]M
 }
 
 const searchShows = `-- name: SearchShows :many
-SELECT s.id, s.library_id, s.tmdb_id, s.title, s.original_title, s.year, s.first_air_date, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path, s.created_at, s.updated_at, s.last_air_date, s.next_air_date, s.credits, s.content_rating, s.poster_tmdb, s.poster_source FROM shows s
+SELECT s.id, s.library_id, s.tmdb_id, s.title, s.original_title, s.year, s.first_air_date, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path, s.created_at, s.updated_at, s.last_air_date, s.next_air_date, s.credits, s.content_rating, s.poster_tmdb, s.poster_source, s.related_checked_at FROM shows s
 JOIN episodes e ON e.show_id = s.id
 JOIN episode_files ef ON ef.episode_id = e.id
 JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
@@ -192,6 +195,7 @@ func (q *Queries) SearchShows(ctx context.Context, arg SearchShowsParams) ([]Sho
 			&i.ContentRating,
 			&i.PosterTmdb,
 			&i.PosterSource,
+			&i.RelatedCheckedAt,
 		); err != nil {
 			return nil, err
 		}

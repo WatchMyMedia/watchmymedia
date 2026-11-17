@@ -147,6 +147,53 @@ type CastMember struct {
 
 type Credits struct {
 	Cast []CastMember `json:"cast"`
+	// Crew is everyone behind the camera; related titles keep only the
+	// directors (PLAN-RELATED.md §4).
+	Crew []CrewMember `json:"crew"`
+}
+
+// CrewMember is one job of one person behind the camera.
+type CrewMember struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Job  string `json:"job"`
+}
+
+// Person is a show's creator.
+type Person struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+// CollectionRef is the collection (franchise) a movie belongs to.
+type CollectionRef struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+// Keyword is one of TMDB's keywords.
+type Keyword struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+// Recommendations is the first page of TMDB's recommendations for a title,
+// best first: what people who liked it also liked. Only IDs are kept.
+type Recommendations struct {
+	Results []struct {
+		ID int `json:"id"`
+	} `json:"results"`
+}
+
+// IDs are the recommended titles' TMDB IDs, in TMDB's order.
+func (r Recommendations) IDs() []int {
+	out := make([]int, 0, len(r.Results))
+	for _, x := range r.Results {
+		if x.ID > 0 {
+			out = append(out, x.ID)
+		}
+	}
+	return out
 }
 
 type Movie struct {
@@ -164,6 +211,14 @@ type Movie struct {
 	BackdropPath  string       `json:"backdrop_path"`
 	Credits       Credits      `json:"credits"`
 	ReleaseDates  ReleaseDates `json:"release_dates"`
+	// The collection, original language, keywords and recommendations are
+	// what related titles are worked out from (PLAN-RELATED.md §4).
+	Collection       *CollectionRef `json:"belongs_to_collection"`
+	OriginalLanguage string         `json:"original_language"`
+	Keywords         struct {
+		Keywords []Keyword `json:"keywords"`
+	} `json:"keywords"`
+	Recommendations Recommendations `json:"recommendations"`
 	// Videos are its trailers, teasers and clips in English or no language
 	// (VideoLanguages).
 	Videos Videos `json:"videos"`
@@ -286,6 +341,14 @@ type TVShow struct {
 	NextEpisode     *EpisodeRef     `json:"next_episode_to_air"`
 	Credits         Credits         `json:"credits"`
 	ContentRatings  ContentRatings  `json:"content_ratings"`
+	// The creators, original language, keywords and recommendations are
+	// what related titles are worked out from (PLAN-RELATED.md §4).
+	CreatedBy        []Person `json:"created_by"`
+	OriginalLanguage string   `json:"original_language"`
+	Keywords         struct {
+		Results []Keyword `json:"results"`
+	} `json:"keywords"`
+	Recommendations Recommendations `json:"recommendations"`
 }
 
 type Episode struct {
@@ -341,11 +404,11 @@ func (c *Client) SearchTV(ctx context.Context, query string, year int) ([]TVResu
 	return res.Results, nil
 }
 
-// GetMovie fetches a movie's details with its cast, releases and videos, in
-// one request.
+// GetMovie fetches a movie's details with its cast, releases, videos,
+// keywords and recommendations, in one request.
 func (c *Client) GetMovie(ctx context.Context, id int) (*Movie, error) {
 	var m Movie
-	q := url.Values{"append_to_response": {"credits,release_dates,videos"}, "include_video_language": {VideoLanguages}}
+	q := url.Values{"append_to_response": {"credits,release_dates,videos,keywords,recommendations"}, "include_video_language": {VideoLanguages}}
 	if err := c.get(ctx, "/movie/"+strconv.Itoa(id), q, &m); err != nil {
 		return nil, err
 	}
@@ -362,9 +425,11 @@ func (c *Client) GetMovieVideos(ctx context.Context, id int) (*Videos, error) {
 	return &v, nil
 }
 
+// GetTV fetches a show's details with its cast, content ratings, keywords
+// and recommendations, in one request.
 func (c *Client) GetTV(ctx context.Context, id int) (*TVShow, error) {
 	var s TVShow
-	if err := c.get(ctx, "/tv/"+strconv.Itoa(id), url.Values{"append_to_response": {"credits,content_ratings"}}, &s); err != nil {
+	if err := c.get(ctx, "/tv/"+strconv.Itoa(id), url.Values{"append_to_response": {"credits,content_ratings,keywords,recommendations"}}, &s); err != nil {
 		return nil, err
 	}
 	return &s, nil

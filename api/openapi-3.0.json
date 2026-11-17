@@ -11063,6 +11063,22 @@
         ],
         "type": "object"
       },
+      "RelatedRows": {
+        "additionalProperties": false,
+        "properties": {
+          "rows": {
+            "description": "In order: collection (movies only, when the library has another film of the movie's TMDB collection; titled with the collection's name, in release order) and similar (More like this, best first, when at least 3 titles qualify). Both style poster, with items. Empty when neither has anything.",
+            "items": {
+              "$ref": "#/components/schemas/ScreenRow"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows"
+        ],
+        "type": "object"
+      },
       "RematchInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -22718,6 +22734,49 @@
         ]
       }
     },
+    "/api/movies/{id}/related": {
+      "get": {
+        "description": "Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.",
+        "operationId": "getMovieRelated",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelatedRows"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "The rows at the end of a movie's page: its collection and More like this",
+        "tags": [
+          "browse"
+        ]
+      }
+    },
     "/api/movies/{id}/rematch": {
       "get": {
         "operationId": "previewMovieRematch",
@@ -25668,6 +25727,49 @@
         "summary": "The posters an admin can choose for a show",
         "tags": [
           "posters"
+        ]
+      }
+    },
+    "/api/shows/{id}/related": {
+      "get": {
+        "description": "Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.",
+        "operationId": "getShowRelated",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelatedRows"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "The row at the end of a show's page: More like this",
+        "tags": [
+          "browse"
         ]
       }
     },
