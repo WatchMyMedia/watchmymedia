@@ -388,6 +388,8 @@ fun MobileNavHost(
                                 onBack = { nav.popBackStack() },
                                 onOpenSettings = { go(MobileRoutes.Settings) },
                                 onOpenTrailer = { t -> nav.navigate(MobileRoutes.Trailer(t.movieId, t.movieTitle, t.trailers.map { it.key }, t.trailers.map { it.name })) },
+                                onOpenMovie = openMovie,
+                                onOpenShow = openShow,
                             )
                         }
                         composable<MobileRoutes.Downloads> {
@@ -567,5 +569,7 @@ private fun ShowPage(nav: NavHostController, showId: Long, arrival: ShowArrival)
         onBack = { nav.popBackStack() },
         onOpenSettings = { nav.go(MobileRoutes.Settings) },
         onOpenDownloads = { nav.go(MobileRoutes.Downloads) },
+        onOpenShow = { id -> nav.navigate(MobileRoutes.Show(id)) },
+        onOpenMovie = { id -> nav.navigate(MobileRoutes.Movie(id)) },
     )
 }

@@ -81,7 +81,9 @@ import media.watchmy.client.ui.ReportShown
  * with Mark season watched and Show missing; then About the show with Mark
  * show watched and Request missing seasons. A chip or a card changes the
  * episode on top here, never the back stack, so Back leaves the show.
- * [arrival] says which episode goes on top first.
+ * [arrival] says which episode goes on top first. The page ends with More
+ * like this (ShowRelated.dc.html), whose cards open their page through
+ * [onOpenShow].
  */
 @Composable
 fun ShowPageScreen(
@@ -92,6 +94,8 @@ fun ShowPageScreen(
     modifier: Modifier = Modifier,
     onOpenSettings: () -> Unit = {},
     onOpenDownloads: () -> Unit = {},
+    onOpenShow: (Long) -> Unit = {},
+    onOpenMovie: (Long) -> Unit = {},
 ) {
     val services = LocalAppServices.current
     val vm = viewModel { ShowPageViewModel(services.library, showId, arrival, services.requests, services.downloads, services.follows, createSavedStateHandle()) }
@@ -106,7 +110,8 @@ fun ShowPageScreen(
     val scroll = rememberScrollState()
     val threshold = with(LocalDensity.current) { StillScroll.roundToPx() }
     val solid by remember { derivedStateOf { scroll.value > threshold } }
-    val twoPane = rememberTabletLayout().twoPane
+    val layout = rememberTabletLayout()
+    val twoPane = layout.twoPane
     val show = state.show
     val ep = state.episode
     val context = LocalContext.current
@@ -131,7 +136,11 @@ fun ShowPageScreen(
                         if (turningOn) followAsk.after(context, show.title)
                     },
                 )
-                if (twoPane) TabletContent(show, ep, state, vm, downloads, scroll, page) else PhoneContent(show, ep, state, vm, downloads, scroll, page)
+                // The row at the page's end, More like this (PLAN-RELATED.md §7).
+                val related: @Composable (Modifier) -> Unit = { placed ->
+                    RelatedRows(state.related, onOpenMovie, onOpenShow, layout.isTablet, placed, edge = if (twoPane) 32.dp else 16.dp)
+                }
+                if (twoPane) TabletContent(show, ep, state, vm, downloads, scroll, page, related) else PhoneContent(show, ep, state, vm, downloads, scroll, page, related)
             }
         }
         PageBar(title = ep?.title?.takeIf { solid }, solid = solid, onBack = onBack)
@@ -217,6 +226,7 @@ private fun PhoneContent(
     downloads: DownloadsViewModel.State,
     scroll: ScrollState,
     page: PageActions,
+    related: @Composable (Modifier) -> Unit,
 ) {
     val library = LocalAppServices.current.library
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -235,6 +245,7 @@ private fun PhoneContent(
         }
         SeasonsSection(show, state, vm, downloads, page, still = PhoneStill, modifier = Modifier.widthIn(max = ColumnMax).padding(top = 28.dp))
         AboutShow(show, state, vm, page, divider = true, modifier = column.padding(top = 28.dp))
+        related(Modifier.widthIn(max = ColumnMax).padding(top = 28.dp))
     }
 }
 
@@ -252,6 +263,7 @@ private fun TabletContent(
     downloads: DownloadsViewModel.State,
     scroll: ScrollState,
     page: PageActions,
+    related: @Composable (Modifier) -> Unit,
 ) {
     val library = LocalAppServices.current.library
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -293,6 +305,8 @@ private fun TabletContent(
             )
         }
         SeasonsSection(show, state, vm, downloads, page, still = TabletStill, modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 32.dp))
+        // Under the season's row, across the page (TabShowRelated.dc.html).
+        related(Modifier.padding(top = 28.dp))
     }
 }
 
