@@ -45,6 +45,8 @@ private struct ShowPageView: View {
     @State private var seasonDownload: SeasonDownloadModel?
     /// The explainer before iOS's question, for this show's title.
     @State private var explaining: ShowDetail?
+    /// The form the dialog that is up opened in (`dialogAsActionSheet`).
+    @State private var dialogOpenedAsActionSheet: Bool?
     @Environment(AppServices.self) private var services
     @Environment(FollowsStore.self) private var follows
     @Environment(NotificationRouter.self) private var router
@@ -97,7 +99,7 @@ private struct ShowPageView: View {
         .sheet(item: $model.report) { report in
             ReportProblemSheet(model: report, centred: wide) { model.report = nil }
         }
-        .sheet(item: Binding(get: { RequestSheet.presented(model.requestSheet, centred: wide) }, set: { model.requestSheet = $0 })) { sheet in
+        .sheet(item: RequestSheet.presenting($model.requestSheet, centred: wide)) { sheet in
             RequestSheet(model: sheet, centred: wide) { model.requestSheet = nil }
         }
         .sheet(item: $seasonDownload) { download in
@@ -114,6 +116,9 @@ private struct ShowPageView: View {
             }
         }
         .task { await model.run() }
+        .onChange(of: model.dialog?.id, initial: true) { _, _ in
+            dialogOpenedAsActionSheet = model.dialog.map { !wide && $0.confirm != nil }
+        }
         .task { await router.refreshStatus() }
         // The line under the actions says why the bell went back until it is pressed again or the page is left.
         .onDisappear { follows.clearFailure() }
@@ -958,13 +963,20 @@ private struct ShowPageView: View {
     /// or as an alert (the iPad's, and one with only OK everywhere).
     private func dialogShown(asActionSheet: Bool) -> Binding<Bool> {
         Binding(
-            get: {
-                guard let dialog = model.dialog, !dialog.recordAgainChoice else { return false }
-                let sheet = !wide && dialog.confirm != nil
-                return sheet == asActionSheet
-            },
-            set: { if !$0 { model.dialog = nil } }
+            get: { dialogAsActionSheet == asActionSheet },
+            set: { shown in if !shown && dialogAsActionSheet == asActionSheet { model.dialog = nil } }
         )
+    }
+
+    /// Whether the dialog that is up is an action sheet (a delete or replace
+    /// on iPhone) or an alert; nil while none is, or the sheet with the box is.
+    /// It keeps the form it opened in: folding or unfolding the iPhone Duo
+    /// changes the width, and taking one form down to put up the other lost
+    /// the question (iOS 27.2 simulator: the new form can't present while the
+    /// old one is going, and that refusal clears it).
+    private var dialogAsActionSheet: Bool? {
+        guard let dialog = model.dialog, !dialog.recordAgainChoice else { return nil }
+        return dialogOpenedAsActionSheet ?? (!wide && dialog.confirm != nil)
     }
 
     @ViewBuilder private func dialogButtons(_ dialog: EpisodeDialog) -> some View {

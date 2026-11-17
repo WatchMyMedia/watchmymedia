@@ -66,7 +66,7 @@ private struct MediaListView: View {
         .task { await model.run() }
         .messageToast($model.message)
         .noticeAlert($model.notice)
-        .sheet(item: Binding(get: { RequestSheet.presented(model.requestSheet, centred: wide) }, set: { model.requestSheet = $0 })) { sheet in
+        .sheet(item: RequestSheet.presenting($model.requestSheet, centred: wide)) { sheet in
             RequestSheet(model: sheet, centred: wide) {
                 model.requestSheetClosed(sheet)
                 model.requestSheet = nil
