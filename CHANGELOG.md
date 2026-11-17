@@ -40,7 +40,7 @@ Duo's two screens and its hinge.
   Cast receiver is unchanged.
 - The server, the Docker image, the Mac app, the Windows app and the Android app are 1.6.0. The
   Mac app and the Windows app of 1.5.0 offer the update under Check for updates. The iPhone,
-  iPad and Apple TV apps are 1.10.0 once the App Store approves them.
+  iPad and Apple TV apps are 1.9.1 once the App Store approves them.
 - All of this has been tried in tests, against a test server in a browser, on Android phone,
   tablet and TV emulators, and on iPhone, iPad, iPhone Duo and Apple TV simulators, with sample
   data. It has not yet been tried on a library matched on TMDB, or on real phones and TVs, so

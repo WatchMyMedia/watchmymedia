@@ -15,6 +15,10 @@
 #   v1.0.P to v1.2.P are 1.6.P   v1.0.0 is 1.6.0, the last App Store version
 #                              before v1.3.0
 #   v1.M.P is 1.(M + 4).P    from v1.3.0: v1.3.0 is 1.7.0, v1.4.0 is 1.8.0
+#   v1.6.P is 1.9.(P + 1)    v1.6.0 is 1.9.1: the maintainer chose a patch to
+#                              v1.5.0's 1.9.0 rather than 1.10.0. v1.7 and later
+#                              follow the line above (v1.7.0 is 1.11.0) unless
+#                              a line is added for them
 #
 # v1.1 and v1.2 shipped no App Store build, so v1.3.0 follows 1.6.0 directly.
 # Their tags still number (a patch to them would sort between 1.6.0 and
@@ -32,6 +36,7 @@ if [[ ! $version =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-(alpha|beta|rc)\.?([0-9]+)?)?
   exit 1
 fi
 major=$((10#${BASH_REMATCH[1]})) minor=$((10#${BASH_REMATCH[2]})) patch=$((10#${BASH_REMATCH[3]}))
+apple_patch=$patch
 pre=${BASH_REMATCH[5]} n=$((10#${BASH_REMATCH[6]:-0}))
 if ((major > 209 || minor > 99 || patch > 999 || n > 29)); then
   echo "version.sh: $tag is out of range (major ≤ 209, minor ≤ 99, patch ≤ 999, pre-release ≤ 29)" >&2
@@ -39,7 +44,12 @@ if ((major > 209 || minor > 99 || patch > 999 || n > 29)); then
 fi
 case $major in
   0) apple_minor=$minor ;;
-  1) apple_minor=$((minor < 3 ? 6 : minor + 4)) ;;
+  1)
+    apple_minor=$((minor < 3 ? 6 : minor + 4))
+    if ((minor == 6)); then
+      apple_minor=9 apple_patch=$((patch + 1))
+    fi
+    ;;
   *)
     echo "version.sh: $tag has no App Store version yet; add a line for v$major tags to apple/scripts/version.sh" >&2
     exit 1
@@ -51,4 +61,4 @@ case $pre in
   rc) last=$((60 + n)) ;;
   *) last=99 ;;
 esac
-echo "MARKETING_VERSION=1.$apple_minor.$patch CURRENT_PROJECT_VERSION=$((major * 10000000 + minor * 100000 + patch * 100 + last))"
+echo "MARKETING_VERSION=1.$apple_minor.$apple_patch CURRENT_PROJECT_VERSION=$((major * 10000000 + minor * 100000 + patch * 100 + last))"
