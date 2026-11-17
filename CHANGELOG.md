@@ -5,6 +5,47 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 1.6.0
+
+The end of every movie and show page now suggests what to watch next from your own library:
+the rest of a film's series, and More like this. The iPhone app also makes use of the iPhone
+Duo's two screens and its hinge.
+
+- This release changes the server's database. Back up before updating: Settings › Backups ›
+  Back up now, or `watchmymedia backup`. Going back to 1.5.0 afterwards needs that backup.
+- A film that belongs to a series on TMDB, such as a trilogy, ends its page with the series'
+  other films that are in your libraries, in release order, under the series' name.
+- Every movie and show page ends with More like this: up to 20 titles of the same kind from your
+  libraries, best first. TMDB's recommendations for the title count most, then titles that
+  share its keywords, its director or creator, or its leading cast. Sharing only a genre is
+  never enough. The row appears once at least three titles qualify. Titles you've watched keep
+  their place, with the usual mark. A title in two libraries, such as a 4K copy, is shown once.
+- This is on the web, phones, tablets, Android TV and Apple TV. On the TVs, pressing down at the
+  end of the page reaches the rows.
+- The server now asks TMDB for each title's keywords and recommendations along with the details
+  it already fetches when it matches a title, so a title matched from now on has its rows at
+  once. Titles already in your library are filled in in the background, starting a few minutes
+  after the server starts, 200 at a time with a short pause between batches, so their rows
+  appear as it goes. A page never waits on TMDB: when its title's recommendations are more than
+  90 days old (30 days for a film or show out in the past year), the server fetches them again
+  in the background and the page uses what it has meanwhile.
+- On the iPhone Duo, the inner screen shows two panes side by side, as an iPad does. Stood half
+  open, the player and Live TV put the picture on the upright half and the controls on the half
+  lying flat. Held like a book, a show's page puts the episode on one side and its season on
+  the other, and Live TV puts a page each side. Folding or unfolding keeps your place, and
+  sideways rows stop at the side bar. Pages on iPads also go side by side from a narrower width
+  than before.
+- The server's API only gained routes, so every app version works with it. Apps from before this
+  release just don't show the new rows, and the new apps don't show them on older servers. The
+  Cast receiver is unchanged.
+- The server, the Docker image, the Mac app, the Windows app and the Android app are 1.6.0. The
+  Mac app and the Windows app of 1.5.0 offer the update under Check for updates. The iPhone,
+  iPad and Apple TV apps are 1.9.1 once the App Store approves them.
+- All of this has been tried in tests, against a test server in a browser, on Android phone,
+  tablet and TV emulators, and on iPhone, iPad, iPhone Duo and Apple TV simulators, with sample
+  data. It has not yet been tried on a library matched on TMDB, or on real phones and TVs, so
+  how good the suggestions are on real titles is still to be seen.
+
 ## 1.5.0
 
 Follow a show and hear when a new episode of it reaches your library. Press Notify me on a
