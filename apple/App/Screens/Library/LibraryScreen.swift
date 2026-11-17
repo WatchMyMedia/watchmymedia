@@ -210,6 +210,7 @@ private struct LibraryView: View {
         }
         .contentMargins(.horizontal, margin, for: .scrollContent)
         .scrollIndicators(.hidden)
+        .stopsAtVerticalBar()
     }
 
     private var filterPanel: some View {
@@ -285,6 +286,7 @@ private struct LibraryView: View {
         }
         .contentMargins(.horizontal, margin, for: .scrollContent)
         .scrollIndicators(.hidden)
+        .stopsAtVerticalBar()
     }
 
     private var chipDivider: some View {

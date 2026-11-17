@@ -179,6 +179,7 @@ struct CardRow<Content: View>: View {
         .contentMargins(.horizontal, margin, for: .scrollContent)
         .scrollTargetBehavior(.viewAligned)
         .scrollIndicators(.hidden)
+        .stopsAtVerticalBar()
     }
 }
 

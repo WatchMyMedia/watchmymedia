@@ -452,6 +452,7 @@ private struct ShowPageView: View {
             }
             .contentMargins(.horizontal, margin - 12, for: .scrollContent)
             .scrollIndicators(.hidden)
+            .stopsAtVerticalBar()
             .overlay(alignment: .bottom) { RowSeparator() }
             .onAppear { if let selected = model.selectedSeason { proxy.scrollTo(selected, anchor: .center) } }
         }
@@ -552,6 +553,7 @@ private struct ShowPageView: View {
                 }
                 .contentMargins(.horizontal, margin - 6, for: .scrollContent)
                 .scrollIndicators(.hidden)
+                .stopsAtVerticalBar()
                 .onAppear { if let id = model.episodeID { proxy.scrollTo(id, anchor: .center) } }
                 .onChange(of: model.episodeID) { _, id in
                     if let id { withAnimation { proxy.scrollTo(id, anchor: .center) } }

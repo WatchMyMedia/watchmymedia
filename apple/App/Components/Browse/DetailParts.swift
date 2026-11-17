@@ -258,6 +258,7 @@ struct CastRow: View {
                     }
                 }
                 .contentMargins(.horizontal, margin, for: .scrollContent)
+                .stopsAtVerticalBar()
                 .scrollIndicators(.hidden)
             }
         }

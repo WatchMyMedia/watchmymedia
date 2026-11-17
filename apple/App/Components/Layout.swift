@@ -32,3 +32,44 @@ extension View {
         toolbar(sizeClass.isWide ? .automatic : .hidden, for: .tabBar)
     }
 }
+
+extension View {
+    /// A row that scrolls sideways stops at the system's vertical bar (the
+    /// iPhone Duo's tab bar down one edge, DuoOuterHome) instead of running on
+    /// under its glass. Where there is no such bar (an iPhone in landscape, by
+    /// its camera) the row still runs to the edge of the screen.
+    func stopsAtVerticalBar() -> some View { modifier(VerticalBarClip()) }
+}
+
+private struct VerticalBarClip: ViewModifier {
+    func body(content: Content) -> some View {
+        // `toolbarVerticalEdge` is iOS 27.1's (Xcode 27.1 and its Swift 6.4.1).
+        #if compiler(>=6.4.1)
+        if #available(iOS 27.1, *) {
+            content.modifier(VerticalBarEdgeClip())
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
+}
+
+#if compiler(>=6.4.1)
+@available(iOS 27.1, *)
+private struct VerticalBarEdgeClip: ViewModifier {
+    @Environment(\.toolbarVerticalEdge) private var edge
+
+    func body(content: Content) -> some View {
+        // Always masked, so the row keeps its identity (and its scroll) when
+        // the bar comes and goes with a fold; without a bar the mask reaches
+        // far past both edges. Up and down it never clips a card's shadow.
+        content.mask {
+            Rectangle()
+                .padding(.vertical, -60)
+                .padding(.horizontal, edge == nil ? -4000 : 0)
+        }
+    }
+}
+#endif
