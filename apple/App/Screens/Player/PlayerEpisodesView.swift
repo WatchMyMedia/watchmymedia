@@ -61,6 +61,9 @@ struct PlayerPortraitDetails: View {
 struct PlayerEpisodesPanel: View {
     let model: PlayerChromeModel
     let episodes: PlayerEpisodesModel
+    /// The window's safe area: inside the player's shell the reader sees none,
+    /// and the trailing edge may hold the camera (the iPhone Duo's outer screen).
+    var safe = EdgeInsets()
     let onClose: () -> Void
 
     var body: some View {
@@ -76,8 +79,9 @@ struct PlayerEpisodesPanel: View {
                     ScrollView { PlayerEpisodeRows(model: model, episodes: episodes, onPlay: onClose, compact: true) }
                 }
                 .padding(24)
-                .padding(.top, geo.safeAreaInsets.top)
-                .frame(width: min(520, geo.size.width - 32), height: geo.size.height)
+                .padding(.top, safe.top)
+                .padding(.trailing, safe.trailing)
+                .frame(width: min(520 + safe.trailing, geo.size.width - 32), height: geo.size.height)
                 .background(Palette.surface)
                 .accessibilityAddTraits(.isModal)
             }

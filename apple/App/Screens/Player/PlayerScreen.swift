@@ -95,9 +95,9 @@ private struct PlayerContent: View {
                 }
             }
             if !pictureInPicture.isActive {
-                overlay(state, insets: insets, metrics: metrics)
+                overlay(state, insets: insets, metrics: metrics, safe: frame.safeArea)
                 if showsEpisodes, model.overlay == nil {
-                    PlayerEpisodesPanel(model: model, episodes: episodes) { showsEpisodes = false }
+                    PlayerEpisodesPanel(model: model, episodes: episodes, safe: frame.safeArea) { showsEpisodes = false }
                 }
             }
         }
@@ -200,10 +200,10 @@ private struct PlayerContent: View {
     }
 
     @ViewBuilder
-    private func overlay(_ state: PlayerState, insets: PlayerInsets, metrics: PlayerMetrics) -> some View {
+    private func overlay(_ state: PlayerState, insets: PlayerInsets, metrics: PlayerMetrics, safe: EdgeInsets) -> some View {
         switch model.overlay {
         case .picker(let tab):
-            PlayerPickerSheet(model: model, tab: tab, insets: insets, sidePanel: metrics.sidePanelPicker)
+            PlayerPickerSheet(model: model, tab: tab, insets: insets, safe: safe, sidePanel: metrics.sidePanelPicker)
                 .transition(slide(metrics.sidePanelPicker ? .trailing : .bottom))
         case .stillWatching:
             StillWatchingDialog(state: state) { model.answerStillWatching(keepWatching: $0) }

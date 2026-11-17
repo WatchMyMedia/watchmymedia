@@ -9,6 +9,9 @@ struct PlayerPickerSheet: View {
     let model: PlayerChromeModel
     let tab: PickerTab
     let insets: PlayerInsets
+    /// The window's safe area, each edge read on its own: the trailing panel
+    /// keeps its content clear of whatever is on its side.
+    var safe = EdgeInsets()
     var sidePanel = false
     @State private var drag: CGFloat = 0
 
@@ -50,10 +53,12 @@ struct PlayerPickerSheet: View {
                         }
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, max(geo.safeAreaInsets.top, 20))
-                .padding(.bottom, max(geo.safeAreaInsets.bottom, 20))
-                .frame(width: min(420, max(geo.size.width - 32, 0)), height: geo.size.height)
+                // Inside the player's shell the reader sees no safe area: the shell's own, edge by edge.
+                .padding(.leading, 24)
+                .padding(.trailing, 24 + safe.trailing)
+                .padding(.top, max(safe.top, 20))
+                .padding(.bottom, max(safe.bottom, 20))
+                .frame(width: min(420 + safe.trailing, max(geo.size.width - 32, 0)), height: geo.size.height)
                 .background(Palette.surface)
                 .overlay(alignment: .leading) { Rectangle().fill(Palette.outline).frame(width: 1) }
                 .accessibilityElement(children: .contain)
@@ -71,6 +76,7 @@ struct PlayerPickerSheet: View {
             let height = min(geo.size.height - 47, 560)
             ZStack(alignment: .bottom) {
                 Color.black.opacity(0.5)
+                    .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture { model.closePicker() }
                     .accessibilityHidden(true)
@@ -80,7 +86,8 @@ struct PlayerPickerSheet: View {
                         .foregroundStyle(PlayerStyle.light)
                         .lineLimit(1)
                         .padding(.top, max(insets.top - 4, 12))
-                        .padding(.horizontal, insets.leading)
+                        .padding(.leading, insets.leading)
+                        .padding(.trailing, insets.trailing)
                         .opacity(0.7)
                         .allowsHitTesting(false)
                     Spacer()
@@ -90,7 +97,6 @@ struct PlayerPickerSheet: View {
                     .offset(y: max(drag, 0))
             }
         }
-        .ignoresSafeArea()
         .accessibilityAction(.escape) { model.closePicker() }
     }
 
@@ -132,7 +138,8 @@ struct PlayerPickerSheet: View {
                 .frame(maxWidth: .infinity)
         }
         .padding(.top, 8)
-        .padding(.horizontal, insets.leading)
+        .padding(.leading, insets.leading)
+        .padding(.trailing, insets.trailing)
         .padding(.bottom, max(insets.bottom - 6, 12))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Palette.surface, in: UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16))
