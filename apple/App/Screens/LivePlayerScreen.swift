@@ -53,9 +53,12 @@ private struct LivePlayerContent: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.verticalSizeClass) private var verticalClass
     @Environment(LiveRecordingsStore.self) private var recordings
+    @Environment(\.foldPosture) private var posture
     /// The takeover warning OK'd, by its recording.
     @State private var dismissedTakeover: String?
     @State private var takeoverError: String?
+    /// Half open on a table or like a book, until Use the whole screen (PLAN-IPHONE-DUO.md §5).
+    @State private var fold = PlayerFold(hasBook: true)
 
     private var state: LivePlayerState { model.state }
     private var stopped: Bool { state.status == .stopped || state.status == .error }
@@ -65,94 +68,139 @@ private struct LivePlayerContent: View {
             content(frame)
         }
         .task(id: model.listings) { if model.listings { await model.followSchedule() } }
+        .onChange(of: posture, initial: true) { _, posture in fold.follow(posture) }
+        // Folded, the controls sit beside the picture, not over it: they stay.
+        .onChange(of: fold.layout, initial: true) { _, layout in
+            model.controls.hold("folded", layout != .flat)
+            if layout != .flat { model.channelsOpen = false }
+        }
     }
 
+    /// The picture keeps its place in the tree whatever the layout: a fold
+    /// moves and resizes it, and never rebuilds the player layer.
     private func content(_ frame: PlayerFrame) -> some View {
-        let portrait = frame.tall
+        let arrangement = PlayerArrangement.live(size: frame.size, safe: frame.safeInsets, fold: fold.layout)
+        let picture = arrangement.picture
         let pip = frame.pictureInPicture
-        return VStack(spacing: 0) {
-                video(frame, portrait: portrait, pip: pip)
-                    .frame(height: portrait ? frame.size.width * 9 / 16 : frame.size.height)
-                if portrait {
-                    if let channel = model.listedChannel {
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            VStack(alignment: .leading, spacing: 0) {
-                                LiveNowBanner(channel: channel, now: context.date, wide: sizeClass.isWide, cellular: state.cellular) {
-                                    HStack(spacing: 10) {
-                                        Button { model.close(); navigator.select(.liveTV) } label: { Label("Guide", systemImage: "rectangle.split.3x1") }
-                                            .buttonStyle(GhostButtonStyle(height: 44, fullWidth: !sizeClass.isWide))
-                                            .accessibilityHint("Stops watching and opens the guide")
-                                        qualityMenu.menuStyle(.button).buttonStyle(GhostButtonStyle(height: 44, fullWidth: !sizeClass.isWide))
-                                    }
-                                }
-                                .padding(16)
-                                Divider().overlay(Palette.separator)
-                                HStack(alignment: .firstTextBaseline) {
-                                    Text(liveOnNowHeading(now: context.date)).font(.headline)
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 16).padding(.vertical, 12)
+        let book = arrangement.kind == .book
+        return ZStack(alignment: .topLeading) {
+            (arrangement.kind == .full ? Color.black : Palette.ground)
+            video(frame.piece(picture), kind: arrangement.kind, pip: pip)
+                .frame(width: picture.width, height: picture.height)
+                .clipShape(RoundedRectangle(cornerRadius: book ? 14 : 0))
+                .offset(x: picture.minX, y: picture.minY)
+            if arrangement.kind == .portrait, let below = arrangement.below {
+                portraitDetails
+                    .frame(width: below.width, height: below.height)
+                    .offset(x: below.minX, y: below.minY)
+            }
+            if arrangement.kind == .tabletop, let below = arrangement.below {
+                TabletopLiveControls(model: model, safe: frame.piece(below).safeArea, onWholeScreen: { fold.useWholeScreen() }) { channels in
+                    channelList(channels, toWatching: true)
+                }
+                .frame(width: below.width, height: below.height)
+                .offset(x: below.minX, y: below.minY)
+            }
+            if book, let below = arrangement.below, let page = arrangement.panel {
+                BookLiveControls(model: model)
+                    .frame(width: below.width, height: below.height)
+                    .offset(x: below.minX, y: below.minY)
+                BookLiveOnNow(model: model, safe: frame.piece(page).safeArea) { channelList(model.channels, toWatching: true) }
+                    .frame(width: page.width, height: page.height)
+                    .offset(x: page.minX, y: page.minY)
+            }
+        }
+        .frame(width: frame.size.width, height: frame.size.height, alignment: .topLeading)
+        .overlay(alignment: .trailing) {
+            if model.channelsOpen && arrangement.kind == .full && !pip.isActive {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        if model.listings {
+                            TimelineView(.periodic(from: .now, by: 30)) { context in
+                                Text(liveOnNowHeading(now: context.date)).font(.title3.bold())
+                            }
+                            Spacer()
+                            Button("Full guide") { model.close(); navigator.select(.liveTV) }
+                                .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.gold).frame(minHeight: 44)
+                        } else {
+                            Text("Channels").font(.title2.bold())
+                            Spacer()
+                        }
+                        Button { model.channelsOpen = false } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Close channels")
+                    }.padding(.horizontal, 16).padding(.top, 8 + frame.safeArea.top)
+                    channelList(model.channels)
+                }
+                .padding(.trailing, frame.safeArea.trailing)
+                .frame(width: min(380, frame.size.width * 0.48) + frame.safeArea.trailing)
+                .background(Palette.ground.opacity(0.97))
+            }
+        }
+        .overlay { if state.askStillWatching { stillWatching } }
+        .foregroundStyle(Palette.text)
+        .animation(.easeInOut(duration: 0.2), value: model.showsControls)
+        .animation(.easeInOut(duration: 0.25), value: arrangement)
+    }
+
+    /// Upright and flat: what is on and the channels, under the picture.
+    @ViewBuilder private var portraitDetails: some View {
+        VStack(spacing: 0) {
+            if let channel = model.listedChannel {
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    VStack(alignment: .leading, spacing: 0) {
+                        LiveNowBanner(channel: channel, now: context.date, wide: sizeClass.isWide, cellular: state.cellular) {
+                            HStack(spacing: 10) {
+                                Button { model.close(); navigator.select(.liveTV) } label: { Label("Guide", systemImage: "rectangle.split.3x1") }
+                                    .buttonStyle(GhostButtonStyle(height: 44, fullWidth: !sizeClass.isWide))
+                                    .accessibilityHint("Stops watching and opens the guide")
+                                qualityMenu.menuStyle(.button).buttonStyle(GhostButtonStyle(height: 44, fullWidth: !sizeClass.isWide))
                             }
                         }
-                    } else {
-                        VStack(alignment: .leading, spacing: 12) {
-                            identity
-                            HStack {
-                                Text("Channels").font(.headline)
-                                Spacer()
-                                qualityMenu
-                            }
-                        }.padding(16)
+                        .padding(16)
+                        Divider().overlay(Palette.separator)
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(liveOnNowHeading(now: context.date)).font(.headline)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 12)
                     }
-                    channelList
                 }
-            }
-            // Under the camera housing on a tall screen; a full-screen picture goes edge to edge.
-            .padding(.top, portrait ? frame.safeArea.top : 0)
-            .background(portrait ? Palette.ground : .black)
-            .overlay(alignment: .trailing) {
-                if model.channelsOpen && !portrait && !pip.isActive {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            if model.listings {
-                                TimelineView(.periodic(from: .now, by: 30)) { context in
-                                    Text(liveOnNowHeading(now: context.date)).font(.title3.bold())
-                                }
-                                Spacer()
-                                Button("Full guide") { model.close(); navigator.select(.liveTV) }
-                                    .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.gold).frame(minHeight: 44)
-                            } else {
-                                Text("Channels").font(.title2.bold())
-                                Spacer()
-                            }
-                            Button { model.channelsOpen = false } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Close channels")
-                        }.padding(.horizontal, 16).padding(.top, 8 + frame.safeArea.top)
-                        channelList
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    identity
+                    HStack {
+                        Text("Channels").font(.headline)
+                        Spacer()
+                        qualityMenu
                     }
-                    .padding(.trailing, frame.safeArea.trailing)
-                    .frame(width: min(380, frame.size.width * 0.48) + frame.safeArea.trailing)
-                    .background(Palette.ground.opacity(0.97))
-                }
+                }.padding(16)
             }
-            .overlay { if state.askStillWatching { stillWatching } }
-            .foregroundStyle(Palette.text)
-            .animation(.easeInOut(duration: 0.2), value: model.showsControls)
+            channelList(model.channels)
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
-    private func video(_ frame: PlayerFrame, portrait: Bool, pip: PictureInPicture) -> some View {
-        let insets = frame.insets(portrait: portrait)
+    /// The picture and what is drawn over it, in `frame` (the picture's piece
+    /// of the screen). Folded, the controls are beside it, and only the
+    /// channel's mark and the notes are over it.
+    private func video(_ frame: PlayerFrame, kind: PlayerArrangement.Kind, pip: PictureInPicture) -> some View {
+        let portrait = kind == .portrait
+        let folded = kind == .tabletop || kind == .book
+        let insets = frame.insets(portrait: false)
         let metrics = frame.metrics
         return ZStack {
             PlayerVideo(player: model.controller.player, backdrop: nil, seed: state.channel?.name ?? "Live TV", pictureInPicture: pip, layout: frame.videoLayout)
             Color.clear.contentShape(Rectangle()).onTapGesture { model.tap() }
-                .pinchToFit(frame, area: frame.videoArea(portrait: portrait))
+                .pinchToFit(frame, area: frame.size)
                 .accessibilityHidden(true)
             if stopped { stoppedPrompt }
+            else if folded && !pip.isActive {
+                FoldedLiveMarks(model: model, book: kind == .book, insets: insets) { fold.useWholeScreen() }
+            }
             else if model.showsControls && !pip.isActive {
                 VStack(spacing: 12) {
                     HStack(spacing: 10) {
                         RoundIconButton(systemImage: "xmark", label: "Stop and close live TV", size: metrics.button, iconSize: metrics.buttonIcon) { model.close() }
-                        VideoFitButton(frame: frame, area: frame.videoArea(portrait: portrait), metrics: metrics) { model.input() }
+                        VideoFitButton(frame: frame, area: frame.size, metrics: metrics) { model.input() }
                         if !portrait {
                             let programme = model.listedChannel?.programme(at: .now)
                             Text([state.channel?.title ?? "Live TV", programme?.title].compactMap(\.self).joined(separator: " · "))
@@ -266,10 +314,13 @@ private struct LivePlayerContent: View {
         .frame(minHeight: 44).accessibilityIdentifier("live-quality")
     }
 
-    private var channelList: some View {
+    /// The channels to switch to. `toWatching` scrolls to the one playing, as
+    /// it changes (the folded layouts, where the list is always there).
+    private func channelList(_ channels: [LiveChannel], toWatching: Bool = false) -> some View {
+        ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(model.channels) { channel in
+                ForEach(channels) { channel in
                     let selected = !stopped && state.channel?.id == channel.id
                     if model.listings {
                         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -287,6 +338,10 @@ private struct LivePlayerContent: View {
             }
         }
         .accessibilityIdentifier("live-player-channels")
+        .onChange(of: toWatching ? state.channel?.id : nil, initial: true) { _, id in
+            if let id { withAnimation { proxy.scrollTo(id, anchor: .center) } }
+        }
+        }
     }
 
     /// "At 9:00 PM a recording needs this tuner. Watching stops then." with OK, and
