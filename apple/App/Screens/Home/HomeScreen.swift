@@ -40,13 +40,22 @@ private struct HomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The iPad's screens fade out and back in for a move with Reduce Motion on.
     @State private var screensFaded = false
+    /// The safe area under the screens, which run to the bottom edge.
+    @State private var bottomInset: CGFloat = 0
 
     private var sideBySide: Bool { wide && width >= PadLayout.sideBySide }
     private var wide: Bool { sizeClass.isWide }
     private var margin: CGFloat { wide ? PadLayout.margin : 16 }
     /// A 16:9 card's width: four Continue watching cards across the iPad.
     private var wideCardWidth: CGFloat { wide ? 248 : 220 }
+    /// Continue watching beside the hero: 362 pt on the iPad held wide, about
+    /// a third of the page on the iPhone Duo's inner screen (DuoOpenHome).
+    private var continueWidth: CGFloat { min(362, ((width - 2 * margin) * 0.36).rounded()) }
     private var liveAvailable: Bool { services.liveTV.capabilities?.available == true }
+    /// A tab bar along the bottom (the iPhone Duo upright, DuoTallHome), which
+    /// each screen keeps clear of; on iPad only the home indicator is there,
+    /// and the next row's line sits 16 pt above the edge, as the boards draw it.
+    private var bottomBar: CGFloat { bottomInset > 24 ? bottomInset : 0 }
 
     /// No server, but downloads to watch (HomeOffline.dc.html): as soon as the
     /// server check fails, not only when Home's own request times out.
@@ -209,6 +218,8 @@ private struct HomeView: View {
         // bottom inset would leave each screen that much taller than a page, so the next
         // screen's top would show under the next-row line.
         .ignoresSafeArea(edges: .bottom)
+        // Read outside: inside, the scroll view that ignores it sees none.
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
         .refreshable { await model.refresh() }
         .overlay(alignment: .trailing) { screenDots(count: endPage + 1) }
         .accessibilityElement(children: .contain)
@@ -225,7 +236,7 @@ private struct HomeView: View {
                 HStack(alignment: .top, spacing: 24) {
                     heroCard(hero, home: home, fillsHeight: true)
                     continuePanel(beside, counter: rowCounter(index: 0, of: rows.count), limit: 6)
-                        .frame(width: 362)
+                        .frame(width: continueWidth)
                 }
                 .frame(maxHeight: .infinity)
                 .padding(.horizontal, margin)
@@ -300,6 +311,7 @@ private struct HomeView: View {
         }
         .frame(maxWidth: 720, alignment: .leading)
         .padding(.horizontal, margin)
+        .padding(.bottom, bottomBar)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .screen()
         .accessibilityElement(children: .contain)
@@ -370,8 +382,8 @@ private struct HomeView: View {
         .buttonStyle(.plain)
         .padding(.leading, margin)
         .padding(.trailing, 40)
-        // Above the home indicator, since the screens run under it.
-        .padding(.bottom, 16)
+        // Above the home indicator, or the tab bar, since the screens run under them.
+        .padding(.bottom, 16 + bottomBar)
         .accessibilityLabel(nextRowLabel(name))
         .accessibilityHint("Shows that row")
         .accessibilityIdentifier("homeNextRow-\(index - 1)")
@@ -402,7 +414,7 @@ private struct HomeView: View {
                 HStack(alignment: .top, spacing: 24) {
                     heroCard(hero, home: home)
                     continuePanel(home.continueWatching)
-                        .frame(width: 362)
+                        .frame(width: continueWidth)
                 }
                 .padding(.horizontal, margin)
             } else if let hero = home.hero {
@@ -505,7 +517,9 @@ private struct HomeView: View {
     /// Continue watching beside the hero: `limit` items (three on the
     /// scrolling Home, six on the first screen, where `counter` is "Row 1 of 7").
     private func continuePanel(_ items: [ContinueItem], counter: String? = nil, limit: Int = 3) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        // The smaller stills of DuoOpenHome where the panel is narrower than the iPad's.
+        let narrow = continueWidth < 340
+        return VStack(alignment: .leading, spacing: narrow ? 8 : 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(continueWatchingTitle).scaledFont(20, weight: .semibold).foregroundStyle(Palette.text)
                 if let counter { Text(counter).scaledFont(13).foregroundStyle(Palette.muted).lineLimit(1) }
@@ -517,9 +531,9 @@ private struct HomeView: View {
             }
             ForEach(items.prefix(limit)) { item in
                 Button { model.resume(item) } label: {
-                    HStack(spacing: 14) {
+                    HStack(spacing: narrow ? 12 : 14) {
                         Artwork(url: url(item.stillPath ?? item.backdropPath, .w300), seed: item.title)
-                            .frame(width: 128, height: 72)
+                            .frame(width: narrow ? 112 : 128, height: narrow ? 63 : 72)
                             .overlay(alignment: .bottom) { ProgressStrip(progress: item.progress) }
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         VStack(alignment: .leading, spacing: 4) {
@@ -535,7 +549,7 @@ private struct HomeView: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(18)
+        .padding(narrow ? 14 : 18)
         .frame(minHeight: 360)
         .background(Palette.surface, in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Palette.separator))
