@@ -51,6 +51,7 @@ private struct LivePlayerContent: View {
     let model: LivePlayerModel
     @Environment(Navigator.self) private var navigator
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.verticalSizeClass) private var verticalClass
     @Environment(LiveRecordingsStore.self) private var recordings
     /// The takeover warning OK'd, by its recording.
     @State private var dismissedTakeover: String?
@@ -203,10 +204,14 @@ private struct LivePlayerContent: View {
                             Button("Channels") { model.toggleChannels() }.font(.subheadline.bold())
                             qualityMenu
                         }
-                        RoundIconButton(systemImage: portrait ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left", label: portrait ? "Full screen" : "Portrait view",
-                                        size: metrics.button, iconSize: metrics.buttonIcon) {
-                            model.input()
-                            OrientationLock.allow(portrait ? .landscape : .portrait)
+                        // A phone's window turns as chosen until Live TV closes. A wide one turns
+                        // with the device (the iPhone Duo's inner screen refuses to be turned from code).
+                        if PlayerWindow(horizontal: sizeClass, vertical: verticalClass) == .phone {
+                            RoundIconButton(systemImage: portrait ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left", label: portrait ? "Full screen" : "Portrait view",
+                                            size: metrics.button, iconSize: metrics.buttonIcon) {
+                                model.input()
+                                OrientationLock.allow(portrait ? .landscape : .portrait, in: .phone)
+                            }
                         }
                     }
                 }

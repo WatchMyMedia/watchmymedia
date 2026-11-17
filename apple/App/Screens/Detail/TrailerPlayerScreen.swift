@@ -10,16 +10,19 @@ import WMMUI
 /// trailer's and the movie's names and YouTube's terms; YouTube's own player
 /// fills the rest at 16:9 with its own controls, and nothing of ours is drawn
 /// over it. When no trailer's owner lets it play outside YouTube, the screen
-/// says so and offers it in YouTube. Landscape on iPhone, like the player.
+/// says so and offers it in YouTube. Landscape in a phone's window, like the player.
 struct TrailerPlayerScreen: View {
     @State var model: TrailerPlayerModel
     let onClose: () -> Void
     @State private var safari: URL?
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontal
+    @Environment(\.verticalSizeClass) private var vertical
 
-    /// The iPad's larger bar (Pad2TrailerPlayer.dc.html). Not the size class:
-    /// the largest iPhones are regular width in landscape.
-    private let wide = UIDevice.current.userInterfaceIdiom == .pad
+    /// The iPad's larger bar (Pad2TrailerPlayer.dc.html), in a window regular
+    /// both ways (an iPad's, the iPhone Duo's inner screen): the largest
+    /// iPhones are regular width in landscape, but compact in height.
+    private var wide: Bool { PlayerWindow(horizontal: horizontal, vertical: vertical) == .wide }
 
     var body: some View {
         VStack(spacing: 0) {
