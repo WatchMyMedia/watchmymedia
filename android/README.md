@@ -211,9 +211,10 @@ this device can play, and the logic is `MovieViewModel`'s (`trailerPlay`):
     player, on a Google TV Streamer and on an emulator, so the app doesn't
     use them.
   - While the trailer is paused, YouTube's player leaves the screen, as
-    while it loads, and our pause screen takes its place: a pause sign, the
-    trailer, the movie and "Paused · 0:13 / 7:45", with the time and
-    length from the page (`trailerTime()`). YouTube's player shows nothing
+    while it loads, and our pause screen takes its place (the board's
+    `paused` state): a pause sign, the trailer, the movie, "Paused · 0:13 /
+    7:45" and the keys ("Select to play · ◀ ▶ 10 s · Back to the movie"),
+    with the time and length from the page (`trailerTime()`). YouTube's player shows nothing
     when it is paused through its API, so a paused trailer looked frozen.
     Select, Play/Pause and Play show the player again, then ask it to play;
     Left, Right, Rewind and Fast-forward jump 10 s and update the time,

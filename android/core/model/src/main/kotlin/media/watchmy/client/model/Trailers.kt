@@ -87,4 +87,14 @@ object TrailerText {
     /** "Paused · 0:13 / 7:45", or "Paused · 0:13" while the length isn't known. */
     fun paused(positionMs: Long, durationMs: Long): String =
         if (durationMs > 0) "$PAUSED · ${formatClock(positionMs)} / ${formatClock(durationMs)}" else "$PAUSED · ${formatClock(positionMs)}"
+
+    /**
+     * The pause screen's hint, each remote key with what it does there:
+     * "Select to play · ◀ ▶ 10 s · Back to the movie". The TV draws the keys
+     * bolder ([pausedKeysLine] is the plain text).
+     */
+    val PAUSED_KEYS: List<Pair<String, String>> = listOf("Select" to "to play", "◀ ▶" to "10 s", "Back" to "to the movie")
+
+    /** [PAUSED_KEYS] as one line. */
+    val pausedKeysLine: String get() = PAUSED_KEYS.joinToString(" · ") { (key, does) -> "$key $does" }
 }

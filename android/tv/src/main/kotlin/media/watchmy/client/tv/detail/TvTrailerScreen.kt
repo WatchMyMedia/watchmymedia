@@ -16,6 +16,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,8 +52,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -309,6 +314,9 @@ internal const val READY_TIMEOUT_MS = 20_000L
 /** The TV player's near-black ground, under the trailer screen's own states (TvTrailerPlayer.dc.html). */
 private val PlayerGround = Color(0xFF070708)
 
+/** The spinner's grey track, which rings the pause screen's pause sign. */
+private val SpinnerTrack = Color.White.copy(alpha = 0.18f)
+
 /** The problem screens' explanation (#BDBDBD in the board). */
 private val BodyText = Color(0xFFBDBDBD)
 
@@ -373,10 +381,11 @@ private fun TrailerLoading(trailer: String, movie: String, modifier: Modifier = 
 }
 
 /**
- * While the trailer is paused, in the player's place: laid out as the
- * loading screen, with a pause sign for the spinner, and where the trailer
- * is ("Paused · 0:13 / 7:45") for "Plays from YouTube". Nothing on it takes
- * focus; the screen has the keys.
+ * While the trailer is paused, in the player's place (TvTrailerPlayer.dc.html,
+ * `paused`): laid out as the loading screen, with a pause sign in a ring of
+ * the spinner's track for the spinner, where the trailer is ("Paused · 0:13 /
+ * 7:45", in even-width digits) for "Plays from YouTube", and the keys under
+ * it. Nothing on it takes focus; the screen has the keys.
  */
 @Composable
 private fun TrailerPaused(trailer: String, movie: String, positionMs: Long, durationMs: Long, modifier: Modifier = Modifier) {
@@ -385,15 +394,28 @@ private fun TrailerPaused(trailer: String, movie: String, positionMs: Long, dura
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(WmmIcons.Pause, contentDescription = null, tint = WmmColors.Text, modifier = Modifier.size(72.dp))
+        Box(Modifier.size(72.dp).border(6.dp, SpinnerTrack, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(WmmIcons.Pause, contentDescription = null, tint = WmmColors.Text, modifier = Modifier.size(28.dp))
+        }
         Text(trailer, style = inter(48.sp, FontWeight.Bold, tracking = -0.01f), color = WmmColors.Text, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 48.dp))
         Text(movie, style = inter(26.sp), color = WmmColors.TextSoft, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
         Text(
             TrailerText.paused(positionMs, durationMs),
-            style = inter(20.sp, FontWeight.Medium),
+            style = inter(20.sp, FontWeight.Medium).copy(fontFeatureSettings = "tnum"),
             color = WmmColors.TextMuted,
             modifier = Modifier.padding(top = 36.dp).semantics { liveRegion = LiveRegionMode.Polite },
         )
+        Text(pausedKeys(), style = inter(18.sp), color = WmmColors.TextFaint, modifier = Modifier.padding(top = 56.dp))
+    }
+}
+
+/** "Select to play · ◀ ▶ 10 s · Back to the movie", the keys bolder and lighter, as the board draws them. */
+private fun pausedKeys(): AnnotatedString = buildAnnotatedString {
+    TrailerText.PAUSED_KEYS.forEachIndexed { i, (key, does) ->
+        if (i > 0) append(" · ")
+        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = WmmColors.TextSoft)) { append(key) }
+        append(" ")
+        append(does)
     }
 }
 

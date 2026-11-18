@@ -228,6 +228,7 @@ class TvTrailerScreenTest {
         assertTrue(shows("Official Trailer"))
         assertTrue(shows("Dead Reckoning Bay"))
         assertTrue(shows("Paused · 0:13 / 7:45"))
+        assertTrue("the keys, as the board's hint", shows("Select to play · ◀ ▶ 10 s · Back to the movie"))
         assertFalse(shows(TrailerText.PLAYS_FROM_YOUTUBE))
         assertFalse("the TV may sleep while paused", anyKeepsScreenOn(compose.activity.window.decorView))
     }
