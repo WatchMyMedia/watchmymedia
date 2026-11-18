@@ -1,10 +1,12 @@
 import { useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { serverQuery } from '../../../api/queries'
+import { CommandLine } from '../../../components/CommandLine'
 import { FolderPicker } from '../../../components/FolderPicker'
 import type { useFolderCheck } from './useFolderCheck'
 import { Button, Field, Message, fieldInput } from '../../../components/settings/Frame'
 import { folderResult, videoCount, type FolderResult } from '../../../lib/librariesSettings'
+import { packageFolderAccess } from '../../../lib/packageInstall'
 import { libraryPathExample } from '../../../lib/transcoder'
 import type { LibraryType } from '../../../lib/setupRules'
 import type { components } from '../../../api/schema'
@@ -79,11 +81,14 @@ export function FolderField({ type, path, onPath, folder, label = 'Server folder
 /**
  * What the check found, worded as the boards draw it. `onUseParent` offers
  * the folder above one show's folder; `onChooseTV` goes back to Type.
+ * `install` is ServerInfo.install: a package install's server runs as its
+ * own user, so a folder it can't read gets that user's name and a command.
  */
-export function FolderResultMessage({ type, check, platform, onRecheck, onUseParent, onChooseTV, editing }: {
+export function FolderResultMessage({ type, check, platform, install, onRecheck, onUseParent, onChooseTV, editing }: {
   type: LibraryType
   check: PathCheck
   platform?: string
+  install?: string
   onRecheck: () => void
   onUseParent?: (parent: string) => void
   onChooseTV?: () => void
@@ -100,9 +105,16 @@ export function FolderResultMessage({ type, check, platform, onRecheck, onUsePar
     )
   }
   if (r.kind === 'unreadable') {
+    const access = packageFolderAccess(install, path)
     return (
       <Message tone="err" title={`The server isn’t allowed to read ${path}`} actions={<Button small onClick={onRecheck}>Check again</Button>}>
-        {platform === 'windows'
+        {access ? (
+          <>
+            {access.text}
+            <CommandLine>{access.command}</CommandLine>
+            <span className="mt-1.5 block">{access.after}</span>
+          </>
+        ) : platform === 'windows'
           ? 'Give the Windows account the server runs as access to the folder, and to the network share if it is one. Then check again.'
           : 'In Docker, set PUID and PGID to the user that owns the folder. On Windows, give the account the server runs as access to the folder. Then check again.'}
       </Message>

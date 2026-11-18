@@ -26,6 +26,20 @@ describe('server-specific hardware preferences', () => {
     expect(softwareEncoderNote(true)).toContain('Settings › Transcoding')
     expect(softwareEncoderNote(false)).toContain('Docker Desktop on macOS')
   })
+  it('tells a package install to install the GPU’s driver, not to pass a device to a container', () => {
+    for (const kind of ['deb', 'rpm']) {
+      for (const setup of [true, false]) {
+        const note = softwareEncoderNote(setup, undefined, kind)
+        expect(note).toContain('install its driver from your distribution')
+        expect(note).not.toContain('/dev/dri')
+        expect(note).not.toContain('Docker')
+        // Each screen's own button: setup's card says Check again, Settings › Transcoding says Test again.
+        expect(note).toContain(setup ? 'Then press Check again.' : 'Then press Test again.')
+      }
+    }
+    expect(softwareEncoderNote(false, undefined, 'docker')).toContain('pass /dev/dri')
+    expect(softwareEncoderNote(false, undefined, 'binary')).toContain('pass /dev/dri')
+  })
   it('preserves adapter zero, supports default reset and rejects ambiguous numbers', () => {
     expect(adapterIndex('0')).toBe(0)
     expect(adapterIndex(' 2 ')).toBe(2)

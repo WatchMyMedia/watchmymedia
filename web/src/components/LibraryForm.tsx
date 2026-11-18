@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { serverQuery } from '../api/queries'
 import { libraryPathExample } from '../lib/transcoder'
 import { checkPath } from '../api/settings'
+import { CommandLine } from './CommandLine'
 import { FolderPicker } from './FolderPicker'
+import { packageFolderAccess } from '../lib/packageInstall'
 import { folderCheckCount, folderLayoutWarning, libraryLabel } from '../lib/setupRules'
 import type { components } from '../api/schema'
 
@@ -41,7 +43,8 @@ export function LibraryForm({
   busy?: boolean
   error?: string | null
 }) {
-  const platform = useQuery(serverQuery).data?.platform
+  const server = useQuery(serverQuery).data
+  const platform = server?.platform
   const folderId = useId()
   const [own, setOwn] = useState<Fields>({ name: initialName ?? libraryLabel(type), path: initialPath ?? '' })
   const { name, path } = value ?? own
@@ -77,6 +80,9 @@ export function LibraryForm({
       if (version === checkVersion.current) setChecking(false)
     }
   }
+
+  // A package install's server runs as its own user: say so, with the command.
+  const access = check?.exists && !check.readable ? packageFolderAccess(server?.install, check.path) : undefined
 
   return (
     <form
@@ -118,7 +124,14 @@ export function LibraryForm({
           {platform === 'windows' ? <>Use a drive path such as <code>{libraryPathExample(type, platform)}</code> or a network path such as <code>{String.raw`\\nas\media`}</code>. The Windows account running WatchMyMedia must have access; mapped drives must be connected in that account.</> : 'Choose a folder on the server, not on the device running this browser.'}
         </p>
       </div>
-      {check && (
+      {access && (
+        <div role="status" className="space-y-1.5 text-sm text-warn">
+          <p>{access.text}</p>
+          <CommandLine className="">{access.command}</CommandLine>
+          <p>{access.after}</p>
+        </div>
+      )}
+      {check && !access && (
         <p role="status" className={`text-sm ${check.exists && check.readable ? 'text-emerald-400' : 'text-warn'}`}>
           {!check.exists
             ? 'Folder not found on the server.'

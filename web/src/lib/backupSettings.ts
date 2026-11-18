@@ -67,14 +67,22 @@ export function backupFailure(error: unknown, folder: string, words: (e: unknown
 export type RestoreStep = { title: string; text: string; command?: string }
 
 /**
- * The four steps of a restore, done on the server itself, with the commands
- * for how it is installed (UpdateStatus.install, and ServerInfo.host for
- * Unraid). `file` is the newest backup's name, or a stand-in.
+ * The steps of a restore, done on the server itself, with the commands for
+ * how it is installed (UpdateStatus.install, and ServerInfo.host for
+ * Unraid). `file` is the newest backup's name, or a stand-in. `configFile`
+ * is Settings.configFile: set when the server reads its config file from
+ * outside the data folder, as the Linux packages do, which adds a step that
+ * puts the backup's copy back there.
  */
-export function restoreSteps(install: Install | undefined, host: string | undefined, dataDir: string, file: string): RestoreStep[] {
+export function restoreSteps(install: Install | undefined, host: string | undefined, dataDir: string, file: string, configFile?: string): RestoreStep[] {
   const folder = backupFolder(dataDir)
-  const archive = `${folder}${folder.endsWith('\\backups') ? '\\' : '/'}${file}`
-  const unpack = `tar -xzf "${archive}" -C "${dataDir}"`
+  const sep = folder.endsWith('\\backups') ? '\\' : '/'
+  const archive = `${folder}${sep}${file}`
+  let unpack = `tar -xzf "${archive}" -C "${dataDir}"`
+  const restored = `${dataDir.replace(/[\\/]+$/, '')}${sep}config.yaml`
+  let config: RestoreStep | undefined = configFile
+    ? { title: 'Put the config file back', text: `This server reads its config file from ${configFile}, not the data folder. Copy the backup’s, now at ${restored}, over it.` }
+    : undefined
   let stop: RestoreStep
   let start: RestoreStep
   let where = `This server’s data folder is ${dataDir}. Replace what’s there with what’s in the backup:`
@@ -97,6 +105,20 @@ export function restoreSteps(install: Install | undefined, host: string | undefi
       stop = { title: 'Stop the server', text: 'Choose Quit from the WatchMyMedia menu by the clock.' }
       start = { title: 'Start the server', text: 'Start WatchMyMedia again from the Start menu.' }
       break
+    case 'deb':
+    case 'rpm':
+      stop = { title: 'Stop the server', text: 'On the server, stop its service:', command: 'sudo systemctl stop watchmymedia' }
+      start = { title: 'Start the server', text: 'Start the service again:', command: 'sudo systemctl start watchmymedia' }
+      where = `This server’s data folder is ${dataDir}. Unpack the backup there as the watchmymedia user, which the server runs as, so it can read what’s unpacked:`
+      unpack = `sudo -u watchmymedia ${unpack}`
+      if (configFile) {
+        config = {
+          title: 'Put the config file back',
+          text: `This server reads its config file from ${configFile}, not the data folder. Copy the backup’s over it and remove the copy:`,
+          command: `sudo cp "${restored}" "${configFile}" && sudo rm "${restored}"`,
+        }
+      }
+      break
     default:
       stop = { title: 'Stop the server', text: 'Stop the server the way it is run: Ctrl+C in its terminal, or its service manager.' }
       start = { title: 'Start the server', text: 'Start it again the same way.' }
@@ -104,6 +126,7 @@ export function restoreSteps(install: Install | undefined, host: string | undefi
   return [
     stop,
     { title: 'Unpack the backup into the data folder', text: where, command: unpack },
+    ...(config ? [config] : []),
     start,
     { title: 'Sign in again', text: 'Everyone signs in again on every device. Then come back here: Plex needs signing in to again, and seek thumbnails are remade by themselves.' },
   ]
