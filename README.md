@@ -185,13 +185,21 @@ package that is not signed; `dnf` installs it with a warning.
   `sudo firewall-cmd --permanent --add-service=watchmymedia && sudo firewall-cmd --reload`
   (firewalld) or `sudo ufw allow WatchMyMedia` (ufw).
 - **Updating and removing.** Installing a newer file updates it and restarts the service if
-  it was running. `apt remove` and `dnf remove` stop the service and keep the settings and
-  `/var/lib/watchmymedia`; `apt purge` also removes the settings and the cache, and says the
-  data is still there.
+  it was running. `apt remove` and `dnf remove` stop the service and keep
+  `/var/lib/watchmymedia` and your settings: apt leaves the settings file where it is, and
+  dnf keeps one you changed as `config.yaml.rpmsave`, which the next install puts back.
+  `apt purge` also removes the settings and the cache, and says the data is still there;
+  `dnf remove` clears the cache.
+- **GPUs.** The driver comes from the distribution. On Debian and Ubuntu that is
+  `mesa-va-drivers` for AMD (`mesa-libgallium` on Ubuntu 26.04) and `intel-media-va-driver`
+  or `intel-media-va-driver-non-free` for Intel. Fedora builds its own Mesa and Intel drivers
+  without H.264 and HEVC; RPM Fusion's `mesa-va-drivers-freeworld` and `intel-media-driver`
+  have them. All of this is read from the packages: nothing has run on a GPU on Linux yet.
+  Without a driver that works, the server transcodes in software, and Settings › Transcoding
+  shows which encoder it found.
 - **Not there yet.** The packages are not on a release or on
   <https://downloads.watchmy.media>, and the apt and dnf repositories that will deliver
-  updates do not exist: a package built here carries no repository entry. Hardware
-  transcoding uses the distribution's drivers and has not been run on a GPU on Linux.
+  updates do not exist: a package built here carries no repository entry.
 
 Developers: [deploy/linux](deploy/linux) holds the one [nfpm](https://nfpm.goreleaser.com/)
 file both formats are built from and what it packs. `make linux-smoke-packages` builds an
