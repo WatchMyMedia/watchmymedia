@@ -46,7 +46,7 @@ export function TranscodingHub() {
   })()
   return (
     <HubPage crumbs={crumbs} title="Transcoding" lede={LEDE} banner={banner || undefined}>
-      <EncoderSection s={s} platform={server.data?.platform} host={server.data?.host} testing={update.isPending || test === 'testing'} onTestAgain={testAgain} error={update.isError && visibleConfirmationError(update.error) ? errorText(update.error) : undefined} />
+      <EncoderSection s={s} platform={server.data?.platform} host={server.data?.host} install={server.data?.install} testing={update.isPending || test === 'testing'} onTestAgain={testAgain} error={update.isError && visibleConfirmationError(update.error) ? errorText(update.error) : undefined} />
       <ThumbnailsSection />
       {s.upload && (
         <Section title="Remote upload limit">
@@ -64,7 +64,7 @@ export function TranscodingHub() {
   )
 }
 
-function EncoderSection({ s, platform, host, testing, onTestAgain, error }: { s: Settings; platform?: string; host?: string; testing: boolean; onTestAgain: () => void; error?: string }) {
+function EncoderSection({ s, platform, host, install, testing, onTestAgain, error }: { s: Settings; platform?: string; host?: string; install?: string; testing: boolean; onTestAgain: () => void; error?: string }) {
   const go = useGo()
   const caps = s.capabilities
   const controls = (
@@ -95,7 +95,7 @@ function EncoderSection({ s, platform, host, testing, onTestAgain, error }: { s:
         detail={encoderLine(s.hwaccel, caps, testedAt(caps.detected))}
         control={controls}
       >
-        {software && <p className="mt-1.5 text-[13px] text-neutral-400">{softwareEncoderNote(false, host)}</p>}
+        {software && <p className="mt-1.5 text-[13px] text-neutral-400">{softwareEncoderNote(false, host, install)}</p>}
       </ItemRow>
     )
   }

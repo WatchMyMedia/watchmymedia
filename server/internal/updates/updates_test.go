@@ -11,7 +11,8 @@ import (
 
 // manifest lists 0.4.0, a yanked 0.4.1, 0.5.0-rc.1 and a broken entry, with
 // downloads on the test server's own host plus one on another host. Only
-// 0.4.0 has a Windows installer, as when the installer is published later.
+// 0.4.0 has a Windows installer and Linux packages, as when those are
+// published later.
 func manifest(host string) string {
 	return `{"schema": 1, "releases": [
 	  {"version": "0.5.0-rc.1", "date": "2026-11-10", "notes": "- rc notes",
@@ -24,7 +25,10 @@ func manifest(host string) string {
 	     "linux-arm64": {"url": "https://elsewhere.example/watchmymedia.tar.gz", "size": 1},
 	     "windows-amd64": {"url": "` + host + `/server/watchmymedia-v0.4.0-windows-amd64.zip", "size": 1},
 	     "windows-app-amd64": {"url": "` + host + `/windows/WatchMyMedia-0.4.0-x64-setup.exe", "size": 60000000},
-	     "windows-app-arm64": {"url": "https://elsewhere.example/setup.exe", "size": 1}}},
+	     "windows-app-arm64": {"url": "https://elsewhere.example/setup.exe", "size": 1},
+	     "deb-amd64": {"url": "` + host + `/apt/pool/watchmymedia_0.4.0_amd64.deb", "size": 70000000},
+	     "deb-arm64": {"url": "https://elsewhere.example/watchmymedia_0.4.0_arm64.deb", "size": 1},
+	     "rpm-amd64": {"url": "` + host + `/rpm/x86_64/watchmymedia-0.4.0-1.x86_64.rpm", "size": 70000000}}},
 	  {"version": "not-a-version"},
 	  {"version": "0.3.4"}
 	]}`
@@ -76,6 +80,12 @@ func TestCheck(t *testing.T) {
 		{name: "windows app gets its installer", version: "v0.3.4", install: InstallWindowsApp, platform: "windows-amd64", latest: "0.4.0", update: true, download: "/windows/WatchMyMedia-0.4.0-x64-setup.exe"},
 		{name: "windows app skips releases without an installer", version: "v0.4.0-rc.2", install: InstallWindowsApp, platform: "windows-amd64", latest: "0.4.0", update: true, download: "/windows/WatchMyMedia-0.4.0-x64-setup.exe"},
 		{name: "windows app ignores an installer on another host", version: "v0.3.4", install: InstallWindowsApp, platform: "windows-arm64"},
+		{name: "deb is told the version and given no file", version: "v0.3.4", install: InstallDeb, platform: "linux-amd64", latest: "0.4.0", update: true},
+		{name: "rpm is told the version and given no file", version: "v0.3.4", install: InstallRpm, platform: "linux-amd64", latest: "0.4.0", update: true},
+		{name: "deb skips releases without its package", version: "v0.4.0-rc.2", install: InstallDeb, platform: "linux-amd64", latest: "0.4.0", update: true},
+		{name: "rpm skips releases without its package", version: "v0.4.0-rc.2", install: InstallRpm, platform: "linux-amd64", latest: "0.4.0", update: true},
+		{name: "deb ignores a package on another host", version: "v0.3.4", install: InstallDeb, platform: "linux-arm64"},
+		{name: "rpm has no release without a package for its architecture", version: "v0.3.4", install: InstallRpm, platform: "linux-arm64"},
 		{name: "portable windows server keeps its archive", version: "v0.3.4", install: InstallBinary, platform: "windows-amd64", latest: "0.4.0", update: true, download: "/server/watchmymedia-v0.4.0-windows-amd64.zip"},
 		{name: "dev build", version: "dev", install: InstallBinary, platform: "linux-amd64", latest: "0.4.0", development: true, download: "/server/watchmymedia-v0.4.0-linux-amd64.tar.gz"},
 		{name: "commit after a tag", version: "v0.3.4-5-gabc1234-dirty", install: InstallMacApp, latest: "0.4.0", development: true, download: "/mac/WatchMyMedia-0.4.0.dmg"},
@@ -188,7 +198,7 @@ func TestOrder(t *testing.T) {
 }
 
 func TestNewInstallKinds(t *testing.T) {
-	for in, want := range map[string]string{"macos-app": InstallMacApp, "windows-app": InstallWindowsApp, "docker": InstallDocker, "": InstallBinary, "snap": InstallBinary} {
+	for in, want := range map[string]string{"macos-app": InstallMacApp, "windows-app": InstallWindowsApp, "docker": InstallDocker, "deb": InstallDeb, "rpm": InstallRpm, "": InstallBinary, "snap": InstallBinary} {
 		if got := New("https://x/releases.json", "v1.0.0", in).Install; got != want {
 			t.Errorf("New(%q).Install = %q, want %q", in, got, want)
 		}

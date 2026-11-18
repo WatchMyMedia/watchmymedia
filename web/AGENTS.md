@@ -115,6 +115,14 @@ the user asks in this conversation; see Authority in the root file.
   drafts with the save bar. A button whose request asks for the password away
   from home is `guarded`, so it carries a lock there, and its call goes
   through `withConfirm`. Removes use `ConfirmDialog`, never `window.confirm`.
+- **Wording by install** (PLAN-LINUX.md §4): how the server was installed
+  changes what Settings says. `UpdateStatus.install` (admins) picks the
+  update steps (`src/lib/updates.ts`) and the restore steps
+  (`src/lib/backupSettings.ts`); `ServerInfo.install` and `.host` pick the
+  folder check's permissions advice and the transcoder's software note
+  (`src/lib/packageInstall.ts`, `src/lib/transcoder.ts`). A new kind, or new
+  advice that names Docker, a container or a service, goes through those, not
+  inline in a page. Commands people copy are drawn with `CommandLine`.
 - **Server features by level**: the web app is served by the same server it
   talks to, so it can rely on the current API. The receiver can't: it is
   deployed separately and loads against any server version, so it reads the

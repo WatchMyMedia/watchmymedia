@@ -20,7 +20,7 @@ export function RestorePage() {
   const server = useQuery(serverQuery)
   const download = useDownloadBackup()
   const s = settings.data
-  const steps = s ? restoreSteps(updates.data?.install, server.data?.host, s.dataDir, s.backups[0]?.name ?? 'watchmymedia-backup.tar.gz') : []
+  const steps = s ? restoreSteps(updates.data?.install, server.data?.host, s.dataDir, s.backups[0]?.name ?? 'watchmymedia-backup.tar.gz', s.configFile) : []
   return (
     <HubPage
       crumbs={crumbs}

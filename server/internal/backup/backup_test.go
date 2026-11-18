@@ -43,7 +43,7 @@ func TestWriteAndSave(t *testing.T) {
 	}
 
 	for range 3 {
-		if _, err := Save(ctx, conn, dir, 2); err != nil {
+		if _, err := Save(ctx, conn, dir, "", 2); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -105,6 +105,74 @@ func TestWriteAndSave(t *testing.T) {
 	}
 }
 
+// The config file the server loaded is saved as config.yaml, wherever it is
+// and whatever it is called, in place of one left in the data directory: the
+// Linux packages keep theirs in /etc/watchmymedia (PLAN-LINUX.md §4).
+func TestWriteSavesTheNamedConfigFile(t *testing.T) {
+	dir := t.TempDir()
+	conn, _ := dbtest.Open(t)
+	loaded := filepath.Join(t.TempDir(), "server.yaml")
+	if err := os.WriteFile(loaded, []byte("port: 27599\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ConfigName), []byte("port: 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	read := func(configFile string) map[string]string {
+		t.Helper()
+		var buf bytes.Buffer
+		if err := Write(t.Context(), conn, dir, configFile, &buf); err != nil {
+			t.Fatal(err)
+		}
+		gz, err := gzip.NewReader(&buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		members := map[string]string{}
+		for tr := tar.NewReader(gz); ; {
+			h, err := tr.Next()
+			if errors.Is(err, io.EOF) {
+				return members
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, err := io.ReadAll(tr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			members[h.Name] = string(body)
+		}
+	}
+	if m := read(loaded); m[ConfigName] != "port: 27599\n" || len(m) != 2 {
+		t.Errorf("with the loaded file named: %v", m)
+	}
+	if m := read(""); m[ConfigName] != "port: 1\n" {
+		t.Errorf("with none named, the data directory's: %v", m)
+	}
+	if m := read(filepath.Join(t.TempDir(), "missing.yaml")); len(m) != 1 || m["watchmymedia.db"] == "" {
+		t.Errorf("with a file that is not there: %v", m)
+	}
+}
+
+// Only a config file outside the data directory has to be put back by hand
+// after a restore.
+func TestConfigElsewhere(t *testing.T) {
+	data := filepath.Join(string(filepath.Separator), "var", "lib", "watchmymedia")
+	etc := filepath.Join(string(filepath.Separator), "etc", "watchmymedia", "config.yaml")
+	for _, tc := range []struct{ configFile, want string }{
+		{"", ""},
+		{filepath.Join(data, ConfigName), ""},
+		{filepath.Join(data, ".", ConfigName), ""},
+		{etc, etc},
+		{filepath.Join(data, "server.yaml"), filepath.Join(data, "server.yaml")},
+	} {
+		if got := ConfigElsewhere(data, tc.configFile); got != tc.want {
+			t.Errorf("ConfigElsewhere(%q) = %q, want %q", tc.configFile, got, tc.want)
+		}
+	}
+}
+
 // Archives hold password hashes and API keys: the folder and the files are
 // the server's alone, and a folder made wider before is tightened.
 func TestSaveIsPrivate(t *testing.T) {
@@ -116,7 +184,7 @@ func TestSaveIsPrivate(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, "backups"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	path, err := Save(t.Context(), conn, dir, 0)
+	path, err := Save(t.Context(), conn, dir, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +219,7 @@ func TestSavePrunes(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	path, err := Save(t.Context(), conn, dir, 2)
+	path, err := Save(t.Context(), conn, dir, "", 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +261,7 @@ func TestArchiveHoldsNoPlexGrant(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(grants, ref+".json"), []byte(secret), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	path, err := Save(ctx, conn, dir, 0)
+	path, err := Save(ctx, conn, dir, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +338,7 @@ func TestArchiveHoldsNoSessionsOrMediaKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	path, err := Save(ctx, conn, dir, 0)
+	path, err := Save(ctx, conn, dir, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}

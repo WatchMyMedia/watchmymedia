@@ -60,4 +60,26 @@ describe('Restore from a backup', () => {
     expect(win[1].command).toBe('tar -xzf "C:\\ProgramData\\WatchMyMedia\\backups\\b.tar.gz" -C "C:\\ProgramData\\WatchMyMedia"')
     expect(restoreSteps(undefined, undefined, '/data', 'b.tar.gz')[0].command).toBeUndefined()
   })
+
+  it('stops and starts a package install’s service, and unpacks as its user', () => {
+    for (const kind of ['deb', 'rpm'] as const) {
+      const steps = restoreSteps(kind, undefined, '/var/lib/watchmymedia', 'b.tar.gz', '/etc/watchmymedia/config.yaml')
+      expect(steps.map((s) => s.title)).toEqual(['Stop the server', 'Unpack the backup into the data folder', 'Put the config file back', 'Start the server', 'Sign in again'])
+      expect(steps[0].command).toBe('sudo systemctl stop watchmymedia')
+      expect(steps[1].command).toBe('sudo -u watchmymedia tar -xzf "/var/lib/watchmymedia/backups/b.tar.gz" -C "/var/lib/watchmymedia"')
+      expect(steps[1].text).toContain('as the watchmymedia user')
+      expect(steps[2].text).toContain('/etc/watchmymedia/config.yaml')
+      expect(steps[2].command).toBe('sudo cp "/var/lib/watchmymedia/config.yaml" "/etc/watchmymedia/config.yaml" && sudo rm "/var/lib/watchmymedia/config.yaml"')
+      expect(steps[3].command).toBe('sudo systemctl start watchmymedia')
+    }
+    // A package install whose config file was moved into the data folder has nothing to put back.
+    expect(restoreSteps('deb', undefined, '/var/lib/watchmymedia', 'b.tar.gz').map((s) => s.title)).not.toContain('Put the config file back')
+  })
+
+  it('says where the config file goes back on any server that reads it from elsewhere', () => {
+    const steps = restoreSteps('binary', undefined, '/srv/wmm', 'b.tar.gz', '/etc/wmm.yaml')
+    expect(steps.map((s) => s.title)).toEqual(['Stop the server', 'Unpack the backup into the data folder', 'Put the config file back', 'Start the server', 'Sign in again'])
+    expect(steps[2]).toEqual({ title: 'Put the config file back', text: 'This server reads its config file from /etc/wmm.yaml, not the data folder. Copy the backup’s, now at /srv/wmm/config.yaml, over it.' })
+    expect(restoreSteps('windows-app', undefined, 'C:\\ProgramData\\WatchMyMedia', 'b.tar.gz', 'D:\\wmm.yaml')[2].text).toContain('now at C:\\ProgramData\\WatchMyMedia\\config.yaml,')
+  })
 })

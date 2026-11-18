@@ -90,10 +90,13 @@ type Deps struct {
 	// Auth guards every API route except the public ones; nil disables auth (tests, spec dumps).
 	Auth *auth.Service
 	// Settings, TMDB, Conn and DataDir back the settings page and backups.
+	// ConfigFile is the config file the server loaded, which backups save;
+	// empty means config.yaml in DataDir.
 	Settings        *settings.Store
 	TMDB            *tmdb.Client
 	Conn            *sql.DB
 	DataDir         string
+	ConfigFile      string
 	DefaultHWDevice *int
 	DefaultHWAccel  string
 	// Net resolves client addresses behind trusted proxies and limits admin

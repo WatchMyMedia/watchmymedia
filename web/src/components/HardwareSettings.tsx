@@ -27,10 +27,10 @@ export function HardwareSettings({ setup = false }: { setup?: boolean }) {
   const server = useQuery(serverQuery)
   // Remount on backend changes, including changes from another admin. A draft
   // CUDA ordinal must never survive into a DirectX backend (or back again).
-  return <HardwareSettingsBody key={settings.data?.hwaccel ?? 'loading'} settings={settings} setup={setup} platform={server.data?.platform} host={server.data?.host} retryServer={() => { void server.refetch() }} />
+  return <HardwareSettingsBody key={settings.data?.hwaccel ?? 'loading'} settings={settings} setup={setup} platform={server.data?.platform} host={server.data?.host} install={server.data?.install} retryServer={() => { void server.refetch() }} />
 }
 
-function HardwareSettingsBody({ settings, platform, host, retryServer, setup }: { settings: UseQueryResult<components['schemas']['Settings']>; platform?: string; host?: string; retryServer: () => void; setup: boolean }) {
+function HardwareSettingsBody({ settings, platform, host, install, retryServer, setup }: { settings: UseQueryResult<components['schemas']['Settings']>; platform?: string; host?: string; install?: string; retryServer: () => void; setup: boolean }) {
   const update = useUpdateSettings()
   const [draft, setDraft] = useState<string | null>(null)
   const [manual, setManual] = useState(false)
@@ -117,7 +117,7 @@ function HardwareSettingsBody({ settings, platform, host, retryServer, setup }: 
           </details>}
         </Panel>
       )}
-      {caps?.hwaccel === 'software' && <p className="max-w-2xl text-sm text-neutral-400">{softwareEncoderNote(setup, host)}</p>}
+      {caps?.hwaccel === 'software' && <p className="max-w-2xl text-sm text-neutral-400">{softwareEncoderNote(setup, host, install)}</p>}
     </>
   )
 }

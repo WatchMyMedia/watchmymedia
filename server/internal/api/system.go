@@ -138,6 +138,7 @@ const APILevel = 31
 type ServerInfo struct {
 	Platform      string `json:"platform,omitempty" required:"false" doc:"Server operating system, such as windows, darwin or linux. Used for server-side folder path examples; absent on older servers."`
 	Host          string `json:"host,omitempty" required:"false" doc:"The platform a container install runs on, when the server can tell: unraid. Settings word updates and GPU setup for it. Absent otherwise and on older servers."`
+	Install       string `json:"install,omitempty" required:"false" doc:"How the server was installed: macos-app, windows-app, docker, deb, rpm or binary. The web words folder permissions and GPU setup for it. A plain string: ignore values you don't know. Absent on older servers."`
 	ID            string `json:"id" doc:"Stable random ID; apps remember servers by it, not by address."`
 	Name          string `json:"name" doc:"Shown in apps' server lists; set under Settings."`
 	Version       string `json:"version"`
@@ -175,6 +176,9 @@ func registerSystem(h huma.API, deps Deps) {
 		Tags:        []string{"system"},
 	}, func(ctx context.Context, _ *struct{}) (*ServerInfoOutput, error) {
 		out := &ServerInfoOutput{Body: ServerInfo{Platform: runtime.GOOS, Host: deps.Host, Version: deps.Version, APILevel: APILevel, Name: settings.DefaultServerName()}}
+		if deps.Updates != nil {
+			out.Body.Install = deps.Updates.Install
+		}
 		if deps.Settings != nil {
 			id, err := deps.Settings.ServerID(ctx)
 			if err != nil {

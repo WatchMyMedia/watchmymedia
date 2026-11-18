@@ -40,7 +40,8 @@ export function EditLibraryFlow({ id }: { id: number }) {
 
 function EditForm({ lib }: { lib: Library }) {
   const go = useGo()
-  const platform = useQuery(serverQuery).data?.platform
+  const server = useQuery(serverQuery).data
+  const platform = server?.platform
   const update = useUpdateLibrary()
   const page = settingsHref('libraries', lib.id)
   const [name, setName] = useState(lib.name)
@@ -80,7 +81,7 @@ function EditForm({ lib }: { lib: Library }) {
       <div className="mt-4">
         <FolderField type={lib.type} path={path} onPath={setPath} folder={folder}>
           {folder.check && !folder.checking && folderChanged && (
-            <FolderResultMessage type={lib.type} check={folder.check} platform={platform} editing onRecheck={() => void folder.run(path)} onUseParent={(p) => { setPath(p); void folder.run(p) }} />
+            <FolderResultMessage type={lib.type} check={folder.check} platform={platform} install={server?.install} editing onRecheck={() => void folder.run(path)} onUseParent={(p) => { setPath(p); void folder.run(p) }} />
           )}
           {folderChanged && (
             <Message tone="warn" title="Changing the folder rescans the library">
