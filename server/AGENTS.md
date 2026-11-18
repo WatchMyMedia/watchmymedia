@@ -334,6 +334,19 @@ variable, and in `deploy/config.example.yaml` with a comment. API keys
 (TMDB, OpenSubtitles) come from the environment or release `ldflags`, never
 the source.
 
+**Install kinds.** `WATCHMYMEDIA_INSTALL` says how the server was installed
+(`internal/updates`: `macos-app`, `windows-app`, `docker`, `deb`, `rpm`, else
+`binary`). It decides what Check for updates offers, and the web words updates,
+restores, folder permissions and GPU setup by it (`UpdateStatus.install` for
+admins, `ServerInfo.install` before sign-in). A kind whose file is published
+apart from the others (`windows-app`, `deb`, `rpm`) is told about a release
+only when the release list has that file for its architecture
+(`requiredKey`). `UpdateStatus.install` is an enum, which no app decodes;
+`ServerInfo.install` is a plain string because the apps do decode that reply.
+The packages keep `config.yaml` outside the data folder
+(`WATCHMYMEDIA_CONFIG`): `config.Config.File` is the file `Load` read, and
+backups save that one ([PLAN-LINUX.md](../PLAN-LINUX.md) §4).
+
 **Tests.** Standard `testing` only (no assertion libraries), `t.TempDir()`
 and `t.Setenv` for isolation, tests beside the code. Tests that call outside
 services are opt-in behind an environment variable, like

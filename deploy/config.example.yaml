@@ -115,6 +115,11 @@ updates:
   # server reads the list of releases at url, sending only its version, and
   # links to the new download. Nothing is checked in the background. Off
   # hides the button (WATCHMYMEDIA_UPDATES_ENABLED, WATCHMYMEDIA_UPDATES_URL).
+  # What it offers depends on how the server was installed, which is not set
+  # here: the apps, the Docker image and the Linux packages say so with
+  # WATCHMYMEDIA_INSTALL (macos-app, windows-app, docker, deb or rpm; anything
+  # else is a server binary). A deb or rpm install is given the apt or dnf
+  # command, not a file.
   enabled: true
   url: https://downloads.watchmy.media/releases.json
 lists:

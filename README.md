@@ -684,7 +684,9 @@ for it if sign-ins start failing for all users. If you changed Docker Desktop's 
 ## Backups
 
 A backup is a `.tar.gz` of the database (libraries, matches, accounts, watch history) and
-`config.yaml`; artwork and subtitle caches are rebuilt on demand, and seek thumbnails are
+the config file the server loaded, saved as `config.yaml` wherever it is kept
+(`<data_dir>/config.yaml`, or the file `WATCHMYMEDIA_CONFIG` names); artwork and subtitle
+caches are rebuilt on demand, and seek thumbnails are
 made again. Backups run nightly
 into `<data_dir>/backups` (keep count in Settings), can be made on demand from Settings
 or downloaded, and from the command line:
@@ -695,7 +697,11 @@ watchmymedia backup /path/to/file.tar.gz
 ```
 
 To restore: stop the server, unpack the archive into the data directory (replacing
-`watchmymedia.db`), and start it again.
+`watchmymedia.db`), and start it again. Where the server reads its config file from
+somewhere else (`WATCHMYMEDIA_CONFIG`, as the Debian and Fedora packages do with
+`/etc/watchmymedia/config.yaml`), copy the unpacked `config.yaml` from the data directory
+back over that file before starting. Settings → Backups → Restore from a backup gives the
+commands for how this server is installed, with its own folders.
 
 A backup keeps no one signed in: it leaves out every browser and device sign-in and the
 key that signs media and cast links, so whoever holds an archive cannot use them. After a
@@ -712,8 +718,11 @@ list of releases at `updates.url` (`https://downloads.watchmy.media/releases.jso
 only its version, and says whether a newer release is out. For a newer one it shows the notes
 and how to update: the DMG for the menu bar app (which can also update itself from its menu),
 the installer for the Windows app (only releases that have one), `docker compose pull` for
-Docker, and the archive for this platform otherwise. The apps and the image say which they are
-with `WATCHMYMEDIA_INSTALL` (`macos-app`, `windows-app`, `docker`). A pre-release
+Docker, the `apt` or `dnf` command for a server installed from the Debian and Ubuntu package
+or the Fedora package (only releases whose package is out for its architecture), and the
+archive for this platform otherwise. The apps, the image and the packages say which they are
+with `WATCHMYMEDIA_INSTALL` (`macos-app`, `windows-app`, `docker`, `deb`, `rpm`); anything
+else is a server binary someone runs. A pre-release
 server is offered pre-releases too, and a development build is never offered an update.
 Nothing is checked in the background; `updates.enabled: false`
 (`WATCHMYMEDIA_UPDATES_ENABLED=false`) hides the button.
