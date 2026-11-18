@@ -66,12 +66,16 @@ import media.watchmy.client.tv.components.ContentEnd
 import media.watchmy.client.tv.components.ContentStart
 import media.watchmy.client.tv.components.FocusMemory
 import media.watchmy.client.tv.components.FocusableBox
-import media.watchmy.client.tv.components.KeepInViewSpec
+import media.watchmy.client.tv.components.CardGap
+import media.watchmy.client.tv.components.KeylineSpec
 import media.watchmy.client.tv.components.TextBright
 import media.watchmy.client.tv.components.TvButton
 import media.watchmy.client.tv.components.TvButtonSize
+import media.watchmy.client.tv.components.fadePassedCards
 import media.watchmy.client.tv.components.focusMemory
 import media.watchmy.client.tv.components.inter
+import media.watchmy.client.tv.components.rememberRowStart
+import media.watchmy.client.tv.components.rowStart
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.BadgeStyle
@@ -178,7 +182,9 @@ private fun SeasonTab(s: SeasonSummary, on: Boolean, missing: Boolean, modifier:
 @Composable
 internal fun EpisodeRow(show: ShowDetail, state: ShowPageViewModel.State, vm: ShowPageActions, library: LibraryRepository, memory: FocusMemory, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val density = LocalDensity.current
-    val spec = remember(density) { with(density) { KeepInViewSpec(leading = 12.dp.toPx(), trailing = (ContentEnd + 12.dp).toPx()) } }
+    // As Home's rows: the episode before the focused one stays in view, and a run of ◀ stops at the first (CardRow).
+    val spec = remember(density) { with(density) { KeylineSpec(leading = 12.dp.toPx(), gap = CardGap.toPx(), trailing = (ContentEnd + 12.dp).toPx()) } }
+    val rowStart = rememberRowStart()
     val episodes = state.episodes
     val index = episodes.indexOfFirst { it.id == state.episodeId }
     val row = rememberLazyListState(initialFirstVisibleItemIndex = (index - 1).coerceAtLeast(0))
@@ -191,10 +197,10 @@ internal fun EpisodeRow(show: ShowDetail, state: ShowPageViewModel.State, vm: Sh
     val nav = remember(up) { Modifier.focusProperties { this.up = up } }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
         LazyRow(
-            modifier.fillMaxWidth().padding(start = ContentStart - 12.dp, top = 12.dp).focusRestorer(memory.requester("ep:${state.episodeId}")),
+            modifier.fillMaxWidth().padding(start = ContentStart - 12.dp, top = 12.dp).fadePassedCards(row).rowStart(rowStart).focusRestorer(memory.requester("ep:${state.episodeId}")),
             state = row,
             contentPadding = PaddingValues(start = 12.dp, end = ContentEnd, top = 12.dp, bottom = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(CardGap),
         ) {
             items(episodes, key = { it.id }) { e ->
                 // Kept across moves along the row, so only the cards whose outline changes draw again.
