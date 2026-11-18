@@ -49,8 +49,9 @@ fun trailerBaseUrl(applicationId: String): String = "https://$applicationId/"
  * Without it (the TV's), the player waits until the app has shown it and
  * calls `playTrailer()`, so it never plays unseen. The app drives it only
  * through YouTube's IFrame API: `playTrailer()`, `pauseTrailer()`,
- * `toggleTrailer()`, `seekBy(seconds)`, and `focusPlayer()`, which gives the
- * player's frame the keyboard so YouTube's own keyboard controls reach it.
+ * `toggleTrailer()` and `seekBy(seconds)`. `trailerTime()` and `seekBy`
+ * return where the player is and how long the video is, in seconds, as
+ * `[time, duration]` ([parseTrailerTime]), for the TV's pause screen.
  *
  * The player is youtube-nocookie.com's, as on the web, with no related videos
  * from other channels at the end (`rel=0`) and its own controls.
@@ -102,18 +103,38 @@ fun trailerPage(key: String, origin: String, autoplay: Boolean = true): String {
           var s = player.getPlayerState();
           if (s === ${TrailerState.PLAYING} || s === ${TrailerState.BUFFERING}) player.pauseVideo(); else player.playVideo();
         }
-        function seekBy(seconds) {
-          if (!player || !player.getCurrentTime) return;
-          player.seekTo(Math.max(0, player.getCurrentTime() + seconds), true);
+        function trailerTime() {
+          if (!player || !player.getCurrentTime) return null;
+          return [player.getCurrentTime(), player.getDuration()];
         }
-        function focusPlayer() {
-          if (player && player.getIframe) player.getIframe().focus();
+        function seekBy(seconds) {
+          if (!player || !player.getCurrentTime) return null;
+          var d = player.getDuration();
+          var t = Math.max(0, player.getCurrentTime() + seconds);
+          if (d > 1) t = Math.min(t, d - 1);
+          player.seekTo(t, true);
+          return [t, d];
         }
         </script>
         <script src="https://www.youtube.com/iframe_api" onerror="post('${TrailerEvent.UNREACHABLE}', 0)"></script>
         </body>
         </html>
     """.trimIndent()
+}
+
+/**
+ * Where the player is and how long the video is, in milliseconds, from what
+ * `trailerTime()` or `seekBy` returned to `evaluateJavascript`
+ * (`[13.2,465.04]`); null for anything else, such as `null` before the
+ * player is ready. The duration is 0 while YouTube doesn't know it.
+ */
+fun parseTrailerTime(result: String?): Pair<Long, Long>? {
+    val parts = result?.trim()?.removeSurrounding("[", "]")?.split(',') ?: return null
+    if (parts.size != 2) return null
+    val time = parts[0].trim().toDoubleOrNull() ?: return null
+    val duration = parts[1].trim().toDoubleOrNull() ?: return null
+    if (time.isNaN() || duration.isNaN()) return null
+    return (time * 1000).toLong().coerceAtLeast(0) to (duration * 1000).toLong().coerceAtLeast(0)
 }
 
 /** [value] as a JavaScript string literal that can't end the script it is in. */

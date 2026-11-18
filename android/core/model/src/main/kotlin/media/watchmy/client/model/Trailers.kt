@@ -80,4 +80,11 @@ object TrailerText {
 
     /** Leaves the trailer screen: the phone's back button, the TV's button beside those messages. */
     const val BACK_TO_MOVIE = "Back to the movie"
+
+    /** The TV's pause screen, in the player's place while a trailer is paused. */
+    const val PAUSED = "Paused"
+
+    /** "Paused · 0:13 / 7:45", or "Paused · 0:13" while the length isn't known. */
+    fun paused(positionMs: Long, durationMs: Long): String =
+        if (durationMs > 0) "$PAUSED · ${formatClock(positionMs)} / ${formatClock(durationMs)}" else "$PAUSED · ${formatClock(positionMs)}"
 }

@@ -46,8 +46,9 @@ import org.robolectric.annotation.Config
 /**
  * The TV's trailer screen (TvTrailerPlayer.dc.html, PLAN-TV-TRAILERS.md §4):
  * our screen while YouTube's player loads out of sight, then the player
- * alone, the remote in both ways of driving it, the refused and unreachable
- * screens, the end, and the hand-off when no WebView can be made.
+ * alone, the remote through YouTube's IFrame API, our pause screen in the
+ * player's place while it is paused (TV0's decision), the refused and
+ * unreachable screens, the end, and the hand-off when no WebView can be made.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w960dp-h540dp-land-television-xhdpi")
@@ -59,10 +60,16 @@ class TvTrailerScreenTest {
     private var web: RecordingWebView? = null
     private var backs = 0
 
-    /** The WebView the screen makes, keeping what the screen sends it: keys and calls into the page. */
+    /**
+     * The WebView the screen makes, keeping what the screen sends it: keys,
+     * and calls into the page with whether the player was shown then and
+     * what they wait to hear back.
+     */
     private class RecordingWebView(context: Context) : WebView(context) {
         val keys = mutableListOf<KeyEvent>()
         val scripts = mutableListOf<String>()
+        val shownAt = mutableMapOf<String, Boolean>()
+        val replies = mutableMapOf<String, ValueCallback<String>>()
         var focusAsked = 0
 
         override fun requestFocus(direction: Int, previouslyFocusedRect: Rect?): Boolean {
@@ -77,6 +84,8 @@ class TvTrailerScreenTest {
 
         override fun evaluateJavascript(script: String, resultCallback: ValueCallback<String>?) {
             scripts += script
+            shownAt[script] = visibility == View.VISIBLE
+            resultCallback?.let { replies[script] = it }
             super.evaluateJavascript(script, resultCallback)
         }
     }
@@ -90,13 +99,35 @@ class TvTrailerScreenTest {
     @After
     fun reset() = TrailerWebViews.reset()
 
-    private fun open(remote: TrailerRemote = TrailerRemote.Keyboard, trailers: List<Trailer.YouTube> = listOf(official, teaser)) {
+    private fun open(trailers: List<Trailer.YouTube> = listOf(official, teaser)) {
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides FakeAppServices(tv = true)) {
-                TvTheme { TvTrailerScreen("Dead Reckoning Bay", trailers, onBack = { backs++ }, remote = remote) }
+                TvTheme { TvTrailerScreen("Dead Reckoning Bay", trailers, onBack = { backs++ }) }
             }
         }
         compose.waitForIdle()
+    }
+
+    /** What the page returns to [script], as `evaluateJavascript` would hand it back. */
+    private fun reply(script: String, result: String) {
+        val callback = checkNotNull(player.replies[script]) { "nothing waits for $script" }
+        compose.runOnUiThread { callback.onReceiveValue(result) }
+        compose.waitForIdle()
+    }
+
+    /** The trailer, ready and playing. */
+    private fun playing() {
+        open()
+        post(TrailerEvent.READY, official.key)
+        post(TrailerEvent.STATE, official.key, TrailerState.PLAYING)
+    }
+
+    /** The trailer playing, then paused at 0:13 of 7:45. */
+    private fun paused() {
+        playing()
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        post(TrailerEvent.STATE, official.key, TrailerState.PAUSED)
+        reply("trailerTime()", "[13.2,465.04]")
     }
 
     private val player get() = checkNotNull(web) { "no WebView" }
@@ -147,6 +178,9 @@ class TvTrailerScreenTest {
         assertTrue(shows(TrailerText.PLAYS_FROM_YOUTUBE))
         assertEquals(View.INVISIBLE, player.visibility)
         assertFalse("nothing of the player's takes focus", player.isFocusable)
+        // WRAP_CONTENT, which AndroidView gives a view without its own, lays the page out 0 px high: sound, no picture (TV0).
+        assertEquals("the page is laid out at the player's full width", ViewGroup.LayoutParams.MATCH_PARENT, player.layoutParams.width)
+        assertEquals("and its full height", ViewGroup.LayoutParams.MATCH_PARENT, player.layoutParams.height)
         val page = shadowOf(player).lastLoadDataWithBaseURL
         assertEquals("https://${compose.activity.packageName}/", page.baseUrl)
         assertTrue(page.data.contains("var KEY = \"WhWc3b3KhnY\";"))
@@ -161,64 +195,104 @@ class TvTrailerScreenTest {
         post(TrailerEvent.READY, official.key)
         assertEquals(View.VISIBLE, player.visibility)
         assertFalse("nothing of ours is drawn while the player is shown", anyText())
-        assertTrue(player.scripts.contains("playTrailer()"))
+        assertEquals("asked to play once shown", true, player.shownAt["playTrailer()"])
     }
 
     @Test
-    fun `with YouTube's keyboard controls, the player has the focus and the remote's keys become k, j and l`() {
-        open(TrailerRemote.Keyboard)
-        post(TrailerEvent.READY, official.key)
-        // Robolectric's WebView has no provider to take the focus itself, so this checks that it was asked to.
-        assertTrue("the WebView takes the focus", player.isFocusable && player.focusAsked > 0)
-        assertTrue("on the player's frame", player.scripts.contains("focusPlayer()"))
-
-        val sent = { code: Int -> player.keys.clear(); press(code); player.keys.map { it.action to it.keyCode } }
-        val k = listOf(KeyEvent.ACTION_DOWN to KeyEvent.KEYCODE_K, KeyEvent.ACTION_UP to KeyEvent.KEYCODE_K)
-        val j = listOf(KeyEvent.ACTION_DOWN to KeyEvent.KEYCODE_J, KeyEvent.ACTION_UP to KeyEvent.KEYCODE_J)
-        val l = listOf(KeyEvent.ACTION_DOWN to KeyEvent.KEYCODE_L, KeyEvent.ACTION_UP to KeyEvent.KEYCODE_L)
-        assertEquals(k, sent(KeyEvent.KEYCODE_DPAD_CENTER))
-        assertEquals("YouTube's page sees a keyboard's k, whatever remote sent it", 'k'.code, player.keys.first().unicodeChar)
-        assertEquals(k, sent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
-        assertEquals(j, sent(KeyEvent.KEYCODE_DPAD_LEFT))
-        assertEquals(j, sent(KeyEvent.KEYCODE_MEDIA_REWIND))
-        assertEquals(l, sent(KeyEvent.KEYCODE_DPAD_RIGHT))
-        assertEquals(l, sent(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD))
-        assertEquals("Up is swallowed", emptyList<Pair<Int, Int>>(), sent(KeyEvent.KEYCODE_DPAD_UP))
-        assertEquals("Down is swallowed", emptyList<Pair<Int, Int>>(), sent(KeyEvent.KEYCODE_DPAD_DOWN))
-        assertEquals("Pause does nothing before it plays", emptyList<Pair<Int, Int>>(), sent(KeyEvent.KEYCODE_MEDIA_PAUSE))
-        post(TrailerEvent.STATE, official.key, TrailerState.PLAYING)
-        assertEquals(k, sent(KeyEvent.KEYCODE_MEDIA_PAUSE))
-        assertEquals("Play does nothing while it plays", emptyList<Pair<Int, Int>>(), sent(KeyEvent.KEYCODE_MEDIA_PLAY))
-
-        player.keys.clear()
-        press(KeyEvent.KEYCODE_BACK)
-        assertEquals("Back is ours", 1, backs)
-        assertTrue("and never the player's", player.keys.isEmpty())
-    }
-
-    @Test
-    fun `with YouTube's IFrame API, the WebView never takes the focus and keys call the player`() {
-        open(TrailerRemote.Api)
-        post(TrailerEvent.READY, official.key)
+    fun `the remote drives YouTube's player through its IFrame API, and the WebView never takes the focus`() {
+        playing()
         assertFalse(player.isFocusable)
         assertEquals("the WebView is never asked to take the focus", 0, player.focusAsked)
-        assertTrue("the screen has it", player.scripts.none { it == "focusPlayer()" })
 
         val called = { code: Int -> player.scripts.clear(); press(code); player.scripts.toList() }
-        assertEquals(listOf("toggleTrailer()"), called(KeyEvent.KEYCODE_DPAD_CENTER))
-        assertEquals(listOf("toggleTrailer()"), called(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
         assertEquals(listOf("playTrailer()"), called(KeyEvent.KEYCODE_MEDIA_PLAY))
-        assertEquals(listOf("pauseTrailer()"), called(KeyEvent.KEYCODE_MEDIA_PAUSE))
         assertEquals(listOf("seekBy(-10)"), called(KeyEvent.KEYCODE_DPAD_LEFT))
         assertEquals(listOf("seekBy(-10)"), called(KeyEvent.KEYCODE_MEDIA_REWIND))
         assertEquals(listOf("seekBy(10)"), called(KeyEvent.KEYCODE_DPAD_RIGHT))
         assertEquals(listOf("seekBy(10)"), called(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD))
         assertEquals(emptyList<String>(), called(KeyEvent.KEYCODE_DPAD_UP))
         assertEquals(emptyList<String>(), called(KeyEvent.KEYCODE_DPAD_DOWN))
+        assertEquals(listOf("toggleTrailer()"), called(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
+        assertEquals(listOf("pauseTrailer()"), called(KeyEvent.KEYCODE_MEDIA_PAUSE))
+        assertEquals(listOf("toggleTrailer()"), called(KeyEvent.KEYCODE_DPAD_CENTER))
         assertTrue("no key reaches the player", player.keys.isEmpty())
 
         press(KeyEvent.KEYCODE_BACK)
         assertEquals("Back is ours", 1, backs)
+    }
+
+    @Test
+    fun `paused, the player leaves the screen for ours, which says where the trailer is`() {
+        paused()
+        assertEquals("YouTube's player isn't on screen while paused", View.INVISIBLE, player.visibility)
+        assertTrue(shows("Official Trailer"))
+        assertTrue(shows("Dead Reckoning Bay"))
+        assertTrue(shows("Paused · 0:13 / 7:45"))
+        assertFalse(shows(TrailerText.PLAYS_FROM_YOUTUBE))
+        assertFalse("the TV may sleep while paused", anyKeepsScreenOn(compose.activity.window.decorView))
+    }
+
+    @Test
+    fun `Select on the pause screen shows the player first, then asks it to play`() {
+        paused()
+        player.scripts.clear()
+        player.shownAt.clear()
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertEquals(View.VISIBLE, player.visibility)
+        assertFalse("nothing of ours is drawn over it", anyText())
+        assertEquals("played only once shown", listOf("playTrailer()"), player.scripts)
+        assertEquals(true, player.shownAt["playTrailer()"])
+        post(TrailerEvent.STATE, official.key, TrailerState.PLAYING)
+        assertEquals(View.VISIBLE, player.visibility)
+
+        // Play and Play/Pause do the same from the pause screen.
+        for (code in listOf(KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {
+            post(TrailerEvent.STATE, official.key, TrailerState.PAUSED)
+            assertEquals(View.INVISIBLE, player.visibility)
+            player.scripts.clear()
+            press(code)
+            assertEquals(KeyEvent.keyCodeToString(code), View.VISIBLE, player.visibility)
+            assertEquals(listOf("playTrailer()"), player.scripts)
+        }
+    }
+
+    @Test
+    fun `jumps on the pause screen move its time and leave the trailer paused`() {
+        paused()
+        player.scripts.clear()
+        press(KeyEvent.KEYCODE_DPAD_LEFT)
+        assertEquals(listOf("seekBy(-10)"), player.scripts)
+        reply("seekBy(-10)", "[3.2,465.04]")
+        assertTrue(shows("Paused · 0:03 / 7:45"))
+        press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        reply("seekBy(10)", "[13.2,465.04]")
+        assertTrue(shows("Paused · 0:13 / 7:45"))
+        press(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)
+        reply("seekBy(10)", "[23.2,465.04]")
+        assertTrue(shows("Paused · 0:23 / 7:45"))
+        press(KeyEvent.KEYCODE_MEDIA_REWIND)
+        reply("seekBy(-10)", "[13.2,465.04]")
+        assertTrue(shows("Paused · 0:13 / 7:45"))
+        // YouTube may buffer while it seeks; the trailer stays paused, out of sight.
+        post(TrailerEvent.STATE, official.key, TrailerState.BUFFERING)
+        post(TrailerEvent.STATE, official.key, TrailerState.PAUSED)
+
+        player.scripts.clear()
+        for (code in listOf(KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN)) press(code)
+        assertEquals("Pause, Up and Down do nothing", emptyList<String>(), player.scripts)
+        assertEquals(View.INVISIBLE, player.visibility)
+        assertTrue(shows("Paused · 0:13 / 7:45"))
+
+        press(KeyEvent.KEYCODE_BACK)
+        assertEquals("Back leaves for the movie page", 1, backs)
+    }
+
+    @Test
+    fun `a paused trailer that plays some other way is shown, never heard unseen`() {
+        paused()
+        post(TrailerEvent.STATE, official.key, TrailerState.PLAYING)
+        assertEquals(View.VISIBLE, player.visibility)
+        assertFalse(anyText())
     }
 
     @Test
@@ -241,7 +315,10 @@ class TvTrailerScreenTest {
         compose.onNodeWithText(TrailerText.BACK_TO_MOVIE).assertExists()
 
         compose.onNodeWithText(TrailerText.OPEN_IN_YOUTUBE).performClick()
-        assertEquals(Uri.parse(official.watchUrl), shadowOf(compose.activity).nextStartedActivity.data)
+        val started = shadowOf(compose.activity).nextStartedActivity
+        assertEquals(Uri.parse(official.watchUrl), started.data)
+        assertTrue("full screen in the YouTube app", started.getBooleanExtra(EXTRA_FORCE_FULLSCREEN, false))
+        assertTrue("and back here when it ends", started.getBooleanExtra(EXTRA_FINISH_ON_ENDED, false))
         compose.onNodeWithText(TrailerText.BACK_TO_MOVIE).performClick()
         assertEquals(1, backs)
     }
@@ -292,7 +369,7 @@ class TvTrailerScreenTest {
     }
 
     @Test
-    fun `it keeps the TV awake while it plays, and pauses when the screen is hidden`() {
+    fun `it keeps the TV awake while it plays, pauses when the screen is hidden, and comes back paused`() {
         open()
         post(TrailerEvent.READY, official.key)
         assertFalse(anyKeepsScreenOn(compose.activity.window.decorView))
@@ -302,6 +379,13 @@ class TvTrailerScreenTest {
         compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
         assertTrue(player.scripts.contains("pauseTrailer()"))
         assertTrue(shadowOf(player).wasOnPauseCalled())
+        post(TrailerEvent.STATE, official.key, TrailerState.PAUSED)
+
+        player.scripts.clear()
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        compose.waitForIdle()
+        assertEquals("back on the pause screen", View.INVISIBLE, player.visibility)
+        assertFalse("it doesn't play by itself", player.scripts.contains("playTrailer()"))
     }
 
     @Test
@@ -309,7 +393,9 @@ class TvTrailerScreenTest {
         installYouTube()
         TrailerWebViews.factory = { throw AndroidRuntimeException("no WebView") }
         open()
-        assertEquals(Uri.parse(official.watchUrl), shadowOf(compose.activity).nextStartedActivity.data)
+        val started = shadowOf(compose.activity).nextStartedActivity
+        assertEquals(Uri.parse(official.watchUrl), started.data)
+        assertTrue(started.getBooleanExtra(EXTRA_FORCE_FULLSCREEN, false) && started.getBooleanExtra(EXTRA_FINISH_ON_ENDED, false))
         assertEquals(1, backs)
         assertFalse("the movie page hands off from now on", TrailerWebViews.installed())
     }

@@ -2,6 +2,7 @@ package media.watchmy.client.ui
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -41,8 +42,21 @@ class TrailerPageTest {
         assertTrue(page.contains("function playTrailer() {\n  if (player && player.playVideo) player.playVideo();"))
         assertTrue(page.contains("function pauseTrailer() {\n  if (player && player.pauseVideo) player.pauseVideo();"))
         assertTrue(page.contains("if (s === 1 || s === 3) player.pauseVideo(); else player.playVideo();"))
-        assertTrue(page.contains("player.seekTo(Math.max(0, player.getCurrentTime() + seconds), true);"))
-        assertTrue(page.contains("player.getIframe().focus();"))
+        assertTrue(page.contains("var t = Math.max(0, player.getCurrentTime() + seconds);"))
+        assertTrue("a jump stops short of the end", page.contains("if (d > 1) t = Math.min(t, d - 1);"))
+        assertTrue(page.contains("player.seekTo(t, true);\n  return [t, d];"))
+        assertTrue(page.contains("return [player.getCurrentTime(), player.getDuration()];"))
+        assertFalse("nothing gives YouTube's frame the keyboard", page.contains("getIframe"))
+    }
+
+    @Test
+    fun `the player's time comes back from the page in milliseconds`() {
+        assertEquals(13_200L to 465_040L, parseTrailerTime("[13.2,465.04]"))
+        assertEquals(0L to 0L, parseTrailerTime("[0, 0]"))
+        assertNull("before the player is ready", parseTrailerTime("null"))
+        assertNull(parseTrailerTime(null))
+        assertNull(parseTrailerTime("[1]"))
+        assertNull(parseTrailerTime("\"oops\""))
     }
 
     @Test
