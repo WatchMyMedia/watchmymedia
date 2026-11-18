@@ -55,6 +55,10 @@ class WorkflowIsolationTest(unittest.TestCase):
         # The Apple apps build on the image with the Xcode the App Store takes.
         hosted.update(dict.fromkeys(('apple', 'apple-tv'), 'xcode-27'))
         hosted.update(dict.fromkeys(('windows-server', 'windows-live-tv', 'windows-app', 'windows-signing'), 'windows-latest'))
+        # The Linux packages install in privileged systemd containers, which
+        # need a Linux Docker host: GitHub's, one for each architecture.
+        hosted['linux-packages'] = 'ubuntu-latest'
+        hosted['linux-packages-install'] = '${{ matrix.runner }}'
         self.assertEqual(set(hosted), set(jobs))
         studio = ['self-hosted', 'macOS', 'ARM64', 'mac-studio']
         # Exercise the actual runs-on expressions, not a second routing helper.
@@ -69,13 +73,18 @@ class WorkflowIsolationTest(unittest.TestCase):
         )
         for job, body in jobs.items():
             runner = re.search(r'(?m)^    runs-on: (.+)$', body).group(1)
+            if job == 'linux-packages-install':
+                # Its matrix names the runners; the test below reads them.
+                self.assertEqual(hosted[job], runner)
+                continue
             for event, private, head, ref, trusted in cases:
                 for visibility in (private, False):
                     context = {'github.event_name': event,
                                'github.event.repository.private': visibility,
                                'github.event.pull_request.head.repo.full_name': head,
                                'github.repository': 'owner/project', 'github.ref': ref}
-                    expected = studio if trusted and visibility and not job.startswith('windows') else hosted[job]
+                    expected = (studio if trusted and visibility and not job.startswith(('windows', 'linux-packages'))
+                                else hosted[job])
                     with self.subTest(job=job, event=event, private=visibility, head=head, ref=ref):
                         self.assertEqual(expected, evaluate_runner(runner, context))
 
@@ -89,7 +98,8 @@ class WorkflowIsolationTest(unittest.TestCase):
         gated = {'server': 'server', 'server-macos': 'server', 'server-race': 'race', 'contract': 'contract', 'web': 'web',
                  'docker': 'docker', 'scripts': 'scripts', 'android': 'android', 'apple': 'apple',
                  'apple-tv': 'apple-tv', 'windows-server': 'windows', 'windows-live-tv': 'windows',
-                 'windows-app': 'windows'}
+                 'windows-app': 'windows', 'linux-packages': 'linux-packages',
+                 'linux-packages-install': 'linux-packages'}
         self.assertEqual(set(gated) | {'changes', 'windows-signing'}, set(jobs))
         for job, output in gated.items():
             with self.subTest(job=job):
@@ -107,6 +117,73 @@ class WorkflowIsolationTest(unittest.TestCase):
                     self.assertIn("'.github/workflows/ci.yml'", block)
         # windows-app installs the web job's build, so web runs with it.
         self.assertIn("steps.filter.outputs.windows == 'true'", outputs['web'])
+
+    def test_linux_packages_install_on_every_supported_release_and_architecture(self):
+        # Supported means named and tested: each release the packages claim,
+        # on amd64 and arm64, installs the packages this run built. Nothing
+        # is published, and the throwaway key's secret half never leaves the
+        # job that made it.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        build, install = jobs['linux-packages'], jobs['linux-packages-install']
+        self.assertIn('        run: make linux-smoke-packages PATH="$PATH"\n', build)
+        self.assertIn("          WMM_LINUX_SMOKE: build/linux-smoke\n"
+                      "        run: python3 -I -m unittest discover -s deploy/linux -p '*_test.py' -v\n", build)
+        self.assertLess(build.index('make linux-smoke-packages'), build.index('WMM_LINUX_SMOKE'))
+        uploads = re.findall(r'(?m)^          name: (linux-packages-\S+)\n          path: \|\n((?:            .*\n)+)', build)
+        self.assertEqual(['linux-packages-deb-amd64', 'linux-packages-deb-arm64',
+                          'linux-packages-rpm-amd64', 'linux-packages-rpm-arm64'], [name for name, _ in uploads])
+        for name, paths in uploads:
+            with self.subTest(artifact=name):
+                self.assertEqual(['build/linux-smoke/older/', 'build/linux-smoke/current/', 'build/linux-smoke/key/public.asc'],
+                                 [re.sub(r'\*.*$', '', path.strip()) for path in paths.splitlines()])
+        for job in (build, install):
+            for marker in ('secret.asc', 'environment:', 'gh release', 'action-gh-release', 'wrangler', 'id-token'):
+                self.assertNotIn(marker, job)
+        self.assertIn("        image: ['debian:12', 'debian:13', 'ubuntu:24.04', 'ubuntu:26.04', 'fedora:44', 'fedora:45']\n", install)
+        self.assertIn('        arch: [amd64, arm64]\n', install)
+        self.assertIn('          - arch: amd64\n            runner: ubuntu-latest\n'
+                      '          - arch: arm64\n            runner: ubuntu-24.04-arm\n', install)
+        self.assertIn('      fail-fast: false\n', install)
+        self.assertIn("          name: linux-packages-${{ startsWith(matrix.image, 'fedora') && 'rpm' || 'deb' }}-${{ matrix.arch }}\n"
+                      "          path: build/linux-smoke\n", install)
+        self.assertIn('        run: deploy/linux/smoke.sh "${{ matrix.image }}"\n', install)
+        # The same six releases the smoke script and the make target name.
+        for path in ('deploy/linux/smoke.sh', 'deploy/linux/packages.mk'):
+            self.assertIn('debian:12, debian:13, ubuntu:24.04, ubuntu:26.04, fedora:44', (ROOT / path).read_text(), path)
+        self.assertIn('deploy/linux', jobs['scripts'])
+
+    def test_linux_package_jobs_run_only_for_what_the_packages_are_built_from(self):
+        # Thirteen jobs, so the list that starts them is deliberate: the
+        # packaging with its make targets, the files it packs from
+        # elsewhere, and how the server starts and finds its folders, config
+        # and ffmpeg, which the wrapper and the service rely on. A wider
+        # entry here (the root Makefile, all of server/ or web/) starts them
+        # for changes they do not test; the server, web and docker jobs
+        # cover what the packages hold of those.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        filters = workflow.split('filters: |', 1)[1]
+        block = re.search(r'(?m)^            linux-packages:\n((?:              - .*\n)+)', filters).group(1)
+        self.assertEqual(['deploy/linux/**', 'deploy/macos/fetch-ffmpeg.sh', 'deploy/macos/FFMPEG-LICENSE.md',
+                          'deploy/config.example.yaml', 'LICENSE', 'server/cmd/server/**',
+                          'server/internal/config/**', '.github/workflows/ci.yml'],
+                         re.findall(r"- '([^']+)'", block))
+        # Both jobs are started by that one list and nothing else.
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        for name in ('linux-packages', 'linux-packages-install'):
+            self.assertEqual(["needs.changes.outputs.linux-packages == 'true'"],
+                             re.findall(r"needs\.changes\.outputs\.[\w-]+ == 'true'", jobs[name]), name)
+        self.assertIn("      linux-packages: ${{ github.event_name == 'workflow_dispatch' || "
+                      "steps.filter.outputs.linux-packages == 'true' }}\n", jobs['changes'])
+        # What the list leaves out is still what the packages are built with:
+        # the Linux make targets are under deploy/linux, not in the root Makefile.
+        makefile = (ROOT / 'Makefile').read_text()
+        self.assertIn('deploy/linux/packages.mk', makefile)
+        for target in ('ffmpeg-linux', 'linux-packages', 'linux-smoke-packages', 'linux-packages-smoke'):
+            self.assertNotRegex(makefile, rf'(?m)^{target}:')
+            self.assertRegex((ROOT / 'deploy/linux/packages.mk').read_text(), rf'(?m)^{target}:')
 
     def test_windows_installer_embeds_the_web_build_from_the_same_run(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
@@ -331,7 +408,7 @@ class WorkflowIsolationTest(unittest.TestCase):
                                workflow.split('jobs:\n', 1)[1]))
         self.assertNotIn('actions/cache@', workflow)
         setups = re.findall(r'(?m)uses: actions/setup-go@[^\n]*\n        with:\n((?:          .*\n)+)', workflow)
-        self.assertEqual(8, len(setups))
+        self.assertEqual(9, len(setups))
         for setup in setups:
             self.assertIn('          cache: false\n', setup)
         save_if = ("if: \"!cancelled() && runner.environment == 'github-hosted' && "
@@ -388,7 +465,7 @@ class WorkflowIsolationTest(unittest.TestCase):
     def test_tools_and_android_sdk_use_runner_owned_directories(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         pnpm = re.findall(r'(?ms)- uses: pnpm/action-setup@[^\n]+\n(.*?)(?=      -)', workflow)
-        self.assertEqual(2, len(pnpm))
+        self.assertEqual(3, len(pnpm))
         for setup in pnpm:
             self.assertIn('dest: ${{ runner.temp }}/setup-pnpm', setup)
         android = re.search(r'(?ms)^  android:\n(.*?)(?=^  apple:)', workflow).group(1)

@@ -45,7 +45,7 @@ WatchMyMedia are the audience for `CHANGELOG.md` and the README.
 | `apple/` | iPhone, iPad and Apple TV apps and the `Kit` package; layout and conventions in [apple/README.md](apple/README.md) |
 | `windows/` | Native Go/Win32 tray app; built by `make windows-app` (development installer; signing pending) |
 | `macos/` | The menu bar app (SwiftPM, Sparkle); built by `macos/build-app.sh` |
-| `deploy/` | Dockerfile and compose files, the Unraid template, the fixture library, CI support |
+| `deploy/` | Dockerfile and compose files, the Unraid template, the Debian, Ubuntu and Fedora packages (`deploy/linux/`), the fixture library, CI support |
 | `brand/export/` | The icons and logos the Mac, Windows and Samsung builds read. Generated; don't edit |
 | `Makefile` | `make help` lists every target |
 
@@ -175,7 +175,9 @@ Run the checks for the surfaces you touched before handing work back. CI
 (`.github/workflows/ci.yml`) runs the same ones on GitHub-hosted runners.
 Each job runs only when what it builds or tests changed: the `changes` job's
 path filters in `ci.yml` decide (the server jobs for `server/`, the apps for
-their folder and `api/`, `scripts` for `deploy/`, the workflows and the docs),
+their folder and `api/`, `scripts` for `deploy/`, the workflows and the docs,
+the Linux package jobs for `deploy/linux/` and the server's start-up and
+configuration),
 and a change to `ci.yml` or a manual run runs everything. When a new job or
 input is added, give it a filter; `deploy/ci/security_test.py` checks every
 job has one. The `server` job runs every Go test, the lint and the
@@ -212,6 +214,7 @@ is encrypted with `GRADLE_ENCRYPTION_KEY`, the only secret `ci.yml` may read
 | Release scripts or `release.yml` | `python3 -I -m unittest discover -s deploy/release -p '*_test.py'` and `python3 -I -m unittest discover -s deploy/ci -p '*_test.py'` |
 | `AGENTS.md`, `CLAUDE.md`, or paths and targets they name | `make agents-check` |
 | Dockerfile | `make docker` |
+| Linux packages (`deploy/linux/`), `deploy/config.example.yaml`, or how the server starts and finds its folders, config and ffmpeg | `python3 -I -m unittest discover -s deploy/linux -p '*_test.py'`, then `make linux-smoke-packages` and `make linux-packages-smoke` ([deploy/AGENTS.md](deploy/AGENTS.md)) |
 | A screen or flow | run it: the web app in a browser, the apps on an emulator or simulator, on the fakes and against a fixture server |
 
 Gaps the usual checks miss:

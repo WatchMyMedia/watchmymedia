@@ -1,0 +1,191 @@
+# The WatchMyMedia server as a .deb (Debian, Ubuntu) and an .rpm (Fedora), for
+# amd64 and arm64, all four from this file. build.py runs nfpm in this folder
+# once per package with these set:
+#
+#   WMM_VERSION      the package's version, from the release tag
+#   WMM_ARCH         amd64 or arm64 (nfpm writes x86_64 and aarch64 in an .rpm)
+#   WMM_SERVER       the server binary for that architecture
+#   WMM_FFMPEG       the folder with the pinned ffmpeg, ffprobe and VERSION
+#   WMM_STAGE        the files build.py writes for this package: the wrapper
+#                    with deb or rpm in it, config.yaml, the repository's key
+#   WMM_SIGNING_KEY  the OpenPGP secret key that signs the .rpm; empty leaves
+#                    it unsigned
+#   WMM_SIGNING_KEY_ID  the id of the subkey to sign with. The key has two
+#                    signing subkeys, one for the .rpm files and one for the
+#                    repositories' lists, and without an id nfpm takes the last
+#
+# nfpm writes v1.7.0 as 1.7.0 and v1.7.0-rc.1 as 1.7.0~rc.1 in both formats.
+name: watchmymedia
+arch: ${WMM_ARCH}
+platform: linux
+version: ${WMM_VERSION}
+section: video
+priority: optional
+maintainer: Eldwick Software <eldwicksoftware@gmail.com>
+vendor: Eldwick Software
+homepage: https://watchmy.media
+license: AGPL-3.0-only
+description: |-
+  Media server for your movies, TV shows, live TV and recordings
+  WatchMyMedia scans Movies and TV folders, matches them on TMDB and streams
+  them to browsers, phones, tablets and TVs. With an HDHomeRun tuner it also
+  plays and records live TV. This package runs the server as a systemd
+  service and includes the ffmpeg it uses.
+
+scripts:
+  preinstall: scripts/preinstall.sh
+  postinstall: scripts/postinstall.sh
+  preremove: scripts/preremove.sh
+  postremove: scripts/postremove.sh
+
+overrides:
+  deb:
+    # The bundled ffmpeg is built for glibc 2.28 or later. It loads the GPU
+    # libraries from the system when it runs, so they are only recommended.
+    # acl has setfacl, which the web gives as the command that lets the
+    # service's user read a library folder; it is not on every install.
+    depends:
+      - libc6 (>= 2.28)
+    recommends:
+      - libva2
+      - libva-drm2
+      - libdrm2
+      - acl
+  rpm:
+    depends:
+      - glibc >= 2.28
+    recommends:
+      - libva
+      - libdrm
+      - acl
+
+# zstd at level 19, which dpkg has read since 1.21.18 (Debian 12 has 1.21.22)
+# and rpm since 4.14. Measured on 2026-11-18: the amd64 .deb is 78 MB in 9 s,
+# where xz gave 79 MB in 36 s (arm64: 76 MB in 9 s against 70 MB in 75 s);
+# gzip gave 87 MB or more. ffmpeg and ffprobe are most of it.
+deb:
+  compression: zstd:19
+
+rpm:
+  summary: Media server for your movies, TV shows, live TV and recordings
+  group: Applications/Multimedia
+  compression: zstd:19
+  signature:
+    key_file: ${WMM_SIGNING_KEY}
+    key_id: ${WMM_SIGNING_KEY_ID}
+
+contents:
+  # The server, with the pinned ffmpeg beside it: the server looks for
+  # ffmpeg next to its own binary first, so it never runs the distribution's.
+  - dst: /usr/lib/watchmymedia
+    type: dir
+    file_info:
+      mode: 0755
+  - src: ${WMM_SERVER}
+    dst: /usr/lib/watchmymedia/watchmymedia
+    expand: true
+    file_info:
+      mode: 0755
+  - src: ${WMM_FFMPEG}/ffmpeg
+    dst: /usr/lib/watchmymedia/ffmpeg
+    expand: true
+    file_info:
+      mode: 0755
+  - src: ${WMM_FFMPEG}/ffprobe
+    dst: /usr/lib/watchmymedia/ffprobe
+    expand: true
+    file_info:
+      mode: 0755
+  - src: ${WMM_FFMPEG}/VERSION
+    dst: /usr/lib/watchmymedia/VERSION
+    expand: true
+    file_info:
+      mode: 0644
+
+  # A few lines of shell that set the folders below and which package this
+  # is, then run the server.
+  - src: ${WMM_STAGE}/watchmymedia
+    dst: /usr/bin/watchmymedia
+    expand: true
+    file_info:
+      mode: 0755
+
+  - src: watchmymedia.service
+    dst: /usr/lib/systemd/system/watchmymedia.service
+    file_info:
+      mode: 0644
+  - src: sysusers.conf
+    dst: /usr/lib/sysusers.d/watchmymedia.conf
+    file_info:
+      mode: 0644
+
+  # deploy/config.example.yaml with every option commented out. It can hold
+  # keys, so only root and the service read it. An update keeps it.
+  - dst: /etc/watchmymedia
+    type: dir
+    file_info:
+      mode: 0755
+  - src: ${WMM_STAGE}/config.yaml
+    dst: /etc/watchmymedia/config.yaml
+    type: config|noreplace
+    expand: true
+    file_info:
+      mode: 0640
+      group: watchmymedia
+
+  # Neither firewall is changed: these only name the port, for
+  # `firewall-cmd --add-service=watchmymedia` and `ufw allow WatchMyMedia`.
+  - src: firewalld.xml
+    dst: /usr/lib/firewalld/services/watchmymedia.xml
+    file_info:
+      mode: 0644
+  - src: ufw.profile
+    dst: /etc/ufw/applications.d/watchmymedia
+    type: config
+    packager: deb
+    file_info:
+      mode: 0644
+
+  - dst: /usr/share/doc/watchmymedia
+    type: dir
+    file_info:
+      mode: 0755
+  # Plain files: nfpm 2.49 leaves a `type: license` file out of a .deb.
+  - src: ../../LICENSE
+    dst: /usr/share/doc/watchmymedia/LICENSE
+    file_info:
+      mode: 0644
+  - src: ../macos/FFMPEG-LICENSE.md
+    dst: /usr/share/doc/watchmymedia/FFMPEG-LICENSE.md
+    file_info:
+      mode: 0644
+
+  # repository: begin
+  # The package's own repository entry and the key that signs the
+  # repository, so that installing one file also sets up updates. build.py
+  # leaves this block out of a build that is given no key.
+  - src: watchmymedia.sources
+    dst: /etc/apt/sources.list.d/watchmymedia.sources
+    type: config|noreplace
+    packager: deb
+    file_info:
+      mode: 0644
+  - src: ${WMM_STAGE}/watchmymedia-archive-keyring.gpg
+    dst: /usr/share/keyrings/watchmymedia-archive-keyring.gpg
+    packager: deb
+    expand: true
+    file_info:
+      mode: 0644
+  - src: watchmymedia.repo
+    dst: /etc/yum.repos.d/watchmymedia.repo
+    type: config|noreplace
+    packager: rpm
+    file_info:
+      mode: 0644
+  - src: ${WMM_STAGE}/RPM-GPG-KEY-watchmymedia
+    dst: /etc/pki/rpm-gpg/RPM-GPG-KEY-watchmymedia
+    packager: rpm
+    expand: true
+    file_info:
+      mode: 0644
+  # repository: end

@@ -1,0 +1,25 @@
+[Unit]
+Description=WatchMyMedia server
+After=network-online.target remote-fs.target
+Wants=network-online.target
+
+[Service]
+User=watchmymedia
+Group=watchmymedia
+ExecStart=/usr/bin/watchmymedia
+StateDirectory=watchmymedia
+StateDirectoryMode=0750
+CacheDirectory=watchmymedia
+CacheDirectoryMode=0750
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

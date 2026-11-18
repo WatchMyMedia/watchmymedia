@@ -46,7 +46,8 @@ def guidance_files():
 
 def make_targets():
     targets = set(UNPUBLISHED_TARGETS) if PUBLIC_COPY else set()
-    for name in ("Makefile", "Makefile.private"):
+    # deploy/linux/packages.mk holds the Linux package targets; the Makefile includes it.
+    for name in ("Makefile", "Makefile.private", "deploy/linux/packages.mk"):
         path = os.path.join(ROOT, name)
         if os.path.exists(path):
             with open(path) as f:

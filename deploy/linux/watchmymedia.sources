@@ -1,0 +1,9 @@
+# WatchMyMedia's apt repository, added by the watchmymedia package so that
+# updates arrive with the system's other updates.
+# To stop using it, add a line "Enabled: no" below; updates keep the change.
+Types: deb
+URIs: https://downloads.watchmy.media/apt
+Suites: stable
+Components: main
+Architectures: amd64 arm64
+Signed-By: /usr/share/keyrings/watchmymedia-archive-keyring.gpg

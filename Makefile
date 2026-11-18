@@ -240,7 +240,7 @@ macos-dmg: build-universal ffmpeg-macos ## Universal app, signed and notarised w
 	UNIVERSAL=1 VERSION=$(VERSION) macos/build-app.sh
 	VERSION=$(VERSION) macos/make-dmg.sh
 
-release: web ffmpeg-macos ffmpeg-windows ## Cross-compile binaries for every platform into dist/ (macOS tarballs and the Windows zip include ffmpeg)
+release: web ffmpeg-macos ffmpeg-linux ffmpeg-windows ## Cross-compile binaries for every platform into dist/ (every archive includes ffmpeg)
 	rm -rf dist && mkdir -p dist
 	@for p in $(PLATFORMS); do \
 	  os=$${p%/*}; arch=$${p#*/}; ext=""; [ "$$os" = windows ] && ext=".exe"; \
@@ -249,10 +249,16 @@ release: web ffmpeg-macos ffmpeg-windows ## Cross-compile binaries for every pla
 	  (cd server && CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags="$(LDFLAGS)" -o ../$$out$$ext ./cmd/server) || exit 1; \
 	  if [ "$$os" = windows ]; then (cd dist && zip -q $$(basename $$out).zip $$(basename $$out)$$ext && rm $$(basename $$out)$$ext) && \
 	    zip -q -j $$out.zip build/ffmpeg/windows-$$arch/ffmpeg.exe build/ffmpeg/windows-$$arch/ffprobe.exe build/ffmpeg/windows-$$arch/VERSION deploy/macos/FFMPEG-LICENSE.md; \
-	  elif [ "$$os" = darwin ]; then tar -czf $$out.tar.gz -C dist $$(basename $$out) -C ../build/ffmpeg/darwin-$$arch ffmpeg ffprobe VERSION -C ../../../deploy/macos FFMPEG-LICENSE.md && rm $$out; \
-	  else tar -C dist -czf $$out.tar.gz $$(basename $$out) && rm $$out; fi; \
+	  else tar -czf $$out.tar.gz -C dist $$(basename $$out) -C ../build/ffmpeg/$$os-$$arch ffmpeg ffprobe VERSION -C ../../../deploy/macos FFMPEG-LICENSE.md && rm $$out; fi; \
 	done
 	@ls -la dist
+
+# The server's Debian, Ubuntu and Fedora packages: ffmpeg-linux, linux-packages,
+# linux-smoke-packages and linux-packages-smoke are in deploy/linux/packages.mk,
+# so that CI's Linux package jobs run for a change to them and not for a change
+# to anything else here. The file is named from this Makefile's own folder:
+# make would otherwise look for it where it was started.
+include $(dir $(abspath $(firstword $(MAKEFILE_LIST))))deploy/linux/packages.mk
 
 # VERSION must be given here: its default, git describe, is never a new tag.
 release-tag: ## Tag origin/main as a release and push it, which starts release.yml (VERSION=vX.Y.Z[-rc.N])

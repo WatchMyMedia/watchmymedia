@@ -41,6 +41,7 @@ jobs:
       # The windows job installs the web build this job makes.
       web: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.web == 'true' || steps.filter.outputs.windows == 'true' }}
       docker: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.docker == 'true' }}
+      linux-packages: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.linux-packages == 'true' }}
       scripts: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.scripts == 'true' }}
       android: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.android == 'true' }}
       windows: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.windows == 'true' }}
@@ -84,6 +85,24 @@ jobs:
               - 'deploy/ci/prepare-docker.py'
               - 'server/**'
               - 'web/**'
+              - '.github/workflows/ci.yml'
+            # The Linux package jobs (thirteen of them) run only when what
+            # they test changed, and this list is that on purpose: the
+            # packaging and its make targets (deploy/linux), the files it
+            # packs from elsewhere, and the two parts of the server the
+            # wrapper and the service rely on, how it starts and where it
+            # looks for its folders, its config and ffmpeg. Not the root
+            # Makefile, and not the rest of server/ or web/: the server, web
+            # and docker jobs cover what the packages hold of those.
+            # deploy/ci/security_test.py holds the list to this.
+            linux-packages:
+              - 'deploy/linux/**'
+              - 'deploy/macos/fetch-ffmpeg.sh'
+              - 'deploy/macos/FFMPEG-LICENSE.md'
+              - 'deploy/config.example.yaml'
+              - 'LICENSE'
+              - 'server/cmd/server/**'
+              - 'server/internal/config/**'
               - '.github/workflows/ci.yml'
             scripts:
               - 'deploy/**'
@@ -477,6 +496,7 @@ jobs:
           python3 -I -m unittest discover -s deploy/ci -p '*_test.py'
           python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'
           python3 -I -m unittest discover -s deploy/fixture -p '*_test.py'
+          python3 -I -m unittest discover -s deploy/linux -p '*_test.py'
       - name: Check the guidance's paths and make targets
         run: python3 -I deploy/ci/check-agent-docs.py
 
@@ -549,6 +569,118 @@ jobs:
             ${{ steps.go-cache.outputs.build }}
             ${{ steps.go-cache.outputs.modules }}
           key: ${{ steps.go-cache.outputs.key }}
+
+  # The server's packages for Debian, Ubuntu and Fedora (deploy/linux): a
+  # .deb and an .rpm for amd64 and arm64, built as `make linux-packages`
+  # builds them, twice: an older set to update from and a current one. Each
+  # is made as a release will be, with the repositories' public key and its
+  # repository entry, and the .rpm signed by a signing subkey: here a
+  # throwaway key's, made in this job, since the real one is only in a
+  # release. The test of their contents then reads all eight. Nothing is
+  # published; the packages are kept a day for the installs below. On
+  # GitHub's Linux runners only: the installs need a Linux Docker host that
+  # runs privileged containers.
+  linux-packages:
+    needs: changes
+    if: needs.changes.outputs.linux-packages == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 9
+          dest: ${{ runner.temp }}/setup-pnpm
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
+          cache-dependency-path: web/pnpm-lock.yaml
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+          cache: false
+      # PATH is passed so make uses the Go and pnpm set up above.
+      - name: Build an older and a current set of packages
+        run: make linux-smoke-packages PATH="$PATH"
+      - name: Check what is in the packages
+        env:
+          WMM_LINUX_SMOKE: build/linux-smoke
+        run: python3 -I -m unittest discover -s deploy/linux -p '*_test.py' -v
+      # One artifact for each format and architecture, so an install job
+      # downloads only its own three files. The throwaway key's public half
+      # goes with them; its other half stays on this machine.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-packages-deb-amd64
+          path: |
+            build/linux-smoke/older/*_amd64.deb
+            build/linux-smoke/current/*_amd64.deb
+            build/linux-smoke/key/public.asc
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-packages-deb-arm64
+          path: |
+            build/linux-smoke/older/*_arm64.deb
+            build/linux-smoke/current/*_arm64.deb
+            build/linux-smoke/key/public.asc
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-packages-rpm-amd64
+          path: |
+            build/linux-smoke/older/*.x86_64.rpm
+            build/linux-smoke/current/*.x86_64.rpm
+            build/linux-smoke/key/public.asc
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-packages-rpm-arm64
+          path: |
+            build/linux-smoke/older/*.aarch64.rpm
+            build/linux-smoke/current/*.aarch64.rpm
+            build/linux-smoke/key/public.asc
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  # Each supported release, on both architectures, in a container that runs
+  # systemd as a machine does (deploy/linux/smoke.sh): install the older
+  # package, update to the current one, remove it, install it again and
+  # purge it, checking the service, its user and groups, the bundled ffmpeg
+  # and that the data and the config are kept; on Fedora also that rpm
+  # accepts the signature once the key is imported. A container shows
+  # nothing of SELinux, a firewall, discovery on a network or a GPU.
+  linux-packages-install:
+    needs: [changes, linux-packages]
+    if: needs.changes.outputs.linux-packages == 'true'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['debian:12', 'debian:13', 'ubuntu:24.04', 'ubuntu:26.04', 'fedora:44', 'fedora:45']
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-packages-${{ startsWith(matrix.image, 'fedora') && 'rpm' || 'deb' }}-${{ matrix.arch }}
+          path: build/linux-smoke
+      - name: Install, update and remove
+        run: deploy/linux/smoke.sh "${{ matrix.image }}"
 
   docker:
     runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}

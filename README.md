@@ -150,11 +150,74 @@ of existing `/config` and `/transcode` contents on the next start.
 
 **Native binary (recommended on macOS).** Download `watchmymedia-<version>-<os>-<arch>` from
 a release (or `make release`), unpack it, and run
-`WATCHMYMEDIA_DATA_DIR=~/watchmymedia ./watchmymedia`. The macOS tarballs and Windows x64 ZIP include
+`WATCHMYMEDIA_DATA_DIR=~/watchmymedia ./watchmymedia`. Every archive includes
 FFmpeg and FFprobe ([jellyfin-ffmpeg](https://github.com/jellyfin/jellyfin-ffmpeg),
 GPL; see `FFMPEG-LICENSE.md` inside), which the server finds next to its own binary.
-The Mac build includes VideoToolbox, libass and zimg. Linux binaries need FFmpeg on
-`PATH`, or `ffmpeg.ffmpeg` / `WATCHMYMEDIA_FFMPEG_PATH` pointing at one.
+The Mac build includes VideoToolbox, libass and zimg. The Linux build needs only glibc 2.28
+or later; for hardware transcoding it loads the system's VA-API, oneVPL and NVIDIA libraries,
+so the GPU's driver comes from the distribution. The Linux archives of 1.6.1 and earlier hold
+only the server: they need FFmpeg on `PATH`, or `ffmpeg.ffmpeg` / `WATCHMYMEDIA_FFMPEG_PATH`
+pointing at one.
+
+**Debian, Ubuntu and Fedora packages (not published yet).** `make linux-packages` builds a
+`.deb` for Debian 13 and 12 and Ubuntu 26.04 and 24.04, and an `.rpm` for Fedora 45 and 44,
+each for amd64 and arm64, into `build/linux-packages/`. Install one with
+`sudo apt install ./watchmymedia_<version>_<arch>.deb` or
+`sudo dnf install ./watchmymedia-<version>-1.<arch>.rpm`. Fedora 45's `rpm -i` refuses a
+package that is not signed; `dnf` installs it with a warning.
+
+- **What it installs.** The server and the same FFmpeg in `/usr/lib/watchmymedia`, and a
+  systemd service, `watchmymedia`, that runs it as its own `watchmymedia` user and starts
+  with the machine. That user is in the `render` and `video` groups, so a GPU needs no
+  `usermod`. Setup is in a browser, at port 27587. Where systemd is not running, as in a
+  container, the install starts nothing.
+- **Where things are.** Data (the database, artwork, backups) in `/var/lib/watchmymedia`,
+  the playback cache in `/var/cache/watchmymedia`, settings in
+  `/etc/watchmymedia/config.yaml`, logs in the journal (`journalctl -u watchmymedia`). The
+  settings file has every option commented out and only root and the service can read it;
+  restart the service after changing it (`sudo systemctl restart watchmymedia`). The two
+  folders are set by the service, not that file: change them with
+  `sudo systemctl edit watchmymedia` (`Environment=WATCHMYMEDIA_DATA_DIR=…`). Both are
+  closed to other users of the machine (mode 750), since the database holds password hashes
+  and the cache what people are watching. A command at a prompt uses the same folders and
+  so runs as the service's user: `sudo -u watchmymedia watchmymedia backup`.
+- **Your library folders** must be readable by the `watchmymedia` user, which a package
+  cannot arrange: home folders and drives a desktop mounts are closed to other users. The
+  web names the folder it cannot read and gives the command,
+  `sudo setfacl -R -m u:watchmymedia:rX <folder>`; the packages recommend `acl`, which has
+  `setfacl`. Folders above it, such as a home folder, have to let that user through too.
+- **The firewall** is left alone. Where one is on, open the port with
+  `sudo firewall-cmd --permanent --add-service=watchmymedia && sudo firewall-cmd --reload`
+  (firewalld) or `sudo ufw allow WatchMyMedia` (ufw).
+- **Updating and removing.** Installing a newer file updates it and restarts the service if
+  it was running. `apt remove` and `dnf remove` stop the service and keep
+  `/var/lib/watchmymedia` and your settings: apt leaves the settings file where it is, and
+  dnf keeps one you changed as `config.yaml.rpmsave`, which the next install puts back.
+  `apt purge` also removes the settings and the cache, and says the data is still there;
+  `dnf remove` clears the cache.
+- **GPUs.** The driver comes from the distribution. On Debian and Ubuntu that is
+  `mesa-va-drivers` for AMD (`mesa-libgallium` on Ubuntu 26.04) and `intel-media-va-driver`
+  or `intel-media-va-driver-non-free` for Intel. Fedora builds its own Mesa and Intel drivers
+  without H.264 and HEVC; RPM Fusion's `mesa-va-drivers-freeworld` and `intel-media-driver`
+  have them. All of this is read from the packages: nothing has run on a GPU on Linux yet.
+  Without a driver that works, the server transcodes in software, and Settings › Transcoding
+  shows which encoder it found.
+- **Not there yet.** The packages are not on a release or on
+  <https://downloads.watchmy.media>. Each carries its repository entry and the public key
+  the repositories will be signed with ([deploy/linux/repository-key.asc](deploy/linux/repository-key.asc)),
+  but the apt and dnf repositories that will deliver updates do not exist yet. Until they do,
+  a machine with a package installed gets an error for that entry from `apt update` (its
+  other lists still update), and a 404 notice from `dnf`, which carries on.
+  `make linux-packages LINUX_REPOSITORY_KEY=` builds packages without the entry.
+
+Developers: [deploy/linux](deploy/linux) holds the one [nfpm](https://nfpm.goreleaser.com/)
+file both formats are built from, what it packs and the make targets. `make
+linux-smoke-packages` builds an older and a current set, signed by a throwaway key (it needs
+`gpg`; the real signing key is only ever in a release), and
+`make linux-packages-smoke IMAGE=debian:13` installs, updates, removes and purges them in a
+container that runs systemd (it needs Docker; `IMAGE` is any of `debian:12`, `debian:13`,
+`ubuntu:24.04`, `ubuntu:26.04`, `fedora:44` and `fedora:45`). CI does the same on all six, on
+amd64 and arm64.
 
 **macOS app.** Download the DMG from <https://watchmy.media/download> and drag the app to
 Applications. It is a menu bar item that runs the server from inside the app bundle with

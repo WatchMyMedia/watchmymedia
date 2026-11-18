@@ -26,6 +26,11 @@ it covers releases, the downloads Worker and the CI runners.
 | `arr/seerr.compose.yaml`, `arr/seerr-setup.sh` | A throwaway Seerr and the Jellyfin it needs, pinned, and the script that finishes their setup and prints Seerr's API key; `go test ./internal/integrations/seerr -run Live` runs against it |
 | `windows/fetch-winsparkle.sh` | The pinned official Windows updater DLL and licence files |
 | `macos/fetch-ffmpeg.sh` | The pinned jellyfin-ffmpeg builds the releases and CI use, with checksums |
+| `linux/nfpm.yaml`, `linux/build.py`, `linux/fetch-nfpm.sh`, `linux/packages.mk` | The Debian, Ubuntu and Fedora packages (`make linux-packages`): one nfpm file for the `.deb` and the `.rpm`, amd64 and arm64; `build.py` writes what differs per package (the `/usr/bin` wrapper's `deb` or `rpm`, the commented-out `config.yaml`, the repository's key) and runs the nfpm that `fetch-nfpm.sh` pins by version and checksum; `packages.mk` holds the make targets, which the root `Makefile` includes |
+| `linux/repository-key.asc` | The public half of the OpenPGP key that signs the `.rpm` files and the apt and dnf repositories. Every package carries it. Its secret parts are the user's and are never in the repository |
+| `linux/watchmymedia.service`, `linux/watchmymedia.sh`, `linux/sysusers.conf`, `linux/scripts/`, `linux/firewalld.xml`, `linux/ufw.profile`, `linux/watchmymedia.sources`, `linux/watchmymedia.repo` | What the packages install: the systemd service, the wrapper that sets the folders, the `watchmymedia` user, the install, update and remove scripts (one set for dpkg and rpm), the firewall definitions, and the apt and dnf repository entries |
+| `linux/package_test.py` | Builds packages from stand-in files and reads them without dpkg or rpm: paths, modes, config files, scripts, the repository entry, versions. With `WMM_LINUX_SMOKE` set it also reads the packages `make linux-smoke-packages` built |
+| `linux/smoke.sh`, `linux/smoke-check.sh`, `linux/throwaway-key.sh` | `make linux-packages-smoke`: installs, updates, removes and purges the packages in a container of one release that runs systemd; the key script makes the throwaway key the test packages are signed with |
 
 ## Checks
 
@@ -34,9 +39,17 @@ python3 -I -m unittest discover -s deploy/release -p '*_test.py'
 python3 -I -m unittest discover -s deploy/ci -p '*_test.py'
 python3 -I -m unittest discover -s deploy/fixture -p '*_test.py'
 python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'   # the Unraid template
+python3 -I -m unittest discover -s deploy/linux -p '*_test.py'    # the Linux packages, from stand-in files
 make docker      # when the Dockerfile, entrypoint or .dockerignore change
 make docker-smoke  # then this, against the image make docker built
+make linux-smoke-packages  # when deploy/linux, config.example.yaml or how the server starts change (needs gpg)
+make linux-packages-smoke IMAGE=debian:13  # then this for each release: also debian:12, ubuntu:24.04, ubuntu:26.04, fedora:44, fedora:45
 ```
+
+The Linux package test reads a `.deb`'s files with Python 3.14 or the `zstd`
+command; with neither it skips those checks and says so. The smoke test
+needs Docker and runs this machine's architecture; CI's
+`linux-packages-install` job runs it on amd64 and arm64.
 
 ## How a release goes
 
@@ -84,3 +97,71 @@ is 1.M.P, `v1.0.0` is 1.6.0, and from `v1.3.0` `v1.M.P` is 1.(M + 4).P.
 - **Fixture.** Synthetic media only, rendered by ffmpeg, with made-up titles:
   no real files and nothing under copyright. Its accounts are for fixture
   servers only.
+- **Linux packages.** Built and tested in CI, and nothing more yet: they are
+  not on a release, signed with a real key or published. What to keep:
+  - One `linux/nfpm.yaml` for both formats and both architectures. A file for one
+    format takes `packager: deb` or `rpm`. nfpm 2.49 leaves a
+    `type: license` file out of a `.deb`, so the licences are plain files.
+  - The four scripts run under dpkg and rpm, which pass different words:
+    `install`, `upgrade`, `configure`, `remove` and `purge` from dpkg, and a
+    count from rpm (1 install, 2 update; 0 removal, 1 update). A new branch
+    needs both.
+  - dpkg runs the scripts with dash, which stops a script at a failed
+    redirection on a builtin whatever follows it: `: > file || true` ends
+    the install where the file cannot be written. Use a command
+    (`touch file 2>/dev/null || true`); the package test refuses the other.
+    macOS's `sh` does not behave this way, so only Linux shows it.
+  - Nothing starts where systemd is not running, the scripts never open a
+    firewall or change SELinux, and the package owns neither
+    `/var/lib/watchmymedia` nor `/var/cache/watchmymedia`, so removing it
+    keeps the library. `linux/package_test.py` and the smoke test check
+    these.
+  - The account is written twice, in `linux/sysusers.conf` and in
+    `linux/scripts/preinstall.sh`, which runs before the package unpacks.
+    Change both.
+  - The service closes `/var/lib/watchmymedia` and
+    `/var/cache/watchmymedia` to other local users (mode 750): the database
+    holds password hashes and the cache what people are watching. It sets
+    no `UMask`, on purpose: what the server writes into library folders
+    (recordings, subtitles, trailers) has to stay readable by whoever
+    shares those folders. systemd applies the mode each time the service
+    starts, so an update closes folders an earlier package left open; the
+    smoke test opens them before the update to see that.
+  - Both packages recommend `acl`, because the web's folder message gives
+    a `setfacl` command and `setfacl` is not on every install. The smoke
+    test runs that command.
+  - The supported releases are named in `ci.yml`'s matrix,
+    `linux/smoke.sh` and the `Makefile`; add or drop one in all three
+    (`ci/security_test.py` checks).
+  - The nfpm pin: bump `VERSION` and every checksum in
+    `linux/fetch-nfpm.sh` together, from the digests GitHub lists for the release's files.
+  - CI's two Linux package jobs are thirteen jobs, so the path list that
+    starts them (`linux-packages` in `ci.yml`'s `changes` job) is
+    deliberate, and `ci/security_test.py` holds it to exactly this:
+    `deploy/linux/**`, the files packed from elsewhere
+    (`macos/fetch-ffmpeg.sh`, `macos/FFMPEG-LICENSE.md`,
+    `config.example.yaml`, the root `LICENSE`), `server/cmd/server/**` and
+    `server/internal/config/**` (how the server starts and where it looks
+    for its folders, config and ffmpeg, which the wrapper and the service
+    rely on), and `ci.yml`. Don't add the root `Makefile` or the rest of
+    `server/` or `web/`: the `server`, `web` and `docker` jobs cover what
+    the packages hold of those. The Linux make targets are in
+    `linux/packages.mk` for this reason; keep new ones there.
+  - `linux/repository-key.asc` is the repositories' real public key, and
+    the default `LINUX_REPOSITORY_KEY`, so every package carries it and its
+    repository entry (`LINUX_REPOSITORY_KEY=` builds without either).
+    `linux/package_test.py` holds the file to the key's fingerprints: a
+    change to it changes what every install trusts, and is the user's to
+    make. Only the public half is ever committed.
+  - The key has a primary key that only certifies and two signing subkeys:
+    one for the `.rpm` files, one for the repositories' lists. A signing
+    key is always given with its subkey's id (`LINUX_SIGNING_KEY_ID`):
+    without one nfpm signs with the last signing subkey, which is the
+    lists'. The `.rpm` subkey's id is `BD64FACE28C2EF71`. CI and the smoke
+    test sign with a throwaway key of the same shape
+    (`linux/throwaway-key.sh`), whose secret part is never uploaded; the
+    real one is only ever in a release.
+  - The key file holds one key and `build.py` insists on that. dnf never
+    refreshes a key it already holds for a repository, so replacing the
+    lists' signer one day means adding a second key to the file, and
+    `build.py` then has to take more than one.
