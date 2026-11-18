@@ -107,8 +107,13 @@ final class LetterIndexTests: XCTestCase {
         XCTAssertTrue(focused(app.buttons["letter-W"]), "at the poster's letter")
         remote.press(.up)
         XCTAssertTrue(focused(app.buttons["letter-V"]))
+        // The grid follows the index to V, scrolling the poster away, before
+        // Menu: on CI's slower runner it had (tvOS 27.2, 2026-11-18), and
+        // focus asked of the undrawn poster went to a V poster instead.
+        _ = XCTWaiter().wait(for: [XCTestExpectation(description: "the grid follows")], timeout: 1.5)
         remote.press(.menu)
-        XCTAssertTrue(focus(app, timeout: 15) { $0 == rowEnd }, "Menu goes back to the poster focus came from")
+        XCTAssertTrue(focus(app, timeout: 15) { $0 == rowEnd },
+                      "Menu goes back to the poster focus came from, \(rowEnd), not \(focusedButton(app).label)")
     }
 
     @MainActor

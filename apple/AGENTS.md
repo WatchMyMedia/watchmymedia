@@ -244,10 +244,14 @@ server, and on iPad in both a regular and a compact width.
   - On tvOS 26.5 focus asked through a `@FocusState` of a view a lazy grid
     hasn't drawn yet is dropped without a word, and no `onChange` follows
     (the library grid's Menu from the letter index, once a letter's jump
-    had scrolled the poster away; on a loaded simulator, and on CI). The
-    grid's `focusItem` (`TV/Screens/Library/LibraryScreen.swift`) scrolls
-    the poster in and asks again until focus lands; ask that way wherever
-    focus goes to something that may be off screen.
+    had scrolled the poster away; on a loaded simulator, and on CI). On
+    tvOS 27.2, on CI's runner, the same request sent focus to another
+    poster, which the index took for a swipe left. The grid's `focusItem`
+    (`TV/Screens/Library/LibraryScreen.swift`) scrolls the poster in, asks
+    once the grid has drawn it (its `onAppear`), and asks again until focus
+    lands, and `focusMoved` lets a move from the index to another poster
+    pass while it asks. Ask that way wherever focus goes to something that
+    may be off screen. On this Mac neither shows: CI's slower runner does.
   - On Apple TV a focused button that becomes disabled keeps focus, dimmed,
     until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
     up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable
