@@ -41,6 +41,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param maxAudioChannels 0 means any.
  * @param maxBitrate Bits per second; 0 means unlimited.
  * @param maxHeight
+ * @param maxPcmChannels The most channels the device's output takes as decoded audio (PCM), when that is fewer than maxAudioChannels, which also counts formats passed through to a receiver as they are. A converted track that the device decodes is sent within it. 0 means the same as maxAudioChannels. From apiLevel 31; older servers reject it.
  * @param maxWidth
  * @param name
  * @param selectsAudioTrack The player chooses among a direct-play file's audio tracks itself and starts on audio.index, so a track other than the file's default stays direct play instead of a remux. From apiLevel 21; older servers reject it.
@@ -76,6 +77,10 @@ data class Profile (
 
     @SerialName(value = "maxHeight")
     val maxHeight: kotlin.Long? = null,
+
+    /* The most channels the device's output takes as decoded audio (PCM), when that is fewer than maxAudioChannels, which also counts formats passed through to a receiver as they are. A converted track that the device decodes is sent within it. 0 means the same as maxAudioChannels. From apiLevel 31; older servers reject it. */
+    @SerialName(value = "maxPcmChannels")
+    val maxPcmChannels: kotlin.Long? = null,
 
     @SerialName(value = "maxWidth")
     val maxWidth: kotlin.Long? = null,

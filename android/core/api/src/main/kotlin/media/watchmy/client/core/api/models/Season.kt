@@ -36,7 +36,7 @@ import kotlinx.serialization.encoding.Encoder
 
 /**
  * @param availableCount Episodes with a present file.
- * @param episodeCount Episodes TMDB lists for the season.
+ * @param episodeCount Episodes TMDB lists for the season, and those named after files because TMDB does not list them.
  * @param id
  * @param name
  * @param number
@@ -57,7 +57,7 @@ data class Season (
     @SerialName(value = "availableCount")
     val availableCount: kotlin.Long,
 
-    /* Episodes TMDB lists for the season. */
+    /* Episodes TMDB lists for the season, and those named after files because TMDB does not list them. */
     @SerialName(value = "episodeCount")
     val episodeCount: kotlin.Long,
 
