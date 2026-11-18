@@ -155,6 +155,15 @@ server, and on iPad in both a regular and a compact width.
   doesn't. A view's `.onChange(of: scenePhase)` under the tab view was not
   seen to report `.background` before the app was ended, so state that must
   survive eviction is saved when it changes (`PlaceKeeping`).
+  SwiftUI draws a `RadialGradient` on the main thread, a pixel at a time,
+  across the whole of its view (`PaintShapeLayer.draw`, then
+  `CGContextDrawRadialGradient`, in a `sample` of the app). The two under
+  each of Apple TV Home's backdrops (1400 × 660 pt) were 200 ms of its first
+  page turn on a tvOS 27.2 simulator. Draw a soft one small and scale it up
+  (`BackdropGlow` in `TV/Screens/Home/HomeScreen.swift`), or only in the box
+  its light reaches (`ArtworkPlaceholder`). The show and movie pages'
+  `DetailBackdrop`, the request dialog and the sign-in screens still draw
+  theirs at full size.
 - **Home's screens** (PLAN-HOME.md §7; `HomeScreen.swift` on both apps): a
   vertical `ScrollView` with `.scrollTargetBehavior(.paging)`, each screen
   `.containerRelativeFrame(.vertical)`. A horizontal card row inside a screen
