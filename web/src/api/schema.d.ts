@@ -4205,6 +4205,7 @@ export interface components {
         AudioPlan: {
             /** Format: int64 */
             channels?: number;
+            /** @description The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3 (PLAN-AUDIO.md). */
             codec?: string;
             copy: boolean;
             /** Format: int64 */

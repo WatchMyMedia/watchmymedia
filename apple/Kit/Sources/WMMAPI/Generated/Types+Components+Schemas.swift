@@ -627,6 +627,8 @@ extension Components {
         public struct AudioPlan: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/AudioPlan/channels`.
             public var channels: Swift.Int64?
+            /// The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3 (PLAN-AUDIO.md).
+            ///
             /// - Remark: Generated from `#/components/schemas/AudioPlan/codec`.
             public var codec: Swift.String?
             /// - Remark: Generated from `#/components/schemas/AudioPlan/copy`.
@@ -637,7 +639,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - channels:
-            ///   - codec:
+            ///   - codec: The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3 (PLAN-AUDIO.md).
             ///   - copy:
             ///   - index:
             public init(
