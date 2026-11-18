@@ -7719,6 +7719,11 @@ export interface components {
             maxBitrate?: number;
             /** Format: int64 */
             maxHeight?: number;
+            /**
+             * Format: int64
+             * @description The most channels the device's output takes as decoded audio (PCM), when that is fewer than maxAudioChannels, which also counts formats passed through to a receiver as they are. A converted track that the device decodes is sent within it. 0 means the same as maxAudioChannels. From apiLevel 31; older servers reject it.
+             */
+            maxPcmChannels?: number;
             /** Format: int64 */
             maxWidth?: number;
             /** @example web */

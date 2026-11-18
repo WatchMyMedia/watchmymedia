@@ -9867,6 +9867,10 @@ extension Components {
             public var maxBitrate: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/Profile/maxHeight`.
             public var maxHeight: Swift.Int64?
+            /// The most channels the device's output takes as decoded audio (PCM), when that is fewer than maxAudioChannels, which also counts formats passed through to a receiver as they are. A converted track that the device decodes is sent within it. 0 means the same as maxAudioChannels. From apiLevel 31; older servers reject it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Profile/maxPcmChannels`.
+            public var maxPcmChannels: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/Profile/maxWidth`.
             public var maxWidth: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/Profile/name`.
@@ -9893,6 +9897,7 @@ extension Components {
             ///   - maxAudioChannels: 0 means any.
             ///   - maxBitrate: Bits per second; 0 means unlimited.
             ///   - maxHeight:
+            ///   - maxPcmChannels: The most channels the device's output takes as decoded audio (PCM), when that is fewer than maxAudioChannels, which also counts formats passed through to a receiver as they are. A converted track that the device decodes is sent within it. 0 means the same as maxAudioChannels. From apiLevel 31; older servers reject it.
             ///   - maxWidth:
             ///   - name:
             ///   - selectsAudioTrack: The player chooses among a direct-play file's audio tracks itself and starts on audio.index, so a track other than the file's default stays direct play instead of a remux. From apiLevel 21; older servers reject it.
@@ -9907,6 +9912,7 @@ extension Components {
                 maxAudioChannels: Swift.Int64? = nil,
                 maxBitrate: Swift.Int64? = nil,
                 maxHeight: Swift.Int64? = nil,
+                maxPcmChannels: Swift.Int64? = nil,
                 maxWidth: Swift.Int64? = nil,
                 name: Swift.String? = nil,
                 selectsAudioTrack: Swift.Bool? = nil,
@@ -9921,6 +9927,7 @@ extension Components {
                 self.maxAudioChannels = maxAudioChannels
                 self.maxBitrate = maxBitrate
                 self.maxHeight = maxHeight
+                self.maxPcmChannels = maxPcmChannels
                 self.maxWidth = maxWidth
                 self.name = name
                 self.selectsAudioTrack = selectsAudioTrack
@@ -9936,6 +9943,7 @@ extension Components {
                 case maxAudioChannels
                 case maxBitrate
                 case maxHeight
+                case maxPcmChannels
                 case maxWidth
                 case name
                 case selectsAudioTrack

@@ -60,12 +60,20 @@ type Profile struct {
 	// decodes and its display shows; from apiLevel 8).
 	VideoCodecs []string `json:"videoCodecs" nullable:"false" required:"false"`
 	// AudioCodecs: aac, opus, mp3, ac3, eac3, flac, vorbis, dts, truehd, pcm.
+	// pcm is copied only in direct play: in HLS ffmpeg writes it as ipcm,
+	// which the players don't read, so it is converted (to FLAC where flac
+	// is listed). A track that doesn't fit is converted to flac, eac3 or ac3
+	// where they are listed, else aac (PLAN-AUDIO.md §3.1).
 	AudioCodecs      []string `json:"audioCodecs" nullable:"false" required:"false"`
 	MaxWidth         int      `json:"maxWidth,omitempty"`
 	MaxHeight        int      `json:"maxHeight,omitempty"`
 	MaxBitrate       int64    `json:"maxBitrate,omitempty" doc:"Bits per second; 0 means unlimited."`
 	MaxAudioChannels int      `json:"maxAudioChannels,omitempty" doc:"0 means any."`
-	HDR              bool     `json:"hdr" required:"false" doc:"True when the client can display HDR. Without hdrTypes, HDR video is copied only when this is true; otherwise transcodes tone-map to SDR."`
+	// MaxPcmChannels: an Android TV on a soundbar over ARC passes E-AC-3
+	// through (eight channels) but takes two channels of PCM, so a track
+	// converted to FLAC or AAC would reach it as stereo (PLAN-AUDIO.md §3.5).
+	MaxPcmChannels int  `json:"maxPcmChannels,omitempty" required:"false" doc:"The most channels the device's output takes as decoded audio (PCM), when that is fewer than maxAudioChannels, which also counts formats passed through to a receiver as they are. A converted track that the device decodes is sent within it. 0 means the same as maxAudioChannels. From apiLevel 31; older servers reject it."`
+	HDR            bool `json:"hdr" required:"false" doc:"True when the client can display HDR. Without hdrTypes, HDR video is copied only when this is true; otherwise transcodes tone-map to SDR."`
 	// HDRTypes is a list of plain strings, not an enum: generated clients
 	// refuse enum values they do not know.
 	HDRTypes []string `json:"hdrTypes,omitempty" nullable:"false" required:"false" doc:"The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means the profile follows PLAN-HDR-PROFILE: HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it."`
