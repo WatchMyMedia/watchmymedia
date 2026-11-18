@@ -21,6 +21,15 @@ const audioAllowance = 256_000
 // Offers, masters and admission checks must all use it to stay equal.
 func PeakBandwidth(videoBps int64) int64 { return 2*videoBps + audioAllowance }
 
+// PeakBandwidthWithAudio is PeakBandwidth for a single rendition whose
+// audio may need more than the allowance: a converted track at E-AC-3's
+// 640 kbps or AAC 5.1's 384, or a copied Dolby or lossless track
+// (PLAN-AUDIO.md §3.3). Adaptive families keep PeakBandwidth: their audio
+// is always the controlled stereo AAC.
+func PeakBandwidthWithAudio(videoBps, audioBps int64) int64 {
+	return 2*videoBps + max(audioBps, audioAllowance)
+}
+
 // VideoRateWithin is the largest video rate whose PeakBandwidth fits peak.
 func VideoRateWithin(peak int64) int64 { return (peak - audioAllowance) / 2 }
 

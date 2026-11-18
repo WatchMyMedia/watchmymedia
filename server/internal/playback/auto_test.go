@@ -69,9 +69,10 @@ func TestDecisionBitrate(t *testing.T) {
 	if d := Decide(info, ".mp4", Request{Profile: p}, nil, Capabilities{}); d.Mode != ModeTranscode || d.Bitrate != 4_000_000+160_000 {
 		t.Errorf("720p: %s at %d", d.Mode, d.Bitrate)
 	}
+	// DTS 5.1 the browser can't decode is sent as AAC 5.1 at 64 kbps a channel.
 	dts := mkInfo("matroska", "h264", 8, "", "dts", 6)
 	dts.Video[0].BitRate = 7_000_000
-	if d := Decide(dts, ".mkv", Request{Profile: webProfile()}, nil, Capabilities{}); d.Mode != ModeAudio || d.Bitrate != 7_000_000+transcodeAudioBitrate {
+	if d := Decide(dts, ".mkv", Request{Profile: webProfile()}, nil, Capabilities{}); d.Mode != ModeAudio || d.Bitrate != 7_000_000+6*aacChannelBitrate {
 		t.Errorf("audio transcode: %s at %d", d.Mode, d.Bitrate)
 	}
 }

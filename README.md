@@ -891,6 +891,14 @@ QSV, VAAPI); `GET /api/playback/capabilities` shows what was found. Segments are
 to a `watchmymedia-sessions` folder under `transcode.dir` and removed when a session goes
 idle; at startup the server clears that folder and leaves the rest of `transcode.dir` alone.
 
+Audio the device can't play is converted to what keeps the most of it (PLAN-AUDIO.md):
+FLAC for a lossless track (TrueHD, DTS-HD MA, PCM, ALAC) when the video is copied, the
+play has no quality cap and isn't a download; E-AC-3 at 640 kbps, 5.1 at most, for
+surround where the device lists it; otherwise AAC, 192 kbps for stereo and 64 kbps a
+channel above, stereo when the quality pick is under 4 Mbps. PCM is copied only in
+direct play. A device that passes Dolby through but takes fewer channels of PCM (a
+soundbar over ARC, a Cast TV) says so with `maxPcmChannels`, so it gets E-AC-3 5.1.
+
 Event HLS prepares about 32 seconds at a time and resumes near the prepared edge as
 segments are delivered. It keeps about 32 seconds of already viewed segments for
 brief retries; pausing a viewer also pauses further preparation. VOD uses its own
@@ -1165,7 +1173,12 @@ MPEG-TS video and audio, remuxes into fMP4, or converts only audio when that is
 enough. Missing source or device facts keep the existing H.264/AAC conversion;
 clients without a profile still receive that conversion. The session reports
 the selected mode and reason. The web player and Cast receiver send a
-conservative H.264/AAC MPEG-TS profile; native Live TV profiles follow.
+conservative H.264/AAC MPEG-TS profile; native Live TV profiles follow. When
+the picture is converted (MPEG-2 or interlaced channels), a profile that lists
+the broadcast's audio keeps it as it is, so the native apps keep AC-3 5.1.
+Converted audio stays 5.1 AAC for a profile that asks for six channels or more,
+except under 4 Mbps of video; the web, the receiver and the Automatic ladder
+get stereo.
 
 API-level-25 clients can also opt into Live TV Automatic when shared sources
 are enabled. A client starts with `quality: "auto"`, `autoRecovery: true` and

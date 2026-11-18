@@ -1247,10 +1247,7 @@ func (m *Manager) args(spec Spec, dir string) []string {
 	if spec.Audio.Copy {
 		a = append(a, "-c:a", "copy")
 	} else {
-		a = append(a, "-c:a", "aac", "-b:a", "192k")
-		if spec.Audio.Channels > 0 {
-			a = append(a, "-ac", strconv.Itoa(spec.Audio.Channels))
-		}
+		a = append(a, audioEncodeArgs(spec.Audio)...)
 	}
 	a = append(a, "-sn")
 
@@ -1301,7 +1298,8 @@ func eventHLSFlags(spec Spec) string {
 	return "independent_segments+temp_file"
 }
 
-// transcodeAudioBitrate is what AAC audio is encoded at.
+// transcodeAudioBitrate is what stereo AAC is encoded at; audioTarget
+// gives surround and other formats their own (audio_target.go).
 const transcodeAudioBitrate = 192_000
 
 // transcodeBitrate is the video bitrate a transcode is held to: the
