@@ -224,9 +224,16 @@ func av1Codecs(profile string, bitDepth, w, h int, fps float64) string {
 
 func audioCodecs(info *probe.MediaInfo, a AudioPlan) string {
 	if !a.Copy {
-		// The transcoder writes AAC-LC (see args).
-		if a.Codec == "aac" {
+		// What audioEncodeArgs writes: AAC-LC, E-AC-3, AC-3 or FLAC.
+		switch a.Codec {
+		case "aac":
 			return "mp4a.40.2"
+		case "eac3":
+			return "ec-3"
+		case "ac3":
+			return "ac-3"
+		case "flac":
+			return "fLaC"
 		}
 		return ""
 	}

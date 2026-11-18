@@ -114,7 +114,7 @@ func vodBandwidth(info *probe.MediaInfo, d playback.Decision, p playback.Profile
 			video = 2_000_000
 		}
 	}
-	return playback.PeakBandwidth(video)
+	return playback.PeakBandwidthWithAudio(video, d.AudioBitrate(info))
 }
 
 func subtitleName(t playback.SubtitleTrack) string {

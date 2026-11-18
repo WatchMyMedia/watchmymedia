@@ -1548,6 +1548,7 @@
             "type": "integer"
           },
           "codec": {
+            "description": "The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3 (PLAN-AUDIO.md).",
             "type": "string"
           },
           "copy": {

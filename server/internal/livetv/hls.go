@@ -98,17 +98,19 @@ func HLSArgs(dir, encoder string, height, kbps int) []string {
 }
 
 // HLSArgsOnDevice keeps Live TV's CPU deinterlacing on its selected encoder.
+// With no plan it converts the audio to stereo AAC, as for a client that
+// sends no live profile.
 func HLSArgsOnDevice(dir, encoder string, height, kbps int, device *int) []string {
-	return hlsVideoArgs(dir, encoder, height, kbps, device, "mpegts", "")
+	return hlsVideoArgs(dir, encoder, height, kbps, device, LivePlan{Mode: "video", SegmentFormat: "mpegts"})
 }
 
-func hlsVideoArgs(dir, encoder string, height, kbps int, device *int, format, hdrType string) []string {
+func hlsVideoArgs(dir, encoder string, height, kbps int, device *int, plan LivePlan) []string {
 	// Use display aspect (including MPEG-2 sample aspect), then square the
 	// pixels. Capping stored width and discarding SAR would squeeze 480i.
 	// Captions need their own supported output path. Leaving A53 side data
 	// attached can also fail VideoToolbox's SEI insertion on real broadcasts.
 	filter := fmt.Sprintf("sidedata=mode=delete:type=A53_CC,%s,scale=w='max(2,trunc(oh*dar/2)*2)':h='max(2,trunc(min(min(ih,%d),%d/dar)/2)*2)',setsar=1", playback.BroadcastDeinterlace, height, height*16/9)
-	if hdrType != "" {
+	if plan.hdrType != "" {
 		filter += "," + strings.Join(playback.ToneMapFilters(), ",")
 	}
 	input, output := playback.EncoderDeviceArgs(encoder, device)
@@ -134,29 +136,46 @@ func hlsVideoArgs(dir, encoder string, height, kbps int, device *int, format, hd
 	// through. Preserve their timestamps instead of duplicating 60p to 120p.
 	a = append(a,
 		"-fps_mode", "vfr",
-		"-force_key_frames", "expr:gte(t,n_forced*2)", "-c:a", "aac", "-ac", "2", "-b:a", "192k", "-af", "aresample=async=1:first_pts=0")
-	return appendHLSOutput(a, dir, format)
+		"-force_key_frames", "expr:gte(t,n_forced*2)")
+	a = append(a, liveAudioArgs(plan, kbps)...)
+	return appendHLSOutput(a, dir, plan.SegmentFormat)
 }
 
 // HLSArgsForPlan keeps the same authorized rolling playlist in every mode.
 // Copy and remux plans never decode video; audio mode converts only audio.
+// kbps is the converted picture's rate, which decides whether video mode's
+// audio conversion may keep surround.
 func HLSArgsForPlan(dir string, plan LivePlan, encoder string, height, kbps int, device *int) []string {
 	if plan.Mode == "video" {
-		return hlsVideoArgs(dir, encoder, height, kbps, device, plan.SegmentFormat, plan.hdrType)
+		return hlsVideoArgs(dir, encoder, height, kbps, device, plan)
 	}
 	a := ffexec.FFmpegArgs()
 	a = append(a, "-y", "-fflags", "+genpts+discardcorrupt", "-probesize", "5000000", "-analyzeduration", "3000000", "-f", "mpegts", "-i", "pipe:0",
 		"-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn", "-c:v", "copy")
-	if plan.Mode == "audio" {
-		a = append(a, "-c:a", "aac", "-ac", "2", "-b:a", "192k", "-af", "aresample=async=1:first_pts=0")
-	} else {
-		a = append(a, "-c:a", "copy")
+	a = append(a, liveAudioArgs(plan, kbps)...)
+	return appendHLSOutput(a, dir, plan.SegmentFormat)
+}
+
+// liveAudioArgs copies the broadcast's audio in original and remux modes, and
+// in video mode when the plan says the device takes it. Otherwise it converts
+// to AAC: the plan's channels at 64 kbps each when it keeps more than two
+// (and, in video mode, when the picture gets liveSurroundVideoKbps or more),
+// else stereo at 192 kbps. Live never converts to E-AC-3 or FLAC: every live
+// profile that lists eac3 also lists ac3, so a broadcast's AC-3 is copied.
+func liveAudioArgs(plan LivePlan, videoKbps int) []string {
+	if plan.Mode != "audio" && (plan.Mode != "video" || plan.copyAudio) {
+		a := []string{"-c:a", "copy"}
 		if plan.SegmentFormat == "fmp4" && plan.sourceAudio == "aac" {
 			// MPEG-TS carries AAC as ADTS; MP4 needs an AudioSpecificConfig.
 			a = append(a, "-bsf:a", "aac_adtstoasc")
 		}
+		return a
 	}
-	return appendHLSOutput(a, dir, plan.SegmentFormat)
+	channels, kbps := 2, liveStereoAudioKbps
+	if plan.audioChannels > 2 && (plan.Mode != "video" || videoKbps >= liveSurroundVideoKbps) {
+		channels, kbps = plan.audioChannels, liveAudioKbpsPerChannel*plan.audioChannels
+	}
+	return []string{"-c:a", "aac", "-ac", strconv.Itoa(channels), "-b:a", strconv.Itoa(kbps) + "k", "-af", "aresample=async=1:first_pts=0"}
 }
 
 func appendHLSOutput(a []string, dir, format string) []string {

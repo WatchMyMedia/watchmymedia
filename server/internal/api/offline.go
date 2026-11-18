@@ -367,6 +367,7 @@ func offlineDecide(ctx context.Context, deps Deps, row db.MediaFile, info *probe
 	if deps.Playback != nil {
 		caps = deps.Playback.Capabilities()
 	}
+	req.Download = true
 	d := playback.Decide(info, filepath.Ext(row.Path), req, sidecars, caps)
 	for _, r := range deps.OnlineSubtitles.List(ctx, row.ID) {
 		d.Subtitles = append(d.Subtitles, downloadedTrack(r))
