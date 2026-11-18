@@ -134,7 +134,7 @@ func backupCommand(args []string) error {
 	defer func() { _ = conn.Close() }()
 	ctx := context.Background()
 	if len(args) == 0 {
-		path, err := backup.Save(ctx, conn, cfg.DataDir, 0)
+		path, err := backup.Save(ctx, conn, cfg.DataDir, cfg.File, 0)
 		if err != nil {
 			return err
 		}
@@ -148,7 +148,7 @@ func backupCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := backup.Write(ctx, conn, cfg.DataDir, f); err != nil {
+	if err := backup.Write(ctx, conn, cfg.DataDir, cfg.File, f); err != nil {
 		_ = f.Close()
 		return err
 	}
@@ -375,7 +375,7 @@ func serve() error {
 	if need, _ := authSvc.SetupRequired(ctx); need {
 		log.Info("no accounts yet: open the web UI to create the first admin")
 	}
-	go backup.RunNightly(ctx, conn, cfg.DataDir, func() int {
+	go backup.RunNightly(ctx, conn, cfg.DataDir, cfg.File, func() int {
 		v, _ := store.Get(ctx, settings.KeyBackupKeep, "7")
 		n, _ := strconv.Atoi(v)
 		return n
@@ -476,7 +476,7 @@ func serve() error {
 	}
 	router, _ := api.New(api.Deps{Version: version, Host: cfg.Updates.Host, Queries: queries, Log: log, Bus: bus, Scanner: sc, Matcher: matcher,
 		AdaptiveHLS: cfg.Transcode.AdaptiveHLS, Images: imageCache.Handler(), Artwork: customArt, ImagesDir: imageCache.Dir(), Playback: sessions, Subtitles: subtitles, OnlineSubtitles: online, Keyframes: keyframes, Prober: prober, Auth: authSvc,
-		Settings: store, TMDB: tmdbClient, Conn: conn, DataDir: cfg.DataDir, DefaultHWAccel: cfg.Transcode.HWAccel, DefaultHWDevice: cfg.Transcode.HWDevice,
+		Settings: store, TMDB: tmdbClient, Conn: conn, DataDir: cfg.DataDir, ConfigFile: cfg.File, DefaultHWAccel: cfg.Transcode.HWAccel, DefaultHWDevice: cfg.Transcode.HWDevice,
 		Net: guard, RemoteAdminConfig: cfg.Network.RemoteAdmin, TMDBKeyFromConfig: cfg.TMDB.APIKey != "",
 		Upload: uploadLimiter,
 		HSTS:   cfg.Auth.SecureCookies, Activity: tracker, Discovery: discoveryDep(advertiser), Turnstile: bot,

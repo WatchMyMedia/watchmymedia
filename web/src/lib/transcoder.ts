@@ -1,4 +1,5 @@
 import type { components } from '../api/schema'
+import { isPackageInstall } from './packageInstall'
 
 type Capabilities = components['schemas']['Capabilities']
 type Inventory = components['schemas']['Inventory']
@@ -51,9 +52,14 @@ export function adapterIndexHint(namespace: 'CUDA' | 'DirectX' | 'render node'):
 
 /**
  * The note under the transcoder card when the encoder is software: what to do
- * for a GPU on the platform the server runs on (ServerInfo.host for Unraid).
+ * for a GPU on the platform the server runs on (ServerInfo.host for Unraid,
+ * ServerInfo.install for the .deb and .rpm packages, which reach the GPU
+ * through the distribution's drivers and have no container to pass it to).
  */
-export function softwareEncoderNote(setup: boolean, host?: string): string {
+export function softwareEncoderNote(setup: boolean, host?: string, install?: string): string {
+  if (isPackageInstall(install)) {
+    return `To convert video on a GPU, install its driver from your distribution: the VA-API driver for Intel or AMD graphics, or NVIDIA’s driver. Then press ${setup ? 'Check again' : 'Test again'}.`
+  }
   if (host === 'unraid') {
     return 'On Unraid, give the container your GPU: for an Intel or AMD GPU keep the /dev/dri device in the WatchMyMedia template (Docker › WatchMyMedia › Edit); for NVIDIA install the Nvidia Driver plugin, add --runtime=nvidia to Extra Parameters and put the GPU’s UUID in NVIDIA_VISIBLE_DEVICES. Then press Check again.'
   }

@@ -1,7 +1,10 @@
 package api
 
 import (
+	"archive/tar"
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -816,7 +819,7 @@ func TestSettingsLibrariesAndBackups(t *testing.T) {
 	srv := newTestServer(t)
 	var st Settings
 	doJSON(t, srv.client, http.MethodGet, srv.URL+"/api/settings", "", &st)
-	if st.TMDBConfigured || st.HWAccel != "auto" || st.BackupKeep != 7 || st.DataDir != srv.dataDir {
+	if st.TMDBConfigured || st.HWAccel != "auto" || st.BackupKeep != 7 || st.DataDir != srv.dataDir || st.ConfigFile != "" {
 		t.Errorf("settings = %+v", st)
 	}
 	// Library CRUD with a real folder.
@@ -889,6 +892,63 @@ func TestSettingsLibrariesAndBackups(t *testing.T) {
 	_ = res.Body.Close()
 	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "application/gzip" || len(body) < 100 {
 		t.Errorf("download -> %d %s %d bytes", res.StatusCode, res.Header.Get("Content-Type"), len(body))
+	}
+}
+
+// A server whose config file is outside the data folder, as the Linux
+// packages' is, says where it is so the restore steps can, and its backups
+// hold that file (PLAN-LINUX.md §4).
+func TestBackupOfAConfigFileElsewhere(t *testing.T) {
+	t.Parallel()
+	loaded := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(loaded, []byte("port: 27599\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	srv := newTestServerWith(t, func(d *Deps) { d.ConfigFile = loaded })
+	var st Settings
+	if doJSON(t, srv.client, http.MethodGet, srv.URL+"/api/settings", "", &st); st.ConfigFile != loaded {
+		t.Errorf("settings configFile = %q, want %q", st.ConfigFile, loaded)
+	}
+	var made backup.Info
+	if code := doJSON(t, srv.client, http.MethodPost, srv.URL+"/api/backups", "", &made).StatusCode; code != http.StatusCreated {
+		t.Fatalf("backup -> %d", code)
+	}
+	saved, err := os.ReadFile(filepath.Join(srv.dataDir, "backups", made.Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := srv.client.Get(srv.URL + "/api/backups/download")
+	if err != nil {
+		t.Fatal(err)
+	}
+	downloaded, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	for name, archive := range map[string][]byte{"saved": saved, "downloaded": downloaded} {
+		gz, err := gzip.NewReader(bytes.NewReader(archive))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		found := ""
+		for tr := tar.NewReader(gz); ; {
+			h, err := tr.Next()
+			if err != nil {
+				break
+			}
+			if h.Name == backup.ConfigName {
+				b, _ := io.ReadAll(tr)
+				found = string(b)
+			}
+		}
+		if found != "port: 27599\n" {
+			t.Errorf("%s backup's config.yaml = %q", name, found)
+		}
+	}
+
+	// In the data folder, where a restore unpacks it, there is nothing to say.
+	inData := newTestServerWith(t, func(d *Deps) { d.ConfigFile = filepath.Join(d.DataDir, "config.yaml") })
+	st = Settings{}
+	if doJSON(t, inData.client, http.MethodGet, inData.URL+"/api/settings", "", &st); st.ConfigFile != "" {
+		t.Errorf("settings configFile for one in the data folder = %q", st.ConfigFile)
 	}
 }
 

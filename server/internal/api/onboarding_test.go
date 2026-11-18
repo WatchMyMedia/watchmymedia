@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -57,6 +58,36 @@ func TestCheckPathStopsAtFolderLimit(t *testing.T) {
 	check := checkPath(dir)
 	if !check.Truncated || check.VideoFiles != checkFolders-1 {
 		t.Errorf("videoFiles %d, truncated %v", check.VideoFiles, check.Truncated)
+	}
+}
+
+// A folder the server is not allowed to look at is one it can't read, not
+// one that isn't there: a library in a home folder that is closed to the
+// packages' watchmymedia user was reported as not found, so the page never
+// said to give that user access (PLAN-LINUX.md §3.6).
+func TestCheckPathBehindAClosedFolder(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("folder permissions work differently on Windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root reads closed folders")
+	}
+	home := filepath.Join(t.TempDir(), "home")
+	videos := filepath.Join(home, "Videos")
+	touch(t, filepath.Join(videos, "Clip (2020).mkv"))
+	if err := os.Chmod(home, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(home, 0o700) }) //nolint:gosec // G302: a folder, which needs its x bit
+	if check := checkPath(videos); !check.Exists || check.Readable {
+		t.Errorf("inside a closed folder: exists %v readable %v, want a folder that can't be read", check.Exists, check.Readable)
+	}
+	if check := checkPath(home); !check.Exists || check.Readable {
+		t.Errorf("the closed folder itself: exists %v readable %v", check.Exists, check.Readable)
+	}
+	if check := checkPath(filepath.Join(t.TempDir(), "nothing-here")); check.Exists {
+		t.Error("a folder that isn't there was reported as existing")
 	}
 }
 

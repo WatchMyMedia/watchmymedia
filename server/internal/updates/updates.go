@@ -23,12 +23,14 @@ import (
 )
 
 // How the server was installed, from WATCHMYMEDIA_INSTALL: the menu bar app,
-// the Windows tray app and the Docker image set it, and anything else is a
-// binary someone runs.
+// the Windows tray app, the Docker image and the Debian and Fedora packages
+// (PLAN-LINUX.md §4) set it, and anything else is a binary someone runs.
 const (
 	InstallMacApp     = "macos-app"
 	InstallWindowsApp = "windows-app"
 	InstallDocker     = "docker"
+	InstallDeb        = "deb"
+	InstallRpm        = "rpm"
 	InstallBinary     = "binary"
 )
 
@@ -50,8 +52,9 @@ type Release struct {
 }
 
 // Asset is one platform's download. Assets are keyed "macos" for the menu
-// bar app's DMG, "windows-app-amd64" for the Windows app's installer and
-// GOOS-GOARCH ("linux-amd64") for server archives.
+// bar app's DMG, "windows-app-amd64" for the Windows app's installer,
+// "deb-amd64" and "rpm-arm64" for the Linux packages and GOOS-GOARCH
+// ("linux-amd64") for server archives.
 type Asset struct {
 	URL  string `json:"url"`
 	Size int64  `json:"size"`
@@ -64,7 +67,7 @@ type Status struct {
 	// Development is set for builds that are not a release (a commit
 	// between tags, a dirty tree, "dev"): they are never told to update.
 	Development bool   `json:"development" doc:"Not a release build, so it is never offered an update."`
-	Install     string `json:"install" enum:"macos-app,windows-app,docker,binary" doc:"How the server was installed, which decides the download."`
+	Install     string `json:"install" enum:"macos-app,windows-app,docker,deb,rpm,binary" doc:"How the server was installed, which decides the download, or the command that updates it."`
 	Source      string `json:"source,omitempty" doc:"The host the release list comes from (updates.url)."`
 	// Checked is the last check that worked; the fields below come from it.
 	Checked         *time.Time `json:"checked,omitempty" doc:"When the last check that worked ran; absent before the first."`
@@ -72,7 +75,7 @@ type Status struct {
 	UpdateAvailable bool       `json:"updateAvailable"`
 	Date            string     `json:"date,omitempty" doc:"Release date of latest (YYYY-MM-DD)."`
 	Notes           string     `json:"notes,omitempty" doc:"What changed in latest, as Markdown list items."`
-	Download        *Download  `json:"download,omitempty" doc:"The file for this install; absent for Docker, which pulls the image."`
+	Download        *Download  `json:"download,omitempty" doc:"The file for this install; absent for Docker, which pulls the image, and for the deb and rpm packages, which apt and dnf update."`
 	// Error is why the most recent check failed, when it did.
 	Error string `json:"error,omitempty" doc:"Why the most recent check failed; the other fields are from the last one that worked."`
 }
@@ -100,7 +103,7 @@ type Checker struct {
 // counts as a binary.
 func New(manifestURL, version, install string) *Checker {
 	switch install {
-	case InstallMacApp, InstallWindowsApp, InstallDocker:
+	case InstallMacApp, InstallWindowsApp, InstallDocker, InstallDeb, InstallRpm:
 	default:
 		install = InstallBinary
 	}
@@ -190,11 +193,13 @@ func (c *Checker) compare(m Manifest) Status {
 		if !ok || r.Yanked || (isPrerelease(r.Version) && !wantPre) {
 			continue
 		}
-		// The Windows installer is published apart from the other files
-		// (PUBLISH_WINDOWS_APP), so a release can come without one: offer the
-		// tray app only releases it can install, never the portable server.
-		if c.Install == InstallWindowsApp {
-			if a, ok := r.Assets[c.assetKey()]; !ok || !c.sameSite(a.URL) {
+		// The Windows installer and the Linux packages are published apart
+		// from the other files (PUBLISH_WINDOWS_APP, PUBLISH_LINUX_PACKAGES),
+		// so a release can come without one: offer the tray app only releases
+		// it can install, never the portable server, and a package install
+		// only releases apt or dnf will find.
+		if key := c.requiredKey(); key != "" {
+			if a, ok := r.Assets[key]; !ok || !c.sameSite(a.URL) {
 				continue
 			}
 		}
@@ -213,17 +218,35 @@ func (c *Checker) compare(m Manifest) Status {
 	return s
 }
 
+// assetKey is the file to link for this install, or "" when it has none.
 func (c *Checker) assetKey() string {
 	switch c.Install {
 	case InstallMacApp:
 		return "macos"
 	case InstallWindowsApp:
-		_, arch, _ := strings.Cut(c.Platform, "-")
-		return "windows-app-" + arch // the installer, as the release list names it
-	case InstallDocker:
-		return "" // the image, not a file
+		return "windows-app-" + c.arch() // the installer, as the release list names it
+	case InstallDocker, InstallDeb, InstallRpm:
+		return "" // the image, or a package apt or dnf fetches: not a file to link
 	}
 	return c.Platform
+}
+
+// requiredKey is the file a release must list before this install is told
+// about it, or "" when any release will do.
+func (c *Checker) requiredKey() string {
+	switch c.Install {
+	case InstallWindowsApp:
+		return c.assetKey()
+	case InstallDeb, InstallRpm:
+		return c.Install + "-" + c.arch() // "deb-amd64", as the release list names the package
+	}
+	return ""
+}
+
+// arch is Go's name for this build's architecture, the end of Platform.
+func (c *Checker) arch() string {
+	_, arch, _ := strings.Cut(c.Platform, "-")
+	return arch
 }
 
 // sameSite accepts a download only from the manifest's own scheme and host,

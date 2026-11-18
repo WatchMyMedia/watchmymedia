@@ -45,7 +45,7 @@ func TestRestoredServerSignsEveryoneInAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	oldKey, _ := settings.New(q).Get(ctx, settings.KeyMediaTokenKey, "")
-	path, err := backup.Save(ctx, conn, live, 0)
+	path, err := backup.Save(ctx, conn, live, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}

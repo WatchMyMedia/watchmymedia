@@ -146,6 +146,30 @@ func TestHDRProfileLevel8(t *testing.T) {
 	}
 }
 
+// The stream's audio is what the server converts to, not always AAC: a
+// TrueHD film on an Android phone showed "aac 6" in Activity while its
+// segments held FLAC 5.1 (PLAN-AUDIO.md §5.3, 2026-11-18).
+func TestStreamInfoShowsTheConvertedAudio(t *testing.T) {
+	t.Parallel()
+	info := &probe.MediaInfo{Video: []probe.VideoStream{{Codec: "h264", Width: 1280, Height: 720}},
+		Audio: []probe.AudioStream{{Index: 1, Codec: "truehd", Channels: 6}}}
+	for _, c := range []struct {
+		audio []string
+		codec string
+	}{
+		{[]string{"aac", "flac"}, "flac"},
+		{[]string{"aac", "eac3"}, "eac3"},
+		{[]string{"aac"}, "aac"},
+	} {
+		req := playback.Request{Profile: playback.Profile{Containers: []string{"mp4"}, VideoCodecs: []string{"h264"}, AudioCodecs: c.audio, MaxAudioChannels: 8}}
+		d := playback.Decide(info, ".mkv", req, nil, playback.Capabilities{})
+		s := streamInfo(info, ".mkv", d, req)
+		if s.Stream.AudioDecision != "transcode" || s.Stream.AudioCodec != c.codec || s.Stream.AudioChannels != 6 {
+			t.Errorf("%v: stream audio %s %s %d, want transcode %s 6", c.audio, s.Stream.AudioDecision, s.Stream.AudioCodec, s.Stream.AudioChannels, c.codec)
+		}
+	}
+}
+
 // Activity's stream side shows what the screen gets: a Dolby Vision file's
 // base layer when that is sent, SDR once tone mapped.
 func TestStreamInfoShowsWhatTheScreenGets(t *testing.T) {

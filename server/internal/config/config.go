@@ -29,6 +29,9 @@ const (
 )
 
 type Config struct {
+	// File is the config file Load read, or looked for: WATCHMYMEDIA_CONFIG,
+	// else config.yaml in the data folder. Backups save it.
+	File string `yaml:"-"`
 	// DataDir holds the database, artwork cache, config file and logs.
 	DataDir   string          `yaml:"data_dir"`
 	Host      string          `yaml:"host"` // listen address; empty means all interfaces
@@ -61,9 +64,10 @@ type ListsConfig struct {
 // UpdatesConfig is Check for updates in Settings › General
 // (PLAN-RELEASES.md §5), which reads the release list at URL when an admin
 // asks. Install is how the server was installed (macos-app, windows-app,
-// docker or binary), which decides the download it links to; the menu bar
-// app, the Windows tray app and the Docker image set it, so it comes from
-// WATCHMYMEDIA_INSTALL only.
+// docker, deb, rpm or binary), which decides the download it links to or
+// the command it gives; the menu bar app, the Windows tray app, the Docker
+// image and the Linux packages set it, so it comes from WATCHMYMEDIA_INSTALL
+// only.
 type UpdatesConfig struct {
 	// Enabled shows the button; turn it off for a server that should never
 	// reach the internet.
@@ -274,6 +278,10 @@ func Load() (Config, error) {
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return cfg, fmt.Errorf("read %s: %w", path, err)
 	}
+	if abs, err := filepath.Abs(path); err == nil {
+		path = abs
+	}
+	cfg.File = path
 
 	if err := applyEnv(&cfg); err != nil {
 		return cfg, err

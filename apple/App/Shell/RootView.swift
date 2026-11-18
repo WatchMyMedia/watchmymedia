@@ -11,6 +11,9 @@ final class AppFlow {
     /// Kept above the size-class branches, so resizing retains the form and
     /// the original account needed by Cancel.
     var serverSwitch: ServerSwitchModel?
+    /// Whether the server had Live TV when the switch began. The tabs and
+    /// Settings keep that layout until the switch ends (`MainTabView`).
+    var serverSwitchLiveTV = false
     var appliedSwitchLaunch = false
     /// Rename this iPhone and Change password while their sheets are up. The
     /// sheet shows while its model is here; the fields write to the model,

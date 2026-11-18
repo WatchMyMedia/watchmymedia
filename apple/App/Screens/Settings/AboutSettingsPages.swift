@@ -74,6 +74,7 @@ struct ServerSettingsPage: View {
 
     /// Switch server keeps its steps in ``AppFlow``, so a resized window keeps its place.
     private func startSwitch() {
+        flow.serverSwitchLiveTV = services.liveTV.capabilities?.available == true
         flow.serverSwitch = ServerSwitchModel(servers: services.servers, auth: services.auth)
     }
 }

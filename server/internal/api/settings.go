@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -50,6 +51,7 @@ type Settings struct {
 	BackupKeep        int                      `json:"backupKeep" doc:"Nightly backups to keep; 0 disables them."`
 	ScanIntervalMin   int                      `json:"scanIntervalMinutes" doc:"Minutes between scheduled scans of every library, which find what the filesystem watcher misses."`
 	DataDir           string                   `json:"dataDir"`
+	ConfigFile        string                   `json:"configFile,omitempty" required:"false" doc:"Where this server reads its config file, when that is not config.yaml in the data folder (WATCHMYMEDIA_CONFIG, as the Linux packages set it). A backup holds it as config.yaml, and after a restore it goes back there. Absent otherwise and on older servers."`
 	Backups           []backup.Info            `json:"backups" nullable:"false"`
 	Activity          ActivitySettings         `json:"activity"`
 	ServerName        string                   `json:"serverName" doc:"What TV and phone apps call this server."`
@@ -593,7 +595,7 @@ func registerSettings(h huma.API, r *chi.Mux, deps Deps) {
 			return nil, huma.Error503ServiceUnavailable("backups not available")
 		}
 		keep, _ := strconv.Atoi(mustGet(ctx, deps, settings.KeyBackupKeep, "7"))
-		path, err := backup.Save(ctx, deps.Conn, deps.DataDir, keep)
+		path, err := backup.Save(ctx, deps.Conn, deps.DataDir, deps.ConfigFile, keep)
 		if explained := backupError(err); explained != nil {
 			deps.Log.WarnContext(ctx, "backup failed", "err", err)
 			return nil, explained
@@ -629,7 +631,7 @@ func registerSettings(h huma.API, r *chi.Mux, deps Deps) {
 		}
 		w.Header().Set("Content-Type", "application/gzip")
 		w.Header().Set("Content-Disposition", `attachment; filename="watchmymedia-backup.tar.gz"`)
-		if err := backup.Write(req.Context(), deps.Conn, deps.DataDir, w); err != nil {
+		if err := backup.Write(req.Context(), deps.Conn, deps.DataDir, deps.ConfigFile, w); err != nil {
 			deps.Log.Error("backup download failed", "err", err)
 		}
 	})
@@ -654,7 +656,7 @@ func mustGet(ctx context.Context, deps Deps, key, def string) string {
 }
 
 func currentSettings(ctx context.Context, deps Deps) Settings {
-	s := Settings{RemoteAdmin: &RemoteAdminSettings{Enabled: deps.Net != nil && deps.Net.RemoteAdmin(), FromConfig: deps.RemoteAdminConfig != nil}, DataDir: deps.DataDir, Backups: []backup.Info{}, HWAccel: "auto",
+	s := Settings{RemoteAdmin: &RemoteAdminSettings{Enabled: deps.Net != nil && deps.Net.RemoteAdmin(), FromConfig: deps.RemoteAdminConfig != nil}, DataDir: deps.DataDir, ConfigFile: backup.ConfigElsewhere(deps.DataDir, deps.ConfigFile), Backups: []backup.Info{}, HWAccel: "auto",
 		TMDBKeyFromConfig: deps.TMDBKeyFromConfig}
 	if deps.Upload != nil {
 		snapshot := deps.Upload.Snapshot()
@@ -807,6 +809,12 @@ const checkFolders = 1000
 func checkPath(p string) PathCheck {
 	out := PathCheck{Path: filepath.Clean(p), Sample: []string{}}
 	st, err := os.Stat(out.Path)
+	if errors.Is(err, fs.ErrPermission) {
+		// Not allowed to look, as inside a home folder closed to the
+		// server's user: a folder it can't read, not one that isn't there.
+		out.Exists = true
+		return out
+	}
 	if err != nil || !st.IsDir() {
 		return out
 	}

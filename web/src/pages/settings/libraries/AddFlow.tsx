@@ -96,7 +96,8 @@ function TypeStep({ common, draft, setDraft }: StepProps) {
 function FolderStep({ common, back, draft, setDraft }: StepProps) {
   const go = useGo()
   const type = draft.type ?? 'movie'
-  const platform = useQuery(serverQuery).data?.platform
+  const server = useQuery(serverQuery).data
+  const platform = server?.platform
   // The check is kept for the folder as typed: the server may write it its own way.
   const folder = useFolderCheck(draft.check, (check) => setDraft((d) => ({ ...d, check: check && { ...check, path: d.path.trim() } })))
   const ready = folderReady(draft)
@@ -140,6 +141,7 @@ function FolderStep({ common, back, draft, setDraft }: StepProps) {
             type={type}
             check={current}
             platform={platform}
+            install={server?.install}
             onRecheck={() => void folder.run(draft.path)}
             onUseParent={(parent) => { setPath(parent); void folder.run(parent) }}
             onChooseTV={() => { setDraft((d) => chooseType(d, 'tv')); go(href('type')) }}

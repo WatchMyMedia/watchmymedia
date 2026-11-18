@@ -16,14 +16,21 @@ struct MainTabView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var liveAvailable: Bool { services.liveTV.capabilities?.available == true }
-    private var settingsPresented: Bool { liveAvailable && (navigator.tab == .settings || flow.serverSwitch != nil) }
+    /// Live TV as the tabs are laid out: with it, Settings leaves the tab bar
+    /// for a sheet. A server switch keeps the layout it began in until it
+    /// ends, since the account it changes can turn Live TV on or off midway.
+    /// Following it closed the sheet holding the switch: an iPad switching
+    /// from a server with a tuner to one without went back to Settings
+    /// before Sign in, every time (2026-11-18).
+    private var liveTVLayout: Bool { flow.serverSwitch == nil ? liveAvailable : flow.serverSwitchLiveTV }
+    private var settingsPresented: Bool { liveTVLayout && (navigator.tab == .settings || flow.serverSwitch != nil) }
     private var unavailableLivePresented: Bool {
         services.liveTV.capabilities != nil && !liveAvailable && navigator.tab == .liveTV && navigator.playbackPresentation == nil
     }
-    private var tabs: [AppTab] { AppTab.phoneTabs(liveTV: liveAvailable) }
+    private var tabs: [AppTab] { AppTab.phoneTabs(liveTV: liveTVLayout) }
 
     var body: some View {
-        TabView(selection: Binding(get: { (settingsPresented || (!liveAvailable && navigator.tab == .liveTV)) ? .home : (flow.serverSwitch == nil ? navigator.tab : .settings) }, set: {
+        TabView(selection: Binding(get: { (settingsPresented || (!liveTVLayout && navigator.tab == .liveTV)) ? .home : (flow.serverSwitch == nil ? navigator.tab : .settings) }, set: {
             if flow.serverSwitch == nil { navigator.select($0) }
         })) {
             ForEach(tabs, id: \.self) { tab in

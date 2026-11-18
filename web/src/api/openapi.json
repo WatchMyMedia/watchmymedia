@@ -12813,6 +12813,10 @@
             "description": "Stable random ID; apps remember servers by it, not by address.",
             "type": "string"
           },
+          "install": {
+            "description": "How the server was installed: macos-app, windows-app, docker, deb, rpm or binary. The web words folder permissions and GPU setup for it. A plain string: ignore values you don't know. Absent on older servers.",
+            "type": "string"
+          },
           "name": {
             "description": "Shown in apps' server lists; set under Settings.",
             "type": "string"
@@ -12974,6 +12978,10 @@
           },
           "cast": {
             "$ref": "#/components/schemas/CastSettings"
+          },
+          "configFile": {
+            "description": "Where this server reads its config file, when that is not config.yaml in the data folder (WATCHMYMEDIA_CONFIG, as the Linux packages set it). A backup holds it as config.yaml, and after a restore it goes back there. Absent otherwise and on older servers.",
+            "type": "string"
           },
           "dataDir": {
             "type": "string"
@@ -14673,7 +14681,7 @@
           },
           "download": {
             "$ref": "#/components/schemas/Download",
-            "description": "The file for this install; absent for Docker, which pulls the image."
+            "description": "The file for this install; absent for Docker, which pulls the image, and for the deb and rpm packages, which apt and dnf update."
           },
           "enabled": {
             "description": "Checking is on (updates.enabled in config); when off, Settings hides the button.",
@@ -14684,11 +14692,13 @@
             "type": "string"
           },
           "install": {
-            "description": "How the server was installed, which decides the download.",
+            "description": "How the server was installed, which decides the download, or the command that updates it.",
             "enum": [
               "macos-app",
               "windows-app",
               "docker",
+              "deb",
+              "rpm",
               "binary"
             ],
             "type": "string"

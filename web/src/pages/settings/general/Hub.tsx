@@ -5,13 +5,14 @@ import { useEventState } from '../../../api/events'
 import { settingsQuery, updateStatusQuery, useCheckForUpdates, useUpdateSettings, type UpdateStatus } from '../../../api/settings'
 import type { components } from '../../../api/schema'
 import { visibleConfirmationError } from '../../../api/withConfirm'
+import { CommandLine } from '../../../components/CommandLine'
 import { ConfirmDialog, LeaveCheck } from '../../../components/settings/Dialogs'
 import { Button, Card, Field, HubPage, ItemRow, LoadingRows, Message, NextStep, Pill, SaveBar, SaveNote, Section, Switch, fieldInput } from '../../../components/settings/Frame'
 import { errorText, useGo, useInstantSave } from '../../../components/settings/hooks'
 import { formatBytes, formatDate, relativeTime } from '../../../lib/format'
 import { generalLede, generalNextStep, removeKeyWords, serverNameError, tmdbDoneLine } from '../../../lib/generalSettings'
 import { settingsCrumbs, settingsHref } from '../../../lib/settingsRoutes'
-import { dockerUpdateSteps, updateDownload } from '../../../lib/updates'
+import { dockerUpdateSteps, packageUpdateSteps, updateDownload } from '../../../lib/updates'
 import { clearNotice, peekNotice } from './notice'
 
 type Settings = components['schemas']['Settings']
@@ -189,9 +190,19 @@ function HowToUpdate({ s, host }: { s: UpdateStatus; host?: string }) {
           <details>
             <summary className="cursor-pointer text-neutral-300 underline hover:text-neutral-100">This server runs in Docker: pull the new image and recreate the container. Show the commands</summary>
             <p className="mt-2">{steps.text}</p>
-            <code className="mt-1.5 block overflow-x-auto rounded-md border border-line bg-ground px-3 py-2 font-mono text-[13px] whitespace-nowrap text-neutral-100 select-all">{steps.command}</code>
+            <CommandLine>{steps.command}</CommandLine>
           </details>
         ) : <p>{steps.text}</p>}
+      </div>
+    )
+  }
+  const pkg = packageUpdateSteps(s.install)
+  if (pkg) {
+    return (
+      <div className="mt-1 text-sm text-neutral-400 [overflow-wrap:anywhere]">
+        <p>{pkg.text}</p>
+        <CommandLine>{pkg.command}</CommandLine>
+        <p className="mt-2">{pkg.after}</p>
       </div>
     )
   }
