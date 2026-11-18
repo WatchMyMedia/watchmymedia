@@ -50,6 +50,9 @@ private struct ShowPageView: View {
     /// Focus went to the top once; after that, it stays where the person puts it.
     @State private var focusedTop = false
     @FocusState private var focus: PageFocus?
+    /// The episode row's cards and its bumps at the first episode (``RowStartScrolling``).
+    @State private var rowCards = RowStartCards<EpisodeDetail.ID>()
+    @State private var rowBumps = 0
     @Environment(AppServices.self) private var services
     @Environment(FollowsStore.self) private var follows
 
@@ -420,7 +423,10 @@ private struct ShowPageView: View {
                 ScrollView(.horizontal) {
                     LazyHStack(alignment: .top, spacing: 28) {
                         ForEach(episodes) { episode in
-                            card(episode, onTop: episode.id == model.episodeID).id(episode.id)
+                            card(episode, onTop: episode.id == model.episodeID)
+                                .rowStartCard(episode.id, in: rowCards)
+                                .rowStartBump(first: episode.id == episodes.first?.id) { rowBumps += 1 }
+                                .id(episode.id)
                         }
                     }
                     .padding(.vertical, 30)
@@ -428,6 +434,8 @@ private struct ShowPageView: View {
                 .contentMargins(.horizontal, TVLayout.gutter, for: .scrollContent)
                 .scrollClipDisabled()
                 .scrollIndicators(.hidden)
+                // As Home's rows: the episode before the focused one stays in view (focus puts its episode on top).
+                .modifier(RowStartScrolling(ids: episodes.map(\.id), focused: model.episodeID, cards: rowCards, bumps: rowBumps))
                 .focusSection()
                 .onAppear { if let id = model.episodeID { proxy.scrollTo(id, anchor: .center) } }
                 .onChange(of: model.selectedSeason) {

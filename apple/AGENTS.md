@@ -149,6 +149,14 @@ server, and on iPad in both a regular and a compact width.
   arranged rows are a `VStack` (`HomeScreen.arrangedRows`). In a `List` in edit
   mode (the rows sheet's `.onMove`) a row's plain `Button` takes no taps: give
   it `.buttonStyle(.borderless)` or a style of its own.
+  In a horizontal `ScrollView` with `.contentMargins` (Apple TV's rows,
+  90 pt), three measures of "where" disagree (tvOS 27.2 simulator): a
+  card's `frame(in: .scrollView(axis: .horizontal))` counts from the
+  leading margin, not the screen's edge; `ScrollGeometry.contentOffset` is
+  minus the margin at the row's start; and `ScrollPosition.scrollTo(x:)`
+  counts from the row's start. `RowStartScrolling`
+  (`TV/Components/RowStart.swift`) adds the margin to the offset before
+  scrolling to a card; without it the row scrolled a card too far.
   Inside the player's full-screen cover a `GeometryReader` that ignores the
   safe area reports zero `safeAreaInsets` (iOS 27.2 simulator): `PlayerShell`
   measures them between a reader that keeps the safe area and one that

@@ -124,7 +124,9 @@ struct FocusSheen: View {
 
 /// A titled row of cards that scrolls sideways (TvHome.dc.html). It is a
 /// focus section that remembers the card focused last, so coming back to the
-/// row lands where the person left it (PLAN-IOS.md §11.2). `focusedItem`
+/// row lands where the person left it (PLAN-IOS.md §11.2). It shows where it
+/// starts (``RowStartScrolling``): the card before the focused one stays in
+/// view, and Left on the first card bumps the row. `focusedItem`
 /// tells the screen which card has focus, for the row screens' panel
 /// (PLAN-HOME.md §7.4); `counter` is "Row 2 of 7" at the heading's right.
 struct ShelfRow<Item: Identifiable, Card: View>: View {
@@ -138,6 +140,8 @@ struct ShelfRow<Item: Identifiable, Card: View>: View {
 
     @FocusState private var focused: Item.ID?
     @State private var remembered: Item.ID?
+    @State private var cards = RowStartCards<Item.ID>()
+    @State private var bumps = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -146,7 +150,10 @@ struct ShelfRow<Item: Identifiable, Card: View>: View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: spacing) {
                     ForEach(items) { item in
-                        card(item).focused($focused, equals: item.id)
+                        card(item)
+                            .focused($focused, equals: item.id)
+                            .rowStartCard(item.id, in: cards)
+                            .rowStartBump(first: item.id == items.first?.id) { bumps += 1 }
                     }
                 }
                 .padding(.vertical, 30)
@@ -154,6 +161,7 @@ struct ShelfRow<Item: Identifiable, Card: View>: View {
             .contentMargins(.horizontal, TVLayout.gutter, for: .scrollContent)
             .scrollClipDisabled()
             .scrollIndicators(.hidden)
+            .modifier(RowStartScrolling(ids: items.map(\.id), focused: focused, cards: cards, bumps: bumps))
             .focusSection()
             .defaultFocus($focused, remembered ?? items.first?.id, priority: .userInitiated)
             .onChange(of: focused) { old, id in
