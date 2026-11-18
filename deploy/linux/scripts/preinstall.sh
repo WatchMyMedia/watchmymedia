@@ -31,8 +31,10 @@ sysusers 2>/dev/null || by_hand
 # dpkg says "install" for a first install and for one after a removal that
 # kept the config, and "upgrade" for an update; its postinst cannot tell the
 # last two apart, so leave it a note. rpm passes 1 and 2 to both scripts.
+# touch, not a redirection: where /run cannot be written (a chroot), dash
+# stops the whole script at a failed redirection, and the install with it.
 note=/run/watchmymedia.install
 case "$1" in
-  install) : > "$note" 2>/dev/null || true ;;
-  upgrade) rm -f "$note" ;;
+  install) touch "$note" 2>/dev/null || true ;;
+  upgrade) rm -f "$note" 2>/dev/null || true ;;
 esac

@@ -390,6 +390,33 @@ class SourceFilesTest(unittest.TestCase):
                           'm watchmymedia render', 'm watchmymedia video'], lines)
         self.assertIn("<<'EOF'\n" + '\n'.join(lines) + '\nEOF\n', (HERE / 'scripts/preinstall.sh').read_text())
 
+    def test_the_scripts_survive_a_system_they_cannot_write_to(self):
+        # dpkg runs them with dash, which stops a script at a failed
+        # redirection on a builtin, whatever follows it: `: > file || true`
+        # ended the install where /run could not be written (a chroot).
+        for script in sorted((HERE / 'scripts').glob('*.sh')):
+            with self.subTest(script=script.name):
+                text = script.read_text()
+                self.assertTrue(text.startswith('#!/bin/sh\n'))
+                self.assertIn('\nset -e\n', text)
+                code = '\n'.join(line for line in text.splitlines() if not line.lstrip().startswith('#'))
+                self.assertNotRegex(code, r'(?m)(^|[;&|]\s*|\)\s*):\s*>')
+        # Before unpacking, with nowhere to leave its note: the script still succeeds.
+        script = (HERE / 'scripts/preinstall.sh').read_text()
+        with tempfile.TemporaryDirectory() as tmp:
+            stubs = pathlib.Path(tmp) / 'bin'
+            stubs.mkdir()
+            for name in ('systemd-sysusers', 'getent', 'groupadd', 'useradd', 'usermod'):
+                (stubs / name).write_text('#!/bin/sh\ncat >/dev/null 2>&1 </dev/null; exit 0\n')
+                (stubs / name).chmod(0o755)
+            copy = pathlib.Path(tmp) / 'preinstall.sh'
+            copy.write_text(script.replace('/run/watchmymedia.install', f'{tmp}/no-such-folder/note'))
+            for argument in ('install', 'upgrade', '1', '2'):
+                with self.subTest(argument=argument):
+                    result = subprocess.run(['sh', str(copy), argument], capture_output=True, text=True,
+                                            env={'PATH': f'{stubs}{os.pathsep}{os.environ["PATH"]}'})
+                    self.assertEqual(0, result.returncode, result.stderr)
+
     def test_the_service_is_the_one_the_plan_gives(self):
         unit = (HERE / 'watchmymedia.service').read_text()
         for line in ('User=watchmymedia', 'Group=watchmymedia', 'ExecStart=/usr/bin/watchmymedia',
