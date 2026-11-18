@@ -213,7 +213,16 @@ Off leaves the bitstream formats out of the profile (logged under
 `adb shell settings put global use_external_surround_sound_flag 1` and
 `external_surround_sound_enabled 1` (then restart the app) make Media3
 report AC-3 and E-AC-3 passthrough, so the two settings send different
-profiles. The profile's size limit is the largest picture the offered
+profiles. The profile's channel limit is the larger of the output's PCM
+channels and its bitstream formats'; when the PCM ones are fewer (a
+soundbar on ARC that takes E-AC-3 but two channels of PCM) it also sends
+`maxPcmChannels`, so a converted track keeps its surround as E-AC-3. It
+lists `pcm`, which the server copies only in direct play of MKV: Media3
+also reads `ipcm`, `fpcm`, `lpcm`, `sowt` and `twos` in MP4 and MOV, but
+not QuickTime's `in24`, `in32`, `fl32` or `fl64`, which ffmpeg writes for
+24-bit, so the server converts PCM in any other file. Both go only to
+servers at API level 31 or later ([PLAN-AUDIO.md](../PLAN-AUDIO.md) §3.4,
+§3.5). The profile's size limit is the largest picture the offered
 codecs' decoders take at 24 fps, whatever the screen, so a phone whose
 hardware decodes 4K direct-plays a 4K file: read from
 `MediaCodecInfo.VideoCapabilities` (the decoders' performance points from

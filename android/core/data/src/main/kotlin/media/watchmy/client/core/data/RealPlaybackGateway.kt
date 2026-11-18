@@ -195,6 +195,7 @@ internal class RealPlaybackGateway(
             hdr = hdr,
             hdrTypes = hdrTypes,
             maxAudioChannels = maxAudioChannels?.toLong(),
+            maxPcmChannels = maxPcmChannels?.toLong(),
             maxBitrate = maxBitrate,
             maxHeight = maxHeight?.toLong(),
             maxWidth = maxWidth?.toLong(),

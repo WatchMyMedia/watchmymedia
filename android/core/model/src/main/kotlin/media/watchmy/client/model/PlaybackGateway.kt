@@ -4,6 +4,13 @@ package media.watchmy.client.model
 const val HDR_PROFILE_API_LEVEL = 8
 
 /**
+ * The API level that reads [PlaybackProfile.maxPcmChannels] and copies pcm
+ * only in direct play (PLAN-AUDIO.md §3.4, §3.5). An older server copies
+ * pcm into HLS as ipcm, which players don't read.
+ */
+const val PCM_PROFILE_API_LEVEL = 31
+
+/**
  * What this device can play, sent with every playback request
  * (PLAN-CLIENTS.md §5.4; the server's `Profile`).
  */
@@ -16,7 +23,7 @@ data class PlaybackProfile(
      * profiles the device decodes and its screen shows.
      */
     val videoCodecs: List<String>,
-    /** aac, mp3, opus, flac, vorbis, ac3, eac3, dts, truehd. */
+    /** aac, mp3, opus, flac, vorbis, pcm, ac3, eac3, dts, truehd. */
     val audioCodecs: List<String>,
     val maxWidth: Int? = null,
     val maxHeight: Int? = null,
@@ -24,6 +31,14 @@ data class PlaybackProfile(
     val maxBitrate: Long? = null,
     /** Null is any. */
     val maxAudioChannels: Int? = null,
+    /**
+     * The most channels the output takes as decoded audio (PCM), when that
+     * is fewer than [maxAudioChannels], which also counts formats passed
+     * through as a bitstream: a soundbar on ARC that takes E-AC-3 but two
+     * channels of PCM. Null leaves it out, as servers before
+     * [PCM_PROFILE_API_LEVEL] refuse it.
+     */
+    val maxPcmChannels: Int? = null,
     val hdr: Boolean = false,
     /** webvtt, ass. */
     val subtitleFormats: List<String> = listOf("webvtt", "ass"),
@@ -42,13 +57,17 @@ data class PlaybackProfile(
     val selectsAudioTrack: Boolean? = null,
 ) {
     /**
-     * The profile for a server at [level]. Below [AUDIO_LANGUAGES_API_LEVEL]
+     * The profile for a server at [level]. Below [PCM_PROFILE_API_LEVEL] it
+     * has no [maxPcmChannels] and no pcm. Below [AUDIO_LANGUAGES_API_LEVEL]
      * it has no [selectsAudioTrack]. Below [HDR_PROFILE_API_LEVEL] it is
      * the one apps sent before: no [hdrTypes], which such a server refuses, no
      * dovi keys, and hevc10 only for an HDR10 screen, since such a server
      * copies 10-bit HEVC to any profile that has it, HDR or not.
      */
     fun forApiLevel(level: Int): PlaybackProfile {
+        if (level < PCM_PROFILE_API_LEVEL && (maxPcmChannels != null || PCM in audioCodecs)) {
+            return copy(audioCodecs = audioCodecs.filter { it != PCM }, maxPcmChannels = null).forApiLevel(level)
+        }
         if (level < AUDIO_LANGUAGES_API_LEVEL && selectsAudioTrack != null) return copy(selectsAudioTrack = null).forApiLevel(level)
         val types = hdrTypes
         if (level >= HDR_PROFILE_API_LEVEL || types == null) return this
@@ -60,6 +79,7 @@ data class PlaybackProfile(
 
     private companion object {
         const val DOVI_KEY = "dovi"
+        const val PCM = "pcm"
     }
 }
 

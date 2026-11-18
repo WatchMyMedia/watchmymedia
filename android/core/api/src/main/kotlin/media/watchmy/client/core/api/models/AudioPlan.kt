@@ -37,7 +37,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param copy
  * @param index
  * @param channels
- * @param codec
+ * @param codec The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3 (PLAN-AUDIO.md).
  */
 @Serializable
 
@@ -52,6 +52,7 @@ data class AudioPlan (
     @SerialName(value = "channels")
     val channels: kotlin.Long? = null,
 
+    /* The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3 (PLAN-AUDIO.md). */
     @SerialName(value = "codec")
     val codec: kotlin.String? = null
 

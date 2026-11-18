@@ -48,7 +48,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param seasons
  * @param title
  * @param tmdbId
- * @param totalEpisodes Episodes TMDB lists across all seasons.
+ * @param totalEpisodes Episodes across all seasons, as the seasons' episodeCount counts them.
  * @param totalSize
  * @param addedAt
  * @param backdropPath
@@ -105,7 +105,7 @@ data class ShowDetail (
     @SerialName(value = "tmdbId")
     val tmdbId: kotlin.Long,
 
-    /* Episodes TMDB lists across all seasons. */
+    /* Episodes across all seasons, as the seasons' episodeCount counts them. */
     @SerialName(value = "totalEpisodes")
     val totalEpisodes: kotlin.Long,
 

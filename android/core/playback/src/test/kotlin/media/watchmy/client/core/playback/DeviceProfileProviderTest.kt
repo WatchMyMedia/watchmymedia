@@ -12,6 +12,7 @@ import media.watchmy.client.core.playback.profile.DeviceProfileProvider
 import media.watchmy.client.core.playback.profile.VideoSize
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -121,8 +122,9 @@ class DeviceProfileProviderTest {
 
         allowed = false
         val off = provider.current()
-        assertEquals(listOf("aac", "mp3", "opus", "flac", "vorbis"), off.audioCodecs)
+        assertEquals(listOf("aac", "mp3", "opus", "flac", "vorbis", "pcm"), off.audioCodecs)
         assertEquals("Within what the output takes as PCM", provider.describe().maxPcmChannels, off.maxAudioChannels)
+        assertNull("One limit, with no bitstream to set apart", off.maxPcmChannels)
         assertEquals("What the device can do is still described", setOf("ac3", "eac3"), provider.describe().passthrough)
 
         allowed = true

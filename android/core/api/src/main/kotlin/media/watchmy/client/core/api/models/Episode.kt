@@ -38,7 +38,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * @param aired Air date is today or earlier.
+ * @param aired Air date is today or earlier; always for an episode named after a file, which has no air date.
  * @param files
  * @param hasFile
  * @param id
@@ -61,7 +61,7 @@ import kotlinx.serialization.encoding.Encoder
 
 data class Episode (
 
-    /* Air date is today or earlier. */
+    /* Air date is today or earlier; always for an episode named after a file, which has no air date. */
     @SerialName(value = "aired")
     val aired: kotlin.Boolean,
 

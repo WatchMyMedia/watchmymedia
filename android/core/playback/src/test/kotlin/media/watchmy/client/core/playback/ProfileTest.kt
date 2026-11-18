@@ -7,15 +7,17 @@ import media.watchmy.client.core.playback.profile.buildProfile
 import media.watchmy.client.core.playback.profile.decodedAudioCodec
 import media.watchmy.client.core.playback.profile.shownHdrTypes
 import media.watchmy.client.model.HDR_PROFILE_API_LEVEL
+import media.watchmy.client.model.PCM_PROFILE_API_LEVEL
 import media.watchmy.client.model.PlaybackProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProfileTest {
-    private val basicAudio = listOf("aac", "mp3", "opus", "flac", "vorbis")
+    private val basicAudio = listOf("aac", "mp3", "opus", "flac", "vorbis", "pcm")
 
     @Test
     fun googleTvStreamer() {
@@ -43,6 +45,7 @@ class ProfileTest {
         assertEquals(2160, p.maxHeight)
         assertEquals(null, p.maxBitrate)
         assertEquals(8, p.maxAudioChannels)
+        assertNull("PCM takes as many channels as the bitstreams", p.maxPcmChannels)
         assertTrue(p.hdr)
         assertEquals(listOf("hdr10", "hlg"), p.hdrTypes)
         assertEquals(listOf("webvtt", "ass"), p.subtitleFormats)
@@ -70,8 +73,57 @@ class ProfileTest {
         assertEquals(1920, p.maxWidth)
         assertEquals(1080, p.maxHeight)
         assertEquals(2, p.maxAudioChannels)
+        assertNull(p.maxPcmChannels)
         assertFalse(p.hdr)
         assertEquals(emptyList<String>(), p.hdrTypes)
+    }
+
+    @Test
+    fun soundbarOnArcTakesEac3ButTwoChannelsOfPcm() {
+        val box = DeviceDescription(
+            tv = true,
+            decoders = listOf(DecoderInfo("video/avc", true), DecoderInfo("video/hevc", true)),
+            passthrough = setOf("eac3"),
+            maxPcmChannels = 2,
+            display = DisplayInfo(1920, 1080, hdr10 = false),
+        )
+        val p = buildProfile(box)
+        assertTrue("pcm" in p.audioCodecs)
+        assertEquals("E-AC-3 passes through with eight", 8, p.maxAudioChannels)
+        assertEquals("Decoded audio reaches it as two", 2, p.maxPcmChannels)
+
+        // Passthrough Off: everything is decoded, so one limit says it all.
+        val off = buildProfile(box.copy(passthrough = emptySet()))
+        assertEquals(2, off.maxAudioChannels)
+        assertNull(off.maxPcmChannels)
+
+        // A receiver that takes as many channels of PCM as of E-AC-3.
+        val receiver = buildProfile(box.copy(maxPcmChannels = 8))
+        assertEquals(8, receiver.maxAudioChannels)
+        assertNull(receiver.maxPcmChannels)
+
+        // No channel count from the output: no limit of either kind.
+        assertNull(buildProfile(box.copy(passthrough = emptySet(), maxPcmChannels = 0)).maxPcmChannels)
+    }
+
+    @Test
+    fun pcmAndItsChannelLimitGoOnlyToServersThatReadThem() {
+        val p = buildProfile(
+            DeviceDescription(
+                tv = true,
+                decoders = listOf(DecoderInfo("video/avc", true)),
+                passthrough = setOf("ac3", "eac3"),
+                maxPcmChannels = 2,
+                display = DisplayInfo(1920, 1080, hdr10 = false),
+            ),
+        )
+        assertSame(p, p.forApiLevel(PCM_PROFILE_API_LEVEL))
+        val older = p.forApiLevel(PCM_PROFILE_API_LEVEL - 1)
+        // Such a server would copy PCM into HLS as ipcm, which players don't read, and refuses maxPcmChannels.
+        assertEquals(listOf("aac", "mp3", "opus", "flac", "vorbis", "ac3", "eac3"), older.audioCodecs)
+        assertNull(older.maxPcmChannels)
+        assertEquals(8, older.maxAudioChannels)
+        assertEquals(p.copy(audioCodecs = older.audioCodecs, maxPcmChannels = null), older)
     }
 
     @Test
@@ -88,6 +140,7 @@ class ProfileTest {
         )
         assertEquals(basicAudio + listOf("ac3", "eac3", "dts", "truehd"), p.audioCodecs)
         assertEquals(8, p.maxAudioChannels)
+        assertEquals("What a conversion it decodes may have", 2, p.maxPcmChannels)
         // HLG alone still counts as HDR, but not as HDR10.
         assertEquals(listOf("h264", "hevc", "hevc10"), p.videoCodecs)
         assertTrue(p.hdr)
@@ -241,7 +294,7 @@ class ProfileTest {
                 name = "androidtv",
                 containers = listOf("mkv", "mp4", "webm", "mpegts"),
                 videoCodecs = listOf("h264", "hevc", "hevc10", "av1"),
-                audioCodecs = basicAudio + "eac3",
+                audioCodecs = basicAudio - "pcm" + "eac3",
                 maxWidth = 3840,
                 maxHeight = 2160,
                 maxAudioChannels = 8,
