@@ -19,9 +19,11 @@
 #                         (default: deploy/linux/repository-key.asc)
 #
 # Each .rpm's signature is checked with rpm's own tool against that public
-# key, and by the id of the subkey that made it, before anything reaches OUT:
-# a package signed by a key the repositories' key does not hold would be
-# refused by every machine.
+# key before anything reaches OUT: a package signed by a key the
+# repositories' key does not hold would be refused by every machine. The
+# package must also name the packages' subkey as its signer (signer.py): the
+# key's other signing subkey is the lists', and rpm from version 6 reports
+# the key's own fingerprint, whichever subkey signed.
 #
 # A pre-release's packages are for the GitHub release only. nfpm writes their
 # version as 1.7.0~rc.1, and GitHub replaces "~" in a file's name with ".",
@@ -30,6 +32,8 @@
 #
 # Needs python3, tar, rpmkeys (the rpm package) and, for the lists,
 # apt-ftparchive (apt-utils) and createrepo_c: Linux, as the release job is.
+# Tried on Ubuntu 24.04 (rpm 4.18) and 26.04 (rpm 6.0), which word a
+# signature differently.
 set -eu
 
 tag=${1:?usage: release.sh TAG ARCHIVES OUT}
@@ -71,9 +75,9 @@ python3 -I "$here/build.py" --version "$tag" --binaries "$work/binaries" --ffmpe
   --out "$work/packages" --repository-key "$repository_key" \
   --signing-key "$LINUX_SIGNING_KEY" --signing-key-id "$LINUX_SIGNING_KEY_ID"
 
-# rpm prints the signer's id in lower case; older versions print its last
-# eight digits and newer ones more, so the match is on how it ends.
-id=$(echo "$LINUX_SIGNING_KEY_ID" | tr 'A-F' 'a-f' | cut -c9-16)
+# rpmkeys exits 0 for a package with no signature at all, so a signature it
+# found good is asked for as well.
+id=$(echo "$LINUX_SIGNING_KEY_ID" | tr 'a-f' 'A-F')
 mkdir "$work/rpmdb"
 rpmkeys --dbpath "$work/rpmdb" --import "$repository_key"
 for rpm in "$work"/packages/*.rpm; do
@@ -82,11 +86,13 @@ for rpm in "$work"/packages/*.rpm; do
     echo "$checked" >&2
     fail "$name is not signed by a key in $repository_key"
   }
-  echo "$checked" | grep -Eiq "^ *Header .*signature, key [a-z: ]*[0-9a-f]*$id: OK\$" || {
+  echo "$checked" | grep -Eiq '^ *Header .*signature, key .*: OK$' || {
     echo "$checked" >&2
-    fail "$name is not signed by the subkey $LINUX_SIGNING_KEY_ID"
+    fail "$name is not signed"
   }
-  echo "$name: signed by $LINUX_SIGNING_KEY_ID, which the repositories' key holds"
+  signer=$(python3 -I "$here/signer.py" "$rpm")
+  [ "$signer" = "$id" ] || fail "$name is signed by ${signer:-no key}, not the packages' subkey $id"
+  echo "$name: signed by $id, which the repositories' key holds"
 done
 
 case $tag in

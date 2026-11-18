@@ -307,9 +307,9 @@ holds the same files as the archive beside it.
   [deploy/linux/repository-key.asc](deploy/linux/repository-key.asc), exported alone and
   armored, with no passphrase. The workflow names that subkey by its id, since the key has a
   second signing subkey for the repositories. The job checks each signature with rpm's own
-  `rpmkeys` against the committed public key before it attaches anything, and fails without
-  the secret: Fedora 45's `rpm -i` refuses an unsigned package. A `.deb` is not signed; apt
-  trusts the repository's signed list.
+  `rpmkeys` against the committed public key, and reads from the package which subkey made
+  it, before it attaches anything. It fails without the secret: Fedora 45's `rpm -i` refuses
+  an unsigned package. A `.deb` is not signed; apt trusts the repository's signed list.
 - **The repositories' lists.** A release also gets
   `watchmymedia-linux-repositories-<version>.tar.gz`: the apt and dnf lists for that
   release's packages, written by `apt-ftparchive` and `createrepo_c`

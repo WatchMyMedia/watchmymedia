@@ -398,9 +398,11 @@ class WorkflowIsolationTest(unittest.TestCase):
         # The script checks each signature before it fills the folder, and
         # writes lists for a release only.
         script = (ROOT / 'deploy/linux/release.sh').read_text()
-        for marker in ('rpmkeys --dbpath "$work/rpmdb" --import "$repository_key"', '--checksig', '"$here/repository.sh"'):
+        for marker in ('rpmkeys --dbpath "$work/rpmdb" --import "$repository_key"', '--checksig',
+                       'python3 -I "$here/signer.py" "$rpm"', '"$here/repository.sh"'):
             self.assertIn(marker, script)
-        self.assertLess(script.index('--checksig'), script.index('"$out/'))
+        self.assertLess(script.index('--checksig'), script.index('python3 -I "$here/signer.py"'))
+        self.assertLess(script.index('python3 -I "$here/signer.py"'), script.index('"$out/'))
         for other in set(jobs) - {'packages'}:
             # Without comments: the one above a job is read with the job before it.
             steps = re.sub(r'(?m)^ *#.*\n', '', jobs[other])

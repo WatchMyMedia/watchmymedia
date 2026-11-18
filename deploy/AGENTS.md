@@ -31,7 +31,7 @@ it covers releases, the downloads Worker and the CI runners.
 | `linux/watchmymedia.service`, `linux/watchmymedia.sh`, `linux/sysusers.conf`, `linux/scripts/`, `linux/firewalld.xml`, `linux/ufw.profile`, `linux/watchmymedia.sources`, `linux/watchmymedia.repo` | What the packages install: the systemd service, the wrapper that sets the folders, the `watchmymedia` user, the install, update and remove scripts (one set for dpkg and rpm), the firewall definitions, and the apt and dnf repository entries |
 | `linux/package_test.py` | Builds packages from stand-in files and reads them without dpkg or rpm: paths, modes, config files, scripts, the repository entry, versions. With `WMM_LINUX_SMOKE` set it also reads the packages `make linux-smoke-packages` built |
 | `linux/smoke.sh`, `linux/smoke-check.sh`, `linux/throwaway-key.sh` | `make linux-packages-smoke`: installs, updates, removes and purges the packages in a container of one release that runs systemd; the key script makes the throwaway key the test packages are signed with |
-| `linux/release.sh`, `linux/repository.sh`, `linux/release_test.py` | What a release attaches (`release.yml`'s `packages` job): `release.sh` builds the four packages from the release's Linux archives, checks each `.rpm`'s signature against `repository-key.asc`, and for a release that is not a pre-release runs `repository.sh`, which writes the apt and dnf repositories' lists for those packages, unsigned; the test drives both from stand-in archives with a throwaway key. Linux only |
+| `linux/release.sh`, `linux/signer.py`, `linux/repository.sh`, `linux/release_test.py` | What a release attaches (`release.yml`'s `packages` job): `release.sh` builds the four packages from the release's Linux archives, checks each `.rpm`'s signature against `repository-key.asc` and reads which subkey made it (`signer.py`), and for a release that is not a pre-release runs `repository.sh`, which writes the apt and dnf repositories' lists for those packages, unsigned; the test drives them from stand-in archives with a throwaway key. Linux only |
 
 ## Checks
 
@@ -50,10 +50,12 @@ make linux-packages-smoke IMAGE=debian:13  # then this for each release: also de
 The release script's tests (`linux/release_test.py`) need Linux with
 `rpm`, `apt-utils`, `createrepo-c` and `gnupg`; elsewhere they are skipped.
 CI's `linux-packages` job installs those and sets `WMM_LINUX_RELEASE`, which
-turns a missing tool into a failure. On a Mac, run them in a container:
+turns a missing tool into a failure. On a Mac, run them in a container, of
+the Ubuntu release GitHub's `ubuntu-latest` is (26.04 on 2026-11-18; the
+tools' versions differ between releases, and 24.04 passes too):
 
 ```bash
-docker run --rm -v "$PWD:/src" -w /src -e WMM_LINUX_RELEASE=1 ubuntu:24.04 sh -c \
+docker run --rm -v "$PWD:/src" -w /src -e WMM_LINUX_RELEASE=1 ubuntu:26.04 sh -c \
   'apt-get update -q && apt-get install -yq --no-install-recommends rpm apt-utils createrepo-c gnupg python3 curl ca-certificates zstd make \
    && python3 -I -m unittest discover -s deploy/linux -p "*_test.py"'
 ```
@@ -186,8 +188,12 @@ is 1.M.P, `v1.0.0` is 1.6.0, and from `v1.3.0` `v1.M.P` is 1.(M + 4).P.
   - **What a release attaches.** `linux/release.sh` builds from the Linux
     archives the `binaries` job packed, so a package and the archive hold
     the same server and ffmpeg. It checks every `.rpm` with `rpmkeys`
-    against `repository-key.asc`, and by the signing subkey's id, before
-    it puts anything in the folder the job attaches; keep that order. The
+    against `repository-key.asc`, and reads the signing subkey's id from
+    the package (`linux/signer.py`), before it puts anything in the folder
+    the job attaches; keep that order. Don't read the subkey from what
+    `rpmkeys` prints: rpm 4.18 (Ubuntu 24.04) prints the subkey's id and
+    rpm 6.0 (Ubuntu 26.04, GitHub's `ubuntu-latest` on 2026-11-18) the
+    key's own fingerprint, whichever subkey signed. The
     job fails without `LINUX_PACKAGE_SIGNING_KEY`: an unsigned `.rpm` is
     never attached. The key is written to `RUNNER_TEMP` and removed in an
     `if: always()` step; `ci/security_test.py` checks all of it.

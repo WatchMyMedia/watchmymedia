@@ -26,6 +26,7 @@ import unittest
 import xml.etree.ElementTree as ET
 
 import package_test
+import signer
 
 HERE = pathlib.Path(__file__).resolve().parent
 TOOLS = ('rpmkeys', 'apt-ftparchive', 'createrepo_c', 'gpg')
@@ -95,6 +96,8 @@ class ReleaseTest(unittest.TestCase):
             self.assertEqual(('1.7.0', '1.7.0', rpm_arch), (deb.version, rpm.version, rpm.arch))
             # Signed by the subkey that was named, and carrying the key it was checked against.
             self.assertEqual(self.signer, rpm.signer)
+            # What release.sh reads the signer with agrees with the package test's own reader.
+            self.assertEqual(self.signer, signer.signer(out / names[f'rpm-{arch}']))
             self.assertFalse(deb.signed)
             self.assertEqual(package_test.build.dearmor((self.key / 'public.asc').read_text()),
                              deb.heads['/usr/share/keyrings/watchmymedia-archive-keyring.gpg'])
@@ -190,6 +193,38 @@ class ReleaseTest(unittest.TestCase):
         self.assertIn('is not signed by a key in', result.stderr)
         self.assertIn('NOKEY', result.stderr)
         self.assertEqual([], list((self.dir / 'other-key').iterdir()))
+
+    def test_the_signer_is_read_from_the_package_whatever_rpm_calls_the_key(self):
+        # rpm 4 prints the signing subkey's id and rpm 6 the key's own
+        # fingerprint, so which subkey signed is read from the package.
+        built = self.dir / 'signers'
+        build = package_test.build.build
+        binaries, ffmpeg = self.dir / 'binaries', self.dir / 'ffmpeg'
+        (signed,) = build('v1.7.0', binaries, ffmpeg, built / 'signed', arches=('amd64',), formats=('rpm',),
+                          signing_key=self.key / 'secret.asc', signing_key_id=self.signer)
+        (unsigned,) = build('v1.7.0', binaries, ffmpeg, built / 'unsigned', arches=('amd64',), formats=('rpm',))
+        (deb,) = build('v1.7.0', binaries, ffmpeg, built / 'deb', arches=('amd64',), formats=('deb',))
+        self.assertEqual(self.signer, signer.signer(signed))
+        self.assertIsNone(signer.signer(unsigned))
+        run = lambda path: subprocess.run(['python3', '-I', str(HERE / 'signer.py'), str(path)], capture_output=True, text=True)
+        self.assertEqual((0, self.signer + '\n'), (run(signed).returncode, run(signed).stdout))
+        self.assertEqual((0, '\n'), (run(unsigned).returncode, run(unsigned).stdout))
+        for other in (deb, self.dir / 'no-such.rpm'):
+            self.assertNotEqual(0, run(other).returncode)
+        # The key rpm names is the primary key on rpm 6 and the subkey on rpm 4: never relied on.
+        primary = [package_test.openpgp_fingerprint(body) for tag, body in package_test.openpgp_packets(
+            package_test.build.dearmor((self.key / 'public.asc').read_text())) if tag == 6][0]
+        self.assertNotEqual(primary[-16:], self.signer)
+
+    def test_an_unsigned_package_is_not_attached(self):
+        # rpmkeys exits 0 for a package with no signature, so release.sh asks
+        # for a signature rpm found good. nfpm leaves a package unsigned when
+        # the key file it is given is empty of keys, which the script refuses.
+        script = (HERE / 'release.sh').read_text()
+        self.assertIn("grep -Eiq '^ *Header .*signature, key .*: OK$'", script)
+        reads = 'python3 -I "$here/signer.py" "$rpm"'
+        self.assertLess(script.index("grep -Eiq '^ *Header"), script.index(reads))
+        self.assertLess(script.index(reads), script.index('"$out/'))
 
     def test_what_is_missing_stops_it_before_anything_is_built(self):
         cases = (
