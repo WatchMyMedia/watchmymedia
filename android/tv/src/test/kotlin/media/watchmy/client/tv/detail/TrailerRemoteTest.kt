@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** PLAN-TV-TRAILERS.md §4.3's table: what each remote key does on the trailer screen, in both ways of driving YouTube's player. */
+/** PLAN-TV-TRAILERS.md §4.3's table: what each remote key does on the trailer screen, through YouTube's IFrame API. */
 class TrailerRemoteTest {
     @Test
     fun `each remote key does what the table says`() {
@@ -31,19 +31,6 @@ class TrailerRemoteTest {
     }
 
     @Test
-    fun `YouTube's keyboard controls get k to play or pause, j and l to jump 10 s`() {
-        assertEquals(KeyEvent.KEYCODE_K, youTubeKeyCode(TrailerKey.Toggle, playing = true))
-        assertEquals(KeyEvent.KEYCODE_K, youTubeKeyCode(TrailerKey.Toggle, playing = false))
-        assertEquals(KeyEvent.KEYCODE_J, youTubeKeyCode(TrailerKey.Back10, playing = true))
-        assertEquals(KeyEvent.KEYCODE_L, youTubeKeyCode(TrailerKey.Ahead10, playing = true))
-        assertEquals("Play plays when paused", KeyEvent.KEYCODE_K, youTubeKeyCode(TrailerKey.Play, playing = false))
-        assertNull("and does nothing while playing", youTubeKeyCode(TrailerKey.Play, playing = true))
-        assertEquals("Pause pauses while playing", KeyEvent.KEYCODE_K, youTubeKeyCode(TrailerKey.Pause, playing = true))
-        assertNull("and does nothing when paused", youTubeKeyCode(TrailerKey.Pause, playing = false))
-        for (k in listOf(TrailerKey.Leave, TrailerKey.Swallow, TrailerKey.Pass)) assertNull(k.name, youTubeKeyCode(k, playing = true))
-    }
-
-    @Test
     fun `YouTube's IFrame API gets playVideo, pauseVideo and seekTo through the page`() {
         assertEquals("toggleTrailer()", trailerScript(TrailerKey.Toggle))
         assertEquals("playTrailer()", trailerScript(TrailerKey.Play))
@@ -51,13 +38,5 @@ class TrailerRemoteTest {
         assertEquals("seekBy(-10)", trailerScript(TrailerKey.Back10))
         assertEquals("seekBy(10)", trailerScript(TrailerKey.Ahead10))
         for (k in listOf(TrailerKey.Leave, TrailerKey.Swallow, TrailerKey.Pass)) assertNull(k.name, trailerScript(k))
-    }
-
-    @Test
-    fun `the debug switch takes either way's name`() {
-        assertEquals(TrailerRemote.Api, TrailerRemoteSetting.parse("api"))
-        assertEquals(TrailerRemote.Keyboard, TrailerRemoteSetting.parse("Keyboard"))
-        assertNull(TrailerRemoteSetting.parse("mouse"))
-        assertNull(TrailerRemoteSetting.parse(null))
     }
 }

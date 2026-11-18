@@ -286,6 +286,10 @@ private class TrailerWebView(
 
     private val view: WebView = WebView(context).apply {
         setBackgroundColor(android.graphics.Color.BLACK)
+        // MATCH_PARENT, not the WRAP_CONTENT AndroidView would give it: a WebView whose height wraps
+        // its content lays the page out 0 px high, so the page's 100% heights collapse and YouTube's
+        // player frame plays its sound with no picture (seen on a Google TV Streamer, TV0).
+        layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         isVerticalScrollBarEnabled = false
         isHorizontalScrollBarEnabled = false
         settings.apply {

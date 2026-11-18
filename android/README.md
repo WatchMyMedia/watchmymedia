@@ -184,7 +184,9 @@ this device can play, and the logic is `MovieViewModel`'s (`trailerPlay`):
   windows, and sends any link that would leave the page to the browser or the
   YouTube app. It pauses when the screen is hidden, and YouTube's own full
   screen button shows the video over the screen (Back leaves it first). The
-  emulators can't draw YouTube's player (AGENTS.md, Emulators).
+  WebView has `MATCH_PARENT` layout params: with the `WRAP_CONTENT`
+  AndroidView gives it, the page is laid out 0 px high and the trailer
+  plays its sound with no picture (AGENTS.md, Emulators).
 - A **YouTube trailer on a TV** plays in the app too
   (PLAN-TV-TRAILERS.md §4, the `TvTrailerPlayer` and `MovieTrailerInApp`
   boards): `TvTrailerScreen` loads
@@ -201,26 +203,23 @@ this device can play, and the logic is `MovieViewModel`'s (`trailerPlay`):
     takes the link, and Back to the movie.
   - A trailer that played closes the screen when it ends. It pauses in
     `onStop` and keeps the TV awake while it plays.
-  - The remote follows the plan's §4.3 table (`TrailerRemote.kt`) in one of
-    two ways, both YouTube's documented ones. The IFrame API is the
-    default: the WebView never takes the focus, and the keys call
-    `playVideo`, `pauseVideo` and `seekTo` in the page. With YouTube's
-    keyboard controls, the WebView takes the focus, the page focuses the
-    player's frame, and Select and Play/Pause become k, Left and Rewind j,
-    Right and Fast-forward l; an emulator's YouTube player ignored them, so
-    the check on a real TV decides which way stays. Back is always the
-    screen's, and Up and Down do nothing.
-  - Debug builds switch between the two without a rebuild, for the check
-    on a real TV; the next trailer opened uses the new way:
-
-    ```bash
-    adb shell am broadcast -n <package>/media.watchmy.client.tv.detail.TrailerRemoteSwitch --es remote api       # or keyboard
-    adb shell am broadcast -n <package>/media.watchmy.client.tv.detail.TrailerRemoteSwitch                       # says which is set
-    ```
-
-    `<package>` is `media.watchmy.client` plus any `-PappIdSuffix`. Only
-    the shell can send it (the receiver asks for `DUMP`), and release
-    builds have no receiver and always use the IFrame API.
+  - The remote follows the plan's §4.3 table (`TrailerRemote.kt`) through
+    YouTube's IFrame API: the screen holds the focus, the WebView never
+    takes it, and the keys call `playVideo`, `pauseVideo` and `seekTo` in
+    the page. Back is always the screen's, and Up and Down do nothing.
+    YouTube's keyboard controls (k, j, l) did nothing in the embedded
+    player, on a Google TV Streamer and on an emulator, so the app doesn't
+    use them.
+  - While the trailer is paused, YouTube's player leaves the screen, as
+    while it loads, and our pause screen takes its place (the board's
+    `paused` state): a pause sign, the trailer, the movie, "Paused · 0:13 /
+    7:45" and the keys ("Select to play · ◀ ▶ 10 s · Back to the movie"),
+    with the time and length from the page (`trailerTime()`). YouTube's player shows nothing
+    when it is paused through its API, so a paused trailer looked frozen.
+    Select, Play/Pause and Play show the player again, then ask it to play;
+    Left, Right, Rewind and Fast-forward jump 10 s and update the time,
+    and the trailer stays paused. A trailer that plays any other way is
+    shown, never left playing out of sight.
   - Where the TV has no usable WebView (`WebView.getCurrentWebViewPackage()`
     is null, or making one throws, which `TrailerWebViews` tries once, on
     the first press), Trailer hands off as before: an `ACTION_VIEW` of the
@@ -228,6 +227,12 @@ this device can play, and the logic is `MovieViewModel`'s (`trailerPlay`):
     under the row. With neither a WebView nor an app for the link, the
     button is hidden for a YouTube trailer. The manifest's `<queries>`
     entry lets `resolveActivity` see YouTube on Android 11 and later.
+  - The TV's hand-offs (that one, and Open in YouTube) add the YouTube
+    app's `force_fullscreen` and `finish_on_ended` extras, so it plays the
+    trailer full screen and comes back to the app when it ends, instead of
+    playing another video four Backs away. They're undocumented, from the
+    retired YouTube Android Player API; the check on a Google TV Streamer
+    saw both work.
 
 On the fakes, Dead Reckoning Bay's trailers are on YouTube (Blender Studio's
 own uploads of two Creative Commons open movies stand in for them) and The

@@ -96,6 +96,9 @@ class TrailerScreenTest {
         assertEquals("https://${compose.activity.packageName}/", shadow.lastLoadDataWithBaseURL.baseUrl)
         assertTrue(shadow.lastLoadDataWithBaseURL.data.contains("var KEY = \"WhWc3b3KhnY\""))
         assertTrue("no file access", !web.settings.allowFileAccess && !web.settings.allowContentAccess)
+        // WRAP_CONTENT, which AndroidView gives a view without its own, lays the page out 0 px high: sound, no picture.
+        assertEquals("the page is laid out at the player's full width", ViewGroup.LayoutParams.MATCH_PARENT, web.layoutParams.width)
+        assertEquals("and its full height", ViewGroup.LayoutParams.MATCH_PARENT, web.layoutParams.height)
         assertTrue("plays without a second tap", !web.settings.mediaPlaybackRequiresUserGesture)
 
         post(web, TrailerEvent.ERROR, "WhWc3b3KhnY", 150)

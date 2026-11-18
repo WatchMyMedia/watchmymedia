@@ -6,8 +6,6 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.view.InputDevice
-import android.view.KeyCharacterMap
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
@@ -18,6 +16,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,8 +35,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -53,8 +52,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -67,9 +70,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import media.watchmy.client.model.Trailer
 import media.watchmy.client.model.TrailerText
 import media.watchmy.client.presentation.detail.TrailerViewModel
@@ -86,6 +87,7 @@ import media.watchmy.client.ui.TrailerState
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.onBack
+import media.watchmy.client.ui.parseTrailerTime
 import media.watchmy.client.ui.trailerBaseUrl
 import media.watchmy.client.ui.trailerPage
 import android.view.KeyEvent as AndroidKeyEvent
@@ -106,10 +108,18 @@ import android.view.KeyEvent as AndroidKeyEvent
  *   ([TrailerViewModel]); after the last, the player is taken off the screen
  *   and ours says so, with Open in YouTube where an app takes the link. When
  *   YouTube can't be reached, ours offers Try again.
+ * - While the trailer is paused, the player leaves the screen again and our
+ *   pause screen takes its place (the user's decision after TV0): the
+ *   trailer, the movie and "Paused · 0:13 / 7:45" under a pause sign.
+ *   YouTube's own player shows nothing when paused through its API, so a
+ *   paused trailer looked frozen. Select or Play shows the player again,
+ *   then asks it to play; the jumps move the time on our screen and leave
+ *   the trailer paused.
  * - A trailer that played and ends closes the screen, as Back does. It
  *   pauses when the screen is hidden, and keeps the TV awake while it plays.
- * - The remote follows §4.3 ([trailerKey]), in the way [remote] says (the
- *   debug setting, [TrailerRemoteSetting], when null). Back is always ours.
+ * - The remote follows §4.3 ([trailerKey]) through YouTube's IFrame API
+ *   ([trailerScript]); the screen holds the focus and the WebView never
+ *   takes it. Back is always ours.
  *
  * When no WebView can be made after all (the screen restored after the
  * TV's WebView went away), the trailer goes to the YouTube app instead.
@@ -120,7 +130,6 @@ fun TvTrailerScreen(
     trailers: List<Trailer.YouTube>,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    remote: TrailerRemote? = null,
 ) {
     val vm = viewModel { TrailerViewModel(createSavedStateHandle(), movieTitle, trailers) }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -132,9 +141,6 @@ fun TvTrailerScreen(
             left = true
             back()
         }
-    }
-    val mode by produceState(remote ?: TrailerRemote.Api, remote) {
-        if (remote == null) value = withContext(Dispatchers.IO) { TrailerRemoteSetting.read(context) }
     }
     val status = remember { TrailerStatus() }
     var notice by remember { mutableStateOf<String?>(null) }
@@ -149,8 +155,15 @@ fun TvTrailerScreen(
                         TrailerEvent.READY -> status.ready(key, vm.state.value.attempt)
                         TrailerEvent.STATE -> {
                             status.playerState = value
-                            if (value == TrailerState.PLAYING) status.played = true
-                            if (value == TrailerState.ENDED && status.played) leave()
+                            when (value) {
+                                TrailerState.PLAYING -> {
+                                    status.played = true
+                                    // Playing is never left out of sight, however it started.
+                                    status.paused = false
+                                }
+                                TrailerState.PAUSED -> status.paused = true
+                                TrailerState.ENDED -> if (status.played) leave()
+                            }
                         }
                         TrailerEvent.ERROR -> vm.playerError(key, value)
                         TrailerEvent.UNREACHABLE -> vm.playerUnreachable(key)
@@ -186,23 +199,49 @@ fun TvTrailerScreen(
         if (!status.isReady(playing.key, state.attempt)) vm.playerUnreachable(playing.key)
     }
 
-    val shown = state.playing?.let { status.isReady(it.key, state.attempt) } == true
+    // Ready: the player is ours to show, or to replace with the pause screen while it is paused.
+    val ready = state.playing?.let { status.isReady(it.key, state.attempt) } == true
+    val paused = ready && status.paused
+    val shown = ready && !status.paused
     val root = remember { FocusRequester() }
-    // Shown first, then asked to play: YouTube's rule that nothing plays unseen.
+    // Shown first, then asked to play, at the start and after a pause: YouTube's rule that nothing plays unseen.
     LaunchedEffect(shown) {
         if (!shown) return@LaunchedEffect
         withFrameNanos { }
         player.play()
     }
-    // Where the remote's keys go while the player is shown (§4.3): the screen, which takes each key first, and
-    // for YouTube's keyboard controls the WebView in it. Should the WebView not take it, the screen still has the keys.
-    LaunchedEffect(shown, mode) {
-        if (!shown) return@LaunchedEffect
+    // The screen holds the focus for the remote's keys (§4.3); the WebView never takes it.
+    LaunchedEffect(ready) {
+        if (!ready) return@LaunchedEffect
         withFrameNanos { }
         root.tryFocus()
-        if (mode == TrailerRemote.Keyboard) player.focusPlayer()
     }
+    // The pause screen's time, from the page.
+    LaunchedEffect(paused) { if (paused) player.time(status::time) }
     LaunchedEffect(shown) { if (shown) notice = null }
+    val onKey = { event: AndroidKeyEvent ->
+        val key = trailerKey(event.keyCode)
+        val jump = key == TrailerKey.Back10 || key == TrailerKey.Ahead10
+        when {
+            key == TrailerKey.Pass || key == TrailerKey.Leave -> false
+            event.action != AndroidKeyEvent.ACTION_DOWN || key == TrailerKey.Swallow -> true
+            // A held play or pause key acts once; held jumps repeat.
+            event.repeatCount > 0 && !jump -> true
+            status.paused -> {
+                when {
+                    // Shown again by the pause screen leaving; then asked to play.
+                    key == TrailerKey.Toggle || key == TrailerKey.Play -> status.paused = false
+                    // Jumps stay paused, and the pause screen shows where they went.
+                    jump -> trailerScript(key)?.let { player.call(it, status::time) }
+                }
+                true
+            }
+            else -> {
+                trailerScript(key)?.let { player.call(it) }
+                true
+            }
+        }
+    }
 
     // YouTube's rules: nothing plays while the screen can't be seen.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -224,19 +263,20 @@ fun TvTrailerScreen(
             .fillMaxSize()
             .background(PlayerGround)
             .onBack(onBack = leave)
-            .onPreviewKeyEvent { shown && player.key(it.nativeKeyEvent, mode, status.playing) }
+            .onPreviewKeyEvent { ready && onKey(it.nativeKeyEvent) }
             .focusRequester(root)
-            .focusable(enabled = shown),
+            .focusable(enabled = ready),
     ) {
         AndroidView(
             factory = { player.attach() },
             modifier = Modifier.fillMaxSize(),
-            update = { player.show(shown, keyboard = mode == TrailerRemote.Keyboard) },
+            update = { player.show(shown) },
         )
         if (shown) return@Box
         val trailer = state.trailer
         val name = trailer?.name ?: TrailerText.BUTTON
         when {
+            paused -> TrailerPaused(name, vm.movieTitle, status.positionMs, status.durationMs)
             state.unreachable -> TrailerProblem(
                 trailer = name,
                 movie = vm.movieTitle,
@@ -274,6 +314,9 @@ internal const val READY_TIMEOUT_MS = 20_000L
 /** The TV player's near-black ground, under the trailer screen's own states (TvTrailerPlayer.dc.html). */
 private val PlayerGround = Color(0xFF070708)
 
+/** The spinner's grey track, which rings the pause screen's pause sign. */
+private val SpinnerTrack = Color.White.copy(alpha = 0.18f)
+
 /** The problem screens' explanation (#BDBDBD in the board). */
 private val BodyText = Color(0xFFBDBDBD)
 
@@ -289,6 +332,20 @@ private class TrailerStatus {
     /** It played at some point, so its end closes the screen. */
     var played = false
 
+    /** YouTube's player said it is paused, and nobody has asked it to play since: the pause screen shows. */
+    var paused by mutableStateOf(false)
+
+    /** Where the paused trailer is, and how long it is (0 while YouTube doesn't know), for the pause screen. */
+    var positionMs by mutableLongStateOf(0L)
+        private set
+    var durationMs by mutableLongStateOf(0L)
+        private set
+
+    fun time(positionMs: Long, durationMs: Long) {
+        this.positionMs = positionMs
+        if (durationMs > 0) this.durationMs = durationMs
+    }
+
     val playing: Boolean get() = playerState == TrailerState.PLAYING || playerState == TrailerState.BUFFERING
 
     fun ready(key: String, attempt: Int) {
@@ -302,6 +359,9 @@ private class TrailerStatus {
         readyFor = null
         playerState = -1
         played = false
+        paused = false
+        positionMs = 0
+        durationMs = 0
     }
 }
 
@@ -317,6 +377,45 @@ private fun TrailerLoading(trailer: String, movie: String, modifier: Modifier = 
         Text(trailer, style = inter(48.sp, FontWeight.Bold, tracking = -0.01f), color = WmmColors.Text, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 48.dp))
         Text(movie, style = inter(26.sp), color = WmmColors.TextSoft, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
         Text(TrailerText.PLAYS_FROM_YOUTUBE, style = inter(20.sp, FontWeight.Medium), color = WmmColors.TextMuted, modifier = Modifier.padding(top = 36.dp))
+    }
+}
+
+/**
+ * While the trailer is paused, in the player's place (TvTrailerPlayer.dc.html,
+ * `paused`): laid out as the loading screen, with a pause sign in a ring of
+ * the spinner's track for the spinner, where the trailer is ("Paused · 0:13 /
+ * 7:45", in even-width digits) for "Plays from YouTube", and the keys under
+ * it. Nothing on it takes focus; the screen has the keys.
+ */
+@Composable
+private fun TrailerPaused(trailer: String, movie: String, positionMs: Long, durationMs: Long, modifier: Modifier = Modifier) {
+    Column(
+        modifier.fillMaxSize().background(PlayerGround),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.size(72.dp).border(6.dp, SpinnerTrack, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(WmmIcons.Pause, contentDescription = null, tint = WmmColors.Text, modifier = Modifier.size(28.dp))
+        }
+        Text(trailer, style = inter(48.sp, FontWeight.Bold, tracking = -0.01f), color = WmmColors.Text, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 48.dp))
+        Text(movie, style = inter(26.sp), color = WmmColors.TextSoft, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
+        Text(
+            TrailerText.paused(positionMs, durationMs),
+            style = inter(20.sp, FontWeight.Medium).copy(fontFeatureSettings = "tnum"),
+            color = WmmColors.TextMuted,
+            modifier = Modifier.padding(top = 36.dp).semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        Text(pausedKeys(), style = inter(18.sp), color = WmmColors.TextFaint, modifier = Modifier.padding(top = 56.dp))
+    }
+}
+
+/** "Select to play · ◀ ▶ 10 s · Back to the movie", the keys bolder and lighter, as the board draws them. */
+private fun pausedKeys(): AnnotatedString = buildAnnotatedString {
+    TrailerText.PAUSED_KEYS.forEachIndexed { i, (key, does) ->
+        if (i > 0) append(" · ")
+        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = WmmColors.TextSoft)) { append(key) }
+        append(" ")
+        append(does)
     }
 }
 
@@ -386,9 +485,8 @@ private fun TrailerProblem(
  * page's events reach [onEvent] on the main thread; [onGone] is called when
  * its renderer died.
  *
- * It is never shown until the player is ready ([show]), takes the focus
- * only for YouTube's keyboard controls, and turns the remote's keys into
- * YouTube's ([key]).
+ * It is never shown until the player is ready ([show]) and never takes
+ * the focus: the screen calls YouTube's IFrame API in the page ([call]).
  */
 @SuppressLint("SetJavaScriptEnabled")
 internal class TvTrailerWebView private constructor(
@@ -403,12 +501,13 @@ internal class TvTrailerWebView private constructor(
     private val origin = baseUrl.removeSuffix("/")
     private var released = false
 
-    /** The YouTube key sent down for each remote key still held, so its key-up matches. */
-    private val held = mutableMapOf<Int, Int>()
-
     init {
         view.apply {
             setBackgroundColor(android.graphics.Color.BLACK)
+            // MATCH_PARENT, not the WRAP_CONTENT AndroidView would give it: a WebView whose height wraps
+            // its content lays the page out 0 px high, so the page's 100% heights collapse and YouTube's
+            // player frame plays its sound with no picture (seen on a Google TV Streamer, TV0).
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             visibility = View.INVISIBLE
             isFocusable = false
             isFocusableInTouchMode = false
@@ -465,61 +564,36 @@ internal class TvTrailerWebView private constructor(
         if (!released) view.loadUrl(BLANK)
     }
 
-    /**
-     * Shows the player, or keeps it out of sight. Shown with YouTube's
-     * keyboard controls ([keyboard]), it can take the focus; otherwise
-     * never, and it gives up any it had.
-     */
-    fun show(shown: Boolean, keyboard: Boolean) {
-        if (released) return
-        view.visibility = if (shown) View.VISIBLE else View.INVISIBLE
-        val focusable = shown && keyboard
-        view.isFocusable = focusable
-        view.isFocusableInTouchMode = focusable
-        if (!focusable && view.hasFocus()) view.clearFocus()
+    /** Shows the player, or keeps it out of sight: while it loads, while it is paused, and behind our messages. */
+    fun show(shown: Boolean) {
+        if (!released) view.visibility = if (shown) View.VISIBLE else View.INVISIBLE
     }
 
     /** Asks the player to play, once it is shown. */
-    fun play() = script("playTrailer()")
+    fun play() = call("playTrailer()")
 
-    /** For YouTube's keyboard controls: the focus on the WebView, and in it on the player's frame. */
-    fun focusPlayer() {
-        if (released) return
-        view.requestFocus()
-        script("focusPlayer()")
-    }
+    /** Reads where the player is and how long the video is ([parseTrailerTime]), into [onTime]. */
+    fun time(onTime: (positionMs: Long, durationMs: Long) -> Unit) = call("trailerTime()", onTime)
 
     /**
-     * A remote key while the player is shown: true when the screen took it
-     * (§4.3). With [TrailerRemote.Keyboard] its YouTube key goes to the
-     * player (k, j or l); with [TrailerRemote.Api] the page calls YouTube's
-     * IFrame API. Held play and pause keys act once; held seeks repeat.
-     * Back and keys that aren't the player's are left alone.
+     * Calls the page ([trailerScript], `trailerPage`). [onTime] gets where
+     * the player is after it, when the call returns that (`trailerTime()`
+     * and the jumps do).
      */
-    fun key(event: AndroidKeyEvent, remote: TrailerRemote, playing: Boolean): Boolean {
-        val key = trailerKey(event.keyCode)
-        if (key == TrailerKey.Pass || key == TrailerKey.Leave) return false
-        if (released || key == TrailerKey.Swallow) return true
-        val seek = key == TrailerKey.Back10 || key == TrailerKey.Ahead10
-        val down = event.action == AndroidKeyEvent.ACTION_DOWN
-        // A held play or pause key acts once.
-        if (down && event.repeatCount > 0 && !seek) return true
-        when (remote) {
-            TrailerRemote.Keyboard -> if (down) {
-                val code = (if (event.repeatCount > 0) held[event.keyCode] else youTubeKeyCode(key, playing)) ?: return true
-                held[event.keyCode] = code
-                view.dispatchKeyEvent(event.asYouTubeKey(code))
-            } else {
-                held.remove(event.keyCode)?.let { view.dispatchKeyEvent(event.asYouTubeKey(it)) }
+    fun call(script: String, onTime: ((positionMs: Long, durationMs: Long) -> Unit)? = null) {
+        if (released) return
+        if (onTime == null) {
+            view.evaluateJavascript(script, null)
+        } else {
+            view.evaluateJavascript(script) { result ->
+                if (!released) parseTrailerTime(result)?.let { (position, duration) -> onTime(position, duration) }
             }
-            TrailerRemote.Api -> if (down) trailerScript(key)?.let(::script)
         }
-        return true
     }
 
     fun pause() {
         if (released) return
-        script("pauseTrailer()")
+        call("pauseTrailer()")
         view.onPause()
     }
 
@@ -535,10 +609,6 @@ internal class TvTrailerWebView private constructor(
         view.removeJavascriptInterface(TRAILER_BRIDGE)
         (view.parent as? ViewGroup)?.removeView(view)
         view.destroy()
-    }
-
-    private fun script(call: String) {
-        if (!released) view.evaluateJavascript(call, null)
     }
 
     /**
@@ -557,13 +627,6 @@ internal class TvTrailerWebView private constructor(
         private const val BLANK = "about:blank"
 
         private fun Uri.isWeb() = scheme == "https" || scheme == "http"
-
-        /**
-         * This key as YouTube's [code], from a keyboard, so the page sees
-         * the letter (k, j or l) whatever remote sent the original.
-         */
-        private fun AndroidKeyEvent.asYouTubeKey(code: Int) =
-            AndroidKeyEvent(downTime, eventTime, action, code, repeatCount, 0, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD)
 
         /** The player's WebView, or null when this TV can't make one ([TrailerWebViews]). */
         fun create(
