@@ -26,6 +26,10 @@ it covers releases, the downloads Worker and the CI runners.
 | `arr/seerr.compose.yaml`, `arr/seerr-setup.sh` | A throwaway Seerr and the Jellyfin it needs, pinned, and the script that finishes their setup and prints Seerr's API key; `go test ./internal/integrations/seerr -run Live` runs against it |
 | `windows/fetch-winsparkle.sh` | The pinned official Windows updater DLL and licence files |
 | `macos/fetch-ffmpeg.sh` | The pinned jellyfin-ffmpeg builds the releases and CI use, with checksums |
+| `linux/nfpm.yaml`, `linux/build.py`, `linux/fetch-nfpm.sh` | The Debian, Ubuntu and Fedora packages (`make linux-packages`): one nfpm file for the `.deb` and the `.rpm`, amd64 and arm64; `build.py` writes what differs per package (the `/usr/bin` wrapper's `deb` or `rpm`, the commented-out `config.yaml`, the repository's key) and runs the nfpm that `fetch-nfpm.sh` pins by version and checksum |
+| `linux/watchmymedia.service`, `linux/watchmymedia.sh`, `linux/sysusers.conf`, `linux/scripts/`, `linux/firewalld.xml`, `linux/ufw.profile`, `linux/watchmymedia.sources`, `linux/watchmymedia.repo` | What the packages install: the systemd service, the wrapper that sets the folders, the `watchmymedia` user, the install, update and remove scripts (one set for dpkg and rpm), the firewall definitions, and the apt and dnf repository entries |
+| `linux/package_test.py` | Builds packages from stand-in files and reads them without dpkg or rpm: paths, modes, config files, scripts, the repository entry, versions. With `WMM_LINUX_SMOKE` set it also reads the packages `make linux-smoke-packages` built |
+| `linux/smoke.sh`, `linux/smoke-check.sh`, `linux/throwaway-key.sh` | `make linux-packages-smoke`: installs, updates, removes and purges the packages in a container of one release that runs systemd; the key script makes the throwaway key the test packages are signed with |
 
 ## Checks
 
@@ -34,9 +38,17 @@ python3 -I -m unittest discover -s deploy/release -p '*_test.py'
 python3 -I -m unittest discover -s deploy/ci -p '*_test.py'
 python3 -I -m unittest discover -s deploy/fixture -p '*_test.py'
 python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'   # the Unraid template
+python3 -I -m unittest discover -s deploy/linux -p '*_test.py'    # the Linux packages, from stand-in files
 make docker      # when the Dockerfile, entrypoint or .dockerignore change
 make docker-smoke  # then this, against the image make docker built
+make linux-smoke-packages  # when deploy/linux, config.example.yaml or how the server starts change (needs gpg)
+make linux-packages-smoke IMAGE=debian:13  # then this for each release: also debian:12, ubuntu:24.04, ubuntu:26.04, fedora:44, fedora:45
 ```
+
+The Linux package test reads a `.deb`'s files with Python 3.14 or the `zstd`
+command; with neither it skips those checks and says so. The smoke test
+needs Docker and runs this machine's architecture; CI's
+`linux-packages-install` job runs it on amd64 and arm64.
 
 ## How a release goes
 
@@ -84,3 +96,28 @@ is 1.M.P, `v1.0.0` is 1.6.0, and from `v1.3.0` `v1.M.P` is 1.(M + 4).P.
 - **Fixture.** Synthetic media only, rendered by ffmpeg, with made-up titles:
   no real files and nothing under copyright. Its accounts are for fixture
   servers only.
+- **Linux packages.** Built and tested in CI, and nothing more yet: they are
+  not on a release, signed with a real key or published. What to keep:
+  - One `linux/nfpm.yaml` for both formats and both architectures. A file for one
+    format takes `packager: deb` or `rpm`. nfpm 2.49 leaves a
+    `type: license` file out of a `.deb`, so the licences are plain files.
+  - The four scripts run under dpkg and rpm, which pass different words:
+    `install`, `upgrade`, `configure`, `remove` and `purge` from dpkg, and a
+    count from rpm (1 install, 2 update; 0 removal, 1 update). A new branch
+    needs both.
+  - Nothing starts where systemd is not running, the scripts never open a
+    firewall or change SELinux, and the package owns neither
+    `/var/lib/watchmymedia` nor `/var/cache/watchmymedia`, so removing it
+    keeps the library. `linux/package_test.py` and the smoke test check
+    these.
+  - The account is written twice, in `linux/sysusers.conf` and in
+    `linux/scripts/preinstall.sh`, which runs before the package unpacks.
+    Change both.
+  - The supported releases are named in `ci.yml`'s matrix,
+    `linux/smoke.sh` and the `Makefile`; add or drop one in all three
+    (`ci/security_test.py` checks).
+  - The nfpm pin: bump `VERSION` and every checksum in
+    `linux/fetch-nfpm.sh` together, from the digests GitHub lists for the release's files.
+  - A package carries its repository entry and key only when it is built
+    with `LINUX_REPOSITORY_KEY`. The real key does not exist yet; the tests
+    make a throwaway one, and its secret half is never uploaded.

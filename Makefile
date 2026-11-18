@@ -9,7 +9,7 @@ OPENSUBTITLES_API_KEY ?=
 LDFLAGS  = -s -w -X main.version=$(VERSION) -X main.openSubtitlesKey=$(OPENSUBTITLES_API_KEY)
 
 .PHONY: help dev web-dev gen gen-sqlc gen-api web build build-universal release ffmpeg-macos ffmpeg-windows windows-app windows-installer windows-test macos-app macos-dmg test bench lint docker docker-up clean fixture fixture-serve apple-api apple-gen apple-test apple-build apple-test-sim apple-archive apple-upload apple-tv-archive apple-tv-upload apple-e2e apple-tv-build apple-tv-test-sim apple-tv-test-sim-ci apple-build-release apple-tv-build-release apple-perf agents-check server-deps android-verify-metadata
-.PHONY: streaming-check release-tag
+.PHONY: streaming-check release-tag ffmpeg-linux linux-packages linux-smoke-packages linux-packages-smoke
 
 PLATFORMS := darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64
 
@@ -215,6 +215,10 @@ ffmpeg-macos: ## Download the pinned ffmpeg build for macOS into build/ffmpeg/da
 ffmpeg-windows: ## Download the pinned ffmpeg build for Windows into build/ffmpeg/windows-amd64
 	deploy/macos/fetch-ffmpeg.sh windows-amd64
 
+ffmpeg-linux: ## Download the pinned ffmpeg build for Linux into build/ffmpeg/linux-{amd64,arm64}
+	deploy/macos/fetch-ffmpeg.sh linux-amd64
+	deploy/macos/fetch-ffmpeg.sh linux-arm64
+
 windows-app: web ffmpeg-windows ## Build the Windows x64 tray app with the server and FFmpeg -> build/windows-app
 	VERSION=$(VERSION) windows/build.sh
 
@@ -240,7 +244,7 @@ macos-dmg: build-universal ffmpeg-macos ## Universal app, signed and notarised w
 	UNIVERSAL=1 VERSION=$(VERSION) macos/build-app.sh
 	VERSION=$(VERSION) macos/make-dmg.sh
 
-release: web ffmpeg-macos ffmpeg-windows ## Cross-compile binaries for every platform into dist/ (macOS tarballs and the Windows zip include ffmpeg)
+release: web ffmpeg-macos ffmpeg-linux ffmpeg-windows ## Cross-compile binaries for every platform into dist/ (every archive includes ffmpeg)
 	rm -rf dist && mkdir -p dist
 	@for p in $(PLATFORMS); do \
 	  os=$${p%/*}; arch=$${p#*/}; ext=""; [ "$$os" = windows ] && ext=".exe"; \
@@ -249,10 +253,44 @@ release: web ffmpeg-macos ffmpeg-windows ## Cross-compile binaries for every pla
 	  (cd server && CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags="$(LDFLAGS)" -o ../$$out$$ext ./cmd/server) || exit 1; \
 	  if [ "$$os" = windows ]; then (cd dist && zip -q $$(basename $$out).zip $$(basename $$out)$$ext && rm $$(basename $$out)$$ext) && \
 	    zip -q -j $$out.zip build/ffmpeg/windows-$$arch/ffmpeg.exe build/ffmpeg/windows-$$arch/ffprobe.exe build/ffmpeg/windows-$$arch/VERSION deploy/macos/FFMPEG-LICENSE.md; \
-	  elif [ "$$os" = darwin ]; then tar -czf $$out.tar.gz -C dist $$(basename $$out) -C ../build/ffmpeg/darwin-$$arch ffmpeg ffprobe VERSION -C ../../../deploy/macos FFMPEG-LICENSE.md && rm $$out; \
-	  else tar -C dist -czf $$out.tar.gz $$(basename $$out) && rm $$out; fi; \
+	  else tar -czf $$out.tar.gz -C dist $$(basename $$out) -C ../build/ffmpeg/$$os-$$arch ffmpeg ffprobe VERSION -C ../../../deploy/macos FFMPEG-LICENSE.md && rm $$out; fi; \
 	done
 	@ls -la dist
+
+# The server for Debian, Ubuntu and Fedora (deploy/linux): the Linux binaries
+# with the pinned ffmpeg, a systemd service and its user, as a .deb and an
+# .rpm for each of amd64 and arm64. LINUX_REPOSITORY_KEY is the armored public
+# key of the apt and dnf repositories: with it the packages carry their
+# repository entry and that key, and without it neither, so they install and
+# never look for updates. LINUX_SIGNING_KEY is the OpenPGP secret key the .rpm
+# files are signed with (its passphrase in NFPM_RPM_PASSPHRASE).
+LINUX_PACKAGES_OUT ?= build/linux-packages
+LINUX_REPOSITORY_KEY ?=
+LINUX_SIGNING_KEY ?=
+
+linux-packages: web ffmpeg-linux ## Build the server's .deb and .rpm for amd64 and arm64 -> build/linux-packages
+	@for arch in amd64 arm64; do \
+	  echo "building build/linux/$$arch/watchmymedia"; \
+	  (cd server && CGO_ENABLED=0 GOOS=linux GOARCH=$$arch go build -trimpath -ldflags="$(LDFLAGS)" -o ../build/linux/$$arch/watchmymedia ./cmd/server) || exit 1; \
+	done
+	python3 -I deploy/linux/build.py --version $(VERSION) --out $(LINUX_PACKAGES_OUT) \
+	  $(if $(LINUX_REPOSITORY_KEY),--repository-key $(LINUX_REPOSITORY_KEY)) $(if $(LINUX_SIGNING_KEY),--signing-key $(LINUX_SIGNING_KEY))
+
+# What linux-packages-smoke installs: an older build to update from, and a
+# current one made as a release will be, signed and with its repository
+# entry, by a throwaway key. Nothing here is published.
+linux-smoke-packages: web ffmpeg-linux ## Build an older and a current set of Linux packages with a throwaway key -> build/linux-smoke
+	deploy/linux/throwaway-key.sh build/linux-smoke/key
+	$(MAKE) -o web -o ffmpeg-linux linux-packages VERSION=v0.0.1 LINUX_PACKAGES_OUT=build/linux-smoke/older \
+	  LINUX_REPOSITORY_KEY= LINUX_SIGNING_KEY=
+	$(MAKE) -o web -o ffmpeg-linux linux-packages VERSION=v0.0.2 LINUX_PACKAGES_OUT=build/linux-smoke/current \
+	  LINUX_REPOSITORY_KEY=build/linux-smoke/key/public.asc LINUX_SIGNING_KEY=build/linux-smoke/key/secret.asc
+
+# IMAGE is one of debian:12, debian:13, ubuntu:24.04, ubuntu:26.04, fedora:44
+# and fedora:45; the container is this machine's architecture.
+IMAGE ?= debian:13
+linux-packages-smoke: ## Install, update and remove build/linux-smoke's packages in a systemd container of IMAGE (default debian:13)
+	deploy/linux/smoke.sh $(IMAGE)
 
 # VERSION must be given here: its default, git describe, is never a new tag.
 release-tag: ## Tag origin/main as a release and push it, which starts release.yml (VERSION=vX.Y.Z[-rc.N])

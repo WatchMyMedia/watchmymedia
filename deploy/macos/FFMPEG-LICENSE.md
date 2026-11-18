@@ -1,8 +1,9 @@
 # About the bundled ffmpeg
 
 The `ffmpeg` and `ffprobe` shipped with WatchMyMedia (next to this file in
-the release tarball or zip; in `Contents/Helpers` of the Mac app) are the
-portable macOS or Windows build of
+the release tarball or zip; in `Contents/Helpers` of the Mac app; in
+`/usr/lib/watchmymedia` of the Debian, Ubuntu and Fedora packages) are the
+portable macOS, Linux or Windows build of
 [jellyfin-ffmpeg](https://github.com/jellyfin/jellyfin-ffmpeg), unchanged;
 `VERSION` (`FFMPEG-VERSION` in the Mac app) names the release.
 WatchMyMedia runs them as separate programs and is not linked against them.

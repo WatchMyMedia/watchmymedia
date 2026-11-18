@@ -150,11 +150,56 @@ of existing `/config` and `/transcode` contents on the next start.
 
 **Native binary (recommended on macOS).** Download `watchmymedia-<version>-<os>-<arch>` from
 a release (or `make release`), unpack it, and run
-`WATCHMYMEDIA_DATA_DIR=~/watchmymedia ./watchmymedia`. The macOS tarballs and Windows x64 ZIP include
+`WATCHMYMEDIA_DATA_DIR=~/watchmymedia ./watchmymedia`. Every archive includes
 FFmpeg and FFprobe ([jellyfin-ffmpeg](https://github.com/jellyfin/jellyfin-ffmpeg),
 GPL; see `FFMPEG-LICENSE.md` inside), which the server finds next to its own binary.
-The Mac build includes VideoToolbox, libass and zimg. Linux binaries need FFmpeg on
-`PATH`, or `ffmpeg.ffmpeg` / `WATCHMYMEDIA_FFMPEG_PATH` pointing at one.
+The Mac build includes VideoToolbox, libass and zimg. The Linux build needs only glibc 2.28
+or later; for hardware transcoding it loads the system's VA-API, oneVPL and NVIDIA libraries,
+so the GPU's driver comes from the distribution. The Linux archives of 1.6.1 and earlier hold
+only the server: they need FFmpeg on `PATH`, or `ffmpeg.ffmpeg` / `WATCHMYMEDIA_FFMPEG_PATH`
+pointing at one.
+
+**Debian, Ubuntu and Fedora packages (not published yet).** `make linux-packages` builds a
+`.deb` for Debian 13 and 12 and Ubuntu 26.04 and 24.04, and an `.rpm` for Fedora 45 and 44,
+each for amd64 and arm64, into `build/linux-packages/`. Install one with
+`sudo apt install ./watchmymedia_<version>_<arch>.deb` or
+`sudo dnf install ./watchmymedia-<version>-1.<arch>.rpm`. Fedora 45's `rpm -i` refuses a
+package that is not signed; `dnf` installs it with a warning.
+
+- **What it installs.** The server and the same FFmpeg in `/usr/lib/watchmymedia`, and a
+  systemd service, `watchmymedia`, that runs it as its own `watchmymedia` user and starts
+  with the machine. That user is in the `render` and `video` groups, so a GPU needs no
+  `usermod`. Setup is in a browser, at port 27587. Where systemd is not running, as in a
+  container, the install starts nothing.
+- **Where things are.** Data (the database, artwork, backups) in `/var/lib/watchmymedia`,
+  the playback cache in `/var/cache/watchmymedia`, settings in
+  `/etc/watchmymedia/config.yaml`, logs in the journal (`journalctl -u watchmymedia`). The
+  settings file has every option commented out and only root and the service can read it;
+  restart the service after changing it (`sudo systemctl restart watchmymedia`). The two
+  folders are set by the service, not that file: change them with
+  `sudo systemctl edit watchmymedia` (`Environment=WATCHMYMEDIA_DATA_DIR=…`).
+  `watchmymedia backup` at a prompt uses the same folders.
+- **Your library folders** must be readable by the `watchmymedia` user, which a package
+  cannot arrange: home folders and drives a desktop mounts are closed to other users.
+- **The firewall** is left alone. Where one is on, open the port with
+  `sudo firewall-cmd --permanent --add-service=watchmymedia && sudo firewall-cmd --reload`
+  (firewalld) or `sudo ufw allow WatchMyMedia` (ufw).
+- **Updating and removing.** Installing a newer file updates it and restarts the service if
+  it was running. `apt remove` and `dnf remove` stop the service and keep the settings and
+  `/var/lib/watchmymedia`; `apt purge` also removes the settings and the cache, and says the
+  data is still there.
+- **Not there yet.** The packages are not on a release or on
+  <https://downloads.watchmy.media>, and the apt and dnf repositories that will deliver
+  updates do not exist: a package built here carries no repository entry. Hardware
+  transcoding uses the distribution's drivers and has not been run on a GPU on Linux.
+
+Developers: [deploy/linux](deploy/linux) holds the one [nfpm](https://nfpm.goreleaser.com/)
+file both formats are built from and what it packs. `make linux-smoke-packages` builds an
+older and a current set with a throwaway signing key (it needs `gpg`), and
+`make linux-packages-smoke IMAGE=debian:13` installs, updates, removes and purges them in a
+container that runs systemd (it needs Docker; `IMAGE` is any of `debian:12`, `debian:13`,
+`ubuntu:24.04`, `ubuntu:26.04`, `fedora:44` and `fedora:45`). CI does the same on all six, on
+amd64 and arm64.
 
 **macOS app.** Download the DMG from <https://watchmy.media/download> and drag the app to
 Applications. It is a menu bar item that runs the server from inside the app bundle with

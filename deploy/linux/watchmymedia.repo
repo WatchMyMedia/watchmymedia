@@ -1,0 +1,13 @@
+# WatchMyMedia's dnf repository, added by the watchmymedia package so that
+# updates arrive with the system's other updates.
+# To stop using it, change enabled=1 to enabled=0; updates keep the change.
+[watchmymedia]
+name=WatchMyMedia
+baseurl=https://downloads.watchmy.media/rpm/$basearch
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-watchmymedia
+# If downloads.watchmy.media cannot be reached, the system's other updates
+# still install.
+skip_if_unavailable=1

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>WatchMyMedia</short>
+  <description>WatchMyMedia media server. Browsers and the phone and TV apps connect to it on TCP port 27587.</description>
+  <port protocol="tcp" port="27587"/>
+</service>
