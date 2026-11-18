@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { searchQuery } from '../api/queries'
 import { requestOptionsQuery, requestableSearchQuery, type Requestable } from '../api/requests'
 import { Poster } from '../components/Poster'
 import { RequestDialog } from '../components/RequestDialog'
+import { SearchBox } from '../components/SearchBox'
 import { OnLiveTV } from '../components/liveTV/OnLiveTV'
 import { seCode } from '../lib/format'
 import { requestSource } from '../lib/requests'
@@ -12,38 +13,12 @@ import { requestSource } from '../lib/requests'
 export function Search({ q }: { q: string }) {
   return (
     <div className="space-y-6">
-      <PhoneSearchBox key={q} q={q} />
+      {/* The app bar's search box is hidden on phones, so the page has its own there. */}
+      <SearchBox key={q} variant="page" initial={q} />
       <Results q={q} />
       <OnLiveTV q={q} />
       <NotInLibrary q={q} />
     </div>
-  )
-}
-
-/** The header's search box is hidden on phones, so the page has its own there. */
-function PhoneSearchBox({ q }: { q: string }) {
-  const navigate = useNavigate()
-  const [text, setText] = useState(q)
-  return (
-    <form
-      role="search"
-      className="sm:hidden"
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (text.trim()) void navigate({ to: '/search', search: { q: text.trim() } })
-      }}
-    >
-      <input
-        type="search"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Search"
-        aria-label="Search titles"
-        autoFocus={!q}
-        enterKeyHint="search"
-        className="min-h-[44px] w-full rounded-md border border-line-2 bg-surface px-3 text-base placeholder:text-neutral-500"
-      />
-    </form>
   )
 }
 

@@ -6,6 +6,7 @@ import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-route
 import { useServerEvents, useEventState } from './api/events'
 import { useAuth } from './authContext'
 import { StatusPanel } from './components/StatusPanel'
+import { SearchBox } from './components/SearchBox'
 import { BrandLockup, BrandMark } from './components/BrandMark'
 import { Login } from './pages/Login'
 import { startCasting } from './cast/sender'
@@ -30,7 +31,6 @@ function Shell() {
   const auth = useAuth()
   const [status, setStatus] = useState(false)
   const [menu, setMenu] = useState(false)
-  const [q, setQ] = useState('')
   const navigate = useNavigate()
   const path = useRouterState({ select: (s) => s.location.pathname })
   const { scans, matches, connected } = useEventState()
@@ -105,21 +105,7 @@ function Shell() {
               </Link>
             )}
           </nav>
-          {hasLibraries && <form
-            className="ml-auto hidden min-w-0 flex-1 justify-end sm:flex"
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (q.trim()) void navigate({ to: '/search', search: { q: q.trim() } })
-            }}
-          >
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search"
-              aria-label="Search titles"
-              className="min-h-[36px] w-full max-w-xs rounded-md border border-line-2 bg-surface px-3 text-sm placeholder:text-neutral-500"
-            />
-          </form>}
+          {hasLibraries && <SearchBox variant="bar" />}
           {/* Phones have no room for the search box: a button opens Search, which has its own. */}
           {hasLibraries && <Link
             to="/search"
