@@ -5,6 +5,46 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 1.6.1
+
+Episodes that TMDB doesn't list yet now play from their show's page, and the web app's search
+box suggests titles from your library as you type. This release changes only the server and the
+web app.
+
+- This release changes the server's database. Back up before updating: Settings › Backups ›
+  Back up now, or `watchmymedia backup`. Going back to 1.6.0 afterwards needs that backup.
+- An episode file whose show is on TMDB, but whose episode or season TMDB doesn't list, now
+  plays as an episode of that show, named after the file. This happens, for example, when your
+  files are a streaming release with six episodes and TMDB lists the broadcast's three. Before,
+  such files were on no show page and appeared only in Recently added, as a group that could
+  not be opened.
+- These episodes sit in order on the show's page in every app, keep their place to resume and
+  their watched marks, and count in the show's and season's totals. Library lists no longer
+  show the same files again as an unmatched card with nowhere to go.
+- The file stays in the library's Unmatched list, and the server asks TMDB about it again each
+  day. When TMDB lists the episode, it takes TMDB's name and details, and everyone's watched
+  marks and places to resume stay. If you match the file by hand or line it up with another
+  season, they move with it. People who follow the show hear about the episode once TMDB lists
+  it.
+- Files already in your library get their episodes when the server next tries unmatched files
+  again, within a day of updating, or at once with Match on the library's page in Settings ›
+  Libraries. Files named by air date or year, specials and episode 0 still need matching by
+  hand.
+- In the web app, the search box at the top lists movies, shows and episodes from your library
+  as you type, from the second letter: up to five movies and shows, best match first, then up
+  to three episodes, then Search for, which opens every result. Arrow keys move through the
+  list, Enter opens the highlighted title and Escape closes it. Enter with nothing highlighted
+  opens the Search page, as before. The Search page's own box on a phone's browser does the
+  same.
+- The server's API is unchanged for the apps: every app version works with it, and older apps
+  show the new episodes too. The Cast receiver is unchanged.
+- The server, the Docker image, the Mac app and the Windows app are 1.6.1. The Mac app and the
+  Windows app of 1.6.0 offer the update under Check for updates. The Android, iPhone, iPad and
+  Apple TV apps have no changes, so their store versions stay as they are.
+- The new episodes have been tried in tests against a stand-in TMDB, not yet on a real library
+  or in the apps. The search suggestions have been tried in a browser against a test server
+  with made-up titles, not yet on a large library or with a screen reader.
+
 ## 1.6.0
 
 The end of every movie and show page now suggests what to watch next from your own library:
