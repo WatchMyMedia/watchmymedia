@@ -453,12 +453,37 @@ class PackageContentsTest(Checks, unittest.TestCase):
         dearmored = subprocess.run(['gpg', '--dearmor'], input=armored.encode(), capture_output=True, check=True)
         self.assertEqual(dearmored.stdout, build.dearmor(armored))
 
-    def test_a_key_that_is_not_one_armored_public_key_is_refused(self):
-        for text in ('', 'not a key', STAND_IN_KEY.replace('PUBLIC', 'PRIVATE')):
+    def test_a_key_file_that_is_not_armored_public_keys_is_refused(self):
+        unfinished = STAND_IN_KEY.replace('-----END PGP PUBLIC KEY BLOCK-----\n', '')
+        for text in ('', 'not a key', STAND_IN_KEY.replace('PUBLIC', 'PRIVATE'), unfinished,
+                     STAND_IN_KEY + 'something else\n', 'something else\n' + STAND_IN_KEY):
             with self.subTest(text=text[:30]):
                 with self.assertRaises(ValueError):
                     build.dearmor(text)
         self.assertEqual(b'stand-in public key for the package tests', build.dearmor(STAND_IN_KEY))
+
+    def test_the_key_file_can_hold_more_than_one_key(self):
+        # dnf never refreshes a key it already holds for a repository, so a
+        # replacement for the lists' signer is a second key in the file. Both
+        # packages then carry both: the apt keyring is one key after the other.
+        second = STAND_IN_KEY.replace(base64.b64encode(b'stand-in public key for the package tests').decode(),
+                                      base64.b64encode(b'a second stand-in key').decode())
+        both = STAND_IN_KEY + '\n' + second
+        self.assertEqual(b'stand-in public key for the package tests' + b'a second stand-in key', build.dearmor(both))
+        key = self.dir / 'two-keys.asc'
+        key.write_text(both)
+        packages = self.build('v1.7.0', 'two-keys', arches=('amd64',), repository_key=key)
+        self.check_package(packages['deb', 'amd64'], 'deb', 'amd64', repository=True, armored=both)
+        self.check_package(packages['rpm', 'amd64'], 'rpm', 'amd64', repository=True, armored=both)
+        if shutil.which('gpg'):
+            # gpg reads two real keys from one file the same way.
+            for name in ('one', 'two'):
+                subprocess.run([str(HERE / 'throwaway-key.sh'), str(self.dir / name)], check=True, capture_output=True)
+            armored = (self.dir / 'one/public.asc').read_text() + (self.dir / 'two/public.asc').read_text()
+            dearmored = subprocess.run(['gpg', '--dearmor'], input=armored.encode(), capture_output=True, check=True)
+            self.assertEqual(dearmored.stdout, build.dearmor(armored))
+            primaries = [openpgp_fingerprint(body) for tag, body in openpgp_packets(build.dearmor(armored)) if tag == 6]
+            self.assertEqual(2, len(set(primaries)))
 
 
 class SourceFilesTest(unittest.TestCase):

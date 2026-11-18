@@ -30,8 +30,9 @@ and streams to:
 - the iPhone, iPad and Apple TV apps on a shared Swift package (`apple/`);
 - the macOS menu bar app that runs the server (`macos/`).
 
-Releases ship the server for macOS, Linux, Windows and Docker, the Mac app,
-the APK and bundle (Play), and the iOS app (TestFlight). The people who run
+Releases ship the server for macOS, Linux, Windows and Docker, its Debian,
+Ubuntu and Fedora packages, the Mac app, the APK and bundle (Play), and the
+iOS app (TestFlight). The people who run
 WatchMyMedia are the audience for `CHANGELOG.md` and the README.
 
 ## Layout
@@ -218,6 +219,7 @@ is encrypted with `GRADLE_ENCRYPTION_KEY`, the only secret `ci.yml` may read
 | `AGENTS.md`, `CLAUDE.md`, or paths and targets they name | `make agents-check` |
 | Dockerfile | `make docker` |
 | Linux packages (`deploy/linux/`), `deploy/config.example.yaml`, or how the server starts and finds its folders, config and ffmpeg | `python3 -I -m unittest discover -s deploy/linux -p '*_test.py'`, then `make linux-smoke-packages` and `make linux-packages-smoke` ([deploy/AGENTS.md](deploy/AGENTS.md)) |
+| What a release attaches for Linux (`deploy/linux/release.sh`, `deploy/linux/repository.sh`, the `packages` job) | the same unittest on Linux with `rpm`, `apt-utils` and `createrepo-c` installed, where it does not skip the release tests ([deploy/AGENTS.md](deploy/AGENTS.md)) |
 | A screen or flow | run it: the web app in a browser, the apps on an emulator or simulator, on the fakes and against a fixture server |
 
 Gaps the usual checks miss:
@@ -269,7 +271,9 @@ explicit go-ahead in the current conversation, every time:
 - **Signing as the company**: running CI with "Also sign and verify a Windows
   installer" (it signs as Eldwick Software LLC), and changing the Azure
   Artifact Signing account, profile, its Entra app or the `windows-signing`
-  environment.
+  environment. The same goes for the key that signs the Linux packages:
+  the `LINUX_PACKAGE_SIGNING_KEY` secret, the subkey id `release.yml` names,
+  and `deploy/linux/repository-key.asc`, which every install trusts.
 - **Production deploys**: `pnpm deploy:receiver` (the Cast receiver on
   cast.watchmy.media, which every cast loads) and any other `wrangler deploy`.
 - **Shared branches and settings**: pushing to `main`, merging pull requests,

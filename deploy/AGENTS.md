@@ -31,6 +31,7 @@ it covers releases, the downloads Worker and the CI runners.
 | `linux/watchmymedia.service`, `linux/watchmymedia.sh`, `linux/sysusers.conf`, `linux/scripts/`, `linux/firewalld.xml`, `linux/ufw.profile`, `linux/watchmymedia.sources`, `linux/watchmymedia.repo` | What the packages install: the systemd service, the wrapper that sets the folders, the `watchmymedia` user, the install, update and remove scripts (one set for dpkg and rpm), the firewall definitions, and the apt and dnf repository entries |
 | `linux/package_test.py` | Builds packages from stand-in files and reads them without dpkg or rpm: paths, modes, config files, scripts, the repository entry, versions. With `WMM_LINUX_SMOKE` set it also reads the packages `make linux-smoke-packages` built |
 | `linux/smoke.sh`, `linux/smoke-check.sh`, `linux/throwaway-key.sh` | `make linux-packages-smoke`: installs, updates, removes and purges the packages in a container of one release that runs systemd; the key script makes the throwaway key the test packages are signed with |
+| `linux/release.sh`, `linux/signer.py`, `linux/repository.sh`, `linux/release_test.py` | What a release attaches (`release.yml`'s `packages` job): `release.sh` builds the four packages from the release's Linux archives, checks each `.rpm`'s signature against `repository-key.asc` and reads which subkey made it (`signer.py`), and for a release that is not a pre-release runs `repository.sh`, which writes the apt and dnf repositories' lists for those packages, unsigned; the test drives them from stand-in archives with a throwaway key. Linux only |
 
 ## Checks
 
@@ -44,6 +45,19 @@ make docker      # when the Dockerfile, entrypoint or .dockerignore change
 make docker-smoke  # then this, against the image make docker built
 make linux-smoke-packages  # when deploy/linux, config.example.yaml or how the server starts change (needs gpg)
 make linux-packages-smoke IMAGE=debian:13  # then this for each release: also debian:12, ubuntu:24.04, ubuntu:26.04, fedora:44, fedora:45
+```
+
+The release script's tests (`linux/release_test.py`) need Linux with
+`rpm`, `apt-utils`, `createrepo-c` and `gnupg`; elsewhere they are skipped.
+CI's `linux-packages` job installs those and sets `WMM_LINUX_RELEASE`, which
+turns a missing tool into a failure. On a Mac, run them in a container, of
+the Ubuntu release GitHub's `ubuntu-latest` is (26.04 on 2026-11-18; the
+tools' versions differ between releases, and 24.04 passes too):
+
+```bash
+docker run --rm -v "$PWD:/src" -w /src -e WMM_LINUX_RELEASE=1 ubuntu:26.04 sh -c \
+  'apt-get update -q && apt-get install -yq --no-install-recommends rpm apt-utils createrepo-c gnupg python3 curl ca-certificates zstd make \
+   && python3 -I -m unittest discover -s deploy/linux -p "*_test.py"'
 ```
 
 The Linux package test reads a `.deb`'s files with Python 3.14 or the `zstd`
@@ -64,7 +78,8 @@ needs Docker and runs this machine's architecture; CI's
    after checking the version shape (`apple/scripts/version.sh`), that it is
    newer than every tag, and that the notes exist. **Only on the user's
    explicit go-ahead.**
-3. `release.yml`: `check` creates the GitHub release; `binaries`, `macos`
+3. `release.yml`: `check` creates the GitHub release; `binaries`,
+   `packages` (the `.deb` and `.rpm`, and the repositories' lists), `macos`
    (signed, notarised DMG), `image` (GHCR, two architectures), `ios`
    (TestFlight), `android` (APK and bundle) and `windows` (the installer,
    signed with Artifact Signing) add to it. It runs on GitHub's runners with
@@ -97,8 +112,11 @@ is 1.M.P, `v1.0.0` is 1.6.0, and from `v1.3.0` `v1.M.P` is 1.(M + 4).P.
 - **Fixture.** Synthetic media only, rendered by ffmpeg, with made-up titles:
   no real files and nothing under copyright. Its accounts are for fixture
   servers only.
-- **Linux packages.** Built and tested in CI, and nothing more yet: they are
-  not on a release, signed with a real key or published. What to keep:
+- **Linux packages.** Built and tested in CI, and built, signed and attached
+  to the GitHub release by `release.yml`'s `packages` job. No release has
+  been tagged since that job was added, and nothing is published: the apt
+  and dnf repositories are the maintainers' to sign and publish. What to
+  keep:
   - One `linux/nfpm.yaml` for both formats and both architectures. A file for one
     format takes `packager: deb` or `rpm`. nfpm 2.49 leaves a
     `type: license` file out of a `.deb`, so the licences are plain files.
@@ -161,7 +179,34 @@ is 1.M.P, `v1.0.0` is 1.6.0, and from `v1.3.0` `v1.M.P` is 1.(M + 4).P.
     test sign with a throwaway key of the same shape
     (`linux/throwaway-key.sh`), whose secret part is never uploaded; the
     real one is only ever in a release.
-  - The key file holds one key and `build.py` insists on that. dnf never
-    refreshes a key it already holds for a repository, so replacing the
-    lists' signer one day means adding a second key to the file, and
-    `build.py` then has to take more than one.
+  - The key file holds one key today and may hold more, one armored block
+    after another: dnf never refreshes a key it already holds for a
+    repository, so replacing the lists' signer one day means adding a
+    brand-new key beside this one, never a new subkey. `build.py` writes
+    every key in the file into both packages; `linux/package_test.py` still
+    holds the committed file to the one key there is.
+  - **What a release attaches.** `linux/release.sh` builds from the Linux
+    archives the `binaries` job packed, so a package and the archive hold
+    the same server and ffmpeg. It checks every `.rpm` with `rpmkeys`
+    against `repository-key.asc`, and reads the signing subkey's id from
+    the package (`linux/signer.py`), before it puts anything in the folder
+    the job attaches; keep that order. Don't read the subkey from what
+    `rpmkeys` prints: rpm 4.18 (Ubuntu 24.04) prints the subkey's id and
+    rpm 6.0 (Ubuntu 26.04, GitHub's `ubuntu-latest` on 2026-11-18) the
+    key's own fingerprint, whichever subkey signed. The
+    job fails without `LINUX_PACKAGE_SIGNING_KEY`: an unsigned `.rpm` is
+    never attached. The key is written to `RUNNER_TEMP` and removed in an
+    `if: always()` step; `ci/security_test.py` checks all of it.
+  - **The lists** (`linux/repository.sh`) are for one release, unsigned, in
+    `watchmymedia-linux-repositories-<version>.tar.gz`. The name is
+    deliberate: the maintainers' publisher takes
+    `watchmymedia-v<version>-<os>-<arch>` archives as server downloads, and
+    this must not look like one. Only SHA-256 is written, because apt asks
+    for `by-hash/<its strongest hash>/` and there is one such folder.
+    `createrepo_c` is told gzip, so the hashed names end `.xml.gz` whatever
+    its default becomes. Nothing here signs a list, and the lists' key
+    (`LINUX_REPO_SIGNING_KEY`) is never named in a workflow of this
+    repository.
+  - **Pre-releases** get packages and no lists. nfpm writes `1.7.0~rc.1`
+    and GitHub replaces `~` in a file's name with `.`, so `release.sh`
+    names them that way itself; the version inside is unchanged.

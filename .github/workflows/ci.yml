@@ -601,9 +601,19 @@ jobs:
       # PATH is passed so make uses the Go and pnpm set up above.
       - name: Build an older and a current set of packages
         run: make linux-smoke-packages PATH="$PATH"
-      - name: Check what is in the packages
+      # What a release's packages job needs beside this job's tools: rpm's
+      # own tool to check a signature, and the two that write the apt and dnf
+      # repositories' lists.
+      - name: Install the package and repository tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rpm apt-utils createrepo-c
+      # WMM_LINUX_RELEASE: the release script's tests run here, and fail
+      # rather than skip if one of those tools is missing.
+      - name: Check what is in the packages, and what a release attaches
         env:
           WMM_LINUX_SMOKE: build/linux-smoke
+          WMM_LINUX_RELEASE: required
         run: python3 -I -m unittest discover -s deploy/linux -p '*_test.py' -v
       # One artifact for each format and architecture, so an install job
       # downloads only its own three files. The throwaway key's public half

@@ -86,9 +86,17 @@ class WorkflowIsolationTest(unittest.TestCase):
                                workflow.split('jobs:\n', 1)[1]))
         build, install = jobs['linux-packages'], jobs['linux-packages-install']
         self.assertIn('        run: make linux-smoke-packages PATH="$PATH"\n', build)
+        # The same run drives the release's script (deploy/linux/release.sh)
+        # on stand-ins, with the tools the release's packages job installs:
+        # set, WMM_LINUX_RELEASE makes a missing tool a failure, not a skip.
         self.assertIn("          WMM_LINUX_SMOKE: build/linux-smoke\n"
+                      "          WMM_LINUX_RELEASE: required\n"
                       "        run: python3 -I -m unittest discover -s deploy/linux -p '*_test.py' -v\n", build)
         self.assertLess(build.index('make linux-smoke-packages'), build.index('WMM_LINUX_SMOKE'))
+        tools = 'sudo apt-get install -y --no-install-recommends rpm apt-utils createrepo-c\n'
+        self.assertLess(build.index(tools), build.index('WMM_LINUX_RELEASE'))
+        release = (ROOT / '.github/workflows/release.yml').read_text()
+        self.assertIn(tools, release.split('\n  packages:\n', 1)[1].split('\n  macos:\n', 1)[0])
         uploads = re.findall(r'(?m)^          name: (linux-packages-\S+)\n          path: \|\n((?:            .*\n)+)', build)
         self.assertEqual(['linux-packages-deb-amd64', 'linux-packages-deb-arm64',
                           'linux-packages-rpm-amd64', 'linux-packages-rpm-arm64'], [name for name, _ in uploads])
@@ -304,6 +312,64 @@ class WorkflowIsolationTest(unittest.TestCase):
                              r'        with:\n(?:          (?!files|path)[^\n]*\n)*          (?:files|path): ([^\n]+)', windows)
         self.assertEqual(['build/windows-installer/WatchMyMedia-*-x64-setup.exe'], outputs)
 
+    def test_release_builds_and_signs_the_linux_packages_in_their_job(self):
+        # The .rpm files are signed with the packages' own subkey, checked
+        # against the committed public key, and only then attached. The key
+        # that signs the repositories' lists is never in this repository.
+        workflow = (ROOT / '.github/workflows/release.yml').read_text()
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        packages = jobs['packages']
+        self.assertIn('    needs: [check, binaries]\n    runs-on: ubuntu-latest\n    environment: release\n'
+                      '    permissions:\n      contents: write\n', packages)
+        # It packs the server and ffmpeg of the archives the binaries job made.
+        self.assertIn('          name: linux-archives\n          path: dist/watchmymedia-*-linux-*.tar.gz\n'
+                      '          if-no-files-found: error\n', jobs['binaries'])
+        self.assertIn('          name: linux-archives\n          path: ${{ runner.temp }}/linux-archives\n', packages)
+        # The key reaches one step, is written outside the checkout and is
+        # removed whatever happens; nothing prints it.
+        self.assertEqual(1, workflow.count('secrets.LINUX_PACKAGE_SIGNING_KEY'))
+        write = re.search(r"(?ms)- name: Write the packages' signing key\n(.*?)(?=      -)", packages).group(1)
+        self.assertIn('LINUX_PACKAGE_SIGNING_KEY: ${{ secrets.LINUX_PACKAGE_SIGNING_KEY }}', write)
+        self.assertEqual(['if [ -z "$LINUX_PACKAGE_SIGNING_KEY" ]; then',
+                          '(umask 077 && printf \'%s\\n\' "$LINUX_PACKAGE_SIGNING_KEY" > "$RUNNER_TEMP/linux-packages.key")'],
+                         [line.strip() for line in write.splitlines() if '$LINUX_PACKAGE_SIGNING_KEY' in line])
+        self.assertEqual(2, packages.count('$LINUX_PACKAGE_SIGNING_KEY'))
+        self.assertIn('      - name: Remove the signing key\n        if: always()\n'
+                      '        run: rm -f "$RUNNER_TEMP/linux-packages.key"\n', packages)
+        self.assertNotIn('set -x', packages)
+        # The subkey is named, and is the one the package test holds the committed key to.
+        self.assertIn('          LINUX_SIGNING_KEY: ${{ runner.temp }}/linux-packages.key\n'
+                      '          LINUX_SIGNING_KEY_ID: BD64FACE28C2EF71\n', packages)
+        rpm_subkey = re.search(r"(?m)^RPM_SUBKEY = '([0-9A-F]{40})'", (ROOT / 'deploy/linux/package_test.py').read_text()).group(1)
+        self.assertEqual('BD64FACE28C2EF71', rpm_subkey[-16:])
+        self.assertIn('deploy/linux/release.sh "$GITHUB_REF_NAME" "$RUNNER_TEMP/linux-archives" build/linux-release\n', packages)
+        order = ['actions/download-artifact@', 'apt-get install', 'linux-packages.key")', 'deploy/linux/release.sh',
+                 'rm -f "$RUNNER_TEMP/linux-packages.key"', 'action-gh-release@']
+        positions = [packages.index(marker) for marker in order]
+        self.assertEqual(sorted(positions), positions)
+        # Only what the script checked leaves the job.
+        outputs = re.findall(r'(?ms)- uses: (?:softprops/action-gh-release|actions/upload-artifact)@[^\n]+\n'
+                             r'        with:\n(?:          (?!files|path)[^\n]*\n)*          (?:files|path): ([^\n]+)', packages)
+        self.assertEqual(['build/linux-release/*'], outputs)
+        self.assertIn('          fail_on_unmatched_files: true\n', packages)
+        # The script checks each signature before it fills the folder, and
+        # writes lists for a release only.
+        script = (ROOT / 'deploy/linux/release.sh').read_text()
+        for marker in ('rpmkeys --dbpath "$work/rpmdb" --import "$repository_key"', '--checksig',
+                       'python3 -I "$here/signer.py" "$rpm"', '"$here/repository.sh"'):
+            self.assertIn(marker, script)
+        self.assertLess(script.index('--checksig'), script.index('python3 -I "$here/signer.py"'))
+        self.assertLess(script.index('python3 -I "$here/signer.py"'), script.index('"$out/'))
+        for other in set(jobs) - {'packages'}:
+            # Without comments: the one above a job is read with the job before it.
+            steps = re.sub(r'(?m)^ *#.*\n', '', jobs[other])
+            for marker in ('LINUX_PACKAGE_SIGNING_KEY', 'LINUX_SIGNING_KEY', 'linux-packages.key', 'deploy/linux/release.sh'):
+                with self.subTest(job=other, marker=marker):
+                    self.assertNotIn(marker, steps)
+        for path in sorted((ROOT / '.github/workflows').glob('*.yml')):
+            self.assertNotIn('LINUX_REPO_SIGNING_KEY', path.read_text(), path.name)
+
     def test_release_runs_on_hosted_runners_without_caches_and_with_least_permissions(self):
         # A release is built from the tagged commit alone, on a machine nobody
         # else has used, and a job can write only what it publishes.
@@ -316,7 +382,7 @@ class WorkflowIsolationTest(unittest.TestCase):
         self.assertEqual(set(), set(re.findall(r'(?m)^          cache: (.+)$', workflow)) - {'false'})
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
-        self.assertEqual({'check', 'binaries', 'macos', 'image', 'ios', 'android', 'windows'}, set(jobs))
+        self.assertEqual({'check', 'binaries', 'packages', 'macos', 'image', 'ios', 'android', 'windows'}, set(jobs))
         # check only reads the tag and the changelog: it must not wait on the
         # scarce macOS runners, since every other job waits on it.
         self.assertRegex(jobs['check'], r'(?m)^    runs-on: ubuntu-latest$')

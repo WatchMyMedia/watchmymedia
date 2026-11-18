@@ -151,6 +151,8 @@ struct TVLiveHomeRow: View {
     @Environment(Navigator.self) private var navigator
     @FocusState private var focused: Focus?
     @State private var remembered: Focus?
+    @State private var cards = RowStartCards<Focus>()
+    @State private var bumps = 0
     private var channels: [LiveChannel] { Array(services.liveTV.channels.filter(\.available).prefix(8)) }
 
     /// What `focusedChannel` holds while the guide card has focus.
@@ -172,18 +174,22 @@ struct TVLiveHomeRow: View {
                             .buttonStyle(.borderless)
                             .playPauseCard(.card(channel)) { navigator.playLive(.init(channel: channel)) }
                             .focused($focused, equals: .channel(channel.id))
+                            .rowStartCard(Focus.channel(channel.id), in: cards)
+                            .rowStartBump(first: channel.id == channels.first?.id) { bumps += 1 }
                             .accessibilityLabel("Watch \(channel.title)")
                             .accessibilityIdentifier("home-live-channel-\(channel.id)")
                         }
                         Button { navigator.select(.liveTV) } label: { LiveAllChannelsCard() }
                         .buttonStyle(.borderless)
                         .focused($focused, equals: .all)
+                        .rowStartCard(Focus.all, in: cards)
                         .accessibilityIdentifier("home-live-all-channels")
                     }
                     .padding(.vertical, 30)
                 }
                 .contentMargins(.horizontal, TVLayout.gutter, for: .scrollContent)
                 .scrollClipDisabled().scrollIndicators(.hidden)
+                .modifier(RowStartScrolling(ids: channels.map { Focus.channel($0.id) } + [.all], focused: focused, cards: cards, bumps: bumps))
                 .frame(maxWidth: .infinity)
                 .focusSection()
                 .defaultFocus($focused, remembered ?? channels.first.map { .channel($0.id) } ?? .all, priority: .userInitiated)
@@ -229,6 +235,8 @@ private struct TVLiveOnNowRow: View {
     @Environment(LiveExtrasStore.self) private var extras
     @FocusState private var focused: Focus?
     @State private var remembered: Focus?
+    @State private var cards = RowStartCards<Focus>()
+    @State private var bumps = 0
     private var channels: [LiveChannel] { Array(services.liveTV.channels.filter(\.available).prefix(12)) }
 
     var body: some View {
@@ -247,17 +255,21 @@ private struct TVLiveOnNowRow: View {
                             .buttonStyle(TVLiveCardButtonStyle())
                             .playPauseCard(.card(channel)) { navigator.playLive(.init(channel: channel)) }
                             .focused($focused, equals: .channel(channel.id))
+                            .rowStartCard(Focus.channel(channel.id), in: cards)
+                            .rowStartBump(first: channel.id == channels.first?.id) { bumps += 1 }
                             .accessibilityIdentifier("home-live-channel-\(channel.id)")
                         }
                         Button { navigator.select(.liveTV) } label: { LiveAllChannelsCard(title: "Full guide", width: 350, height: 197) }
                             .buttonStyle(.borderless)
                             .focused($focused, equals: .guide)
+                            .rowStartCard(Focus.guide, in: cards)
                             .accessibilityIdentifier("home-live-all-channels")
                     }
                     .padding(.vertical, 30)
                 }
                 .contentMargins(.horizontal, TVLayout.gutter, for: .scrollContent)
                 .scrollClipDisabled().scrollIndicators(.hidden)
+                .modifier(RowStartScrolling(ids: channels.map { Focus.channel($0.id) } + [.guide], focused: focused, cards: cards, bumps: bumps))
                 .frame(maxWidth: .infinity)
                 .focusSection()
                 .defaultFocus($focused, remembered ?? channels.first.map { .channel($0.id) } ?? .guide, priority: .userInitiated)

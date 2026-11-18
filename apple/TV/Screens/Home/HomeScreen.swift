@@ -362,7 +362,7 @@ private struct HomeRowScreen: View {
             if let panel { ScreenBackdrop(url: panel.pictureURL ?? url(panel.picturePath, .w1280), seed: panel.seed) }
             VStack(alignment: .leading, spacing: 0) {
                 if let panel {
-                    FocusPanel(panel: panel, moreInRow: row.hasSeveralCards)
+                    FocusPanel(panel: panel, moreInRow: row.hasSeveralCards, atStart: atStart)
                         .padding(.horizontal, TVLayout.gutter)
                         .padding(.top, 150)
                         .accessibilityIdentifier("homeFocusPanel-\(row.id)")
@@ -386,6 +386,13 @@ private struct HomeRowScreen: View {
 
     private func url(_ path: String?, _ size: ImageSize) -> URL? {
         services.library.imageURL(path, size: size)
+    }
+
+    /// The focused card is the row's first; on the Live TV row, the first channel.
+    private var atStart: Bool {
+        guard row.style == .live else { return row.isFirstCard(focusedCard) }
+        let first = services.liveTV.channels.first(where: \.available)?.id
+        return focusedChannel == nil || focusedChannel == first
     }
 
     /// The panel for the focused card; the Live TV row's is the focused channel's programme.
@@ -453,6 +460,8 @@ private extension View {
 private struct FocusPanel: View {
     let panel: RowPanel
     let moreInRow: Bool
+    /// The row's first card: the hint offers only ▶ (RowStartBest.dc.html).
+    var atStart = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -483,7 +492,7 @@ private struct FocusPanel: View {
                     .padding(.horizontal, 8)
                     .frame(minWidth: 34, minHeight: 28)
                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.outlineStrong))
-                Text(panel.hint(moreInRow: moreInRow))
+                Text(panel.hint(moreInRow: moreInRow, atStart: atStart))
                     .font(.system(size: 17))
                     .foregroundStyle(Palette.faint)
                     .lineLimit(1)

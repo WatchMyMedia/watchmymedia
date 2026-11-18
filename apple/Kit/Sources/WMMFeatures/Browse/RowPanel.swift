@@ -73,9 +73,13 @@ public struct RowPanel: Hashable, Sendable {
     }
 
     /// The TV's hint after the Select key: "opens the episode · ◀ ▶ more in this row · ▼ next row".
-    /// `moreInRow` is false for a row of one card.
-    public func hint(moreInRow: Bool = true) -> String {
-        [opens, moreInRow ? "◀ ▶ more in this row" : nil, "▼ next row"].compactMap { $0 }.joined(separator: " · ")
+    /// `moreInRow` is false for a row of one card. `atStart`: the panel is the
+    /// row's first card's, which has nothing before it, so only ▶ moves along
+    /// the row (RowStartBest.dc.html; Android TV adds "◀ menu" for its rail,
+    /// which Apple TV, with its tabs at the top, doesn't have).
+    public func hint(moreInRow: Bool = true, atStart: Bool = false) -> String {
+        let along = moreInRow ? (atStart ? "▶ more in this row" : "◀ ▶ more in this row") : nil
+        return [opens, along, "▼ next row"].compactMap { $0 }.joined(separator: " · ")
     }
 
     /// What VoiceOver says for the panel: the kicker, title, facts, tags and overview, in that order.
@@ -246,6 +250,20 @@ extension ScreenRow {
         guard isList, let subtitle else { return title }
         let count = subtitle.components(separatedBy: " · ").first { $0.contains(" of ") }
         return count.map { "\(title) · \($0)" } ?? title
+    }
+
+    /// The card with `key` is the row's first (no key yet is the first too,
+    /// as ``RowPanel/panel(for:card:today:)`` takes it). False for a Live TV
+    /// row, whose channels the screen holds.
+    public func isFirstCard(_ key: String?) -> Bool {
+        let first: String?
+        switch style {
+        case .poster, .wide: first = items.first?.cardID
+        case .episode: first = episodes.first?.cardKey
+        case .continue: first = continueItems.first?.cardKey
+        case .live: return false
+        }
+        return key == nil || key == first
     }
 
     /// The row's cards have a card after the first, so ◀ ▶ moves along it.

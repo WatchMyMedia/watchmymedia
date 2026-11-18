@@ -82,24 +82,34 @@ def commented_config(example):
 
 
 def dearmor(armored):
-    """An armored OpenPGP public key as the binary keyring apt's Signed-By reads.
+    """Armored OpenPGP public keys as the binary keyring apt's Signed-By reads.
 
-    One key block only, which is all there is today. If the lists' signer is
-    ever replaced, the dnf key file has to gain a second key (dnf never
-    refreshes a key it already holds for a repository), and this has to take
-    more than one block.
+    The file holds one key today and may hold more, one armored block after
+    another: dnf never refreshes a key it already holds for a repository, so
+    replacing the lists' signer one day means adding a brand-new key beside
+    this one. The keyring is the keys in the file's order, as `gpg --dearmor`
+    writes them.
     """
-    lines = armored.strip().splitlines()
-    if not lines or lines[0].strip() != '-----BEGIN PGP PUBLIC KEY BLOCK-----' \
-            or lines[-1].strip() != '-----END PGP PUBLIC KEY BLOCK-----':
-        raise ValueError('the repository key must be one armored OpenPGP public key')
-    body = [line.strip() for line in lines[1:-1]]
-    # Armor headers (Version:, Comment:) end at the first blank line.
-    if '' in body:
-        body = body[body.index('') + 1:]
-    # The last line may be the armor's checksum, which starts with "=".
-    data = ''.join(line for line in body if not line.startswith('='))
-    return base64.b64decode(data, validate=True)
+    begin, end = '-----BEGIN PGP PUBLIC KEY BLOCK-----', '-----END PGP PUBLIC KEY BLOCK-----'
+    keys, body = [], None
+    for line in (line.strip() for line in armored.splitlines()):
+        if body is None:
+            if line == begin:
+                body = []
+            elif line:
+                raise ValueError('the repository key must be armored OpenPGP public keys and nothing else')
+        elif line == end:
+            # Armor headers (Version:, Comment:) end at the first blank line.
+            if '' in body:
+                body = body[body.index('') + 1:]
+            # The last line may be the armor's checksum, which starts with "=".
+            keys.append(base64.b64decode(''.join(part for part in body if not part.startswith('=')), validate=True))
+            body = None
+        else:
+            body.append(line)
+    if body is not None or not keys:
+        raise ValueError('the repository key must be armored OpenPGP public keys and nothing else')
+    return b''.join(keys)
 
 
 def nfpm_config(with_repository):
@@ -113,8 +123,11 @@ def source_date_epoch():
     """The commit's time, so the same commit builds the same files."""
     if os.environ.get('SOURCE_DATE_EPOCH'):
         return os.environ['SOURCE_DATE_EPOCH']
-    result = subprocess.run(['git', '-C', str(ROOT), 'log', '-1', '--format=%ct'],
-                            capture_output=True, text=True, check=False)
+    try:
+        result = subprocess.run(['git', '-C', str(ROOT), 'log', '-1', '--format=%ct'],
+                                capture_output=True, text=True, check=False)
+    except OSError:  # no git, as in a bare container
+        return ''
     return result.stdout.strip() if result.returncode == 0 else ''
 
 
