@@ -69,4 +69,54 @@ final class HomeScreensTests: XCTestCase {
         XCTAssertTrue(visible(panel))
         XCTAssertTrue(panelSays(panel, "Season 1 · yesterday. The Quiet Meridian"), "the row that comes back restores the card it had focus on: \(panel.label)")
     }
+    /// Where a row starts (RowStartBest.dc.html): moving back along a row,
+    /// the card before the focused one stays whole on screen, so the 2nd card
+    /// never sits where the 1st does; Left on the 1st card keeps focus there.
+    @MainActor
+    func testMovingBackAlongARowKeepsTheCardBeforeInViewAndStopsAtTheFirst() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-fakes", "-fakesRows"]
+        app.launch()
+        let play = app.buttons["Play"]
+        XCTAssertTrue(play.waitUntilExists(timeout: 15))
+        XCTAssertTrue(app.waitForFocusedButton(timeout: 15) { _ in true }, "the tab bar has focus")
+        remote.press(.down)
+        XCTAssertTrue(focused(play))
+        remote.press(.down)
+        let continuing = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "S02 E04 · 23 min left")).firstMatch
+        XCTAssertTrue(focused(continuing))
+        remote.press(.down)
+        let panel = app.descendants(matching: .any)["homeFocusPanel-recentlyAddedShows"]
+        XCTAssertTrue(visible(panel))
+        XCTAssertTrue(panelSays(panel, "Harbor Lights"))
+
+        // Every screen is laid out, so a title matches cards on other screens too: take the one in this row.
+        let window = app.windows.firstMatch.frame
+        func card(_ title: String) -> CGRect {
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title)).allElementsBoundByIndex
+                .map(\.frame).first { window.intersects($0) && $0.minY > window.midY - 100 } ?? .null
+        }
+        // To the row's end, which scrolls it, then back to its 3rd card.
+        func focusedIs(_ prefix: String) -> Bool { app.focusedButton.lookedAt?.label.hasPrefix(prefix) == true }
+        for _ in 0..<20 where !focusedIs("See all") { app.press(.right, thenWaitForFocusToMove: 3) }
+        XCTAssertTrue(focusedIs("See all"), "focus reached the row's end")
+        for _ in 0..<20 where !focusedIs("Saltmarsh") { app.press(.left, thenWaitForFocusToMove: 3) }
+        XCTAssertTrue(panelSays(panel, "Saltmarsh"), "focus is back on the 3rd card: \(panel.label)")
+        XCTAssertTrue(eventually(timeout: 3) { card("The Quiet Meridian").minX >= window.minX }, "the 2nd card is whole on screen: \(card("The Quiet Meridian"))")
+        XCTAssertLessThan(card("Harbor Lights").minX, window.minX, "the 1st is past the edge, so the row still goes on")
+
+        app.press(.left, thenWaitForFocusToMove: 3)
+        XCTAssertTrue(panelSays(panel, "The Quiet Meridian"))
+        XCTAssertTrue(eventually(timeout: 3) { card("Harbor Lights").minX >= window.minX }, "the 1st card comes whole into view: \(card("Harbor Lights"))")
+        let second = card("The Quiet Meridian").minX
+
+        app.press(.left, thenWaitForFocusToMove: 3)
+        XCTAssertTrue(panelSays(panel, "Harbor Lights"))
+        XCTAssertLessThan(card("Harbor Lights").minX + 50, second, "the 1st card's place isn't the one the 2nd had: the row has reached its start")
+
+        remote.press(.left)
+        remote.press(.left)
+        XCTAssertTrue(panelSays(panel, "Harbor Lights"), "Left on the first card keeps focus there")
+        XCTAssertTrue(visible(panel), "and on this screen")
+    }
 }

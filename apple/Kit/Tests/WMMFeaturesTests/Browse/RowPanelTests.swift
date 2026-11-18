@@ -85,6 +85,21 @@ import WMMModel
         #expect(episode.hint(moreInRow: false) == "resumes · ▼ next row")
     }
 
+    @Test func theFirstCardsHintOffersOnlyRight() throws {
+        let row = ScreenRow(id: "recentlyAddedShows", style: .poster, title: "Recently added · TV Shows", items: home.recentlyAddedShows)
+        let panel = try #require(RowPanel.panel(for: row, card: nil, today: testToday))
+        #expect(panel.hint(atStart: true) == "opens the episode · ▶ more in this row · ▼ next row")
+        #expect(panel.hint(moreInRow: false, atStart: true) == "opens the episode · ▼ next row")
+
+        #expect(row.isFirstCard(nil), "before focus has moved, the panel is the first card's")
+        #expect(row.isFirstCard(home.recentlyAddedShows[0].cardID))
+        #expect(!row.isFirstCard(home.recentlyAddedShows[1].cardID))
+        let continuing = ScreenRow(id: "continue", style: .continue, title: "Continue watching", continueItems: home.continueWatching)
+        #expect(continuing.isFirstCard(home.continueWatching[0].cardKey))
+        #expect(!continuing.isFirstCard(home.continueWatching[1].cardKey))
+        #expect(!ScreenRow(id: "live", style: .live, title: "Live TV").isFirstCard(nil), "the Live TV row's channels are the screen's")
+    }
+
     @Test func aChannelSaysWhatIsOnNow() {
         let clock = LiveClock(locale: Locale(identifier: "en_US"), calendar: Calendar(identifier: .gregorian))
         let start = testToday.addingTimeInterval(-37 * 60), end = testToday.addingTimeInterval(23 * 60)

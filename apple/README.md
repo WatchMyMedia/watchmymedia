@@ -1228,8 +1228,15 @@ brand views and the QR code in `WMMUI`. The two targets share no files.
   bar). Buttons, cards and rows draw the focus themselves from
   `isFocused` (`TVButtonStyle`, `TVChipStyle`, `focusRim`): the system's
   lift and shadow plus the gold rim. A row of cards is a `ShelfRow`, a
-  focus section that remembers its focused card. Secondary actions are a
-  long-press `contextMenu`.
+  focus section that remembers its focused card. Every row of cards shows
+  where it starts (`RowStartScrolling`, as Android TV's rows do): moving
+  back, the card before the focused one stays whole in view, so at the
+  start focus itself moves into the first place; cards scrolled past fade
+  at the screen's edge; and Left on the first card, which has nowhere to
+  go, gives the row a small bump, with the panel's hint offering only ▶
+  there. A row that isn't a `ShelfRow` (the Live TV rows, the show page's
+  episodes) puts `rowStartCard` on its cards and the modifier on its
+  `ScrollView`. Secondary actions are a long-press `contextMenu`.
 - **Tests**: Swift Testing. Run `make apple-test` before handing work back,
   `make apple-test-sim` when the iPhone app or anything UIKit changed, and
   `make apple-tv-test-sim` when the Apple TV app did.
