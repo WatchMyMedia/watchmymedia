@@ -29,7 +29,7 @@ public struct DeviceDescription: Hashable, Sendable {
     public var hdrTypes: Set<String>
     /// The most audio channels to ask for (``audioChannels(output:tv:handheldSurround:)``):
     /// on an Apple TV what its output takes (2, or 6 or 8 to a receiver set to Dolby);
-    /// 2 on an iPhone or iPad until ``handheldSurroundChecked``.
+    /// on an iPhone or iPad 6, or more over AirPlay to a receiver (``handheldSurroundChecked``).
     public var maxAudioChannels: Int
 
     public init(tv: Bool, decodes: Set<String>, decodes4K: Bool, hdr: Bool, hdrTypes: Set<String> = [], maxAudioChannels: Int = 2) {
@@ -94,18 +94,21 @@ public func displayHDRTypes(eligible: Bool, modes: Set<String>) -> Set<String> {
     return modes.isEmpty ? ["hdr10", "hlg"] : modes
 }
 
-/// Whether an iPhone or iPad says it takes surround (PLAN-APPLE-REVIEW.md §2.1):
-/// it would then ask for six channels or more and mix 5.1 down itself, so a
-/// 5.1 film keeps direct play. Off until a device check shows 5.1 AC-3 and
-/// E-AC-3 direct play working on the speaker and on headphones; turning it on
-/// is this one line.
-public let handheldSurroundChecked = false
+/// Whether an iPhone or iPad says it takes surround (PLAN-APPLE-REVIEW.md §2.1,
+/// PLAN-AUDIO.md §3.7). On: it asks for six channels or more, so a 5.1 film
+/// keeps direct play and AVPlayer mixes it down to the speaker or headphones
+/// itself (AirPods with Spatial Audio spatialize it). Off, it would ask for two
+/// and the server would convert every 5.1 track to stereo. The device check is
+/// still to do on hardware: 5.1 AC-3, E-AC-3 and FLAC on the speaker, on wired
+/// and Bluetooth headphones, and on AirPods with Spatial Audio (PLAN-AUDIO.md
+/// §5.3). If it fails, turning surround off is this one line.
+public let handheldSurroundChecked = true
 
 /// The audio channels a profile asks for. An Apple TV asks for what its
 /// output takes now (`AVAudioSession.maximumOutputNumberOfChannels`: 2 for a
 /// TV's speakers, 6 or 8 for a receiver), never fewer than 2. An iPhone or
-/// iPad asks for 2, or with `handheldSurround` for 6 or what its output takes
-/// if more (AirPlay to a receiver).
+/// iPad asks for 6, or what its output takes if more (AirPlay to a receiver),
+/// and mixes 5.1 down itself; with `handheldSurround` off it asks for 2.
 public func audioChannels(output: Int, tv: Bool, handheldSurround: Bool = handheldSurroundChecked) -> Int {
     if tv { return max(output, 2) }
     return handheldSurround ? max(output, 6) : 2
@@ -211,7 +214,7 @@ public final class DeviceProfileProvider: ProfileProvider {
     private let handheldSurround: Bool
     private var described: DeviceDescription?
 
-    /// - Parameter handheldSurround: an iPhone or iPad asks for surround; ``handheldSurroundChecked`` decides it.
+    /// - Parameter handheldSurround: an iPhone or iPad asks for six channels or more; ``handheldSurroundChecked`` by default.
     public init(probe: any DeviceProbe = AVFoundationProbe(), tv: Bool = false, handheldSurround: Bool = handheldSurroundChecked) {
         self.probe = probe
         self.tv = tv
