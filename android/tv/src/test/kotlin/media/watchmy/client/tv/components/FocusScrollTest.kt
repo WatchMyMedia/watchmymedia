@@ -27,6 +27,23 @@ class FocusScrollTest {
         assertEquals(-100f, keep.calculateScrollDistance(offset = 0f, size = 900f, containerSize = 1000f))
     }
 
+    // A row of cards 200 wide and 24 apart, starting 12 in: the card before the focused one keeps its place at 12.
+    private val keyline = KeylineSpec(leading = 12f, gap = 24f, trailing = 50f)
+
+    @Test
+    fun `a row keeps the card before the focused one in view`() {
+        assertEquals("One card in from the start is where it rests", 0f, keyline.calculateScrollDistance(offset = 236f, size = 200f, containerSize = 1000f))
+        assertEquals("Further along doesn't scroll either", 0f, keyline.calculateScrollDistance(offset = 460f, size = 200f, containerSize = 1000f))
+        assertEquals("At the edge it scrolls back a card, which brings the one before it in", -224f, keyline.calculateScrollDistance(offset = 12f, size = 200f, containerSize = 1000f))
+        assertEquals("The far end is as before", 100f, keyline.calculateScrollDistance(offset = 850f, size = 200f, containerSize = 1000f))
+    }
+
+    @Test
+    fun `a row too narrow for two cards keeps the focused one whole`() {
+        assertEquals(0f, keyline.calculateScrollDistance(offset = 12f, size = 200f, containerSize = 480f))
+        assertEquals(-12f, keyline.calculateScrollDistance(offset = 0f, size = 200f, containerSize = 480f))
+    }
+
     @Test
     fun `the pivot always puts the item's top at the pivot`() {
         val pivot = PivotSpec(124f)

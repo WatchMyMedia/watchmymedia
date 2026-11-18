@@ -240,7 +240,7 @@ internal fun ArrangedHomeContent(
                     val panel = remember(row, focused, available, now) { row.cardPanelAt(focused, available, now, format, home.seeAllType(row)) }
                     Box(Modifier.fillMaxSize()) {
                         RowBackdrop(panel?.pictureUrl(library, liveRepository, ImageSize.W1280), panel?.seed ?: row.title)
-                        if (panel != null) FocusPanel(panel, Modifier.padding(start = ContentStart, top = 96.dp).width(940.dp))
+                        if (panel != null) FocusPanel(panel, Modifier.padding(start = ContentStart, top = 96.dp).width(940.dp), first = focused == 0)
                         PrefetchNeighbours(row, focused, available, library, liveRepository, now, format)
                         Box(Modifier.padding(top = 556.dp)) {
                             RowBlock(row, Modifier.pageKeys(up = { pageTo(index - 1) }, down = { pageTo(index + 1) })) { focused = it }

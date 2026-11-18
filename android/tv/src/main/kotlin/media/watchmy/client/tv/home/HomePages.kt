@@ -112,6 +112,9 @@ private val CardTarget.hint: String
 
 private const val MORE = " · ◀ ▶ more in this row · ▼ next row"
 
+/** On the row's first card, where ◀ leaves the row for the rail (RowStartBest.dc.html). */
+private const val MORE_FIRST = " · ▶ more in this row · ◀ menu · ▼ next row"
+
 /**
  * The focused card's picture filling the top of a row screen (HomeRow.dc.html:
  * 1360 wide from 560 in, 660 tall, faded into the ground from the left and
@@ -149,9 +152,12 @@ internal fun PrefetchNeighbours(row: ScreenRow, index: Int, channels: List<LiveC
     }
 }
 
-/** The kicker, title, facts, two-line overview and OK hint over a row screen's backdrop (HomeRow.dc.html `Focused title`). */
+/**
+ * The kicker, title, facts, two-line overview and OK hint over a row screen's backdrop (HomeRow.dc.html `Focused title`).
+ * [first]: the panel is the row's first card's, and the hint says ◀ goes to the menu.
+ */
 @Composable
-internal fun FocusPanel(panel: CardPanel, modifier: Modifier = Modifier) {
+internal fun FocusPanel(panel: CardPanel, modifier: Modifier = Modifier, first: Boolean = false) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Kicker(panel.kicker, fontSize = 19.sp)
         Text(
@@ -195,7 +201,7 @@ internal fun FocusPanel(panel: CardPanel, modifier: Modifier = Modifier) {
             ) {
                 Text("OK", style = inter(14.sp, FontWeight.Bold), color = WmmColors.TextSoft)
             }
-            Text(panel.target.hint + MORE, style = inter(17.sp), color = WmmColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(panel.target.hint + if (first) MORE_FIRST else MORE, style = inter(17.sp), color = WmmColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

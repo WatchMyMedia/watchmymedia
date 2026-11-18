@@ -1041,7 +1041,15 @@ minutes of playing a file, before and after a change.
   rows remember their focused item; a screen's remembered item survives
   navigation (`rememberFocusMemory`, and `rememberSaveable` for anything
   else focus depends on); a button busy with its work stays focusable and
-  ignores OK (`FocusableBox`'s `enabled`). Back closes overlays first:
+  ignores OK (`FocusableBox`'s `enabled`). A row of cards shows where it
+  starts (`design/mockups/android-tv/RowStartBest.dc.html`): the card
+  before the focused one stays in view (`KeylineSpec`), so at the start
+  focus itself moves into the first place; cards scrolled past fade at the
+  row's edge (`fadePassedCards`); and a run of ◀ (the key held, or pressed
+  again within 400 ms) stops at the first card, where the row gives and the
+  rail's active section pulses, while a ◀ pressed by itself opens the rail
+  (`RowStart`). `CardRow` does all three; a row with a list of its own, as
+  the show page's episodes, takes the same three. Back closes overlays first:
   handle it with `Modifier.onBack` (`core:ui`) on the screen or overlay it
   belongs to. A remote's Back arrives as a key, which Compose turns into a
   focus move before a `BackHandler` sees it; on Android 16 and later, where

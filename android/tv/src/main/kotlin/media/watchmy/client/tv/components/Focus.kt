@@ -165,16 +165,34 @@ fun Modifier.focusMemory(memory: FocusMemory, key: String): Modifier =
  */
 @OptIn(ExperimentalFoundationApi::class)
 class KeepInViewSpec(private val leading: Float, private val trailing: Float) : BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
+        keepInView(offset, size, leading, containerSize - trailing)
+}
+
+/**
+ * Focus scrolling for a row of cards: as [KeepInViewSpec], with the leading
+ * edge one card and [gap] further in, so the card before the focused one
+ * stays in view. At the row's start there is nothing left to scroll back to,
+ * so focus itself moves into the first place: the first card is the one
+ * with nothing before it (RowStartBest.dc.html). A row's cards are one
+ * width, so the focused card's own size stands for its neighbour's. Where
+ * two cards don't fit, the focused one is kept whole as before.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+class KeylineSpec(private val leading: Float, private val gap: Float, private val trailing: Float) : BringIntoViewSpec {
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-        val start = leading
         val end = containerSize - trailing
-        return when {
-            offset >= start && offset + size <= end -> 0f
-            size > end - start -> offset - start
-            offset < start -> offset - start
-            else -> offset + size - end
-        }
+        val keyline = leading + size + gap
+        return keepInView(offset, size, if (keyline + size <= end) keyline else leading, end)
     }
+}
+
+/** The least scroll that puts an item [size] long at [offset] between [start] and [end]; its start wins when it is longer than that. */
+private fun keepInView(offset: Float, size: Float, start: Float, end: Float): Float = when {
+    offset >= start && offset + size <= end -> 0f
+    size > end - start -> offset - start
+    offset < start -> offset - start
+    else -> offset + size - end
 }
 
 /**

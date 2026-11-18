@@ -1,5 +1,7 @@
 package media.watchmy.client.tv.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +21,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,6 +30,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -93,18 +102,29 @@ fun TvScaffold(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val contentFocus = remember { FocusRequester() }
+    val hint = remember { RailHint() }
     Box(modifier.fillMaxSize().background(WmmColors.Ground)) {
-        Box(Modifier.fillMaxSize().focusRequester(contentFocus).focusRestorer(), content = content)
-        Rail(section, sectionRoot, onNavigate, contentFocus)
+        CompositionLocalProvider(LocalRailHint provides hint) {
+            Box(Modifier.fillMaxSize().focusRequester(contentFocus).focusRestorer(), content = content)
+        }
+        Rail(section, sectionRoot, onNavigate, contentFocus, hint)
     }
 }
 
 @Composable
-private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -> Unit, content: FocusRequester) {
+private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -> Unit, content: FocusRequester, hint: RailHint) {
     val user by LocalAppServices.current.auth.user.collectAsStateWithLifecycle()
     val inbox = LocalRequestBadge.current.inbox ?: 0
     val sections = RailSection.shown(LocalLiveTVAvailable.current)
     var expanded by remember { mutableStateOf(false) }
+    // A row stopped a run of ◀ at its first card: the active section pulses, since the next ◀ comes here.
+    val pulse = remember { Animatable(0f) }
+    LaunchedEffect(hint.stops) {
+        if (hint.stops > 0) {
+            pulse.snapTo(1f)
+            pulse.animateTo(0f, tween(520))
+        }
+    }
     val activeFocus = remember { FocusRequester() }
     val avatarFocus = remember { FocusRequester() }
     val scrim = if (expanded) {
@@ -141,6 +161,7 @@ private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -
                 count = if (s == RailSection.Settings) inbox else 0,
                 onClick = { if (s != active || !sectionRoot) onNavigate(s.route) else content.requestFocus() },
                 modifier = toContent.then(if (s == active) Modifier.focusRequester(activeFocus) else Modifier),
+                pulse = if (s == active) { { pulse.value } } else null,
             )
         }
         Spacer(Modifier.weight(1f))
@@ -166,7 +187,7 @@ private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -
 }
 
 @Composable
-private fun RailItem(label: String, icon: ImageVector, active: Boolean, expanded: Boolean, count: Int, onClick: () -> Unit, modifier: Modifier) {
+private fun RailItem(label: String, icon: ImageVector, active: Boolean, expanded: Boolean, count: Int, onClick: () -> Unit, modifier: Modifier, pulse: (() -> Float)? = null) {
     val described = if (count > 0) modifier.semantics { contentDescription = "$label, $count in the Inbox" } else modifier
     FocusableBox(onClick = onClick, modifier = described, cornerRadius = 16.dp, focusedScale = 1.04f) { focused ->
         val bg = when {
@@ -183,6 +204,20 @@ private fun RailItem(label: String, icon: ImageVector, active: Boolean, expanded
             Modifier
                 .height(60.dp)
                 .width(if (expanded) 250.dp else 60.dp)
+                .drawBehind {
+                    // A gold outline that spreads from the item and fades (RowStartBest.dc.html `pulse`).
+                    val p = pulse?.invoke() ?: 0f
+                    if (p > 0f) {
+                        val out = (1f - p) * 18.dp.toPx()
+                        drawRoundRect(
+                            color = WmmColors.Accent.copy(alpha = 0.75f * p),
+                            topLeft = Offset(-out, -out),
+                            size = Size(size.width + 2 * out, size.height + 2 * out),
+                            cornerRadius = CornerRadius(16.dp.toPx() + out),
+                            style = Stroke(3.dp.toPx()),
+                        )
+                    }
+                }
                 .background(bg, RoundedCornerShape(16.dp)),
             verticalAlignment = Alignment.CenterVertically,
         ) {

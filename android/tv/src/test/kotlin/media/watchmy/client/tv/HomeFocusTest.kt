@@ -9,12 +9,14 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import media.watchmy.client.fake.FakeData
 import media.watchmy.client.fake.fakeLatencyMs
+import media.watchmy.client.tv.components.RowStart
 import media.watchmy.client.ui.LocalAppServices
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -252,6 +254,87 @@ class HomeFocusTest {
             press(Key.DirectionDown)
             assertFocusShowing("Row 2 of ")
         }
+    }
+
+    @Test
+    fun `A run of left stops at a row's first card, and a press by itself opens the rail`() {
+        val shows = toRecentlyAddedShows()
+        repeat(4) { press(Key.DirectionRight) }
+
+        // Presses 50 ms apart, more of them than there are cards to the left.
+        compose.onRoot().performKeyInput { repeat(12) { pressKey(Key.DirectionLeft) } }
+        compose.waitForIdle()
+        assertEquals("The run stops at the first card instead of opening the rail", shows.first(), focused())
+        assertTrue("The hint says where ◀ goes from here: ${hint()}", "◀ menu" in hint())
+
+        compose.onRoot().performKeyInput {
+            advanceEventTime(RowStart.RUN_MS + 100)
+            pressKey(Key.DirectionLeft)
+        }
+        compose.waitForIdle()
+        assertEquals("A press by itself goes to the rail", "Home", focused())
+        press(Key.DirectionRight)
+        assertEquals(shows.first(), focused())
+    }
+
+    @Test
+    fun `Left held down stops at a row's first card`() {
+        val shows = toRecentlyAddedShows()
+        repeat(4) { press(Key.DirectionRight) }
+
+        compose.onRoot().performKeyInput {
+            keyDown(Key.DirectionLeft)
+            advanceEventTime(3_000)
+            keyUp(Key.DirectionLeft)
+        }
+        compose.waitForIdle()
+        assertEquals(shows.first(), focused())
+    }
+
+    @Test
+    fun `Moving back along a row keeps the card before the focused one in view`() {
+        val shows = toRecentlyAddedShows()
+        // To the row's end, which scrolls it (ten posters and See all are more than a screen holds), then back to the third card.
+        repeat(shows.size + 1) { press(Key.DirectionRight) }
+        repeat(shows.size - 2) { press(Key.DirectionLeft) }
+        assertEquals(shows[2], focused())
+        assertTrue("The hint offers both ways along the row: ${hint()}", "◀ ▶ more in this row" in hint())
+
+        // The row has scrolled back with focus: the second card sits where the row starts, whole, and the third after it.
+        val start = compose.onRoot().fetchSemanticsNode().boundsInRoot.width * 154f / 1920f
+        // Its title, on the screen showing: other screens' rows have the show too, clipped to nothing.
+        val before = compose.onAllNodesWithText(shows[1], useUnmergedTree = true).fetchSemanticsNodes().single { it.boundsInRoot.height > 0f }.boundsInRoot
+        assertEquals("${shows[1]} starts where the row does", start, before.left, 2f)
+        assertTrue("The focused card sits after it", compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.left > before.left + 100f)
+
+        // The row keeps that place while another row has focus and it shrinks, and when it grows again.
+        press(Key.DirectionDown)
+        press(Key.DirectionUp)
+        assertEquals(shows[2], focused())
+        val back = compose.onAllNodesWithText(shows[1], useUnmergedTree = true).fetchSemanticsNodes().single { it.boundsInRoot.height > 0f }.boundsInRoot
+        assertEquals("${shows[1]} is back where the row starts", start, back.left, 2f)
+
+        press(Key.DirectionLeft)
+        press(Key.DirectionLeft)
+        assertEquals(shows.first(), focused())
+        assertEquals("At the start focus moves into the first place", start, compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.left, 2f)
+    }
+
+    /** The OK hint of the row screen showing: the screens either side are composed too, clipped to nothing. */
+    private fun hint(): String {
+        val showing = compose.onAllNodesWithText("more in this row", substring = true, useUnmergedTree = true).fetchSemanticsNodes()
+            .single { it.boundsInRoot.height > 0f }
+        return showing.config[SemanticsProperties.Text].first().text
+    }
+
+    /** Pages to Recently added shows' row screen; its titles, in the row's order. */
+    private fun toRecentlyAddedShows(): List<String> {
+        press(Key.DirectionDown)
+        press(Key.DirectionDown) // Live TV.
+        press(Key.DirectionDown)
+        val shows = home.recentlyAddedShows.map { it.title }
+        assertTrue("${focused()} is in Recently added shows", focused() in shows)
+        return shows
     }
 
     /** The focused element is on screen, and so is the heading counter that starts with [counter]: the page showing is the one with focus. */

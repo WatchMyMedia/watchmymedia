@@ -35,10 +35,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
@@ -223,7 +226,7 @@ class CardRowFocus internal constructor(private val animated: State<Float>, priv
      * off the edge until the row scrolled after it. Runs before each frame's
      * layout, which reads the new sizes, so the two land together.
      */
-    internal fun holdAnchor(progress: Float, leading: Float, trailing: Float) {
+    internal fun holdAnchor(progress: Float, leading: Float, trailing: Float, gap: Float) {
         if (progress == lastProgress) return
         val starting = lastProgress == 0f || lastProgress == 1f
         lastProgress = progress
@@ -232,7 +235,11 @@ class CardRowFocus internal constructor(private val animated: State<Float>, priv
         if (starting) anchorX = list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == a.index }?.offset?.toFloat()
         val from = anchorX ?: return
         val width = a.widthPx * scale(a.landscape)
-        val x = min(from, viewport.size.width - trailing - width).coerceAtLeast(leading)
+        val end = viewport.size.width - trailing
+        // The card before it grows as well and stays whole in view, as the row's KeylineSpec keeps it once this is done.
+        val keyline = leading + width + gap
+        val start = if (a.index > 0 && keyline + width <= end) keyline else leading
+        val x = min(from, end - width).coerceAtLeast(start)
         list.requestScrollToItem(a.index, (leading - x).roundToInt())
     }
 
@@ -280,23 +287,27 @@ fun BoxScope.PlayMark() {
 
 /**
  * A horizontal row of cards that starts at [start], keeps the
- * focused card in view with the least scroll, and gives focus back to the
+ * focused card in view with the least scroll and the card before it in view
+ * too ([KeylineSpec]), and gives focus back to the
  * card it had when focus comes back to the row; the first time, to [enter]
  * when given, else the card nearest where focus came from. Its cards grow
  * while it has focus, so the row in focus is the tallest on screen
- * ([CardRowFocus]).
+ * ([CardRowFocus]). Cards it has scrolled past fade at its leading edge, and
+ * a run of ◀ stops at its first card ([RowStart]).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CardRow(modifier: Modifier = Modifier, start: Dp = ContentStart, enter: FocusRequester = FocusRequester.Default, content: LazyListScope.() -> Unit) {
     val density = LocalDensity.current
-    val spec = remember(density) { with(density) { KeepInViewSpec(leading = 12.dp.toPx(), trailing = (ContentEnd + 12.dp).toPx()) } }
     val leading = with(density) { 12.dp.toPx() }
     val trailing = with(density) { (ContentEnd + 12.dp).toPx() }
+    val gap = with(density) { CardGap.toPx() }
+    val spec = remember(leading, gap, trailing) { KeylineSpec(leading, gap, trailing) }
     val list = rememberLazyListState()
     var hasFocus by remember { mutableStateOf(false) }
     val progress = animateFloatAsState(if (hasFocus) 1f else 0f, tween(220), label = "rowFocus")
     val rowFocus = remember(progress, list) { CardRowFocus(progress, list) }
+    val rowStart = rememberRowStart()
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec, LocalCardRowFocus provides rowFocus) {
         LazyRow(
             modifier = modifier
@@ -304,21 +315,42 @@ fun CardRow(modifier: Modifier = Modifier, start: Dp = ContentStart, enter: Focu
                 .padding(start = start - 12.dp)
                 .onPlaced { rowFocus.viewport = it }
                 .onFocusChanged { hasFocus = it.hasFocus }
+                .fadePassedCards(list)
+                .rowStart(rowStart)
                 .focusRestorer(enter),
             state = list,
             contentPadding = PaddingValues(start = 12.dp, end = ContentEnd, top = 12.dp, bottom = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(CardGap),
             content = content,
         )
     }
-    HoldFocusedCard(rowFocus, leading, trailing)
+    HoldFocusedCard(rowFocus, leading, trailing, gap)
 }
+
+/** The space between a row's cards. */
+internal val CardGap = 24.dp
+
+/**
+ * Fades a row into the ground at its leading edge while there are cards
+ * before the ones showing, so a row that has more to the left looks unlike
+ * one at its start (RowStartBest.dc.html). Drawn over the row rather than
+ * masked, which would put every row in a layer of its own.
+ */
+internal fun Modifier.fadePassedCards(list: LazyListState): Modifier = drawWithContent {
+    drawContent()
+    if (list.canScrollBackward) {
+        val width = PassedFade.toPx()
+        drawRect(Brush.horizontalGradient(listOf(WmmColors.Ground, Color.Transparent), endX = width), size = Size(width, size.height))
+    }
+}
+
+private val PassedFade = 56.dp
 
 /** Composes again each frame the row grows or shrinks, to hold its focused card in place. */
 @Composable
-private fun HoldFocusedCard(row: CardRowFocus, leading: Float, trailing: Float) {
+private fun HoldFocusedCard(row: CardRowFocus, leading: Float, trailing: Float, gap: Float) {
     val progress = row.progress
-    SideEffect { row.holdAnchor(progress, leading, trailing) }
+    SideEffect { row.holdAnchor(progress, leading, trailing, gap) }
 }
 
 /**
