@@ -70,6 +70,7 @@ func TestAudioTargets(t *testing.T) {
 		{"DTS on Chrome is AAC 5.1", "dts", "DTS", 6, ".mkv", webProfile(), false, ModeAudio, AudioPlan{Index: 1, Codec: "aac", Channels: 6, Bitrate: 384_000}},
 		{"PCM plays directly", "pcm_s24le", "", 6, ".mkv", androidTVDecodes, false, ModeDirect, AudioPlan{Index: 1, Codec: "pcm_s24le", Copy: true, Channels: 6}},
 		{"PCM in HLS is FLAC", "pcm_s24le", "", 6, ".avi", androidTVDecodes, false, ModeAudio, AudioPlan{Index: 1, Codec: "flac", Channels: 6, Bitrate: 6 * 48_000 * 24 * 6 / 10}},
+		{"PCM in MOV is FLAC: ExoPlayer reads no in24", "pcm_s24le", "", 6, ".mov", androidTVDecodes, false, ModeAudio, AudioPlan{Index: 1, Codec: "flac", Channels: 6, Bitrate: 6 * 48_000 * 24 * 6 / 10}},
 		{"PCM on Apple TV is FLAC", "pcm_s24le", "", 6, ".mkv", appleTVReceiver, false, ModeAudio, AudioPlan{Index: 1, Codec: "flac", Channels: 6, Bitrate: 6 * 48_000 * 24 * 6 / 10}},
 		{"stereo ALAC on Android is FLAC", "alac", "", 2, ".mkv", androidTVARC, false, ModeAudio, AudioPlan{Index: 1, Codec: "flac", Channels: 2, Bitrate: 2 * 48_000 * 24 * 6 / 10}},
 		{"surround AAC to stereo", "aac", "", 6, ".mkv", appleTVSpeakers, false, ModeAudio, AudioPlan{Index: 1, Codec: "aac", Channels: 2, Bitrate: 192_000}},
@@ -101,7 +102,7 @@ func TestAudioTargetReasons(t *testing.T) {
 		t.Errorf("reasons %q", d.Reasons)
 	}
 	d = Decide(pcm, ".avi", Request{Profile: androidTVDecodes}, nil, Capabilities{})
-	if !slices.Contains(d.Reasons, "PCM audio is converted for HLS") {
+	if !slices.Contains(d.Reasons, "PCM audio is copied only in direct play of Matroska") {
 		t.Errorf("reasons %q", d.Reasons)
 	}
 }

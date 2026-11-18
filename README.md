@@ -896,7 +896,7 @@ FLAC for a lossless track (TrueHD, DTS-HD MA, PCM, ALAC) when the video is copie
 play has no quality cap and isn't a download; E-AC-3 at 640 kbps, 5.1 at most, for
 surround where the device lists it; otherwise AAC, 192 kbps for stereo and 64 kbps a
 channel above, stereo when the quality pick is under 4 Mbps. PCM is copied only in
-direct play. A device that passes Dolby through but takes fewer channels of PCM (a
+direct play of Matroska. A device that passes Dolby through but takes fewer channels of PCM (a
 soundbar over ARC, a Cast TV) says so with `maxPcmChannels`, so it gets E-AC-3 5.1.
 
 Event HLS prepares about 32 seconds at a time and resumes near the prepared edge as

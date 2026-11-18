@@ -637,11 +637,13 @@ func Decide(info *probe.MediaInfo, ext string, req Request, sidecars []Sidecar, 
 		containerOK = false
 		d.Reasons = append(d.Reasons, sent.Why)
 	}
-	if audio != nil && audioOK && audioKey(*audio) == "pcm" && (!videoOK || burn || !containerOK) {
-		// ffmpeg writes PCM into fMP4 as ipcm, which the players don't
-		// read, so an HLS stream converts it (PLAN-AUDIO.md §3.4).
+	if audio != nil && audioOK && audioKey(*audio) == "pcm" && (!videoOK || burn || !containerOK || containerOf(ext) != "mkv") {
+		// PCM is copied only in direct play of Matroska (PLAN-AUDIO.md
+		// §3.4). ffmpeg writes it into fMP4 as ipcm, which the players
+		// don't read, and ExoPlayer (Media3 1.11) reads no in24 or fl32 in
+		// MOV, which ffmpeg writes for 24-bit, nor PCM in MPEG-TS.
 		audioOK = false
-		d.Reasons = append(d.Reasons, "PCM audio is converted for HLS")
+		d.Reasons = append(d.Reasons, "PCM audio is copied only in direct play of Matroska")
 	}
 	switch {
 	case !videoOK || burn:
