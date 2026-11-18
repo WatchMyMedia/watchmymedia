@@ -16,8 +16,9 @@ sealed interface Trailer {
     data class File(override val name: String, val fileId: Long, val durationMs: Long? = null) : Trailer
 
     /**
-     * A YouTube video, played by YouTube's own player (phones and tablets)
-     * or the YouTube app (TVs). [key] is its video id.
+     * A YouTube video, played by YouTube's own player in the app (phones,
+     * tablets and Android TV) or by the YouTube app (an Android TV without a
+     * usable WebView). [key] is its video id.
      */
     data class YouTube(override val name: String, val key: String) : Trailer {
         /** The watch link, which the YouTube app opens where it is installed. */
@@ -35,8 +36,9 @@ private val YOUTUBE_KEY = Regex("[A-Za-z0-9_-]{1,64}")
 
 /**
  * The trailer the Trailer button plays: the first the server lists that this
- * device can play. [youTube] is false where no app can open a YouTube link
- * (a TV without the YouTube app); the button then shows only for a file.
+ * device can play. [youTube] is false where a YouTube trailer can't play
+ * (a TV with neither a usable WebView nor an app for YouTube's links); the
+ * button then shows only for a file.
  */
 fun MovieDetail.trailer(youTube: Boolean = true): Trailer? =
     trailers.firstOrNull { it is Trailer.File || (youTube && it is Trailer.YouTube) }
@@ -58,7 +60,7 @@ fun MovieDetail.trailerRequest(trailer: Trailer.File): PlayRequest =
 object TrailerText {
     const val BUTTON = "Trailer"
 
-    /** Under the TV's button row, for a YouTube trailer. */
+    /** Under the TV's button row, for a YouTube trailer handed to the YouTube app (no usable WebView). */
     const val OPENS_YOUTUBE = "Opens the YouTube app"
 
     /** The trailer screen's top bar. */
@@ -75,4 +77,7 @@ object TrailerText {
     /** When YouTube's player doesn't load (no connection). */
     const val UNREACHABLE_TITLE = "Couldn’t reach YouTube"
     const val UNREACHABLE_BODY = "Check the connection and try again."
+
+    /** Leaves the trailer screen: the phone's back button, the TV's button beside those messages. */
+    const val BACK_TO_MOVIE = "Back to the movie"
 }

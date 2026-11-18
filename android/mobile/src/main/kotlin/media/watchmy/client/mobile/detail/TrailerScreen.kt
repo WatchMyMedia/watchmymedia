@@ -79,9 +79,13 @@ import media.watchmy.client.model.Trailer
 import media.watchmy.client.model.TrailerText
 import media.watchmy.client.presentation.detail.TrailerViewModel
 import media.watchmy.client.ui.Inter
+import media.watchmy.client.ui.TRAILER_BRIDGE
+import media.watchmy.client.ui.TrailerEvent
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.rememberTabletLayout
+import media.watchmy.client.ui.trailerBaseUrl
+import media.watchmy.client.ui.trailerPage
 
 /**
  * A movie's YouTube trailers on phones and tablets (TrailerPlayer.dc.html,
@@ -217,7 +221,7 @@ private fun TrailerBar(title: String, movieTitle: String, tablet: Boolean, onBac
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            BarIconButton(WmmIcons.Back, "Back to the movie", onBack)
+            BarIconButton(WmmIcons.Back, TrailerText.BACK_TO_MOVIE, onBack)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = if (tablet) 18.sp else 16.sp, color = WmmColors.Text), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(movieTitle, style = TextStyle(fontFamily = Inter, fontSize = if (tablet) 14.sp else 13.sp, color = WmmColors.TextMuted), maxLines = 1, overflow = TextOverflow.Ellipsis)

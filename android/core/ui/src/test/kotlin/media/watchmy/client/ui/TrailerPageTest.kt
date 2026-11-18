@@ -1,4 +1,4 @@
-package media.watchmy.client.mobile.detail
+package media.watchmy.client.ui
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,6 +22,27 @@ class TrailerPageTest {
         assertTrue(page.contains("window.$TRAILER_BRIDGE.post(kind, KEY, value | 0)"))
         assertTrue(page.contains("onError: function (e) { post('error', e.data); }"))
         assertTrue("no other channels' videos at the end", page.contains("rel: 0"))
+        assertTrue("it tells the app when it plays, pauses and ends", page.contains("onStateChange: function (e) { post('state', e.data); }"))
+    }
+
+    @Test
+    fun `the phone's page plays as soon as the player is ready`() {
+        val page = trailerPage("WhWc3b3KhnY", "https://media.watchmy.client")
+        assertTrue(page.contains("var AUTOPLAY = true;"))
+        assertTrue(page.contains("autoplay: 1,"))
+        assertTrue(page.contains("onReady: function (e) { if (AUTOPLAY) e.target.playVideo(); post('ready', 0); }"))
+    }
+
+    @Test
+    fun `the TV's page waits to be asked, and is driven only through YouTube's IFrame API`() {
+        val page = trailerPage("WhWc3b3KhnY", "https://media.watchmy.client", autoplay = false)
+        assertTrue(page.contains("var AUTOPLAY = false;"))
+        assertTrue(page.contains("autoplay: 0,"))
+        assertTrue(page.contains("function playTrailer() {\n  if (player && player.playVideo) player.playVideo();"))
+        assertTrue(page.contains("function pauseTrailer() {\n  if (player && player.pauseVideo) player.pauseVideo();"))
+        assertTrue(page.contains("if (s === 1 || s === 3) player.pauseVideo(); else player.playVideo();"))
+        assertTrue(page.contains("player.seekTo(Math.max(0, player.getCurrentTime() + seconds), true);"))
+        assertTrue(page.contains("player.getIframe().focus();"))
     }
 
     @Test
