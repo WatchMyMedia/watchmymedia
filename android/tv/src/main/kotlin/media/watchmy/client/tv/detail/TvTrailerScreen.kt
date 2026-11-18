@@ -133,7 +133,7 @@ fun TvTrailerScreen(
             back()
         }
     }
-    val mode by produceState(remote ?: TrailerRemote.Keyboard, remote) {
+    val mode by produceState(remote ?: TrailerRemote.Api, remote) {
         if (remote == null) value = withContext(Dispatchers.IO) { TrailerRemoteSetting.read(context) }
     }
     val status = remember { TrailerStatus() }

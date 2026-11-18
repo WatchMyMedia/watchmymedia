@@ -238,9 +238,11 @@ didn't start.
   builds' WebViews take Chrome DevTools: `adb forward tcp:<port>
   localabstract:webview_devtools_remote_<pid>`, then `/json` and the page's
   WebSocket.
-- The TV's trailer screen drives YouTube's player by its keyboard controls
-  unless a debug build is switched to the IFrame API with
-  `TrailerRemoteSwitch` (README, the movie trailers list). Robolectric's WebView has
+- The TV's trailer screen drives YouTube's player through its IFrame API
+  unless a debug build is switched to its keyboard controls with
+  `TrailerRemoteSwitch` (README, the movie trailers list). On an
+  `android-35` emulator YouTube's player ignored its keyboard controls (k,
+  Space, j, arrows), sent by the app or through DevTools. Robolectric's WebView has
   no provider, so it never takes the focus there: `TvTrailerScreenTest`
   checks that it was asked to, and the screen itself holds the focus and
   takes the keys first, so the keys still reach it.

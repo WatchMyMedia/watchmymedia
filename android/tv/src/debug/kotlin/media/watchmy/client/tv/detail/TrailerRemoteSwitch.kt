@@ -15,7 +15,7 @@ import kotlin.concurrent.thread
  * adb shell am broadcast -n media.watchmy.client/media.watchmy.client.tv.detail.TrailerRemoteSwitch --es remote api
  * ```
  *
- * `remote` is `api` or `keyboard` (the default); without it, the reply says
+ * `remote` is `api` (the default) or `keyboard`; without it, the reply says
  * which one is set. The next trailer opened uses it, and it stays set until
  * the app's data is cleared.
  */

@@ -202,12 +202,14 @@ this device can play, and the logic is `MovieViewModel`'s (`trailerPlay`):
   - A trailer that played closes the screen when it ends. It pauses in
     `onStop` and keeps the TV awake while it plays.
   - The remote follows the plan's §4.3 table (`TrailerRemote.kt`) in one of
-    two ways, both YouTube's documented ones. YouTube's keyboard controls
-    are the default: the WebView takes the focus, the page focuses the
+    two ways, both YouTube's documented ones. The IFrame API is the
+    default: the WebView never takes the focus, and the keys call
+    `playVideo`, `pauseVideo` and `seekTo` in the page. With YouTube's
+    keyboard controls, the WebView takes the focus, the page focuses the
     player's frame, and Select and Play/Pause become k, Left and Rewind j,
-    Right and Fast-forward l. With the IFrame API, the WebView never takes
-    the focus, and the keys call `playVideo`, `pauseVideo` and `seekTo` in
-    the page. Back is always the screen's, and Up and Down do nothing.
+    Right and Fast-forward l; an emulator's YouTube player ignored them, so
+    the check on a real TV decides which way stays. Back is always the
+    screen's, and Up and Down do nothing.
   - Debug builds switch between the two without a rebuild, for the check
     on a real TV; the next trailer opened uses the new way:
 
@@ -218,7 +220,7 @@ this device can play, and the logic is `MovieViewModel`'s (`trailerPlay`):
 
     `<package>` is `media.watchmy.client` plus any `-PappIdSuffix`. Only
     the shell can send it (the receiver asks for `DUMP`), and release
-    builds have no receiver and always use the keyboard controls.
+    builds have no receiver and always use the IFrame API.
   - Where the TV has no usable WebView (`WebView.getCurrentWebViewPackage()`
     is null, or making one throws, which `TrailerWebViews` tries once, on
     the first press), Trailer hands off as before: an `ACTION_VIEW` of the

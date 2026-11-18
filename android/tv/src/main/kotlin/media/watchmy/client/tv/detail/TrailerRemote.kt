@@ -97,8 +97,9 @@ fun trailerScript(key: TrailerKey): String? = when (key) {
 }
 
 /**
- * Which [TrailerRemote] the trailer screen uses: [TrailerRemote.Keyboard],
- * unless a debug build was switched with adb (`TrailerRemoteSwitch` in
+ * Which [TrailerRemote] the trailer screen uses: [TrailerRemote.Api], the
+ * one seen working (an emulator's YouTube player ignored its keyboard
+ * controls), unless a debug build was switched with adb (`TrailerRemoteSwitch` in
  * tv/src/debug; android/README.md), for TV0 to try both without a rebuild.
  * Release builds never read the setting.
  */
@@ -108,8 +109,8 @@ internal object TrailerRemoteSetting {
 
     /** Reads storage in a debug build: call it off the main thread. */
     fun read(context: Context): TrailerRemote {
-        if (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0) return TrailerRemote.Keyboard
-        return parse(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null)) ?: TrailerRemote.Keyboard
+        if (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0) return TrailerRemote.Api
+        return parse(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null)) ?: TrailerRemote.Api
     }
 
     fun write(context: Context, remote: TrailerRemote) =
