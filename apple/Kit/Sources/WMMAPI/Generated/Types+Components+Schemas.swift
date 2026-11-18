@@ -12069,6 +12069,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ServerInfo/id`.
             public var id: Swift.String
+            /// How the server was installed: macos-app, windows-app, docker, deb, rpm or binary. The web words folder permissions and GPU setup for it. A plain string: ignore values you don't know. Absent on older servers.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ServerInfo/install`.
+            public var install: Swift.String?
             /// Shown in apps' server lists; set under Settings.
             ///
             /// - Remark: Generated from `#/components/schemas/ServerInfo/name`.
@@ -12095,6 +12099,7 @@ extension Components {
             ///   - casting: The server issues cast tokens (POST /auth/cast-token), so apps may offer casting.
             ///   - host: The platform a container install runs on, when the server can tell: unraid. Settings word updates and GPU setup for it. Absent otherwise and on older servers.
             ///   - id: Stable random ID; apps remember servers by it, not by address.
+            ///   - install: How the server was installed: macos-app, windows-app, docker, deb, rpm or binary. The web words folder permissions and GPU setup for it. A plain string: ignore values you don't know. Absent on older servers.
             ///   - name: Shown in apps' server lists; set under Settings.
             ///   - platform: Server operating system, such as windows, darwin or linux. Used for server-side folder path examples; absent on older servers.
             ///   - setupRequired: No account exists yet; finish setup in a browser.
@@ -12106,6 +12111,7 @@ extension Components {
                 casting: Swift.Bool? = nil,
                 host: Swift.String? = nil,
                 id: Swift.String,
+                install: Swift.String? = nil,
                 name: Swift.String,
                 platform: Swift.String? = nil,
                 setupRequired: Swift.Bool,
@@ -12117,6 +12123,7 @@ extension Components {
                 self.casting = casting
                 self.host = host
                 self.id = id
+                self.install = install
                 self.name = name
                 self.platform = platform
                 self.setupRequired = setupRequired
@@ -12129,6 +12136,7 @@ extension Components {
                 case casting
                 case host
                 case id
+                case install
                 case name
                 case platform
                 case setupRequired

@@ -8483,6 +8483,8 @@ export interface components {
             host?: string;
             /** @description Stable random ID; apps remember servers by it, not by address. */
             id: string;
+            /** @description How the server was installed: macos-app, windows-app, docker, deb, rpm or binary. The web words folder permissions and GPU setup for it. A plain string: ignore values you don't know. Absent on older servers. */
+            install?: string;
             /** @description Shown in apps' server lists; set under Settings. */
             name: string;
             /** @description Server operating system, such as windows, darwin or linux. Used for server-side folder path examples; absent on older servers. */
@@ -8544,6 +8546,8 @@ export interface components {
             backups: components["schemas"]["Info"][];
             capabilities?: components["schemas"]["Capabilities"];
             cast: components["schemas"]["CastSettings"];
+            /** @description Where this server reads its config file, when that is not config.yaml in the data folder (WATCHMYMEDIA_CONFIG, as the Linux packages set it). A backup holds it as config.yaml, and after a restore it goes back there. Absent otherwise and on older servers. */
+            configFile?: string;
             dataDir: string;
             /** @description Live Windows CUDA/DirectX adapter names and backend-specific ordinals. Admin-only; discovery does not prove encoding support. Absent on older servers or unsupported platforms. */
             hardwareAdapters?: components["schemas"]["Inventory"];
@@ -9186,17 +9190,17 @@ export interface components {
             date?: string;
             /** @description Not a release build, so it is never offered an update. */
             development: boolean;
-            /** @description The file for this install; absent for Docker, which pulls the image. */
+            /** @description The file for this install; absent for Docker, which pulls the image, and for the deb and rpm packages, which apt and dnf update. */
             download?: components["schemas"]["Download"];
             /** @description Checking is on (updates.enabled in config); when off, Settings hides the button. */
             enabled: boolean;
             /** @description Why the most recent check failed; the other fields are from the last one that worked. */
             error?: string;
             /**
-             * @description How the server was installed, which decides the download.
+             * @description How the server was installed, which decides the download, or the command that updates it.
              * @enum {string}
              */
-            install: "macos-app" | "windows-app" | "docker" | "binary";
+            install: "macos-app" | "windows-app" | "docker" | "deb" | "rpm" | "binary";
             /** @description Newest release for this server: stable releases, and pre-releases too when this is one. */
             latest?: string;
             /** @description What changed in latest, as Markdown list items. */

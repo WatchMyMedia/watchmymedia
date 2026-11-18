@@ -81,3 +81,32 @@ func TestUpdatesOff(t *testing.T) {
 		t.Errorf("check -> %d", code)
 	}
 }
+
+// A server installed from a package says so: to admins in the updates
+// reply, which has the command in place of a file, and in the server info
+// the web's folder check and transcoder notes read (PLAN-LINUX.md §4).
+func TestPackageInstallKinds(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []string{updates.InstallDeb, updates.InstallRpm} {
+		var list *httptest.Server
+		list = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"releases": [{"version": "0.4.0", "date": "2026-11-03", "notes": "- notes",
+			  "assets": {"` + kind + `-amd64": {"url": "` + list.URL + `/pkg", "size": 9}, "` + kind + `-arm64": {"url": "` + list.URL + `/pkg", "size": 9},
+			    "linux-amd64": {"url": "` + list.URL + `/a.tar.gz", "size": 9}, "linux-arm64": {"url": "` + list.URL + `/a.tar.gz", "size": 9}}}]}`))
+		}))
+		t.Cleanup(list.Close)
+		srv := newTestServerWith(t, func(d *Deps) {
+			d.Version = "v0.3.4"
+			d.Updates = updates.New(list.URL+"/releases.json", d.Version, kind)
+			d.Updates.Platform = "linux-amd64"
+		})
+		var s UpdateStatus
+		if code := doJSON(t, srv.client, http.MethodPost, srv.URL+"/api/settings/updates/check", "", &s).StatusCode; code != http.StatusOK || s.Install != kind || !s.UpdateAvailable || s.Latest != "0.4.0" || s.Download != nil {
+			t.Errorf("%s check -> %d %+v", kind, code, s)
+		}
+		var info ServerInfo
+		if doJSON(t, srv.client, http.MethodGet, srv.URL+"/api/server", "", &info); info.Install != kind {
+			t.Errorf("%s server info install = %q", kind, info.Install)
+		}
+	}
+}

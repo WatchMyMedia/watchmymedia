@@ -1,5 +1,5 @@
 // Package backup writes and prunes archives of the data directory: a
-// consistent copy of the SQLite database, config.yaml, and the subtitles
+// consistent copy of the SQLite database, the config file, and the subtitles
 // downloaded from online providers (each cost a download from the day's
 // quota). Artwork and converted subtitles are left out since they can be
 // made again, and so are the Plex connection's grants
@@ -37,8 +37,27 @@ const DownloadedSubtitlesDir = "subtitles-downloaded"
 // directory.
 const ArtworkDir = "artwork"
 
-// Write streams a .tar.gz of the database and config to w.
-func Write(ctx context.Context, conn *sql.DB, dataDir string, w io.Writer) error {
+// ConfigName is the config file's name in an archive, and in the data
+// directory when the server reads it from there.
+const ConfigName = "config.yaml"
+
+// ConfigElsewhere is configFile when the server reads its config file from
+// somewhere other than the data directory, and "" when it does not: a
+// restore unpacks into the data directory, so the archive's copy then has
+// to be put back there by hand.
+func ConfigElsewhere(dataDir, configFile string) string {
+	if configFile == "" || filepath.Clean(configFile) == filepath.Join(dataDir, ConfigName) {
+		return ""
+	}
+	return configFile
+}
+
+// Write streams a .tar.gz of the database and config to w. configFile is
+// the config file the server loaded (config.Config.File), saved as
+// config.yaml whatever it is called and wherever it is: the Linux packages
+// keep it in /etc/watchmymedia (PLAN-LINUX.md §4). Empty means config.yaml
+// in the data directory.
+func Write(ctx context.Context, conn *sql.DB, dataDir, configFile string, w io.Writer) error {
 	tmp, err := os.MkdirTemp(dataDir, ".backup-*")
 	if err != nil {
 		return err
@@ -57,8 +76,11 @@ func Write(ctx context.Context, conn *sql.DB, dataDir string, w io.Writer) error
 	if err := addFile(tw, snapshot, "watchmymedia.db"); err != nil {
 		return err
 	}
-	if cfg := filepath.Join(dataDir, "config.yaml"); exists(cfg) {
-		if err := addFile(tw, cfg, "config.yaml"); err != nil {
+	if configFile == "" {
+		configFile = filepath.Join(dataDir, ConfigName)
+	}
+	if exists(configFile) {
+		if err := addFile(tw, configFile, ConfigName); err != nil {
 			return err
 		}
 	}
@@ -127,14 +149,14 @@ func scrub(ctx context.Context, snapshot string) error {
 }
 
 // Save writes an archive into <dataDir>/backups and prunes older ones
-// beyond keep. It returns the archive path.
+// beyond keep. It returns the archive path. configFile is as for Write.
 //
 // An archive holds password hashes, the *arr API keys and webhook tokens,
 // the OpenSubtitles password and the other keys saved in Settings (though
 // not sessions or the media token key, which scrub removes), so the folder
 // is the server's alone (0700, tightened if it was made wider) and so is
 // each archive (0600).
-func Save(ctx context.Context, conn *sql.DB, dataDir string, keep int) (string, error) {
+func Save(ctx context.Context, conn *sql.DB, dataDir, configFile string, keep int) (string, error) {
 	dir := filepath.Join(dataDir, "backups")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
@@ -156,7 +178,7 @@ func Save(ctx context.Context, conn *sql.DB, dataDir string, keep int) (string, 
 		_ = f.Close()
 		return "", err
 	}
-	if err := Write(ctx, conn, dataDir, f); err != nil {
+	if err := Write(ctx, conn, dataDir, configFile, f); err != nil {
 		_ = f.Close()
 		_ = os.Remove(path + ".tmp")
 		return "", err
@@ -203,7 +225,7 @@ func prune(dir string, keep int) {
 }
 
 // RunNightly saves a backup shortly after start and then once a day.
-func RunNightly(ctx context.Context, conn *sql.DB, dataDir string, keep func() int, log *slog.Logger) {
+func RunNightly(ctx context.Context, conn *sql.DB, dataDir, configFile string, keep func() int, log *slog.Logger) {
 	first := time.After(5 * time.Minute)
 	ticker := time.NewTicker(24 * time.Hour)
 	defer ticker.Stop()
@@ -218,7 +240,7 @@ func RunNightly(ctx context.Context, conn *sql.DB, dataDir string, keep func() i
 		if k <= 0 {
 			continue
 		}
-		if path, err := Save(ctx, conn, dataDir, k); err != nil {
+		if path, err := Save(ctx, conn, dataDir, configFile, k); err != nil {
 			log.Error("nightly backup failed", "err", err)
 		} else {
 			log.Info("backup written", "path", path)

@@ -178,6 +178,33 @@ func TestLoadConfigFileThenEnvOverrides(t *testing.T) {
 	}
 }
 
+// Load says which config file it read, for backups: WATCHMYMEDIA_CONFIG
+// when set, as the Linux packages set it, else config.yaml in the data
+// folder, whether or not the file is there.
+func TestLoadRecordsTheConfigFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("WATCHMYMEDIA_DATA_DIR", dir)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "config.yaml"); cfg.File != want {
+		t.Errorf("File = %q, want %q", cfg.File, want)
+	}
+
+	elsewhere := filepath.Join(t.TempDir(), "server.yaml")
+	if err := os.WriteFile(elsewhere, []byte("port: 7001\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WATCHMYMEDIA_CONFIG", elsewhere)
+	if cfg, err = Load(); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.File != elsewhere || cfg.Port != 7001 {
+		t.Errorf("File = %q port %d, want %q and 7001", cfg.File, cfg.Port, elsewhere)
+	}
+}
+
 func TestLoadRejectsBadPort(t *testing.T) {
 	t.Setenv("WATCHMYMEDIA_DATA_DIR", t.TempDir())
 	t.Setenv("WATCHMYMEDIA_PORT", "70000")
