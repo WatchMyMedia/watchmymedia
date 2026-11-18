@@ -46,8 +46,8 @@ import media.watchmy.client.presentation.value
  *
  * Its trailer (MovieTrailer.dc.html, PLAN-TRAILERS.md §6.2) is the first one
  * the server lists that this device can play: a file anywhere, and a YouTube
- * video where [youTube] says so (phones and tablets always; a TV only when
- * an app can open YouTube's link).
+ * video where [youTube] says so (phones and tablets always; a TV when it can
+ * show YouTube's player in a WebView, or an app can open YouTube's link).
  */
 class MovieViewModel(
     private val library: LibraryRepository,

@@ -45,14 +45,19 @@ import media.watchmy.client.tv.live.LiveChannelsScreen
 import media.watchmy.client.tv.live.LivePlayerScreen
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.PlayRequest
+import media.watchmy.client.model.Trailer
+import media.watchmy.client.model.isYouTubeKey
 import media.watchmy.client.tv.components.LocalRequestBadge
 import media.watchmy.client.tv.detail.MovieScreen
 import media.watchmy.client.tv.detail.ShowPageScreen
+import media.watchmy.client.tv.detail.TvTrailerScreen
 import media.watchmy.client.tv.home.HomeScreen
 import media.watchmy.client.tv.library.LibraryScreen
 import media.watchmy.client.tv.player.PlayerScreen
@@ -136,7 +141,10 @@ fun TvNavHost(
     }
     val format = rememberLiveClockFormat()
     val bannerModel = viewModel { ReminderBannerViewModel(services.live) }
-    val banner by bannerModel.banner.collectAsStateWithLifecycle()
+    val due by bannerModel.banner.collectAsStateWithLifecycle()
+    // Nothing of ours is drawn over YouTube's player (PLAN-TV-TRAILERS.md §3.3): a reminder waits for the trailer to close.
+    val entry by nav.currentBackStackEntryAsState()
+    val banner = due.takeUnless { entry?.destination?.hasRoute<TvRoutes.Trailer>() == true }
     val dismiss = bannerModel::dismiss
     val bannerKeys = remember(banner?.comeKey()) {
         BannerKeys(
@@ -238,7 +246,13 @@ fun TvNavHost(
                         onNavigate = { r -> nav.navigateSection(r) },
                         onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id)) },
                         onOpenShow = { id -> nav.navigate(TvRoutes.Show(id)) },
+                        onOpenTrailer = { t -> nav.navigate(TvRoutes.Trailer(t.movieId, t.movieTitle, t.trailers.map { it.key }, t.trailers.map { it.name })) },
                     )
+                }
+                composable<TvRoutes.Trailer> {
+                    val r = it.toRoute<TvRoutes.Trailer>()
+                    val trailers = r.keys.zip(r.names) { key, name -> Trailer.YouTube(name, key) }.filter { t -> isYouTubeKey(t.key) }
+                    TvTrailerScreen(movieTitle = r.movieTitle, trailers = trailers, onBack = { nav.popBackStack() })
                 }
                 composable<TvRoutes.Search> {
                     SearchScreen(

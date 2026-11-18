@@ -156,7 +156,7 @@ private suspend fun settleFocus(target: FocusRequester) {
 
 /** Keeps the TV from dimming or starting its screensaver while [on], and puts back what was there before. */
 @Composable
-private fun KeepScreenOn(on: Boolean) {
+internal fun KeepScreenOn(on: Boolean) {
     val view = LocalView.current
     DisposableEffect(view, on) {
         val before = view.keepScreenOn

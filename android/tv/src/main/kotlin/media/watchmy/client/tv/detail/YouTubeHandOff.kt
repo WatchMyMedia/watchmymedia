@@ -8,16 +8,20 @@ import android.os.Build
 import androidx.core.net.toUri
 
 /**
- * The TV hands YouTube trailers to the YouTube app (PLAN-TRAILERS.md §6.2):
- * an `ACTION_VIEW` of the watch link, which the YouTube app takes, as
- * Jellyfin's Android TV app does. Google TV ships with YouTube.
+ * Where the TV can't show YouTube's player in a WebView ([TrailerWebViews];
+ * PLAN-TV-TRAILERS.md §4.4), it hands YouTube trailers to the YouTube app
+ * (PLAN-TRAILERS.md §6.2): an `ACTION_VIEW` of the watch link, which the
+ * YouTube app takes, as Jellyfin's Android TV app does. Google TV ships with
+ * YouTube. The trailer screen's Open in YouTube uses it too.
  */
 private fun watchIntent(url: String) = Intent(Intent.ACTION_VIEW, url.toUri())
 
 /**
- * Whether an app here can open a YouTube watch link; without one, the
- * Trailer button is hidden for YouTube trailers. Android 11 and later show
- * the app only through the `<queries>` entry in the app's manifest.
+ * Whether an app here can open a YouTube watch link; without one (and
+ * without a usable WebView) the Trailer button is hidden for YouTube
+ * trailers, and the trailer screen has no Open in YouTube. Android 11 and
+ * later show the app only through the `<queries>` entry in the app's
+ * manifest.
  */
 internal fun Context.canOpenYouTube(): Boolean {
     val intent = watchIntent("https://www.youtube.com/watch?v=WhWc3b3KhnY")

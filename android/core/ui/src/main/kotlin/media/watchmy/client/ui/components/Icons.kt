@@ -128,6 +128,9 @@ object WmmIcons {
     val NotFound = stroke("M18 11a7 7 0 1 1-14 0a7 7 0 1 1 14 0", "m20 20-3.5-3.5M9 9.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4M11 14.5h.01")
     val Warning = stroke("M12 3 2 20h20L12 3z", "M12 10v4M12 17h.01")
 
+    /** A cloud struck through: the TV's trailer screen when YouTube can't be reached (TvTrailerPlayer.dc.html). */
+    val Offline = stroke("M3 3l18 18", "M8 18h9a4 4 0 0 0 .8-7.9A6 6 0 0 0 7.2 8", "M5 10.5A4 4 0 0 0 6 18")
+
     /** Six dots: a row's drag handle. */
     val DragHandle: ImageVector = ImageVector.Builder("drag-handle", 24.dp, 24.dp, 24f, 24f)
         .addPath(

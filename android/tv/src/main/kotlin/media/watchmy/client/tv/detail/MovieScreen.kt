@@ -95,8 +95,11 @@ import media.watchmy.client.ui.ReportShown
  * Mark watched and, where the server takes reports, More (Report a problem,
  * as on the episode page), then its versions, each with Play this, beside
  * the default version's audio and the cast. [onNavigate] goes to a rail
- * section. A trailer file plays in the player; a YouTube trailer opens the
- * YouTube app, and without an app to open it there is no Trailer for it.
+ * section. A trailer file plays in the player; a YouTube trailer plays in
+ * the app's trailer screen through [onOpenTrailer] (MovieTrailerInApp.dc.html,
+ * PLAN-TV-TRAILERS.md §4.5). Where this TV has no usable WebView, the
+ * YouTube app takes it instead, with "Opens the YouTube app" under the
+ * button, and with neither there is no Trailer for it.
  * The page ends with its related titles (MovieRelated.dc.html): ▼ from the
  * cast or the versions reaches them, and a card opens its page through
  * [onOpenMovie].
@@ -109,11 +112,14 @@ fun MovieScreen(
     onNavigate: (Any) -> Unit = {},
     onOpenMovie: (Long) -> Unit = {},
     onOpenShow: (Long) -> Unit = {},
+    onOpenTrailer: (TrailerPlay.YouTube) -> Unit = {},
 ) {
     val services = LocalAppServices.current
     val context = LocalContext.current
-    val youTube = remember(context) { context.canOpenYouTube() }
-    val vm = viewModel(key = "movie-$movieId") { MovieViewModel(services.library, movieId, services.requests, youTube = youTube, plans = services.playback::plans) }
+    // YouTube's player in a WebView here, else the YouTube app (PLAN-TV-TRAILERS.md §4.4).
+    var inApp by remember { mutableStateOf(TrailerWebViews.installed()) }
+    val youTubeApp = remember(context) { context.canOpenYouTube() }
+    val vm = viewModel(key = "movie-$movieId") { MovieViewModel(services.library, movieId, services.requests, youTube = inApp || youTubeApp, plans = services.playback::plans) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val memory = rememberFocusMemory()
@@ -122,7 +128,10 @@ fun MovieScreen(
     val onTrailer: () -> Unit = {
         when (val play = vm.trailerPlay()) {
             is TrailerPlay.File -> onPlay(play.request)
-            is TrailerPlay.YouTube -> {
+            is TrailerPlay.YouTube -> if (inApp && TrailerWebViews.usable(context)) {
+                onOpenTrailer(play)
+            } else {
+                inApp = false
                 val first = play.trailers.firstOrNull()
                 if (first != null && !context.openYouTube(first.watchUrl)) vm.say(TrailerText.COULD_NOT_OPEN)
             }
@@ -144,6 +153,7 @@ fun MovieScreen(
                     { vm.setWatched(!state.watched) },
                     onMore = if (state.canReport) ({ more = true }) else null,
                     trailer = state.trailer,
+                    trailerInApp = inApp,
                     onTrailer = onTrailer,
                 ) {
                     RelatedRows(state.related, services.library, memory, onOpenMovie, onOpenShow, Modifier.padding(bottom = 60.dp))
@@ -197,6 +207,7 @@ private fun MovieContent(
     onToggleWatched: () -> Unit,
     onMore: (() -> Unit)?,
     trailer: Trailer?,
+    trailerInApp: Boolean,
     onTrailer: () -> Unit,
     related: @Composable () -> Unit,
 ) {
@@ -230,7 +241,7 @@ private fun MovieContent(
                                 TvButton("Play from start", { onPlay(req) }, Modifier.focusMemory(memory, "start"), size = TvButtonSize.Medium)
                             }
                         }
-                        if (trailer != null) TrailerButton(youTube = trailer is Trailer.YouTube, onTrailer, Modifier.focusMemory(memory, "trailer"))
+                        if (trailer != null) TrailerButton(handOff = trailer is Trailer.YouTube && !trailerInApp, onTrailer, Modifier.focusMemory(memory, "trailer"))
                         TvButton(
                             if (movie.watch?.completed == true) "Mark unwatched" else "Mark watched",
                             onToggleWatched,
@@ -297,14 +308,16 @@ private fun MovieContent(
 }
 
 /**
- * Trailer, with "Opens the YouTube app" under it for a YouTube trailer. The
- * line takes no room in the row, so the buttons stay where they are.
+ * Trailer, with "Opens the YouTube app" under it for a YouTube trailer
+ * handed to the YouTube app ([handOff]); one that plays in the app has no
+ * line, as a file has none. The line takes no room in the row, so the
+ * buttons stay where they are.
  */
 @Composable
-private fun TrailerButton(youTube: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun TrailerButton(handOff: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box {
         TvButton(TrailerText.BUTTON, onClick, modifier, size = TvButtonSize.Medium, icon = WmmIcons.Clapper)
-        if (youTube) {
+        if (handOff) {
             Text(
                 TrailerText.OPENS_YOUTUBE,
                 style = inter(18.sp, FontWeight.Medium),

@@ -15,15 +15,16 @@ sealed interface TrailerPlay {
     data class File(val request: PlayRequest) : TrailerPlay
 
     /**
-     * YouTube: the trailer screen on phones and tablets, which tries
-     * [trailers] in turn, best first; the YouTube app on a TV (the first's
+     * YouTube: the trailer screen, which tries [trailers] in turn, best
+     * first; on a TV without a usable WebView, the YouTube app (the first's
      * watch link).
      */
     data class YouTube(val movieId: Long, val movieTitle: String, val trailers: List<Trailer.YouTube>) : TrailerPlay
 }
 
 /**
- * The trailer screen on phones and tablets (TrailerPlayer.dc.html): YouTube's
+ * The trailer screen on phones, tablets (TrailerPlayer.dc.html) and Android
+ * TV (TvTrailerPlayer.dc.html, PLAN-TV-TRAILERS.md §4.2): YouTube's
  * player plays [trailers] in turn, best first. When a video's owner doesn't
  * let it play outside YouTube (YouTube's errors 101 and 150), the next one is
  * tried; after the last, the screen says so and offers Open in YouTube, for

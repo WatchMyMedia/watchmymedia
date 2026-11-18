@@ -174,7 +174,7 @@ this device can play, and the logic is `MovieViewModel`'s (`trailerPlay`):
 - A **YouTube trailer on a phone or tablet** opens `TrailerScreen`: our bar
   above a WebView holding YouTube's IFrame player at 16:9, in landscape on
   phones, with nothing of ours over the video. The WebView loads a page of
-  ours (`TrailerPage.kt`) with `loadDataWithBaseURL` at
+  ours (`TrailerPage.kt` in `core:ui`, shared with the TV) with `loadDataWithBaseURL` at
   `https://<application id>/`, which gives YouTube's player the Referer
   YouTube asks apps to identify themselves by (error 153 without one). The
   page tells the app what happens through a JavaScript interface; errors 101
@@ -185,10 +185,47 @@ this device can play, and the logic is `MovieViewModel`'s (`trailerPlay`):
   YouTube app. It pauses when the screen is hidden, and YouTube's own full
   screen button shows the video over the screen (Back leaves it first). The
   emulators can't draw YouTube's player (AGENTS.md, Emulators).
-- A **YouTube trailer on a TV** is an `ACTION_VIEW` of the watch link, which
-  the YouTube app takes, with "Opens the YouTube app" under the row. The
-  button is hidden for it when no app can open the link; the manifest's
-  `<queries>` entry lets `resolveActivity` see YouTube on Android 11 and later.
+- A **YouTube trailer on a TV** plays in the app too
+  (PLAN-TV-TRAILERS.md §4, the `TvTrailerPlayer` and `MovieTrailerInApp`
+  boards): `TvTrailerScreen` loads
+  the same page, without autoplay, in a WebView that fills the screen.
+  - While the player loads, our screen shows the trailer, the movie and
+    "Plays from YouTube" under a spinner, and the WebView is there but
+    invisible.
+  - Once the page says the player is ready, the screen shows it, with
+    nothing of ours on it or beside it (the reminder banner waits too),
+    then asks it to play. Nothing plays unseen.
+  - A player that isn't ready within 20 s counts as unreachable.
+  - Refused (101 and 150 after the last trailer) and unreachable take the
+    player off the screen for ours, with Open in YouTube only when an app
+    takes the link, and Back to the movie.
+  - A trailer that played closes the screen when it ends. It pauses in
+    `onStop` and keeps the TV awake while it plays.
+  - The remote follows the plan's §4.3 table (`TrailerRemote.kt`) in one of
+    two ways, both YouTube's documented ones. YouTube's keyboard controls
+    are the default: the WebView takes the focus, the page focuses the
+    player's frame, and Select and Play/Pause become k, Left and Rewind j,
+    Right and Fast-forward l. With the IFrame API, the WebView never takes
+    the focus, and the keys call `playVideo`, `pauseVideo` and `seekTo` in
+    the page. Back is always the screen's, and Up and Down do nothing.
+  - Debug builds switch between the two without a rebuild, for the check
+    on a real TV; the next trailer opened uses the new way:
+
+    ```bash
+    adb shell am broadcast -n <package>/media.watchmy.client.tv.detail.TrailerRemoteSwitch --es remote api       # or keyboard
+    adb shell am broadcast -n <package>/media.watchmy.client.tv.detail.TrailerRemoteSwitch                       # says which is set
+    ```
+
+    `<package>` is `media.watchmy.client` plus any `-PappIdSuffix`. Only
+    the shell can send it (the receiver asks for `DUMP`), and release
+    builds have no receiver and always use the keyboard controls.
+  - Where the TV has no usable WebView (`WebView.getCurrentWebViewPackage()`
+    is null, or making one throws, which `TrailerWebViews` tries once, on
+    the first press), Trailer hands off as before: an `ACTION_VIEW` of the
+    watch link, which the YouTube app takes, with "Opens the YouTube app"
+    under the row. With neither a WebView nor an app for the link, the
+    button is hidden for a YouTube trailer. The manifest's `<queries>`
+    entry lets `resolveActivity` see YouTube on Android 11 and later.
 
 On the fakes, Dead Reckoning Bay's trailers are on YouTube (Blender Studio's
 own uploads of two Creative Commons open movies stand in for them) and The
@@ -725,7 +762,7 @@ against `cmd/livetvfixture`.
 | `app` | Application (builds `DataServices` and `PlaybackEngine`, the image loader, which also fetches the media notification's artwork; starts the Cast SDK at the first `ON_START`, `FirstForeground`; WorkManager starts on first use), the one activity for both launchers and its routing of casts and links (`IntentRouter`), the local network prompt, reminders' alarms (`app/reminders/`), debug builds' StrictMode (`StrictModeChecks`), the process's past exits (`AndroidDiagnostics`), manifest, icons |
 | `core:model` | Domain models and the interfaces everything builds against: `ServerRepository`, `AuthRepository`, `LibraryRepository`, `PreferencesRepository`, `PlaybackController`, `PlaybackGateway`, `LiveRepository`, `LivePlaybackController`, `AppServices`; and the pure helpers both UIs share, so the phone and the TV say the same thing: labels, dates and counts, error messages and `attempt`, play requests, deep links |
 | `core:presentation` | The ViewModels the phone and the TV share, so both pages behave alike (the Apple apps' WMMFeatures models): their state, with what loads as a `Load` (loading, failed or ready), and their one-shot events. Depends only on `core:model`, lifecycle's ViewModel and SavedStateHandle, and coroutines: no Compose, no Android UI |
-| `core:ui` | Brand tokens (`WmmColors`), Inter, the phone Material 3 theme, `LocalAppServices`, shared pieces: `Artwork`, `Badge`, `ProgressStrip`, `WatchedCheck`, `BrandMark`, `WmmIcons`, the loading skeletons' blocks, lines and sheen (`Skeleton.kt`, still with animations off), `SubtitleCues` (both players' text subtitles, in a `CaptionLook`: the TV's Subtitle size, the phone's system caption settings), `playerKey` (both players' remote and keyboard keys), `SeekThumbnail` and `ScrubberLayout` (both players' seek thumbnails) and `CoilSeekThumbnails` (their tiles), `PRIVACY_POLICY_URL` |
+| `core:ui` | Brand tokens (`WmmColors`), Inter, the phone Material 3 theme, `LocalAppServices`, shared pieces: `Artwork`, `Badge`, `ProgressStrip`, `WatchedCheck`, `BrandMark`, `WmmIcons`, the loading skeletons' blocks, lines and sheen (`Skeleton.kt`, still with animations off), `SubtitleCues` (both players' text subtitles, in a `CaptionLook`: the TV's Subtitle size, the phone's system caption settings), `playerKey` (both players' remote and keyboard keys), `SeekThumbnail` and `ScrubberLayout` (both players' seek thumbnails) and `CoilSeekThumbnails` (their tiles), `TrailerPage.kt` (both trailer screens' page for YouTube's player), `PRIVACY_POLICY_URL` |
 | `core:fake` | In-memory fakes of every interface, with the mockups' sample library and a pretend player (tests, previews, the player harnesses, `-Pfakes=true`) |
 | `core:api` | Client generated from `../api/openapi-3.0.json` |
 | `core:data` | Real repositories: servers (DataStore, mDNS), sign-in and pairing, library, preferences, the server's event stream, playback API calls (`DataServices`) |
