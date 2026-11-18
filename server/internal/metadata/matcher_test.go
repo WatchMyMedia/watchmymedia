@@ -240,12 +240,15 @@ func TestMatchEpisodes(t *testing.T) {
 	if sum.Matched != 2 || sum.Unmatched != 4 || sum.Failed != 0 {
 		t.Fatalf("summary = %+v", sum)
 	}
+	// S01E99 and S09E01 are not on TMDB: they stay unmatched and play as
+	// episodes named after their files (filenamed_test.go).
 	shows, _ := e.q.ListShows(e.ctx, db.ListShowsParams{LibraryID: e.tv.ID, Limit: 10})
-	if len(shows) != 1 || shows[0].Show.Title != "Breaking Bad" || shows[0].EpisodeCount != 2 {
+	if len(shows) != 1 || shows[0].Show.Title != "Breaking Bad" || shows[0].EpisodeCount != 4 {
 		t.Fatalf("shows = %+v", shows)
 	}
 	seasons, _ := e.q.ListSeasons(e.ctx, shows[0].Show.ID)
-	if len(seasons) != 2 || seasons[0].Number != 1 || seasons[0].AvailableCount != 2 || seasons[1].AvailableCount != 0 {
+	if len(seasons) != 3 || seasons[0].Number != 1 || seasons[0].AvailableCount != 3 || seasons[1].AvailableCount != 0 ||
+		seasons[2].Number != 9 || seasons[2].FileNamed != 1 || seasons[2].AvailableCount != 1 {
 		t.Errorf("seasons = %+v", seasons)
 	}
 	// Season 2 has no files but its episodes are stored anyway.
@@ -253,8 +256,8 @@ func TestMatchEpisodes(t *testing.T) {
 		t.Errorf("season 2 episodes = %+v", eps)
 	}
 	rows, _ := e.q.ListSeasonEpisodeFiles(e.ctx, seasons[0].ID)
-	if len(rows) != 3 { // file1->ep1, file2->ep1, file2->ep2
-		t.Errorf("episode files = %d, want 3", len(rows))
+	if len(rows) != 4 { // file1->ep1, file2->ep1, file2->ep2, E99's file->its own E99
+		t.Errorf("episode files = %d, want 4", len(rows))
 	}
 	f, _ := e.q.GetMediaFileByPath(e.ctx, "/t/Breaking Bad (2008)/Season 01/Breaking Bad - S01E99.mkv")
 	if f.MatchStatus != StatusUnmatched || !strings.Contains(*f.MatchError, "no episode [99]") {

@@ -259,8 +259,14 @@ func TestApplySeasonsAndRemember(t *testing.T) {
 	if ep, _ := e.q.GetEpisode(e.ctx, eps[0]); ep.Title != "Flood" {
 		t.Errorf("E03 landed on %q", ep.Title)
 	}
-	if eps, _ := e.q.ListEpisodeIDsForFile(e.ctx, other.ID); len(eps) != 0 {
-		t.Errorf("season 5 followed season 4's line-up: %v", eps)
+	// Season 5, which TMDB's Harbor Lights lacks too, plays as an episode of
+	// the folder's show named after its file, not of the line-up's show.
+	if eps, _ := e.q.ListEpisodeIDsForFile(e.ctx, other.ID); len(eps) != 1 {
+		t.Errorf("season 5 episodes = %v", eps)
+	} else if ep, _ := e.q.GetEpisode(e.ctx, eps[0]); ep.FileNamed != 1 {
+		t.Errorf("season 5 followed season 4's line-up: %+v", ep)
+	} else if show, _ := e.q.GetShow(e.ctx, ep.ShowID); show.TmdbID != 500 {
+		t.Errorf("season 5 is an episode of %d", show.TmdbID)
 	}
 
 	// Forgetting the line-up leaves matched files matched.

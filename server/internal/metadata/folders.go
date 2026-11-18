@@ -218,8 +218,13 @@ func (m *Matcher) ApplyGroup(ctx context.Context, lib db.Library, files []db.Med
 				res.Matched++
 			case errors.As(err, &nm):
 				// The show is right but this episode is not on TMDB: leave the
-				// file unmatched with the reason, for the episode picker.
-				if err := m.record(ctx, f.ID, StatusUnmatched, nil, nil, nil, new(err.Error()), false); err != nil {
+				// file unmatched with the reason, for the episode picker, and
+				// playing meanwhile as an episode of that show named after it.
+				named, nerr := m.fileNamed(ctx, lib, f, tmdbID, guessOf(f), err)
+				if nerr != nil {
+					return res, nerr
+				}
+				if err := m.record(ctx, f.ID, StatusUnmatched, nil, named, nil, new(err.Error()), false); err != nil {
 					return res, err
 				}
 				res.NeedEpisodes++

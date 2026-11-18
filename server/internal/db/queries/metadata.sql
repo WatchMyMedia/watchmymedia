@@ -107,13 +107,14 @@ SELECT id, tmdb_id FROM shows WHERE library_id = ? AND content_rating IS NULL;
 UPDATE shows SET content_rating = ? WHERE id = ?;
 
 -- name: UpsertSeason :one
+-- A season as TMDB lists it. One made for files (file_named) becomes TMDB's.
 INSERT INTO seasons (show_id, number, name, overview, air_date, poster_path, episode_count)
 VALUES (?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (show_id, number) DO UPDATE SET
     name = excluded.name, overview = excluded.overview, air_date = excluded.air_date,
     poster_tmdb = excluded.poster_path,
     poster_path = CASE WHEN seasons.poster_source = '' THEN excluded.poster_path ELSE seasons.poster_path END,
-    episode_count = excluded.episode_count
+    episode_count = excluded.episode_count, file_named = 0
 RETURNING *;
 
 -- name: GetSeason :one
@@ -133,11 +134,14 @@ WHERE s.show_id = ?
 ORDER BY s.number;
 
 -- name: UpsertEpisode :one
+-- An episode as TMDB lists it. One named after a file (file_named) becomes
+-- TMDB's in place, so the files linked to it and its watch state stay.
 INSERT INTO episodes (season_id, show_id, number, title, overview, air_date, still_path, runtime_min, rating)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (season_id, number) DO UPDATE SET
     title = excluded.title, overview = excluded.overview, air_date = excluded.air_date,
-    still_path = excluded.still_path, runtime_min = excluded.runtime_min, rating = excluded.rating
+    still_path = excluded.still_path, runtime_min = excluded.runtime_min, rating = excluded.rating,
+    file_named = 0
 RETURNING *;
 
 -- name: GetEpisodeByNumber :one
@@ -164,6 +168,61 @@ DELETE FROM episode_files WHERE media_file_id = ?;
 
 -- name: InsertEpisodeFile :exec
 INSERT OR IGNORE INTO episode_files (episode_id, media_file_id) VALUES (?, ?);
+
+-- name: InsertFileNamedSeason :exec
+-- A season TMDB does not list, for files numbered in it (see
+-- InsertFileNamedEpisode). One that exists, TMDB's or not, stays as it is.
+INSERT INTO seasons (show_id, number, name, file_named) VALUES (?, ?, ?, 1)
+ON CONFLICT (show_id, number) DO NOTHING;
+
+-- name: InsertFileNamedEpisode :exec
+-- An episode TMDB does not list, named after the file numbered as it, so
+-- the file plays in its place on the show's page. One that exists (TMDB's,
+-- or made for another copy of the file) stays as it is.
+INSERT INTO episodes (season_id, show_id, number, title, file_named) VALUES (?, ?, ?, ?, 1)
+ON CONFLICT (season_id, number) DO NOTHING;
+
+-- name: ListFileNamedEpisodesForFile :many
+-- The file-named episodes a file is linked to, in order.
+SELECT e.id
+FROM episode_files ef
+JOIN episodes e ON e.id = ef.episode_id
+JOIN seasons se ON se.id = e.season_id
+WHERE ef.media_file_id = ? AND e.file_named = 1
+ORDER BY se.number, e.number;
+
+-- name: ListFilelessFileNamedEpisodes :many
+-- Of these episodes, the file-named ones that no file is linked to now.
+SELECT episodes.id, episodes.season_id FROM episodes
+WHERE episodes.file_named = 1 AND episodes.id IN (sqlc.slice(ids))
+  AND NOT EXISTS (SELECT 1 FROM episode_files ef WHERE ef.episode_id = episodes.id)
+ORDER BY episodes.id;
+
+-- name: DeleteFilelessFileNamedEpisodes :exec
+DELETE FROM episodes
+WHERE episodes.file_named = 1 AND episodes.id IN (sqlc.slice(ids))
+  AND NOT EXISTS (SELECT 1 FROM episode_files ef WHERE ef.episode_id = episodes.id);
+
+-- name: DeleteEmptyFileNamedSeasons :exec
+DELETE FROM seasons
+WHERE seasons.file_named = 1 AND seasons.id IN (sqlc.slice(ids))
+  AND NOT EXISTS (SELECT 1 FROM episodes e WHERE e.season_id = seasons.id);
+
+-- name: SweepFileNamedEpisodes :execrows
+-- A library's file-named episodes that no file is linked to any more (a
+-- person deleted the file). The partial index holds only file-named rows,
+-- so the rest of the library's episodes are not read.
+DELETE FROM episodes
+WHERE episodes.file_named = 1
+  AND episodes.show_id IN (SELECT shows.id FROM shows WHERE shows.library_id = ?)
+  AND NOT EXISTS (SELECT 1 FROM episode_files ef WHERE ef.episode_id = episodes.id);
+
+-- name: SweepFileNamedSeasons :execrows
+-- A library's file-named seasons left without episodes.
+DELETE FROM seasons
+WHERE seasons.file_named = 1
+  AND seasons.show_id IN (SELECT shows.id FROM shows WHERE shows.library_id = ?)
+  AND NOT EXISTS (SELECT 1 FROM episodes e WHERE e.season_id = seasons.id);
 
 -- name: ListPendingMatches :many
 -- Trailers (extra_kind) are never matched; the match index holds the kind,
@@ -213,8 +272,11 @@ SELECT * FROM match_overrides WHERE library_id = ?;
 -- not each file's probe, which is the largest. Without statistics SQLite
 -- would read the whole library off its (library_id, status) index rather
 -- than the few files the match index finds, hence INDEXED BY. Trailers are
--- left out on the index too.
-SELECT id, path, size, parsed, height, duration_ms, added_at, match_status, match_error, match_candidates, match_ignored
+-- left out on the index too. file_named is set for a file that plays as
+-- episodes named after it while TMDB does not list its episodes.
+SELECT id, path, size, parsed, height, duration_ms, added_at, match_status, match_error, match_candidates, match_ignored,
+    EXISTS (SELECT 1 FROM episode_files ef JOIN episodes e ON e.id = ef.episode_id
+            WHERE ef.media_file_id = media_files.id AND e.file_named = 1) AS file_named
 FROM media_files INDEXED BY media_files_match_idx
 WHERE library_id = ? AND match_status IN ('pending', 'unmatched', 'failed') AND extra_kind IS NULL AND status = 'present'
 ORDER BY path;

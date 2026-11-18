@@ -16,11 +16,11 @@ WHERE episode_id IS NULL AND id = (
     CROSS JOIN seasons se ON se.id = e.season_id
     CROSS JOIN shows s ON s.id = e.show_id
     CROSS JOIN episode_arrivals a ON a.tmdb_id = s.tmdb_id AND a.season = se.number AND a.number = e.number
-    WHERE e.id = ?1)
+    WHERE e.id = ?1 AND e.file_named = 0)
 `
 
 // An arrival whose episode row has gone, with its library, moves to this
-// episode row of the same TMDB episode.
+// episode row of the same TMDB episode (not to one named after a file).
 func (q *Queries) AdoptEpisodeArrival(ctx context.Context, episodeID *int64) error {
 	_, err := q.db.ExecContext(ctx, adoptEpisodeArrival, episodeID)
 	return err
@@ -389,7 +389,7 @@ SELECT s.tmdb_id, se.number, e.number, e.id, CAST(?1 AS TEXT), CAST(?2 AS INTEGE
 FROM episodes e
 CROSS JOIN seasons se ON se.id = e.season_id
 CROSS JOIN shows s ON s.id = e.show_id
-WHERE e.id = ?3
+WHERE e.id = ?3 AND e.file_named = 0
   AND NOT EXISTS (SELECT 1 FROM episode_arrivals a WHERE a.tmdb_id = s.tmdb_id AND a.season = se.number AND a.number = e.number)
 `
 
@@ -403,6 +403,9 @@ type RecordEpisodeArrivalParams struct {
 // season and the number) has one, in any library: it arrives once. It
 // looks first rather than leaning on the unique index, since a conflict
 // still uses up an AUTOINCREMENT id and a cursor would name no arrival.
+// An episode named after a file is no TMDB episode: it would take the
+// number's arrival from the episode TMDB lists there later, so it arrives
+// when TMDB lists it and the file is linked to it again.
 func (q *Queries) RecordEpisodeArrival(ctx context.Context, arg RecordEpisodeArrivalParams) error {
 	_, err := q.db.ExecContext(ctx, recordEpisodeArrival, arg.ArrivedAt, arg.Quiet, arg.EpisodeID)
 	return err

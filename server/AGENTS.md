@@ -38,7 +38,7 @@ Under `internal/`:
 |---|---|
 | `api` | Every HTTP route: huma operations registered per area (`registerActivity`, …), their input and output types, and the OpenAPI document |
 | `db` | Connection, embedded goose migrations, sqlc queries (`internal/db/queries/*.sql` → `*.sql.go`) |
-| `library`, `scanner`, `parser`, `probe`, `metadata`, `tmdb`, `images` | Finding files, naming them, matching them on TMDB, artwork. Season line-ups, for seasons TMDB numbers differently from the files, are in `internal/metadata/seasonmap.go` ([PLAN-SEASON-MAPPING.md](../PLAN-SEASON-MAPPING.md)) |
+| `library`, `scanner`, `parser`, `probe`, `metadata`, `tmdb`, `images` | Finding files, naming them, matching them on TMDB, artwork. Season line-ups, for seasons TMDB numbers differently from the files, are in `internal/metadata/seasonmap.go` ([PLAN-SEASON-MAPPING.md](../PLAN-SEASON-MAPPING.md)); episodes named after files, for a known show's episodes TMDB does not list, in `internal/metadata/filenamed.go` |
 | `artwork` | The pictures admins chose in place of TMDB's posters ([PLAN-POSTERS.md](../PLAN-POSTERS.md)): uploads and links copied once, re-encoded as JPEG and named `c-<hash>.jpg` under `<data_dir>/artwork`, the address check on links, and the sweep. `images` serves them scaled on the TMDB image route; the routes are `internal/api/posters.go`. `poster_path` stays the poster to show: change it only through `SetMoviePoster`, `SetShowPoster` and `SetSeasonPoster`, and keep the upserts' `poster_source` guard, or a refresh overwrites an admin's choice |
 | `trailers` | Movies' YouTube trailers from TMDB: choosing the best three, `movies.trailers`, the background refresh (`Refresher`) and whether the Trailers from YouTube setting is on ([PLAN-TRAILERS.md](../PLAN-TRAILERS.md)) |
 | `related` | Related titles at the end of movie and show pages ([PLAN-RELATED.md](../PLAN-RELATED.md)): each title's tags from TMDB (`movie_tags`, `show_tags`: recommendations, keywords, genres, billed cast, director or creator, language) and a movie's collection, written when the matcher stores a title (`StoreMovie`, `StoreShow`, in its transaction); the scoring (`Similar`, weights in `score.go`); and the background job (`Refresher`) that fills in titles matched before and refetches a title whose page was opened with data older than 30 or 90 days. Pages never wait on TMDB. The routes are `internal/api/related.go` |
@@ -157,13 +157,30 @@ it, and outlives a library removed. It is announced only when that file's
 copies, renames, a 4K library's copy and a library added again are silent,
 old files matched late or moved onto another episode are quiet, and a new
 file fixed onto the right episode is announced. Inserting `episode_files`
-anywhere else skips that.
+anywhere else skips that. An episode named after a file (`file_named`) has
+no arrival: it is no TMDB episode, and would take the number's arrival from
+the one TMDB lists there later.
+
+**Episodes named after files.** A numbered file whose show is known but
+whose season or episode TMDB does not list is linked to an episode of that
+show at its numbers, titled with the file's name (`episodes.file_named`,
+and `seasons.file_named` for a season TMDB lacks;
+`internal/metadata/filenamed.go`). The file stays unmatched, in the
+Unmatched view and the daily retry. `linkEpisodes` never treats such a
+row as TMDB's; `UpsertEpisode` and `UpsertSeason` turn it into TMDB's in
+place when TMDB lists it, so links and watch state stay. `Matcher.record`
+keeps a file's file-named links when it records the file unmatched with
+no episodes (TMDB failing or still lacking it), and when it gives the file
+others, moves their watch state there and removes them. Counts of what TMDB
+lists (requests' season availability) leave them out; the show and season
+pages count them.
 
 **Watch state.** Change `watch_state` only through `internal/watchstate`, never
 with its queries directly: each change must also take a revision and leave a
 local guard in the same transaction, or an import can later overwrite the
 user's choice. Deleting a movie or episode deletes its state and guards by
-trigger. `episodes` holds every episode TMDB lists, aired or not, so a bulk
+trigger. `episodes` holds every episode TMDB lists, aired or not (and the
+ones named after files, which have a file instead of an air date), so a bulk
 mark must not mark what can't have been watched: Mark season and Mark show
 watched mark (and guard) only episodes that have aired by today (UTC) or
 have a file present, so a new episode isn't already watched when it comes.

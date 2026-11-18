@@ -4800,7 +4800,7 @@ export interface components {
              */
             addedAt?: string;
             airDate?: string;
-            /** @description Air date is today or earlier. */
+            /** @description Air date is today or earlier; always for an episode named after a file, which has no air date. */
             aired: boolean;
             /** @description Its download in Sonarr's queue. */
             download?: components["schemas"]["QueueDownload"];
@@ -8257,7 +8257,7 @@ export interface components {
             availableCount: number;
             /**
              * Format: int64
-             * @description Episodes TMDB lists for the season.
+             * @description Episodes TMDB lists for the season, and those named after files because TMDB does not list them.
              */
             episodeCount: number;
             /** Format: int64 */
@@ -8301,7 +8301,7 @@ export interface components {
             availableCount: number;
             /**
              * Format: int64
-             * @description Episodes TMDB lists for the season.
+             * @description Episodes TMDB lists for the season, and those named after files because TMDB does not list them.
              */
             episodeCount: number;
             episodes: components["schemas"]["Episode"][];
@@ -8678,7 +8678,7 @@ export interface components {
             tmdbId: number;
             /**
              * Format: int64
-             * @description Episodes TMDB lists across all seasons.
+             * @description Episodes across all seasons, as the seasons' episodeCount counts them.
              */
             totalEpisodes: number;
             /** Format: int64 */

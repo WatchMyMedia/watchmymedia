@@ -81,6 +81,7 @@ type Episode struct {
 	StillPath  *string  `json:"still_path"`
 	RuntimeMin *int64   `json:"runtime_min"`
 	Rating     *float64 `json:"rating"`
+	FileNamed  int64    `json:"file_named"`
 }
 
 type EpisodeArrival struct {
@@ -702,6 +703,7 @@ type Season struct {
 	EpisodeCount int64   `json:"episode_count"`
 	PosterTmdb   *string `json:"poster_tmdb"`
 	PosterSource string  `json:"poster_source"`
+	FileNamed    int64   `json:"file_named"`
 }
 
 type SeasonMap struct {

@@ -1110,10 +1110,17 @@ func firstMatched(items []BrowseItem) (BrowseItem, bool) {
 // or folder. Ignored files are left out, and so are episodes of a show that
 // is already in the list (Pick episodes) unless withEpisodes is set, as for
 // Recently added, where they are new arrivals the show's card does not show.
+// Files playing as episodes named after them are left out too: their show
+// has them already, so here they would be listed twice, once with nowhere to
+// go. The Unmatched view still lists them.
 func unmatchedItems(ctx context.Context, deps Deps, lib db.Library, withEpisodes bool) ([]BrowseItem, error) {
 	rows, err := deps.Queries.ListFilesNeedingMatch(ctx, lib.ID)
-	if err != nil || len(rows) == 0 {
+	if err != nil {
 		return []BrowseItem{}, err
+	}
+	rows = slices.DeleteFunc(rows, func(r db.ListFilesNeedingMatchRow) bool { return r.FileNamed })
+	if len(rows) == 0 {
+		return []BrowseItem{}, nil
 	}
 	overrides, err := deps.Queries.ListMatchOverrides(ctx, lib.ID)
 	if err != nil {

@@ -78,12 +78,13 @@ LIMIT 1;
 
 -- name: ListSeasonAvailabilityByTMDB :many
 -- Each season of a TMDB show, in every library that has it: how many of its
--- episodes have a present file, and how many have aired.
+-- episodes have a present file, and how many have aired. Episodes named
+-- after files are not TMDB's, so they don't make a season look complete.
 SELECT se.number, se.episode_count,
     (SELECT COUNT(DISTINCT e.id) FROM episodes e
        JOIN episode_files ef ON ef.episode_id = e.id
        JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
-     WHERE e.season_id = se.id) AS available_count,
+     WHERE e.season_id = se.id AND e.file_named = 0) AS available_count,
     (SELECT COUNT(*) FROM episodes e
      WHERE e.season_id = se.id AND e.air_date IS NOT NULL AND e.air_date <= sqlc.arg('today')) AS aired_count
 FROM shows s

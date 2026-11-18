@@ -112,12 +112,15 @@ JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
 WHERE e.show_id = ?;
 
 -- name: ListShowSeasons :many
--- A show's seasons, each with how many of its episodes have a present file.
+-- A show's seasons, each with how many of its episodes have a present file,
+-- and how many are named after files because TMDB does not list them (they
+-- are not in the season's episode_count, which is TMDB's).
 SELECT sqlc.embed(s),
     (SELECT COUNT(DISTINCT e.id) FROM episodes e
        JOIN episode_files ef ON ef.episode_id = e.id
        JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
-     WHERE e.season_id = s.id) AS available_count
+     WHERE e.season_id = s.id) AS available_count,
+    (SELECT COUNT(*) FROM episodes e WHERE e.season_id = s.id AND e.file_named = 1) AS file_named_count
 FROM seasons s
 WHERE s.show_id = ?
 ORDER BY s.number;

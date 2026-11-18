@@ -10,7 +10,7 @@ import (
 )
 
 const searchEpisodes = `-- name: SearchEpisodes :many
-SELECT e.id, e.season_id, e.show_id, e.number, e.title, e.overview, e.air_date, e.still_path, e.runtime_min, e.rating, se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path, MAX(f.id) AS file_id
+SELECT e.id, e.season_id, e.show_id, e.number, e.title, e.overview, e.air_date, e.still_path, e.runtime_min, e.rating, e.file_named, se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path, MAX(f.id) AS file_id
 FROM episodes e
 JOIN seasons se ON se.id = e.season_id
 JOIN shows s ON s.id = e.show_id
@@ -38,6 +38,7 @@ type SearchEpisodesRow struct {
 	StillPath      *string     `json:"still_path"`
 	RuntimeMin     *int64      `json:"runtime_min"`
 	Rating         *float64    `json:"rating"`
+	FileNamed      int64       `json:"file_named"`
 	SeasonNumber   int64       `json:"season_number"`
 	ShowTitle      string      `json:"show_title"`
 	ShowPosterPath *string     `json:"show_poster_path"`
@@ -64,6 +65,7 @@ func (q *Queries) SearchEpisodes(ctx context.Context, arg SearchEpisodesParams) 
 			&i.StillPath,
 			&i.RuntimeMin,
 			&i.Rating,
+			&i.FileNamed,
 			&i.SeasonNumber,
 			&i.ShowTitle,
 			&i.ShowPosterPath,
