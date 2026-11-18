@@ -123,8 +123,11 @@ def source_date_epoch():
     """The commit's time, so the same commit builds the same files."""
     if os.environ.get('SOURCE_DATE_EPOCH'):
         return os.environ['SOURCE_DATE_EPOCH']
-    result = subprocess.run(['git', '-C', str(ROOT), 'log', '-1', '--format=%ct'],
-                            capture_output=True, text=True, check=False)
+    try:
+        result = subprocess.run(['git', '-C', str(ROOT), 'log', '-1', '--format=%ct'],
+                                capture_output=True, text=True, check=False)
+    except OSError:  # no git, as in a bare container
+        return ''
     return result.stdout.strip() if result.returncode == 0 else ''
 
 

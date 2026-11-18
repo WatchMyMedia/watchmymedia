@@ -54,7 +54,7 @@ turns a missing tool into a failure. On a Mac, run them in a container:
 
 ```bash
 docker run --rm -v "$PWD:/src" -w /src -e WMM_LINUX_RELEASE=1 ubuntu:24.04 sh -c \
-  'apt-get update -q && apt-get install -yq --no-install-recommends rpm apt-utils createrepo-c gnupg python3 curl ca-certificates zstd \
+  'apt-get update -q && apt-get install -yq --no-install-recommends rpm apt-utils createrepo-c gnupg python3 curl ca-certificates zstd make \
    && python3 -I -m unittest discover -s deploy/linux -p "*_test.py"'
 ```
 
