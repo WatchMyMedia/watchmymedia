@@ -3,7 +3,8 @@ import XCTest
 /// Home one row a screen (PLAN-HOME.md §7.4) on the fakes with arranged
 /// rows: ▼ from the first row pages to the next row's screen, whose panel
 /// follows the focused card; the row that comes back restores its card;
-/// Menu returns to the first screen. Runs in `make apple-tv-test-sim`.
+/// Menu returns to the first screen, and so does the last screen's Back to
+/// the top. Runs in `make apple-tv-test-sim`.
 final class HomeScreensTests: XCTestCase {
     @MainActor private var remote: XCUIRemote { XCUIRemote.shared }
 
@@ -68,5 +69,30 @@ final class HomeScreensTests: XCTestCase {
         remote.press(.down)
         XCTAssertTrue(visible(panel))
         XCTAssertTrue(panelSays(panel, "Season 1 · yesterday. The Quiet Meridian"), "the row that comes back restores the card it had focus on: \(panel.label)")
+    }
+
+    /// The last screen's Back to the top: the first screen again, with focus on Play.
+    @MainActor
+    func testBackToTheTopOnTheLastScreenReturnsToTheFirstOnPlay() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-fakes", "-fakesRows"]
+        app.launch()
+        let play = app.buttons["Play"]
+        XCTAssertTrue(play.waitUntilExists(timeout: 15), "Home shows the hero")
+        XCTAssertTrue(app.waitForFocusedButton(timeout: 15) { _ in true }, "the tab bar has focus")
+
+        // Down through Play and the seven rows to the last screen's buttons.
+        let edit = app.buttons["editRows"]
+        let back = app.buttons["homeBackToTop"]
+        for _ in 0..<12 where edit.lookedAt?.hasFocus != true && back.lookedAt?.hasFocus != true {
+            app.press(.down, thenWaitForFocusToMove: 5)
+        }
+        XCTAssertTrue(visible(back), "Down reaches the last screen: \(app.focusedButton.label)")
+        for _ in 0..<2 where back.lookedAt?.hasFocus != true { app.press(.right, thenWaitForFocusToMove: 3) }
+        XCTAssertTrue(focused(back, timeout: 5), "Right from Edit rows reaches Back to the top: \(app.focusedButton.label)")
+
+        remote.press(.select)
+        XCTAssertTrue(focused(play), "Back to the top returns to the first screen, on Play: \(app.focusedButton.label)")
+        XCTAssertTrue(visible(app.staticTexts["Row 1 of 7"]))
     }
 }
