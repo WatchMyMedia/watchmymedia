@@ -172,7 +172,10 @@ Several agent sessions use this repository at once.
 ## Validation
 
 Run the checks for the surfaces you touched before handing work back. CI
-(`.github/workflows/ci.yml`) runs the same ones on GitHub-hosted runners.
+(`.github/workflows/ci.yml`) runs the same ones on GitHub-hosted runners,
+and only those: the repository is public, so anyone's pull request runs
+here, and no workflow may name a self-hosted runner or pick one at run time
+(`deploy/ci/security_test.py` checks).
 Each job runs only when what it builds or tests changed: the `changes` job's
 path filters in `ci.yml` decide (the server jobs for `server/`, the apps for
 their folder and `api/`, `scripts` for `deploy/`, the workflows and the docs,

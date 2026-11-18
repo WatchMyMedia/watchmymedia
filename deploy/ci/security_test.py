@@ -1,5 +1,4 @@
-"""Keep trusted CI routing explicit and concurrent runners isolated."""
-import ast
+"""Keep CI on GitHub's own machines, and concurrent runners isolated."""
 import json
 import os
 import pathlib
@@ -14,38 +13,12 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
-def evaluate_runner(expression, context):
-    if not expression.startswith('${{'):
-        return expression
-    expression = expression[3:-2].strip()
-    expression = re.sub(r"fromJSON\('([^']+)'\)", lambda match: repr(json.loads(match[1])), expression)
-    expression = re.sub(r'github\.[a-zA-Z_.]+', lambda match: repr(context[match[0]]), expression)
-    expression = expression.replace('&&', ' and ').replace('||', ' or ')
-
-    def evaluate(node):
-        if isinstance(node, ast.Constant):
-            return node.value
-        if isinstance(node, ast.List):
-            return [evaluate(value) for value in node.elts]
-        if isinstance(node, ast.Compare) and len(node.ops) == 1 and isinstance(node.ops[0], ast.Eq):
-            return evaluate(node.left) == evaluate(node.comparators[0])
-        if isinstance(node, ast.BoolOp):
-            value = evaluate(node.values[0])
-            for right in node.values[1:]:
-                if isinstance(node.op, ast.And):
-                    value = value and evaluate(right)
-                elif isinstance(node.op, ast.Or):
-                    value = value or evaluate(right)
-                else:
-                    raise AssertionError('Unsupported runner operator')
-            return value
-        raise AssertionError('Unsupported runner expression: ' + ast.dump(node))
-
-    return evaluate(ast.parse(expression, mode='eval').body)
-
-
 class WorkflowIsolationTest(unittest.TestCase):
-    def test_runner_routing_for_trusted_and_untrusted_events(self):
+    def test_every_job_runs_on_githubs_own_machines(self):
+        # The repository is public, so a pull request from anyone runs here.
+        # Every job names one of GitHub's machines, fresh for each job, and
+        # no workflow can reach a self-hosted runner, a maintainer's Mac or
+        # anything chosen at run time.
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
@@ -56,37 +29,22 @@ class WorkflowIsolationTest(unittest.TestCase):
         hosted.update(dict.fromkeys(('apple', 'apple-tv'), 'xcode-27'))
         hosted.update(dict.fromkeys(('windows-server', 'windows-live-tv', 'windows-app', 'windows-signing'), 'windows-latest'))
         # The Linux packages install in privileged systemd containers, which
-        # need a Linux Docker host: GitHub's, one for each architecture.
+        # need a Linux Docker host: GitHub's, one for each architecture. Its
+        # matrix names the runners; the test of that job reads them.
         hosted['linux-packages'] = 'ubuntu-latest'
         hosted['linux-packages-install'] = '${{ matrix.runner }}'
         self.assertEqual(set(hosted), set(jobs))
-        studio = ['self-hosted', 'macOS', 'ARM64', 'mac-studio']
-        # Exercise the actual runs-on expressions, not a second routing helper.
-        cases = (
-            ('pull_request', True, 'owner/project', 'refs/pull/1/merge', True),
-            ('pull_request', True, 'fork/project', 'refs/pull/1/merge', False),
-            ('pull_request', True, '', 'refs/pull/1/merge', False),
-            ('push', True, '', 'refs/heads/main', True),
-            ('push', True, '', 'refs/heads/feature', False),
-            ('workflow_dispatch', True, '', 'refs/heads/feature', True),
-            ('pull_request_target', True, 'owner/project', 'refs/heads/main', False),
-        )
         for job, body in jobs.items():
-            runner = re.search(r'(?m)^    runs-on: (.+)$', body).group(1)
-            if job == 'linux-packages-install':
-                # Its matrix names the runners; the test below reads them.
-                self.assertEqual(hosted[job], runner)
-                continue
-            for event, private, head, ref, trusted in cases:
-                for visibility in (private, False):
-                    context = {'github.event_name': event,
-                               'github.event.repository.private': visibility,
-                               'github.event.pull_request.head.repo.full_name': head,
-                               'github.repository': 'owner/project', 'github.ref': ref}
-                    expected = (studio if trusted and visibility and not job.startswith(('windows', 'linux-packages'))
-                                else hosted[job])
-                    with self.subTest(job=job, event=event, private=visibility, head=head, ref=ref):
-                        self.assertEqual(expected, evaluate_runner(runner, context))
+            with self.subTest(job=job):
+                self.assertEqual(hosted[job], re.search(r'(?m)^    runs-on: (.+)$', body).group(1))
+        for path in sorted((ROOT / '.github/workflows').glob('*.y*ml')):
+            text = path.read_text()
+            with self.subTest(workflow=path.name):
+                for word in ('self-hosted', 'mac-studio', 'repository.private', 'vars.CI_RUNNER'):
+                    self.assertNotIn(word, text)
+                for runner in re.findall(r'(?m)^\s+runs-on: (.+)$', text):
+                    if runner != '${{ matrix.runner }}':
+                        self.assertNotIn('${{', runner)
 
     def test_every_job_runs_only_for_what_it_checks(self):
         # Each job waits on the changes job and runs when its own paths, this

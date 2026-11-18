@@ -17,10 +17,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Trusted CI in this private repository uses the four Mac Studio runners.
-# Fork PRs (and all CI if the repository becomes public) stay on disposable
-# hosted machines. Keep the event/repository guard on every compatible job;
-# Windows stays hosted. See deploy/ci/mac-studio.md for the access boundary.
+# Every job runs on GitHub's own machines, fresh for each job. This
+# repository is public, so a pull request from anyone runs here: no job may
+# run on a machine of ours (deploy/ci/security_test.py checks).
 permissions:
   contents: read
 
@@ -30,7 +29,7 @@ jobs:
   # the server's race tests or build the apps. A manual run runs everything,
   # and so does a change to this file.
   changes:
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: read
@@ -161,7 +160,7 @@ jobs:
   server:
     needs: changes
     if: needs.changes.outputs.server == 'true'
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Keep Go caches in this runner's tool cache
@@ -220,7 +219,6 @@ jobs:
         with:
           version: v2.15.0
           working-directory: server
-          skip-cache: ${{ runner.environment == 'self-hosted' }}
       - name: Check generated code is current
         working-directory: server
         run: |
@@ -279,7 +277,7 @@ jobs:
   server-macos:
     needs: changes
     if: needs.changes.outputs.server == 'true'
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Keep Go caches in this runner's tool cache
@@ -370,7 +368,7 @@ jobs:
   server-race:
     needs: changes
     if: needs.changes.outputs.race == 'true'
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Keep Go caches in this runner's tool cache
@@ -450,7 +448,7 @@ jobs:
   web:
     needs: changes
     if: needs.changes.outputs.web == 'true'
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: web
@@ -487,7 +485,7 @@ jobs:
   scripts:
     needs: changes
     if: needs.changes.outputs.scripts == 'true'
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Test the release, Unraid and CI scripts
@@ -505,7 +503,7 @@ jobs:
   contract:
     needs: changes
     if: needs.changes.outputs.contract == 'true'
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Keep Go caches in this runner's tool cache
@@ -683,7 +681,7 @@ jobs:
         run: deploy/linux/smoke.sh "${{ matrix.image }}"
 
   docker:
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     needs: [changes, server, web]
     # After the server and web jobs, when they ran and passed or had nothing
     # to check.
@@ -693,16 +691,16 @@ jobs:
       - name: Check Docker is running
         run: |
           docker info --format 'Docker {{.ServerVersion}} on {{.OperatingSystem}}' || {
-            echo "::error::Docker is not running for the runner's user. Start OrbStack or Docker Desktop on the Mac Studio, or check the hosted Linux daemon (deploy/ci/mac-studio.md)."
+            echo "::error::Docker is not running on this runner."
             exit 1
           }
       # Keep registry credentials and keychain helpers out of CI, while
-      # retaining the Mac's Docker context and installed CLI plugins.
+      # retaining the runner's Docker context and installed CLI plugins.
       - name: Prepare a private Docker config
         run: |
           python3 -I deploy/ci/prepare-docker.py "${DOCKER_CONFIG:-$HOME/.docker}" "$RUNNER_TEMP/docker-ci"
           echo "DOCKER_CONFIG=$RUNNER_TEMP/docker-ci" >> "$GITHUB_ENV"
-      # Native Linux image: arm64 on the Mac Studio, amd64 on hosted Linux.
+      # Native Linux image: amd64, on GitHub's Linux runner.
       # The release image job builds both architectures with QEMU.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -726,7 +724,7 @@ jobs:
   android:
     needs: changes
     if: needs.changes.outputs.android == 'true'
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: android
@@ -797,13 +795,13 @@ jobs:
   # simulator, the Kit's included (they run on tvOS in the apple-tv job; on
   # the Mac, make apple-test runs them locally). On GitHub's Macs it runs on
   # the xcode-27 image with the Xcode release.yml uploads with
-  # (apple/scripts/select-xcode.sh); the Mac Studio uses its own. XcodeGen
+  # (apple/scripts/select-xcode.sh). XcodeGen
   # comes from Homebrew, at least the version project.yml asks for
   # (apple/scripts/install-xcodegen.sh).
   apple:
     needs: changes
     if: needs.changes.outputs.apple == 'true'
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'xcode-27' }}
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Use the release Xcode
@@ -877,7 +875,7 @@ jobs:
   apple-tv:
     needs: changes
     if: needs.changes.outputs.apple-tv == 'true'
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'xcode-27' }}
+    runs-on: xcode-27
     # Two jobs share the remote UI tests, whole classes each
     # (apple/scripts/tv-ui-shard.py): one simulator ran them past 20 minutes
     # (2026-11-14), and two clones in one job saved nothing. Share 1 also runs
@@ -906,8 +904,9 @@ jobs:
             swift-packages-${{ runner.os }}-${{ hashFiles('apple/project.yml', 'apple/Kit/Package.swift', 'apple/Kit/Package.resolved') }}-
             swift-packages-${{ runner.os }}-
       - name: Build and test on an Apple TV simulator
-        # Two Studio runners stalled after all tests passed. Avoid verbose
-        # sysdiagnose collection, a possible cause; keep results and failures.
+        # Runners stalled after all tests passed when this ran on a Mac of
+        # the maintainers'. Avoid verbose sysdiagnose collection, a possible
+        # cause; keep results and failures.
         # Built once, then (share 1) the Kit's tests and this share's UI
         # tests, apart, on one simulator. Two clones on this three-core runner
         # made each test two to three times slower and saved nothing (runs of
@@ -936,9 +935,9 @@ jobs:
             apple/build/TVUITests.xcresult
 
   # The Go tests on Windows, with the ffmpeg build the Windows app will ship
-  # (PLAN.md §7c). The Mac Studio cannot run Windows, so this,
-  # windows-live-tv and windows-app are GitHub's Windows runners, side by
-  # side; they run only when the server, the Windows app, the ffmpeg pin or
+  # (PLAN.md §7c). This, windows-live-tv and windows-app run on GitHub's
+  # Windows runners, side by side; they run only when the server, the
+  # Windows app, the ffmpeg pin or
   # this file changed. No GPU: they cover the software path, Windows file
   # handling and the GPU pipelines' arguments, not the GPUs themselves.
   windows-server:
