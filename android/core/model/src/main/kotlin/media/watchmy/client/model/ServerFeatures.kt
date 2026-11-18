@@ -91,4 +91,10 @@ value class ServerFeatures(val level: Int) {
 
     /** 30: related titles at the end of movie and show pages (PLAN-RELATED.md). */
     val related: Boolean get() = level >= RELATED_API_LEVEL
+
+    /**
+     * 31: Profile.maxPcmChannels and pcm, copied only in direct play; a
+     * converted track may be FLAC, E-AC-3 or AC-3 (PLAN-AUDIO.md).
+     */
+    val pcmProfile: Boolean get() = level >= PCM_PROFILE_API_LEVEL
 }

@@ -30,6 +30,7 @@ class ServerFeaturesTest {
             "liveAutomatic" to (26 to { it.liveAutomatic }),
             "tokenWithDecision" to (28 to { it.tokenWithDecision }),
             "liveStatusWaits" to (28 to { it.liveStatusWaits }),
+            "pcmProfile" to (31 to { it.pcmProfile }),
         )
         for ((name, entry) in features) {
             val (level, has) = entry

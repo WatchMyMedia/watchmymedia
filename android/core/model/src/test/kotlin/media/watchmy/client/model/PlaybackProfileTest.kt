@@ -45,4 +45,19 @@ class PlaybackProfileTest {
         // Below the HDR level too, with the HDR fields made old as well.
         assertEquals(dolbyVisionTv.forApiLevel(HDR_PROFILE_API_LEVEL - 1), selecting.forApiLevel(HDR_PROFILE_API_LEVEL - 1))
     }
+
+    @Test fun `pcm and maxPcmChannels go only to servers that read them`() {
+        val soundbar = dolbyVisionTv.copy(audioCodecs = listOf("aac", "pcm", "eac3"), maxAudioChannels = 8, maxPcmChannels = 2)
+        assertSame(soundbar, soundbar.forApiLevel(PCM_PROFILE_API_LEVEL))
+        val older = soundbar.forApiLevel(PCM_PROFILE_API_LEVEL - 1)
+        assertEquals(listOf("aac", "eac3"), older.audioCodecs)
+        assertNull(older.maxPcmChannels)
+        assertEquals(8, older.maxAudioChannels)
+        // pcm alone is taken out too, and the rest of the old profile still applies below the HDR level.
+        assertEquals(listOf("aac"), dolbyVisionTv.copy(audioCodecs = listOf("aac", "pcm")).forApiLevel(PCM_PROFILE_API_LEVEL - 1).audioCodecs)
+        assertEquals(
+            dolbyVisionTv.forApiLevel(HDR_PROFILE_API_LEVEL - 1).copy(audioCodecs = listOf("aac", "eac3"), maxAudioChannels = 8),
+            soundbar.forApiLevel(HDR_PROFILE_API_LEVEL - 1),
+        )
+    }
 }

@@ -16,6 +16,7 @@ import media.watchmy.client.core.data.TestServer.Companion.problem
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.DecisionRequest
 import media.watchmy.client.model.HDR_PROFILE_API_LEVEL
+import media.watchmy.client.model.PCM_PROFILE_API_LEVEL
 import media.watchmy.client.model.PlayState
 import media.watchmy.client.model.PlaybackMode
 import media.watchmy.client.model.PlaybackProfile
@@ -136,6 +137,39 @@ class PlaybackGatewayTest {
         val planned = sentProfile("POST /api/playback/plans")
         assertEquals(emptyList<String>(), planned.strings("hdrTypes"))
         assertEquals(listOf("h264", "hevc", "hevc10"), planned.strings("videoCodecs"))
+    }
+
+    /** A box on a soundbar over ARC: E-AC-3 with eight channels, PCM with two (PLAN-AUDIO.md §3.5). */
+    private val soundbar = profile.copy(audioCodecs = listOf("aac", "pcm", "eac3"), maxAudioChannels = 8, maxPcmChannels = 2)
+
+    @Test
+    fun `a server below the PCM level gets no pcm and no maxPcmChannels`() = runBlocking {
+        h.services.servers.select(h.testServer.copy(apiLevel = PCM_PROFILE_API_LEVEL - 1))
+        server.always("POST /api/files/4/playback", json(fixture("decision-hls.json")))
+        gateway.bind().decide(DecisionRequest(4, soundbar, h.services.client))
+        val tv = sentProfile("POST /api/files/4/playback")
+        assertFalse("it refuses the field, even as null", "maxPcmChannels" in tv)
+        assertEquals(listOf("aac", "eac3"), tv.strings("audioCodecs"))
+        assertEquals(8L, tv["maxAudioChannels"]!!.jsonPrimitive.long)
+    }
+
+    @Test
+    fun `from the PCM level decisions and plans carry pcm and maxPcmChannels`() = runBlocking {
+        h.services.servers.select(h.testServer.copy(apiLevel = PCM_PROFILE_API_LEVEL))
+        server.always("POST /api/files/4/playback", json(fixture("decision-hls.json")))
+        gateway.bind().decide(DecisionRequest(4, soundbar, h.services.client))
+        val tv = sentProfile("POST /api/files/4/playback")
+        assertEquals(2L, tv["maxPcmChannels"]!!.jsonPrimitive.long)
+        assertEquals(listOf("aac", "pcm", "eac3"), tv.strings("audioCodecs"))
+
+        gateway.plans(soundbar, StreamQuality.Original, listOf(9))
+        val planned = sentProfile("POST /api/playback/plans")
+        assertEquals(2L, planned["maxPcmChannels"]!!.jsonPrimitive.long)
+        assertEquals(listOf("aac", "pcm", "eac3"), planned.strings("audioCodecs"))
+
+        // No separate PCM limit: the field is left out.
+        gateway.bind().decide(DecisionRequest(4, soundbar.copy(maxPcmChannels = null), h.services.client))
+        assertFalse("maxPcmChannels" in sentProfile("POST /api/files/4/playback"))
     }
 
     @Test
