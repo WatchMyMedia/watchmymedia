@@ -228,24 +228,24 @@ didn't start.
   run -f -n androidx.work.systemjobscheduler <package> <jobId>`, with the id
   from `dumpsys jobscheduler` (it changes each time the work is scheduled).
   Without `-n` it says "Could not find job".
-- YouTube's embedded player (the phone's and the TV's trailer screens) never draws on these
-  emulators: the WebView area stays black on `android-35` with any `-gpu`
-  mode, though the video plays (`getPlayerState()` is 1), and on
-  `android-37.0` with `-gpu host` WebView's GPU thread aborts the app
-  (`gl_version_info.cc`, "Chrome runs only on top of OpenGL ES"). A plain page
-  or `<video>` in the same WebView draws, so check the screen's layout,
-  messages and hand-offs on an emulator and the picture on a device. Debug
+- YouTube's embedded player (the phone's and the TV's trailer screens)
+  draws and plays on an `android-35` emulator with the default `-gpu`. Its
+  WebView needs `MATCH_PARENT` layout params: AndroidView gives a view
+  without its own `WRAP_CONTENT`, and a WebView whose height wraps its
+  content lays the page out 0 px high, so YouTube's frame plays the sound
+  with no picture. That, not the emulators, was the black picture this
+  note used to describe: before the fix the page's
+  `getComputedStyle(document.documentElement).height` was `0px` and the
+  frame 616×0 on a phone emulator, as on a Google TV. On `android-37.0`
+  with `-gpu host`, WebView's GPU thread has aborted the app
+  (`gl_version_info.cc`, "Chrome runs only on top of OpenGL ES"). Debug
   builds' WebViews take Chrome DevTools: `adb forward tcp:<port>
   localabstract:webview_devtools_remote_<pid>`, then `/json` and the page's
   WebSocket.
-- The TV's trailer screen drives YouTube's player through its IFrame API
-  unless a debug build is switched to its keyboard controls with
-  `TrailerRemoteSwitch` (README, the movie trailers list). On an
-  `android-35` emulator YouTube's player ignored its keyboard controls (k,
-  Space, j, arrows), sent by the app or through DevTools. Robolectric's WebView has
-  no provider, so it never takes the focus there: `TvTrailerScreenTest`
-  checks that it was asked to, and the screen itself holds the focus and
-  takes the keys first, so the keys still reach it.
+- YouTube's embedded player ignores its keyboard controls (k, Space, j, the
+  arrows), on an emulator and on a Google TV Streamer, whoever sends them.
+  The TV's trailer screen drives it through its IFrame API only, holding
+  the focus itself; the WebView never takes it.
 
 ## Casting
 
