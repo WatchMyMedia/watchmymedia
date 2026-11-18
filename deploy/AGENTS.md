@@ -26,7 +26,8 @@ it covers releases, the downloads Worker and the CI runners.
 | `arr/seerr.compose.yaml`, `arr/seerr-setup.sh` | A throwaway Seerr and the Jellyfin it needs, pinned, and the script that finishes their setup and prints Seerr's API key; `go test ./internal/integrations/seerr -run Live` runs against it |
 | `windows/fetch-winsparkle.sh` | The pinned official Windows updater DLL and licence files |
 | `macos/fetch-ffmpeg.sh` | The pinned jellyfin-ffmpeg builds the releases and CI use, with checksums |
-| `linux/nfpm.yaml`, `linux/build.py`, `linux/fetch-nfpm.sh` | The Debian, Ubuntu and Fedora packages (`make linux-packages`): one nfpm file for the `.deb` and the `.rpm`, amd64 and arm64; `build.py` writes what differs per package (the `/usr/bin` wrapper's `deb` or `rpm`, the commented-out `config.yaml`, the repository's key) and runs the nfpm that `fetch-nfpm.sh` pins by version and checksum |
+| `linux/nfpm.yaml`, `linux/build.py`, `linux/fetch-nfpm.sh`, `linux/packages.mk` | The Debian, Ubuntu and Fedora packages (`make linux-packages`): one nfpm file for the `.deb` and the `.rpm`, amd64 and arm64; `build.py` writes what differs per package (the `/usr/bin` wrapper's `deb` or `rpm`, the commented-out `config.yaml`, the repository's key) and runs the nfpm that `fetch-nfpm.sh` pins by version and checksum; `packages.mk` holds the make targets, which the root `Makefile` includes |
+| `linux/repository-key.asc` | The public half of the OpenPGP key that signs the `.rpm` files and the apt and dnf repositories. Every package carries it. Its secret parts are the user's and are never in the repository |
 | `linux/watchmymedia.service`, `linux/watchmymedia.sh`, `linux/sysusers.conf`, `linux/scripts/`, `linux/firewalld.xml`, `linux/ufw.profile`, `linux/watchmymedia.sources`, `linux/watchmymedia.repo` | What the packages install: the systemd service, the wrapper that sets the folders, the `watchmymedia` user, the install, update and remove scripts (one set for dpkg and rpm), the firewall definitions, and the apt and dnf repository entries |
 | `linux/package_test.py` | Builds packages from stand-in files and reads them without dpkg or rpm: paths, modes, config files, scripts, the repository entry, versions. With `WMM_LINUX_SMOKE` set it also reads the packages `make linux-smoke-packages` built |
 | `linux/smoke.sh`, `linux/smoke-check.sh`, `linux/throwaway-key.sh` | `make linux-packages-smoke`: installs, updates, removes and purges the packages in a container of one release that runs systemd; the key script makes the throwaway key the test packages are signed with |
@@ -123,6 +124,33 @@ is 1.M.P, `v1.0.0` is 1.6.0, and from `v1.3.0` `v1.M.P` is 1.(M + 4).P.
     (`ci/security_test.py` checks).
   - The nfpm pin: bump `VERSION` and every checksum in
     `linux/fetch-nfpm.sh` together, from the digests GitHub lists for the release's files.
-  - A package carries its repository entry and key only when it is built
-    with `LINUX_REPOSITORY_KEY`. The real key does not exist yet; the tests
-    make a throwaway one, and its secret half is never uploaded.
+  - CI's two Linux package jobs are thirteen jobs, so the path list that
+    starts them (`linux-packages` in `ci.yml`'s `changes` job) is
+    deliberate, and `ci/security_test.py` holds it to exactly this:
+    `deploy/linux/**`, the files packed from elsewhere
+    (`macos/fetch-ffmpeg.sh`, `macos/FFMPEG-LICENSE.md`,
+    `config.example.yaml`, the root `LICENSE`), `server/cmd/server/**` and
+    `server/internal/config/**` (how the server starts and where it looks
+    for its folders, config and ffmpeg, which the wrapper and the service
+    rely on), and `ci.yml`. Don't add the root `Makefile` or the rest of
+    `server/` or `web/`: the `server`, `web` and `docker` jobs cover what
+    the packages hold of those. The Linux make targets are in
+    `linux/packages.mk` for this reason; keep new ones there.
+  - `linux/repository-key.asc` is the repositories' real public key, and
+    the default `LINUX_REPOSITORY_KEY`, so every package carries it and its
+    repository entry (`LINUX_REPOSITORY_KEY=` builds without either).
+    `linux/package_test.py` holds the file to the key's fingerprints: a
+    change to it changes what every install trusts, and is the user's to
+    make. Only the public half is ever committed.
+  - The key has a primary key that only certifies and two signing subkeys:
+    one for the `.rpm` files, one for the repositories' lists. A signing
+    key is always given with its subkey's id (`LINUX_SIGNING_KEY_ID`):
+    without one nfpm signs with the last signing subkey, which is the
+    lists'. The `.rpm` subkey's id is `BD64FACE28C2EF71`. CI and the smoke
+    test sign with a throwaway key of the same shape
+    (`linux/throwaway-key.sh`), whose secret part is never uploaded; the
+    real one is only ever in a release.
+  - The key file holds one key and `build.py` insists on that. dnf never
+    refreshes a key it already holds for a repository, so replacing the
+    lists' signer one day means adding a second key to the file, and
+    `build.py` then has to take more than one.

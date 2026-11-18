@@ -150,9 +150,40 @@ class WorkflowIsolationTest(unittest.TestCase):
                       "          path: build/linux-smoke\n", install)
         self.assertIn('        run: deploy/linux/smoke.sh "${{ matrix.image }}"\n', install)
         # The same six releases the smoke script and the make target name.
-        for path in ('deploy/linux/smoke.sh', 'Makefile'):
+        for path in ('deploy/linux/smoke.sh', 'deploy/linux/packages.mk'):
             self.assertIn('debian:12, debian:13, ubuntu:24.04, ubuntu:26.04, fedora:44', (ROOT / path).read_text(), path)
         self.assertIn('deploy/linux', jobs['scripts'])
+
+    def test_linux_package_jobs_run_only_for_what_the_packages_are_built_from(self):
+        # Thirteen jobs, so the list that starts them is deliberate: the
+        # packaging with its make targets, the files it packs from
+        # elsewhere, and how the server starts and finds its folders, config
+        # and ffmpeg, which the wrapper and the service rely on. A wider
+        # entry here (the root Makefile, all of server/ or web/) starts them
+        # for changes they do not test; the server, web and docker jobs
+        # cover what the packages hold of those.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        filters = workflow.split('filters: |', 1)[1]
+        block = re.search(r'(?m)^            linux-packages:\n((?:              - .*\n)+)', filters).group(1)
+        self.assertEqual(['deploy/linux/**', 'deploy/macos/fetch-ffmpeg.sh', 'deploy/macos/FFMPEG-LICENSE.md',
+                          'deploy/config.example.yaml', 'LICENSE', 'server/cmd/server/**',
+                          'server/internal/config/**', '.github/workflows/ci.yml'],
+                         re.findall(r"- '([^']+)'", block))
+        # Both jobs are started by that one list and nothing else.
+        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                               workflow.split('jobs:\n', 1)[1]))
+        for name in ('linux-packages', 'linux-packages-install'):
+            self.assertEqual(["needs.changes.outputs.linux-packages == 'true'"],
+                             re.findall(r"needs\.changes\.outputs\.[\w-]+ == 'true'", jobs[name]), name)
+        self.assertIn("      linux-packages: ${{ github.event_name == 'workflow_dispatch' || "
+                      "steps.filter.outputs.linux-packages == 'true' }}\n", jobs['changes'])
+        # What the list leaves out is still what the packages are built with:
+        # the Linux make targets are under deploy/linux, not in the root Makefile.
+        makefile = (ROOT / 'Makefile').read_text()
+        self.assertIn('deploy/linux/packages.mk', makefile)
+        for target in ('ffmpeg-linux', 'linux-packages', 'linux-smoke-packages', 'linux-packages-smoke'):
+            self.assertNotRegex(makefile, rf'(?m)^{target}:')
+            self.assertRegex((ROOT / 'deploy/linux/packages.mk').read_text(), rf'(?m)^{target}:')
 
     def test_windows_installer_embeds_the_web_build_from_the_same_run(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()

@@ -3,9 +3,9 @@
 # release that runs systemd, as a machine does: the service has to start by
 # itself, as its own user, with the bundled ffmpeg and its data in
 # /var/lib/watchmymedia (smoke-check.sh has the list). Needs only Docker and
-# the packages `make linux-smoke-packages` builds: an older set, and a
-# current one that is signed and carries its repository entry, as a release
-# will be, with a throwaway key.
+# the packages `make linux-smoke-packages` builds: an older set and a current
+# one, each made as a release will be, with its repository entry and the
+# repositories' key, and the .rpm signed, here by a throwaway key's subkey.
 #
 # A container shows nothing of SELinux, a firewall, discovery on a network or
 # a GPU. downloads.watchmy.media is made unreachable inside it, so the test
@@ -92,9 +92,11 @@ docker exec "$name" mkdir /smoke
 docker cp "$older" "$name:/smoke/older.$kind"
 docker cp "$current" "$name:/smoke/current.$kind"
 docker cp "$key" "$name:/smoke/public.asc"
+docker cp "$root/deploy/linux/repository-key.asc" "$name:/smoke/repository-key.asc"
 docker cp "$root/deploy/linux/smoke-check.sh" "$name:/smoke/smoke-check.sh"
 
-if docker exec "$name" sh /smoke/smoke-check.sh "$kind" "/smoke/older.$kind" "/smoke/current.$kind" /smoke/public.asc; then
+if docker exec "$name" sh /smoke/smoke-check.sh "$kind" "/smoke/older.$kind" "/smoke/current.$kind" \
+  /smoke/public.asc /smoke/repository-key.asc; then
   echo "== $image: passed"
 else
   echo "== $image: FAILED; the service's last lines:" >&2

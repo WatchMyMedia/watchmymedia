@@ -10,6 +10,7 @@ run on those packages, which hold the real server and ffmpeg.
 """
 import base64
 import gzip
+import hashlib
 import importlib.util
 import io
 import os
@@ -75,6 +76,15 @@ SCRIPTS = {'preinstall': ('preinst', 1023), 'postinstall': ('postinst', 1024),
            'preremove': ('prerm', 1025), 'postremove': ('postrm', 1026)}
 ELF_MACHINE = {'amd64': 62, 'arm64': 183}
 
+# The repositories' public key, which the packages carry. The user made the
+# key on 2026-11-18 and keeps its secret parts: the primary key only
+# certifies, and each of its two subkeys signs one thing.
+REPOSITORY_KEY = HERE / 'repository-key.asc'
+KEY_IDENTITY = 'Eldwick Software (WatchMyMedia packages) <eldwicksoftware@gmail.com>'
+KEY_FINGERPRINT = '3C3CE93DA59EBE83C4B3ED24CB959CFB56BCDBB9'
+RPM_SUBKEY = '0F6C201014F06FD2CEF33155BD64FACE28C2EF71'    # signs the .rpm files
+LISTS_SUBKEY = '9F8C7D9F8D7CA28E48A61C3E844C814C2E1CB935'  # signs the apt and dnf lists
+
 
 def unzstd(data):
     """zstd data unpacked, with Python 3.14's module or the zstd command."""
@@ -86,6 +96,70 @@ def unzstd(data):
     if not shutil.which('zstd'):
         raise unittest.SkipTest('reading a .deb needs Python 3.14 or the zstd command')
     return subprocess.run(['zstd', '-dc'], input=data, capture_output=True, check=True).stdout
+
+
+def openpgp_packets(data):
+    """(tag, body) for each packet of binary OpenPGP data: a key, or a signature."""
+    at = 0
+    while at < len(data):
+        first = data[at]
+        at += 1
+        if first & 0x40:  # the newer header: the tag, then a length of one, two or five bytes
+            tag, length = first & 0x3f, data[at]
+            at += 1
+            if 192 <= length < 224:
+                length = ((length - 192) << 8) + data[at] + 192
+                at += 1
+            elif length == 255:
+                length = int.from_bytes(data[at:at + 4], 'big')
+                at += 4
+            elif length >= 224:
+                raise ValueError('a packet in pieces, which a key or a signature is not')
+        else:
+            tag, size = (first & 0x3c) >> 2, (1, 2, 4)[first & 3]
+            length = int.from_bytes(data[at:at + size], 'big')
+            at += size
+        yield tag, data[at:at + length]
+        at += length
+
+
+def openpgp_fingerprint(body):
+    """The fingerprint of a version 4 public key or subkey packet."""
+    if body[0] != 4:
+        raise ValueError(f'a version {body[0]} key, not 4')
+    return hashlib.sha1(b'\x99' + len(body).to_bytes(2, 'big') + body).hexdigest().upper()
+
+
+def openpgp_subpackets(body):
+    """A version 4 signature's subpackets, hashed and unhashed, as {type: data}."""
+    if body[0] != 4:
+        raise ValueError(f'a version {body[0]} signature, not 4')
+    found, at = {}, 4
+    for _ in range(2):
+        end = at + 2 + int.from_bytes(body[at:at + 2], 'big')
+        at += 2
+        while at < end:
+            length = body[at]
+            at += 1
+            if 192 <= length < 255:
+                length = ((length - 192) << 8) + body[at] + 192
+                at += 1
+            elif length == 255:
+                length = int.from_bytes(body[at:at + 4], 'big')
+                at += 4
+            found[body[at] & 0x7f] = body[at + 1:at + length]
+            at += length
+    return found
+
+
+def openpgp_signer(signature):
+    """The id of the key that made a signature: the last 16 hex digits of its fingerprint."""
+    (tag, body), = openpgp_packets(signature)
+    if tag != 2:
+        raise ValueError('not a signature')
+    subpackets = openpgp_subpackets(body)
+    # 33 is the signer's fingerprint after a version byte, 16 its key id.
+    return (subpackets[33][-8:] if 33 in subpackets else subpackets[16]).hex().upper()
 
 
 class Package:
@@ -149,6 +223,7 @@ class Package:
         self.signature_tags = set(signature)
         # A signature over the header (RSA 268, DSA 267) or over header and payload (1002, 1005).
         self.signed = bool(self.signature_tags & {267, 268, 1002, 1005})
+        self.signer = openpgp_signer(signature[268]) if 268 in signature else None
         self.name, self.version, self.release, self.arch = (header[tag] for tag in (1000, 1001, 1002, 1022))
         self.fields = {'Vendor': header.get(1011, ''), 'License': header.get(1014, ''),
                        'Packager': header.get(1015, ''), 'Homepage': header.get(1020, ''),
@@ -279,8 +354,6 @@ class PackageContentsTest(Checks, unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory()
         cls.dir = pathlib.Path(cls.tmp.name)
         cls.binaries, cls.ffmpeg = stand_ins(cls.dir)
-        cls.key = cls.dir / 'public.asc'
-        cls.key.write_text(STAND_IN_KEY)
 
     @classmethod
     def tearDownClass(cls):
@@ -292,13 +365,15 @@ class PackageContentsTest(Checks, unittest.TestCase):
                                        if arch in path.name or rpm in path.name)): Package(path) for path in paths}
 
     def test_a_release_build_has_everything_in_its_place(self):
-        packages = self.build('v1.7.0', 'release', repository_key=self.key)
+        # With the repositories' key, as `make linux-packages` builds.
+        armored = REPOSITORY_KEY.read_text()
+        packages = self.build('v1.7.0', 'release', repository_key=REPOSITORY_KEY)
         self.assertEqual({'watchmymedia_1.7.0_amd64.deb', 'watchmymedia_1.7.0_arm64.deb',
                           'watchmymedia-1.7.0-1.x86_64.rpm', 'watchmymedia-1.7.0-1.aarch64.rpm'},
                          {package.path.name for package in packages.values()})
         for (kind, arch), package in packages.items():
             self.assertEqual('1.7.0', package.version)
-            self.check_package(package, kind, arch, repository=True, armored=STAND_IN_KEY)
+            self.check_package(package, kind, arch, repository=True, armored=armored)
         for arch in build.ARCHES:
             self.check_same_files(packages['deb', arch], packages['rpm', arch])
             # Each package holds its own architecture's files.
@@ -341,17 +416,39 @@ class PackageContentsTest(Checks, unittest.TestCase):
                 self.assertEqual((written, '1'), (rpm.version, rpm.release))
                 self.assertEqual(f'watchmymedia-{written}-1.x86_64.rpm', rpm.path.name)
 
-    def test_the_rpm_is_signed_when_given_a_key(self):
+    def test_the_rpm_is_signed_by_the_subkey_that_is_named(self):
         if not shutil.which('gpg'):
             self.skipTest('making a throwaway key needs gpg')
         key = self.dir / 'key'
         subprocess.run([str(HERE / 'throwaway-key.sh'), str(key)], check=True, capture_output=True)
-        packages = self.build('v1.7.0', 'signed', arches=('amd64',), repository_key=key / 'public.asc',
-                              signing_key=key / 'secret.asc')
-        self.assertTrue(packages['rpm', 'amd64'].signed)
-        self.assertFalse(packages['deb', 'amd64'].signed)
         armored = (key / 'public.asc').read_text()
-        self.check_package(packages['deb', 'amd64'], 'deb', 'amd64', repository=True, armored=armored)
+        # The throwaway key is shaped like the real one: a primary key and two signing subkeys.
+        (_, primary), (_, first), (_, second) = [(tag, openpgp_fingerprint(body)) for tag, body in
+                                                 openpgp_packets(build.dearmor(armored)) if tag in (6, 14)]
+        self.assertEqual(first[-16:], (key / 'signing-key-id').read_text().strip())
+        # What a release is given holds the first subkey's secret part and no other.
+        secret = (key / 'secret.asc').read_text()
+        listing = subprocess.run(['gpg', '--batch', '--list-packets'], input=secret, capture_output=True, text=True)
+        self.assertIn('gnu-dummy', listing.stdout)
+        self.assertEqual(1, listing.stdout.count(':secret sub key packet:'))
+        self.assertIn('keyid: ' + first[-16:], listing.stdout)
+        self.assertNotIn('keyid: ' + second[-16:], listing.stdout)
+
+        packages = self.build('v1.7.0', 'signed', arches=('amd64',), repository_key=REPOSITORY_KEY,
+                              signing_key=key / 'secret.asc', signing_key_id=first[-16:])
+        rpm, deb = packages['rpm', 'amd64'], packages['deb', 'amd64']
+        self.assertTrue(rpm.signed)
+        # nfpm takes the key's last signing subkey unless it is told which.
+        self.assertEqual(first[-16:], rpm.signer)
+        self.assertNotIn(rpm.signer, (second[-16:], primary[-16:]))
+        self.assertFalse(deb.signed)
+        self.check_package(deb, 'deb', 'amd64', repository=True, armored=REPOSITORY_KEY.read_text())
+        # A key without the subkey's id, or an id without a key, is refused before anything is built.
+        for options in ({'signing_key': key / 'secret.asc'}, {'signing_key_id': first[-16:]},
+                        {'signing_key': key / 'secret.asc', 'signing_key_id': first}):
+            with self.subTest(options=sorted(options)):
+                with self.assertRaises(ValueError):
+                    self.build('v1.7.0', 'refused', arches=('amd64',), **options)
         # The keyring apt reads is gpg's own binary form of the same key.
         dearmored = subprocess.run(['gpg', '--dearmor'], input=armored.encode(), capture_output=True, check=True)
         self.assertEqual(dearmored.stdout, build.dearmor(armored))
@@ -365,6 +462,39 @@ class PackageContentsTest(Checks, unittest.TestCase):
 
 
 class SourceFilesTest(unittest.TestCase):
+    def test_the_committed_key_is_the_one_the_user_made(self):
+        # Every package trusts updates signed by this key, so a change to the
+        # file has to be a change someone meant.
+        armored = REPOSITORY_KEY.read_text()
+        self.assertEqual(1, armored.count('-----BEGIN PGP PUBLIC KEY BLOCK-----'))
+        self.assertNotIn('PRIVATE KEY', armored)
+        packets = list(openpgp_packets(build.dearmor(armored)))
+        # 5 and 7 are a secret key and a secret subkey: only the public half is ever here.
+        self.assertFalse([tag for tag, _ in packets if tag in (5, 7)])
+        self.assertEqual([KEY_FINGERPRINT], [openpgp_fingerprint(body) for tag, body in packets if tag == 6])
+        self.assertEqual([RPM_SUBKEY, LISTS_SUBKEY],
+                         [openpgp_fingerprint(body) for tag, body in packets if tag == 14])
+        self.assertEqual([KEY_IDENTITY], [body.decode() for tag, body in packets if tag == 13])
+        # RSA (algorithm 1) of 4096 bits, each of the three.
+        for tag, body in packets:
+            if tag in (6, 14):
+                self.assertEqual((1, 4096), (body[5], int.from_bytes(body[6:8], 'big')))
+        # What each may do, from the signature that follows it: the primary
+        # key certifies (1) and the subkeys sign (2), and none expires (9).
+        flags, owner = {}, None
+        for tag, body in packets:
+            if tag in (6, 14):
+                owner = openpgp_fingerprint(body)
+            elif tag == 2:
+                subpackets = openpgp_subpackets(body)
+                if 27 in subpackets:
+                    flags[owner] = subpackets[27][0]
+                self.assertFalse(int.from_bytes(subpackets.get(9, b''), 'big'), 'the key has an expiry date')
+        self.assertEqual({KEY_FINGERPRINT: 1, RPM_SUBKEY: 2, LISTS_SUBKEY: 2}, flags)
+        # The packaging signs with the first subkey by its id wherever it signs.
+        self.assertIn('BD64FACE28C2EF71', RPM_SUBKEY)
+        self.assertIn('LINUX_REPOSITORY_KEY ?= deploy/linux/repository-key.asc\n', (HERE / 'packages.mk').read_text())
+
     def test_every_option_in_the_packaged_config_is_commented_out(self):
         example = (ROOT / 'deploy/config.example.yaml').read_text()
         config = build.commented_config(example)
@@ -483,6 +613,23 @@ class SourceFilesTest(unittest.TestCase):
         self.assertEqual(['DARWIN_ARM64', 'DARWIN_X86_64', 'LINUX_ARM64', 'LINUX_X86_64'], [name for name, _ in sums])
         self.assertEqual(4, len({digest for _, digest in sums}))
 
+    def test_the_targets_run_from_the_repository_root_and_live_here(self):
+        # CI's Linux package jobs run for a change to these targets, so they
+        # are in this folder, and the root Makefile only includes the file.
+        makefile = (ROOT / 'Makefile').read_text()
+        fragment = (HERE / 'packages.mk').read_text()
+        for target in ('ffmpeg-linux', 'linux-packages', 'linux-smoke-packages', 'linux-packages-smoke'):
+            with self.subTest(target=target):
+                self.assertRegex(fragment, rf'(?m)^{target}:.* ## ')
+                self.assertNotRegex(makefile, rf'(?m)^{target}:')
+        self.assertIn('include $(dir $(abspath $(firstword $(MAKEFILE_LIST))))deploy/linux/packages.mk\n', makefile)
+        # From any folder, as the workflow tests run make, and listed by make help.
+        with tempfile.TemporaryDirectory() as elsewhere:
+            listed = subprocess.run(['make', '-f', str(ROOT / 'Makefile'), 'help'], cwd=elsewhere,
+                                    capture_output=True, text=True, check=True).stdout
+        for target in ('ffmpeg-linux', 'linux-packages', 'linux-smoke-packages', 'linux-packages-smoke'):
+            self.assertRegex(listed, rf'(?m)^  {target} ')
+
     def test_the_release_archives_pack_ffmpeg_for_linux_too(self):
         makefile = (ROOT / 'Makefile').read_text()
         recipe = re.search(r'(?m)^release:(.*)\n((?:\t.*\n)+)', makefile)
@@ -506,16 +653,20 @@ class BuiltPackagesTest(Checks, unittest.TestCase):
         self.assertEqual({(kind, arch) for kind in build.FORMATS for arch in build.ARCHES}, set(found))
         return found
 
-    def test_the_older_build_is_plain_and_the_current_one_is_made_as_a_release(self):
-        armored = (pathlib.Path(os.environ['WMM_LINUX_SMOKE']) / 'key/public.asc').read_text()
+    def test_both_builds_are_made_as_a_release_is_but_for_the_signing_key(self):
+        folder = pathlib.Path(os.environ['WMM_LINUX_SMOKE'])
+        # The repositories' real key is in the packages; the signature is a throwaway subkey's.
+        armored = REPOSITORY_KEY.read_text()
+        signer = (folder / 'key/signing-key-id').read_text().strip()
         older, current = self.packages('older'), self.packages('current')
-        for (kind, arch), package in older.items():
-            self.check_package(package, kind, arch, repository=False)
-            self.assertFalse(package.signed)
-        for (kind, arch), package in current.items():
-            self.check_package(package, kind, arch, repository=True, armored=armored)
-            self.assertEqual(kind == 'rpm', package.signed, package.path.name)
-            self.assertNotEqual(older[kind, arch].version, package.version)
+        for packages in (older, current):
+            for (kind, arch), package in packages.items():
+                self.check_package(package, kind, arch, repository=True, armored=armored)
+                self.assertEqual(kind == 'rpm', package.signed, package.path.name)
+                if kind == 'rpm':
+                    self.assertEqual(signer, package.signer, package.path.name)
+        for key, package in current.items():
+            self.assertNotEqual(older[key].version, package.version)
         for arch, machine in ELF_MACHINE.items():
             deb = current['deb', arch]
             self.check_same_files(deb, current['rpm', arch])

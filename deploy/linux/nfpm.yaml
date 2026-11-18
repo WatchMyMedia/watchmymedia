@@ -10,6 +10,9 @@
 #                    with deb or rpm in it, config.yaml, the repository's key
 #   WMM_SIGNING_KEY  the OpenPGP secret key that signs the .rpm; empty leaves
 #                    it unsigned
+#   WMM_SIGNING_KEY_ID  the id of the subkey to sign with. The key has two
+#                    signing subkeys, one for the .rpm files and one for the
+#                    repositories' lists, and without an id nfpm takes the last
 #
 # nfpm writes v1.7.0 as 1.7.0 and v1.7.0-rc.1 as 1.7.0~rc.1 in both formats.
 name: watchmymedia
@@ -65,6 +68,7 @@ rpm:
   compression: zstd:19
   signature:
     key_file: ${WMM_SIGNING_KEY}
+    key_id: ${WMM_SIGNING_KEY_ID}
 
 contents:
   # The server, with the pinned ffmpeg beside it: the server looks for

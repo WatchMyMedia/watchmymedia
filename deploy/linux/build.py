@@ -6,16 +6,21 @@ runs this. It writes the few files that differ between packages into a stage
 folder, then runs the pinned nfpm (fetch-nfpm.sh) on nfpm.yaml once for each.
 
   python3 -I deploy/linux/build.py --version v1.7.0
-      [--repository-key public.asc] [--signing-key secret.asc]
+      [--repository-key deploy/linux/repository-key.asc]
+      [--signing-key secret.asc --signing-key-id BD64FACE28C2EF71]
       [--binaries build/linux] [--ffmpeg build/ffmpeg] [--out build/linux-packages]
       [--arch amd64] [--format deb]
 
 --repository-key is the armored public half of the key that signs the apt and
-dnf repositories. With it the packages carry their repository entry and the
-key; without it they carry neither, so they install and never look for
-updates. --signing-key is the secret key nfpm signs the .rpm with (its
-passphrase in NFPM_RPM_PASSPHRASE); a .deb is not signed, since apt trusts
-the repository's signed list instead.
+dnf repositories (repository-key.asc here; `make linux-packages` passes it).
+With it the packages carry their repository entry and the key; without it
+they carry neither, so they install and never look for updates.
+
+--signing-key is the secret key nfpm signs the .rpm with (its passphrase in
+NFPM_RPM_PASSPHRASE), and --signing-key-id names the subkey that signs: the
+key has one signing subkey for the .rpm files and another for the
+repositories' lists, and left to itself nfpm takes the last. A .deb is not
+signed, since apt trusts the repository's signed list instead.
 """
 import argparse
 import base64
@@ -77,7 +82,13 @@ def commented_config(example):
 
 
 def dearmor(armored):
-    """An armored OpenPGP public key as the binary keyring apt's Signed-By reads."""
+    """An armored OpenPGP public key as the binary keyring apt's Signed-By reads.
+
+    One key block only, which is all there is today. If the lists' signer is
+    ever replaced, the dnf key file has to gain a second key (dnf never
+    refreshes a key it already holds for a repository), and this has to take
+    more than one block.
+    """
     lines = armored.strip().splitlines()
     if not lines or lines[0].strip() != '-----BEGIN PGP PUBLIC KEY BLOCK-----' \
             or lines[-1].strip() != '-----END PGP PUBLIC KEY BLOCK-----':
@@ -107,9 +118,13 @@ def source_date_epoch():
     return result.stdout.strip() if result.returncode == 0 else ''
 
 
-def build(version, binaries, ffmpeg, out, repository_key=None, signing_key=None,
+def build(version, binaries, ffmpeg, out, repository_key=None, signing_key=None, signing_key_id=None,
           arches=tuple(ARCHES), formats=FORMATS, nfpm=None):
     """Builds the packages into out and returns their paths."""
+    if bool(signing_key) != bool(signing_key_id):
+        raise ValueError('a signing key needs the id of the subkey to sign with, and the id needs the key')
+    if signing_key_id and not re.fullmatch(r'[0-9A-Fa-f]{16}', signing_key_id):
+        raise ValueError('the signing subkey id is 16 hex digits, the last 16 of its fingerprint')
     out = pathlib.Path(out).resolve()
     nfpm = nfpm or subprocess.run([str(HERE / 'fetch-nfpm.sh')], check=True, capture_output=True,
                                   text=True).stdout.strip()
@@ -146,7 +161,8 @@ def build(version, binaries, ffmpeg, out, repository_key=None, signing_key=None,
                 target.mkdir(parents=True)
                 env = dict(os.environ, WMM_VERSION=package_version(version), WMM_ARCH=arch,
                            WMM_SERVER=str(server), WMM_FFMPEG=str(tools), WMM_STAGE=str(stage),
-                           WMM_SIGNING_KEY=str(pathlib.Path(signing_key).resolve()) if signing_key else '')
+                           WMM_SIGNING_KEY=str(pathlib.Path(signing_key).resolve()) if signing_key else '',
+                           WMM_SIGNING_KEY_ID=(signing_key_id or '').lower())
                 if epoch:
                     env['SOURCE_DATE_EPOCH'] = epoch
                 # nfpm reads the files nfpm.yaml names from the folder it runs in.
@@ -174,12 +190,14 @@ def main():
                         help='where the packages go (default: build/linux-packages)')
     parser.add_argument('--repository-key', help="the repositories' armored public key")
     parser.add_argument('--signing-key', help='the OpenPGP secret key that signs the .rpm')
+    parser.add_argument('--signing-key-id', help='the id of the subkey to sign with: 16 hex digits')
     parser.add_argument('--arch', action='append', choices=sorted(ARCHES), help='default: both')
     parser.add_argument('--format', action='append', choices=FORMATS, help='default: both')
     args = parser.parse_args()
     try:
         packages = build(args.version, args.binaries, args.ffmpeg, args.out, args.repository_key,
-                         args.signing_key, args.arch or tuple(ARCHES), args.format or FORMATS)
+                         args.signing_key, args.signing_key_id, args.arch or tuple(ARCHES),
+                         args.format or FORMATS)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         sys.exit(f'linux packages: {error}')
     for package in packages:

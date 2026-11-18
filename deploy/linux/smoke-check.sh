@@ -7,13 +7,20 @@
 # and a removal stops it and keeps the library. The first failure stops the
 # run, since every later step builds on the one before.
 #
-#   smoke-check.sh deb|rpm OLDER CURRENT PUBLIC_KEY
+#   smoke-check.sh deb|rpm OLDER CURRENT SIGNERS_KEY REPOSITORY_KEY
 #   smoke-check.sh --no-systemd deb|rpm CURRENT   in a container without systemd:
 #                                                 the package installs and starts nothing
+#
+# SIGNERS_KEY is the public key of the throwaway key the test .rpm files are
+# signed with; REPOSITORY_KEY is the repositories' key, which the packages carry.
 set -eu
 
 plain=no
-if [ "$1" = --no-systemd ]; then plain=yes; shift; kind=$1 current=$2; else kind=$1 older=$2 current=$3 key=$4; fi
+if [ "$1" = --no-systemd ]; then
+  plain=yes; shift; kind=$1 current=$2
+else
+  kind=$1 older=$2 current=$3 key=$4 repository_key=$5
+fi
 unit=watchmymedia.service
 port=27587
 data=/var/lib/watchmymedia
@@ -186,10 +193,22 @@ for tool in ffmpeg ffprobe; do
   chmod 755 "/usr/local/bin/$tool"
 done
 
+# The package's repository entry is in place, once, with the repositories' key.
+check_repository() {
+  check "the package manager would ask the package's repository for updates" uses_repository
+  if [ "$kind" = deb ]; then
+    check "its key is there" test -s "$apt_key"
+    refute "and no second copy of the entry" test -e "$apt_entry.dpkg-dist" -o -e "$apt_entry.dpkg-new" -o -e "$apt_entry.dpkg-remove"
+  else
+    check "its key is the repositories' key" cmp -s "$repository_key" "$dnf_key"
+    refute "and no second copy of the entry" test -e "$dnf_entry.rpmnew" -o -e "$dnf_entry.rpmsave"
+  fi
+}
+
 step "Install the older build"
 install_file "$older"
 check_running
-refute "a build without the key adds no repository" uses_repository
+check_repository
 older_version=$(installed_version)
 id=$(server_id)
 [ -n "$id" ] || fail "the server gave no id"
@@ -210,12 +229,9 @@ check_running
 [ "$(server_id)" = "$id" ] && pass "it is the same server: the data was kept" || fail "the server has a new id"
 check "the config was kept (the server still listens on $port)" grep -qx 'port: 27590' "$config"
 refute "no second copy of the config was left" test -e "$config.rpmnew" -o -e "$config.dpkg-dist" -o -e "$config.dpkg-new"
-check "the package added its repository" uses_repository
+check_repository
 if [ "$kind" = deb ]; then
-  check "with its key" test -s "$apt_key"
   check "the firewall profile for ufw is there" test -f /etc/ufw/applications.d/watchmymedia
-else
-  check "with its key" test -s "$dnf_key"
 fi
 check "the firewalld service definition is there" test -f /usr/lib/firewalld/services/watchmymedia.xml
 
@@ -243,7 +259,7 @@ check_running
 [ "$(server_id)" = "$id" ] && pass "it is the same server, with its data" || fail "the server has a new id"
 check "the kept config is in use" grep -qx 'port: 27590' "$config"
 refute "no saved copy is left over" test -e "$config.rpmsave"
-check "the repository is back" uses_repository
+check_repository
 
 if [ "$kind" = deb ]; then
   step "Purge"
@@ -264,8 +280,10 @@ else
   refute "the repository entry is gone" test -e "$dnf_entry"
 
   # Fedora 45's rpm refuses a package it cannot verify (%_pkgverify_level
-  # all), so the signature has to pass with only the key imported.
-  step "The signed package verifies once its key is imported"
+  # all), so the signature has to pass with only the key imported. The test
+  # packages are signed by a throwaway key's subkey, as a release is by the
+  # real key's, so it is the throwaway key that is imported here.
+  step "The signed package verifies once its signer's key is imported"
   rpm -K "$current" 2>&1 | grep -q 'signatures OK' && fail "the signature passed before the key was imported" \
     || pass "rpm -K does not pass without the key"
   rpm --import "$key"
@@ -273,7 +291,7 @@ else
   echo "$said" | grep -q 'digests signatures OK' && pass "rpm -K: digests signatures OK" || fail "rpm -K: $said"
   rpm -i "$current"
   check_running
-  check "the installed key is the one that was imported" cmp -s "$key" "$dnf_key"
+  check_repository
   rpm -e watchmymedia
 fi
 

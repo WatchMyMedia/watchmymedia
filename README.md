@@ -198,12 +198,17 @@ package that is not signed; `dnf` installs it with a warning.
   Without a driver that works, the server transcodes in software, and Settings › Transcoding
   shows which encoder it found.
 - **Not there yet.** The packages are not on a release or on
-  <https://downloads.watchmy.media>, and the apt and dnf repositories that will deliver
-  updates do not exist: a package built here carries no repository entry.
+  <https://downloads.watchmy.media>. Each carries its repository entry and the public key
+  the repositories will be signed with ([deploy/linux/repository-key.asc](deploy/linux/repository-key.asc)),
+  but the apt and dnf repositories that will deliver updates do not exist yet. Until they do,
+  a machine with a package installed gets an error for that entry from `apt update` (its
+  other lists still update), and a 404 notice from `dnf`, which carries on.
+  `make linux-packages LINUX_REPOSITORY_KEY=` builds packages without the entry.
 
 Developers: [deploy/linux](deploy/linux) holds the one [nfpm](https://nfpm.goreleaser.com/)
-file both formats are built from and what it packs. `make linux-smoke-packages` builds an
-older and a current set with a throwaway signing key (it needs `gpg`), and
+file both formats are built from, what it packs and the make targets. `make
+linux-smoke-packages` builds an older and a current set, signed by a throwaway key (it needs
+`gpg`; the real signing key is only ever in a release), and
 `make linux-packages-smoke IMAGE=debian:13` installs, updates, removes and purges them in a
 container that runs systemd (it needs Docker; `IMAGE` is any of `debian:12`, `debian:13`,
 `ubuntu:24.04`, `ubuntu:26.04`, `fedora:44` and `fedora:45`). CI does the same on all six, on

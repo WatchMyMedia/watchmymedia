@@ -86,16 +86,21 @@ jobs:
               - 'server/**'
               - 'web/**'
               - '.github/workflows/ci.yml'
-            # The packaging, what it packs, and the parts of the server the
-            # wrapper and the service rely on: how it starts and where it
-            # looks for its folders, its config and ffmpeg.
+            # The Linux package jobs (thirteen of them) run only when what
+            # they test changed, and this list is that on purpose: the
+            # packaging and its make targets (deploy/linux), the files it
+            # packs from elsewhere, and the two parts of the server the
+            # wrapper and the service rely on, how it starts and where it
+            # looks for its folders, its config and ffmpeg. Not the root
+            # Makefile, and not the rest of server/ or web/: the server, web
+            # and docker jobs cover what the packages hold of those.
+            # deploy/ci/security_test.py holds the list to this.
             linux-packages:
               - 'deploy/linux/**'
               - 'deploy/macos/fetch-ffmpeg.sh'
               - 'deploy/macos/FFMPEG-LICENSE.md'
               - 'deploy/config.example.yaml'
               - 'LICENSE'
-              - 'Makefile'
               - 'server/cmd/server/**'
               - 'server/internal/config/**'
               - '.github/workflows/ci.yml'
@@ -567,12 +572,14 @@ jobs:
 
   # The server's packages for Debian, Ubuntu and Fedora (deploy/linux): a
   # .deb and an .rpm for amd64 and arm64, built as `make linux-packages`
-  # builds them, twice: an older set to update from, and a current one made
-  # as a release will be, signed and with its repository entry, by a
-  # throwaway key made here. The test of their contents then reads all
-  # eight. Nothing is published; the packages are kept a day for the
-  # installs below. On GitHub's Linux runners only: the installs need a
-  # Linux Docker host that runs privileged containers.
+  # builds them, twice: an older set to update from and a current one. Each
+  # is made as a release will be, with the repositories' public key and its
+  # repository entry, and the .rpm signed by a signing subkey: here a
+  # throwaway key's, made in this job, since the real one is only in a
+  # release. The test of their contents then reads all eight. Nothing is
+  # published; the packages are kept a day for the installs below. On
+  # GitHub's Linux runners only: the installs need a Linux Docker host that
+  # runs privileged containers.
   linux-packages:
     needs: changes
     if: needs.changes.outputs.linux-packages == 'true'
