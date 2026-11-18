@@ -119,6 +119,17 @@ is 1.M.P, `v1.0.0` is 1.6.0, and from `v1.3.0` `v1.M.P` is 1.(M + 4).P.
   - The account is written twice, in `linux/sysusers.conf` and in
     `linux/scripts/preinstall.sh`, which runs before the package unpacks.
     Change both.
+  - The service closes `/var/lib/watchmymedia` and
+    `/var/cache/watchmymedia` to other local users (mode 750): the database
+    holds password hashes and the cache what people are watching. It sets
+    no `UMask`, on purpose: what the server writes into library folders
+    (recordings, subtitles, trailers) has to stay readable by whoever
+    shares those folders. systemd applies the mode each time the service
+    starts, so an update closes folders an earlier package left open; the
+    smoke test opens them before the update to see that.
+  - Both packages recommend `acl`, because the web's folder message gives
+    a `setfacl` command and `setfacl` is not on every install. The smoke
+    test runs that command.
   - The supported releases are named in `ci.yml`'s matrix,
     `linux/smoke.sh` and the `Makefile`; add or drop one in all three
     (`ci/security_test.py` checks).

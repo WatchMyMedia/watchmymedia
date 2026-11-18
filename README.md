@@ -177,10 +177,15 @@ package that is not signed; `dnf` installs it with a warning.
   settings file has every option commented out and only root and the service can read it;
   restart the service after changing it (`sudo systemctl restart watchmymedia`). The two
   folders are set by the service, not that file: change them with
-  `sudo systemctl edit watchmymedia` (`Environment=WATCHMYMEDIA_DATA_DIR=…`).
-  `watchmymedia backup` at a prompt uses the same folders.
+  `sudo systemctl edit watchmymedia` (`Environment=WATCHMYMEDIA_DATA_DIR=…`). Both are
+  closed to other users of the machine (mode 750), since the database holds password hashes
+  and the cache what people are watching. A command at a prompt uses the same folders and
+  so runs as the service's user: `sudo -u watchmymedia watchmymedia backup`.
 - **Your library folders** must be readable by the `watchmymedia` user, which a package
-  cannot arrange: home folders and drives a desktop mounts are closed to other users.
+  cannot arrange: home folders and drives a desktop mounts are closed to other users. The
+  web names the folder it cannot read and gives the command,
+  `sudo setfacl -R -m u:watchmymedia:rX <folder>`; the packages recommend `acl`, which has
+  `setfacl`. Folders above it, such as a home folder, have to let that user through too.
 - **The firewall** is left alone. Where one is on, open the port with
   `sudo firewall-cmd --permanent --add-service=watchmymedia && sudo firewall-cmd --reload`
   (firewalld) or `sudo ufw allow WatchMyMedia` (ufw).

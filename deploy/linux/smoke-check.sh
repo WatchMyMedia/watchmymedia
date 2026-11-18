@@ -122,7 +122,16 @@ check_running() {
   check "the database is in $data" test -s "$data/watchmymedia.db"
   [ "$(stat -c %U "$data/watchmymedia.db")" = watchmymedia ] && pass "and belongs to watchmymedia" || fail "the database's owner"
   refute "no data folder beside where the service started" test -e /data
-  [ "$(stat -c %U "$cache")" = watchmymedia ] && pass "the playback cache is $cache" || fail "$cache is missing or not the service's"
+  # The database holds password hashes and the cache what people are
+  # watching: only the service's user and group may look in either.
+  for folder in "$data" "$cache"; do
+    [ "$(stat -c '%a %U %G' "$folder")" = '750 watchmymedia watchmymedia' ] && pass "$folder is the service's alone (750)" \
+      || fail "$folder is $(stat -c '%a %U %G' "$folder")"
+    refute "another local user cannot list $folder" runuser -u nobody -- ls "$folder"
+  done
+  refute "another local user cannot read the database" runuser -u nobody -- cat "$data/watchmymedia.db"
+  [ "$(curl -fsS "http://127.0.0.1:$port/api/server" | field install)" = "$kind" ] \
+    && pass "the server says it was installed from the .$kind" || fail "the server does not say it is a $kind install"
   [ "$(stat -c '%a %U %G' "$config")" = '640 root watchmymedia' ] && pass "only root and the service read the config" \
     || fail "config.yaml is $(stat -c '%a %U %G' "$config")"
 
@@ -134,6 +143,33 @@ check_running() {
   runuser -u watchmymedia -- watchmymedia probe-transcoder -hwaccel software 2>/dev/null | grep -q '"libx264"' \
     && pass "the bundled ffmpeg encodes H.264 here" || fail "the bundled ffmpeg could not encode"
   [ ! -s "$decoy" ] && pass "nothing ran an ffmpeg from PATH" || fail "an ffmpeg from PATH ran: $(cat "$decoy")"
+}
+
+# The folder message a package install gives for a folder the server cannot
+# read: the service's user is let in by setfacl, which the package recommends.
+check_folder_access() {
+  check "setfacl is there, from the recommended acl package" command -v setfacl
+  library=/srv/smoke-library
+  mkdir -p "$library/Movies"
+  echo film > "$library/Movies/film.txt"
+  chmod -R go= "$library"
+  refute "the service's user cannot read a folder closed to others" runuser -u watchmymedia -- cat "$library/Movies/film.txt"
+  setfacl -R -m u:watchmymedia:rX "$library"
+  check "and can after the folder message's setfacl command" runuser -u watchmymedia -- cat "$library/Movies/film.txt"
+  refute "which lets nobody else in" runuser -u nobody -- cat "$library/Movies/film.txt"
+}
+
+# A backup made at a prompt as the service's user, as the restore steps run
+# their commands: the wrapper finds the data, and the closed folder lets it in.
+check_backup() {
+  made=$(sudo -u watchmymedia watchmymedia backup) || fail "sudo -u watchmymedia watchmymedia backup failed"
+  case "$made" in
+    "$data"/backups/*) pass "sudo -u watchmymedia watchmymedia backup wrote $made" ;;
+    *) fail "the backup went to '$made', not $data/backups" ;;
+  esac
+  check "the backup is there and not empty" test -s "$made"
+  [ "$(stat -c %U "$made")" = watchmymedia ] && pass "and is the service's" || fail "the backup belongs to $(stat -c %U "$made")"
+  refute "another local user cannot read it" runuser -u nobody -- cat "$made"
 }
 
 check_stopped() {
@@ -209,6 +245,8 @@ step "Install the older build"
 install_file "$older"
 check_running
 check_repository
+check_folder_access
+check_backup
 older_version=$(installed_version)
 id=$(server_id)
 [ -n "$id" ] || fail "the server gave no id"
@@ -220,6 +258,10 @@ port=27590
 wait_healthy
 
 step "Update to the current build"
+# As a package from before the folders were closed made them: open to all.
+# The update has to close them.
+chmod 755 "$data" "$cache"
+check "before the update, another local user can list $data" runuser -u nobody -- ls "$data"
 before=$(main_pid)
 install_file "$current"
 [ "$(installed_version)" != "$older_version" ] && pass "the package is $(installed_version), was $older_version" \

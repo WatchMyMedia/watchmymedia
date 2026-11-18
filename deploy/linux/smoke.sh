@@ -55,7 +55,7 @@ if [ "$kind" = deb ]; then
   docker build -q --platform "$platform" -t "$tag" - >/dev/null <<EOF
 FROM $image
 ENV container=docker DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends systemd systemd-sysv dbus curl ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends systemd systemd-sysv dbus curl ca-certificates sudo
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]
 EOF
@@ -63,7 +63,7 @@ else
   docker build -q --platform "$platform" -t "$tag" - >/dev/null <<EOF
 FROM $image
 ENV container=docker
-RUN dnf -y install systemd util-linux curl hostname
+RUN dnf -y install systemd util-linux curl hostname sudo
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]
 EOF

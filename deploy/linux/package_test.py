@@ -311,7 +311,7 @@ class Checks:
                 self.assertEqual((HERE / 'scripts' / f'{name}.sh').read_text().strip(),
                                  package.scripts[name].strip(), name)
             if kind == 'deb':
-                self.assertEqual(['libva2', 'libva-drm2', 'libdrm2'], package.recommends)
+                self.assertEqual(['libva2', 'libva-drm2', 'libdrm2', 'acl'], package.recommends)
                 self.assertEqual(['libc6 (>= 2.28)'], package.depends)
                 self.assertEqual('Eldwick Software <eldwicksoftware@gmail.com>', package.fields['Maintainer'])
                 self.assertEqual('https://watchmy.media', package.fields['Homepage'])
@@ -320,7 +320,7 @@ class Checks:
                 self.assertFalse(package.signed)
                 self.check_deb_files(package, kind, repository, armored)
             else:
-                self.assertEqual(['libva', 'libdrm'], package.recommends)
+                self.assertEqual(['libva', 'libdrm', 'acl'], package.recommends)
                 self.assertIn('glibc 2.28', package.depends)
                 self.assertEqual('Eldwick Software', package.fields['Vendor'])
                 self.assertEqual('AGPL-3.0-only', package.fields['License'])
@@ -551,6 +551,9 @@ class SourceFilesTest(unittest.TestCase):
         unit = (HERE / 'watchmymedia.service').read_text()
         for line in ('User=watchmymedia', 'Group=watchmymedia', 'ExecStart=/usr/bin/watchmymedia',
                      'StateDirectory=watchmymedia', 'CacheDirectory=watchmymedia', 'Restart=on-failure',
+                     # The database holds password hashes and the cache what people are
+                     # watching: only the service's user and group read either.
+                     'StateDirectoryMode=0750', 'CacheDirectoryMode=0750',
                      'NoNewPrivileges=yes', 'PrivateTmp=yes', 'ProtectSystem=full',
                      'After=network-online.target remote-fs.target', 'WantedBy=multi-user.target'):
             self.assertIn(line + '\n', unit)
@@ -558,6 +561,9 @@ class SourceFilesTest(unittest.TestCase):
         # them, and the GPU's device nodes have to stay reachable.
         for setting in ('ProtectHome', 'ProtectSystem=strict', 'PrivateDevices', 'DeviceAllow', 'ReadOnlyPaths'):
             self.assertNotIn(setting, unit)
+        # No UMask: recordings, subtitles and trailers the server writes into
+        # library folders stay readable by whoever shares those folders.
+        self.assertNotIn('UMask', unit)
 
     def test_the_wrapper_fills_in_only_what_is_unset(self):
         wrapper = (HERE / 'watchmymedia.sh').read_text().replace('@INSTALL@', 'deb')

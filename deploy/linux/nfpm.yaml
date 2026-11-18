@@ -42,18 +42,22 @@ overrides:
   deb:
     # The bundled ffmpeg is built for glibc 2.28 or later. It loads the GPU
     # libraries from the system when it runs, so they are only recommended.
+    # acl has setfacl, which the web gives as the command that lets the
+    # service's user read a library folder; it is not on every install.
     depends:
       - libc6 (>= 2.28)
     recommends:
       - libva2
       - libva-drm2
       - libdrm2
+      - acl
   rpm:
     depends:
       - glibc >= 2.28
     recommends:
       - libva
       - libdrm
+      - acl
 
 # zstd at level 19, which dpkg has read since 1.21.18 (Debian 12 has 1.21.22)
 # and rpm since 4.14. Measured on 2026-11-18: the amd64 .deb is 78 MB in 9 s,
