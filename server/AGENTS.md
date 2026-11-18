@@ -212,6 +212,19 @@ no-replace rename (`renameat2` `RENAME_NOREPLACE`, macOS `RENAME_EXCL`) and
 sometimes hard links; `internal/livetv/dvr/publish_unix.go` falls back in
 that order.
 
+**Converted audio** (PLAN-AUDIO.md): `audioTarget`
+(`internal/playback/audio_target.go`) picks FLAC, E-AC-3, AC-3 or AAC.
+ffmpeg's E-AC-3 and AC-3 encoders stop at 5.1 (from 7.1 it downmixes to 5.1
+without asking) and AC-3 at 640 kbps (asked for 768k, it writes 640k). PCM in
+fMP4 is written as `ipcm`, which the players don't read, and ExoPlayer reads
+no `in24` or `fl32` PCM in MOV (what ffmpeg writes for 24-bit), so PCM is
+copied only in direct play of Matroska. FLAC keeps a 24-bit source's depth
+with no `-sample_fmt`, downmixed or not. ffmpeg's experimental TrueHD encoder
+writes 5.1 at most, so 7.1 test sources are PCM or FLAC. `-ac 3` on a 3.0 AC-3
+source gives AAC 2.1; 4, 5 and 6 channels map cleanly. Declared bandwidth for
+a single rendition counts the audio (`PeakBandwidthWithAudio`); adaptive
+families keep the stereo AAC allowance.
+
 **ffmpeg.** Run ffmpeg and ffprobe through `internal/ffexec`, never with
 the standard library directly: it starts them in a process group that dies
 with the server (Pdeathsig on Linux, a job object on Windows, pid files in

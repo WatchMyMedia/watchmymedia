@@ -29,6 +29,15 @@ describe('castProfile', () => {
     expect(p.maxAudioChannels).toBe(8)
     expect(p.videoCodecs).toEqual(expect.arrayContaining(['h264', 'hevc', 'hevc10']))
     expect(p.separateAudio).toBe(true)
+    expect(p).not.toHaveProperty('maxPcmChannels')
+  })
+
+  it('says two PCM channels to servers that convert to E-AC-3', () => {
+    vi.stubGlobal('MediaSource', { isTypeSupported: tvMse })
+    expect(castProfile(tv, 31).maxPcmChannels).toBe(2)
+    expect(castProfile(tv, 30)).not.toHaveProperty('maxPcmChannels')
+    vi.stubGlobal('MediaSource', { isTypeSupported: (t: string) => !/(ec-3|ac-3)/.test(t) })
+    expect(castProfile(tv, 31)).not.toHaveProperty('maxPcmChannels')
   })
 })
 

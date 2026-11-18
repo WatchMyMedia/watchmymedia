@@ -41,11 +41,27 @@ type SourceInfo struct {
 
 type LivePlan struct {
 	Mode          string // original, remux, audio or video
-	Reason        string
+	Reason        string // why the mode: in video mode, why the picture is converted
 	SegmentFormat string // mpegts or fmp4
 	sourceAudio   string
 	hdrType       string
+	// copyAudio is video mode's choice to write the broadcast's audio as it
+	// is, as original and remux always do and audio mode never does.
+	copyAudio bool
+	// audioChannels is what a conversion may keep (liveAudioChannels); video
+	// mode keeps more than two only at liveSurroundVideoKbps or above.
+	audioChannels int
 }
+
+// Live audio conversions are AAC: stereo at 192 kbps, as before, or up to 5.1
+// at 64 kbps a channel (PLAN-AUDIO.md §3.6). A converted picture below
+// liveSurroundVideoKbps is a play kept small for a slow link, which keeps
+// stereo (PLAN-AUDIO.md decision 8).
+const (
+	liveStereoAudioKbps     = 192
+	liveAudioKbpsPerChannel = 64
+	liveSurroundVideoKbps   = 4000
+)
 
 func validateLiveProfile(p *LiveProfile) error {
 	if p == nil {
@@ -90,6 +106,14 @@ func chooseLivePlan(profile *LiveProfile, source SourceInfo, quality string) Liv
 		fallback.Reason = "source_unknown"
 		return fallback
 	}
+	// The source is known from here on. A picture converted for any of the
+	// reasons below keeps the broadcast's audio when the device takes it, so
+	// an ATSC 1.0 channel's MPEG-2 doesn't cost an app its AC-3 5.1.
+	fallback.sourceAudio = source.AudioCodec
+	fallback.copyAudio = liveAudioFits(profile, source, fallback.SegmentFormat)
+	if !fallback.copyAudio {
+		fallback.audioChannels = liveAudioChannels(profile, source)
+	}
 	if source.HDRType != "" && !slices.Contains(profile.HDRTypes, source.HDRType) {
 		fallback.Reason = "hdr_unsupported"
 		return fallback
@@ -126,15 +150,34 @@ func chooseLivePlan(profile *LiveProfile, source SourceInfo, quality string) Liv
 		fallback.Reason = "segment_format_unsupported"
 		return fallback
 	}
-	if source.AudioPresent && (source.AudioCodec == "" || source.AudioChannels <= 0 || !slices.Contains(profile.AudioCodecs, source.AudioCodec) ||
-		profile.MaxAudioChannels > 0 && source.AudioChannels > profile.MaxAudioChannels ||
-		format == "fmp4" && !fmp4Audio(source.AudioCodec)) {
-		return LivePlan{Mode: "audio", Reason: "audio_unsupported", SegmentFormat: format}
+	if !liveAudioFits(profile, source, format) {
+		return LivePlan{Mode: "audio", Reason: "audio_unsupported", SegmentFormat: format, audioChannels: liveAudioChannels(profile, source)}
 	}
 	if format == "fmp4" {
 		return LivePlan{Mode: "remux", Reason: "compatible_source", SegmentFormat: format, sourceAudio: source.AudioCodec}
 	}
 	return LivePlan{Mode: "original", Reason: "compatible_source", SegmentFormat: format}
+}
+
+// liveAudioFits says whether the broadcast's audio can be written as it is:
+// the device lists its codec and takes its channels, and fMP4 segments can
+// carry it.
+func liveAudioFits(profile *LiveProfile, source SourceInfo, format string) bool {
+	return source.AudioPresent && source.AudioCodec != "" && source.AudioChannels > 0 &&
+		slices.Contains(profile.AudioCodecs, source.AudioCodec) &&
+		(profile.MaxAudioChannels <= 0 || source.AudioChannels <= profile.MaxAudioChannels) &&
+		(format != "fmp4" || fmp4Audio(source.AudioCodec))
+}
+
+// liveAudioChannels is how many channels a conversion keeps: up to 5.1 for a
+// device that says it takes six channels or more, else stereo. A profile that
+// sends no limit (the web's and the Cast receiver's) stays stereo until AAC
+// 5.1 in MPEG-TS is checked on them (PLAN-AUDIO.md §3.6).
+func liveAudioChannels(profile *LiveProfile, source SourceInfo) int {
+	if profile == nil || profile.MaxAudioChannels < 6 || source.AudioChannels <= 2 {
+		return 2
+	}
+	return min(source.AudioChannels, 6)
 }
 
 func fmp4Audio(codec string) bool {

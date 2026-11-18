@@ -126,7 +126,13 @@ type HealthOutput struct {
 // GET /shows/{id}/related, the rows at the end of a movie's or a show's
 // page as ScreenRows (collection, movies only, then similar, More like
 // this). Apps ask for them, and draw the rows, only from this level.
-const APILevel = 30
+// 31: converted audio keeps lossless and surround (PLAN-AUDIO.md): a track
+// the device can't take is converted to FLAC, E-AC-3 or AC-3 where the
+// profile lists them, not only AAC, so decision.audio.codec may be flac,
+// eac3 or ac3 with copy false; Profile.maxPcmChannels, the channels the
+// output takes as PCM; and pcm is copied only in direct play. Apps send
+// maxPcmChannels and list pcm only from this level.
+const APILevel = 31
 
 // ServerInfo identifies the server to apps before anyone signs in.
 type ServerInfo struct {

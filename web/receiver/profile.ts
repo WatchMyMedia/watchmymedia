@@ -8,6 +8,10 @@ type Decision = components['schemas']['Decision']
 /** The apiLevel from which a server serves audio as its own rendition. */
 export const SEPARATE_AUDIO_LEVEL = 4
 
+/** The apiLevel from which a server takes maxPcmChannels and converts
+ * audio to E-AC-3 or FLAC (PLAN-AUDIO.md). */
+export const PCM_CHANNELS_LEVEL = 31
+
 const AUDIO_CODECS: Record<string, string> = { ac3: 'ac-3', eac3: 'ec-3', opus: 'Opus', flac: 'fLaC', mp3: 'mp4a.40.34' }
 
 /**
@@ -191,6 +195,10 @@ export function castProfile(ctx: framework.CastReceiverContext, level = 0): Prof
     maxHeight: uhd ? 2160 : 1080,
     maxBitrate: 0,
     maxAudioChannels: surround ? 8 : 2,
+    // A TV plays decoded audio as two channels, on its speakers or as PCM
+    // over ARC, but passes Dolby through: so a track the server converts
+    // comes as E-AC-3 5.1, not as FLAC or AAC the TV mixes down.
+    ...(surround && level >= PCM_CHANNELS_LEVEL && { maxPcmChannels: 2 }),
     hdr: hdr10,
     hdrTypes,
     subtitleFormats: ['webvtt'],

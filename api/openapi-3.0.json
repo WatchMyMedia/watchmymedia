@@ -1542,6 +1542,7 @@
             "type": "integer"
           },
           "codec": {
+            "description": "The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3 (PLAN-AUDIO.md).",
             "type": "string"
           },
           "copy": {
@@ -10782,6 +10783,11 @@
             "type": "integer"
           },
           "maxHeight": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "maxPcmChannels": {
+            "description": "The most channels the device's output takes as decoded audio (PCM), when that is fewer than maxAudioChannels, which also counts formats passed through to a receiver as they are. A converted track that the device decodes is sent within it. 0 means the same as maxAudioChannels. From apiLevel 31; older servers reject it.",
             "format": "int64",
             "type": "integer"
           },

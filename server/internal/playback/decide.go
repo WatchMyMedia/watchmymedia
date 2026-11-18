@@ -60,12 +60,20 @@ type Profile struct {
 	// decodes and its display shows; from apiLevel 8).
 	VideoCodecs []string `json:"videoCodecs" nullable:"false" required:"false"`
 	// AudioCodecs: aac, opus, mp3, ac3, eac3, flac, vorbis, dts, truehd, pcm.
+	// pcm is copied only in direct play: in HLS ffmpeg writes it as ipcm,
+	// which the players don't read, so it is converted (to FLAC where flac
+	// is listed). A track that doesn't fit is converted to flac, eac3 or ac3
+	// where they are listed, else aac (PLAN-AUDIO.md §3.1).
 	AudioCodecs      []string `json:"audioCodecs" nullable:"false" required:"false"`
 	MaxWidth         int      `json:"maxWidth,omitempty"`
 	MaxHeight        int      `json:"maxHeight,omitempty"`
 	MaxBitrate       int64    `json:"maxBitrate,omitempty" doc:"Bits per second; 0 means unlimited."`
 	MaxAudioChannels int      `json:"maxAudioChannels,omitempty" doc:"0 means any."`
-	HDR              bool     `json:"hdr" required:"false" doc:"True when the client can display HDR. Without hdrTypes, HDR video is copied only when this is true; otherwise transcodes tone-map to SDR."`
+	// MaxPcmChannels: an Android TV on a soundbar over ARC passes E-AC-3
+	// through (eight channels) but takes two channels of PCM, so a track
+	// converted to FLAC or AAC would reach it as stereo (PLAN-AUDIO.md §3.5).
+	MaxPcmChannels int  `json:"maxPcmChannels,omitempty" required:"false" doc:"The most channels the device's output takes as decoded audio (PCM), when that is fewer than maxAudioChannels, which also counts formats passed through to a receiver as they are. A converted track that the device decodes is sent within it. 0 means the same as maxAudioChannels. From apiLevel 31; older servers reject it."`
+	HDR            bool `json:"hdr" required:"false" doc:"True when the client can display HDR. Without hdrTypes, HDR video is copied only when this is true; otherwise transcodes tone-map to SDR."`
 	// HDRTypes is a list of plain strings, not an enum: generated clients
 	// refuse enum values they do not know.
 	HDRTypes []string `json:"hdrTypes,omitempty" nullable:"false" required:"false" doc:"The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means the profile follows PLAN-HDR-PROFILE: HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it."`
@@ -102,6 +110,9 @@ type Request struct {
 	// so native players show the real timeline and seek anywhere; its
 	// master playlist also offers the text subtitles as renditions.
 	Playlist string `json:"playlist,omitempty" enum:"event,vod" doc:"HLS playlist kind: event (default) or vod (the whole file, for native players)."`
+	// Download is an offline download's decision, which never converts to
+	// FLAC: a download is kept on the device (PLAN-AUDIO.md §2.3).
+	Download bool `json:"-"`
 }
 
 // Start is where the request asks to start, 0 when it doesn't say.
@@ -176,9 +187,12 @@ type VideoPlan struct {
 
 type AudioPlan struct {
 	Index    int    `json:"index"`
-	Codec    string `json:"codec,omitempty"`
+	Codec    string `json:"codec,omitempty" doc:"The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3 (PLAN-AUDIO.md)."`
 	Copy     bool   `json:"copy"`
 	Channels int    `json:"channels,omitempty"`
+	// Bitrate is a converted track's encoder rate (for FLAC an estimate),
+	// which the stream's bitrate and declared bandwidth count.
+	Bitrate int64 `json:"-"`
 }
 
 // Decision is the chosen mode and everything the player needs.
@@ -623,6 +637,14 @@ func Decide(info *probe.MediaInfo, ext string, req Request, sidecars []Sidecar, 
 		containerOK = false
 		d.Reasons = append(d.Reasons, sent.Why)
 	}
+	if audio != nil && audioOK && audioKey(*audio) == "pcm" && (!videoOK || burn || !containerOK || containerOf(ext) != "mkv") {
+		// PCM is copied only in direct play of Matroska (PLAN-AUDIO.md
+		// §3.4). ffmpeg writes it into fMP4 as ipcm, which the players
+		// don't read, and ExoPlayer (Media3 1.11) reads no in24 or fl32 in
+		// MOV, which ffmpeg writes for 24-bit, nor PCM in MPEG-TS.
+		audioOK = false
+		d.Reasons = append(d.Reasons, "PCM audio is copied only in direct play of Matroska")
+	}
 	switch {
 	case !videoOK || burn:
 		d.Mode, d.Protocol = ModeTranscode, "hls"
@@ -677,7 +699,13 @@ func Decide(info *probe.MediaInfo, ext string, req Request, sidecars []Sidecar, 
 		// deinterlaces what it is sent as it would any interlaced file.
 		d.Video.Deinterlace = len(info.Video) > 0 && Interlaced(v)
 	}
-	if !d.Audio.Copy {
+	switch {
+	case !d.Audio.Copy && audio != nil:
+		d.Audio = audioTarget(*audio, p, d.Video.Copy, req.Download)
+		if why := audioReason(d.Audio); why != "" {
+			d.Reasons = append(d.Reasons, why)
+		}
+	case !d.Audio.Copy:
 		d.Audio.Codec = "aac"
 		if p.MaxAudioChannels > 0 && d.Audio.Channels > p.MaxAudioChannels {
 			d.Audio.Channels = p.MaxAudioChannels
@@ -697,7 +725,7 @@ func streamBitrate(info *probe.MediaInfo, d Decision, audio *probe.AudioStream, 
 	switch {
 	case audio == nil:
 	case !d.Audio.Copy:
-		audioBps = transcodeAudioBitrate
+		audioBps = d.Audio.Bitrate
 	default:
 		audioBps = audio.BitRate
 	}
