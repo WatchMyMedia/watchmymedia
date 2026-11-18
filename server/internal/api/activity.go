@@ -184,7 +184,12 @@ func streamInfo(info *probe.MediaInfo, ext string, d playback.Decision, req play
 			}
 		}
 		if !d.Audio.Copy {
-			out.AudioDecision, out.AudioCodec = "transcode", "aac"
+			// What the server writes: FLAC, E-AC-3 or AC-3 since API level
+			// 31 (PLAN-AUDIO.md), else AAC.
+			out.AudioDecision, out.AudioCodec = "transcode", d.Audio.Codec
+			if out.AudioCodec == "" {
+				out.AudioCodec = "aac"
+			}
 			if d.Audio.Channels > 0 {
 				out.AudioChannels = d.Audio.Channels
 			}
