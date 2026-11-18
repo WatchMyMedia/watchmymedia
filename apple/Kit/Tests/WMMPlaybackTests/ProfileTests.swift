@@ -33,7 +33,8 @@ import WMMModel
         #expect(p.maxWidth == 3840)
         #expect(p.maxHeight == 2160)
         #expect(p.maxBitrate == nil)
-        #expect(p.maxAudioChannels == 2)
+        // Six on its stereo speaker: it mixes 5.1 down itself (PLAN-AUDIO.md §3.7).
+        #expect(p.maxAudioChannels == 6)
         #expect(p.hdr)
         #expect(p.subtitleFormats == ["webvtt"])
     }
@@ -134,18 +135,25 @@ import WMMModel
         }
     }
 
-    @Test func anIPhoneOrIPadAsksForStereoUntilSurroundIsChecked() {
-        // §2.1: six or more only once a device check shows 5.1 direct play works.
-        #expect(!handheldSurroundChecked)
-        let surroundOut = Device(plays: everything, hdrEligible: true, hardwareHEVC: true, outputChannels: 6)
-        #expect(buildProfile(describeDevice(surroundOut)).maxAudioChannels == 2)
-        #expect(DeviceProfileProvider(probe: surroundOut).current().maxAudioChannels == 2)
-        // With the switch on: at least six, so the device mixes 5.1 down itself, or more over AirPlay to a receiver.
+    @Test func anIPhoneOrIPadAsksForSixChannelsOrMore() {
+        // PLAN-APPLE-REVIEW.md §2.1, PLAN-AUDIO.md §3.7: a 5.1 film keeps direct play and the
+        // device mixes it down itself, on the speaker or headphones (two channels out).
+        #expect(handheldSurroundChecked)
         let stereoOut = Device(plays: everything, hdrEligible: true, hardwareHEVC: true)
-        #expect(buildProfile(describeDevice(stereoOut, handheldSurround: true)).maxAudioChannels == 6)
-        #expect(DeviceProfileProvider(probe: stereoOut, handheldSurround: true).current().maxAudioChannels == 6)
-        #expect(audioChannels(output: 8, tv: false, handheldSurround: true) == 8)
+        #expect(buildProfile(describeDevice(stereoOut)).maxAudioChannels == 6)
+        #expect(DeviceProfileProvider(probe: stereoOut).current().maxAudioChannels == 6)
+        // More over AirPlay to a receiver set to 7.1.
+        let receiverOut = Device(plays: everything, hdrEligible: true, hardwareHEVC: true, outputChannels: 8)
+        #expect(buildProfile(describeDevice(receiverOut)).maxAudioChannels == 8)
+        #expect(audioChannels(output: 8, tv: false) == 8)
+        #expect(audioChannels(output: 0, tv: false) == 6)
+        // With the switch off: stereo whatever the output, and the server converts 5.1.
+        let surroundOut = Device(plays: everything, hdrEligible: true, hardwareHEVC: true, outputChannels: 6)
+        #expect(buildProfile(describeDevice(surroundOut, handheldSurround: false)).maxAudioChannels == 2)
+        #expect(DeviceProfileProvider(probe: surroundOut, handheldSurround: false).current().maxAudioChannels == 2)
         #expect(audioChannels(output: 8, tv: false, handheldSurround: false) == 2)
+        // The switch is the iPhone and iPad's alone: an Apple TV asks for its output either way.
+        #expect(audioChannels(output: 2, tv: true, handheldSurround: true) == 2)
     }
 
     @Test func theProviderReadsTheAudioOutputAtEveryCall() {
@@ -165,8 +173,12 @@ import WMMModel
         #expect(tv.current().maxAudioChannels == 8)
         // Live TV asks the same provider (LivePlaybackEngine), so a channel gets the same.
         #expect(tv.current().audioCodecs.contains("eac3"))
+        // A phone AirPlaying to that receiver asks for its eight, and six back on its own speaker.
         let phone = DeviceProfileProvider(probe: route)
-        #expect(phone.current().maxAudioChannels == 2)
+        #expect(phone.current().maxAudioChannels == 8)
+        route.channels = 2
+        #expect(phone.current().maxAudioChannels == 6)
+        #expect(tv.current().maxAudioChannels == 2)
     }
 
     @Test func theProviderProbesCodecsOnceAndHDREveryTime() {

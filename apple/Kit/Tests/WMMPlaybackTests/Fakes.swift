@@ -385,7 +385,7 @@ let phoneProfile = PlaybackProfile(
     audioCodecs: ["aac", "mp3", "flac", "alac", "ac3", "eac3"],
     maxWidth: 3840,
     maxHeight: 2160,
-    maxAudioChannels: 2,
+    maxAudioChannels: 6,
     hdr: true,
     selectsAudioTrack: true
 )
