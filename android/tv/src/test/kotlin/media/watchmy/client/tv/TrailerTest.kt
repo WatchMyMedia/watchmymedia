@@ -118,6 +118,8 @@ class TrailerTest {
         val started = shadowOf(compose.activity).nextStartedActivity
         assertEquals(Intent.ACTION_VIEW, started.action)
         assertEquals(Uri.parse("https://www.youtube.com/watch?v=WhWc3b3KhnY"), started.data)
+        assertTrue("full screen in the YouTube app", started.getBooleanExtra("force_fullscreen", false))
+        assertTrue("and back to the movie page when it ends", started.getBooleanExtra("finish_on_ended", false))
         assertNull(opened)
     }
 
@@ -131,7 +133,9 @@ class TrailerTest {
         noHint()
         compose.onNodeWithText(TrailerText.BUTTON).performClick()
         assertNull(opened)
-        assertEquals(Uri.parse("https://www.youtube.com/watch?v=WhWc3b3KhnY"), shadowOf(compose.activity).nextStartedActivity.data)
+        val started = shadowOf(compose.activity).nextStartedActivity
+        assertEquals(Uri.parse("https://www.youtube.com/watch?v=WhWc3b3KhnY"), started.data)
+        assertTrue(started.getBooleanExtra("force_fullscreen", false) && started.getBooleanExtra("finish_on_ended", false))
         compose.onNodeWithText(TrailerText.OPENS_YOUTUBE).assertExists()
     }
 

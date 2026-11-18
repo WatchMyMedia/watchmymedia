@@ -34,12 +34,31 @@ internal fun Context.canOpenYouTube(): Boolean {
     return found != null
 }
 
-/** Opens [url] in the YouTube app; false when nothing could open it after all. */
+/**
+ * Opens [url] in the YouTube app; false when nothing could open it after
+ * all. The extras ask the YouTube app to play it full screen and to come
+ * back here when it ends, instead of playing another video and leaving
+ * people four Backs from the movie page. They are the retired YouTube
+ * Android Player API's and undocumented, but TV0 saw both work on a Google
+ * TV Streamer (2026-11-18): YouTube opened its StandalonePlayerActivity and
+ * returned to the app by itself at the end. Other apps that take the link
+ * ignore them.
+ */
 internal fun Context.openYouTube(url: String): Boolean = try {
-    startActivity(watchIntent(url))
+    startActivity(
+        watchIntent(url)
+            .putExtra(EXTRA_FORCE_FULLSCREEN, true)
+            .putExtra(EXTRA_FINISH_ON_ENDED, true),
+    )
     true
 } catch (_: ActivityNotFoundException) {
     false
 } catch (_: SecurityException) {
     false
 }
+
+/** The YouTube app's extra for playing a watch link full screen (see [openYouTube]). */
+internal const val EXTRA_FORCE_FULLSCREEN = "force_fullscreen"
+
+/** The YouTube app's extra for coming back when the video ends (see [openYouTube]). */
+internal const val EXTRA_FINISH_ON_ENDED = "finish_on_ended"
