@@ -105,6 +105,11 @@ is 1.M.P, `v1.0.0` is 1.6.0, and from `v1.3.0` `v1.M.P` is 1.(M + 4).P.
     `install`, `upgrade`, `configure`, `remove` and `purge` from dpkg, and a
     count from rpm (1 install, 2 update; 0 removal, 1 update). A new branch
     needs both.
+  - dpkg runs the scripts with dash, which stops a script at a failed
+    redirection on a builtin whatever follows it: `: > file || true` ends
+    the install where the file cannot be written. Use a command
+    (`touch file 2>/dev/null || true`); the package test refuses the other.
+    macOS's `sh` does not behave this way, so only Linux shows it.
   - Nothing starts where systemd is not running, the scripts never open a
     firewall or change SELinux, and the package owns neither
     `/var/lib/watchmymedia` nor `/var/cache/watchmymedia`, so removing it
