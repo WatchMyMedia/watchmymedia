@@ -235,6 +235,14 @@ Gaps the usual checks miss:
   `WATCHMYMEDIA_DATA_DIR`, `WATCHMYMEDIA_PORT`, `WATCHMYMEDIA_HOST=127.0.0.1`
   and `WATCHMYMEDIA_DISCOVERY=false`. An empty data folder gives a server
   that still needs setup.
+- **Titles written into a scratch database**: the fixture's titles are
+  unmatched, so a check that needs matched ones (search, a movie's page) can
+  insert `libraries`, `movies`, `shows`, `episodes` and `media_files` rows
+  with `sqlite3`. Rows with no files behind them are marked missing by the
+  next scan: at startup, on the schedule, or within a minute when the folder
+  watcher finds a library folder it doesn't watch yet (as for a drive just
+  mounted). Point those libraries at a folder that doesn't exist: a scan of
+  an unreachable library folder is skipped and leaves its files alone.
 - **Fakes**: every client runs without a server on its fakes (`-Pfakes=true`
   on Android, `-fakes` on Apple), with a fictional library.
 - **Slow links**: `dnctl` needs sudo and `adb emu network speed` does not
