@@ -85,6 +85,73 @@ jobs:
           path: server/internal/webui/dist/
           if-no-files-found: error
           retention-days: 1
+      # The Linux archives, for the packages job: its .deb and .rpm hold the
+      # server and the ffmpeg that are in these.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-archives
+          path: dist/watchmymedia-*-linux-*.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  # The server's Debian, Ubuntu and Fedora packages: a .deb and an .rpm for
+  # amd64 and arm64, built as `make linux-packages` builds them
+  # (deploy/linux/release.sh) from the Linux archives the binaries job packed,
+  # so a package holds the same server and ffmpeg as the archive beside it.
+  # The .rpm files are signed with the packages' own subkey, and each
+  # signature is checked against the committed public key
+  # (deploy/linux/repository-key.asc) before anything is attached. A release
+  # also gets the apt and dnf repositories' lists for its packages
+  # (deploy/linux/repository.sh), unsigned: the maintainers sign them when
+  # they publish, with a key this repository never holds. A pre-release
+  # (v1.2.3-rc.1) gets the packages and no lists: its packages stay on the
+  # GitHub release.
+  packages:
+    needs: [check, binaries]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-archives
+          path: ${{ runner.temp }}/linux-archives
+      # rpm's own tool checks the signatures; apt-ftparchive (apt-utils) and
+      # createrepo_c write the repositories' lists.
+      - name: Install the package and repository tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rpm apt-utils createrepo-c
+      # The key lives in RUNNER_TEMP, outside the checkout, and is removed at
+      # the end even when the job fails or is cancelled. Nothing prints it.
+      - name: Write the packages' signing key
+        env:
+          LINUX_PACKAGE_SIGNING_KEY: ${{ secrets.LINUX_PACKAGE_SIGNING_KEY }}
+        run: |
+          if [ -z "$LINUX_PACKAGE_SIGNING_KEY" ]; then
+            echo "::error::LINUX_PACKAGE_SIGNING_KEY is not set in the release environment, so the Linux packages cannot be signed (README, \"Releasing the Linux packages\")."
+            exit 1
+          fi
+          (umask 077 && printf '%s\n' "$LINUX_PACKAGE_SIGNING_KEY" > "$RUNNER_TEMP/linux-packages.key")
+      # The id names the packages' signing subkey: without it nfpm signs with
+      # the key's last signing subkey, which is the repositories' lists'.
+      - name: Build, sign and check the packages, and write the repositories' lists
+        env:
+          LINUX_SIGNING_KEY: ${{ runner.temp }}/linux-packages.key
+          LINUX_SIGNING_KEY_ID: BD64FACE28C2EF71
+        run: |
+          deploy/linux/release.sh "$GITHUB_REF_NAME" "$RUNNER_TEMP/linux-archives" build/linux-release
+          { echo "### Linux packages ${GITHUB_REF_NAME#v}"; echo; echo '```'; ls -l build/linux-release | tail -n +2; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/linux-packages.key"
+      - uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        with:
+          files: build/linux-release/*
+          fail_on_unmatched_files: true
 
   # The menu bar app as a universal DMG. With the signing and notarisation
   # secrets set (see README, "Releasing the Mac app") it is Developer ID

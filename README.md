@@ -202,9 +202,11 @@ package that is not signed; `dnf` installs it with a warning.
   have them. All of this is read from the packages: nothing has run on a GPU on Linux yet.
   Without a driver that works, the server transcodes in software, and Settings › Transcoding
   shows which encoder it found.
-- **Not there yet.** The packages are not on a release or on
-  <https://downloads.watchmy.media>. Each carries its repository entry and the public key
-  the repositories will be signed with ([deploy/linux/repository-key.asc](deploy/linux/repository-key.asc)),
+- **Not there yet.** A release now builds the packages and attaches them to its GitHub
+  release ([Releasing the Linux packages](#releasing-the-linux-packages)); no release has
+  been tagged since, and they are not on <https://downloads.watchmy.media>. Each carries its
+  repository entry and the public key the repositories are signed with
+  ([deploy/linux/repository-key.asc](deploy/linux/repository-key.asc)),
   but the apt and dnf repositories that will deliver updates do not exist yet. Until they do,
   a machine with a package installed gets an error for that entry from `apt update` (its
   other lists still update), and a 404 notice from `dnf`, which carries on.
@@ -254,7 +256,8 @@ checked that the version is valid and newer than every tag so far and that the c
 has its notes, and it asks before pushing. Only repository admins can push a `v*` tag.
 The tag starts `.github/workflows/release.yml`, which creates the
 GitHub release with those notes (as a pre-release for a suffixed tag); each job then adds
-its files: the server archives, the DMG, the APK and the Windows installer. It also pushes
+its files: the server archives, the Linux packages, the DMG, the APK and the Windows
+installer. It also pushes
 the Docker image and uploads the iPhone app to TestFlight. The Mac app's build number,
 which Sparkle compares, is the number the iPhone and
 Android builds use (`apple/scripts/version.sh`: 1.2.3 is 10200399).
@@ -262,6 +265,8 @@ Android builds use (`apple/scripts/version.sh`: 1.2.3 is 10200399).
 The workflow runs on GitHub's runners and restores nothing from a cache. Its signing keys
 and API keys are secrets of the `release` environment (`windows-signing` for the Windows
 job), which admit only `v*` tags; a build without them still runs, unsigned, and says so.
+The Linux packages are the exception: without their key the job fails and the release has
+none.
 
 A GitHub release is not yet what people are offered. The website, the servers' Check for
 updates and the Mac and Windows apps' updaters read <https://downloads.watchmy.media>,
@@ -289,6 +294,37 @@ Locally, `make macos-dmg` does the same: it signs with the first Developer ID in
 keychain (or `CODESIGN_IDENTITY`), and notarises when `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`
 and `NOTARY_KEY_PATH` are set, or `NOTARY_KEYCHAIN_PROFILE` names a profile saved with
 `xcrun notarytool store-credentials`.
+
+### Releasing the Linux packages
+
+The `packages` job in `.github/workflows/release.yml` builds the `.deb` and the `.rpm`, for
+amd64 and arm64, on every `v*` tag. It runs [deploy/linux/release.sh](deploy/linux/release.sh),
+which packs the server and the FFmpeg from the release's own Linux archives, so a package
+holds the same files as the archive beside it.
+
+- **Signing.** The `.rpm` files are signed with the `release` environment secret
+  `LINUX_PACKAGE_SIGNING_KEY`: the packages' signing subkey of the key whose public half is
+  [deploy/linux/repository-key.asc](deploy/linux/repository-key.asc), exported alone and
+  armored, with no passphrase. The workflow names that subkey by its id, since the key has a
+  second signing subkey for the repositories. The job checks each signature with rpm's own
+  `rpmkeys` against the committed public key, and reads from the package which subkey made
+  it, before it attaches anything. It fails without the secret: Fedora 45's `rpm -i` refuses
+  an unsigned package. A `.deb` is not signed; apt trusts the repository's signed list.
+- **The repositories' lists.** A release also gets
+  `watchmymedia-linux-repositories-<version>.tar.gz`: the apt and dnf lists for that
+  release's packages, written by `apt-ftparchive` and `createrepo_c`
+  ([deploy/linux/repository.sh](deploy/linux/repository.sh)) and laid out as
+  downloads.watchmy.media serves them (`apt/dists/stable/…`, `rpm/<arch>/repodata/…`). They
+  are not signed. The maintainers sign `Release` and `repomd.xml` when they publish, with
+  the key's other subkey, which is never in this repository.
+- **Pre-releases.** A `-rc.N` tag gets the four packages and no lists, and they stay on the
+  GitHub release. Their version is `1.2.3~rc.1`, which sorts before `1.2.3`; the files are
+  named `watchmymedia_1.2.3.rc.1_<arch>.deb` and `watchmymedia-1.2.3.rc.1-1.<arch>.rpm`,
+  because GitHub replaces `~` in a file's name.
+
+`deploy/linux/release.sh` runs on Linux only (it needs `rpmkeys`, `apt-ftparchive` and
+`createrepo_c`); its test, [deploy/linux/release_test.py](deploy/linux/release_test.py),
+drives it from stand-in archives with a throwaway key, and CI runs it.
 
 ## TV and phone apps
 
