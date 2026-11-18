@@ -51,7 +51,9 @@ class WorkflowIsolationTest(unittest.TestCase):
                                workflow.split('jobs:\n', 1)[1]))
         hosted = dict.fromkeys(('changes', 'web', 'contract', 'docker', 'scripts', 'android', 'server', 'server-race'), 'ubuntu-latest')
         # macOS runners are the scarce ones: only what needs a Mac runs there.
-        hosted.update(dict.fromkeys(('server-macos', 'apple', 'apple-tv'), 'macos-26'))
+        hosted['server-macos'] = 'macos-26'
+        # The Apple apps build on the image with the Xcode the App Store takes.
+        hosted.update(dict.fromkeys(('apple', 'apple-tv'), 'xcode-27'))
         hosted.update(dict.fromkeys(('windows-server', 'windows-live-tv', 'windows-app', 'windows-signing'), 'windows-latest'))
         self.assertEqual(set(hosted), set(jobs))
         studio = ['self-hosted', 'macOS', 'ARM64', 'mac-studio']
@@ -285,12 +287,40 @@ class WorkflowIsolationTest(unittest.TestCase):
         self.assertRegex(jobs['check'], r'(?m)^    runs-on: ubuntu-latest$')
         for name, job in jobs.items():
             with self.subTest(job=name):
-                self.assertRegex(job, r'(?m)^    runs-on: (macos-26|ubuntu-latest|windows-latest)$')
+                self.assertRegex(job, r'(?m)^    runs-on: (macos-26|xcode-27|ubuntu-latest|windows-latest)$')
                 # Every job that reads a secret runs in an environment that admits only v* tags.
                 if 'secrets.' in job.replace('secrets.GITHUB_TOKEN', ''):
                     self.assertRegex(job, r'(?m)^    environment: (release|windows-signing)$')
                 if 'packages: write' in job:
                     self.assertEqual('image', name)
+
+    def test_the_app_store_upload_uses_the_xcode_ci_tests_with(self):
+        # App Store Connect warns about iPhone builds made with the iOS 26 SDK
+        # (ITMS-90725, v1.6.1's 1.9.2) and from April 2027 refuses them. The
+        # release's ios job and CI's Apple jobs pick their Xcode with one
+        # script, before anything builds, on the image for its major version.
+        script = (ROOT / 'apple/scripts/select-xcode.sh').read_text()
+        version = re.search(r'(?m)^version=(\d+)\.\d+$', script)
+        self.assertIsNotNone(version)
+        major = int(version.group(1))
+        self.assertGreaterEqual(major, 27)
+
+        def jobs_of(path):
+            workflow = (ROOT / path).read_text()
+            return dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
+                                   workflow.split('jobs:\n', 1)[1]))
+
+        release, ci = jobs_of('.github/workflows/release.yml'), jobs_of('.github/workflows/ci.yml')
+        hosted_only = "        if: runner.environment == 'github-hosted'\n"
+        for name, job, condition in (('release ios', release['ios'], ''),
+                                     ('ci apple', ci['apple'], hosted_only),
+                                     ('ci apple-tv', ci['apple-tv'], hosted_only)):
+            with self.subTest(job=name):
+                self.assertRegex(job, rf"(?m)^    runs-on: .*\bxcode-{major}\b")
+                step = ('      - name: Use the release Xcode\n' + condition
+                        + '        run: apple/scripts/select-xcode.sh\n')
+                self.assertIn(step, job)
+                self.assertLess(job.index(step), job.index('apple/scripts/install-xcodegen.sh'))
 
     def test_go_caches_are_saved_only_by_main_on_hosted_runners(self):
         # Pull requests read main's Go caches and never write one, so no pull

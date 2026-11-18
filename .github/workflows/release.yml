@@ -252,15 +252,20 @@ jobs:
   # tag (apple/scripts/version.sh). Signing is automatic through an App Store
   # Connect API key (README, "Releasing the iPhone app"); without the
   # APP_STORE_CONNECT_* secrets the job only builds for the simulator and
-  # says so.
+  # says so. It builds with the Xcode CI's apple jobs test with
+  # (apple/scripts/select-xcode.sh), on the xcode-27 image: App Store Connect
+  # takes iPhone and iPad builds only from the iOS 27 SDK from April 2027, and
+  # macos-26 stops at Xcode 26.6 (v1.6.1's 1.9.2 drew ITMS-90725 for it).
   ios:
     needs: check
-    runs-on: macos-26
+    runs-on: xcode-27
     environment: release
     env:
       HAS_ASC: ${{ secrets.APP_STORE_CONNECT_KEY_P8 != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Use the release Xcode
+        run: apple/scripts/select-xcode.sh
       - name: Install XcodeGen
         run: apple/scripts/install-xcodegen.sh
       - name: Write the App Store Connect key

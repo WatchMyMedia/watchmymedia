@@ -663,15 +663,20 @@ jobs:
   # with the TV app, or api/ changed: the Swift API client against
   # api/openapi.json, then the app built and every test run on an iOS
   # simulator, the Kit's included (they run on tvOS in the apple-tv job; on
-  # the Mac, make apple-test runs them locally). Xcode is already on the Mac
-  # Studio and hosted Macs; XcodeGen comes from Homebrew, at least the
-  # version project.yml asks for (apple/scripts/install-xcodegen.sh).
+  # the Mac, make apple-test runs them locally). On GitHub's Macs it runs on
+  # the xcode-27 image with the Xcode release.yml uploads with
+  # (apple/scripts/select-xcode.sh); the Mac Studio uses its own. XcodeGen
+  # comes from Homebrew, at least the version project.yml asks for
+  # (apple/scripts/install-xcodegen.sh).
   apple:
     needs: changes
     if: needs.changes.outputs.apple == 'true'
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'xcode-27' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Use the release Xcode
+        if: runner.environment == 'github-hosted'
+        run: apple/scripts/select-xcode.sh
       - name: Install XcodeGen
         run: apple/scripts/install-xcodegen.sh
       # The OpenAPI generator is built from source in release mode (two
@@ -735,12 +740,12 @@ jobs:
   # The Apple TV app (apple/TV, PLAN-IOS.md §11.2), when the TV app, what it
   # shares with the iPhone app, or api/ changed:
   # built, and the Kit's tests and the remote UI tests (apple/TVUITests) run,
-  # on an Apple TV simulator. The tvOS simulator runtime is downloaded the
-  # first time a runner needs it.
+  # on an Apple TV simulator, with the same Xcode as the apple job. The tvOS
+  # simulator runtime is downloaded the first time a runner needs it.
   apple-tv:
     needs: changes
     if: needs.changes.outputs.apple-tv == 'true'
-    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'macos-26' }}
+    runs-on: ${{ github.event.repository.private && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "macOS", "ARM64", "mac-studio"]') || 'xcode-27' }}
     # Two jobs share the remote UI tests, whole classes each
     # (apple/scripts/tv-ui-shard.py): one simulator ran them past 20 minutes
     # (2026-11-14), and two clones in one job saved nothing. Share 1 also runs
@@ -751,6 +756,9 @@ jobs:
         share: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Use the release Xcode
+        if: runner.environment == 'github-hosted'
+        run: apple/scripts/select-xcode.sh
       - name: Install XcodeGen
         run: apple/scripts/install-xcodegen.sh
       - name: Install the tvOS simulator runtime

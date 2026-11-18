@@ -368,6 +368,12 @@ version is four ahead of the tag's (`v1.3.0` is 1.7.0, `v1.4.0` is 1.8.0) on
 iPhone, iPad and Apple TV, while the server, the Mac app and Android say
 the tag's own version.
 
+The job builds with the Xcode `apple/scripts/select-xcode.sh` names (27.2), on
+GitHub's `xcode-27` image, the same Xcode CI's `apple` and `apple-tv` jobs test
+with. From April 2027 App Store Connect takes iPhone and iPad builds only from
+the iOS 27 SDK or later, and GitHub's `macos-26` image stops at Xcode 26.6.
+To move to a newer Xcode, change the version in that script.
+
 Once, by hand, in the Eldwick Software account (team `6R8GZD78G3`):
 
 1. Register the bundle ID `media.watchmy.client` (Certificates, Identifiers &

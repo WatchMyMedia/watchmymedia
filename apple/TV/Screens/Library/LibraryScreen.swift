@@ -36,6 +36,8 @@ private struct LibraryView: View {
     @State private var placedFocus: GridFocus?
     /// A letter's jump, waiting for focus to rest on it.
     @State private var follow: Task<Void, Never>?
+    /// The posters the grid has drawn, which `focusItem` waits for.
+    @State private var drawn = DrawnPosters()
 
     private static let columnCount = 7
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 24, alignment: .top), count: LibraryView.columnCount)
@@ -263,7 +265,11 @@ private struct LibraryView: View {
                                 WatchToggleButton(watched: item.watched) { await model.setWatched(item, $0) }
                             }
                         }
-                        .onAppear { Task { await model.itemAppeared(item) } }
+                        .onAppear {
+                            drawn.ids.insert(item.id)
+                            Task { await model.itemAppeared(item) }
+                        }
+                        .onDisappear { drawn.ids.remove(item.id) }
                     }
                 }
                 .padding(.leading, TVLayout.gutter)
@@ -347,6 +353,14 @@ private struct LibraryView: View {
             placedFocus = nil
             return
         }
+        if case .item = placedFocus {
+            // Asked for a poster from the index, focus went to another one:
+            // tvOS 27.2 did that on CI's slower runner, before the poster was
+            // drawn. Not a swipe left, so `focusItem` goes on asking.
+            if case .letter = old, case .item = new { return }
+            // The remote moved focus: `focusItem` stops asking.
+            placedFocus = nil
+        }
         switch (old, new) {
         case (.item(let id), .letter(let entered)):
             returnID = id
@@ -401,20 +415,25 @@ private struct LibraryView: View {
     }
 
     /// Scrolls the poster into the grid (it may not be drawn yet), then focuses it.
-    /// tvOS 26.5 drops, unanswered, focus asked of a poster the grid hasn't
-    /// drawn yet (Menu from the index once a letter's jump had scrolled the
-    /// poster away, on a loaded simulator), so it scrolls the poster in at
-    /// once and asks again until focus lands there, for up to two seconds,
-    /// unless the remote moves focus first.
+    /// Focus asked of a poster the grid hasn't drawn yet (Menu from the index
+    /// once a letter's jump had scrolled the poster away) is dropped,
+    /// unanswered, on tvOS 26.5, and went to another poster on tvOS 27.2 on
+    /// CI's slower runner. So it scrolls the poster in at once, asks once the
+    /// grid has drawn it (or after a second), and asks again until focus
+    /// lands there, for up to two seconds, unless the remote moves focus first.
     private func focusItem(_ id: Int, _ proxy: ScrollViewProxy) async {
         let anchor = UnitPoint(x: 0.5, y: 0.32)
         withAnimation { proxy.scrollTo(id, anchor: anchor) }
         await Task.yield()
         let from = focus
-        place(.item(id))
         guard from != .item(id) else { return }
-        // Still waiting: not landed (`focusMoved` clears what was placed), nor moved elsewhere.
-        func waiting() -> Bool { !Task.isCancelled && placedFocus == .item(id) && focus == from }
+        for _ in 0..<20 where !drawn.ids.contains(id) {
+            try? await Task.sleep(for: .milliseconds(50))
+            guard !Task.isCancelled, focus == from else { return }
+        }
+        place(.item(id))
+        // Still waiting: neither landed nor moved by the remote (`focusMoved` clears what was placed for both).
+        func waiting() -> Bool { !Task.isCancelled && placedFocus == .item(id) }
         for _ in 0..<20 {
             try? await Task.sleep(for: .milliseconds(100))
             guard waiting() else { return }
@@ -441,4 +460,10 @@ private struct LibraryView: View {
         }
         .padding(.top, 100)
     }
+}
+
+/// The ids of the posters the grid has drawn, kept outside SwiftUI's
+/// observation: a poster scrolling in or out must not redraw the page.
+@MainActor private final class DrawnPosters {
+    var ids: Set<Int> = []
 }

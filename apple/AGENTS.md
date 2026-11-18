@@ -107,8 +107,10 @@ server, and on iPad in both a regular and a compact width.
   The hinge reaches the screens as `\.foldPosture` (`readsFoldPosture()` at
   the root; `.tabletop` or `.book`, the fold through the middle of the
   window). iOS 27.1 APIs (`UIHingeInteraction`, `verticalBarEdge`) sit
-  behind `#if compiler(>=6.4.1)` as well as `#available`, because CI may
-  build with an older Xcode.
+  behind `#if compiler(>=6.4.1)` as well as `#available`, because an older
+  Xcode may build the app. CI and the release did, on Xcode 26.6, until
+  they moved to `scripts/select-xcode.sh`'s Xcode, so 1.9.2 (v1.6.1)
+  shipped without them.
   - Pages go side by side from `PadLayout.sideBySide` (860 pt, so the Duo
     held wide gets two panes and the 11-inch iPad in portrait, 834 pt,
     still stacks); `PadLayout.landscape` (1000 pt) is where a page's
@@ -242,10 +244,14 @@ server, and on iPad in both a regular and a compact width.
   - On tvOS 26.5 focus asked through a `@FocusState` of a view a lazy grid
     hasn't drawn yet is dropped without a word, and no `onChange` follows
     (the library grid's Menu from the letter index, once a letter's jump
-    had scrolled the poster away; on a loaded simulator, and on CI). The
-    grid's `focusItem` (`TV/Screens/Library/LibraryScreen.swift`) scrolls
-    the poster in and asks again until focus lands; ask that way wherever
-    focus goes to something that may be off screen.
+    had scrolled the poster away; on a loaded simulator, and on CI). On
+    tvOS 27.2, on CI's runner, the same request sent focus to another
+    poster, which the index took for a swipe left. The grid's `focusItem`
+    (`TV/Screens/Library/LibraryScreen.swift`) scrolls the poster in, asks
+    once the grid has drawn it (its `onAppear`), and asks again until focus
+    lands, and `focusMoved` lets a move from the index to another poster
+    pass while it asks. Ask that way wherever focus goes to something that
+    may be off screen. On this Mac neither shows: CI's slower runner does.
   - On Apple TV a focused button that becomes disabled keeps focus, dimmed,
     until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
     up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable
@@ -414,8 +420,13 @@ didn't start.
 
 The `ios` job in `release.yml` archives on every `v*` tag and uploads to
 TestFlight once the App Store Connect key secrets are set; until then it
-builds for the simulator. `make apple-archive` and `make apple-upload` sign
-with the accounts on this Mac and upload: run them only when the user asks.
+builds for the simulator. It and CI's `apple` and `apple-tv` jobs build with
+the Xcode `scripts/select-xcode.sh` names, on GitHub's `xcode-27` image: App
+Store Connect flags uploads made with the iOS 26 SDK (ITMS-90725) and from
+April 2027 refuses them. Raise the version there, never in one workflow alone
+(`deploy/ci/security_test.py` checks). `make apple-archive` and
+`make apple-upload` sign with the accounts on this Mac and upload: run them
+only when the user asks.
 When the user archives in Xcode, run `make apple-gen VERSION=vX.Y.Z` first, or
 the archive is the placeholder 1.0 (1) in `project.yml`.
 The Apple TV app can't be archived in Xcode while the team has no Apple TV
