@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -808,6 +809,12 @@ const checkFolders = 1000
 func checkPath(p string) PathCheck {
 	out := PathCheck{Path: filepath.Clean(p), Sample: []string{}}
 	st, err := os.Stat(out.Path)
+	if errors.Is(err, fs.ErrPermission) {
+		// Not allowed to look, as inside a home folder closed to the
+		// server's user: a folder it can't read, not one that isn't there.
+		out.Exists = true
+		return out
+	}
 	if err != nil || !st.IsDir() {
 		return out
 	}
