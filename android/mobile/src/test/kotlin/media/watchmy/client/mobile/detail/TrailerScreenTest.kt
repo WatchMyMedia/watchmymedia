@@ -17,6 +17,8 @@ import media.watchmy.client.model.Trailer
 import media.watchmy.client.model.TrailerText
 import media.watchmy.client.presentation.detail.TrailerPlay
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TRAILER_BRIDGE
+import media.watchmy.client.ui.TrailerEvent
 import media.watchmy.client.ui.WatchMyMediaPhoneTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
