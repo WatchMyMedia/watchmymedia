@@ -1,4 +1,5 @@
 """Keep CI on GitHub's own machines, and concurrent runners isolated."""
+import importlib.util
 import json
 import os
 import pathlib
@@ -45,36 +46,6 @@ class WorkflowIsolationTest(unittest.TestCase):
                 for runner in re.findall(r'(?m)^\s+runs-on: (.+)$', text):
                     if runner != '${{ matrix.runner }}':
                         self.assertNotIn('${{', runner)
-
-    def test_every_job_runs_only_for_what_it_checks(self):
-        # Each job waits on the changes job and runs when its own paths, this
-        # workflow or a manual run say so, so a docs or template change does
-        # not run the server's race tests or build the apps.
-        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
-        jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
-                               workflow.split('jobs:\n', 1)[1]))
-        gated = {'server': 'server', 'server-macos': 'server', 'server-race': 'race', 'contract': 'contract', 'web': 'web',
-                 'docker': 'docker', 'scripts': 'scripts', 'android': 'android', 'apple': 'apple',
-                 'apple-tv': 'apple-tv', 'windows-server': 'windows', 'windows-live-tv': 'windows',
-                 'windows-app': 'windows', 'linux-packages': 'linux-packages',
-                 'linux-packages-install': 'linux-packages'}
-        self.assertEqual(set(gated) | {'changes', 'windows-signing'}, set(jobs))
-        for job, output in gated.items():
-            with self.subTest(job=job):
-                self.assertRegex(jobs[job], r'(?m)^    needs: (changes|\[changes[^\]]*\])$')
-                self.assertIn(f"needs.changes.outputs.{output} == 'true'", jobs[job])
-        outputs = dict(re.findall(r"(?m)^      ([\w-]+): (\$\{\{ github\.event_name == 'workflow_dispatch' \|\|.*)$", jobs['changes']))
-        # apple-api gates a step, not a job: the apple job's API client check.
-        self.assertEqual(set(gated.values()) | {'apple-api'}, set(outputs))
-        self.assertIn("needs.changes.outputs.apple-api == 'true'", jobs['apple'])
-        filters = jobs['changes'].split('filters: |', 1)[1]
-        for output in outputs:
-            with self.subTest(output=output):
-                block = re.search(rf'(?ms)^            {output}:\n((?:              - .*\n)+)', filters).group(1)
-                if output != 'scripts':
-                    self.assertIn("'.github/workflows/ci.yml'", block)
-        # windows-app installs the web job's build, so web runs with it.
-        self.assertIn("steps.filter.outputs.windows == 'true'", outputs['web'])
 
     def test_linux_packages_install_on_every_supported_release_and_architecture(self):
         # Supported means named and tested: each release the packages claim,
@@ -128,21 +99,23 @@ class WorkflowIsolationTest(unittest.TestCase):
         # entry here (the root Makefile, all of server/ or web/) starts them
         # for changes they do not test; the server, web and docker jobs
         # cover what the packages hold of those.
-        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
-        filters = workflow.split('filters: |', 1)[1]
-        block = re.search(r'(?m)^            linux-packages:\n((?:              - .*\n)+)', filters).group(1)
-        self.assertEqual(['deploy/linux/**', 'deploy/macos/fetch-ffmpeg.sh', 'deploy/macos/FFMPEG-LICENSE.md',
-                          'deploy/config.example.yaml', 'LICENSE', 'server/cmd/server/**',
-                          'server/internal/config/**', '.github/workflows/ci.yml'],
-                         re.findall(r"- '([^']+)'", block))
+        # deploy/ci/changes.py holds the list; changes_test.py holds each
+        # job to its area, and a change to either job in ci.yml runs both.
+        spec = importlib.util.spec_from_file_location('changes', ROOT / 'deploy/ci/changes.py')
+        changes = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(changes)
+        self.assertEqual(['deploy/linux/', 'deploy/macos/fetch-ffmpeg.sh', 'deploy/macos/FFMPEG-LICENSE.md',
+                          'deploy/config.example.yaml', 'LICENSE', 'server/cmd/server/', 'server/internal/config/'],
+                         changes.AREAS['linux-packages'])
         # Both jobs are started by that one list and nothing else.
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
         for name in ('linux-packages', 'linux-packages-install'):
             self.assertEqual(["needs.changes.outputs.linux-packages == 'true'"],
                              re.findall(r"needs\.changes\.outputs\.[\w-]+ == 'true'", jobs[name]), name)
-        self.assertIn("      linux-packages: ${{ github.event_name == 'workflow_dispatch' || "
-                      "steps.filter.outputs.linux-packages == 'true' }}\n", jobs['changes'])
+        self.assertEqual({}, {area: others for area, others in changes.ALSO.items()
+                              if area == 'linux-packages' or 'linux-packages' in others})
         # What the list leaves out is still what the packages are built with:
         # the Linux make targets are under deploy/linux, not in the root Makefile.
         makefile = (ROOT / 'Makefile').read_text()

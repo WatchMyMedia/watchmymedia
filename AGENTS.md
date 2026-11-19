@@ -177,14 +177,44 @@ Run the checks for the surfaces you touched before handing work back. CI
 and only those: the repository is public, so anyone's pull request runs
 here, and no workflow may name a self-hosted runner or pick one at run time
 (`deploy/ci/security_test.py` checks).
-Each job runs only when what it builds or tests changed: the `changes` job's
-path filters in `ci.yml` decide (the server jobs for `server/`, the apps for
-their folder and `api/`, `scripts` for `deploy/`, the workflows and the docs,
-the Linux package jobs for `deploy/linux/` and the server's start-up and
-configuration),
-and a change to `ci.yml` or a manual run runs everything. When a new job or
-input is added, give it a filter; `deploy/ci/security_test.py` checks every
-job has one. The `server` job runs every Go test, the lint and the
+Each job runs only when what it builds or tests changed.
+`deploy/ci/changes.py` holds the rules, and the `changes` job runs it: the
+server jobs for `server/`, the web's for `web/`, Android's for `android/` and
+`api/`, each Apple app's for its own folders and the Kit, the Linux package
+jobs for `deploy/linux/` and the server's start-up and configuration. Four
+rules keep long jobs from running for nothing (45% of the job time in the
+60 runs of 17 to 19 November 2026 went to them):
+
+- A change to a job in `ci.yml` runs that job, not the others, and a comment
+  runs none. Only a change to what every job shares (the triggers, the
+  permissions, the concurrency group) or a manual run runs everything.
+- `AGENTS.md`, `CLAUDE.md` and `README.md` start no build, wherever they are.
+- The Apple apps compile the Swift client committed in the Kit, not `api/`:
+  an API change runs the check that the client is current (a step of the
+  `apple` job), and the apps build only when the client or their own code
+  changed. The scripts only a release or a person runs (`version.sh`,
+  `generate.sh`, `live-tv-fixture.py`) don't start them either.
+- On `main`, a pull request's merge does not build the Apple apps again:
+  the pull request's run just did, and the repeat was a fifth of all job
+  time. They build there only when their Swift package pins
+  (`apple/project.yml`, the Kit's `Package.swift` and `Package.resolved`)
+  or their own job changed, which is when `main` has a cache to save. So
+  a merge that breaks an Apple app only when combined with another shows
+  on the next Apple pull request, not on `main`: when two open pull
+  requests touch the same Apple code, update the second from `main` before
+  merging it. The script knows a pull request's merge by GitHub's merge
+  commit; a squash merge, a commit pushed straight to `main` and a merge
+  made by hand all build the apps, since no run has.
+
+The `scripts` job is the exception: it takes seconds, its tests read files
+across the repository, and it runs for every change. When a new job or input
+is added, name what it is built from in `changes.py`;
+`deploy/ci/changes_test.py` checks that every job waits for an area, that
+every name there is a file or folder that exists, and that every script
+under `apple/scripts/` either starts a job or is listed as one CI doesn't
+run. `python3 -I deploy/ci/changes.py` prints what a pull request from the
+current branch would run, and why; each run's summary page shows the same.
+The `server` job runs every Go test, the lint and the
 generated-code check on Linux; `server-macos` tests only the packages with
 macOS code of their own (`deploy/ci/security_test.py` checks that every
 package with a `_darwin.go` file is among them), since GitHub's macOS runners
