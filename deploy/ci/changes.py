@@ -13,6 +13,9 @@ its answer (`needs.changes.outputs.<area>`). A job runs when:
   - a job that needs its output runs (ALSO);
   - the run was started by hand, or there is no commit to compare with.
 
+On main, a pull request's merge does not build the Apple apps again (ONCE):
+the pull request's own run just did. Any other push there builds them.
+
 The scripts job is not here: it takes seconds, its tests read files across
 the repository, and it runs for every change.
 
@@ -89,6 +92,16 @@ GUIDANCE = ('AGENTS.md', 'CLAUDE.md', 'README.md')
 # job's build.
 ALSO = {'windows': ['web']}
 
+# What a pull request's merge does not build again on main: the pull
+# request's run just built it, on GitHub's scarce Macs, and the push after it
+# repeated that (673 of 3,012 job-minutes in the runs of 17 to 19 November
+# 2026, and two of that week's three failures were tests that fail now and
+# then). They still run there for what only main does, which is save their
+# caches: when the Swift package pins those are keyed on changed (PINS), and
+# when the job itself did, whose saving steps no pull request runs.
+ONCE = ('apple', 'apple-tv')
+PINS = ('apple/project.yml', 'apple/Kit/Package.swift', 'apple/Kit/Package.resolved')
+
 JOB = re.compile(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:\n|\Z)')
 GATE = re.compile(r"needs\.changes\.outputs\.([\w-]+) == 'true'")
 
@@ -128,9 +141,12 @@ def edited_areas(before, after):
     return areas & set(AREAS)
 
 
-def plan(files, workflow_before, workflow_after):
-    """For each area, why it runs: empty when it doesn't."""
+def plan(files, workflow_before, workflow_after, merged=False):
+    """For each area, why it runs: empty when it doesn't. merged: the change is a pull request's merge on main."""
     why = changed_areas(files)
+    if merged:
+        for area in ONCE:
+            why[area] = [path for path in why[area] if path in PINS]
     if WORKFLOW in files:
         if workflow_before is None:
             return everything('there is no earlier ci.yml to compare with')
@@ -169,11 +185,18 @@ def base_of(event, before):
     return None
 
 
-def plan_from(base):
+def merges_a_pull_request(before):
+    """Whether a push is one pull request's merge onto the commit before it, as GitHub makes it."""
+    parents = git('rev-list', '--parents', '-n', '1', 'HEAD').split()[1:]
+    return (len(parents) == 2 and parents[0] == before
+            and git('log', '-1', '--format=%s').startswith('Merge pull request #'))
+
+
+def plan_from(base, merged=False):
     files = [path for path in git('diff', '--name-only', '--no-renames', '-z', base, 'HEAD').split('\0') if path]
     shown = subprocess.run(['git', 'show', f'{base}:{WORKFLOW}'], capture_output=True, text=True)
     with open(WORKFLOW) as workflow:
-        return plan(files, shown.stdout if shown.returncode == 0 else None, workflow.read())
+        return plan(files, shown.stdout if shown.returncode == 0 else None, workflow.read(), merged)
 
 
 def reason(started):
@@ -182,25 +205,34 @@ def reason(started):
 
 def main(argv):
     event = os.environ.get('EVENT', '')
+    built = set()
     if event == 'workflow_dispatch':
         why = everything('a manual run')
     elif event:
-        base = base_of(event, os.environ.get('BEFORE', ''))
+        before = os.environ.get('BEFORE', '')
+        base = base_of(event, before)
         why = plan_from(base) if base else everything('there is no earlier commit to compare with')
+        if base and event == 'push' and merges_a_pull_request(before):
+            merged = plan_from(base, merged=True)
+            built = {area for area in why if why[area] and not merged[area]}
+            why = merged
     else:
         why = plan_from(git('merge-base', argv[1] if len(argv) > 1 else 'origin/main', 'HEAD').strip())
-    width = max(map(len, why))
-    for area, started in why.items():
-        print(f'{area:<{width}}  ' + (f'runs: {reason(started)}' if started else 'skipped'))
+    answers = {area: f'runs: {reason(started)}' if started else
+               "skipped: the pull request's run built it" if area in built else 'skipped'
+               for area, started in why.items()}
+    width = max(map(len, answers))
+    for area, answer in answers.items():
+        print(f'{area:<{width}}  {answer}')
     if os.environ.get('GITHUB_OUTPUT'):
         with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
             for area, started in why.items():
                 output.write(f"{area}={'true' if started else 'false'}\n")
     if os.environ.get('GITHUB_STEP_SUMMARY'):
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
-            summary.write('| Area | Runs for |\n|---|---|\n')
-            for area, started in why.items():
-                summary.write(f"| `{area}` | {reason(started) if started else 'skipped'} |\n")
+            summary.write('| Area | This run |\n|---|---|\n')
+            for area, answer in answers.items():
+                summary.write(f'| `{area}` | {answer} |\n')
 
 
 if __name__ == '__main__':

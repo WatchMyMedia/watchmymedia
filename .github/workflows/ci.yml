@@ -30,7 +30,8 @@ jobs:
   # each part is made from, and prints why each one runs. A change to a job
   # here runs that job, not the others; a change to what they all share (the
   # triggers, the permissions, the concurrency group) and a manual run run
-  # everything.
+  # everything. On main, a pull request's merge does not build the Apple apps
+  # again: the pull request's own run just did.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -719,7 +720,9 @@ jobs:
   # the Mac, make apple-test runs them locally). An API change that leaves
   # the client as it was builds nothing: the apps compile the client, not
   # api/. One job, not two, so both parts share one of GitHub's Macs, the
-  # scarce runners. On GitHub's Macs it runs on
+  # scarce runners. On main, a pull request's merge builds the app again
+  # only when its Swift package pins or this job changed, which is when
+  # there is a cache for main to save. On GitHub's Macs it runs on
   # the xcode-27 image with the Xcode release.yml uploads with
   # (apple/scripts/select-xcode.sh). XcodeGen
   # comes from Homebrew, at least the version project.yml asks for
@@ -797,7 +800,8 @@ jobs:
           path: apple/build/Tests.xcresult
 
   # The Apple TV app (apple/TV, PLAN-IOS.md §11.2), when the TV app or what it
-  # shares with the iPhone app changed:
+  # shares with the iPhone app changed, and on main after a pull request only
+  # for new package pins or a change to this job, as the apple job:
   # built, and the Kit's tests and the remote UI tests (apple/TVUITests) run,
   # on an Apple TV simulator, with the same Xcode as the apple job. The tvOS
   # simulator runtime is downloaded the first time a runner needs it.

@@ -89,6 +89,37 @@ class RulesTest(unittest.TestCase):
         # Named once, by what changed, when it runs for its own files too.
         self.assertEqual(['web/src/App.tsx'], changes.plan(['windows/tray/main.go', 'web/src/App.tsx'], None, '')['web'])
 
+    def test_a_pull_requests_merge_does_not_build_the_apple_apps_again(self):
+        server = {'server', 'race', 'contract', 'docker', 'windows', 'web'}
+        for files, expected in (
+                (['apple/App/Screens/Home.swift', 'apple/UITests/HomeTests.swift'], set()),
+                (['apple/Kit/Sources/WMMUI/Artwork.swift', 'apple/TV/Screens/Home.swift'], set()),
+                (['apple/scripts/simulator.sh'], set()),
+                # What their package caches are keyed on: main builds, and
+                # saves the caches pull requests read.
+                (['apple/Kit/Package.resolved', 'apple/Kit/Sources/WMMUI/Artwork.swift'], {'apple', 'apple-tv'}),
+                (['apple/project.yml'], {'apple', 'apple-tv'}),
+                # The client check is not the apps, and every other job runs
+                # as it does for any push: main saves their caches too.
+                (['api/openapi.json', 'apple/Kit/Sources/WMMAPI/Generated/Types.swift'], {'contract', 'android', 'apple-api'}),
+                (['server/internal/api/activity.go', 'android/tv/Home.kt', 'apple/App/Home.swift'], server | {'android'})):
+            with self.subTest(files=files):
+                self.assertEqual(expected, running(changes.plan(files, None, '', merged=True)))
+                self.assertLessEqual(expected, running(changes.plan(files, None, '')))
+        # Named by the pin alone, not by the code that came with it.
+        why = changes.plan(['apple/App/Home.swift', 'apple/Kit/Package.resolved'], None, '', merged=True)
+        self.assertEqual(['apple/Kit/Package.resolved'], why['apple'])
+        # The pins are what the jobs' package caches are keyed on, and each
+        # is a file both jobs are built from.
+        ci = jobs()
+        self.assertEqual(('apple', 'apple-tv'), changes.ONCE)
+        for job in changes.ONCE:
+            keys = re.findall(r"key: swift-packages-\$\{\{ runner\.os \}\}-\$\{\{ hashFiles\(([^)]*)\) \}\}-\$\{\{ github\.job \}\}",
+                              ci[job])
+            self.assertEqual([list(changes.PINS)], [re.findall(r"'([^']+)'", key) for key in keys], job)
+            for pin in changes.PINS:
+                self.assertTrue(any(changes.matches(pin, name) for name in changes.AREAS[job]), pin)
+
     def test_a_name_is_a_folder_or_a_file_that_is_there(self):
         self.assertTrue(changes.matches('server/internal/api/activity.go', 'server/'))
         self.assertFalse(changes.matches('server-notes/x.go', 'server/'))
@@ -186,7 +217,12 @@ class WorkflowEditsTest(unittest.TestCase):
                 self.assertEqual(set(GATES.get(name, [])), changes.edited_areas(text, after))
                 self.assertEqual(set(GATES.get(name, [])) | ({'web'} if name.startswith('windows-') and name in GATES else set()),
                                  running(changes.plan([changes.WORKFLOW], text, after)))
+                # On main too: a job's cache-saving steps run nowhere else.
+                self.assertEqual(running(changes.plan([changes.WORKFLOW, 'apple/App/Home.swift'], text, after)) - {'apple'}
+                                 | set(GATES.get(name, [])),
+                                 running(changes.plan([changes.WORKFLOW, 'apple/App/Home.swift'], text, after, merged=True)))
         self.assertEqual(set(changes.AREAS), running(changes.plan([changes.WORKFLOW], None, text)))
+        self.assertEqual(set(changes.AREAS), running(changes.plan([changes.WORKFLOW], None, text, merged=True)))
 
     def test_every_job_waits_for_its_area(self):
         ci = jobs()
@@ -270,15 +306,15 @@ class RunTest(unittest.TestCase):
         self.assertLessEqual(set(answers.values()), {'true', 'false'})
         return {area for area, answer in answers.items() if answer == 'true'}, result.stdout
 
-    def pull_request(self, files):
-        """A branch with a change, merged into main as GitHub's merge ref is; main moves on first."""
+    def pull_request(self, files, message='Merge pull request #7 from WatchMyMedia/topic'):
+        """A branch with a change, merged into main as GitHub merges one; main moves on first."""
         self.git('checkout', '--quiet', '-b', 'topic')
         self.write(files)
         self.commit('Change')
         self.git('checkout', '--quiet', 'main')
         self.write({'web/src/App.tsx': '\n'})
         self.commit('Something else lands on main')
-        self.git('merge', '--quiet', '--no-ff', '--message', 'Merge', 'topic')
+        self.git('merge', '--quiet', '--no-ff', '--message', message, 'topic')
         return self.git('rev-parse', 'HEAD')
 
     def test_a_pull_request_runs_for_its_own_changes_not_mains(self):
@@ -310,6 +346,42 @@ class RunTest(unittest.TestCase):
                                               capture_output=True).returncode)
         ran, _ = self.run_script(clone, EVENT='push', BEFORE=self.first)
         self.assertEqual({'server', 'race', 'contract', 'docker', 'windows', 'web', 'linux-packages'}, ran)
+
+    def test_a_merge_on_main_leaves_the_apple_apps_to_its_pull_request(self):
+        merge = self.pull_request({'apple/App/Home.swift': '\n', 'apple/TV/Home.swift': '\n', 'android/app.kt': 'class App\n'})
+        clone = self.checkout(merge)
+        before = self.git('rev-parse', merge + '^1')
+        # The pull request's run builds them, whatever its commit looks like.
+        self.assertEqual({'apple', 'apple-tv', 'android'}, self.run_script(clone, EVENT='pull_request')[0])
+        self.assertEqual({'apple', 'apple-tv', 'android'}, self.run_script(clone, EVENT='pull_request', BEFORE=before)[0])
+        # The push that merges it builds the rest again, whose caches main saves.
+        ran, printed = self.run_script(clone, EVENT='push', BEFORE=before)
+        self.assertEqual({'android'}, ran)
+        self.assertRegex(printed, r"(?m)^apple +skipped: the pull request's run built it$")
+        self.assertRegex(printed, r"(?m)^apple-tv +skipped: the pull request's run built it$")
+        self.assertRegex(printed, r'(?m)^server +skipped$')
+
+    def test_a_merge_on_main_builds_the_apple_apps_for_new_package_pins(self):
+        merge = self.pull_request({'apple/App/Home.swift': '\n', 'apple/Kit/Package.resolved': '{}\n'})
+        ran, printed = self.run_script(self.checkout(merge), EVENT='push', BEFORE=self.git('rev-parse', merge + '^1'))
+        self.assertEqual({'apple', 'apple-tv'}, ran)
+        self.assertRegex(printed, r'(?m)^apple +runs: apple/Kit/Package\.resolved$')
+
+    def test_a_push_no_pull_request_ran_builds_the_apple_apps(self):
+        # Straight to main: nothing has built it.
+        self.write({'apple/App/Home.swift': '\n'})
+        direct = self.commit('Change')
+        self.assertEqual({'apple'}, self.run_script(self.checkout(direct), EVENT='push', BEFORE=self.first)[0])
+        # A merge made by hand, not by GitHub for a pull request.
+        self.git('reset', '--quiet', '--hard', self.first)
+        by_hand = self.pull_request({'apple/App/Home.swift': '\n'}, message="Merge branch 'topic'")
+        self.assertEqual({'apple'}, self.run_script(self.checkout(by_hand), EVENT='push',
+                                                    BEFORE=self.git('rev-parse', by_hand + '^1'))[0])
+        # A pull request's merge pushed with a commit before it that no run saw.
+        self.git('checkout', '--quiet', '-B', 'main', self.first)
+        self.git('branch', '--quiet', '-D', 'topic')
+        merge = self.pull_request({'apple/App/Home.swift': '\n'})
+        self.assertEqual({'apple', 'web', 'docker'}, self.run_script(self.checkout(merge), EVENT='push', BEFORE=self.first)[0])
 
     def test_everything_runs_by_hand_and_without_a_commit_to_compare_with(self):
         clone = self.checkout(self.first)

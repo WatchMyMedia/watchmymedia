@@ -181,9 +181,9 @@ Each job runs only when what it builds or tests changed.
 `deploy/ci/changes.py` holds the rules, and the `changes` job runs it: the
 server jobs for `server/`, the web's for `web/`, Android's for `android/` and
 `api/`, each Apple app's for its own folders and the Kit, the Linux package
-jobs for `deploy/linux/` and the server's start-up and configuration. Three
-rules keep long jobs from running for nothing (a third of the job time in
-the 60 runs of 17 to 19 November 2026 went to them):
+jobs for `deploy/linux/` and the server's start-up and configuration. Four
+rules keep long jobs from running for nothing (45% of the job time in the
+60 runs of 17 to 19 November 2026 went to them):
 
 - A change to a job in `ci.yml` runs that job, not the others, and a comment
   runs none. Only a change to what every job shares (the triggers, the
@@ -194,6 +194,17 @@ the 60 runs of 17 to 19 November 2026 went to them):
   `apple` job), and the apps build only when the client or their own code
   changed. The scripts only a release or a person runs (`version.sh`,
   `generate.sh`, `live-tv-fixture.py`) don't start them either.
+- On `main`, a pull request's merge does not build the Apple apps again:
+  the pull request's run just did, and the repeat was a fifth of all job
+  time. They build there only when their Swift package pins
+  (`apple/project.yml`, the Kit's `Package.swift` and `Package.resolved`)
+  or their own job changed, which is when `main` has a cache to save. So
+  a merge that breaks an Apple app only when combined with another shows
+  on the next Apple pull request, not on `main`: when two open pull
+  requests touch the same Apple code, update the second from `main` before
+  merging it. The script knows a pull request's merge by GitHub's merge
+  commit; a squash merge, a commit pushed straight to `main` and a merge
+  made by hand all build the apps, since no run has.
 
 The `scripts` job is the exception: it takes seconds, its tests read files
 across the repository, and it runs for every change. When a new job or input
