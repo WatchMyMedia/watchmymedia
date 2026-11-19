@@ -163,6 +163,15 @@ server, and on iPad in both a regular and a compact width.
   doesn't. A view's `.onChange(of: scenePhase)` under the tab view was not
   seen to report `.background` before the app was ended, so state that must
   survive eviction is saved when it changes (`PlaceKeeping`).
+  SwiftUI draws a `RadialGradient` on the main thread, a pixel at a time,
+  across the whole of its view (`PaintShapeLayer.draw`, then
+  `CGContextDrawRadialGradient`, in a `sample` of the app). The two under
+  each of Apple TV Home's backdrops (1400 × 660 pt) were 200 ms of its first
+  page turn on a tvOS 27.2 simulator. Draw a soft one small and scale it up
+  (`BackdropGlow` in `TV/Screens/Home/HomeScreen.swift`), or only in the box
+  its light reaches (`ArtworkPlaceholder`). The show and movie pages'
+  `DetailBackdrop`, the request dialog and the sign-in screens still draw
+  theirs at full size.
 - **Home's screens** (PLAN-HOME.md §7; `HomeScreen.swift` on both apps): a
   vertical `ScrollView` with `.scrollTargetBehavior(.paging)`, each screen
   `.containerRelativeFrame(.vertical)`. A horizontal card row inside a screen
@@ -174,8 +183,15 @@ server, and on iPad in both a regular and a compact width.
   on the card nearest the way it came, whatever `defaultFocus` says, so
   `ShelfRow` and the Live TV rows move it to the remembered or first card when
   focus enters (`old == nil` in `onChange(of: focused)`); a container's
-  `.focused($page, equals: n)` reports which screen holds focus and, set,
-  moves focus into that screen (Back to the top, Menu). The Siri Remote in the
+  `.focused($held)` says when focus is inside it and, set, moves focus into
+  it (Back to the top, Menu), and each screen has such a state of its own
+  (`ScreenFocus`). The screen on view and the screen asked to take focus are
+  in `HomePaging`, an `@Observable` that `HomeView`'s body does not read.
+  That body builds every screen, and its first run after Home loads updates
+  them all at once (135 ms on a tvOS 27.2 simulator, where any other move
+  takes 30), so keep out of it any state a focus move or a page turn
+  changes: one `@FocusState` there for all the screens made the first Down
+  from the tab bar that slow. The Siri Remote in the
   simulator tool has no Menu key: `TVUITests/HomeScreensTests.swift` checks
   Menu with `XCUIRemote`. On Apple TV each screen is identified by what it
   shows (`HomePage`), not its place, and a row's screen (`HomeRowScreen`)
@@ -405,6 +421,20 @@ didn't start.
   simulator, so read something shown briefly in the look that finds it
   (`wait(until:)` reads one snapshot) and keep it up long enough for a whole
   look (`-liveBannerSeconds 15` for the reminder banner).
+- XCUITest's Siri Remote sends a press and its release 4 ms apart, and the
+  focus engine repeats an arrow still held after half a second (again at
+  0.7 s and 0.86 s, then every 0.1 s). The release waits its turn on the
+  main thread, so a press that starts more than half a second of work there
+  can move focus twice: on CI's runner one Down from the tab bar went on
+  from Play to the first row (`SeeAllTests`, twice on 2026-11-18, the press
+  taking 0.65 s where others take 0.22). Nothing in the test was early, and
+  a person's press would do the same, so find the work in the app; don't
+  press again or wait longer. To find it, log each `UIPress` from a swizzled
+  `UIApplication.sendEvent` with `press.timestamp` beside the time it is
+  handled (the gap between a press and its release being handled is the
+  main thread's time; 15 to 60 ms for a move on Home), log
+  `UIFocusSystem.didUpdateNotification`, and run `sample <pid> 2 1` on the
+  app across the press: the simulator's app is a process on this Mac.
 - XCUITest's Siri Remote has no touch-surface swipe, and Right while paused
   skips 10 s, so AVKit's own scrubbing (and the thumbnails it draws from an
   I-frame playlist) can't be driven from a test; check it by hand.

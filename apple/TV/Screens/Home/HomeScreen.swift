@@ -28,11 +28,9 @@ private struct HomeView: View {
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
 
-    /// The screen on view: the hero's, one per row after the first, then the end screen.
-    @State private var page: HomePage?
-    /// The screen that holds focus; a container's focus state, so Back to the
-    /// top and Menu can move focus to the first screen.
-    @FocusState private var focusedPage: HomePage?
+    /// The screen on view and the screen asked to take focus. `body` reads
+    /// neither, so a focus move or a page turn doesn't draw every screen again.
+    @State private var paging = HomePaging()
     @State private var editingRows = false
     /// The row screen a See all left for its library's tab, and the count of
     /// Menu's returns to Home then (``Navigator/exitsToHome``): Menu back from
@@ -77,22 +75,9 @@ private struct HomeView: View {
     /// The paging screens: the hero and the first row, a screen per further row, the end screen.
     private func screens(_ home: HomeData) -> some View {
         let rows = home.drawnRows(liveTV: liveAvailable)
-        let atTop = (page ?? .start) == .start
-        return ScrollView(.vertical) {
+        return HomePager(paging: paging) {
             screenStack(home, rows: rows)
         }
-        .scrollTargetBehavior(.paging)
-        .scrollPosition(id: $page)
-        .scrollIndicators(.hidden)
-        .scrollClipDisabled()
-        .ignoresSafeArea()
-        // Focus moving into another screen pages to it.
-        .onChange(of: focusedPage) { _, focused in
-            guard let focused, focused != page ?? .start else { return }
-            withAnimation(.easeInOut(duration: 0.3)) { page = focused }
-        }
-        // Menu on a row screen goes back to the first screen; from there it is the system's.
-        .onExitCommand(perform: atTop ? nil : { backToTop() })
     }
 
     /// The screens, each identified by what it shows (``HomePage``), not its
@@ -117,11 +102,6 @@ private struct HomeView: View {
         .scrollTargetLayout()
     }
 
-    private func backToTop() {
-        withAnimation(.easeInOut(duration: 0.3)) { page = .start }
-        focusedPage = .start
-    }
-
     /// Home shows again: after Menu from the grid a row's See all opened, its
     /// screen comes back with focus in the row, which lands on See all (the
     /// card it had). Choosing Home in the tab bar leaves focus there, as the
@@ -132,8 +112,8 @@ private struct HomeView: View {
         guard navigator.exitsToHome > left.exits else { return }
         Task { @MainActor in
             await Task.yield()
-            page = left.page
-            focusedPage = left.page
+            paging.page = left.page
+            paging.focus(left.page)
         }
     }
 
@@ -167,7 +147,7 @@ private struct HomeView: View {
             .overlay(alignment: .top) { TabBarAccessories() }
         }
         .screen()
-        .focused($focusedPage, equals: .start)
+        .modifier(ScreenFocus(page: .start, paging: paging))
     }
 
     /// A row's screen (TvHomeRow.dc.html), a view of its own: moving along
@@ -177,9 +157,10 @@ private struct HomeView: View {
             row: row, index: index,
             counter: rowCounter(index: index, of: rows.count),
             nextName: rows.indices.contains(index + 1) ? rows[index + 1].screenName : HomeEndScreen.name,
-            model: model, page: page, focusedPage: $focusedPage,
+            model: model,
             leaving: { seeAllLeft = (page, navigator.exitsToHome) }
         )
+        .modifier(ScreenFocus(page: page, paging: paging))
         .id(page)
     }
 
@@ -200,7 +181,7 @@ private struct HomeView: View {
                 if model.canEditRows {
                     TVEditRowsButton { editingRows = true }
                 }
-                Button(HomeEndScreen.backToTop, action: backToTop)
+                Button(HomeEndScreen.backToTop) { paging.backToTop() }
                     .buttonStyle(TVButtonStyle(height: 60, fontSize: 21))
                     .accessibilityIdentifier("homeBackToTop")
             }
@@ -217,7 +198,7 @@ private struct HomeView: View {
         .padding(.top, 330)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .screen()
-        .focused($focusedPage, equals: .end)
+        .modifier(ScreenFocus(page: .end, paging: paging))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("homeEnd")
     }
@@ -296,7 +277,7 @@ private struct HomeView: View {
     private func heroBackdrop(_ hero: Hero) -> some View {
         Artwork(url: url(hero.backdropPath, .w1280), seed: hero.title, maxPixel: 1920)
             .frame(width: 1400, height: 640)
-            .overlay(RadialGradient(colors: [Palette.gold.opacity(0.10), .clear], center: UnitPoint(x: 0.7, y: 0.3), startRadius: 0, endRadius: 700))
+            .overlay(BackdropGlow(width: 1400, height: 640))
             .overlay(LinearGradient(stops: [.init(color: Palette.ground, location: 0), .init(color: Palette.ground.opacity(0.85), location: 0.22), .init(color: Palette.ground.opacity(0), location: 0.6)], startPoint: .leading, endPoint: .trailing))
             .overlay(LinearGradient(stops: [.init(color: Palette.ground.opacity(0), location: 0.55), .init(color: Palette.ground, location: 1)], startPoint: .top, endPoint: .bottom))
             .clipped()
@@ -310,6 +291,95 @@ private enum HomePage: Hashable {
     case start
     case row(String)
     case end
+}
+
+/// Which of Home's screens is on view and which is asked to take focus.
+/// It is kept apart from `HomeView`, whose body builds every screen: only
+/// the pager reads the page and only the screens read the request, so a
+/// focus move or a page turn draws those again and not all of Home.
+///
+/// While `HomeView` held both, its body ran again when focus first came in
+/// from the tab bar, and the first such run after Home loads updates every
+/// screen at once: that Down kept the main thread 225 ms, any later move
+/// 30 (tvOS 27.2 simulator, 2026-11-18; 135 of it this, the rest drawing
+/// the backdrops' glow). On CI's slower runner it passed the half second
+/// after which the focus engine repeats an arrow still held, and the
+/// remote's release waits behind the work, so one press went on from Play
+/// to the row below (`TVUITests/SeeAllTests.swift`).
+@MainActor @Observable
+private final class HomePaging {
+    /// A screen asked to take focus; `serial` makes asking for the same screen again a new value.
+    struct FocusRequest: Equatable {
+        var page: HomePage
+        var serial: Int
+    }
+
+    /// The screen on view: the hero's, one per row after the first, then the end screen.
+    var page: HomePage?
+    /// The screen asked to take focus: Back to the top, Menu, and Menu back from a See all.
+    private(set) var focusWanted: FocusRequest?
+
+    /// Focus moving into another screen pages to it.
+    func focusEntered(_ focused: HomePage) {
+        guard focused != page ?? .start else { return }
+        withAnimation(.easeInOut(duration: 0.3)) { page = focused }
+    }
+
+    /// Moves focus into a screen.
+    func focus(_ screen: HomePage) {
+        focusWanted = FocusRequest(page: screen, serial: (focusWanted?.serial ?? 0) + 1)
+    }
+
+    func backToTop() {
+        withAnimation(.easeInOut(duration: 0.3)) { page = .start }
+        focus(.start)
+    }
+}
+
+/// The paging scroll view around Home's screens. The screens are built by
+/// `HomeView` and handed over as a value, so a page turn runs this body and
+/// leaves them as they were.
+private struct HomePager<Screens: View>: View {
+    @Bindable var paging: HomePaging
+    let screens: Screens
+
+    init(paging: HomePaging, @ViewBuilder screens: () -> Screens) {
+        self.paging = paging
+        self.screens = screens()
+    }
+
+    var body: some View {
+        let atTop = (paging.page ?? .start) == .start
+        ScrollView(.vertical) {
+            screens
+        }
+        .scrollTargetBehavior(.paging)
+        .scrollPosition(id: $paging.page)
+        .scrollIndicators(.hidden)
+        .scrollClipDisabled()
+        .ignoresSafeArea()
+        // Menu on a row screen goes back to the first screen; from there it is the system's.
+        .onExitCommand(perform: atTop ? nil : { paging.backToTop() })
+    }
+}
+
+/// One of Home's screens holding focus, with a focus state of its own: it
+/// says when focus comes into the screen, and moves focus into it when asked.
+private struct ScreenFocus: ViewModifier {
+    let page: HomePage
+    let paging: HomePaging
+    @FocusState private var holdsFocus: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .focused($holdsFocus)
+            .onChange(of: holdsFocus) { _, holds in
+                if holds { paging.focusEntered(page) }
+            }
+            .onChange(of: paging.focusWanted) { _, wanted in
+                if wanted?.page == page { holdsFocus = true }
+            }
+    }
 }
 
 private extension TVRowActions {
@@ -345,8 +415,6 @@ private struct HomeRowScreen: View {
     let counter: String
     let nextName: String
     let model: HomeModel
-    let page: HomePage
-    var focusedPage: FocusState<HomePage?>.Binding
     /// The row's See all is leaving Home for its library's tab.
     let leaving: () -> Void
     /// The focused card's key (``BrowseItem/cardID``, ``EpisodeCard/cardKey``, ``ContinueItem/cardKey``).
@@ -375,7 +443,6 @@ private struct HomeRowScreen: View {
             }
         }
         .screen()
-        .focused(focusedPage, equals: page)
         // The cards either side are fetched ahead, so ◀ ▶ does not flash the placeholder.
         .task(id: focusedCard) {
             for neighbour in RowPanel.neighbours(for: row, card: focusedCard) {
@@ -434,11 +501,31 @@ private struct ScreenBackdrop: View {
     var body: some View {
         CrossfadeArtwork(url: url, seed: seed, maxPixel: 1920)
             .frame(width: 1400, height: 660)
-            .overlay(RadialGradient(colors: [Palette.gold.opacity(0.10), .clear], center: UnitPoint(x: 0.7, y: 0.3), startRadius: 0, endRadius: 700))
+            .overlay(BackdropGlow(width: 1400, height: 660))
             .overlay(LinearGradient(stops: [.init(color: Palette.ground, location: 0), .init(color: Palette.ground.opacity(0.85), location: 0.22), .init(color: Palette.ground.opacity(0), location: 0.6)], startPoint: .leading, endPoint: .trailing))
             .overlay(LinearGradient(stops: [.init(color: Palette.ground.opacity(0), location: 0.5), .init(color: Palette.ground, location: 1)], startPoint: .top, endPoint: .bottom))
             .clipped()
             .accessibilityHidden(true)
+    }
+}
+
+/// The warm light over a backdrop's top right: gold fading out over 700 pt.
+/// SwiftUI draws a radial gradient on the main thread, a pixel at a time,
+/// at the size of its view: at 1400 × 660 pt on every screen of Home, this
+/// one was 110 of the 240 ms that the first page turn kept the main thread
+/// (tvOS 27.2 simulator, 2026-11-18). So it is drawn a tenth of the size
+/// and scaled up, which a light this soft doesn't show: under Home's first
+/// screen no pixel changed by more than 2 in 255.
+private struct BackdropGlow: View {
+    let width: CGFloat
+    let height: CGFloat
+    private static let shrink: CGFloat = 10
+
+    var body: some View {
+        RadialGradient(colors: [Palette.gold.opacity(0.10), .clear], center: UnitPoint(x: 0.7, y: 0.3), startRadius: 0, endRadius: 700 / Self.shrink)
+            .frame(width: width / Self.shrink, height: height / Self.shrink)
+            .scaleEffect(Self.shrink)
+            .frame(width: width, height: height)
     }
 }
 

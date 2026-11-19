@@ -83,13 +83,33 @@ struct ArtworkRequest: Hashable {
 /// The mockups' placeholder: a diagonal gradient from the palette with a soft light at the top left.
 public struct ArtworkPlaceholder: View {
     let seed: String
+    /// How far the light reaches from its centre, a fifth of the way along the top edge.
+    private static let reach: CGFloat = 160
 
     public init(seed: String) { self.seed = seed }
 
     public var body: some View {
         let colors = Palette.artwork[Palette.index(for: seed, count: Palette.artwork.count)]
         LinearGradient(colors: [colors.0, colors.1], startPoint: UnitPoint(x: 0.3, y: 0), endPoint: UnitPoint(x: 0.7, y: 1))
-            .overlay(RadialGradient(colors: [.white.opacity(0.10), .clear], center: UnitPoint(x: 0.2, y: 0), startRadius: 0, endRadius: 160))
+            .overlay(alignment: .topLeading) { GeometryReader { light(in: $0.size) } }
+    }
+
+    /// The light, in the part of the artwork it reaches and no more. SwiftUI
+    /// draws a radial gradient on the main thread, a pixel at a time, over
+    /// the whole of its view, and a placeholder lies under every picture:
+    /// drawn across Apple TV's backdrops (1400 × 660 pt) it was about 100 of
+    /// the 130 ms that Home's first page turn still kept the main thread
+    /// (tvOS 27.2 simulator, 2026-11-18). The gradient is the same one, cut
+    /// to its reach.
+    private func light(in size: CGSize) -> some View {
+        let centre = size.width * 0.2
+        let left = max(0, centre - Self.reach)
+        let width = max(0, min(size.width, centre + Self.reach) - left)
+        return RadialGradient(colors: [.white.opacity(0.10), .clear],
+                              center: UnitPoint(x: width > 0 ? (centre - left) / width : 0, y: 0),
+                              startRadius: 0, endRadius: Self.reach)
+            .frame(width: width, height: min(size.height, Self.reach))
+            .offset(x: left)
     }
 }
 
