@@ -14,11 +14,11 @@
 #   v0.M.P is 1.M.P          v0.5.2 is 1.5.2 (the App Store reached 1.5.10)
 #   v1.0.P to v1.2.P are 1.6.P   v1.0.0 is 1.6.0, the last App Store version
 #                              before v1.3.0
-#   v1.M.P is 1.(M + 4).P    from v1.3.0: v1.3.0 is 1.7.0, v1.4.0 is 1.8.0
+#   v1.M.P is 1.(M + 4).P    v1.3 to v1.5: v1.3.0 is 1.7.0, v1.4.0 is 1.8.0
 #   v1.6.P is 1.9.(P + 1)    v1.6.0 is 1.9.1: the maintainer chose a patch to
-#                              v1.5.0's 1.9.0 rather than 1.10.0. v1.7 and later
-#                              follow the line above (v1.7.0 is 1.11.0) unless
-#                              a line is added for them
+#                              v1.5.0's 1.9.0 rather than 1.10.0
+#   v1.M.P is 1.(M + 3).P    from v1.7.0, which the maintainer made 1.10.0,
+#                              the version after v1.6's 1.9.x: v1.8.0 is 1.11.0
 #
 # v1.1 and v1.2 shipped no App Store build, so v1.3.0 follows 1.6.0 directly.
 # Their tags still number (a patch to them would sort between 1.6.0 and
@@ -45,7 +45,7 @@ fi
 case $major in
   0) apple_minor=$minor ;;
   1)
-    apple_minor=$((minor < 3 ? 6 : minor + 4))
+    apple_minor=$((minor < 3 ? 6 : minor < 7 ? minor + 4 : minor + 3))
     if ((minor == 6)); then
       apple_minor=9 apple_patch=$((patch + 1))
     fi
