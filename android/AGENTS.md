@@ -124,9 +124,26 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   After changing a library, a plugin or the wrapper, run
   `make android-verify-metadata` and commit the file with the change, after
   reading its diff: only the versions you changed, and what they bring,
-  should move. Dependabot's Gradle pull requests need the same command run
-  on their branch. Don't hand-edit the components, and never rewrite the
-  file over a checksum mismatch: find out why the download changed.
+  should move. Don't hand-edit the components, and never rewrite the file
+  over a checksum mismatch: find out why the download changed.
+- **Dependabot's Gradle pull requests** fail the `android` job with
+  "Dependency verification failed", naming the new version's POM, because
+  Dependabot can't update the metadata. To fix one:
+  1. Check its branch out in a worktree
+     (`git worktree add <path> -B <branch> origin/<branch>`). A worktree has
+     no `android/local.properties`: copy yours in, or set `ANDROID_HOME`.
+  2. Run `make android-verify-metadata` (about a minute).
+  3. Read the diff. No checksum of an artifact the file already listed may
+     change, and `<configuration>` stays as it was. Older versions leave, or
+     keep only their POMs. Each new component must be something a bumped
+     library's POM asks for; the POMs are in Gradle's cache, under
+     `caches/modules-2/files-2.1/<group>/<name>/<version>/`. On pull
+     request 89 (19 November 2026), Play Publisher 4.1.2 and Robolectric 4.18
+     moved 535 lines of the file, and every one traced back to them.
+  4. Commit only that file and push it to Dependabot's branch. Dependabot
+     stops rebasing a branch once someone else has pushed to it.
+  5. Merge once the `android` job has passed, with a merge commit
+     (Validation in the root `AGENTS.md` says why).
 - **Don't change `gradle.properties`, the wrapper or the toolchain** as part
   of another change; those are their own change.
 - **The fakes' artwork** is fictional and lives in `core/fake/src/fakes/assets`,
