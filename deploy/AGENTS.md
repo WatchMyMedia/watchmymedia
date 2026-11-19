@@ -11,6 +11,7 @@ it covers releases, the downloads Worker and the CI runners.
 |---|---|
 | `Dockerfile`, `entrypoint.sh`, `docker-compose*.yml`, `Caddyfile`, `swag/` | The image (built from source; see `../.dockerignore`) and example setups behind proxies. The image's ffmpeg is jellyfin-ffmpeg from Jellyfin's apt repository, which carries the Intel, AMD and Vulkan user-mode drivers; the entrypoint runs the server as `PUID`/`PGID` in the groups that own `/dev/dri` |
 | `unraid/` | The Unraid Docker template (`watchmymedia.xml`), the templates repository's profile, their test, and `mirror.sh`, which assembles the public `WatchMyMedia/unraid-templates` repository Community Applications reads; [its README](unraid/README.md) has the hand install, the test list for an Unraid server and the submission checklist |
+| `ci/changes.py` | Which CI jobs a change runs: what each job is built from, and the rules (a change to a job in `ci.yml` runs that job alone; guidance files start no build). CI's `changes` job runs it; `python3 -I deploy/ci/changes.py` prints what the current branch would run (`changes_test.py` tests it) |
 | `ci/baseline_profile.py` | Fails when the Android app's committed baseline and startup profiles have many rules for app classes that are gone (CI's `android` job runs it; `baseline_profile_test.py` tests it) |
 | `ci/docker-smoke.sh` | Checks a built image without a GPU: ffmpeg's hardware encoders and filters, the entrypoint's device groups, `--group-add` and `UMASK`, and that the server comes up healthy (`make docker-smoke`; CI's `docker` job runs it) |
 | `config.example.yaml` | Every server option, commented; update it with any new option |
@@ -155,14 +156,15 @@ is 1.9.(P + 1), and from `v1.7.0` `v1.M.P` is 1.(M + 3).P (`v1.7.0` is 1.10.0).
   - The nfpm pin: bump `VERSION` and every checksum in
     `linux/fetch-nfpm.sh` together, from the digests GitHub lists for the release's files.
   - CI's two Linux package jobs are thirteen jobs, so the path list that
-    starts them (`linux-packages` in `ci.yml`'s `changes` job) is
+    starts them (`linux-packages` in `ci/changes.py`) is
     deliberate, and `ci/security_test.py` holds it to exactly this:
-    `deploy/linux/**`, the files packed from elsewhere
+    `deploy/linux/`, the files packed from elsewhere
     (`macos/fetch-ffmpeg.sh`, `macos/FFMPEG-LICENSE.md`,
-    `config.example.yaml`, the root `LICENSE`), `server/cmd/server/**` and
-    `server/internal/config/**` (how the server starts and where it looks
+    `config.example.yaml`, the root `LICENSE`), `server/cmd/server/` and
+    `server/internal/config/` (how the server starts and where it looks
     for its folders, config and ffmpeg, which the wrapper and the service
-    rely on), and `ci.yml`. Don't add the root `Makefile` or the rest of
+    rely on). A change to either job in `ci.yml` starts them too; a change
+    to another job there does not. Don't add the root `Makefile` or the rest of
     `server/` or `web/`: the `server`, `web` and `docker` jobs cover what
     the packages hold of those. The Linux make targets are in
     `linux/packages.mk` for this reason; keep new ones there.
