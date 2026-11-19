@@ -462,16 +462,40 @@ builds for the simulator. It and CI's `apple` and `apple-tv` jobs build with
 the Xcode `scripts/select-xcode.sh` names, on GitHub's `xcode-27` image: App
 Store Connect flags uploads made with the iOS 26 SDK (ITMS-90725) and from
 April 2027 refuses them. Raise the version there, never in one workflow alone
-(`deploy/ci/security_test.py` checks). `make apple-archive` and
-`make apple-upload` sign with the accounts on this Mac and upload: run them
-only when the user asks.
+(`deploy/ci/security_test.py` checks). `make apple-upload` and
+`make apple-tv-upload` sign with the key or the accounts on this Mac and
+upload: run them only when the user asks.
 When the user archives in Xcode, run `make apple-gen VERSION=vX.Y.Z` first, or
 the archive is the placeholder 1.0 (1) in `project.yml`.
-The Apple TV app can't be archived in Xcode while the team has no Apple TV
-registered ("Your team has no devices from which to generate a provisioning
-profile"): `make apple-tv-archive` archives it unsigned, and
-`make apple-tv-upload` signs it at export with Apple Distribution and an App
-Store profile, which needs no device. Run the upload only when the user asks.
+Both apps are archived without a certificate and signed only by the export,
+with Apple Distribution and an App Store profile (`ExportOptions.plist`):
+- **Never sign the archive.** Signing it needs an Apple Development
+  certificate whose private key is in the keychain. A GitHub-hosted runner
+  starts with none, so with `-allowProvisioningUpdates` and the API key Xcode
+  made a new one ("Apple Development: Created via API") on every release,
+  until v1.7.0's `ios` job failed with "Your account has reached the maximum
+  number of certificates" and "No profiles for 'media.watchmy.client' were
+  found". With the key, the export signs in the cloud and makes no
+  certificate. The Apple TV app can't have a signed archive anyway while the
+  team has no Apple TV registered ("Your team has no devices").
+- **An unsigned archive drops entitlements.** The export signs each bundle
+  with the entitlements in its archived signature, plus application-identifier,
+  team-identifier, `get-task-allow` false and beta-reports-active; it does not
+  read the entitlements file or take the profile's. Apple TV uploads 1.8.7 to
+  1.10.0 were unsigned and shipped the app and the Top Shelf extension without
+  their App Group. So the archive targets sign each bundle that has an
+  entitlements file ad hoc with it (`codesign -s - --entitlements`, extension
+  before app). Xcode won't do that itself: ad hoc signing a device target with
+  entitlements fails with "requires a provisioning profile". A new
+  `CODE_SIGN_ENTITLEMENTS` (a capability on the iPhone app, which has none
+  today) needs its line in the archive target; `security_test.py` checks.
+- **Check an export before trusting it**: export to a folder with a copy of
+  `ExportOptions.plist` whose `destination` is `export` (never upload to
+  check), then read `DistributionSummary.plist` or `codesign -d
+  --entitlements - --xml` on each bundle in the IPA's `Payload`, and the
+  profile with `security cms -D -i …/embedded.mobileprovision`. An export with
+  `-allowProvisioningUpdates` may regenerate the Xcode-managed App Store
+  profile when the entitlements change.
 Google ships `GoogleCast.framework` without a dSYM, so the iPhone target's
 archive-only "Make GoogleCast's dSYM" step makes one with `dsymutil`. Without
 it, an upload warns "The archive did not include a dSYM for the

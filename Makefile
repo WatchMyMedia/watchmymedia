@@ -173,28 +173,43 @@ apple-e2e: apple-gen ## Run the app end to end on $(SIM) against E2E_SERVER (def
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMediaE2E -destination "platform=iOS Simulator,id=$$id" \
 	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/E2E.xcresult $(APPLE_SIM_SIGNING) test
 
-# Signing for apple-archive and apple-upload: an App Store Connect API key
+# Signing for apple-upload and apple-tv-upload: an App Store Connect API key
 # (README, "Releasing the iPhone app"). Without ASC_KEY_PATH, Xcode uses the
 # accounts signed in on this Mac.
 APPLE_AUTH = $(if $(ASC_KEY_PATH),-authenticationKeyPath $(ASC_KEY_PATH) -authenticationKeyID $(ASC_KEY_ID) -authenticationKeyIssuerID $(ASC_ISSUER_ID))
 
-apple-archive: apple-gen ## Archive the iPhone app for the App Store (VERSION=vX.Y.Z) -> apple/build/WatchMyMedia.xcarchive
+# Both apps are archived without a certificate and signed when exported, with
+# Apple Distribution and an App Store profile (apple/ExportOptions.plist).
+# - iPhone: an archive signed in the usual way signs with an Apple Development
+#   certificate, and a release runner starts with none in its keychain, so
+#   Xcode asked Apple for a new one on every release until the team reached
+#   its limit (v1.7.0: "Choose a certificate to revoke"). With the API key the
+#   export signs in the cloud and makes no certificate.
+# - Apple TV: with no Apple TV registered to the team, Xcode can't make the
+#   tvOS development profile a signed archive needs ("Your team has no
+#   devices"); an App Store profile needs no device.
+# The export signs each bundle with the entitlements its archived signature
+# has, plus the App Store's own (application-identifier, beta-reports-active).
+# An unsigned bundle has none, so a bundle with an entitlements file is signed
+# ad hoc with it after archiving: the Apple TV app and its Top Shelf
+# extension, whose App Group every upload from 1.8.7 to 1.10.0 lacked. The
+# iPhone app has no entitlements file (apple/AGENTS.md, Releases).
+apple-archive: apple-gen ## Archive the iPhone app for the App Store, unsigned (VERSION=vX.Y.Z) -> apple/build/WatchMyMedia.xcarchive
 	versions=$$(apple/scripts/version.sh $(VERSION)) && \
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMedia -configuration Release -destination 'generic/platform=iOS' \
-	  -archivePath apple/build/WatchMyMedia.xcarchive -allowProvisioningUpdates $(APPLE_AUTH) $$versions archive
+	  -archivePath apple/build/WatchMyMedia.xcarchive CODE_SIGNING_ALLOWED=NO $$versions archive
 
-apple-upload: apple-archive ## Archive and upload the iPhone app to TestFlight (VERSION=vX.Y.Z)
+apple-upload: apple-archive ## Sign the iPhone archive for the App Store and upload it to TestFlight (VERSION=vX.Y.Z)
 	xcodebuild -exportArchive -archivePath apple/build/WatchMyMedia.xcarchive -exportOptionsPlist apple/ExportOptions.plist \
 	  -exportPath apple/build/export -allowProvisioningUpdates $(APPLE_AUTH)
 
-# The Apple TV app is archived unsigned and signed when exported. With no Apple
-# TV registered to the team, Xcode can't make the tvOS development profile its
-# archive step signs with ("Your team has no devices"); the export signs with
-# Apple Distribution and an App Store profile, which needs no device.
 apple-tv-archive: apple-gen ## Archive the Apple TV app for the App Store, unsigned (VERSION=vX.Y.Z) -> apple/build/WatchMyMediaTV.xcarchive
 	versions=$$(apple/scripts/version.sh $(VERSION)) && \
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -configuration Release -destination 'generic/platform=tvOS' \
 	  -archivePath apple/build/WatchMyMediaTV.xcarchive CODE_SIGNING_ALLOWED=NO $$versions archive
+	app=apple/build/WatchMyMediaTV.xcarchive/Products/Applications/WatchMyMediaTV.app && \
+	codesign -f -s - --entitlements apple/TopShelf/TopShelf.entitlements "$$app/PlugIns/WatchMyMediaTopShelf.appex" && \
+	codesign -f -s - --entitlements apple/TV/WatchMyMediaTV.entitlements "$$app"
 
 apple-tv-upload: apple-tv-archive ## Sign the Apple TV archive for the App Store and upload it to TestFlight (VERSION=vX.Y.Z)
 	xcodebuild -exportArchive -archivePath apple/build/WatchMyMediaTV.xcarchive -exportOptionsPlist apple/ExportOptions.plist \
