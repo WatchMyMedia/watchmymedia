@@ -2,6 +2,7 @@
 import json
 import os
 import pathlib
+import plistlib
 import re
 import shutil
 import subprocess
@@ -785,6 +786,56 @@ esac
                 self.assertIn(f"-destination 'generic/platform={platform}'", recipe)
                 self.assertIn('CODE_SIGNING_ALLOWED=NO', recipe)
                 self.assertIn('apple/scripts/check-release-binary.sh', recipe)
+
+    def test_app_store_archives_need_no_certificate_and_keep_entitlements(self):
+        # A signed archive signs with an Apple Development certificate, and a
+        # release runner starts with none, so with -allowProvisioningUpdates
+        # Xcode asked Apple for a new one on every release until the team
+        # reached its limit (v1.7.0's ios job: "Choose a certificate to
+        # revoke"). Both apps archive without a certificate; only the export
+        # signs, for the App Store, which needs none in the runner's keychain.
+        makefile = (ROOT / 'Makefile').read_text()
+
+        def recipe(target):
+            # The target's own lines only, up to the first line without a tab.
+            return re.search(r'(?m)^' + re.escape(target) + r':[^\n]*\n((?:\t[^\n]*\n)+)', makefile).group(1)
+
+        for archive, upload in (('apple-archive', 'apple-upload'), ('apple-tv-archive', 'apple-tv-upload')):
+            with self.subTest(target=archive):
+                self.assertIn(' archive\n', recipe(archive))
+                self.assertIn('CODE_SIGNING_ALLOWED=NO', recipe(archive))
+                self.assertNotIn('-allowProvisioningUpdates', recipe(archive))
+                self.assertNotIn('APPLE_AUTH', recipe(archive))
+                self.assertRegex(makefile, rf'(?m)^{re.escape(upload)}: {re.escape(archive)} ')
+                self.assertIn('-exportArchive', recipe(upload))
+                self.assertIn('-exportOptionsPlist apple/ExportOptions.plist', recipe(upload))
+                self.assertIn('-allowProvisioningUpdates $(APPLE_AUTH)', recipe(upload))
+        with (ROOT / 'apple/ExportOptions.plist').open('rb') as f:
+            options = plistlib.load(f)
+        self.assertEqual('app-store-connect', options['method'])
+        self.assertEqual('automatic', options['signingStyle'])
+        self.assertEqual('6R8GZD78G3', options['teamID'])
+        # The export signs a bundle with the entitlements its archived
+        # signature has, and an unsigned one has none: the Apple TV app and
+        # its Top Shelf extension lost their App Group in every upload from
+        # 1.8.7 to 1.10.0. So each bundle with an entitlements file is signed
+        # ad hoc with it after archiving, extensions before the app that
+        # holds them.
+        archives = recipe('apple-archive') + recipe('apple-tv-archive')
+        files = re.findall(r'(?m)^\s+CODE_SIGN_ENTITLEMENTS: (\S+)$', (ROOT / 'apple/project.yml').read_text())
+        self.assertLessEqual({'TV/WatchMyMediaTV.entitlements', 'TopShelf/TopShelf.entitlements'}, set(files))
+        for name in files:
+            with self.subTest(entitlements=name):
+                self.assertTrue((ROOT / 'apple' / name).is_file())
+                self.assertRegex(archives, rf'codesign -f -s - --entitlements apple/{re.escape(name)} ')
+        self.assertNotIn('--deep', archives)
+        tv = recipe('apple-tv-archive')
+        self.assertLess(tv.index('TopShelf.entitlements'), tv.index('WatchMyMediaTV.entitlements'))
+        self.assertLess(tv.index(' archive\n'), tv.index('codesign'))
+        workflow = (ROOT / '.github/workflows/release.yml').read_text()
+        ios = re.search(r'(?ms)^  ios:\n(.*?)(?=^  [\w-]+:\n)', workflow).group(1)
+        self.assertIn('make apple-upload VERSION=${GITHUB_REF_NAME}', ios)
+        self.assertNotIn('xcodebuild', ios)
 
     def test_build_context_excludes_nested_credentials_and_client_outputs(self):
         rules = set((ROOT / '.dockerignore').read_text().splitlines())

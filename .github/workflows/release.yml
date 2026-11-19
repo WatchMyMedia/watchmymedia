@@ -319,7 +319,10 @@ jobs:
   # tag (apple/scripts/version.sh). Signing is automatic through an App Store
   # Connect API key (README, "Releasing the iPhone app"); without the
   # APP_STORE_CONNECT_* secrets the job only builds for the simulator and
-  # says so. It builds with the Xcode CI's apple jobs test with
+  # says so. The archive is unsigned and only the export signs it, for the
+  # App Store: signing the archive made a new Apple Development certificate
+  # on every runner until v1.7.0 hit the team's limit (Makefile,
+  # apple-archive). It builds with the Xcode CI's apple jobs test with
   # (apple/scripts/select-xcode.sh), on the xcode-27 image: App Store Connect
   # takes iPhone and iPad builds only from the iOS 27 SDK from April 2027, and
   # macos-26 stops at Xcode 26.6 (v1.6.1's 1.9.2 drew ITMS-90725 for it).

@@ -60,8 +60,11 @@ placeholder back. `make apple-archive VERSION=v1.2.3` sets them itself.
 The Apple TV app (the WatchMyMedia TV scheme) can't be archived in Xcode until
 an Apple TV is registered to the team, because Xcode's archive step signs with a
 tvOS development profile. `make apple-tv-archive VERSION=v1.2.3` archives it
-unsigned instead, and `make apple-tv-upload VERSION=v1.2.3` signs it for the App
-Store when exporting and uploads it to TestFlight.
+unsigned instead and signs the app and its Top Shelf extension ad hoc with their
+entitlements (the App Group), and `make apple-tv-upload VERSION=v1.2.3` signs it
+for the App Store when exporting and uploads it to TestFlight. The iPhone app's
+`make apple-archive` and `make apple-upload` work the same way, without a
+development certificate ("Releasing the iPhone app" in the root README).
 
 Nothing can tap a simulator from a script, so two more launch arguments
 reach any screen for a screenshot: `-tab tvShows` (or `home`, `movies`,

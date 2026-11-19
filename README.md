@@ -476,9 +476,10 @@ To move to a newer Xcode, change the version in that script.
 Once, by hand, in the Eldwick Software account (team `6R8GZD78G3`):
 
 1. Register the bundle ID `media.watchmy.client` (Certificates, Identifiers &
-   Profiles), with no extra capabilities, and create the app in App Store
-   Connect with it. The Apple TV app will join the same record (universal
-   purchase).
+   Profiles), and create the app in App Store Connect with it. The Apple TV
+   app joins the same record (universal purchase). Its one capability is the
+   App Group `group.media.watchmy.client`, which the Apple TV app shares with
+   its Top Shelf extension, `media.watchmy.client.topshelf`.
 2. Make an App Store Connect API key (Users and Access → Integrations → Team
    Keys) whose role may manage certificates and profiles (Admin, or App Manager
    with access to Certificates, Identifiers & Profiles), so `xcodebuild
@@ -492,9 +493,22 @@ Without the secrets the job builds the app for the simulator and warns. Locally,
 on this Mac, or with `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_PATH` set. To archive
 in Xcode instead, run `make apple-gen VERSION=v1.2.3` first: otherwise the archive is
 the project's placeholder version, 1.0 (1). The Apple TV app uploads with
-`make apple-tv-upload VERSION=v1.2.3`: it is archived unsigned and signed for the
-App Store at export, since Xcode's own Archive needs an Apple TV registered to the
-team.
+`make apple-tv-upload VERSION=v1.2.3`, since Xcode's own Archive needs an Apple TV
+registered to the team.
+
+Both apps are archived without a certificate and signed only when exported, for
+the App Store. Signing the archive needs an Apple Development certificate in the
+keychain, and a GitHub-hosted runner starts with none, so Xcode made a new one
+through the API key ("Apple Development: Created via API") on every release
+until v1.7.0's job failed at the team's limit ("Choose a certificate to
+revoke"). The export makes none: with the key it signs in the cloud. An unsigned
+archive carries no entitlements, though, and the export signs each app and
+extension only with the entitlements in its archived signature, so
+`make apple-tv-archive` signs the Apple TV app and its Top Shelf extension ad hoc
+with their entitlements files. Without that, Apple TV 1.8.7 to 1.10.0 shipped
+without the App Group the two share. Giving the iPhone app a capability means
+adding the same step to `make apple-archive`. The certificates earlier releases
+made are no use to anyone: their private keys went with the runners.
 
 ## Remote access with Tailscale
 
