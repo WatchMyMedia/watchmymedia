@@ -5,6 +5,77 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 1.7.0
+
+Films keep their surround and lossless sound when the server has to convert it, Android TV plays
+trailers inside the app, and both TV apps show where a row starts. The server also comes as a
+package for Debian, Ubuntu and Fedora.
+
+- This release doesn't change the server's database, so going back to 1.6.1 needs no backup.
+- When the server converts a film's audio, it no longer turns every track into AAC at 192 kbps.
+  A lossless track (TrueHD, DTS-HD MA, PCM, FLAC or ALAC) becomes FLAC when the picture is sent
+  as it is, at Original quality or Automatic's top, and not for a download. A surround track
+  becomes Dolby Digital Plus 5.1 at 640 kbps for a device that takes it, when the quality
+  allows 4 Mbps or more. Anything else is AAC: 192 kbps for stereo, 64 kbps a channel above
+  that. Activity names the format the audio is sent in.
+- PCM audio is sent as it is only when a Matroska file plays directly. In any other file the
+  server converts it, to FLAC where the device takes it, since the players can't read PCM there.
+- Live TV keeps the broadcast's sound when the server converts only the picture (MPEG-2 and
+  interlaced channels), for an app that takes that sound. When it converts the sound too, it
+  keeps up to 5.1 for the Android, iPhone, iPad and Apple TV apps. The web app and Cast stay in
+  stereo for now.
+- iPhone and iPad now play 5.1 films directly and mix them down themselves, rather than having
+  the server convert them to stereo. Over AirPlay to a 7.1 receiver they ask for eight
+  channels. Downloads and Live TV keep 5.1 too. Apple TV's sound is unchanged.
+- An Android TV on a soundbar that takes Dolby but only two channels of PCM now gets Dolby
+  Digital Plus 5.1 where it used to get audio it played in stereo. The Android app also plays
+  PCM in Matroska files directly. Both need a 1.7.0 server.
+- The Cast receiver now asks for Dolby Digital Plus 5.1 rather than FLAC when the TV takes
+  Dolby, since a TV plays FLAC in stereo. It has been live on cast.watchmy.media since
+  2026-11-18 and takes effect with a 1.7.0 server.
+- On Android TV, Trailer plays a YouTube trailer inside the app, full screen, instead of handing
+  it to the YouTube app. Select pauses and plays, Left and Right jump 10 seconds, and Back goes
+  back to the movie. While a trailer is paused, the screen shows its name and how far in it is.
+  When a trailer can't play inside the app, Open in YouTube plays it there and comes back to the
+  app at the end. A TV without a working web view hands trailers to YouTube as before.
+- On Android phones and tablets, YouTube trailers show their picture again. They could play as
+  sound over a black screen.
+- On Android TV and Apple TV, a row keeps the card before the one you're on in view, and cards
+  scrolled past fade at the edge, so a row's first card no longer looks like its seventh.
+  Home's hint on a row's first card says what each arrow does.
+- On Android TV, holding Left, or pressing it again quickly, stops at a row's first card with a
+  small bump instead of running on into the menu. A single Left from the first card still opens
+  the menu. On Apple TV, Left on a row's first card bumps the row.
+- On Apple TV, Home answers the remote more quickly when you come down into it from the tabs.
+- On an iPad with Live TV, switching to a server without Live TV no longer goes back to Settings
+  before you sign in.
+- The iPhone app is now built with Xcode 27.2, so on the iPhone Duo the App Store build follows
+  the hinge: the half-open layouts from 1.6.0 are in it. The build of 1.9.2 left them out.
+- The server now comes as a package for Debian 12 and 13, Ubuntu 24.04 and 26.04, and Fedora 44
+  and 45, on amd64 and arm64. It installs the server with its own FFmpeg and runs it as a
+  service, under its own `watchmymedia` user, that starts with the machine. Setup is in a
+  browser at port 27587. The package adds WatchMyMedia's repository, so updates come with the
+  system's own, through apt or dnf.
+- For a package install, Settings › General › Updates gives the apt or dnf command, and the
+  steps for restoring a backup use the service's commands. When the server can't read a library
+  folder because of its permissions, the folder check now says so, on every install, where it
+  used to say the folder was not found. On a package install it also gives the command that
+  lets the server read the folder.
+- The Linux downloads (`.tar.gz`) now carry their own FFmpeg, as the Mac's do, so they no longer
+  need one on `PATH`.
+- A backup saves the settings file the server loaded, even when it is outside the data folder.
+- Every app version works with this server, and the new apps work with older servers, without
+  the audio changes that need 1.7.0.
+- The server, the Docker image, the Debian, Ubuntu and Fedora packages, the Mac app, the Windows
+  app and the Android app are 1.7.0. The Mac app and the Windows app of 1.6.1 offer the update
+  under Check for updates. The iPhone, iPad and Apple TV apps are 1.10.0 once the App Store
+  approves them.
+- The audio changes have been tried on an Android phone and an iPad's speakers against a test
+  server, and Android TV trailers on a Google TV Streamer. The row changes have been tried on
+  Android TV and Apple TV emulators and simulators. The packages have been installed in tests
+  on each of the six releases, on both architectures. None of it has yet been tried on a
+  soundbar, a Cast TV, headphones, a real Apple TV, or a Linux machine with a GPU.
+
 ## 1.6.1
 
 Episodes that TMDB doesn't list yet now play from their show's page, and the web app's search
