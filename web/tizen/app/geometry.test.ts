@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nearest } from './remote'
+import { nearest } from './geometry'
 
 const origin = { left: 100, top: 100, width: 100, height: 60 }
 describe('remote focus geometry', () => {
