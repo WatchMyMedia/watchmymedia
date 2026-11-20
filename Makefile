@@ -76,6 +76,25 @@ apple-test-sim: apple-gen ## Build the app and run every test on the $(SIM) simu
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMedia -destination "platform=iOS Simulator,id=$$id" \
 	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/Tests.xcresult $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) test
 
+# CI's way to run the same tests: two targets, with the Release build between
+# them, so that every build is done before a simulator boots. On GitHub's
+# three-core runners a simulator's first boot takes minutes, and what compiles
+# meanwhile takes two to three times as long: the Debug build took 215 s with
+# nothing booted and 409 to 690 s beside the boot (runs of 2026-11-20). So
+# these boot nothing, and xcodebuild boots the simulator when the tests
+# start. apple-test-sim is as it was: this was measured on the runners, not on
+# a Mac whose simulators have booted before.
+apple-build-for-testing: apple-gen ## Build the app and its tests for the $(SIM) simulator, booting nothing (as CI does)
+	id=$$(apple/scripts/simulator.sh "$(SIM)") && \
+	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMedia -destination "platform=iOS Simulator,id=$$id" \
+	  -derivedDataPath $(APPLE_DERIVED) $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) build-for-testing
+
+apple-test-without-building: ## Run every test apple-build-for-testing built, on the $(SIM) simulator (as CI does)
+	id=$$(apple/scripts/simulator.sh "$(SIM)") && \
+	rm -rf apple/build/Tests.xcresult && \
+	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMedia -destination "platform=iOS Simulator,id=$$id" \
+	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/Tests.xcresult $(APPLE_TEST_FLAGS) test-without-building
+
 apple-tv-build: apple-gen ## Build the Apple TV app for the simulator -> apple/build/DerivedData
 	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination 'generic/platform=tvOS Simulator' \
 	  -derivedDataPath $(APPLE_DERIVED) $(APPLE_SIM_SIGNING) build
@@ -91,7 +110,10 @@ apple-tv-test-sim: apple-gen ## Build the Apple TV app and run every test on the
 # CI's way to run the same tests: build once, run the
 # Kit's tests, then the remote UI tests on their own. Both runs go ahead, and
 # either failing fails the target. Results: TVTests.xcresult (Kit),
-# TVUITests.xcresult (UI). TV_UI_WORKERS above 1 runs the UI tests on that many
+# TVUITests.xcresult (UI). The build and the tests are a target each, and
+# neither boots the simulator before the build, as for the iPhone app above:
+# CI builds Release between them. apple-tv-test-sim-ci runs one after the
+# other. TV_UI_WORKERS above 1 runs the UI tests on that many
 # clones of the simulator. That helps on a Mac with cores to spare, not on
 # GitHub's three-core runner: there two clones made every test two to three
 # times slower, and the UI tests took no less time (runs of 2026-11-12 and
@@ -104,14 +126,18 @@ TV_UI_WORKERS ?= 1
 TV_UI_SHARD ?=
 TV_KIT_TESTS ?= yes
 comma := ,
-apple-tv-test-sim-ci: apple-gen ## Build once, then the Kit tests and the UI tests apart on the $(TV_SIM) simulator (TV_UI_SHARD=1/2 for half the UI tests)
+# A share that does not exist fails here, before the build.
+apple-tv-build-for-testing: apple-gen ## Build the Apple TV app and its tests for the $(TV_SIM) simulator, booting nothing (as CI does)
+	$(if $(TV_UI_SHARD),python3 -I apple/scripts/tv-ui-shard.py $(subst /, ,$(TV_UI_SHARD)) >/dev/null &&) \
+	id=$$(apple/scripts/simulator.sh "$(TV_SIM)" appletv) && \
+	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
+	  -derivedDataPath $(APPLE_DERIVED) $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) build-for-testing
+
+apple-tv-test-without-building: ## The Kit tests and the UI tests apart, on what apple-tv-build-for-testing built (TV_UI_SHARD=1/2 for half the UI tests)
 	ui_tests="$$($(if $(TV_UI_SHARD),python3 -I apple/scripts/tv-ui-shard.py $(subst /, ,$(TV_UI_SHARD)),echo -only-testing:WatchMyMediaTVUITests))" && \
 	[ -n "$$ui_tests" ] && \
 	id=$$(apple/scripts/simulator.sh "$(TV_SIM)" appletv) && \
-	{ xcrun simctl boot "$$id" 2>/dev/null || true; } && \
 	rm -rf apple/build/TVTests.xcresult apple/build/TVUITests.xcresult && \
-	xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator,id=$$id" \
-	  -derivedDataPath $(APPLE_DERIVED) $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) build-for-testing && \
 	{ kit=0; ui=0; \
 	  $(if $(filter yes,$(TV_KIT_TESTS)),xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme 'WatchMyMedia TV' -destination "platform=tvOS Simulator$(comma)id=$$id" \
 	    -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVTests.xcresult $(APPLE_TEST_FLAGS) \
@@ -125,6 +151,8 @@ apple-tv-test-sim-ci: apple-gen ## Build once, then the Kit tests and the UI tes
 	    test-without-building || ui=$$?; \
 	  echo "Kit tests: exit $$kit; UI tests: exit $$ui"; \
 	  [ $$kit -eq 0 ] && [ $$ui -eq 0 ]; }
+
+apple-tv-test-sim-ci: apple-tv-build-for-testing apple-tv-test-without-building ## Build once, then the Kit tests and the UI tests apart on the $(TV_SIM) simulator (TV_UI_SHARD=1/2 for half the UI tests)
 
 # The Release configuration for devices, unsigned: what an archive compiles
 # (optimised, no DEBUG, so no fakes), without signing. CI runs both, so a
