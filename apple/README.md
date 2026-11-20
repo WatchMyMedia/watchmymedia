@@ -12,11 +12,15 @@ or newer (`brew install xcodegen`). From the repository root:
 make apple-test       # the Kit's unit tests, on this Mac (seconds, no simulator)
 make apple-build      # generate the project and build the app for the simulator
 make apple-test-sim   # build and run every test on the iPhone 17 Pro simulator, or the newest iPhone Pro (SIM=… for another)
+make apple-build-for-testing     # what CI runs: build the app and its tests for that simulator, booting nothing
+make apple-test-without-building # then run the tests it built; CI builds Release between the two
 make apple-api        # after `make gen-api`: regenerate Kit/Sources/WMMAPI/Generated; commit it
 make apple-e2e        # the app end to end against a server (default: the fixture server at localhost:27588)
 make apple-tv-build   # build the Apple TV app for the simulator
 make apple-tv-test-sim # build it and run every test on the Apple TV 4K simulator (TV_SIM=… for another)
-make apple-tv-test-sim-ci # what CI runs: one build, then the Kit's tests and the UI tests apart; CI's two jobs pass TV_UI_SHARD=1/2 and 2/2 (TV_KIT_TESTS=no) to share the UI test classes
+make apple-tv-test-sim-ci # what CI runs, in one go: one build, then the Kit's tests and the UI tests apart; CI's two jobs pass TV_UI_SHARD=1/2 and 2/2 (TV_KIT_TESTS=no) to share the UI test classes
+make apple-tv-build-for-testing     # its first half, booting nothing
+make apple-tv-test-without-building # its second half; CI builds Release between the two
 make apple-build-release    # the iPhone app in Release for devices, unsigned, then check-release-binary.sh (CI runs it)
 make apple-tv-build-release # the same for the Apple TV app
 make apple-perf       # launch and scrolling measures on SIM and TV_SIM, five runs each (not in CI)
@@ -1101,9 +1105,10 @@ developer account; simulator builds are signed ad hoc and need neither.
 
 **Release builds.** `make apple-build-release` and `make apple-tv-build-release`
 build the Release configuration for devices without signing (what an archive
-compiles), and CI's `apple` and `apple-tv` jobs run them after their tests, so a
+compiles), and CI's `apple` and `apple-tv` jobs run them between building the
+tests and running them, so a
 break that only shows in Release (an `#if DEBUG`, optimisation, a missing
-import) shows before a tag. `scripts/check-release-binary.sh` then fails if the
+import) shows before a tag. The tests run whether or not it passed. `scripts/check-release-binary.sh` then fails if the
 app has no privacy manifest, holds any `WMMFakes` symbol or still reads
 `-fakesSignedOut`, or if an extension in its `PlugIns` (the Top Shelf) has no
 privacy manifest of its own or holds code from `WMMModel`, `WMMData`,
