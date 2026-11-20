@@ -1,12 +1,10 @@
 # WatchMyMedia for Android and Google TV
 
 One app, one APK: the TV UI on Android TV and Google TV (including the Google
-TV Streamer), the phone UI on phones and tablets. The plan is
-[PLAN-CLIENTS.md](../PLAN-CLIENTS.md) §5 and §2.3; the screens follow the
-mockups in [design/mockups](../design/mockups) (`android-tv/` and `android/`).
+TV Streamer), the phone UI on phones and tablets. The screens follow the
+maintainers' designs.
 
-Tablet layouts follow [PLAN-TABLETS.md](../PLAN-TABLETS.md) and the
-[tablet boards](../design/mockups/android-tablet). At 600 dp the bottom bar
+Tablet layouts follow the tablet boards. At 600 dp the bottom bar
 becomes a navigation rail, grids fit the available width, and dialogs and
 single-column pages keep readable widths. At 1000 dp Home, Library, Search,
 details and the Inbox use two panes. Settings puts its list of groups beside the
@@ -64,8 +62,8 @@ fictional library with a few fictional backdrops from `core/fake/src/fakes/asset
 no server): the TV shows a pairing code and signs itself
 in after a few seconds, and the phone takes any name with the password
 `password`. Any name but Alex signs in as an admin; Alex is a member, whose
-requests wait for approval. On the fakes the server takes requests
-([PLAN-ARR.md](../PLAN-ARR.md)): search for "harbor" for the Not in your
+requests wait for approval. On the fakes the server takes requests:
+search for "harbor" for the Not in your
 library row, and Copperline lists its missing episodes in every state the
 boards draw. Add `-PfakesSeerr=true` to exercise a Seerr-only server: requests
 go to a separate fake Seerr list, while admins can still approve earlier
@@ -85,7 +83,7 @@ account and the server’s admin-network permission; Search now and Monitor
 still require Radarr/Sonarr management. Settings has Your requests, and admins' Inbox with its count
 on the Settings tab (phone) and the rail's Settings (tablet and TV).
 
-Settings on a phone or tablet ([PLAN-ANDROID-SETTINGS.md](../PLAN-ANDROID-SETTINGS.md))
+Settings on a phone or tablet
 opens on a list of groups named and ordered as the
 web app's tabs, each saying what is chosen: Playback, Audio & subtitles,
 Downloads, Home rows, then Account & devices, Your requests and About, and for
@@ -96,8 +94,8 @@ doesn't save stays on its row with Try again; the account's rows wait until its
 settings have loaded. Signing out, signing another device out and Remove all
 downloads ask first.
 
-A show, a season and an episode all open one page ([PLAN-SHOW-PAGE.md](../PLAN-SHOW-PAGE.md),
-`ShowPageViewModel`): the chosen episode on top with Play, Mark watched and
+A show, a season and an episode all open one page (`ShowPageViewModel`):
+the chosen episode on top with Play, Mark watched and
 its own ⋮ (the TV's More), the season chips or tabs (Specials last) over the
 season's row of episodes, and About the show with Mark show watched and
 Request missing seasons. Which episode goes on top is `onTop` in `core:model`:
@@ -136,7 +134,7 @@ fakes, which draw the Cast glyph instead of the real button:
 adb shell am start -n media.watchmy.client/media.watchmy.client.mobile.player.harness.PlayerHarnessActivity -e scenario casting
 ```
 
-Automatic quality ([PLAN-AUTO-QUALITY.md](../PLAN-AUTO-QUALITY.md)) needs a
+Automatic quality needs a
 server at API level 3; older ones don't offer it. The harnesses show a step
 down on the fakes (`-e scenario auto` on the phone, `--es scene auto` on the
 TV) and a return to Direct play (`-e scenario autorecovery` or `--es scene
@@ -154,7 +152,7 @@ to the proxy's port. The fixture's `S01E01` (720p, 2.7 Mbps) steps down at
 1.5 Mbps; its other episodes are too small to stall. On an emulator, use 720p
 or smaller: its software decoders fall behind at 1080p.
 
-Seek thumbnails ([PLAN-TRICKPLAY.md](../PLAN-TRICKPLAY.md)) show the picture
+Seek thumbnails show the picture
 at the target while a finger drags the scrubber on a phone or tablet, or the
 remote seeks on a TV (with the step beside the time). They need a server at
 API level 9 that has made them for the file, which it does in the background
@@ -163,7 +161,7 @@ alone. Sheets come through the image loader (`CoilSeekThumbnails`), which
 signs in only to the current server, and each tile is cut out of its sheet
 with `BitmapRegionDecoder`. On the fakes every play has them, drawn in code.
 
-Movie trailers ([PLAN-TRAILERS.md](../PLAN-TRAILERS.md) §6.2) need a server at
+Movie trailers need a server at
 API level 20, which lists them on the movie (`trailers`, best first); older
 servers list none, so there is no Trailer button. The button (after Play or
 Resume and Play from start) plays the first trailer the server lists that
@@ -187,9 +185,8 @@ this device can play, and the logic is `MovieViewModel`'s (`trailerPlay`):
   WebView has `MATCH_PARENT` layout params: with the `WRAP_CONTENT`
   AndroidView gives it, the page is laid out 0 px high and the trailer
   plays its sound with no picture (AGENTS.md, Emulators).
-- A **YouTube trailer on a TV** plays in the app too
-  (PLAN-TV-TRAILERS.md §4, the `TvTrailerPlayer` and `MovieTrailerInApp`
-  boards): `TvTrailerScreen` loads
+- A **YouTube trailer on a TV** plays in the app too:
+  `TvTrailerScreen` loads
   the same page, without autoplay, in a WebView that fills the screen.
   - While the player loads, our screen shows the trailer, the movie and
     "Plays from YouTube" under a spinner, and the WebView is there but
@@ -203,7 +200,7 @@ this device can play, and the logic is `MovieViewModel`'s (`trailerPlay`):
     takes the link, and Back to the movie.
   - A trailer that played closes the screen when it ends. It pauses in
     `onStop` and keeps the TV awake while it plays.
-  - The remote follows the plan's §4.3 table (`TrailerRemote.kt`) through
+  - The remote's keys (`TrailerRemote.kt`) go through
     YouTube's IFrame API: the screen holds the focus, the WebView never
     takes it, and the keys call `playVideo`, `pauseVideo` and `seekTo` in
     the page. Back is always the screen's, and Up and Down do nothing.
@@ -211,8 +208,8 @@ this device can play, and the logic is `MovieViewModel`'s (`trailerPlay`):
     player, on a Google TV Streamer and on an emulator, so the app doesn't
     use them.
   - While the trailer is paused, YouTube's player leaves the screen, as
-    while it loads, and our pause screen takes its place (the board's
-    `paused` state): a pause sign, the trailer, the movie, "Paused · 0:13 /
+    while it loads, and our pause screen takes its place:
+    a pause sign, the trailer, the movie, "Paused · 0:13 /
     7:45" and the keys ("Select to play · ◀ ▶ 10 s · Back to the movie"),
     with the time and length from the page (`trailerTime()`). YouTube's player shows nothing
     when it is paused through its API, so a paused trailer looked frozen.
@@ -265,8 +262,8 @@ lists `pcm`, which the server copies only in direct play of MKV: Media3
 also reads `ipcm`, `fpcm`, `lpcm`, `sowt` and `twos` in MP4 and MOV, but
 not QuickTime's `in24`, `in32`, `fl32` or `fl64`, which ffmpeg writes for
 24-bit, so the server converts PCM in any other file. Both go only to
-servers at API level 31 or later ([PLAN-AUDIO.md](../PLAN-AUDIO.md) §3.4,
-§3.5). The profile's size limit is the largest picture the offered
+servers at API level 31 or later.
+The profile's size limit is the largest picture the offered
 codecs' decoders take at 24 fps, whatever the screen, so a phone whose
 hardware decodes 4K direct-plays a 4K file: read from
 `MediaCodecInfo.VideoCapabilities` (the decoders' performance points from
@@ -282,7 +279,7 @@ neither do low-RAM devices.
 
 ### Rows people arrange, and rows made from lists
 
-From API level 22 ([PLAN-ROWS.md](../PLAN-ROWS.md) §8.2) Home and each
+From API level 22 Home and each
 library's Movies or TV screen come in the person's order
 (`LibraryRepository.arrangedHome` and `libraryRows`, `getHome` and
 `getLibraryRows` with `arranged=true`); older servers keep the fixed rows.
@@ -305,7 +302,7 @@ first row's first card. Movies and TV get their rows above the grid.
   dialog) and imports' unmatched titles as Not found
   (`MediaListViewModel`). Refresh now and Delete are on the phone's ⋮ for
   whoever may change the list.
-- **See all** (PLAN-SEE-ALL.md §4.4), on the phone and the tablet: a row
+- **See all**, on the phone and the tablet: a row
   with a `seeAll` link ends in a See all card the size of its cards and has
   See all in its heading ("See all TV shows · By last aired", `seeAllWords`).
   A list's opens the list page. A library's posts the link's sort to
@@ -314,7 +311,7 @@ first row's first card. Movies and TV get their rows above the grid.
   chosen the sort, and the screen scrolls to the grid's heading
   (`State.toGrid`). The rows above the Movies and TV grids call `open`
   directly. Continue watching and Live TV have none.
-- **See all on the TV** (PLAN-SEE-ALL.md S4): the list row's card, now on
+- **See all on the TV**: the list row's card, now on
   every row with a `seeAll` link (`TvSeeAll`, `tvHomeSeeAll`,
   `tvLibrarySeeAll` in `tv/rows/TvRows.kt`), as large as the row's artwork
   as it grows (`RowArtCard`). Home's one row a screen shows its panel
@@ -331,7 +328,7 @@ list; the missing titles are the fake request flow's, in each request state.
 
 ### Following shows: new-episode notifications
 
-From API level 29 ([PLAN-NEW-EPISODES.md](../PLAN-NEW-EPISODES.md) §7.1–§7.3)
+From API level 29
 a show's About has **Notify me** first, on the phone, the tablet and the TV:
 it follows the show on the server at once, for the person on every device,
 and goes back with the page's message if the server refuses
@@ -386,7 +383,7 @@ lists the id).
 
 ### Related titles at the end of movie and show pages
 
-From API level 30 ([PLAN-RELATED.md](../PLAN-RELATED.md) §6–§7) a movie's page
+From API level 30 a movie's page
 ends with its collection (the collection's other films in the library, in
 release order, named as TMDB names it) and More like this, and a show's page
 with More like this (`LibraryRepository.movieRelated` and `showRelated`,
@@ -442,8 +439,8 @@ copies stored beside the file.
 
 ### Downloads
 
-Phones and tablets download movies and episodes to watch with no connection
-([PLAN-DOWNLOADS.md](../PLAN-DOWNLOADS.md)); the TV app never shows them.
+Phones and tablets download movies and episodes to watch with no connection;
+the TV app never shows them.
 Download is offered from API level 10 to whoever the server's Who can
 download allows (admins by default, `RequestOptions.offline`); with downloads
 offered, Downloads takes Search's place in the phone's bottom bar (Search
@@ -576,8 +573,8 @@ the same API-level gates (`FAKE_SERVER_API_LEVEL`).
 
 ### Listings
 
-With a server at API level 13 whose `capabilities.guide` is true
-([PLAN-LIVE-TV-GUIDE.md](../PLAN-LIVE-TV-GUIDE.md) §6.3), Live TV shows
+With a server at API level 13 whose `capabilities.guide` is true,
+Live TV shows
 programme listings; otherwise every screen above stays as it was. The phone's
 guide shows an hour across, with the selected programme above it and its
 details in a bottom sheet; from 1000 dp the tablet shows two hours beside the
@@ -607,8 +604,8 @@ Use an isolated Android 35 AVD and an app-id suffix, as described above.
 
 ### Favourites, search and reminders
 
-From API level 15 with listings ([PLAN-LIVE-TV-GUIDE.md](../PLAN-LIVE-TV-GUIDE.md)
-§6.5), the guide has a star column left of the channels and a Favourites
+From API level 15 with listings,
+the guide has a star column left of the channels and a Favourites
 filter first among the chips once there is a favourite. Every client keeps
 one rule (`LiveGuideFilter.keeps`): a favourite shows with or without
 listings, in channel order. Live TV's top bar has Search listings and More
@@ -674,8 +671,8 @@ ANDROID_SERIAL=emulator-5690 ./gradlew :core:data:connectedDebugAndroidTest \
 
 ### Casting Live TV
 
-With a server at API level 14 whose `capabilities.cast` is true
-([PLAN-LIVE-TV.md](../PLAN-LIVE-TV.md) §4.1), Live TV's top bar and the live
+With a server at API level 14 whose `capabilities.cast` is true,
+Live TV's top bar and the live
 player have the Cast button (the LiveCast and TabLiveCast boards). A channel is
 offered to a TV only when its receiver's `state` lists the `live` feature, so
 an older receiver or TV app is never sent one; file casting is unchanged.
@@ -774,8 +771,8 @@ against `cmd/livetvfixture`.
 | `core:api` | Client generated from `../api/openapi-3.0.json` |
 | `core:data` | Real repositories: servers (DataStore, mDNS), sign-in and pairing, library, preferences, the server's event stream, playback API calls (`DataServices`) |
 | `core:playback` | `PlaybackEngine`, file `RealPlaybackController` and separate `RealLivePlaybackController` on Media3, device profile, media session, Watch Next |
-| `core:downloads` | Offline downloads on phones and tablets ([PLAN-DOWNLOADS.md](../PLAN-DOWNLOADS.md)): Media3's `DownloadManager` and `WmmDownloadService`, the download cache, `o1.` tokens, the records and offline progress queue, sync, and the player's way to downloaded items (`OfflineDownloads`) |
-| `core:cast` | Casting ([PLAN-CAST.md](../PLAN-CAST.md)): the phone's `RealCastService` and its remote `CastPlaybackController` on the Cast SDK, Cast Connect's `CastConnectReceiver` for the TV app, and `CastProtocol`, the Kotlin side of `web/src/cast/protocol.ts` |
+| `core:downloads` | Offline downloads on phones and tablets: Media3's `DownloadManager` and `WmmDownloadService`, the download cache, `o1.` tokens, the records and offline progress queue, sync, and the player's way to downloaded items (`OfflineDownloads`) |
+| `core:cast` | Casting: the phone's `RealCastService` and its remote `CastPlaybackController` on the Cast SDK, Cast Connect's `CastConnectReceiver` for the TV app, and `CastProtocol`, the Kotlin side of `web/src/cast/protocol.ts` |
 | `tv` | Compose for TV screens; `tv/player/` is the TV player, with a debug harness in `tv/src/debug` |
 | `mobile` | Material 3 phone screens; `mobile/player/` is the phone player, with a debug harness in `mobile/src/debug` |
 | `baselineprofile` | Tests that drive `app` on a device: the journeys that write its baseline and startup profiles, the startup and frame-timing benchmarks (Macrobenchmark), and `fixture_server.py`, the seeded fixture server the real-build journey uses ("Baseline profile" below) |
@@ -1042,7 +1039,7 @@ minutes of playing a file, before and after a change.
   navigation (`rememberFocusMemory`, and `rememberSaveable` for anything
   else focus depends on); a button busy with its work stays focusable and
   ignores OK (`FocusableBox`'s `enabled`). A row of cards shows where it
-  starts (`design/mockups/android-tv/RowStartBest.dc.html`): the card
+  starts: the card
   before the focused one stays in view (`KeylineSpec`), so at the start
   focus itself moves into the first place; cards scrolled past fade at the
   row's edge (`fadePassedCards`); and a run of ◀ (the key held, or pressed

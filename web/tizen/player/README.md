@@ -5,7 +5,7 @@ adapter, the device profile, the file, recording and trailer player, the
 Live TV player, subtitles and seek thumbnails. The screens render the stores'
 snapshots and call their commands. Import from `player/index.ts` only.
 
-The behaviour is the Android TV app's (PLAN-CLIENTS.md §2.3), built on the
+The behaviour is the Android TV app's, built on the
 web's shared rules in `src/lib/` rather than copies of them: skip, the next
 episode card and heartbeats (`play/rules.ts`), resume and event timelines
 (`play/stream.ts`), qualities (`quality.ts`), Still watching
@@ -107,6 +107,6 @@ The tests drive the controllers with fake players, timers and servers. None
 of it proves AVPlay: decoding each claim in `profile.ts`, HLS fMP4 and event
 playlists, seeking near the end, `getTotalTrackInfo` and `setSelectTrack`,
 `setSilentSubtitle`, `GET_LIVE_DURATION`, `suspend` and `restore`, the HTTP
-status event, 4K mode and HDR10 all wait for the QN90D session
-(PLAN-SAMSUNG.md §3), as does how often AVPlay reports the time, which the cue
+status event, 4K mode and HDR10 all wait for the QN90D session,
+as does how often AVPlay reports the time, which the cue
 timing rides on.

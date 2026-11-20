@@ -2,8 +2,7 @@
 
 The web app (`src/`) and the Google Cast receiver (`receiver/`). Read the root
 [AGENTS.md](../AGENTS.md) first. The web app is embedded in the server binary;
-the receiver is deployed on its own to cast.watchmy.media
-([PLAN-CAST.md](../PLAN-CAST.md) §4).
+the receiver is deployed on its own to cast.watchmy.media.
 
 ## Commands
 
@@ -56,8 +55,7 @@ the user asks in this conversation; see Authority in the root file.
   progress, selection, focus and badges; orange (`warn`) is for warnings. The
   apps and the site use the same colours. Check every page at phone width:
   some header pieces hide below the `sm` breakpoint.
-- **Screens follow `design/mockups/web/`.** Update the web canvas first for a
-  UI change (root file, How work goes).
+- **Screens follow the maintainers' designs.** Don't restyle one in passing.
 - **`public/reminders-sw.js`** is the service worker that shows Live TV
   reminders and new episodes of followed shows (scope `/`). It handles no
   fetches, so nothing of the app is cached or served from it; keep it that
@@ -73,19 +71,18 @@ the user asks in this conversation; see Authority in the root file.
   words are `src/lib/newEpisodes.ts`, and when the holding tab checks is
   `src/lib/newEpisodeSchedule.ts`, outside React and with the last change in
   storage, so a redraw, a reload or another tab taking the lock still checks
-  when the window ends (PLAN-NEW-EPISODES.md §6.1, §7.5). The layout draws
+  when the window ends. The layout draws
   the banners from one place in every page. A
   show's line is its one episode, the first to the last listed ("S3 E7 to
   E9"), or "From S3 E1" when more arrived than the feed lists, as on
   Android and Apple.
-- **YouTube trailers** (`src/pages/Trailer.tsx`, PLAN-TRAILERS.md §6.1) are the
+- **YouTube trailers** (`src/pages/Trailer.tsx`) are the
   app's one outside frame: a plain `<iframe>` of `www.youtube-nocookie.com`,
   never YouTube's IFrame API script, and nothing drawn over it. Keep its
   `referrerpolicy="strict-origin-when-cross-origin"`: the server's
   `Referrer-Policy: same-origin` sends no Referer, and YouTube then refuses to
-  play (error 153). The player's `postMessage` events are undocumented; the
-  plan's As built says what they were when checked.
-- **Rows** (PLAN-ROWS.md): Home and each library's Overview draw the
+  play (error 153). The player's `postMessage` events are undocumented.
+- **Rows**: Home and each library's Overview draw the
   server's `rows` (`arranged=true`) by `style`, skipping styles they don't
   know and `live`; `src/lib/screenRows.ts`, `src/lib/rowLayout.ts` and `src/lib/mediaLists.ts`
   hold the rules. Reordering is Move up and Move down plus our own pointer
@@ -93,24 +90,24 @@ the user asks in this conversation; see Authority in the root file.
   Add a row live in the address (`?edit`, `&add`) so Make a list
   (`/lists/new`) can come back to them; the unsaved order waits in
   `src/components/rows/rowDrafts.ts` for the visit. A movie's and a show's
-  page end with their related rows (PLAN-RELATED.md §7):
+  page end with their related rows:
   `src/components/rows/RelatedRows.tsx` draws them with `ScreenRows`, never
   with See all, once the details have loaded. Their query keys start with
   `related`, apart from the details', so refetching a page's details doesn't
   work the rows out again.
-- **Row cards** (PLAN-HOME.md §6): a card is a `div` of parts that are
+- **Row cards**: a card is a `div` of parts that are
   links of their own, drawn from `src/lib/cardLinks.ts` by
   `src/components/CardParts.tsx`: the title opens the title; a Recently
   added show card's "S03" opens the show on that season and its "E07" the
   episode's address, which puts it on top of the show's page
-  (PLAN-SHOW-PAGE.md; an older link's `?at=` redirects there, as `?episode=`
+  (an older link's `?at=` redirects there, as `?episode=`
   does); the
   picture is a pointer target for the most specific link, with `tabIndex={-1}`
   and `aria-hidden`, so a card has one tab stop per destination. Every link
   carries an `aria-label` naming the whole target. No quality badge on any
-  card; quality is a fact on the hero and the detail pages. The apps keep
-  PLAN-EPISODE-PAGE.md §10 (`addedEpisode` stays for them).
-- **Settings** (PLAN-ADMIN-SETTINGS.md): each tab opens on a hub, and each
+  card; quality is a fact on the hero and the detail pages.
+  `addedEpisode` stays for the apps.
+- **Settings**: each tab opens on a hub, and each
   task with more than one step is a flow at its own address under the tab.
   `src/lib/settingsRoutes.ts` lists every address and whether it is a hub, an
   item page or a flow (flows take the whole window, without the app bar or the
@@ -122,7 +119,7 @@ the user asks in this conversation; see Authority in the root file.
   drafts with the save bar. A button whose request asks for the password away
   from home is `guarded`, so it carries a lock there, and its call goes
   through `withConfirm`. Removes use `ConfirmDialog`, never `window.confirm`.
-- **Wording by install** (PLAN-LINUX.md §4): how the server was installed
+- **Wording by install**: how the server was installed
   changes what Settings says. `UpdateStatus.install` (admins) picks the
   update steps (`src/lib/updates.ts`) and the restore steps
   (`src/lib/backupSettings.ts`); `ServerInfo.install` and `.host` pick the

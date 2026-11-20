@@ -44,7 +44,7 @@ not tokens, addresses, account IDs, titles or paths. The caller must establish
 which user owns the token and which PMS account ID represents that user.
 History coverage is all retained records in that library, or records since the
 specified timestamp (rounded down to a UTC second). Neither proves lifetime history.
-See internal/plex/COMPATIBILITY.md for setup, limits and the live test matrix.
+See cmd/plexprobe/README.md for setup and limits.
 `
 
 type capability struct {

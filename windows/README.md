@@ -1,7 +1,9 @@
 # Windows desktop app
 
 The notification-area app supervises the same Go server used on other platforms.
-It is under development and not yet a signed public Windows release.
+It has been on <https://watchmy.media/download> since 1.0.0 (2026-11-06): every release
+has a signed installer, and the app updates itself from **Check for updates…** in its
+menu (Signed updates below). This file is for building and testing it.
 
 Build on the development Mac or Mac Studio:
 
@@ -27,9 +29,10 @@ and its descendants. The PC stays awake while the server reports playback.
 
 One instance runs per Windows user. A second launch opens its browser. If another
 user or program owns the port, choose **Use another port**; the app saves its new
-port in `tray-port`. It does not attach to the other server. **Check for updates**
-currently opens the server's Settings page; signed automatic installer updates
-come in W4. Do not claim that this development build has automatic updates.
+port in `tray-port`. It does not attach to the other server. In a release build,
+**Check for updates** opens WinSparkle, which installs a newer signed release when you
+agree; a development build has no feed, so it opens the web Settings update check
+instead (Signed updates below).
 
 Developer/test arguments:
 
@@ -46,9 +49,11 @@ off. It checks first run, one instance, graceful quit and force-kill cleanup.
 The supervisor tests also exercise crash/restart, a stuck child, port conflicts,
 setup opening once, invalid local replies and log rotation.
 
-Still required before public release: real Windows menu/keyboard/DPI/theme and
-sign-in checks, GPU/network-share tests, different-account UAC acceptance, signing
-and verified installer updates. See [the Windows plan](../PLAN-WINDOWS.md).
+Windows launched without a real PC to test on, so these are still to be checked on a
+real Windows 11 PC: menu, keyboard, DPI, theme and sign-in behaviour, installing,
+updating between two signed releases and uninstalling, different-account UAC, network
+shares, and NVIDIA, Intel, AMD and hybrid GPUs. Until a GPU vendor passes, nothing
+claims hardware acceleration on Windows.
 
 ## Collect hardware test evidence
 
@@ -163,8 +168,8 @@ the feed: only the release job's verified installer reaches the publisher.
 ## Signing
 
 Builds are signed with Azure Artifact Signing as Eldwick Software LLC, only in
-jobs that use the `windows-signing` environment, which admits only `v*` tags
-([SIGNING.md](SIGNING.md) has the Azure and GitHub setup):
+jobs that use the `windows-signing` environment, which admits only `v*` tags (the
+Azure and GitHub setup is in the maintainers' own notes, outside this repository):
 
 - release.yml's `windows` job signs every release (Releasing below);
 - CI's `windows-signing` job signs a development build on request: run the CI

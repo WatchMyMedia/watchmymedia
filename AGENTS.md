@@ -19,6 +19,12 @@ Where an `AGENTS.private.md` sits beside an `AGENTS.md`, read it too. It holds
 the maintainers' rules for releases, the site and the plans, which are kept
 outside the public repository, and it comes first where the two differ.
 
+Everything in this repository is public. Cite a plan or a mockup by its name
+(`PLAN-ROWS.md §4`, `design/mockups/web/`), never as a link: those files are
+not here ([CONTRIBUTING.md](CONTRIBUTING.md#files-this-repository-does-not-have)),
+so a link opens a 404. Keep out the address of a design canvas or of the
+maintainers' own servers, and anything else they keep to themselves.
+
 ## What this is
 
 A self-hosted media server and its clients. One Go server (with the React web

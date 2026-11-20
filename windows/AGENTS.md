@@ -1,6 +1,6 @@
 # Windows desktop app
 
-Read the root [AGENTS.md](../AGENTS.md) and [PLAN-WINDOWS.md](../PLAN-WINDOWS.md).
+Read the root [AGENTS.md](../AGENTS.md).
 This is a separate, pure-Go module. The server remains in `server/`.
 
 - `cmd/tray/`: Windows GUI entry point; `internal/winui/`: native message loop,
@@ -32,8 +32,7 @@ server before assigning its job; fail closed if job setup fails. Closing stdin
 is graceful shutdown; after five seconds terminate the job. Never poll an occupied
 port belonging to another user's server. Keep Windows CI GitHub-hosted.
 
-The approved repository boards are in `design/mockups/windows/`; they are not on
-a design canvas. Use fictional data in screenshots and fixture tests.
+Use fictional data in screenshots and fixture tests.
 
 `installer.nsi` and `installer.sh` build the development NSIS installer under
 `build/windows-installer/`. `installer-smoke.ps1` is for disposable hosted Windows.
@@ -41,7 +40,7 @@ Use the desktop user's token and environment for post-elevation launch/configura
 never fall back to the installing administrator. Only explicit interactive opt-in
 may delete the desktop user's data; silent uninstall keeps it.
 
-Signing ([SIGNING.md](SIGNING.md), README "Signing") runs only in jobs with the
+Signing ([README, Signing](README.md#signing)) runs only in jobs with the
 `windows-signing` environment, from `v*` tags: release.yml's `windows` job and
 CI's `windows-signing` job on a manual run that asks for it. Both sign as Eldwick
 Software LLC, so a manual signing run needs the user's go-ahead like a release.

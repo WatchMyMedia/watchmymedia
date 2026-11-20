@@ -1,7 +1,7 @@
 # core:playback
 
-The real `PlaybackController`: PLAN-CLIENTS.md §2.3 on Media3 ExoPlayer, the
-device profile (§5.4), the media session, and Watch Next on TVs.
+The real `PlaybackController`: the player behaviour on Media3 ExoPlayer, the
+device profile, the media session, and Watch Next on TVs.
 
 ## Wiring
 
@@ -22,7 +22,7 @@ merges into the app's on its own.
 
 | File | What |
 |---|---|
-| `RealPlaybackController` | The §2.3 machine: decisions, resume, heartbeats, Skip, Next Episode, Still watching, tracks, quality, token refresh, errors |
+| `RealPlaybackController` | The machine: decisions, resume, heartbeats, Skip, Next Episode, Still watching, tracks, quality, token refresh, errors |
 | `Rules.kt` | The numbers and pure rules (position mapping, token URLs, skip modes, error messages) |
 | `StillWatching` | The counters, one per app session |
 | `player/` | `MediaPlayer` (what the controller needs from a player) and `ExoMediaPlayer` |
@@ -33,5 +33,5 @@ merges into the app's on its own.
 ## Tests
 
 `./gradlew :core:playback:testDebugUnitTest` runs the controller on a fake
-player, a fake gateway and virtual time (`Fakes.kt`), so every timing in
-§2.3 is checked to the tick without a device.
+player, a fake gateway and virtual time (`Fakes.kt`), so every timing
+is checked to the tick without a device.

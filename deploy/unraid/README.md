@@ -2,8 +2,7 @@
 
 The Unraid Docker template, how people install it (from Community
 Applications, or by hand), how to test it on an Unraid server, and the
-submission checklist. The design and decisions are in
-[PLAN-UNRAID.md](../../PLAN-UNRAID.md); the guide for people is
+submission checklist. The guide for people is
 [watchmy.media/guide/unraid](https://watchmy.media/guide/unraid).
 
 ## Files
@@ -79,7 +78,7 @@ created, so a later install from Community Applications finds their values.
 ## Testing on an Unraid server
 
 The acceptance for U1, U2 and U4 together, run by someone with an Unraid
-server (PLAN-UNRAID.md Decision 2). Collect, in this order:
+server. Collect, in this order:
 
 1. Unraid version (Tools › System Devices or the top bar), and `ls -l /dev/dri`
    or the Nvidia Driver plugin page's GPU UUID.
@@ -110,8 +109,8 @@ titles or screenshots of their media.
 WatchMyMedia was submitted on 2026-11-19 and approved automatically, as a
 Docker-only submission can be; it appears in Community Applications after
 the next catalog build, listed as "WatchMyMedia's Repository". It had waited
-for the repository to be open-sourced and the GHCR package to be public
-(PLAN-UNRAID.md Decision 1): the portal's scan refuses an image it cannot
+for the repository to be open-sourced and the GHCR package to be public:
+the portal's scan refuses an image it cannot
 pull, and the policy wants a maintainer's own app to be open source. The
 steps, kept for a resubmission or another templates repository:
 
