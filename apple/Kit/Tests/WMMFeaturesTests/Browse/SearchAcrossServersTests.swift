@@ -105,6 +105,31 @@ import WMMModel
         #expect(after.movies.map(\.server) == [cabin])
     }
 
+    /// The order is the Servers list's, whichever answers first: a server's
+    /// rows wait for every server before it in the list.
+    @Test func aServerLaterInTheListWaitsForTheOnesBeforeIt() async throws {
+        let gate = Gate()
+        library.otherGates[FakeServers.cabin.id] = gate
+        library.otherAnswers[FakeServers.den.id] = .success(SearchResults(movies: [BrowseItem(kind: .movie, id: 9, libraryID: 1, title: "Harbor Fog")]))
+        await search("harbor")
+        #expect(try listing().movies.isEmpty, "Den server answered, but Cabin server comes before it and is still out")
+
+        gate.open()
+        await time.settle()
+        #expect(try listing().movies.map(\.title) == ["Harbor Nights", "Harbor Fog"])
+        #expect(try listing().movies.map(\.server) == [cabin, den])
+    }
+
+    @Test func aServerThatGivesUpLetsTheOnesAfterItIn() async throws {
+        library.otherGates[FakeServers.cabin.id] = Gate()
+        library.otherAnswers[FakeServers.den.id] = .success(SearchResults(movies: [BrowseItem(kind: .movie, id: 9, libraryID: 1, title: "Harbor Fog")]))
+        await search("harbor")
+        #expect(try listing().movies.isEmpty)
+        await time.advance(byMs: 4_000)
+        #expect(try listing().movies.map(\.server) == [den], "Cabin server's four seconds are up")
+        #expect(model.unlisted.map(\.id) == [FakeServers.cabin.id])
+    }
+
     @Test func aResultOnAnotherServerGetsItsPictureFromThatServer() async throws {
         await search("harbor")
         let listing = try listing()
@@ -183,7 +208,7 @@ import WMMModel
         #expect(library.otherSearches.map(\.server) == [FakeServers.officeMini.id], "only the one signed in to and new enough")
         #expect(model.serverCount == 2)
         #expect(Set(model.unlisted.map(\.line)) == [
-            "Den server is signed out here, so its titles aren’t listed.",
+            "You’re signed out of Den server here, so its titles aren’t listed.",
             "Cabin server is too old for this app, so its titles aren’t listed.",
         ])
         #expect(model.unlisted.allSatisfy { !$0.canRetry })

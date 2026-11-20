@@ -86,8 +86,10 @@ public struct UnlistedServer: Hashable, Sendable, Identifiable {
 /// With two or more servers signed in, every query goes to each of them at
 /// once, each to its own address with its own sign-in
 /// (``LibraryRepository/search(_:serverID:)``). The server in use's results
-/// draw first; each other server's are added to the end of each group as
-/// they arrive, and rows on screen never move. Each server gets
+/// draw first; each other server's are added to the end of each group in
+/// the Servers list's order, once every server before it has answered or
+/// failed, so rows on screen never move and the order doesn't depend on
+/// which answered first. Each server gets
 /// ``serverTimeout``; one still out after ``stillAskingAfter`` is named at
 /// the end of the list (``stillAsking``), and one that doesn't answer gets a
 /// line with Try again (``unlisted``) and isn't asked again for
@@ -172,8 +174,11 @@ public final class SearchModel {
     @ObservationIgnored private var round = 0
     /// The other servers asked this round, in the Servers list's order.
     @ObservationIgnored private var asked: [SearchSource] = []
-    /// Answers that came before the server in use's, by server ID.
+    /// Answers not added yet, by server ID: the server in use, or a server
+    /// earlier in the list, is still out.
     @ObservationIgnored private var early: [String: SearchResults] = [:]
+    /// How many of ``asked`` have had their turn: added, or failed.
+    @ObservationIgnored private var turns = 0
     /// This round's lines, shown once the server in use has answered.
     @ObservationIgnored private var roundUnlisted: [UnlistedServer] = []
     /// A server answered this round.
@@ -334,7 +339,12 @@ public final class SearchModel {
         }
         roundUnlisted.removeAll { $0.id == server.id }
         unlisted = roundUnlisted
-        if !asked.contains(where: { $0.id == server.id }) { asked.append(server.server) }
+        // It had its turn: asked again, its rows go after everything listed.
+        if let index = asked.firstIndex(where: { $0.id == server.id }) {
+            asked.remove(at: index)
+            if index < turns { turns -= 1 }
+        }
+        asked.append(server.server)
         ask(saved, resultsFor, round: round)
     }
 
@@ -491,6 +501,7 @@ public final class SearchModel {
         let across = acrossServers
         asked = []
         early = [:]
+        turns = 0
         roundUnlisted = []
         anyAnswered = false
         currentFailure = nil
@@ -545,13 +556,25 @@ public final class SearchModel {
                                                     line: SearchWords.didNotAnswer(current.name), canRetry: true), at: 0)
             }
         }
-        // The last search's rows from other servers go; the answers that came
-        // first are added in the Servers list's order, and later ones after them.
+        // The last search's rows from other servers go, and this one's are
+        // added in the Servers list's order as far as they have answered.
         currentDone = true
-        added = asked.compactMap { source in early[source.id].map { (source, $0) } }
-        early = [:]
+        added = []
         unlisted = roundUnlisted
+        addInOrder()
         settle()
+    }
+
+    /// Adds the other servers' answers in the Servers list's order, stopping
+    /// at the first that is still out: its rows, and those of the servers
+    /// after it, wait for it (``serverTimeout`` at most).
+    private func addInOrder() {
+        guard currentDone else { return }
+        while turns < asked.count, !out.contains(asked[turns].id) {
+            let source = asked[turns]
+            if let found = early.removeValue(forKey: source.id) { added.append((source, found)) }
+            turns += 1
+        }
     }
 
     /// Asks one other server, through its own API, within ``serverTimeout``.
@@ -579,7 +602,7 @@ public final class SearchModel {
         case .success(let found):
             if !anyAnswered { remember(resultsFor.isEmpty ? trimmedQuery : resultsFor) }
             anyAnswered = true
-            if currentDone { added.append((source, found)) } else { early[source.id] = found }
+            early[source.id] = found
         case .failure(let error):
             guard !(error is CancellationError) else { return }
             let line: UnlistedServer
@@ -593,6 +616,7 @@ public final class SearchModel {
             roundUnlisted.append(line)
             if currentDone { unlisted = roundUnlisted }
         }
+        addInOrder()
         settle()
     }
 
@@ -651,7 +675,7 @@ public enum SearchWords {
     public static func didNotAnswer(_ name: String) -> String { "\(name) didn’t answer, so its titles aren’t listed." }
 
     /// A registered server this device is signed out of, which isn't asked.
-    public static func signedOut(_ name: String) -> String { "\(name) is signed out here, so its titles aren’t listed." }
+    public static func signedOut(_ name: String) -> String { "You’re signed out of \(name) here, so its titles aren’t listed." }
 
     /// A registered server older than this app works with, which isn't asked.
     public static func tooOld(_ name: String) -> String { "\(name) is too old for this app, so its titles aren’t listed." }

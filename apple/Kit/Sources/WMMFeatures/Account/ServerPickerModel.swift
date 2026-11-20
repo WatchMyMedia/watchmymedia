@@ -32,6 +32,7 @@ public final class ServerPickerModel {
     private let servers: any ServerRepository
     private let now: () -> Date
     private let selectionAllowed: () -> Bool
+    private let refusal: (Server) -> (any Error)?
 
     /// The address typed under Enter an address.
     public var address = "" {
@@ -55,10 +56,14 @@ public final class ServerPickerModel {
     public private(set) var discovering = false
     private var discoveryOwners: Set<UUID> = []
 
-    public init(servers: any ServerRepository, now: @escaping () -> Date = { .now }, selectionAllowed: @escaping () -> Bool = { true }) {
+    /// - Parameter refusal: why the server an address reached isn't chosen,
+    ///   when it answers; Add a server refuses one that is added already.
+    public init(servers: any ServerRepository, now: @escaping () -> Date = { .now }, selectionAllowed: @escaping () -> Bool = { true },
+                refusal: @escaping (Server) -> (any Error)? = { _ in nil }) {
         self.servers = servers
         self.now = now
         self.selectionAllowed = selectionAllowed
+        self.refusal = refusal
     }
 
     /// Servers announcing themselves on this network, with their sign-in.
@@ -161,6 +166,7 @@ public final class ServerPickerModel {
             let server = try await servers.probe(address)
             if server.tooOld { throw ServerTooOldError(server: server) }
             try Task.checkCancellation()
+            if let refused = refusal(server) { throw refused }
             // A Settings switch belongs to the account that opened it. A
             // sign-out or account change during the probe must not select
             // its result over the new context.
@@ -171,10 +177,21 @@ public final class ServerPickerModel {
         } catch is CancellationError {
             return false
         } catch {
-            let text = connectMessage(error, label: label)
+            let text = (error as? ServerAlreadyAdded)?.message ?? connectMessage(error, label: label)
             if key == Self.addressKey { addressError = text } else { self.error = text }
             failure = ConnectFailure(key: key, label: label, error: error)
             return false
         }
     }
+}
+
+/// The address reached a server this device is registered with already:
+/// Add a server doesn't add it again.
+public struct ServerAlreadyAdded: Error, Hashable, Sendable {
+    public var name: String
+
+    public var title: String { "\(name) is already added" }
+    public static let body = "Choose it in Servers to switch to it."
+    /// "Cabin server is already added. Choose it in Servers to switch to it."
+    public var message: String { "\(title). \(Self.body)" }
 }

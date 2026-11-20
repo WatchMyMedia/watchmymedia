@@ -6,7 +6,8 @@ import WMMModel
 /// which stays on the server it was on until the new one is signed in, and
 /// goes back there on Cancel or any failure. Servers this device is
 /// registered with already aren't offered again (``found``, ``remembered``,
-/// ``alreadyAdded``): switching to one of those needs no steps
+/// ``alreadyAdded``), and an address typed that reaches one is refused
+/// with ``ServerAlreadyAdded``: switching to one of those needs no steps
 /// (``ServersModel``). Credentials stay in the repositories; cancellation
 /// selects the original saved endpoint, never a newly discovered address
 /// with its ID.
@@ -29,8 +30,8 @@ public final class AddServerModel {
     /// The server and account it ended on, once added.
     public private(set) var addedServer: Server?
     public private(set) var addedUser: User?
-    /// The server reached was signed in to already (its address was typed),
-    /// so Sign in was skipped: nothing was added, the app switched to it.
+    /// A sign-in for the server reached was kept already (from before a
+    /// reinstall, say), so Sign in was skipped.
     public private(set) var skippedSignIn = false
     /// Signing in again to a registered server whose sign-in ended, not adding one.
     public private(set) var signingInAgain = false
@@ -57,10 +58,23 @@ public final class AddServerModel {
         originalUser = user
         let permission = SelectionPermission()
         selectionPermission = permission
+        let again = SignInAgain()
+        signInAgain = again
         picker = ServerPickerModel(servers: servers, selectionAllowed: {
             permission.valid && Self.sameEndpoint(servers.current?.server, original.server) && auth.user == user
+        }, refusal: { reached in
+            // Registered already, unless it is the one being signed in to again.
+            guard reached.id != again.serverID,
+                  reached.id == original.server.id || servers.registered.contains(where: { $0.server.id == reached.id }) else { return nil }
+            return ServerAlreadyAdded(name: reached.name)
         })
     }
+
+    /// The registered server ``signIn(to:)`` is signing in to again, which isn't refused as added already.
+    private final class SignInAgain {
+        var serverID: String?
+    }
+    private let signInAgain: SignInAgain
 
     /// Password/setup requests finish before Back can change their account.
     /// Pairing is view-scoped and stops when the sign-in pane disappears.
@@ -91,6 +105,7 @@ public final class AddServerModel {
     public func signIn(to serverID: String) async {
         guard let saved = servers.saved.first(where: { $0.server.id == serverID }) else { return }
         signingInAgain = true
+        signInAgain.serverID = serverID
         await choose(ServerPickerModel.Row(
             id: saved.server.id, kind: .remembered, name: saved.server.name, address: saved.server.baseURL.absoluteString,
             detail: saved.switcherLine, tooOld: saved.server.tooOld, current: false, signedIn: saved.signedIn

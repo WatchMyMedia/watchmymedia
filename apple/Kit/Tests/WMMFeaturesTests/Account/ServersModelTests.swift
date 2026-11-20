@@ -93,7 +93,7 @@ import WMMModel
         #expect(model.rows.first?.name == "Server 1", "the one in use first")
         #expect(model.rows.dropFirst().map(\.name).first == "Server 12", "then by last use")
         #expect(!model.canAdd)
-        #expect(model.addLine(device: "iPad") == "This iPad keeps up to 12 servers. Remove one first.")
+        #expect(model.addLine(device: "iPad") == "This iPad keeps up to 12 servers. Remove one in Settings › Server, then add this one.")
     }
 
     // MARK: Switching
@@ -190,6 +190,19 @@ import WMMModel
         #expect(account.selected.isEmpty, "never opened with another server's sign-in")
         #expect(model.failure?.title == "Couldn’t reach Office Mac mini")
         #expect(account.current?.server == FakeServers.livingRoom)
+    }
+
+    @Test func aServerThatAnswersTooOldSaysToUpdateIt() async throws {
+        let account = SwitchAccount()
+        account.users[FakeServers.officeMini.baseURL] = viewer
+        var old = FakeServers.officeMini
+        old.apiLevel = 0
+        account.probeError = ServerTooOldError(server: old)
+        let model = ServersModel(servers: account, navigator: Navigator())
+        #expect(await model.switchTo(FakeServers.officeMini.id) == false)
+        #expect(model.failure?.title == "Office Mac mini is too old for this app")
+        #expect(model.failure?.body == "Update it, then switch. You’re still on Living room server.")
+        #expect(account.selected.isEmpty)
     }
 
     @Test func aServerWhoseSignInEndedOpensItsSignIn() async throws {
@@ -294,13 +307,17 @@ import WMMModel
         let library = FakeLibraryRepository()
         await s.model.open(DeepLink.movie(id: 500).url(publishedFor: FakeServers.den.id), library: library)
         #expect(s.servers.current?.server.id == FakeServers.livingRoom.id)
-        #expect(s.model.failure?.title == "Couldn’t reach Den server")
+        // Nobody chose it from Servers, so it is said as the note and Servers stays shut.
+        #expect(s.model.note == "Couldn’t reach Den server. You’re still on Living room server.")
+        #expect(s.model.failure == nil)
+        #expect(!s.model.presented)
         #expect(s.navigator.path(for: .home).isEmpty)
+        #expect(s.navigator.arrival == nil)
 
-        s.model.dismissFailure()
+        s.model.note = nil
         await s.model.open(DeepLink.movie(id: 500).url(publishedFor: "srv-unknown"), library: library)
         #expect(s.servers.current?.server.id == FakeServers.livingRoom.id)
-        #expect(s.model.failure == nil)
+        #expect(s.model.note == nil)
         #expect(s.navigator.path(for: .home).isEmpty)
 
         // Link a TV isn't Apple TV's: the app says which links it takes.
@@ -370,6 +387,7 @@ import WMMModel
         #expect(ServersWords.accountLabel(user: "Sam", server: "Cabin server") == "Servers. Sam, on Cabin server")
         #expect(ServersWords.accountLabel(user: "Sam", server: nil) == "Servers. Sam")
         #expect(ServersWords.yourServersLede(device: "iPhone", count: 3) == "This iPhone is signed in to each of these. Search looks in all of them.")
+        #expect(ServersWords.yourServersLede(device: "iPhone", count: 1) == "This iPhone is signed in to this server. Add another and search looks in both.")
         #expect(ServersWords.downloadsValue(count: 3, bytes: Int64(12.4 * 1_073_741_824)) == "3 · 12.4 GB")
         #expect(ServersWords.downloadsValue(count: 0, bytes: 0) == "None")
         #expect(ServersWords.moreDownloads(3, server: "Cabin server") == "3 more from Cabin server")

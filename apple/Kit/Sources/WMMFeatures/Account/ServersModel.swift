@@ -312,8 +312,10 @@ public final class ServersModel {
     /// search result), or it is known not to answer (Watch its downloads).
     /// True once it is the one in use; a server that doesn't answer leaves
     /// the app where it was and opens Servers on the failure.
+    /// - Parameter quietly: a failure is said as the note and Servers stays
+    ///   shut: for a link, which nobody chose from a screen that could answer it.
     @discardableResult
-    public func switchTo(_ serverID: String, arriving: ServerArrival? = nil, asking: Bool = true) async -> Bool {
+    public func switchTo(_ serverID: String, arriving: ServerArrival? = nil, asking: Bool = true, quietly: Bool = false) async -> Bool {
         guard switching == nil, removing == nil else { return false }
         guard let saved = servers.registered.first(where: { $0.server.id == serverID }) else { return false }
         guard saved.server.id != servers.current?.server.id else {
@@ -332,7 +334,7 @@ public final class ServersModel {
             } catch is CancellationError {
                 return false
             } catch {
-                failed(saved, error: error, arriving: arriving)
+                failed(saved, error: error, arriving: arriving, quietly: quietly)
                 return false
             }
         }
@@ -344,7 +346,7 @@ public final class ServersModel {
             try await servers.select(server)
         } catch {
             navigator.arrival = nil
-            failed(saved, error: error, arriving: arriving)
+            failed(saved, error: error, arriving: arriving, quietly: quietly)
             return false
         }
         failedArrival = nil
@@ -396,7 +398,7 @@ public final class ServersModel {
 
     private struct NoAnswer: Error {}
 
-    private func failed(_ saved: SavedServer, error: any Error, arriving: ServerArrival?) {
+    private func failed(_ saved: SavedServer, error: any Error, arriving: ServerArrival?, quietly: Bool) {
         let stillOn = servers.current.map { ServersWords.stillOn($0.server.name) }
         let held = downloads.elsewhere.first { $0.serverID == saved.server.id }?.count ?? 0
         let connect = ConnectFailure(key: saved.server.id, label: saved.server.name, error: error)
@@ -404,8 +406,14 @@ public final class ServersModel {
         if error is NoAnswer || connect.kind == .unreachable {
             words = SettingsNotice(title: ServersWords.couldNotReach(saved.server.name),
                                    body: [ServersWords.mayBeOff, stillOn].compactMap { $0 }.joined(separator: " "))
+        } else if case .tooOld = connect.kind {
+            words = ServersWords.tooOldToSwitch(saved.server.name, stillOn: stillOn)
         } else {
             words = connect.notice(after: stillOn)
+        }
+        guard !quietly else {
+            note = [words.title + ".", stillOn].compactMap { $0 }.joined(separator: " ")
+            return
         }
         failure = Failure(serverID: saved.server.id, title: words.title, body: words.body, downloads: held)
         failedArrival = arriving
@@ -420,7 +428,7 @@ public final class ServersModel {
     /// published for another registered server that is signed in switches to
     /// that server first, asking it which it is, and opens once the screens
     /// are rebuilt there (``Navigator/land(on:)``); when it doesn't answer
-    /// the app stays where it was and Servers says so. `accepts` leaves out
+    /// the app stays where it was and the note says so. `accepts` leaves out
     /// links a device doesn't take (Link a TV on Apple TV).
     public func open(_ url: URL, library: any LibraryRepository, liveTV: (any LiveTVRepository)? = nil, accepts: (DeepLink) -> Bool = { _ in true }) async {
         let current = servers.current?.server.id
@@ -430,7 +438,7 @@ public final class ServersModel {
             await navigator.open(opening.link, library: library, liveTV: liveTV)
             return
         }
-        await switchTo(server, arriving: ServerArrival(serverID: server, link: opening.link))
+        await switchTo(server, arriving: ServerArrival(serverID: server, link: opening.link), quietly: true)
     }
 
     // MARK: Removing, and signing out
@@ -510,7 +518,12 @@ public enum ServersWords {
 
     /// Under Add a server with ``maximumRegisteredServers`` registered.
     public static func addLimit(device: String) -> String {
-        "This \(device) keeps up to \(maximumRegisteredServers) servers. Remove one first."
+        "This \(device) keeps up to \(maximumRegisteredServers) servers. Remove one in Settings › Server, then add this one."
+    }
+
+    /// A switch to a server that answers on a version this app can't use.
+    public static func tooOldToSwitch(_ name: String, stillOn: String?) -> SettingsNotice {
+        SettingsNotice(title: "\(name) is too old for this app", body: ["Update it, then switch.", stillOn].compactMap { $0 }.joined(separator: " "))
     }
 
     public static func couldNotReach(_ name: String) -> String { "Couldn’t reach \(name)" }
@@ -560,7 +573,7 @@ public enum ServersWords {
     /// Under Your servers: "This iPhone is signed in to each of these. Search looks in all of them."
     public static func yourServersLede(device: String, count: Int) -> String {
         count > 1 ? "This \(device) is signed in to each of these. Search looks in all of them."
-            : "This \(device) is signed in to this one. Add another and search looks in both."
+            : "This \(device) is signed in to this server. Add another and search looks in both."
     }
 
     public static let downloadsFromIt = "Downloads from it"

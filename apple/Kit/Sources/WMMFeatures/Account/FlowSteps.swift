@@ -200,6 +200,8 @@ public struct ConnectFailure: Hashable, Sendable {
         case tooOld(version: String)
         /// It refused, or the address needs https: the reason as given.
         case other(String)
+        /// It is a server this device is registered with already.
+        case alreadyAdded(name: String)
     }
 
     /// The row's ID, or ``ServerPickerModel/addressKey`` for the typed address.
@@ -213,6 +215,8 @@ public struct ConnectFailure: Hashable, Sendable {
         self.label = label
         if let old = error as? ServerTooOldError {
             kind = .tooOld(version: old.server.version)
+        } else if let added = error as? ServerAlreadyAdded {
+            kind = .alreadyAdded(name: added.name)
         } else if let api = error as? APIError {
             let words = api.message
             let reasoned = words == localNetworkOffMessage || words.contains("https") || words.contains("certificate")
@@ -232,6 +236,8 @@ public struct ConnectFailure: Hashable, Sendable {
              "It is on \(versionLabel(version)), and this app needs server \(minimumServerVersion) or newer. Update that server, then try again.")
         case .other(let words):
             ("Couldn’t connect to \(label)", words)
+        case .alreadyAdded(let name):
+            (ServerAlreadyAdded(name: name).title, ServerAlreadyAdded.body)
         }
         return SettingsNotice(title: title, body: after.map { "\(body) \($0)" } ?? body)
     }
@@ -339,13 +345,7 @@ extension AddServerModel {
     /// device is signed in to now; `tv` words the way to Servers for the remote.
     public func finished(device: String, signedIn: Int, tv: Bool = false) -> FinishedWords? {
         guard outcome == .added, let server = addedServer else { return nil }
-        let title = if skippedSignIn {
-            "\(server.name) was added already"
-        } else if signingInAgain {
-            "You’re signed in to \(server.name) again"
-        } else {
-            "\(server.name) is added"
-        }
+        let title = signingInAgain ? "You’re signed in to \(server.name) again" : "\(server.name) is added"
         let count = max(signedIn, 1)
         let changed = count > 1
             ? "This \(device) is signed in to \(count) servers. Search looks in all of them."

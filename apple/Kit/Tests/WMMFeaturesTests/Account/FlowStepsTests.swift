@@ -158,15 +158,16 @@ import WMMModel
         #expect(first.finished(device: "Apple TV", signedIn: 3, tv: true)?.whatHappensNext
             == ["Select your initial beside the tabs to switch. It doesn’t ask for a password again."])
 
-        // Living room server is registered, so it isn't offered; its address typed switches to it with no Sign in.
+        // Living room server is registered, so it isn't offered, and its address typed isn't added again.
         let back = try #require(AddServerModel(servers: services.servers, auth: services.auth))
         #expect(!back.remembered.contains { $0.id == FakeServers.livingRoom.id })
         back.picker.address = FakeServers.livingRoom.baseURL.absoluteString
         await back.connectToAddress()
-        #expect(back.outcome == .added)
-        #expect(back.skippedSignIn, "no Sign in step")
-        #expect(back.flowStep.done == [1, 2, 3])
-        #expect(back.finished(device: "iPhone", signedIn: 2)?.title == "Living room server was added already")
+        #expect(back.outcome == nil)
+        #expect(back.flowStep.number == 1)
+        #expect(back.chooseProblem == SettingsNotice(
+            title: "Living room server is already added",
+            body: "Choose it in Servers to switch to it. You’re still on Office Mac mini."))
     }
 
     @Test func everyFailureSaysYoureStillOnTheFirstServer() async throws {

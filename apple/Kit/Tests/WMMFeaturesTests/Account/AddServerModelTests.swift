@@ -38,13 +38,19 @@ import WMMModel
         #expect(model.outcome == .added)
         #expect(services.auth.user?.name == "Robin")
 
+        // Living room server is registered: its address isn't added again, and nothing changes.
         let returning = try #require(AddServerModel(servers: services.servers, auth: services.auth))
         returning.picker.address = FakeServers.livingRoom.baseURL.absoluteString
         await returning.connectToAddress()
-        #expect(returning.outcome == .added)
-        #expect(returning.signIn == nil)
-        #expect(services.auth.user?.name == "Sam")
-        #expect(services.servers.saved.first { $0.id == FakeServers.officeMini.id }?.signedIn == true)
+        #expect(returning.outcome == nil)
+        #expect(returning.phase == .picking)
+        #expect(returning.chooseProblem == SettingsNotice(
+            title: "Living room server is already added",
+            body: "Choose it in Servers to switch to it. You’re still on Office Mac mini."))
+        #expect(returning.picker.addressError == "Living room server is already added. Choose it in Servers to switch to it.")
+        #expect(services.auth.user?.name == "Robin")
+        #expect(services.servers.current?.server.id == FakeServers.officeMini.id)
+        #expect(services.servers.saved.first { $0.id == FakeServers.livingRoom.id }?.signedIn == true)
     }
 
     @Test func startsOnlyForASignedInAccount() {
@@ -53,16 +59,34 @@ import WMMModel
         #expect(AddServerModel(servers: account, auth: account) == nil)
     }
 
-    @Test func rememberedSignInFinishesWithoutAForm() async throws {
+    /// A sign-in kept from before a reinstall, for a server this install has
+    /// never listed: choosing the server signs in at once.
+    @Test func aKeptSignInFinishesWithoutAForm() async throws {
         let account = SwitchAccount()
+        account.entries[FakeServers.officeMini.id] = nil
+        account.probeAnswer = FakeServers.officeMini
         account.users[FakeServers.officeMini.baseURL] = viewer
         let model = try #require(AddServerModel(servers: account, auth: account))
         model.picker.address = FakeServers.officeMini.baseURL.absoluteString
         await model.connectToAddress()
         #expect(model.outcome == .added)
+        #expect(model.skippedSignIn)
         #expect(model.signIn == nil)
         #expect(account.user == viewer)
         #expect(account.users[FakeServers.livingRoom.baseURL] == sam)
+        #expect(model.finished(device: "iPhone", signedIn: 2)?.title == "Office Mac mini is added")
+    }
+
+    @Test func anAddressThatReachesARegisteredServerIsNotAddedAgain() async throws {
+        let account = SwitchAccount()
+        account.users[FakeServers.officeMini.baseURL] = viewer
+        let model = try #require(AddServerModel(servers: account, auth: account))
+        model.picker.address = FakeServers.officeMini.baseURL.absoluteString
+        await model.connectToAddress()
+        #expect(model.phase == .picking)
+        #expect(account.selected.isEmpty, "nothing is chosen")
+        #expect(model.chooseProblem?.title == "Office Mac mini is already added")
+        #expect(account.user == sam)
     }
 
     @Test func newServerWaitsForPasswordAndKeepsTheOriginalSignIn() async throws {
