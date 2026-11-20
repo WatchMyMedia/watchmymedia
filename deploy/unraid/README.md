@@ -1,7 +1,7 @@
 # WatchMyMedia on Unraid
 
-The Unraid Docker template, how to install it before (and after) the
-Community Applications listing, how to test it on an Unraid server, and the
+The Unraid Docker template, how people install it (from Community
+Applications, or by hand), how to test it on an Unraid server, and the
 submission checklist. The design and decisions are in
 [PLAN-UNRAID.md](../../PLAN-UNRAID.md); the guide for people is
 [watchmy.media/guide/unraid](https://watchmy.media/guide/unraid).
@@ -37,10 +37,22 @@ A release does not need a template change unless the image's paths or
 variables changed; the `latest` tag moves on its own, and Unraid's Docker
 page shows the update.
 
+## Installing from Community Applications
+
+WatchMyMedia has been
+[listed in Community Applications](https://ca.unraid.net/apps/watchmymedia-1q0vytr13s083f)
+since 2026-11-20. In Unraid's **Apps** tab, people search for WatchMyMedia
+and click **Install** on its tile. Unraid opens the Add Container form
+filled in from the templates repository's copy of `watchmymedia.xml`;
+**Apply** starts it. If the Apps tab offers to install
+Community Applications first, that comes first. The guide for people, with
+the GPU steps, is [watchmy.media/guide/unraid](https://watchmy.media/guide/unraid).
+
 ## Installing by hand
 
-Until the app is in Community Applications (and on any Unraid box where it
-is not), from the Unraid terminal:
+Where Apps can't be used (a box without Community Applications, or one whose
+Unraid is older than the template's `MinVer`, which Community Applications
+can hide the app from), from the Unraid terminal:
 
 ```bash
 wget -O /boot/config/plugins/dockerMan/templates-user/my-WatchMyMedia.xml https://raw.githubusercontent.com/WatchMyMedia/unraid-templates/main/templates/watchmymedia.xml
@@ -50,16 +62,6 @@ Then Docker › Add Container and pick **WatchMyMedia** from the template
 list. Unraid saves the user's copy as that same file once the container is
 created, so a later install from Community Applications finds their values.
 
-**While the image is private**, the box also needs a way to pull it. Either:
-
-- the Unraid terminal runs `docker login ghcr.io` with a fine-grained GitHub
-  token the owner creates with read access to this one package (Unraid's
-  Docker page then pulls with that login, and Check for Updates works), or
-- the owner ships a tarball: `docker pull --platform linux/amd64 ghcr.io/watchmymedia/watchmymedia:X.Y.Z`
-  then `docker save ghcr.io/watchmymedia/watchmymedia:X.Y.Z | gzip > watchmymedia-X.Y.Z.tar.gz`;
-  on the box, `docker load < watchmymedia-X.Y.Z.tar.gz` and the template's
-  Repository changed to that tag. Check for Updates cannot work this way.
-
 ## Testing on an Unraid server
 
 The acceptance for U1, U2 and U4 together, run by someone with an Unraid
@@ -67,7 +69,7 @@ server (PLAN-UNRAID.md Decision 2). Collect, in this order:
 
 1. Unraid version (Tools › System Devices or the top bar), and `ls -l /dev/dri`
    or the Nvidia Driver plugin page's GPU UUID.
-2. Install by hand as above, with the GPU device kept (Intel/AMD) or the
+2. Install from Apps (or by hand) as above, with the GPU device kept (Intel/AMD) or the
    NVIDIA runtime and variables added; start; open the WebUI; finish setup
    from the LAN.
 3. The first 20 lines of the container's log (Docker › WatchMyMedia › Logs):
@@ -91,9 +93,13 @@ titles or screenshots of their media.
 
 ## Submitting to Community Applications
 
-Blocked until the repository is open-sourced and the GHCR package is public
-(PLAN-UNRAID.md Decision 1); the portal's scan refuses an image it cannot
-pull, and the policy wants a maintainer's own app to be open source. Then:
+WatchMyMedia was submitted on 2026-11-19 and approved automatically, as a
+Docker-only submission can be; it appears in Community Applications after
+the next catalog build, listed as "WatchMyMedia's Repository". It had waited
+for the repository to be open-sourced and the GHCR package to be public
+(PLAN-UNRAID.md Decision 1): the portal's scan refuses an image it cannot
+pull, and the policy wants a maintainer's own app to be open source. The
+steps, kept for a resubmission or another templates repository:
 
 1. The owner makes `ghcr.io/watchmymedia/watchmymedia` public in the package's
    settings and checks that `docker pull` works signed out.
@@ -105,8 +111,14 @@ pull, and the policy wants a maintainer's own app to be open source. Then:
    and mirror again).
 4. The site's guide at `/guide/unraid` is live, since the template's `ReadMe`
    points at it.
-5. Sign in at <https://ca.unraid.net/submit/new> with an Unraid account, add
-   the repository's GitHub URL, run Validate and Scan, fix what they flag,
-   submit. Approved apps appear at the next catalog build.
-6. Afterwards: link the listing from the site's download page, and change
+5. The [Unraid Community Apps](https://github.com/apps/unraid-community-apps)
+   GitHub App is installed on the templates repository, with read access to
+   contents and write access to issues; the portal can't run Validate
+   without it. Ours is installed on `unraid-templates` only.
+6. Sign in at <https://ca.unraid.net/submit/new> with an Unraid account, add
+   the repository's GitHub URL and a repository name (Community Applications
+   shows it with "'s Repository" after it; ours is "WatchMyMedia"), run
+   Validate and Scan, fix what they flag, submit. Approved apps appear at the
+   next catalog build.
+7. Afterwards: link the listing from the site's download page, and change
    the guide's "install by hand" step to "search Community Applications".
