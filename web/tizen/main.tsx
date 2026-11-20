@@ -43,16 +43,22 @@ function closed(title: string, message: string) {
 /**
  * The app's one player, made once: AVPlay on the TV; in the development
  * preview only, the browser's video (imported so the TV build leaves it
- * out); none where neither is there, as when the TV build opens in a
+ * out), or on the fakes a simulated stream; none where neither is there, as when the TV build opens in a
  * desktop browser, which can sign in and browse but not play.
  */
-async function makePlayer(): Promise<Player | undefined> {
+async function makePlayer(fakes: boolean): Promise<Player | undefined> {
   const avplay = (window as SamsungWindow).webapis?.avplay
   if (avplay) {
     document.querySelector('#browser-player')?.remove()
     return new AVPlayPlayer(avplay)
   }
   if (!import.meta.env.DEV) return undefined
+  // The fictional server has no media a <video> could open: a simulated stream plays instead.
+  if (fakes) {
+    document.querySelector('#av-player')?.remove()
+    const { previewPlayer } = await import('./fakes/player')
+    return previewPlayer(document.querySelector<HTMLVideoElement>('#browser-player') ?? undefined)
+  }
   const { BrowserPlayer } = await import('./player/browser-player')
   document.querySelector('#av-player')?.remove()
   return new BrowserPlayer(document.querySelector<HTMLVideoElement>('#browser-player')!)
@@ -72,7 +78,7 @@ async function start() {
     initialAddress = location.origin
   }
   const app = new AppSession(appStorage(), { model: tvModel(), initialAddress })
-  const player = await makePlayer()
+  const player = await makePlayer(fakes !== undefined)
   const input = new Input(document.body)
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) app.suspend()
