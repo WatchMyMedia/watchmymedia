@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { LiveChannel } from '../../../src/api/liveTV'
 import { liveTVCapabilitiesQuery } from '../../../src/api/queries'
 import { cancelRecording } from '../../../src/api/recordings'
 import { useFocus, useKeys, useNav, useSession } from '../../app/hooks'
 import { holdScreenSaver } from '../../app/platform'
+import { recordPlaybackError } from '../../app/playbackErrors'
 import type { PlayRequest } from '../../app/routes'
 import type { LivePlayback } from '../../player'
 import { ProblemScreen } from '../../ui/States'
@@ -12,7 +13,7 @@ import { placeholderTone } from '../../ui/tones'
 import { useNow } from './clock'
 import { GoToChannelPanel } from './GoToChannel'
 import { useRecordingAction } from './liveData'
-import { liveProblem, lowerQuality, type ProblemAction } from './liveProblems'
+import { liveProblem, loggedKind, lowerQuality, type ProblemAction } from './liveProblems'
 import { registerTuner, rememberChannel, useLivePlayback, useVideoSurface } from './livePlayback'
 import { ChannelBanner, Controls, OnNowPanel, ProblemDialog, ProblemPage, QualityPanel, StillWatching, TakeoverBanner, TopBar, Tuning } from './LivePlayerParts'
 import { BANNER_MS, CONTROLS_MS, liveBackAction, liveKeyAction, numberKey, type LivePanel } from './liveRemote'
@@ -79,6 +80,14 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
     number: channel?.number, admin: session.isAdmin, quality: state.quality, pauseMinutes: caps.data?.pauseSeconds ? Math.max(1, Math.round(caps.data.pauseSeconds / 60)) : undefined,
   }) : undefined
   const prompt = state.askStillWatching
+  // Each failure goes in Settings › About's log of the last playback errors, as a code.
+  // The engine words a failure afresh on each tick, so it is logged by what it is, once until it clears.
+  const failed = state.failure ? `${state.failure.reason ?? ''}:${state.failure.title}` : ''
+  const logFailure = useEffectEvent(() => {
+    const kind = state.failure && loggedKind(state.failure.reason)
+    if (kind) recordPlaybackError({ media: 'live', kind, channel: channel?.number })
+  })
+  useEffect(() => { if (failed) logFailure() }, [failed])
   const controls = shownControls
   const banner = !!channel && channel.id !== bannerDone
 

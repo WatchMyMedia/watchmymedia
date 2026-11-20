@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LiveProgramme } from '../../../src/api/liveTV'
 import type { Recording, RecordingRule } from '../../../src/api/recordings'
-import { liveProblem, lowerQuality, stillWatchingWords } from './liveProblems'
+import { liveProblem, loggedKind, lowerQuality, stillWatchingWords } from './liveProblems'
 import { DEFAULT_OPTIONS, atWords, createBody, optionsSummary, recordChoice, recordSet, recordedNote, ruleBody, stepKeep, stepPadding } from './recordModel'
 import { actions, card, details, playRequest, rowCount } from './recordingsModel'
 import { bannerReminder, loadSeen, markSeen, nextCheck, reminderRow, remindersHeading } from './remindersModel'
@@ -148,5 +148,10 @@ describe('Live TV’s problems', () => {
     expect(liveProblem({ title: 'Live TV could not start', detail: 'Try again, or choose another channel.' }, { admin: false, quality: '1080' }).title).toBe('Live TV could not start')
     expect([lowerQuality('auto'), lowerQuality('480'), lowerQuality('360')]).toEqual(['720', '360', undefined])
     expect(stillWatchingWords(59.2)).toBe('1:00')
+  })
+
+  it('logs failures for About, not the stops people chose or expect', () => {
+    expect([loggedKind('no_signal'), loggedKind('encoder_failed'), loggedKind('access_revoked'), loggedKind('tuners_busy'), loggedKind(undefined)]).toEqual(['network', 'format', 'auth', 'other', 'other'])
+    expect([loggedKind('pause_expired'), loggedKind('inactive'), loggedKind('recording'), loggedKind('stopped_by_admin')]).toEqual([undefined, undefined, undefined, undefined])
   })
 })

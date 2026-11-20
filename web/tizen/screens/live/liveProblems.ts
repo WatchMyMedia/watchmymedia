@@ -99,3 +99,18 @@ export function stillWatchingWords(secondsLeft: number): string {
   const s = Math.max(0, Math.ceil(secondsLeft))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
+
+/**
+ * How Settings › About's error log files a Live TV failure (app/playbackErrors.ts):
+ * its kind, or undefined for a stop that isn't a failure (a pause or four
+ * quiet hours gave the tuner back, a recording took it, an admin stopped it).
+ */
+export function loggedKind(reason: string | undefined): 'network' | 'auth' | 'format' | 'other' | undefined {
+  switch (reason) {
+    case 'pause_expired': case 'inactive': case 'recording': case 'stopped_by_admin': return undefined
+    case 'lease_expired': case 'tuner_unavailable': case 'device_changed': case 'signal_lost': case 'no_signal': case 'stream_stalled': return 'network'
+    case 'encoder_failed': case 'protected_channel': return 'format'
+    case 'not_allowed': case 'access_changed': case 'access_revoked': return 'auth'
+    default: return 'other'
+  }
+}
