@@ -156,7 +156,7 @@ export function SearchScreen() {
   const several = peers.length > 0
   const resultsRef = useRef<HTMLElement>(null)
   const [again, setAgain] = useState<string[]>([])
-  // A server asked again that answers takes its line away: focus goes to a card, or back to the keyboard.
+  // A server asked again that answers takes its line away, and focus with it: focus goes to a card.
   const answered = again.filter((id) => parts.find((p) => p.id === id)?.state !== 'asking')
   if (answered.length) setAgain(again.filter((id) => !answered.includes(id)))
   useEffect(() => {
@@ -196,7 +196,8 @@ export function SearchScreen() {
   const { shows, movies, episodes } = merged
   const nil = searching ? notInLibrary(requestable.data?.items, results) : []
   const chips = !inResults && text.trim().length >= SUGGEST_MIN_CHARS ? suggestionChips(library.data, text) : []
-  const nothing = searching && merged.settled && !library.isError && !shows.length && !movies.length && !episodes.length && !hits.length && !nil.length && !requestable.isPending
+  // With one server it says so as it always has; with several, only once each has answered for these words.
+  const nothing = searching && (several ? merged.settled : library.isSuccess) && !library.isError && !shows.length && !movies.length && !episodes.length && !hits.length && !nil.length && !requestable.isPending
   const switching = appState.screen === 'signedIn' && appState.switching?.state === 'switching' ? appState.switching : undefined
 
   const toKeyboard = () => {

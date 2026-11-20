@@ -259,8 +259,9 @@ export class AppSession {
     const known = this.store.get(info.id)
     const account = known?.account
     const facts = { id: info.id, name: info.name, baseUrl, version: info.version, apiLevel: info.apiLevel }
-    // A server being added is remembered once it is signed in to, so leaving its sign-in leaves nothing behind.
-    if (known || !this.back) this.store.remember(facts)
+    // From the signed-in app nothing is remembered until the server is signed in to, so leaving its sign-in
+    // leaves nothing behind, and the server the app is on stays the one a launch opens.
+    if (!this.back) this.store.remember(facts)
     if (!account) { this.showSignIn(info, baseUrl); return }
     try {
       const api = bearerClient(baseUrl, { token: account.token, timeoutMs: PROBE_MS })

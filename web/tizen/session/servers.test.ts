@@ -247,6 +247,22 @@ describe('adding a server from the signed-in app', () => {
     app.shutdown()
   })
 
+  it('leaves the list as it was when the sign-in of a server this TV is signed out of is left', async () => {
+    const a = living(), b = cabin()
+    stubServers([a, b])
+    const { app, storage, first } = await signedInTo([a], [b])
+    app.addServer()
+    app.editAddress('192.0.2.31')
+    await app.connect()
+    expect(app.snapshot()).toMatchObject({ screen: 'signIn', server: { id: 'srv-cabin' } })
+    app.cancel()
+    app.cancel()
+    expect(session(app)).toBe(first)
+    // The server the app is on is still the one used last, so a launch opens on it.
+    expect(new ServerStore(storage).last()?.id).toBe('srv-living')
+    app.shutdown()
+  })
+
   it('keeps the app on its server when the address answers nothing or a server it can’t use', async () => {
     const a = living(), b = { ...cabin(), apiLevel: REQUIRED_API_LEVEL - 1 }
     stubServers([a, b])
