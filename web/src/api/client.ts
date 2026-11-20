@@ -30,9 +30,13 @@ export class ApiError extends Error {
   }
 }
 
-/** Unwraps an openapi-fetch result for use as a TanStack Query queryFn. */
+/**
+ * Unwraps an openapi-fetch result for use as a TanStack Query queryFn. Any 2xx
+ * succeeds, and one without a body (a 204, or a 202 that only says the work
+ * started, as Search now's does) gives undefined; anything else throws.
+ */
 export function unwrap<T>(res: { data?: T; error?: unknown; response: Response }): T {
-  if (res.error !== undefined || (res.data === undefined && res.response.status !== 204)) {
+  if (res.error !== undefined || !res.response.ok) {
     throw new ApiError(res.response, res.error)
   }
   return res.data as T
