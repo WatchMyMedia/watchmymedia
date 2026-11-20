@@ -1,6 +1,5 @@
 -- +goose Up
--- Following shows and the episodes that arrive for them
--- (PLAN-NEW-EPISODES.md section 5.1).
+-- Following shows and the episodes that arrive for them.
 --
 -- show_follows is each person's list, keyed by the show's TMDB id: a show's
 -- row belongs to one library and can be made again, the TMDB id survives

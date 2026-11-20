@@ -1,6 +1,6 @@
 -- +goose Up
 -- Where a season starts when TMDB numbers it differently from the files in
--- a show folder (PLAN-SEASON-MAPPING.md): files from from_season and
+-- a show folder: files from from_season and
 -- from_episode on are the TMDB show's to_season and to_episode on, in order.
 -- The show may be another one than the folder's, as when TMDB lists a later
 -- season as a show of its own. Matching uses it before it searches, so files

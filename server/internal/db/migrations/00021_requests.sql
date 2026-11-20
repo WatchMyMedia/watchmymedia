@@ -1,5 +1,5 @@
 -- +goose Up
--- Requests and problem reports (PLAN-ARR.md §7.2, §9), kept by the server
+-- Requests and problem reports, kept by the server
 -- when Radarr and Sonarr carry requests out without Seerr. Deleting an
 -- account deletes what it asked for and reported, as it deletes its history.
 CREATE TABLE requests (

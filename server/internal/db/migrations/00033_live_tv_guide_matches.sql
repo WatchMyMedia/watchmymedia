@@ -1,5 +1,5 @@
--- TMDB pictures and descriptions for listings (PLAN-LIVE-TV-GUIDE.md §4.2,
--- G3). A refresh replaces each channel's programmes about once a day, so
+-- TMDB pictures and descriptions for listings.
+-- A refresh replaces each channel's programmes about once a day, so
 -- matches are kept apart from them: a show or movie is looked up once a
 -- month, not once a day, and each run stays within its 200 TMDB calls.
 -- feed_description keeps the feed's text while a matched TMDB overview

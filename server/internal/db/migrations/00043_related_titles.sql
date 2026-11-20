@@ -1,5 +1,5 @@
 -- +goose Up
--- Related titles at the end of movie and show pages (PLAN-RELATED.md 4).
+-- Related titles at the end of movie and show pages.
 -- A movie keeps its TMDB collection; both kinds keep when their related
 -- data was last fetched (NULL: never, so the fill-in job fetches it).
 ALTER TABLE movies ADD COLUMN collection_id INTEGER;

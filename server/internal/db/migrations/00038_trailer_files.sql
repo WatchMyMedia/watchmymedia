@@ -1,5 +1,5 @@
 -- +goose Up
--- Trailer files in the library (PLAN-TRAILERS.md §5.2). A trailer is a
+-- Trailer files in the library. A trailer is a
 -- media_files row, so playback, Cast and every player work on it by file
 -- id, but it is not library content: extra_kind says what it is (NULL for
 -- library content, 'trailer' for trailers) and extra_of which movie it

@@ -1,5 +1,5 @@
--- Live TV favourites, reminders and listings search (PLAN-LIVE-TV-GUIDE.md
--- §5.7, G6). Favourites and reminders belong to a person and name the
+-- Live TV favourites, reminders and listings search.
+-- Favourites and reminders belong to a person and name the
 -- channel by its number, not its id: removing and re-adding a tuner gives
 -- its channels new ids and would otherwise lose them. A reminder keeps its
 -- own copy of the programme, since every refresh replaces

@@ -1,6 +1,6 @@
 -- +goose Up
--- Lists that rows on Home and the library screens are made from
--- (PLAN-ROWS.md 7.2): from TMDB, MDBList, a saved library filter, or an
+-- Lists that rows on Home and the library screens are made
+-- from: from TMDB, MDBList, a saved library filter, or an
 -- import. A list belongs to one person (owner_id), or to the household when
 -- owner_id is NULL; deleting a person deletes their lists.
 --

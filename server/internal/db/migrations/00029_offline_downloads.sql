@@ -1,5 +1,5 @@
 -- +goose Up
--- Files people downloaded to watch offline (PLAN-DOWNLOADS.md): who, on which
+-- Files people downloaded to watch offline: who, on which
 -- device, which version of the file, and what was asked for, so a transcoding
 -- download's session can be made again. item_type and item_id name the movie
 -- or (first) episode the file was, so a download whose file went can still

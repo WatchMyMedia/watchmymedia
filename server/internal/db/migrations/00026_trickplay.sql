@@ -1,5 +1,5 @@
 -- +goose Up
--- Seek thumbnails made for each file (PLAN-TRICKPLAY.md). One row per file:
+-- Seek thumbnails made for each file. One row per file:
 -- the version the tiles are for, and what came of making them. Rows go with
 -- their file; the folders on disk are swept to match. file_size and
 -- file_mtime are what the version was made from, so the work list can find

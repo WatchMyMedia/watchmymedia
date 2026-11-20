@@ -1,6 +1,6 @@
 -- +goose Up
--- Local watch choices must survive imports from another server
--- (PLAN-PLEX-SYNC.md, "Additive merge rules"). An unwatch deletes its
+-- Local watch choices must survive imports from another
+-- server. An unwatch deletes its
 -- watch_state row, so each choice keeps a guard of its own: per user and
 -- item, who decided it last. Every local change (a play, a mark, an unwatch,
 -- a season or show action) takes the next revision and makes its guards
