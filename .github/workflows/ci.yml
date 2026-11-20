@@ -813,18 +813,29 @@ jobs:
           restore-keys: |
             swift-packages-${{ runner.os }}-${{ hashFiles('apple/project.yml', 'apple/Kit/Package.swift', 'apple/Kit/Package.resolved') }}-
             swift-packages-${{ runner.os }}-
+      # Both builds come before the tests, so that nothing compiles beside a
+      # booting simulator. On these three-core runners a simulator's first
+      # boot takes minutes, and a build that ran meanwhile took two to three
+      # times as long (runs of 2026-11-20: the Debug build 215 s with nothing
+      # booted, 409 to 690 s beside the boot). No step boots one: xcodebuild
+      # does when the tests start.
       # No code coverage in CI: nobody reads it, and it slows the build.
-      - name: Build and test on a simulator
+      - name: Build for testing
+        id: build
         if: needs.changes.outputs.apple == 'true'
         run: |
           xcodebuild -version
-          make apple-test-sim APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
+          make apple-build-for-testing APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
       # The Release configuration for devices, unsigned: what an archive
       # compiles, so a release-only break shows before a tag. The target also
       # checks the privacy manifest is in the app and the fakes aren't.
       - name: Build for release
         if: needs.changes.outputs.apple == 'true'
         run: make apple-build-release PATH="$PATH"
+      # The tests run whether or not the Release build passed.
+      - name: Test on a simulator
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: make apple-test-without-building APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: "!cancelled() && needs.changes.outputs.apple == 'true' && steps.packages.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
         with:
@@ -875,21 +886,27 @@ jobs:
           restore-keys: |
             swift-packages-${{ runner.os }}-${{ hashFiles('apple/project.yml', 'apple/Kit/Package.swift', 'apple/Kit/Package.resolved') }}-
             swift-packages-${{ runner.os }}-
-      - name: Build and test on an Apple TV simulator
-        # Runners stalled after all tests passed when this ran on a Mac of
-        # the maintainers'. Avoid verbose sysdiagnose collection, a possible
-        # cause; keep results and failures.
-        # Built once, then (share 1) the Kit's tests and this share's UI
-        # tests, apart, on one simulator. Two clones on this three-core runner
-        # made each test two to three times slower and saved nothing (runs of
-        # 2026-11-12 and 2026-11-14), and a Kit timing test failed beside them.
-        timeout-minutes: 30
-        run: make apple-tv-test-sim-ci TV_UI_SHARD=${{ matrix.share }}/2 TV_KIT_TESTS=${{ matrix.share == 1 && 'yes' || 'no' }} APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
+      # Built once, before anything boots: the apple job says why.
+      - name: Build for testing
+        id: build
+        run: make apple-tv-build-for-testing APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
       # Release for devices, unsigned, as in the apple job: once, in share 2,
       # which has no Kit tests to run.
       - name: Build for release
         if: matrix.share == 2
         run: make apple-tv-build-release PATH="$PATH"
+      - name: Test on an Apple TV simulator
+        # Runners stalled after all tests passed when this ran on a Mac of
+        # the maintainers'. Avoid verbose sysdiagnose collection, a possible
+        # cause; keep results and failures.
+        # (Share 1) the Kit's tests, then this share's UI tests, apart, on
+        # one simulator, whether or not the Release build passed. Two clones
+        # on this three-core runner made each test two to three times slower
+        # and saved nothing (runs of 2026-11-12 and 2026-11-14), and a Kit
+        # timing test failed beside them.
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 30
+        run: make apple-tv-test-without-building TV_UI_SHARD=${{ matrix.share }}/2 TV_KIT_TESTS=${{ matrix.share == 1 && 'yes' || 'no' }} APPLE_TV_TEST_DIAGNOSTICS=never APPLE_TEST_FLAGS='-enableCodeCoverage NO' PATH="$PATH"
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: "!cancelled() && matrix.share == 1 && steps.packages.outputs.cache-hit != 'true' && runner.environment == 'github-hosted' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
         with:
