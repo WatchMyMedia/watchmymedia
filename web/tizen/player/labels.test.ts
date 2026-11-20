@@ -23,8 +23,11 @@ describe('player words', () => {
   it('words tracks and results', () => {
     expect(audioWords({ index: 2, codec: 'ac3', channels: 6, default: false, language: 'fr', title: 'Commentary' })).toEqual({ label: 'French', detail: 'AC3 5.1 · Commentary' })
     expect(audioWords({ index: 3, codec: 'aac', channels: 1, default: false })).toEqual({ label: 'Track 3', detail: 'AAC' })
+    // ffprobe tags an untagged track und, which Intl.DisplayNames names "root": the TV showed "Audio root".
+    expect(audioWords({ index: 1, codec: 'aac', channels: 2, default: true, language: 'und' })).toEqual({ label: 'Track 1', detail: 'AAC Stereo' })
     expect(channelsWords(8)).toBe('7.1')
     expect(subtitleWords({ id: 's1', codec: 'pgs', format: 'image', burnInOnly: true, default: false, external: false, forced: true, language: 'en' })).toEqual({ label: 'English', detail: 'Forced · burned in, restarts playback' })
+    expect(subtitleWords({ id: 's2', codec: 'subrip', format: 'webvtt', burnInOnly: false, default: false, external: false, forced: false, language: 'und', title: 'Signs' })).toEqual({ label: 'Signs', detail: undefined })
     expect(subtitleWords({ id: 'd1', codec: 'subrip', format: 'webvtt', burnInOnly: false, default: false, external: true, forced: false, source: 'opensubtitles', language: 'es', release: 'Release.1080p' })).toEqual({ label: 'Spanish', detail: 'OpenSubtitles · Release.1080p' })
     expect(onlineWords({ id: 'r', language: 'de', release: 'R', hashMatch: true, hearingImpaired: true, forced: false, aiTranslated: false, downloads: 1, trusted: true })).toEqual({ label: 'German', detail: 'matches this file · HI · R' })
     expect(episodeWords({ seasonNumber: 3, episodeNumber: 8, title: 'Squall Line' })).toBe('S03 E08 · Squall Line')

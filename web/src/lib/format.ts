@@ -93,11 +93,21 @@ const languageNames = (() => {
 })()
 
 /** "English", "Portuguese (Brazil)" from en, pt-br or eng; the code itself when unknown. */
+/**
+ * A track's language tag, or undefined when it names none: missing, or `und`
+ * (undetermined), which ffprobe gives untagged tracks and which
+ * Intl.DisplayNames would call "root".
+ */
+export function knownLanguage(code?: string | null): string | undefined {
+  return code && code.toLowerCase() !== 'und' ? code : undefined
+}
+
 export function languageName(code?: string): string {
-  if (!code) return 'Unknown language'
+  const tag = knownLanguage(code)
+  if (!tag) return 'Unknown language'
   try {
-    return languageNames?.of(code) ?? code.toUpperCase()
+    return languageNames?.of(tag) ?? tag.toUpperCase()
   } catch {
-    return code.toUpperCase()
+    return tag.toUpperCase()
   }
 }

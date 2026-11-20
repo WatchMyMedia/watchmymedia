@@ -1,5 +1,5 @@
 import type { components } from '../../../src/api/schema'
-import { formatBytes, formatRuntime, languageName, resolutionLabel } from '../../../src/lib/format'
+import { formatBytes, formatRuntime, knownLanguage, languageName, resolutionLabel } from '../../../src/lib/format'
 import { firstTrailer, type PlayableTrailer } from '../../../src/lib/trailers'
 import type { PlayRequest } from '../../app/routes'
 import { codecWords } from '../../player'
@@ -157,14 +157,14 @@ export function versionTracks(f: MediaFileDetail, perKind = 3): TrackLine[] {
   }
   audio.slice(0, perKind).forEach((a, i) => {
     // A titled track reads by its title ("Commentary"), others by their language.
-    const lang = a.language && a.language !== 'und' ? languageName(a.language) : undefined
+    const lang = knownLanguage(a.language) ? languageName(a.language) : undefined
     const name = a.title?.trim() || lang || 'Unknown language'
     lines.push({ kind: i === 0 ? 'Audio' : undefined, text: [name, [codecWords(a.codec), channelsText(a.channels, a.channelLayout)].filter(Boolean).join(' ')].filter(Boolean).join(SEP), default: a.default })
   })
   if (audio.length > perKind) lines.push({ text: `+ ${audio.length - perKind} more` })
   const subs = f.probe?.subtitles ?? []
   subs.slice(0, perKind).forEach((s, i) => {
-    const lang = s.language && s.language !== 'und' ? languageName(s.language) : undefined
+    const lang = knownLanguage(s.language) ? languageName(s.language) : undefined
     const name = [lang ?? s.title ?? 'Unknown language', lang && s.title && s.title !== lang ? s.title : ''].filter(Boolean).join(' ')
     lines.push({ kind: i === 0 ? 'Subtitles' : undefined, text: [s.forced ? `${name} (Forced)` : name, subtitleFormat(s.codec)].join(SEP), burnIn: s.image })
   })
