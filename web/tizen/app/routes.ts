@@ -9,6 +9,9 @@ import { LiveScreen } from '../screens/live/LiveScreen'
 import { SearchScreen } from '../screens/search/SearchScreen'
 import { SettingsScreen } from '../screens/settings/SettingsScreen'
 import { RequestsScreen } from '../screens/settings/RequestsScreen'
+import { LiveGuideScreen } from '../screens/live/LiveGuideScreen'
+import { RecordingsScreen } from '../screens/live/RecordingsScreen'
+import { RemindersScreen } from '../screens/live/RemindersScreen'
 
 // Every screen of the signed-in app: the one union of routes, and the
 // registry that draws each. A feature adds its route here (a variant in
@@ -21,13 +24,17 @@ export type PlayRequest =
   | { kind: 'recording'; id: string; startMs?: number; title?: string }
   | { kind: 'trailer'; movieId: number; title?: string; youtubeKey?: string; fileId?: number }
 
+/** Settings' groups (SettingsGroups on the canvas), in the order the left column lists them. */
+export type SettingsGroup = 'playback' | 'languages' | 'homeRows' | 'notifications' | 'account' | 'requests' | 'about' | 'server'
+
 export type Route =
   // Sections: the rail opens these, on top of Home.
   | { name: 'home' }
   | { name: 'search' }
   | { name: 'library'; type: 'movie' | 'tv' }
   | { name: 'live' }
-  | { name: 'settings' }
+  /** Settings, opened at a group (Home's Edit rows opens `homeRows` at that screen). */
+  | { name: 'settings'; group?: SettingsGroup; rowsScreen?: 'home' | 'movie' | 'tv' }
   // Pages: each opens on top of what opened it.
   /** A row's See all: its library sorted the row's way (PLAN-SEE-ALL.md). */
   | { name: 'seeAll'; libraryId: number; title: string; sort?: string; filter?: string; genre?: string }
@@ -36,6 +43,10 @@ export type Route =
   /** The show page (PLAN-SHOW-PAGE.md): up next on top, or a season's start, or an episode. */
   | { name: 'show'; id: number; season?: number; episodeId?: number }
   | { name: 'requests'; inbox?: boolean }
+  /** The guide, at a channel or a time (ms since the epoch). */
+  | { name: 'liveGuide'; channelId?: string; at?: number }
+  | { name: 'recordings' }
+  | { name: 'reminders' }
   | { name: 'player'; play: PlayRequest }
 
 /** The rail's sections, top to bottom. */
@@ -63,6 +74,9 @@ export const ROUTES: { [N in Route['name']]: RouteDef<N> } = {
   movie: { screen: MovieScreen },
   show: { screen: ShowScreen },
   requests: { screen: RequestsScreen },
+  liveGuide: { screen: LiveGuideScreen },
+  recordings: { screen: RecordingsScreen },
+  reminders: { screen: RemindersScreen },
   player: { screen: PlayerScreen, chrome: 'full' },
 }
 
