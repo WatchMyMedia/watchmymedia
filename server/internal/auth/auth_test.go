@@ -51,23 +51,23 @@ func TestSetupLoginAuthenticateLogout(t *testing.T) {
 	if need, _ := s.SetupRequired(ctx); !need {
 		t.Fatal("setup should be required with no users")
 	}
-	u, err := s.CreateUser(ctx, "Taimoor", "secret12", true)
+	u, err := s.CreateUser(ctx, "Robin", "secret12", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !u.IsAdmin || u.Name != "Taimoor" {
+	if !u.IsAdmin || u.Name != "Robin" {
 		t.Errorf("user = %+v", u)
 	}
-	if _, err := s.CreateUser(ctx, "taimoor", "other123", false); err == nil {
+	if _, err := s.CreateUser(ctx, "robin", "other123", false); err == nil {
 		t.Error("duplicate name (case-insensitive) accepted")
 	}
-	if _, _, err := s.Login(ctx, Credentials{Name: "Taimoor", Password: "nope"}, Client{}); !errors.Is(err, ErrInvalidCredentials) {
+	if _, _, err := s.Login(ctx, Credentials{Name: "Robin", Password: "nope"}, Client{}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Errorf("bad password -> %v", err)
 	}
 	if _, _, err := s.Login(ctx, Credentials{Name: "nobody", Password: "secret12"}, Client{}); !errors.Is(err, ErrInvalidCredentials) {
 		t.Errorf("unknown user -> %v", err)
 	}
-	got, grant, err := s.Login(ctx, Credentials{Name: "taimoor", Password: "secret12"}, Client{UserAgent: "test-agent"})
+	got, grant, err := s.Login(ctx, Credentials{Name: "robin", Password: "secret12"}, Client{UserAgent: "test-agent"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestSetupLoginAuthenticateLogout(t *testing.T) {
 	if _, err := s.Authenticate(ctx, token); !errors.Is(err, ErrUnauthenticated) {
 		t.Errorf("expired token -> %v", err)
 	}
-	token = login(t, s, "taimoor", "secret12")
+	token = login(t, s, "robin", "secret12")
 	if err := s.Logout(ctx, token); err != nil {
 		t.Fatal(err)
 	}
@@ -94,8 +94,8 @@ func TestSetupLoginAuthenticateLogout(t *testing.T) {
 		t.Error("token still valid after logout")
 	}
 	// Changing the password signs out every other session.
-	token = login(t, s, "taimoor", "secret12")
-	keep := login(t, s, "taimoor", "secret12")
+	token = login(t, s, "robin", "secret12")
+	keep := login(t, s, "robin", "secret12")
 	if err := s.ChangePassword(ctx, u.ID, "newpass9", keep); err != nil {
 		t.Fatal(err)
 	}
@@ -105,10 +105,10 @@ func TestSetupLoginAuthenticateLogout(t *testing.T) {
 	if _, err := s.Authenticate(ctx, keep); err != nil {
 		t.Errorf("the session that changed the password was signed out: %v", err)
 	}
-	if _, _, err := s.Login(ctx, Credentials{Name: "taimoor", Password: "newpass9"}, Client{}); err != nil {
+	if _, _, err := s.Login(ctx, Credentials{Name: "robin", Password: "newpass9"}, Client{}); err != nil {
 		t.Error("new password rejected")
 	}
-	if _, err := s.CheckPassword(ctx, "taimoor", "secret12"); !errors.Is(err, ErrInvalidCredentials) {
+	if _, err := s.CheckPassword(ctx, "robin", "secret12"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Errorf("old password -> %v", err)
 	}
 }

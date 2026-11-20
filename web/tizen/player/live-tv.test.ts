@@ -137,7 +137,7 @@ describe('refusals and failures', () => {
   })
 
   it('never shows the server’s sentence', async () => {
-    const h = harness({ start: () => Response.json({ detail: 'Tuner at http://192.168.1.247 refused' }, { status: 400 }) })
+    const h = harness({ start: () => Response.json({ detail: 'Tuner at http://192.168.1.50 refused' }, { status: 400 }) })
     await tuned(h)
     expect(JSON.stringify(h.live.snapshot().failure)).not.toContain('192.168')
     expect(h.live.snapshot().failure?.title).toBe('Live TV could not start')
