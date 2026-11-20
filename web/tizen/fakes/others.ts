@@ -23,7 +23,8 @@ export const CABIN: FakeIdentity = { origin: 'http://cabin.local:27587', id: 'fa
 export const DEN: FakeIdentity = { origin: 'http://den.local:27587', id: 'fake-den', name: 'Den' }
 export const ATTIC: FakeIdentity = { origin: 'http://attic.local:27587', id: 'fake-attic', name: 'Attic' }
 
-/** The sign-ins the preview starts with on Cabin and Den, as if this TV had signed in to them before. */
+/** The sign-ins the preview starts with, as if this TV had signed in to each of them before. */
+export const LAKESIDE_TOKEN = 'fake-lakeside-session'
 export const CABIN_TOKEN = 'fake-cabin-session'
 export const DEN_TOKEN = 'fake-den-session'
 

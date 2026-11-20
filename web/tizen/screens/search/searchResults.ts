@@ -62,6 +62,9 @@ export function noMatchWords(q: string, answered: number): { title: string; body
 /** At the end of the results while a server is still out after a second. */
 export const stillAsking = (names: readonly string[]) => `Still asking ${named(names)}…`
 
+/** In place of a server's line while Try again asks it. */
+export const askingAgain = (name: string) => `Asking ${name} again…`
+
 /** A server that failed, at the end of the results, beside Try again. */
 export const didNotAnswer = (name: string) => `${name} didn’t answer, so its titles aren’t listed.`
 

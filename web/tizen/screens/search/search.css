@@ -74,4 +74,6 @@
 /* At the end of the library's results with several servers: one still out, or one that didn't answer and its Try again. */
 .search-tail { display: flex; align-items: center; gap: 1rem; min-height: 3.5rem; margin: 0; font-size: 1.25rem; color: var(--text-3); }
 .search-tail > svg { width: 1.625rem; height: 1.625rem; color: var(--warn); flex: none; }
-.search-tail .tv-btn { height: 3.5rem; margin-left: .5rem; padding: 0 1.5rem; border-radius: var(--radius); font-size: 1.1875rem; }
+.search-tail--again { width: 100%; text-align: left; }
+.search-tail__again { display: inline-flex; align-items: center; height: 3.5rem; margin-left: .5rem; padding: 0 1.5rem; border-radius: var(--radius); background: var(--ghost); border: 1px solid var(--ghost-line); font-size: 1.1875rem; font-weight: 600; color: var(--text); white-space: nowrap; transition: transform var(--focus-time) ease-out; }
+.search-tail--again:focus .search-tail__again { background: var(--ghost-focus); outline: var(--focus-width) solid var(--accent); outline-offset: var(--focus-offset); transform: scale(var(--focus-scale)); }

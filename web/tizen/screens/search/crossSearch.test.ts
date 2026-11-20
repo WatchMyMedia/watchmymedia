@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '../../../src/api/schema'
 import { ASK_AGAIN_MS, CrossSearch, mergeResults, resultKey, SERVER_MS, SLOW_MS, type Asked, type Part } from './crossSearch'
-import { didNotAnswer, emptyWords, noMatchWords, stillAsking } from './searchResults'
+import { askingAgain, didNotAnswer, emptyWords, noMatchWords, stillAsking } from './searchResults'
 
 type Results = components['schemas']['SearchResults']
 
@@ -153,5 +153,6 @@ describe('search across servers', () => {
     expect(stillAsking(['Cabin server'])).toBe('Still asking Cabin server…')
     expect(stillAsking(['Cabin server', 'Den server'])).toBe('Still asking Cabin server and Den server…')
     expect(didNotAnswer('Den server')).toBe('Den server didn’t answer, so its titles aren’t listed.')
+    expect(askingAgain('Den server')).toBe('Asking Den server again…')
   })
 })

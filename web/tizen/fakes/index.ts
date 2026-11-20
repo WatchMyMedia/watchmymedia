@@ -9,7 +9,7 @@ import { registerSettings } from './settings'
 import { registerDetails } from './details'
 import { registerPlayer } from './player'
 import { FAKE_USER } from './data'
-import { ATTIC, CABIN, CABIN_TITLES, CABIN_TOKEN, DEN, DEN_TOKEN, LAKESIDE, registerCabin, type FakeIdentity } from './others'
+import { ATTIC, CABIN, CABIN_TITLES, CABIN_TOKEN, DEN, DEN_TOKEN, LAKESIDE, LAKESIDE_TOKEN, registerCabin, type FakeIdentity } from './others'
 
 // The browser preview's fictional server (`pnpm dev:tizen`, then open
 // /?fakes). Development only: main.tsx imports this behind
@@ -56,15 +56,16 @@ export function createFakeServer(mode = '', identity: FakeIdentity = LAKESIDE): 
  * registerStart knows ("old", "setup", "expire"). Returns the address to put
  * in the server field.
  *
- * "servers" remembers three more servers beside Lakeside: Cabin, signed in,
- * with titles of its own; Den, signed in, which never answers; and Attic,
- * which this TV is signed out of. Sign in to Lakeside first, as on any run.
+ * "servers" is a TV that has four servers and opens on Lakeside, signed
+ * in: Cabin, signed in, with titles of its own; Den, signed in, which never
+ * answers; and Attic, which this TV is signed out of.
  */
 export function installFakes(mode: string, storage: Storage | undefined): string {
   const servers = [createFakeServer(mode)]
   if (mode === 'servers') {
     const cabin = createFakeServer('', CABIN)
     cabin.trust(CABIN_TOKEN)
+    servers[0].trust(LAKESIDE_TOKEN)
     servers.push(cabin, createFakeServer('', ATTIC))
     const store = new ServerStore(storage)
     const day = 86_400_000
@@ -73,6 +74,7 @@ export function installFakes(mode: string, storage: Storage | undefined): string
     if (!store.get(ATTIC.id)) store.remember(facts(ATTIC), Date.now() - 9 * day)
     if (!store.get(DEN.id)) store.remember({ ...facts(DEN), account: account(DEN_TOKEN) }, Date.now() - 5 * day)
     if (!store.get(CABIN.id)) store.remember({ ...facts(CABIN), account: account(CABIN_TOKEN) }, Date.now() - 2 * day)
+    if (!store.get(LAKESIDE.id)) store.remember({ ...facts(LAKESIDE), account: account(LAKESIDE_TOKEN) })
   }
   const real = window.fetch.bind(window)
   window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
