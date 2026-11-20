@@ -270,8 +270,8 @@ internal class Http(
     /**
      * The one place a token is added and a 401 handled. A request tagged with
      * a [Credential] goes as that and nothing else; an untagged one (an image)
-     * as the current sign-in. Either way only to its server, and never to the
-     * sign-in call itself.
+     * as the sign-in of the server it is for. Either way only to its server,
+     * and never to the sign-in call itself.
      */
     private fun authorize(chain: Interceptor.Chain): Response {
         val request = chain.request()
@@ -283,13 +283,20 @@ internal class Http(
         return response
     }
 
-    /** The current sign-in, for an untagged [request] to the current server; its token is opened only then. */
+    /**
+     * The sign-in of the server an untagged [request] is for: the one in
+     * use, or another kept server that is signed in (a picture from a search
+     * of every server). A server's token is opened only for a request to its
+     * own address, and goes nowhere else.
+     */
     private fun current(request: Request): Credential? {
-        val session = store.session() ?: return null
-        val account = session.account ?: return null
-        if (!owns(session.server.baseUrl, request.url)) return null
-        val token = store.tokenForRequest(session.server.id, account) ?: return null
-        return accountCredential(session.server, token)
+        val stored = store.value
+        val server = stored.current?.takeIf { owns(it.baseUrl, request.url) }
+            ?: stored.servers.firstOrNull { it.account != null && owns(it.baseUrl, request.url) }
+            ?: return null
+        val account = server.account ?: return null
+        val token = store.tokenForRequest(server.id, account) ?: return null
+        return accountCredential(server, token)
     }
 
     companion object {

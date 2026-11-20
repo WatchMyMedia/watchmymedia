@@ -397,6 +397,14 @@ interface LibraryRepository {
 
     suspend fun search(text: String): SearchResults
 
+    /**
+     * [search] on the registered server [serverId], as the person signed in
+     * there, whichever server is in use: the call goes to that server's own
+     * address with its own sign-in. Every id in the reply is that server's.
+     * Throws [SignedOutException] when no one is signed in there.
+     */
+    suspend fun searchOn(serverId: String, text: String): SearchResults = search(text)
+
     suspend fun setWatched(kind: ContinueItem.Kind, id: Long, watched: Boolean)
 
     suspend fun setSeasonWatched(showId: Long, season: Int, watched: Boolean)
@@ -426,6 +434,12 @@ interface LibraryRepository {
      * image loader adds the sign-in, so the URL carries no token.
      */
     fun imageUrl(path: String?, size: ImageSize): String?
+
+    /**
+     * [imageUrl] for a picture on the registered server [serverId]: its own
+     * address, which the image loader signs with that server's sign-in.
+     */
+    fun imageUrlOn(serverId: String, path: String?, size: ImageSize): String? = imageUrl(path, size)
 
     /**
      * Emits when watch state or the library changed on the server (the

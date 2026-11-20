@@ -121,6 +121,20 @@ internal class RealLibraryRepository(
         return SearchResults(r.movies.map { it.toBrowseItem() }, r.shows.map { it.toBrowseItem() }, r.episodes.map { it.toCard() })
     }
 
+    /**
+     * The call is built for [serverId] alone: its address and its sign-in
+     * ([Http.bindTo]), so what is typed goes to each server as its own
+     * person and no sign-in is sent to another server's address.
+     */
+    override suspend fun searchOn(serverId: String, text: String): SearchResults {
+        val q = text.trim().take(MAX_SEARCH)
+        if (q.isEmpty()) return SearchResults(emptyList(), emptyList(), emptyList())
+        val server = store.value.servers.firstOrNull { it.id == serverId }
+        val access = server?.account?.let { http.bindTo(serverId, it.userId) } ?: throw SignedOutException()
+        val r = access.call { base, client -> browse(base, client).search(q) }
+        return SearchResults(r.movies.map { it.toBrowseItem() }, r.shows.map { it.toBrowseItem() }, r.episodes.map { it.toCard() })
+    }
+
     override suspend fun setWatched(kind: ContinueItem.Kind, id: Long, watched: Boolean) {
         http.signedIn { base, client ->
             val api = WatchApi(base, client)
@@ -224,9 +238,14 @@ internal class RealLibraryRepository(
         return null
     }
 
-    override fun imageUrl(path: String?, size: ImageSize): String? {
+    override fun imageUrl(path: String?, size: ImageSize): String? = imageUrlAt(store.current.value?.server?.baseUrl, path, size)
+
+    override fun imageUrlOn(serverId: String, path: String?, size: ImageSize): String? =
+        imageUrlAt(store.value.servers.firstOrNull { it.id == serverId }?.baseUrl, path, size)
+
+    private fun imageUrlAt(base: String?, path: String?, size: ImageSize): String? {
         val p = path?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        val base = store.current.value?.server?.baseUrl ?: return null
+        if (base == null) return null
         return "$base/api/images/${size.path}${if (p.startsWith('/')) p else "/$p"}"
     }
 

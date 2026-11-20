@@ -28,7 +28,6 @@ import media.watchmy.client.model.FOLLOWS_API_LEVEL
 import media.watchmy.client.model.FollowsRepository
 import media.watchmy.client.model.NewEpisodes
 import media.watchmy.client.model.NewEpisodeGroup
-import media.watchmy.client.model.NewEpisodesCursor
 import media.watchmy.client.model.NewEpisodesCursors
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -62,6 +61,9 @@ class NewEpisodeFollowerTest {
     private val library = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
     private val session = MutableStateFlow<Any?>(0)
     private var account: String? = "acct-a"
+
+    /** Every account signed in on the device. */
+    private var accounts: Set<String> = setOf("acct-a")
     private val owner = object : LifecycleOwner {
         override val lifecycle = LifecycleRegistry.createUnsafe(this)
     }
@@ -92,10 +94,34 @@ class NewEpisodeFollowerTest {
         }
     }
 
-    private class Cursors(var kept: NewEpisodesCursor? = null) : NewEpisodesCursors {
-        override fun read() = kept
-        override fun keep(cursor: NewEpisodesCursor?) {
-            kept = cursor
+    private data class NewEpisodesCursor(val account: String, val cursor: String)
+
+    /** The cursors by account; [kept] is the only one, where a test has one account. */
+    private class Cursors(kept: NewEpisodesCursor? = null) : NewEpisodesCursors {
+        val all = LinkedHashMap<String, String>()
+
+        init {
+            kept?.let { all[it.account] = it.cursor }
+        }
+
+        var kept: NewEpisodesCursor?
+            get() = all.entries.singleOrNull()?.let { NewEpisodesCursor(it.key, it.value) }
+            set(value) {
+                all.clear()
+                value?.let { all[it.account] = it.cursor }
+            }
+
+        override fun read(account: String) = all[account]
+        override fun keep(account: String, cursor: String) {
+            all[account] = cursor
+        }
+
+        override fun forget(account: String) {
+            all.remove(account)
+        }
+
+        override fun keepOnly(accounts: Set<String>) {
+            all.keys.retainAll(accounts)
         }
     }
 
@@ -110,7 +136,7 @@ class NewEpisodeFollowerTest {
         Dispatchers.resetMain()
     }
 
-    private fun follower() = NewEpisodeFollower(follows, library, session, { account }, { account }, cursors, schedule, notices, scope, io = dispatcher).also { it.start(owner.lifecycle) }
+    private fun follower() = NewEpisodeFollower(follows, library, session, { account }, { account }, { accounts }, cursors, schedule, notices, scope, io = dispatcher).also { it.start(owner.lifecycle) }
 
     /** In front, and past the moment checks asked for together gather in. */
     private fun foreground() {
@@ -214,19 +240,57 @@ class NewEpisodeFollowerTest {
     }
 
     @Test
-    fun `signing out or another account cancels the work and forgets the cursor`() {
+    fun `signing out cancels the work, forgets the cursor and takes away what is showing`() {
         val f = follower()
         foreground()
         assertTrue(schedule.scheduled)
+        account = null
+        accounts = emptySet()
         f.sessionChanged()
+        session.value = 1
         test.runCurrent()
         assertEquals(false, schedule.scheduled)
         assertNull(cursors.kept)
         assertEquals("what is showing goes", 1, notices.taken)
-        account = null
+    }
+
+    @Test
+    fun `a switch to another server signed in here keeps each one's cursor, the work and what is showing`() {
+        accounts = setOf("acct-a", "acct-b")
+        val f = follower()
+        foreground()
+        assertEquals(mapOf("acct-a" to "1841"), cursors.all)
+        // On the other server: its first check starts from now, and the first server's place stays.
+        account = "acct-b"
+        f.sessionChanged()
         session.value = 1
+        foreground()
+        assertEquals(mapOf("acct-a" to "1841", "acct-b" to "1841"), cursors.all)
+        assertTrue("the check follows the server in use", schedule.scheduled)
+        assertEquals("a notification for the other server opens it by switching", 0, notices.taken)
+        assertTrue(notices.posted.isEmpty())
+        // Back on the first: what arrived meanwhile is announced, from where it left off.
+        account = "acct-a"
+        f.sessionChanged()
+        session.value = 2
+        foreground()
+        assertEquals(listOf("Harbor Lights"), notices.posted.single().first.map { it.title })
+        assertEquals("acct-a", notices.posted.single().second)
+        assertEquals(mapOf("acct-a" to "1842", "acct-b" to "1841"), cursors.all)
+    }
+
+    @Test
+    fun `removing a server that isn't in use forgets its cursor alone`() {
+        accounts = setOf("acct-a", "acct-b")
+        cursors.all["acct-a"] = "1841"
+        cursors.all["acct-b"] = "77"
+        val f = follower()
         test.runCurrent()
-        assertEquals(false, schedule.scheduled)
+        accounts = setOf("acct-a")
+        f.sessionChanged()
+        test.runCurrent()
+        assertEquals(mapOf("acct-a" to "1841"), cursors.all)
+        assertEquals("its notifications go: a tap would find no account", 1, notices.taken)
     }
 
     @Test
@@ -254,7 +318,7 @@ class NewEpisodeFollowerTest {
         val refusing = object : FollowsRepository by follows {
             override suspend fun newEpisodes(after: String?): NewEpisodes = throw ApiException(404, "no route")
         }
-        NewEpisodeFollower(refusing, library, session, { account }, { account }, cursors, schedule, notices, scope, io = dispatcher).also { it.start(owner.lifecycle) }
+        NewEpisodeFollower(refusing, library, session, { account }, { account }, { accounts }, cursors, schedule, notices, scope, io = dispatcher).also { it.start(owner.lifecycle) }
         foreground()
         assertTrue("a proxy answers 404 while the server restarts", schedule.scheduled)
         assertEquals(NewEpisodesCursor("acct-a", "1841"), cursors.kept)
@@ -270,7 +334,7 @@ class NewEpisodeFollowerTest {
                 return this@NewEpisodeFollowerTest.follows.refresh()
             }
         }
-        NewEpisodeFollower(flaky, library, session, { account }, { account }, cursors, schedule, notices, scope, io = dispatcher).also { it.start(owner.lifecycle) }
+        NewEpisodeFollower(flaky, library, session, { account }, { account }, { accounts }, cursors, schedule, notices, scope, io = dispatcher).also { it.start(owner.lifecycle) }
         foreground()
         session.value = 1
         runCurrent()

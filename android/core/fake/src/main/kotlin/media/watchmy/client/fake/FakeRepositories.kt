@@ -52,6 +52,7 @@ import media.watchmy.client.model.SearchResults
 import media.watchmy.client.model.SegmentKind
 import media.watchmy.client.model.Server
 import media.watchmy.client.model.ServerRepository
+import media.watchmy.client.model.ServerSwitch
 import media.watchmy.client.model.SkipMode
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.FOLLOWS_API_LEVEL
@@ -82,47 +83,134 @@ val OfficeMini = Server("srv-office", "Office Mac mini", "http://office-mini.loc
 /** Open to the internet, so password sign-in needs a browser check: the phone pairs instead. */
 val RemoteHome = Server("srv-remote", "home.watchmy.media", "https://home.watchmy.media", "0.9.3", FAKE_SERVER_API_LEVEL, turnstile = true)
 
+/** Registered and signed in, with a small library of its own ([FakeCabin]). */
+val Cabin = Server("srv-cabin", "Cabin server", "http://192.168.4.31:27587", "0.9.3", FAKE_SERVER_API_LEVEL)
+
+/** Registered and signed in, and off: it never answers, so a switch to it fails and a search of every server leaves it out. */
+val Den = Server("srv-den", "Den server", "http://192.168.4.52:27587", "0.9.1", FAKE_SERVER_API_LEVEL)
+
+/**
+ * The fake servers: the Living room server in use, the Cabin server and the
+ * Den server registered and signed in (the Den server doesn't answer), a
+ * fourth registered and signed out, and the Office Mac mini on the network
+ * and not added yet. Each keeps its own sign-in, as the real store does:
+ * [signIn] and [signOut] are the fake sign-in's, for the server in use.
+ */
 class FakeServerRepository(signedIn: Boolean = true) : ServerRepository {
+    private data class Entry(val server: Server, val lastUserName: String?, val account: User?, val lastUsedAtMs: Long) {
+        fun toSaved() = SavedServer(server, account?.name ?: lastUserName, account != null, lastUsedAtMs, account?.id)
+    }
+
+    // Unconfined: the derived flows follow a change at once, without a scope to run in.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+
+    /** The servers that don't answer: a switch that asks first fails, and so does a search of them. */
+    var unreachable: Set<String> = setOf(Den.id)
+
     override val discovered: Flow<List<DiscoveredServer>> = flowOf(
         listOf(LivingRoom, OfficeMini).map { DiscoveredServer(it.id, it.name, it.baseUrl, it.version, it.apiLevel) },
     )
-    private val savedState = MutableStateFlow(
-        listOf(
-            SavedServer(LivingRoom, "Sam", signedIn, System.currentTimeMillis()),
-            SavedServer(RemoteHome, "Sam", false, System.currentTimeMillis() - 3 * 86_400_000L),
-        ),
+    private val entries = MutableStateFlow(
+        System.currentTimeMillis().let { now ->
+            listOf(
+                Entry(LivingRoom, "Sam", User(1, "Sam", true).takeIf { signedIn }, now),
+                Entry(Cabin, "Sam", User(4, "Sam", false), now - 86_400_000L),
+                Entry(Den, "Sam", User(2, "Sam", true), now - 2 * 86_400_000L),
+                Entry(RemoteHome, "Sam", null, now - 3 * 86_400_000L),
+            )
+        },
     )
+    private val currentId = MutableStateFlow<String?>(LivingRoom.id)
+
+    private fun saved(list: List<Entry>) = list.sortedByDescending { it.lastUsedAtMs }.map { it.toSaved() }
+
+    private val savedState = entries.map(::saved).stateIn(scope, SharingStarted.Eagerly, saved(entries.value))
     override val saved: Flow<List<SavedServer>> = savedState
-    private val currentState = MutableStateFlow<SavedServer?>(savedState.value.first())
-    override val current: StateFlow<SavedServer?> = currentState.asStateFlow()
+
+    private fun entry(list: List<Entry>, id: String?) = list.firstOrNull { it.server.id == id }
+
+    override val current: StateFlow<SavedServer?> = combine(entries, currentId) { list, id -> entry(list, id)?.toSaved() }
+        .stateIn(scope, SharingStarted.Eagerly, entry(entries.value, currentId.value)?.toSaved())
+
+    /** Who is signed in on the server in use: the fake sign-in's `user`. */
+    val user: StateFlow<User?> = combine(entries, currentId) { list, id -> entry(list, id)?.account }
+        .stateIn(scope, SharingStarted.Eagerly, entry(entries.value, currentId.value)?.account)
+
+    /** Who is signed in on [serverId], whichever server is in use. */
+    fun account(serverId: String): User? = entry(entries.value, serverId)?.account
+
+    /** Signs [user] in on the server in use. */
+    fun signIn(user: User) {
+        val id = currentId.value ?: return
+        entries.update { list -> list.map { if (it.server.id == id) it.copy(account = user, lastUserName = user.name) else it } }
+    }
+
+    /** Signs out of the server in use, which stays on the list; with another still signed in, that one is in use next. */
+    fun signOut() {
+        val id = currentId.value ?: return
+        val next = entries.value.filter { it.account != null && it.server.id != id }.maxByOrNull { it.lastUsedAtMs }
+        entries.update { list -> list.map { if (it.server.id == id) it.copy(account = null) else it } }
+        if (next != null) use(next.server.id)
+    }
+
+    private fun use(id: String) {
+        val now = System.currentTimeMillis()
+        entries.update { list -> list.map { if (it.server.id == id) it.copy(lastUsedAtMs = now) else it } }
+        currentId.value = id
+    }
 
     override suspend fun probe(address: String): Server {
         latency()
         val a = address.trim()
         if (a.isEmpty() || a.contains(' ')) throw ApiException(null, "That doesn't look like a server address.")
-        return listOf(LivingRoom, OfficeMini, RemoteHome).firstOrNull { a in it.baseUrl } ?: LivingRoom
+        val found = listOf(LivingRoom, OfficeMini, RemoteHome, Cabin, Den).firstOrNull { a in it.baseUrl } ?: LivingRoom
+        if (found.id in unreachable) throw ApiException(null, "Couldn't reach $a. Check the address and that the server is running.")
+        return found
     }
 
     override suspend fun select(server: Server) {
-        val existing = savedState.value.firstOrNull { it.server.id == server.id }
         // Choosing a server again takes in what it says about itself now, as the real one does.
-        val entry = (existing ?: SavedServer(server, null, false, 0)).copy(server = server, lastUsedAtMs = System.currentTimeMillis())
-        savedState.value = listOf(entry) + savedState.value.filter { it.server.id != server.id }
-        currentState.value = entry
+        entries.update { list ->
+            if (list.any { it.server.id == server.id }) list.map { if (it.server.id == server.id) it.copy(server = server) else it }
+            else list + Entry(server, null, null, 0)
+        }
+        use(server.id)
+    }
+
+    override suspend fun switchTo(serverId: String, ask: Boolean): ServerSwitch {
+        val target = entry(entries.value, serverId) ?: return ServerSwitch.Gone
+        if (ask) {
+            latency()
+            if (serverId in unreachable) return ServerSwitch.Unreachable
+        }
+        if (target.server.tooOld) return ServerSwitch.TooOld
+        use(serverId)
+        return if (target.account != null) ServerSwitch.Switched else ServerSwitch.NeedsSignIn
     }
 
     override suspend fun forget(serverId: String) {
-        savedState.value = savedState.value.filter { it.server.id != serverId }
-        if (currentState.value?.server?.id == serverId) currentState.value = savedState.value.firstOrNull()
+        val wasCurrent = currentId.value == serverId
+        entries.update { list -> list.filter { it.server.id != serverId } }
+        if (!wasCurrent) return
+        val next = entries.value.filter { it.account != null }.maxByOrNull { it.lastUsedAtMs }
+        if (next != null) use(next.server.id) else currentId.value = null
     }
 }
 
-class FakeAuthRepository(signedIn: Boolean = true) : AuthRepository {
+/**
+ * The fake sign-in. With [servers] it is the sign-in of whichever fake
+ * server is in use, each with its own; alone, one person signed in or not.
+ */
+class FakeAuthRepository(signedIn: Boolean = true, private val servers: FakeServerRepository? = null) : AuthRepository {
     private val sam = User(1, "Sam", true)
     private val userState = MutableStateFlow(if (signedIn) sam else null)
-    override val user: StateFlow<User?> = userState.asStateFlow()
+    override val user: StateFlow<User?> = servers?.user ?: userState.asStateFlow()
     private val name = MutableStateFlow("Living room TV")
     override val deviceName: StateFlow<String> = name.asStateFlow()
+
+    private fun signedIn(user: User) {
+        if (servers != null) servers.signIn(user) else userState.value = user
+    }
 
     override suspend fun setDeviceName(name: String) {
         this.name.value = name.trim().ifEmpty { this.name.value }
@@ -132,7 +220,7 @@ class FakeAuthRepository(signedIn: Boolean = true) : AuthRepository {
         latency()
         if (password != "password") throw ApiException(401, "Wrong name or password.")
         // Alex is a member, as on the request boards; anyone else signs in as an admin.
-        return sam.copy(name = name, isAdmin = !name.trim().equals("Alex", ignoreCase = true)).also { userState.value = it }
+        return sam.copy(name = name, isAdmin = !name.trim().equals("Alex", ignoreCase = true)).also(::signedIn)
     }
 
     /** Shows the code for a few seconds, then signs in, so the TV flow can be seen end to end. */
@@ -142,12 +230,12 @@ class FakeAuthRepository(signedIn: Boolean = true) : AuthRepository {
         val code = PairingCode("KQ7F2W", System.currentTimeMillis() + 10 * 60_000L, "http://192.168.1.20:27587/link?code=KQ7F2W", 2_000)
         emit(PairingState.Waiting(code))
         delay(8_000)
-        userState.value = sam
+        signedIn(sam)
         emit(PairingState.Approved(sam))
     }
 
     override suspend fun signOut() {
-        userState.value = null
+        if (servers != null) servers.signOut() else userState.value = null
     }
 
     private val sessionList = MutableStateFlow(
@@ -199,13 +287,22 @@ class FakeLibraryRepository(
     private val rows: FakeRowsData = FakeRowsData(),
     /** The person follows the show (Notify me), from [FOLLOWS_API_LEVEL]; null leaves `following` out, as an older server does. */
     private val following: ((showId: Long) -> Boolean)? = null,
+    /** The fake servers, each with a library of its own; null serves the Living room server's alone. */
+    private val servers: FakeServerRepository? = null,
     private val user: () -> String? = { "Sam" },
 ) : LibraryRepository {
     /** The server can't be reached: Home and the pages fail as with no connection, for the offline Home (-PfakesOffline=true). */
     var offline: Boolean = false
 
+    private fun shelfOf(serverId: String?): FakeShelf = if (serverId == Cabin.id) FakeCabin.shelf else LivingRoomShelf
+
+    /** The library of the server in use. */
+    private fun shelf(): FakeShelf = shelfOf(servers?.current?.value?.server?.id)
+
     private fun unreachable() {
-        if (offline) throw ApiException(null, "Couldn't reach the server. Check the connection and try again.", java.io.IOException("offline"))
+        // A server that doesn't answer, in use all the same (its downloads are watched): as with no connection.
+        val away = servers?.let { s -> s.current.value?.server?.id in s.unreachable } == true
+        if (offline || away) throw ApiException(null, "Couldn't reach the server. Check the connection and try again.", java.io.IOException("offline"))
     }
 
     private fun titleKey(title: String): String {
@@ -217,7 +314,7 @@ class FakeLibraryRepository(
     override suspend fun home(): HomeData {
         latency()
         unreachable()
-        return FakeData.home()
+        return shelf().home(System.currentTimeMillis())
     }
 
     /** Home in the person's order from [ROWS_API_LEVEL], with the fixed arrays empty, as the server sends it. */
@@ -235,10 +332,10 @@ class FakeLibraryRepository(
         latency()
         unreachable()
         if (level() < ROWS_API_LEVEL) return emptyList()
-        return rows.rows(RowScreens.library(libraryId), FakeData.home())
+        return rows.rows(RowScreens.library(libraryId), shelf().home(System.currentTimeMillis()))
     }
 
-    override suspend fun continueWatching(): List<ContinueItem> = FakeData.continueWatching.also { latency(); unreachable() }
+    override suspend fun continueWatching(): List<ContinueItem> = shelf().continueWatching.also { latency(); unreachable() }
 
     override suspend fun libraries(): List<Library> = listOf(
         Library(FakeData.MOVIE_LIBRARY, "Movies", LibraryType.Movie),
@@ -247,7 +344,8 @@ class FakeLibraryRepository(
 
     override suspend fun items(query: ItemQuery): ItemPage {
         latency()
-        val all = if (query.libraryId == FakeData.MOVIE_LIBRARY) FakeData.movies else FakeData.shows
+        val shelf = shelf()
+        val all = if (query.libraryId == FakeData.MOVIE_LIBRARY) shelf.movies else shelf.shows
         var list = all.filter { item ->
             when (query.filter) {
                 ItemFilter.All -> true
@@ -273,7 +371,7 @@ class FakeLibraryRepository(
         return ItemPage(
             items = list.drop(query.offset).take(query.limit), total = list.size, offset = query.offset,
             genres = genres, decades = all.mapNotNull { it.year?.div(10)?.times(10) }.distinct().sortedDescending(),
-            summary = FakeData.summary(query.libraryId),
+            summary = shelf.summary(query.libraryId),
             genreCounts = genreCounts,
             letters = if (query.sort == ItemSort.Title) list.mapIndexed { index, item ->
                 val initial = titleKey(item.title).firstOrNull()?.uppercaseChar()
@@ -282,36 +380,44 @@ class FakeLibraryRepository(
         )
     }
 
-    override suspend fun show(id: Long) = FakeData.show(id, arr, user())
+    override suspend fun show(id: Long) = shelf().show(id, arr, user())
         .let { s -> if (level() >= FOLLOWS_API_LEVEL && following != null) s.copy(following = following(s.id)) else s }
         .also { latency(); unreachable() }
 
-    override suspend fun season(showId: Long, number: Int) = FakeData.season(showId, number, arr, user()).also { latency(); unreachable() }
+    override suspend fun season(showId: Long, number: Int) = shelf().season(showId, number, arr, user()).also { latency(); unreachable() }
 
-    override suspend fun movie(id: Long) = FakeData.movie(id).let { if (level() >= TRAILERS_API_LEVEL) it else it.copy(trailers = emptyList()) }.also { latency(); unreachable() }
+    override suspend fun movie(id: Long) = shelf().movie(id).let { if (level() >= TRAILERS_API_LEVEL) it else it.copy(trailers = emptyList()) }.also { latency(); unreachable() }
 
     /** From [RELATED_API_LEVEL] ([FakeData.movieRelated]); an older fake server has none. */
     override suspend fun movieRelated(id: Long): List<ScreenRow> {
         latency()
         unreachable()
-        return if (level() >= RELATED_API_LEVEL) FakeData.movieRelated(id) else emptyList()
+        return if (level() >= RELATED_API_LEVEL) shelf().movieRelated(id) else emptyList()
     }
 
     override suspend fun showRelated(id: Long): List<ScreenRow> {
         latency()
         unreachable()
-        return if (level() >= RELATED_API_LEVEL) FakeData.showRelated(id) else emptyList()
+        return if (level() >= RELATED_API_LEVEL) shelf().showRelated(id) else emptyList()
     }
 
     override suspend fun search(text: String): SearchResults {
         latency()
-        val t = text.trim()
-        if (t.isEmpty()) return SearchResults(emptyList(), emptyList(), emptyList())
-        return SearchResults(
-            movies = FakeData.movies.filter { it.title.contains(t, true) },
-            shows = FakeData.shows.filter { it.title.contains(t, true) },
-            episodes = FakeData.recentlyAired(System.currentTimeMillis()).filter { it.title.contains(t, true) || it.showTitle.contains(t, true) },
-        )
+        unreachable()
+        return shelf().search(text)
+    }
+
+    /**
+     * Each fake server answers with its own library, as its own person: one
+     * that doesn't answer fails after a moment, and one no one is signed in
+     * to refuses.
+     */
+    override suspend fun searchOn(serverId: String, text: String): SearchResults {
+        val all = servers ?: return search(text)
+        latency()
+        if (serverId in all.unreachable) throw ApiException(null, "Couldn't reach the server. Check the connection and try again.", java.io.IOException("no answer"))
+        if (all.account(serverId) == null) throw media.watchmy.client.model.SignedOutException()
+        return shelfOf(serverId).search(text)
     }
 
     override suspend fun setWatched(kind: ContinueItem.Kind, id: Long, watched: Boolean) {
@@ -321,9 +427,9 @@ class FakeLibraryRepository(
 
     override suspend fun setSeasonWatched(showId: Long, season: Int, watched: Boolean) = latency()
 
-    override suspend fun playRequest(fileId: Long): PlayRequest = FakeData.playRequest(fileId).also { latency() }
+    override suspend fun playRequest(fileId: Long): PlayRequest = shelf().playRequest(fileId).also { latency() }
 
-    override suspend fun filePage(fileId: Long): DeepLink? = FakeData.filePage(fileId).also { latency() }
+    override suspend fun filePage(fileId: Long): DeepLink? = shelf().filePage(fileId).also { latency() }
 
     /**
      * The fake library has no posters, so cards show their placeholders; the
