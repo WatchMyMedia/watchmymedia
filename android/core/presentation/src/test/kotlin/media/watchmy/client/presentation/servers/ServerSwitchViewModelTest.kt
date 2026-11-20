@@ -1,6 +1,8 @@
 package media.watchmy.client.presentation.servers
 
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -15,6 +17,7 @@ import media.watchmy.client.fake.RemoteHome
 import media.watchmy.client.model.AddServerStep
 import media.watchmy.client.model.DeepLink
 import media.watchmy.client.model.NOW_ON_MS
+import media.watchmy.client.model.SavedServer
 import media.watchmy.client.model.ServerRepository
 import media.watchmy.client.model.ServerSwitch
 import media.watchmy.client.model.linkAccount
@@ -38,6 +41,11 @@ class ServerSwitchViewModelTest {
     /** The fake servers, noting each switch and whether it asked the server first. */
     private class TestServers(val fake: FakeServerRepository = FakeServerRepository()) : ServerRepository by fake {
         val switches = mutableListOf<Pair<String, Boolean>>()
+
+        /** The saved list as it stood, when set: the real one is published a moment after the server in use. */
+        var stale: List<SavedServer>? = null
+
+        override val saved: Flow<List<SavedServer>> get() = stale?.let(::flowOf) ?: fake.saved
 
         override suspend fun switchTo(serverId: String, ask: Boolean): ServerSwitch {
             switches += serverId to ask
@@ -129,6 +137,34 @@ class ServerSwitchViewModelTest {
         assertNull(vm.state.value.returnTo)
     }
 
+    @Test fun `a sign-in the server ended after the switch still has Cancel, back to the server before`() = runTest {
+        val vm = model()
+        runCurrent()
+        servers.switchTo(Cabin.id)
+        runCurrent()
+        assertNull(vm.state.value.returnTo)
+        // The Cabin server's first reply: another device signed this one out.
+        servers.fake.signInEnded()
+        runCurrent()
+        assertEquals(Cabin.id, current)
+        assertEquals("the server used last that is still signed in", LivingRoom.id, vm.state.value.returnTo)
+
+        vm.cancelSignIn()
+        runCurrent()
+        assertEquals(LivingRoom.id, current)
+        assertNull(vm.state.value.returnTo)
+        assertTrue("the Cabin server stays on the list, signed out", servers.fake.saved.first().any { it.server.id == Cabin.id && it.registered && !it.signedIn })
+    }
+
+    @Test fun `a sign-in that ends with no other server signed in has nowhere for Cancel to go`() = runTest {
+        val one = TestServers(FakeServerRepository(several = false))
+        val vm = ServerSwitchViewModel(one)
+        runCurrent()
+        one.fake.signInEnded()
+        runCurrent()
+        assertNull(vm.state.value.returnTo)
+    }
+
     @Test fun `Add a server goes from choosing to signing in to Added, and says what changed`() = runTest {
         val vm = model()
         runCurrent()
@@ -154,6 +190,19 @@ class ServerSwitchViewModelTest {
         vm.doneAdding()
         assertNull(vm.state.value.adding)
         assertNull(vm.state.value.added)
+    }
+
+    @Test fun `the Added step counts the server just signed in to before the saved list has it`() = runTest {
+        val vm = model()
+        runCurrent()
+        vm.startAdding()
+        servers.select(OfficeMini)
+        runCurrent()
+        // The list still has the Office Mac mini as it was chosen, with no one signed in.
+        servers.stale = servers.fake.saved.first()
+        auth.signIn("Sam", "password")
+        runCurrent()
+        assertEquals(ServerSwitchViewModel.Added("Office Mac mini", "Sam", signedIn = 4), vm.state.value.added)
     }
 
     @Test fun `Add a server on a TV ends on the new server's Home with the note`() = runTest {
@@ -198,7 +247,9 @@ class ServerSwitchViewModelTest {
         runCurrent()
         assertEquals(Cabin.id, current)
         assertEquals("it has just answered the search", listOf(Cabin.id to false), servers.switches)
-        assertEquals(ServerSwitchViewModel.Landing("harbor", DeepLink.Movie(800)), vm.state.value.landing)
+        assertEquals(ServerSwitchViewModel.Landing(Cabin.id, "harbor", DeepLink.Movie(800)), vm.state.value.landing)
+        assertNull("the screens of the server it left don't get it", vm.state.value.landingFor(LivingRoom.id))
+        assertEquals(vm.state.value.landing, vm.state.value.landingFor(Cabin.id))
         assertEquals("Now on Cabin server", vm.state.value.note)
         vm.landingShown()
         assertNull(vm.state.value.landing)

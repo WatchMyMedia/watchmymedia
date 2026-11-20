@@ -95,7 +95,7 @@ fun TvApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
                             onSignedOut = {},
                             deepLink = pendingLink,
                             onDeepLinkHandled = { pendingLink = null },
-                            landing = moves.landing,
+                            landing = moves.landingFor(server?.server?.id),
                             onLandingShown = switcher::landingShown,
                             onOpenElsewhere = switcher::openFound,
                         )

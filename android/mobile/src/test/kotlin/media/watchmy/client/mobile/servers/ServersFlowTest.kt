@@ -215,7 +215,11 @@ class ServersFlowTest {
         compose.onAllNodesWithText("Cabin server").onFirst().assertIsDisplayed()
 
         compose.onNodeWithText("Harborside").performClick()
-        compose.waitUntil(5_000) { current == Cabin.id }
+        // The switch is the app's own work, not the screen's: let it run.
+        compose.waitUntil(5_000) {
+            compose.waitForIdle()
+            current == Cabin.id
+        }
         assertEquals("the phone is on the server that has it", Cabin.id, current)
         waitFor("Now on Cabin server")
         // The title's page, on the Cabin server.

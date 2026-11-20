@@ -59,6 +59,16 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   signed in to several too, so signing out there moves to the next server:
   a test of what a device with one server does makes them with
   `several = false` (`quietTvFakes(several = false)` on the TV).
+  Two things only real servers showed, on an emulator with two throwaway
+  ones. A switch takes a moment (it runs in the data layer's scope), so
+  what is set before it is drawn once for the server still in use: a search
+  result's landing was opened, and used up, by the old server's screens, and
+  the app arrived on Home. Name the server such state is for and hand it
+  only to that server's screens (`State.landingFor`); the fakes' switch
+  waits their usual delay so a fakes build shows the same order. And
+  `LocalStore` sets the server in use before the saved list: a collector of
+  `current` on the main thread can run between the two, so count or look up
+  the server in use from `current`, and only the others from `saved`.
 - **Server changes.** A page's ViewModel reloads for `libraryChanges`
   (core:model's `LibraryChange`, with the items and libraries an event
   names) through `Freshness` in core:presentation, which ignores changes

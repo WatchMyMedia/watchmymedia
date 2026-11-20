@@ -156,6 +156,12 @@ class FakeServerRepository(signedIn: Boolean = true, several: Boolean = true) : 
         if (next != null) use(next.server.id)
     }
 
+    /** The server in use ended this device's sign-in (signed out from another device): it stays in use, signed out. */
+    fun signInEnded() {
+        val id = currentId.value ?: return
+        entries.update { list -> list.map { if (it.server.id == id) it.copy(account = null) else it } }
+    }
+
     private fun use(id: String) {
         val now = System.currentTimeMillis()
         entries.update { list -> list.map { if (it.server.id == id) it.copy(lastUsedAtMs = now) else it } }
@@ -181,11 +187,11 @@ class FakeServerRepository(signedIn: Boolean = true, several: Boolean = true) : 
     }
 
     override suspend fun switchTo(serverId: String, ask: Boolean): ServerSwitch {
+        // Asked or not, the real switch takes a moment (it runs in the data layer's scope): what the caller
+        // set before it is on screen, for the server still in use, before the app moves.
+        latency()
         val target = entry(entries.value, serverId) ?: return ServerSwitch.Gone
-        if (ask) {
-            latency()
-            if (serverId in unreachable) return ServerSwitch.Unreachable
-        }
+        if (ask && serverId in unreachable) return ServerSwitch.Unreachable
         if (target.server.tooOld) return ServerSwitch.TooOld
         use(serverId)
         return if (target.account != null) ServerSwitch.Switched else ServerSwitch.NeedsSignIn

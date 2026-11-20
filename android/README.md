@@ -308,7 +308,10 @@ nothing ties two servers together, and the server has no part in this.
   kept: it is in use at once, the signed-in screens are rebuilt on it, and a
   note says "Now on Cabin server" for four seconds (a snackbar on phones and
   tablets, a banner at the top right of the TV that takes no focus). Its
-  sign-in has ended: its sign-in screen opens, and Cancel goes back. It
+  sign-in has ended: its sign-in screen opens, and Cancel goes back. The
+  device learns of a sign-in ended elsewhere only from that server's first
+  reply, after the switch; Cancel then goes to the server used last that is
+  still signed in. It
   doesn't answer, or another server answers at its address: the app stays
   where it was and says so, with Try again and, on a device holding
   downloads from it, Watch its downloads, which switches without asking.
@@ -342,7 +345,9 @@ nothing ties two servers together, and the server has no part in this.
   switch (`key(server.id, user)`), so the note, Add a server's steps, the
   way back from a sign-in and a search result's landing are kept by
   `ServerSwitchViewModel`, which `MobileApp` and `TvApp` make for the
-  activity.
+  activity. A landing names its server, and only that server's screens get
+  it (`landingFor`): the switch takes a moment, and the screens of the
+  server still in use would otherwise open the page and use the landing up.
 - **Links and notifications.** A launcher's or notification's link names
   its account (`account=`). One for another account signed in on the
   device switches to its server before it opens (`DeepLink.serverFor`); one

@@ -47,8 +47,8 @@ class ServerSwitchViewModel(
     private val addedStep: Boolean = true,
     private val noteMs: Long = NOW_ON_MS,
 ) : ViewModel() {
-    /** Search with [query], then [page] on top, once the app is on the server that has it. */
-    data class Landing(val query: String, val page: DeepLink)
+    /** Search with [query], then [page] on top, once the app is on [serverId], the server that has it. */
+    data class Landing(val serverId: String, val query: String, val page: DeepLink)
 
     /** Add a server's last step: which server, who signed in, and how many servers the device is signed in to now. */
     data class Added(val serverName: String, val userName: String?, val signedIn: Int)
@@ -61,7 +61,16 @@ class ServerSwitchViewModel(
         val added: Added? = null,
         /** The server the app was on before it switched to one that needs a sign-in: where Cancel goes. */
         val returnTo: String? = null,
-    )
+    ) {
+        /**
+         * [landing] for the screens of [serverId], and for no others. The
+         * switch takes a moment, and the landing is set before it: the
+         * screens of the server still in use would otherwise open the page
+         * (another server's id, on theirs) and use the landing up before the
+         * app has moved.
+         */
+        fun landingFor(serverId: String?): Landing? = landing?.takeIf { it.serverId == serverId }
+    }
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
@@ -104,11 +113,18 @@ class ServerSwitchViewModel(
                     landing = null,
                 )
             }
+            // The server in use ended the sign-in (another device signed this one out, which a server just switched to
+            // only says at its first reply): Cancel on its sign-in goes to the server used last that is still signed in.
+            was?.signedIn == true && !now.signedIn -> {
+                val back = servers.saved.first().filter { it.registered && it.signedIn && it.server.id != now.server.id }.maxByOrNull { it.lastUsedAtMs }
+                if (back != null) _state.update { it.copy(returnTo = back.server.id, landing = null) }
+            }
             // Signed in on the server the app switched to.
             was?.signedIn == false && now.signedIn && (_state.value.returnTo != null || _state.value.adding == AddServerStep.SignIn) -> {
                 val adding = _state.value.adding == AddServerStep.SignIn
                 if (adding && addedStep) {
-                    val signedIn = servers.saved.first().count { it.registered && it.signedIn }
+                    // The saved list can be a moment behind the server in use: count this one, and the others it lists.
+                    val signedIn = 1 + servers.saved.first().count { it.registered && it.signedIn && it.server.id != now.server.id }
                     _state.update { it.copy(returnTo = null, adding = AddServerStep.Added, added = Added(now.server.name, now.userName, signedIn)) }
                 } else {
                     _state.update { it.copy(returnTo = null, adding = null) }
@@ -143,7 +159,7 @@ class ServerSwitchViewModel(
         viewModelScope.launch {
             val current = servers.current.value?.server
             val name = servers.saved.first().firstOrNull { it.server.id == serverId }?.server?.name
-            _state.update { it.copy(landing = Landing(query, page)) }
+            _state.update { it.copy(landing = Landing(serverId, query, page)) }
             val outcome = attempt { servers.switchTo(serverId, ask = false) }.getOrDefault(ServerSwitch.Unreachable)
             if (outcome != ServerSwitch.Switched) {
                 _state.update { it.copy(landing = null) }

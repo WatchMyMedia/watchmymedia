@@ -133,7 +133,7 @@ fun MobileApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
                                 onSignedOut = { pending = null },
                                 deepLink = pending,
                                 onDeepLinkHandled = { pending = null },
-                                landing = moves.landing,
+                                landing = moves.landingFor(current.server.id),
                                 onLandingShown = switcher::landingShown,
                                 onOpenElsewhere = switcher::openFound,
                             )
