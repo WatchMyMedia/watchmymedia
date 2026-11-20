@@ -13,8 +13,8 @@ package id and the submission are still to come.
 
 Built on 2026-11-19 and checked in the browser preview; the first TV session (below) checked sign-in, browsing and playback on a QN90D:
 
-- The start: choosing a server (remembered servers with Remove, an address
-  typed with the TV's keyboard, Not encrypted for plain http away from home),
+- The start: choosing a server (remembered servers, an address typed with
+  the TV's keyboard, Not encrypted for plain http away from home),
   signing in with a six-character code and a QR code of the server's link
   page that renews as it runs out, or a name and password, and the problems
   (can't reach, not set up, too old for this TV, signed out from another
@@ -25,6 +25,15 @@ Built on 2026-11-19 and checked in the browser preview; the first TV session (be
   pages on what opened them, each screen remembering its place, Return
   walking back and asking before leaving at Home, Hold OK, the remote's media,
   channel and number keys, and the offline banner.
+- Several servers: the rail's account button opens Servers (the servers
+  this TV has, the current one marked, Add a server, Manage servers). OK on
+  another one switches at once, with "Now on …" for a moment; one that
+  doesn't answer leaves the app where it was, with Try again; one signed out
+  here opens its sign-in. Settings › Account & devices › Servers has each
+  server's page and Remove this server…. Search looks in every server this
+  TV is signed in to, names the server under a title from another one, and
+  switches to it when that title is opened. Up to 12 servers, kept on the
+  TV only.
 - The data layer: the web app's own queries and event table over a bearer
   client per session, a fresh cache per server and account, media tokens
   for pictures, and live updates over `GET /api/events`.
@@ -75,7 +84,10 @@ pnpm dev:tizen
 Open <http://127.0.0.1:5186/?fakes>. Its server, Lakeside, is at the
 prefilled address; its code signs in by itself after a few seconds, and the
 password form takes Sam and `watching`. `?fakes=away` adds a remembered
-server away from home over http; `?fakes=old`, `?fakes=setup` and
+server away from home over http; `?fakes=servers` opens signed in to
+Lakeside on a TV that has three more servers (Cabin, with titles of its
+own; Den, which never answers; Attic, signed out here), for Servers, a
+switch and Search across servers; `?fakes=old`, `?fakes=setup` and
 `?fakes=expire` show the start problems. `?fakes=member` signs in a member
 instead of an admin; `?fakes=empty`, `scanning` and `unreadable` give Home's
 empty states; `?fakes=player` makes the player step down in Automatic, stop
@@ -174,6 +186,18 @@ too old, unreachable (with Not encrypted) and signed-out problems. The
 fixture server and the live test were not run for this checkpoint. A real
 remote, the TV's keyboard, screensaver, suspend and wake, AVPlay and the
 packaged app's networking remain unverified on a TV.
+
+Several servers, 2026-11-20: 366 unit tests pass. In the browser preview
+at 1280×720, on `?fakes=servers` and against two throwaway servers with
+different libraries (the second reached through a small local proxy that
+drops `Origin`, `Sec-Fetch-*` and cookies, as the TV's requests arrive):
+Servers from the account button and Return back to it, a switch both ways,
+a server that doesn't answer and Try again, a sign-in on a server signed
+out here and Cancel, Add a server to its last step, Remove, Sign out moving
+to another server, and Search finding a word on both servers, opening the
+other server's title, playing it (in that server's Activity only) and
+searching again with one server stopped. Not on a TV: a real remote, the
+packaged app reaching two servers, and AVPlay after a switch.
 
 ## Signing and testing on a TV
 
