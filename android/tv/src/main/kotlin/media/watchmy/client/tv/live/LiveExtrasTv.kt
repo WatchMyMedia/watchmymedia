@@ -20,7 +20,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.layout.onSizeChanged
+import media.watchmy.client.tv.components.bringWholeIntoView
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -256,6 +261,10 @@ internal class BannerKeys(private val onWatch: () -> Unit, private val holdsOk: 
  * Search's On Live TV row (android-tv/LiveSearch): programmes on now and later
  * that match [query]. OK watches one that is on and opens a later one in the
  * guide; Hold OK opens Remind me and Watch.
+ *
+ * A card in focus brings the whole row into view, down to the line under the
+ * cards that says what OK and Hold OK do. Left to the card's picture, the
+ * page stopped scrolling with that line cut off at the foot of the screen.
  */
 @Composable
 fun TvLiveSearchRow(
@@ -270,7 +279,20 @@ fun TvLiveSearchRow(
     if (!state.available || state.searched == null || state.error != null) return
     var focused by remember { mutableStateOf<LiveSearchHit?>(null) }
     var menu by remember { mutableStateOf<LiveSearchHit?>(null) }
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    // The line under the cards comes with the first card in focus, after the page has scrolled for it: ask again once the row has grown.
+    val whole = remember { BringIntoViewRequester() }
+    var hasFocus by remember { mutableStateOf(false) }
+    var height by remember { mutableIntStateOf(0) }
+    LaunchedEffect(hasFocus, height) { if (hasFocus) whole.bringIntoView() }
+    Column(
+        modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(whole)
+            .onSizeChanged { height = it.height }
+            .onFocusChanged { hasFocus = it.hasFocus }
+            .bringWholeIntoView(),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
             Text("On Live TV", style = inter(30.sp, FontWeight.Bold), color = WmmColors.Text)
             if (state.results.isNotEmpty()) Text("${state.results.size}", style = inter(20.sp), color = WmmColors.TextMuted)

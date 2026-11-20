@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -142,6 +143,26 @@ class SearchFocusTest {
         for (hint in listOf(top, bottom)) {
             assertTrue("a hint runs from ${hint.left} to ${hint.right}, outside the keyboard's ${keyboard.left} to ${keyboard.right}", hint.left >= keyboard.left && hint.right <= keyboard.right)
         }
+    }
+
+    /**
+     * The list scrolled only as far as the focused card's picture, so with On
+     * Live TV as the last row the line under it, which says what OK and Hold
+     * OK do, was cut off at the foot of the screen.
+     */
+    @Test
+    fun `the focused Live TV card's key hints are on screen`() {
+        typeHar()
+        repeat(7) { press(Key.DirectionRight) }
+        assertEquals("Harbor Lights", focused())
+        // Down the results to On Live TV; its cards read as one thing, so the line under them shows that one has focus.
+        val hint = hasText("Open it in the guide") or hasText("Watch ", substring = true)
+        repeat(4) { if (compose.onAllNodes(hint).fetchSemanticsNodes().isEmpty()) press(Key.DirectionDown) }
+        val line = compose.onAllNodes(hint).onFirst().fetchSemanticsNode()
+        val screen = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        val top = line.positionInRoot.y
+        assertTrue("the line runs from $top to ${top + line.size.height}, off a screen ${screen.bottom} tall", top >= 0f && top + line.size.height <= screen.bottom)
+        assertEquals("how much of the line's height shows", line.size.height.toFloat(), line.boundsInRoot.height, 1f)
     }
 
     @Test
