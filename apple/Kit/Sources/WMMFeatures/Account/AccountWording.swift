@@ -303,7 +303,6 @@ public let serverAddressExample = "192.168.1.20 or https://home.example.net"
 public let serverAddressNote = "An IP address or a .local name works over http on your own network. A hostname needs https; Tailscale Serve or a reverse proxy gives it one."
 /// The tick by the server in use, spoken.
 public let serverInUse = "In use"
-public let switchServerTitle = "Switch server"
 
 public let pairingGettingCode = "Getting a code…"
 public let pairingCodeAccepted = "Code accepted. Signing in…"

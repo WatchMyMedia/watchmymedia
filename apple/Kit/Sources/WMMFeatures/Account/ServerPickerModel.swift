@@ -42,7 +42,7 @@ public final class ServerPickerModel {
         }
     }
 
-    /// The last failure to connect, by kind, for Switch server's first step
+    /// The last failure to connect, by kind, for Add a server's first step
     /// (``ConnectFailure/notice(after:)``); ``error`` and ``addressError`` say it as today.
     public private(set) var failure: ConnectFailure?
 

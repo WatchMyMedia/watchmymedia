@@ -2,14 +2,22 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Keeps an in-app server switch inside Settings until it is signed in or
-/// cancelled. Credentials stay in the repositories; cancellation selects the
-/// original saved endpoint, never a newly discovered address with its ID.
+/// Add a server: Choose a server, Sign in, Added. It runs over the app,
+/// which stays on the server it was on until the new one is signed in, and
+/// goes back there on Cancel or any failure. Servers this device is
+/// registered with already aren't offered again (``found``, ``remembered``,
+/// ``alreadyAdded``): switching to one of those needs no steps
+/// (``ServersModel``). Credentials stay in the repositories; cancellation
+/// selects the original saved endpoint, never a newly discovered address
+/// with its ID.
+///
+/// The same steps sign in again to a registered server whose sign-in ended
+/// (``signIn(to:)``), starting on Sign in.
 @MainActor
 @Observable
-public final class ServerSwitchModel {
+public final class AddServerModel {
     public enum Phase: Equatable { case picking, connecting, signingIn, restoring, finished }
-    public enum Outcome: Equatable { case switched, cancelled, accountChanged }
+    public enum Outcome: Equatable { case added, cancelled, accountChanged }
 
     public let originalServer: Server
     public let originalUser: User
@@ -18,11 +26,14 @@ public final class ServerSwitchModel {
     public private(set) var outcome: Outcome?
     public private(set) var signIn: SignInModel?
     public private(set) var error: String?
-    /// The server and account it ended on, once switched.
-    public private(set) var switchedTo: Server?
-    public private(set) var switchedUser: User?
-    /// The server chosen was signed in to already, so Sign in was skipped.
+    /// The server and account it ended on, once added.
+    public private(set) var addedServer: Server?
+    public private(set) var addedUser: User?
+    /// The server reached was signed in to already (its address was typed),
+    /// so Sign in was skipped: nothing was added, the app switched to it.
     public private(set) var skippedSignIn = false
+    /// Signing in again to a registered server whose sign-in ended, not adding one.
+    public private(set) var signingInAgain = false
 
     private let servers: any ServerRepository
     private let auth: any AuthRepository
@@ -57,8 +68,33 @@ public final class ServerSwitchModel {
         phase == .connecting || phase == .restoring || signIn?.busy == true || signIn?.checking == true
     }
 
+    /// Servers on this network that aren't registered yet.
+    public var found: [ServerPickerModel.Row] { picker.found.filter { !registeredIDs.contains($0.id) } }
+
+    /// Servers used before, never signed in to, that aren't on this network now.
+    public var remembered: [ServerPickerModel.Row] { picker.remembered.filter { !registeredIDs.contains($0.id) } }
+
+    private var registeredIDs: Set<String> { Set(servers.registered.map(\.server.id)).union([originalServer.id]) }
+
+    /// Under the list: "Already added: Living room server, Cabin server."
+    public var alreadyAdded: String {
+        let names = servers.registered.map(\.server.name)
+        return "Already added: \((names.isEmpty ? [originalServer.name] : names).joined(separator: ", "))."
+    }
+
     public func choose(_ row: ServerPickerModel.Row) async {
         await connect { await self.picker.choose(row) }
+    }
+
+    /// Starts on Sign in for a registered server whose sign-in ended, from
+    /// its row in Servers or its page in Settings.
+    public func signIn(to serverID: String) async {
+        guard let saved = servers.saved.first(where: { $0.server.id == serverID }) else { return }
+        signingInAgain = true
+        await choose(ServerPickerModel.Row(
+            id: saved.server.id, kind: .remembered, name: saved.server.name, address: saved.server.baseURL.absoluteString,
+            detail: saved.switcherLine, tooOld: saved.server.tooOld, current: false, signedIn: saved.signedIn
+        ))
     }
 
     public func connectToAddress() async {
@@ -81,7 +117,7 @@ public final class ServerSwitchModel {
         phase = .signingIn
         signIn = SignInModel(servers: servers, auth: auth, pairsByDefault: pairsByDefault)
         accountChanged()
-        if outcome == .switched { skippedSignIn = true }
+        if outcome == .added { skippedSignIn = true }
     }
 
     /// Called when the repositories change. An unrelated account transition
@@ -94,7 +130,7 @@ public final class ServerSwitchModel {
             guard let target, Self.sameEndpoint(servers.current?.server, target) else {
                 return finish(.accountChanged)
             }
-            if servers.current?.signedIn == true, auth.user != nil { finish(.switched) }
+            if servers.current?.signedIn == true, auth.user != nil { finish(.added) }
         case .connecting:
             // Remember an interruption even if another window returns to
             // the same account before this probe finishes.
@@ -149,9 +185,9 @@ public final class ServerSwitchModel {
     }
 
     private func finish(_ outcome: Outcome) {
-        if outcome == .switched {
-            switchedTo = servers.current?.server
-            switchedUser = auth.user
+        if outcome == .added {
+            addedServer = servers.current?.server
+            addedUser = auth.user
         }
         signIn = nil
         self.outcome = outcome

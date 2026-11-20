@@ -748,6 +748,12 @@ extension LibraryRepository {
 
     /// A repository that can't ask has none.
     public func relatedRows(_ title: RelatedTitle) async throws -> [ScreenRow] { [] }
+
+    /// A repository for one server alone has no other to ask.
+    public func search(_ text: String, serverID: String) async throws -> SearchResults { throw SignedOutError() }
+
+    /// A repository for one server alone has no other's pictures.
+    public func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL? { nil }
 }
 
 /// The page whose related titles are asked for: a
@@ -804,6 +810,18 @@ public protocol LibraryRepository: AnyObject {
     /// The full URL of a TMDB image path at `size`, or nil for no image. The
     /// image loader adds the sign-in, so the URL carries no token.
     func imageURL(_ path: String?, size: ImageSize) -> URL?
+
+    /// Search on a server this device is signed in to that isn't the one in
+    /// use, for search across servers: GET /api/search at that server's own
+    /// address with its own sign-in, never the current server's. Every id in
+    /// the reply is that server's. Throws ``SignedOutError`` when no sign-in
+    /// is kept for it, ``ServerTooOldError`` when it is too old for this app,
+    /// else ``APIError``.
+    func search(_ text: String, serverID: String) async throws -> SearchResults
+
+    /// ``imageURL(_:size:)`` on a server that isn't the one in use: a picture
+    /// loads from the server its title is on, with that server's sign-in.
+    func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL?
 
     /// Yields when watch state or the library changed (a mark watched here, or
     /// the server's watch.changed and library.changed events), so screens

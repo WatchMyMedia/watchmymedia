@@ -42,6 +42,17 @@ public final class DownloadsModel {
     }
 
     public var enabled: Bool { downloads.enabled }
+
+    /// What this device holds from the other servers it is signed in to,
+    /// each as a line under the list ("3 more from Cabin server") that
+    /// switches to that server; `servers` names them, in the Servers list's order.
+    public func elsewhere(_ servers: any ServerRepository) -> [OtherServerDownloads] {
+        let held = Dictionary(downloads.elsewhere.map { ($0.serverID, $0) }, uniquingKeysWith: { a, _ in a })
+        return servers.registered.compactMap { saved in
+            guard saved.server.id != servers.current?.server.id, let here = held[saved.server.id], here.count > 0 else { return nil }
+            return OtherServerDownloads(serverID: saved.server.id, line: ServersWords.moreDownloads(here.count, server: saved.server.name))
+        }
+    }
     public var canDownload: Bool { downloads.canDownload }
     public var all: [OfflineDownload] { downloads.downloads }
     public var settings: DownloadSettings { downloads.settings }
@@ -164,4 +175,13 @@ public final class DownloadsModel {
 
     /// Try again on the offline Home: a sync, which also says whether the server is back.
     public func sync() async { await downloads.sync() }
+}
+
+/// Another server's downloads on this device, as the Downloads list's line for them.
+public struct OtherServerDownloads: Hashable, Sendable, Identifiable {
+    public var serverID: String
+    /// "3 more from Cabin server".
+    public var line: String
+
+    public var id: String { serverID }
 }

@@ -216,11 +216,18 @@ final class RealServerRepository: ServerRepository {
         return found.apiLevel != saved.apiLevel
     }
 
-    /// Forgets the server and its sign-in, and ends the session on the server
-    /// when it can be reached (forgetting works offline either way).
+    /// Forgets the server and its sign-in, whichever server is in use, and
+    /// ends the session on the server when it can be reached (forgetting
+    /// works offline either way). First, while that session stands, what a
+    /// sign-out does for the server in use: its downloads here report every
+    /// copy removed (``LocalStore/runSignOutHooks(serverID:)``). Then the
+    /// sign-in goes, and its downloads are deleted from this device.
     func forget(serverID: String) async {
+        guard store.state.servers.contains(where: { $0.server.id == serverID }) else { return }
+        if store.loadCredential(serverID: serverID) != nil { await store.runSignOutHooks(serverID: serverID) }
+        // As it stands now: the hooks may have waited on a server that doesn't answer.
         guard let gone = store.state.servers.first(where: { $0.server.id == serverID }) else { return }
-        let credential = store.loadCredential(serverID: serverID)
+        let credential = store.credentials[serverID]
         store.update { state in
             state.servers.removeAll { $0.server.id == serverID }
             if state.currentID == serverID { state.currentID = nil }

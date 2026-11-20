@@ -101,6 +101,15 @@ public final class Navigator {
     /// ⌘F asked for Search: the Search screen puts the cursor in its field, then clears this.
     public var searchFieldRequested = false
 
+    /// Where a switch to another server is headed, kept until the screens
+    /// have been rebuilt on it (``land(on:)``).
+    public var arrival: ServerArrival?
+
+    /// Words for Search to ask when it next shows (``takeSearchWords()``):
+    /// the search a result on another server was opened from, asked again
+    /// on that server.
+    public var searchWords: String?
+
     /// A row's See all for a library, kept for the
     /// tab that shows it until that tab's grid takes it: one a tab, used once.
     @ObservationIgnored private var browseLinks: [AppTab: RowLink] = [:]
@@ -194,7 +203,7 @@ public final class Navigator {
     /// Applies launch arguments: `-tab settings` picks a tab, `-open <url>`
     /// opens a `watchmymedia://` link. For screenshots and UI checks on a
     /// simulator, where nothing can tap. They are the app's own, so a play
-    /// or channel link acts as it reads (``DeepLink/opening(_:signedInServer:)``
+    /// or channel link acts as it reads (``DeepLink/opening(_:signedInServer:others:)``
     /// is for links from outside).
     public func applyLaunchArguments(_ arguments: [String], library: any LibraryRepository, liveTV: (any LiveTVRepository)? = nil) async {
         func value(after flag: String) -> String? {
@@ -208,7 +217,7 @@ public final class Navigator {
     }
 
     /// Opens a `watchmymedia://` link the app was opened with, as
-    /// ``DeepLink/opening(_:signedInServer:)`` read it.
+    /// ``DeepLink/opening(_:signedInServer:others:)`` read it.
     public func open(_ link: DeepLink, library: any LibraryRepository, liveTV: (any LiveTVRepository)? = nil) async {
         switch link {
         case .filePage(let fileID):

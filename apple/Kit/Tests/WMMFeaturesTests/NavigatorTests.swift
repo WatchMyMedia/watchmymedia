@@ -162,6 +162,29 @@ import WMMModel
         #expect(DeepLink.opening(url("https://example.com/play/4"), signedInServer: "srv-a") == nil)
     }
 
+    /// A link the app published for another server this device is signed in
+    /// to opens, with that server named for the app to switch to first; one
+    /// for a server it isn't registered with still opens nothing.
+    @Test func aPublishedLinkForAnotherRegisteredServerNamesIt() throws {
+        func url(_ text: String) -> URL { URL(string: text)! }
+        let published = DeepLink.play(fileID: 4).url(publishedFor: "srv-b", source: "top-shelf")
+        #expect(DeepLink.opening(published, signedInServer: "srv-a", others: ["srv-b", "srv-c"]) == .init(link: .play(fileID: 4), server: "srv-b"))
+        #expect(DeepLink.opening(published, signedInServer: "srv-b", others: ["srv-a"]) == .init(link: .play(fileID: 4)), "the server in use: no switch")
+        #expect(DeepLink.opening(published, signedInServer: "srv-a", others: ["srv-c"]) == nil, "not registered, or signed out there")
+        #expect(DeepLink.opening(published, signedInServer: "srv-a", others: []) == nil)
+        #expect(DeepLink.opening(published, signedInServer: nil, others: ["srv-b"]) == .init(link: .play(fileID: 4), server: "srv-b"),
+                "signed out of the server in use, it still opens on the one it names")
+        // A published link that names no server opens nothing, whatever is registered.
+        #expect(DeepLink.opening(url("watchmymedia://play/4?source=reminder"), signedInServer: "srv-a", others: ["srv-b"]) == nil)
+        #expect(DeepLink.opening(url("watchmymedia://play/4?source=reminder&server="), signedInServer: "srv-a", others: [""]) == nil)
+        // A link the app didn't publish never switches, and never plays.
+        #expect(DeepLink.opening(url("watchmymedia://play/4"), signedInServer: "srv-a", others: ["srv-b"]) == .init(link: .filePage(fileID: 4)))
+        #expect(DeepLink.opening(url("watchmymedia://shows/100"), signedInServer: "srv-a", others: ["srv-b"]) == .init(link: .show(id: 100, season: nil)))
+        // A reminder's channel on another registered server takes its tuner once the app is there.
+        let reminder = DeepLink.liveTV(channelID: "a07f09").url(publishedFor: "srv-b", source: "reminder")
+        #expect(DeepLink.opening(reminder, signedInServer: "srv-a", others: ["srv-b"]) == .init(link: .liveTV(channelID: "a07f09"), server: "srv-b"))
+    }
+
     @Test func aChannelLinkTunesOnlyWhenTheAppPublishedIt() {
         let reminder = DeepLink.liveTV(channelID: "a07f09").url(publishedFor: "srv-a", source: "reminder")
         #expect(DeepLink.opening(reminder, signedInServer: "srv-a") == .liveTV(channelID: "a07f09"))

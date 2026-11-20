@@ -1,7 +1,7 @@
 import Foundation
 import WMMModel
 
-// Link a TV and Switch server as stepped tasks:
+// Link a TV and Add a server as stepped tasks:
 // each step's
 // number and name and the next one's, each button's label and why it is
 // off, every failure ending in what was or wasn't done, and the finished
@@ -189,9 +189,9 @@ extension LinkTVModel {
     }
 }
 
-// MARK: - Switch server
+// MARK: - Add a server
 
-/// Why connecting to a server failed, as Switch server's first step says it.
+/// Why connecting to a server failed, as Add a server's first step says it.
 public struct ConnectFailure: Hashable, Sendable {
     public enum Kind: Hashable, Sendable {
         /// Nothing answered at the address.
@@ -237,8 +237,10 @@ public struct ConnectFailure: Hashable, Sendable {
     }
 }
 
-extension ServerSwitchModel {
-    public static let stepNames = ["Choose a server", "Sign in", "Switched"]
+extension AddServerModel {
+    public static let stepNames = ["Choose a server", "Sign in", "Added"]
+    /// The task's name, over its steps.
+    public static let title = "Add a server"
 
     public var flowStep: FlowStep {
         switch phase {
@@ -249,11 +251,10 @@ extension ServerSwitchModel {
     }
 
     /// "You’re still on Living room server.", which ends every failure.
-    public var stillOn: String { "You’re still on \(originalServer.name)." }
+    public var stillOn: String { ServersWords.stillOn(originalServer.name) }
 
     /// The first step's title.
     public static let chooseTitle = "Which server?"
-    public static let current = "Current"
     public static let enterAddress = "Enter an address…"
     public static let enterAddressLine = "For a server that isn’t listed"
     public static let connectTitle = "Connect to this address"
@@ -283,11 +284,11 @@ extension ServerSwitchModel {
         "On a phone or computer signed in to \(signingInTo?.name ?? "that server"), open Link a TV and enter this code. You’re still on \(originalServer.name) until it’s approved."
     }
     /// Apple TV's path over the steps.
-    public static let tvPath = "Settings › Server › Switch server"
+    public static let tvPath = "Settings › Server › Add a server"
 
     /// Apple TV's lede on the first step.
     public var chooseLede: String {
-        "Servers on this network appear by themselves. You stay signed in on \(originalServer.name), and switching back needs no password."
+        "Servers on this network appear by themselves. You stay signed in on \(originalServer.name), and switching between them needs no password."
     }
 
     /// Why Connect to this address is off; nil while it is on.
@@ -295,18 +296,12 @@ extension ServerSwitchModel {
         picker.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Connect is off until there is an address." : nil
     }
 
-    /// A row's line in the list: a server signed in to already says it needs no password.
-    public func detail(for row: ServerPickerModel.Row, tv: Bool = false) -> String {
-        guard row.signedIn, !row.current, !row.tooOld else { return row.detail }
-        return row.detail + (tv ? ", so no password is needed" : ", no password needed")
-    }
-
     /// Why connecting failed, ending in "You’re still on Living room server."
     public var chooseProblem: SettingsNotice? { picker.failure?.notice(after: stillOn) }
 
-    /// The server being signed in to, on the second step, or switched to.
+    /// The server being signed in to, on the second step, or added.
     public var signingInTo: Server? {
-        if outcome == .switched { return switchedTo }
+        if outcome == .added { return addedServer }
         return phase == .signingIn || phase == .restoring ? signIn?.server : nil
     }
 
@@ -338,26 +333,34 @@ extension ServerSwitchModel {
         return SettingsNotice(title: "Couldn’t sign in to \(signingInTo?.name ?? "the server")", body: "\(words) \(stillOn)")
     }
 
-    /// Switched's words: what changed and what happens next. `downloadsKept`
-    /// adds that the first server's downloads stay on this device.
-    public func finished(device: String, downloadsKept: Bool = false) -> FinishedWords? {
-        guard outcome == .switched, let server = switchedTo else { return nil }
-        let still = downloadsKept
-            ? "You’re still signed in on \(originalServer.name), and its downloads stay on this \(device)."
-            : "You’re still signed in on \(originalServer.name)."
+    /// Added's words: "Den server is added", that this device is on it now,
+    /// how many servers it is signed in to and that search looks in all of
+    /// them, and where switching is. `signedIn` is how many servers this
+    /// device is signed in to now; `tv` words the way to Servers for the remote.
+    public func finished(device: String, signedIn: Int, tv: Bool = false) -> FinishedWords? {
+        guard outcome == .added, let server = addedServer else { return nil }
+        let title = if skippedSignIn {
+            "\(server.name) was added already"
+        } else if signingInAgain {
+            "You’re signed in to \(server.name) again"
+        } else {
+            "\(server.name) is added"
+        }
+        let count = max(signedIn, 1)
+        let changed = count > 1
+            ? "This \(device) is signed in to \(count) servers. Search looks in all of them."
+            : "This \(device) is signed in to 1 server."
         return FinishedWords(
-            title: "You’re on \(server.name)",
-            lede: switchedUser.map { "Signed in as \($0.name)." } ?? "",
-            whatChanged: ["This \(device) now shows \(server.name)’s library, Home and settings.", still],
-            whatHappensNext: [
-                "Switch back any time under Settings › Server. It needs no password.",
-                "Playback and Audio & subtitles are your choices on \(server.name), kept there.",
-            ]
+            title: title,
+            lede: addedUser.map { "You’re on it now, signed in as \($0.name)." } ?? "You’re on it now.",
+            whatChanged: [changed],
+            whatHappensNext: [tv ? "Select your initial beside the tabs to switch. It doesn’t ask for a password again."
+                                 : "Tap your initial on Home to switch. It doesn’t ask for a password again."]
         )
     }
 
-    /// Apple TV's buttons on Switched, and the line under them.
+    /// Apple TV's buttons on Added, and the line under them.
     public static let goHome = "Go to Home"
     public static let backToSettings = "Back to Settings"
-    public static let tvFinishedHint = "There is no way back from here: the switch is done. Menu goes to Home"
+    public static let tvFinishedHint = "There is no way back from here: the server is added. Menu goes to Home"
 }

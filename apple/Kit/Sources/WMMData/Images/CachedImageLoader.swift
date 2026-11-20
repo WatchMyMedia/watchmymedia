@@ -2,23 +2,25 @@ import Foundation
 import WMMModel
 
 /// Loads artwork through a `URLSession` with a disk cache (the server marks
-/// images immutable for a year), sending the bearer token to the current
-/// server and to no other host.
+/// images immutable for a year). A picture's request carries the bearer
+/// token of the server it is on, whichever server is in use (search lists
+/// other servers' titles), and no token goes to any other host.
 final class CachedImageLoader: ImageLoader {
-    /// The sign-in in use, if any, read on the main actor for each image.
-    typealias Current = @MainActor @Sendable () -> SignedInSession?
+    /// The sign-in for the server `url` is on, if any, read on the main actor
+    /// for each image (``LocalStore/signedIn(for:)``).
+    typealias SignIn = @MainActor @Sendable (_ url: URL) -> SignedInSession?
     /// A 401 with this sign-in's token: it was revoked.
     typealias Rejected = @Sendable (SignedInSession) async -> Void
 
     private let session: URLSession
-    private let current: Current
+    private let signIn: SignIn
     private let rejected: Rejected
 
     /// - Parameter rejected: what a revoked token does; by default what any
     ///   other request's would (``ServerAPI/tokenRefused()``).
-    init(session: URLSession, current: @escaping Current, rejected: @escaping Rejected = { await $0.api.tokenRefused() }) {
+    init(session: URLSession, signIn: @escaping SignIn, rejected: @escaping Rejected = { await $0.api.tokenRefused() }) {
         self.session = session
-        self.current = current
+        self.signIn = signIn
         self.rejected = rejected
     }
 
@@ -34,7 +36,7 @@ final class CachedImageLoader: ImageLoader {
     }
 
     func data(for url: URL) async throws -> Data {
-        let signedIn = await current()
+        let signedIn = await signIn(url)
         let request = signedIn?.api.authorizedRequest(url) ?? URLRequest(url: url)
         let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode >= 400 {

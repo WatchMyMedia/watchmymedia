@@ -100,13 +100,13 @@ public final class DataServices {
         requests = requestsRepository
         liveTV = RealLiveTVRepository(store: store, events: events)
         preferences = preferencesRepository
-        offline = RealOfflineGateway(store: store, auth: authRepository)
+        offline = RealOfflineGateway(store: store)
         casting = RealCastGateway(store: store, reader: serverInfo)
         rows = RealRowsRepository(store: store, events: events)
         follows = RealFollowsRepository(store: store, events: events)
         images = CachedImageLoader(
             session: imageSession ?? session,
-            current: { [weak store] in try? store?.signedIn() }
+            signIn: { [weak store] url in store?.signedIn(for: url) }
         )
 
         // On each sign-in (and at launch, when signed in): check the session is still good and load the

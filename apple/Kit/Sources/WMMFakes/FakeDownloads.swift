@@ -10,8 +10,39 @@ import WMMModel
 @MainActor
 @Observable
 public final class FakeDownloadRepository: DownloadRepository {
-    public private(set) var downloads: [OfflineDownload]
+    /// Living room server's, held whichever server is in use.
+    private var held: [OfflineDownload]
     public var canDownload: Bool
+    /// With several servers: whose downloads show follows the server in use.
+    @ObservationIgnored private let servers: FakeServerRepository?
+
+    /// Living room server's downloads while it is the server in use (or
+    /// with no servers to follow); none on Cabin server, which this device
+    /// has downloaded nothing from, nor on Den server, whose three are only counted.
+    public var downloads: [OfflineDownload] {
+        get { onSample ? held : [] }
+        set { if onSample { held = newValue } }
+    }
+
+    private var onSample: Bool {
+        guard let servers, let current = servers.current?.server.id else { return true }
+        return current != FakeServers.cabin.id && current != FakeServers.den.id
+    }
+
+    /// What is held from the servers not in use: Living room server's while
+    /// away from it, and three from Den server, so Servers offers Watch its
+    /// 3 downloads when it doesn't answer.
+    public var elsewhere: [ServerDownloads] {
+        guard let servers, let current = servers.current?.server.id else { return [] }
+        var others: [ServerDownloads] = []
+        if !onSample, !held.isEmpty, servers.signedIn(on: FakeServers.livingRoom.id) {
+            others.append(ServerDownloads(serverID: FakeServers.livingRoom.id, count: held.count, bytes: held.filter(\.downloaded).reduce(0) { $0 + $1.sizeBytes }))
+        }
+        if current != FakeServers.den.id, servers.signedIn(on: FakeServers.den.id) {
+            others.append(ServerDownloads(serverID: FakeServers.den.id, count: 3, bytes: 13_314_398_618))
+        }
+        return others
+    }
     public private(set) var settings = DownloadSettings()
     /// The marks made offline, in order (tests).
     public private(set) var marks: [(fileID: Int, watched: Bool)] = []
@@ -23,9 +54,10 @@ public final class FakeDownloadRepository: DownloadRepository {
     /// person's audio languages); nil is the file's default.
     public var preferredAudio: Int?
 
-    public init(seeded: Bool = true, canDownload: Bool = true) {
+    public init(seeded: Bool = true, canDownload: Bool = true, servers: FakeServerRepository? = nil) {
         self.canDownload = canDownload
-        downloads = seeded ? Self.seed : []
+        self.servers = servers
+        held = seeded ? Self.seed : []
     }
 
     public var enabled: Bool { canDownload || !downloads.isEmpty }

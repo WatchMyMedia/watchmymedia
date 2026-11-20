@@ -147,11 +147,15 @@ public protocol OfflineGateway: AnyObject {
     /// Whether `owner` is still signed in on its server.
     func signedIn(_ owner: OfflineOwner) -> Bool
 
-    /// Called whenever the sign-in in use changes: another server or account, or signed out.
+    /// Called whenever the sign-in in use changes (another server or account,
+    /// or signed out), and whenever the sign-in kept for any other server
+    /// goes: that server was removed, or its session was refused.
     func onSessionChange(_ listener: @escaping @MainActor () -> Void)
 
-    /// Runs `hook` before a sign-out ends the session, while the server still takes it.
-    func beforeSignOut(_ hook: @escaping @MainActor @Sendable () async -> Void)
+    /// Runs `hook` before a sign-out ends `owner`'s session, while its server
+    /// still takes it: signing out of the server in use, or removing any
+    /// server this device is signed in to.
+    func beforeSignOut(_ hook: @escaping @MainActor @Sendable (_ owner: OfflineOwner) async -> Void)
 
     /// Whether `owner` may download now (``offlineAPILevel`` and RequestOptions.offline).
     func allowed(_ owner: OfflineOwner) async throws -> Bool

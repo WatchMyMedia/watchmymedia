@@ -451,17 +451,9 @@ public enum SettingsWords {
     }
 
     public static let thisServer = "This server"
-    public static let anotherServer = "Another server"
     public static let address = "Address"
     public static let version = "Version"
     public static let signedInAs = "Signed in as"
-    public static let switchServerLine = "Three steps: choose it, sign in, done. You stay signed in here, and switching back needs no password."
-    /// Apple TV's row line, with the rest in its panel.
-    public static let switchServerShortLine = "Three steps: choose it, sign in, done"
-    public static let switchServerAbout = [
-        "Choose another server on this network, or enter its address, then sign in there.",
-        "You stay signed in here, and switching back needs no password.",
-    ]
     public static let inboxLine = "Requests to approve and problems people reported"
 
     // MARK: Apple TV

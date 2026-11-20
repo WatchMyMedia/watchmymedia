@@ -100,7 +100,7 @@ public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
         engine.delegate = self
         engine.setWifiOnly(stored.wifiOnly)
         gateway.onSessionChange { [weak self] in self?.sessionChanged() }
-        gateway.beforeSignOut { [weak self] in await self?.reportAllRemoved() }
+        gateway.beforeSignOut { [weak self] owner in await self?.reportAllRemoved(owner) }
         sessionChanged()
         startTicker()
     }
@@ -126,6 +126,24 @@ public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
         let list = buildDownloads(owner)
         built = (tick, storedVersion, engineEdits, owner, list)
         return list
+    }
+
+    /// What is held from each other server still signed in to: a count and
+    /// its bytes as far as they have come. Titles stay with their account.
+    public var elsewhere: [ServerDownloads] {
+        _ = engineTick
+        let current = owner?.key
+        let others = stored.records.filter { $0.ownerKey != current && gateway.signedIn($0.owner) }
+        guard !others.isEmpty else { return [] }
+        let held = engine.downloads()
+        return Dictionary(grouping: others) { $0.owner.serverID }.map { serverID, records in
+            let bytes = records.reduce(Int64(0)) { sum, rec in
+                if let e = held[rec.id], e.bytes > 0 { return sum + e.bytes }
+                guard rec.completedAt != nil, let record = parse(rec) else { return sum }
+                return sum + record.sizeBytes
+            }
+            return ServerDownloads(serverID: serverID, count: records.count, bytes: bytes)
+        }.sorted { $0.serverID < $1.serverID }
     }
 
     private func buildDownloads(_ owner: OfflineOwner?) -> [OfflineDownload] {
@@ -631,9 +649,9 @@ public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
         if removedHere && again { await syncOwner(o, again: false) }
     }
 
-    /// Before signing out: the progress made here and every copy, reported removed, while the session stands.
-    private func reportAllRemoved() async {
-        guard let o = owner else { return }
+    /// Before `o` is signed out (of the server in use, or of any server being
+    /// removed): the progress made here and every copy, reported removed, while the session stands.
+    private func reportAllRemoved(_ o: OfflineOwner) async {
         let held = stored.records.filter { $0.ownerKey == o.key }
         let gone = Set(held.filter { $0.mark == .removedFromServer }.map(\.id))
         let entries = stored.progress.filter { $0.ownerKey == o.key && !gone.contains($0.downloadID ?? "") }

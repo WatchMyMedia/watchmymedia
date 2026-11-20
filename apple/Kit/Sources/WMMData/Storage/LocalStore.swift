@@ -32,6 +32,14 @@ final class LocalStore {
     @ObservationIgnored private var sessionKey: String?
     @ObservationIgnored private var sessionListeners: [(_ signedIn: Bool) -> Void] = []
     @ObservationIgnored private var cachedAPI: (key: String, api: ServerAPI)?
+    /// The APIs of the other servers signed in to, by server ID, for search across servers and their pictures.
+    @ObservationIgnored private var otherAPIs: [String: (key: String, api: ServerAPI)] = [:]
+    /// Run before a sign-in is ended on its server (``beforeSignOut(_:)``).
+    @ObservationIgnored private var signOutHooks: [SignOutHook] = []
+    @ObservationIgnored private var signInRemovedListeners: [() -> Void] = []
+
+    /// What runs before `serverID`'s sign-in ends, with the sign-in that is ending.
+    typealias SignOutHook = @MainActor @Sendable (_ server: Server, _ credential: StoredCredential) async -> Void
     /// Servers whose sign-in couldn't be read (a launch before the first
     /// unlock), read again when protected data becomes available.
     @ObservationIgnored private(set) var unreadable: Set<String> = []
@@ -149,13 +157,20 @@ final class LocalStore {
     /// Keeps (or with nil, forgets) the sign-in on a server.
     func setCredential(_ credential: StoredCredential?, serverID: String) {
         unreadable.remove(serverID)
+        let before = revision
+        let previous = credentials[serverID]
         mutate {
-            let previous = credentials[serverID]
             credentials[serverID] = credential
             storage.setCredential(credential, serverID: serverID)
             if let name = credential?.user.name ?? previous?.user.name {
                 state.updateServer(serverID) { $0.lastUserName = name }
             }
+        }
+        otherAPIs[serverID] = nil
+        // The sign-in of a server that isn't in use went: the session in use
+        // didn't change, so its listeners heard nothing.
+        if credential == nil, previous != nil, revision == before {
+            for listener in signInRemovedListeners { listener() }
         }
     }
 
@@ -183,6 +198,29 @@ final class LocalStore {
     /// another account, a new token, or signed out), with whether one is in use.
     func onSessionChange(_ listener: @escaping (_ signedIn: Bool) -> Void) {
         sessionListeners.append(listener)
+    }
+
+    /// Calls `listener` when the sign-in kept for a server that isn't the
+    /// one in use goes (the server was removed, or its session refused),
+    /// which ``onSessionChange(_:)`` doesn't report.
+    func onSignInRemoved(_ listener: @escaping () -> Void) {
+        signInRemovedListeners.append(listener)
+    }
+
+    /// Runs `hook` before a sign-in is ended on its server, while the server
+    /// still takes it (offline downloads report themselves removed).
+    func beforeSignOut(_ hook: @escaping SignOutHook) {
+        signOutHooks.append(hook)
+    }
+
+    /// Runs the sign-out hooks for `serverID`'s sign-in, each for at most 5 s;
+    /// nothing when no sign-in is kept for it.
+    func runSignOutHooks(serverID: String) async {
+        guard let server = state.servers.first(where: { $0.server.id == serverID })?.server,
+              let credential = credentials[serverID] else { return }
+        for hook in signOutHooks {
+            _ = try? await withDeadline(.seconds(5)) { await hook(server, credential) }
+        }
     }
 
     private func mutate(_ body: () -> Void) {
@@ -215,6 +253,35 @@ final class LocalStore {
         let api = api(serverID: server.id, baseURL: server.baseURL, token: credential.token)
         cachedAPI = (key, api)
         return SignedInSession(serverID: server.id, token: credential.token, api: api)
+    }
+
+    /// The API of a server this device is signed in to that isn't the one
+    /// in use, with its own sign-in on its own address. ``SignedOutError``
+    /// when no sign-in is kept for it, ``ServerTooOldError`` when it is too old.
+    func other(serverID: String) throws -> SignedInSession {
+        guard let server = state.servers.first(where: { $0.server.id == serverID })?.server,
+              let credential = credentials[serverID] else { throw SignedOutError() }
+        if server.tooOld { throw ServerTooOldError(server: server) }
+        let key = "\(server.baseURL.absoluteString) \(credential.token)"
+        if let cached = otherAPIs[serverID], cached.key == key {
+            return SignedInSession(serverID: serverID, token: credential.token, api: cached.api)
+        }
+        let api = api(serverID: serverID, baseURL: server.baseURL, token: credential.token)
+        otherAPIs[serverID] = (key, api)
+        return SignedInSession(serverID: serverID, token: credential.token, api: api)
+    }
+
+    /// The sign-in a request for `url` goes out with: the server's that the
+    /// address is on, the one in use first, then any other this device is
+    /// signed in to. For an address on none of them, the sign-in in use,
+    /// which doesn't sign it (``RequestSigner``).
+    func signedIn(for url: URL) -> SignedInSession? {
+        let current = try? signedIn()
+        if let current, ServerAPI.owns(current.api.baseURL, url) { return current }
+        for stored in state.servers where stored.server.id != state.currentID && ServerAPI.owns(stored.server.baseURL, url) {
+            if let session = try? other(serverID: stored.server.id) { return session }
+        }
+        return current
     }
 
     /// Runs a call as the signed-in user; a refused token signs out (in

@@ -281,6 +281,11 @@ public protocol DownloadRepository: AnyObject, Observable {
     /// This account's downloads, newest first.
     var downloads: [OfflineDownload] { get }
 
+    /// What is held here from the other servers this device is signed in to:
+    /// how many and how large, never their titles. The Downloads list's line
+    /// for each ("3 more from Cabin server") and a server's page read it.
+    var elsewhere: [ServerDownloads] { get }
+
     var settings: DownloadSettings { get }
 
     /// How `fileID` would download at each quality.
@@ -319,7 +324,25 @@ public protocol DownloadRepository: AnyObject, Observable {
     func sync() async
 }
 
+/// The downloads this device holds from one server that isn't the one in use.
+public struct ServerDownloads: Hashable, Sendable, Identifiable {
+    public var serverID: String
+    public var count: Int
+    public var bytes: Int64
+
+    public init(serverID: String, count: Int, bytes: Int64) {
+        self.serverID = serverID
+        self.count = count
+        self.bytes = bytes
+    }
+
+    public var id: String { serverID }
+}
+
 public extension DownloadRepository {
+    /// Simple repositories keep one account's downloads.
+    var elsewhere: [ServerDownloads] { [] }
+
     /// Simple repositories expose only the current account's pending transfers.
     func availableStorage() -> DownloadStorage {
         var result = storage()

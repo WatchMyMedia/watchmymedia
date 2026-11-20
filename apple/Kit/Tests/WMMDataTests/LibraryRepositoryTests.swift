@@ -425,7 +425,7 @@ struct LibraryRepositoryTests {
         // The loader on another host's session: no token goes there.
         let other = StubServer()
         other.respond { _, _, _ in (200, Data([9])) }
-        let loader = CachedImageLoader(session: other.session, current: { [store = h.services.store] in try? store.signedIn() }, rejected: { _ in })
+        let loader = CachedImageLoader(session: other.session, signIn: { [store = h.services.store] url in store.signedIn(for: url) }, rejected: { _ in })
         #expect(try await loader.data(for: other.baseURL.appending(path: "x.jpg")) == Data([9]))
         #expect(other.seen.first?.value(forHTTPHeaderField: "Authorization") == nil)
     }

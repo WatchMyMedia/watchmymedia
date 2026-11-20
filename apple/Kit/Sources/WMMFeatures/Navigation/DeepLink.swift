@@ -11,14 +11,17 @@ import Foundation
 /// as android/mobile/.../DeepLinks.kt reads them.
 ///
 /// A link that starts playback or takes a tuner (`play/…`, `movies/{id}?play=1`, `live-tv/{id}`)
-/// does so only when the app published it for the server signed in
-/// (as Android's DeepLink.open): such a
-/// link carries `source=` and `server=` (``url(publishedFor:source:)``), and
-/// one for another server opens nothing. Any other play link, from a web
+/// does so only when the app published it for a server this device is
+/// signed in to (as Android's DeepLink.open): such a
+/// link carries `source=` and `server=` (``url(publishedFor:source:)``). One
+/// for the server in use opens as it reads; one for another registered
+/// server that is signed in opens once the app has switched to that server
+/// (``opening(_:signedInServer:others:)`` names it); one for a server that
+/// isn't registered opens nothing. Any other play link, from a web
 /// page, a QR code or another app, opens the file's page with Play ready
 /// (``filePage(fileID:)``), any other movie play link the movie's page, and
 /// any other channel link opens the guide.
-/// Open a link from outside with ``opening(_:signedInServer:)``; the app's
+/// Open a link from outside with ``opening(_:signedInServer:others:)``; the app's
 /// own launch arguments (`-open`) are the app's, and act as they read.
 public enum DeepLink: Hashable, Sendable {
     case play(fileID: Int)
@@ -126,25 +129,53 @@ extension DeepLink {
         return server?.value ?? ""
     }
 
-    /// `url` as the app opens it with `serverID` signed in (nil when none
-    /// is): a link the app published for another server, or for none, opens
-    /// nothing; a play link the app didn't publish opens the file's page, a
-    /// movie play link the movie's; a channel link it didn't publish opens
-    /// the guide; every other link opens as it reads.
-    public static func opening(_ url: URL, signedInServer serverID: String?) -> DeepLink? {
-        let publisher = publishedServer(url)
-        if let publisher, serverID == nil || publisher != serverID { return nil }
-        guard let link = DeepLink(url: url) else { return nil }
-        switch link {
-        case .play(let id): return publisher != nil ? link : .filePage(fileID: id)
-        case .playMovie(let id): return publisher != nil ? link : .movie(id: id)
-        case .liveTV(_?): return publisher != nil ? link : .liveTV(channelID: nil)
-        default: return link
+    /// A link as the app opens it, and the server to switch to before it does.
+    public struct Opening: Hashable, Sendable {
+        public var link: DeepLink
+        /// The registered server the link was published for, when that isn't
+        /// the one in use: the app switches to it, then opens the link. Nil
+        /// for a link that opens where the app is.
+        public var server: String?
+
+        public init(link: DeepLink, server: String? = nil) {
+            self.link = link
+            self.server = server
         }
     }
 
+    /// `url` as the app opens it with `serverID` signed in (nil when none
+    /// is) and `others` the other registered servers it is signed in to: a
+    /// link the app published for the server in use opens as it reads; one
+    /// published for one of `others` opens the same way with that server
+    /// named, for the app to switch to first; one published for any other
+    /// server, or for none, opens nothing. A play link the app didn't publish
+    /// opens the file's page, a movie play link the movie's; a channel link
+    /// it didn't publish opens the guide; every other link opens as it reads.
+    public static func opening(_ url: URL, signedInServer serverID: String?, others: [String]) -> Opening? {
+        let publisher = publishedServer(url)
+        var switchTo: String?
+        if let publisher, publisher != serverID {
+            guard !publisher.isEmpty, others.contains(publisher) else { return nil }
+            switchTo = publisher
+        }
+        guard let link = DeepLink(url: url) else { return nil }
+        let opened: DeepLink = switch link {
+        case .play(let id): publisher != nil ? link : .filePage(fileID: id)
+        case .playMovie(let id): publisher != nil ? link : .movie(id: id)
+        case .liveTV(_?): publisher != nil ? link : .liveTV(channelID: nil)
+        default: link
+        }
+        return Opening(link: opened, server: switchTo)
+    }
+
+    /// ``opening(_:signedInServer:others:)`` with no other server registered:
+    /// a link published for a server that isn't the one in use opens nothing.
+    public static func opening(_ url: URL, signedInServer serverID: String?) -> DeepLink? {
+        opening(url, signedInServer: serverID, others: [])?.link
+    }
+
     /// The link as the app publishes it (a reminder's notification, Top
-    /// Shelf and quick actions), for `serverID`: only that server's sign-in opens it.
+    /// Shelf and quick actions), for `serverID`: only a device signed in to that server opens it.
     public func url(publishedFor serverID: String, source: String = "app") -> URL {
         var c = URLComponents(url: url, resolvingAgainstBaseURL: false)!
         c.queryItems = (c.queryItems ?? []) + [URLQueryItem(name: "source", value: source), URLQueryItem(name: "server", value: serverID)]

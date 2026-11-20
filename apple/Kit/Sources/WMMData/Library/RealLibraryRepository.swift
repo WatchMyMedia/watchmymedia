@@ -88,6 +88,16 @@ final class RealLibraryRepository: LibraryRepository {
         return SearchResults(movies: r.movies.map(\.browseItem), shows: r.shows.map(\.browseItem), episodes: r.episodes.map(\.card))
     }
 
+    /// GET /api/search on a server that isn't in use, through an API built
+    /// for that server alone: its address, its token (``LocalStore/other(serverID:)``).
+    /// A 401 there forgets that sign-in and leaves the one in use alone.
+    func search(_ text: String, serverID: String) async throws -> SearchResults {
+        let q = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxSearch))
+        guard !q.isEmpty else { return SearchResults() }
+        let r = try await store.other(serverID: serverID).api.call { try await $0.search(query: .init(q: q)).ok.body.json }
+        return SearchResults(movies: r.movies.map(\.browseItem), shows: r.shows.map(\.browseItem), episodes: r.episodes.map(\.card))
+    }
+
     /// Each mark tells every listener what changed, and the server's echo of
     /// it is dropped (``ServerEvents/expect(_:)``), so every screen showing it
     /// loads once.
@@ -228,9 +238,15 @@ final class RealLibraryRepository: LibraryRepository {
     }
 
     func imageURL(_ path: String?, size: ImageSize) -> URL? {
-        guard let p = Mapping.nonBlank(path?.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let base = store.current?.server.baseURL
-        else { return nil }
+        Self.imageURL(path, size: size, base: store.current?.server.baseURL)
+    }
+
+    func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL? {
+        Self.imageURL(path, size: size, base: store.state.servers.first { $0.server.id == serverID }?.server.baseURL)
+    }
+
+    private static func imageURL(_ path: String?, size: ImageSize, base: URL?) -> URL? {
+        guard let p = Mapping.nonBlank(path?.trimmingCharacters(in: .whitespacesAndNewlines)), let base else { return nil }
         return URL(string: base.absoluteString + "/api/images/\(size.rawValue)" + (p.hasPrefix("/") ? p : "/" + p))
     }
 

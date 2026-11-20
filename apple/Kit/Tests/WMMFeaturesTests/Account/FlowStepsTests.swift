@@ -19,9 +19,9 @@ import WMMModel
         #expect(first.line == "Step 1 of 3 · Enter the code · next: Check it’s yours")
         #expect(first.accessibilityLabel == "Step 1 of 3, Enter the code")
         #expect(first.done.isEmpty)
-        let second = FlowStep(number: 2, names: ServerSwitchModel.stepNames)
-        #expect(second.line == "Step 2 of 3 · Sign in · next: Switched")
-        #expect(second.shortLine == "Step 2 of 3 · next: Switched")
+        let second = FlowStep(number: 2, names: AddServerModel.stepNames)
+        #expect(second.line == "Step 2 of 3 · Sign in · next: Added")
+        #expect(second.shortLine == "Step 2 of 3 · next: Added")
         #expect(second.done == [1])
         let last = FlowStep(number: 3, names: LinkTVModel.stepNames, done: [1, 2, 3])
         #expect(last.line == "Linked")
@@ -116,7 +116,7 @@ import WMMModel
         #expect(model.problem?.body == "Someone approved this code a moment ago, so nothing more was linked. It’s listed under Signed-in devices.")
     }
 
-    // MARK: Switch server
+    // MARK: Add a server
 
     private func signedInServers() -> (FakeServerRepository, FakeAuthRepository) {
         let servers = FakeServerRepository()
@@ -124,10 +124,13 @@ import WMMModel
         return (servers, auth)
     }
 
-    @Test func switchingToAServerSignedInToAlreadySkipsSignIn() async throws {
+    @Test func addingAServerSaysWhatChangedAndOneAlreadyAddedSkipsSignIn() async throws {
         let services = AppServices.fake(client: .fakePhone)
-        // Sign in on the Office Mac mini once, then come back to Living room.
-        let first = try #require(ServerSwitchModel(servers: services.servers, auth: services.auth))
+        #expect(AddServerModel.stepNames == ["Choose a server", "Sign in", "Added"])
+        #expect(AddServerModel.title == "Add a server")
+        // Add the Office Mac mini, signing in there.
+        let first = try #require(AddServerModel(servers: services.servers, auth: services.auth))
+        #expect(first.flowStep.line == "Step 1 of 3 · Choose a server · next: Sign in")
         first.picker.address = FakeServers.officeMini.baseURL.absoluteString
         await first.connectToAddress()
         #expect(first.flowStep.number == 2)
@@ -143,39 +146,35 @@ import WMMModel
         first.signIn?.password = "password"
         await first.signIn?.signIn()
         first.accountChanged()
-        #expect(first.outcome == .switched)
+        #expect(first.outcome == .added)
         #expect(!first.skippedSignIn)
         #expect(first.flowStep.number == 3)
-        let words = try #require(first.finished(device: "iPhone", downloadsKept: true))
-        #expect(words.title == "You’re on Office Mac mini")
-        #expect(words.lede == "Signed in as Robin.")
-        #expect(words.whatChanged == [
-            "This iPhone now shows Office Mac mini’s library, Home and settings.",
-            "You’re still signed in on Living room server, and its downloads stay on this iPhone.",
-        ])
-        #expect(words.whatHappensNext == [
-            "Switch back any time under Settings › Server. It needs no password.",
-            "Playback and Audio & subtitles are your choices on Office Mac mini, kept there.",
-        ])
+        #expect(first.flowStep.line == "Added")
+        let words = try #require(first.finished(device: "iPhone", signedIn: 2))
+        #expect(words.title == "Office Mac mini is added")
+        #expect(words.lede == "You’re on it now, signed in as Robin.")
+        #expect(words.whatChanged == ["This iPhone is signed in to 2 servers. Search looks in all of them."])
+        #expect(words.whatHappensNext == ["Tap your initial on Home to switch. It doesn’t ask for a password again."])
+        #expect(first.finished(device: "Apple TV", signedIn: 3, tv: true)?.whatHappensNext
+            == ["Select your initial beside the tabs to switch. It doesn’t ask for a password again."])
 
-        let back = try #require(ServerSwitchModel(servers: services.servers, auth: services.auth))
-        let row = try #require(back.picker.remembered.first { $0.id == FakeServers.livingRoom.id })
-        #expect(row.signedIn)
-        #expect(back.detail(for: row).hasSuffix(", no password needed"))
-        #expect(back.detail(for: row, tv: true).hasSuffix(", so no password is needed"))
-        await back.choose(row)
-        #expect(back.outcome == .switched)
+        // Living room server is registered, so it isn't offered; its address typed switches to it with no Sign in.
+        let back = try #require(AddServerModel(servers: services.servers, auth: services.auth))
+        #expect(!back.remembered.contains { $0.id == FakeServers.livingRoom.id })
+        back.picker.address = FakeServers.livingRoom.baseURL.absoluteString
+        await back.connectToAddress()
+        #expect(back.outcome == .added)
         #expect(back.skippedSignIn, "no Sign in step")
         #expect(back.flowStep.done == [1, 2, 3])
-        #expect(back.finished(device: "Apple TV")?.whatChanged.last == "You’re still signed in on Office Mac mini.")
+        #expect(back.finished(device: "iPhone", signedIn: 2)?.title == "Living room server was added already")
     }
 
     @Test func everyFailureSaysYoureStillOnTheFirstServer() async throws {
         let account = SwitchAccount()
-        let model = try #require(ServerSwitchModel(servers: account, auth: account))
+        let model = try #require(AddServerModel(servers: account, auth: account))
         #expect(model.stillOn == "You’re still on Living room server.")
         #expect(model.connectOffReason == "Connect is off until there is an address.")
-        #expect(model.chooseLede == "Servers on this network appear by themselves. You stay signed in on Living room server, and switching back needs no password.")
+        #expect(model.chooseLede == "Servers on this network appear by themselves. You stay signed in on Living room server, and switching between them needs no password.")
 
         account.probeError = APIError(status: nil, message: "Couldn't reach the server. Check the connection and try again.")
         model.picker.address = "192.0.2.99"
@@ -259,7 +258,7 @@ import WMMModel
         let services = AppServices.fake(client: .fakePhone)
         let auth = try #require(services.auth as? FakeAuthRepository)
         auth.pairingApproval = .zero
-        let model = try #require(ServerSwitchModel(servers: services.servers, auth: services.auth))
+        let model = try #require(AddServerModel(servers: services.servers, auth: services.auth))
         #expect(!model.pairsByDefault)
         model.picker.address = FakeServers.officeMini.baseURL.absoluteString
         await model.connectToAddress()
@@ -280,14 +279,14 @@ import WMMModel
         model.useCode()
         await form.pair()
         model.accountChanged()
-        #expect(model.outcome == .switched)
+        #expect(model.outcome == .added)
         #expect(!model.skippedSignIn)
-        #expect(model.finished(device: "iPhone")?.title == "You’re on Office Mac mini")
+        #expect(model.finished(device: "iPhone", signedIn: 2)?.title == "Office Mac mini is added")
     }
 
     @Test func appleTVStartsOnTheCode() async throws {
         let services = AppServices.fake(client: .fakeAppleTV)
-        let model = try #require(ServerSwitchModel(servers: services.servers, auth: services.auth, pairsByDefault: true))
+        let model = try #require(AddServerModel(servers: services.servers, auth: services.auth, pairsByDefault: true))
         #expect(model.pairsByDefault)
         model.picker.address = FakeServers.officeMini.baseURL.absoluteString
         await model.connectToAddress()
