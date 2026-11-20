@@ -28,6 +28,15 @@ against an isolated synthetic server, and the app builds for Chromium 108.
 - Three 60-second synthetic clips and an opt-in live contract test for direct
   MP4, HLS remux, audio/video conversion delivery, resume and token revocation.
 
+The player engine for the full TV client is in [`player/`](player/README.md),
+2026-11-19: the AVPlay adapter with tracks, live streams and backgrounding; one
+conservative QN90D-class profile; the file, recording and trailer player
+(heartbeats, directives, Automatic, skip, the next episode, Still watching,
+held seeking with thumbnails, WebVTT cues, OpenSubtitles, recovery and token
+renewal); and the Live TV player on the shared tuner controller. It has unit
+tests with fake players and servers only; no screen uses most of it yet, and
+nothing of it has run on a TV.
+
 The development preview labels itself **Browser preview · not AVPlay**. Its
 HTML video/Hls.js adapter is excluded from the production TV bundle. The TV app
 fails clearly when Samsung APIs are unavailable; it never silently substitutes
