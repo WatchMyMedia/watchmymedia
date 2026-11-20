@@ -258,6 +258,15 @@ public final class SearchModel {
         return requestables.filter { $0.state != .available && requests?.options.canRequest($0.mediaType) == true }
     }
 
+    /// Beside Not in your library's heading: how many, and across servers
+    /// the server they would be requested on, since those stay the server
+    /// in use's ("4 · Living room server").
+    public var notInLibraryDetail: String {
+        let count = formatCount(notInLibrary.count)
+        guard acrossServers, let name = servers?.current?.server.name else { return count }
+        return "\(count) · \(name)"
+    }
+
     /// Opens the request sheet for a result that can be asked for.
     public func openRequest(_ item: Requestable) {
         guard let requests, item.state == .requestable else { return }

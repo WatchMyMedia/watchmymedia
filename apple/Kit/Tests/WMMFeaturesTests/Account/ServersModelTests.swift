@@ -308,6 +308,60 @@ import WMMModel
         #expect(s.navigator.tab == .home)
     }
 
+    // MARK: Settings › Server
+
+    @Test func yourServersListsEachWithWhoIsSignedInAndItsVersion() async throws {
+        let s = Several()
+        #expect(s.model.settingsRows.map(\.name) == ["Living room server", "Cabin server", "Den server"])
+        #expect(s.model.settingsRows.map(\.detail) == ["Sam · 192.168.1.20:27587 · v0.9.3", "Sam · 192.0.2.31:27587 · v1.4.5", "Sam · 192.0.2.52:27587 · v1.3.2"])
+        #expect(s.model.settingsRows.map(\.current) == [true, false, false])
+        #expect(s.servers.signedInCount == 3)
+
+        let sample = ServersModel(servers: FakeServerRepository(), navigator: Navigator())
+        #expect(sample.settingsRows.map(\.detail) == [
+            "Sam · 192.168.1.20:27587 · v0.9.3",
+            "Sam · home.watchmy.media · v0.9.3 · Signed out here",
+            "Sam · nas.local:27587 · v0.6.0 · Too old for this app",
+        ])
+    }
+
+    @Test func aServersPageSaysWhatItHoldsAndWhatCanBeDone() async throws {
+        let s = Several()
+        let den = try #require(s.model.page(FakeServers.den.id, device: "iPhone", showsDownloads: true))
+        #expect(den.name == "Den server")
+        #expect(den.facts.map(\.label) == ["Address", "Version", "Signed in as", "Downloads from it"])
+        #expect(den.facts.map(\.value) == ["192.0.2.52:27587", "v1.3.2 · API 6", "Sam", "3 · 12.4 GB"])
+        #expect(den.canSwitch && !den.canSignIn)
+        #expect(den.removeQuestion.title == "Remove Den server from this iPhone?")
+        #expect(den.removeQuestion.lines.first == "This iPhone is signed out of it, and its 3 downloads here are deleted.")
+
+        // The server in use: its own list's downloads, and no Switch to this server.
+        let living = try #require(s.model.page(FakeServers.livingRoom.id, device: "iPhone", showsDownloads: true))
+        #expect(!living.canSwitch && !living.canSignIn)
+        #expect(living.facts.last?.value.hasPrefix("3 · ") == true)
+
+        // Apple TV keeps no downloads, and says nothing of them.
+        let tv = try #require(s.model.page(FakeServers.cabin.id, device: "Apple TV", showsDownloads: false))
+        #expect(tv.facts.map(\.label) == ["Address", "Version", "Signed in as"])
+        #expect(tv.removeQuestion.lines.first == "This Apple TV is signed out of it.")
+
+        #expect(s.model.page("srv-unknown", device: "iPhone", showsDownloads: true) == nil)
+        await s.model.remove(FakeServers.den.id)
+        #expect(s.model.page(FakeServers.den.id, device: "iPhone", showsDownloads: true) == nil, "off the list, its page goes")
+    }
+
+    @Test func aSignedOutServersPageOffersSignInAgain() throws {
+        let servers = FakeServerRepository()
+        let model = ServersModel(servers: servers, navigator: Navigator())
+        let page = try #require(model.page(FakeServers.remoteHome.id, device: "iPad", showsDownloads: true))
+        #expect(page.canSignIn && !page.canSwitch)
+        #expect(page.facts.first { $0.label == "Signed in as" }?.value == "Signed out here")
+        let old = try #require(model.page(FakeServers.oldNAS.id, device: "iPad", showsDownloads: true))
+        #expect(!old.canSignIn && !old.canSwitch, "too old: it can only be removed")
+        model.signInAgain(FakeServers.remoteHome.id)
+        #expect(model.signInRequest?.server.id == FakeServers.remoteHome.id)
+    }
+
     // MARK: Words
 
     @Test func theWordsAreAsServersSaysThem() {

@@ -232,6 +232,16 @@ import WMMModel
         #expect(try listing().movies.map(\.title) == ["Harbor Nights"])
     }
 
+    @Test func notInYourLibraryNamesTheServerItWouldBeRequestedOn() async throws {
+        let requests = FakeRequestsRepository(library: library.fake, admin: true)
+        let model = SearchModel(library: library, navigator: navigator, debounce: .zero, requests: requests, servers: servers, switcher: switcher)
+        model.setQuery("harbo")
+        await model.pending?.value
+        await model.pendingRequestables?.value
+        #expect(!model.notInLibrary.isEmpty)
+        #expect(model.notInLibraryDetail == "\(model.notInLibrary.count) · Living room server")
+    }
+
     // MARK: A keystroke
 
     @Test func aKeystrokeCancelsEveryCallStillOut() async throws {

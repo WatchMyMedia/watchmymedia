@@ -24,6 +24,9 @@ extension ServerRepository {
     public func usable(_ serverID: String) -> Bool {
         registered.contains { $0.server.id == serverID && $0.signedIn && !$0.server.tooOld }
     }
+
+    /// How many servers this device is signed in to.
+    public var signedInCount: Int { registered.filter(\.signedIn).count }
 }
 
 /// Where the app goes once a switch has rebuilt its screens on the new
@@ -206,6 +209,87 @@ public final class ServersModel {
 
     /// Whether a switch is under way, so the other rows wait.
     public var busy: Bool { switching != nil || removing != nil }
+
+    // MARK: Settings › Server
+
+    /// A row under Your servers: the server, who is signed in there, its
+    /// address and version, and Current or its state.
+    public struct SettingsRow: Identifiable, Hashable, Sendable {
+        /// The server's ID.
+        public var id: String
+        public var name: String
+        /// "Sam · home.example.net · v1.4.5"; with a state, that follows: "… · Signed out here".
+        public var detail: String
+        public var current: Bool
+    }
+
+    public var settingsRows: [SettingsRow] {
+        let current = servers.current?.server.id
+        return servers.registered.map { saved in
+            let state: String? = saved.server.id == current ? nil : saved.server.tooOld ? ServersWords.tooOld : saved.signedIn ? nil : ServersWords.signedOutHere
+            return SettingsRow(id: saved.server.id, name: saved.server.name,
+                               detail: [saved.settingsLine, state].compactMap { $0 }.joined(separator: " · "), current: saved.server.id == current)
+        }
+    }
+
+    /// A server's page in Settings: its facts, what can be done with it,
+    /// and the question Remove this server asks.
+    public struct Page: Hashable, Sendable {
+        public struct Fact: Hashable, Sendable, Identifiable {
+            public var label: String
+            public var value: String
+            public var id: String { label }
+        }
+
+        public var serverID: String
+        public var name: String
+        /// Address, Version, Signed in as, and on a device that downloads, Downloads from it.
+        public var facts: [Fact]
+        /// Switch to this server is offered: signed in there, new enough, and not the one in use.
+        public var canSwitch: Bool
+        /// Sign in again is offered: its sign-in ended.
+        public var canSignIn: Bool
+        public var removeQuestion: ConfirmWords
+    }
+
+    /// The page of `serverID`, or nil once it is off the list. `device` is
+    /// "iPhone", "iPad" or "Apple TV"; `showsDownloads` is for the devices that download.
+    public func page(_ serverID: String, device: String, showsDownloads: Bool) -> Page? {
+        guard let saved = servers.registered.first(where: { $0.server.id == serverID }) else { return nil }
+        let current = saved.server.id == servers.current?.server.id
+        let held = heldDownloads(from: serverID)
+        var facts = [
+            Page.Fact(label: SettingsWords.address, value: saved.server.displayAddress),
+            Page.Fact(label: SettingsWords.version, value: saved.server.versionAndAPI),
+            Page.Fact(label: SettingsWords.signedInAs, value: saved.signedIn ? saved.userName ?? "" : ServersWords.signedOutHere),
+        ]
+        if showsDownloads {
+            facts.append(Page.Fact(label: ServersWords.downloadsFromIt, value: ServersWords.downloadsValue(count: held.count, bytes: held.bytes)))
+        }
+        return Page(
+            serverID: serverID, name: saved.server.name, facts: facts,
+            canSwitch: !current && saved.signedIn && !saved.server.tooOld,
+            canSignIn: !current && !saved.signedIn && !saved.server.tooOld,
+            removeQuestion: ServersWords.removeQuestion(server: saved.server.name, device: device, downloads: showsDownloads ? held.count : 0)
+        )
+    }
+
+    /// What this device holds from `serverID`: the list's own for the server in use, the count kept for any other.
+    private func heldDownloads(from serverID: String) -> (count: Int, bytes: Int64) {
+        if serverID == servers.current?.server.id {
+            let all = downloads.downloads
+            return (all.count, all.filter(\.downloaded).reduce(0) { $0 + $1.sizeBytes })
+        }
+        let other = downloads.elsewhere.first { $0.serverID == serverID }
+        return (other?.count ?? 0, other?.bytes ?? 0)
+    }
+
+    /// Sign in again, on a server's page: hands the server to the app's sign-in, as its row in Servers does.
+    public func signInAgain(_ serverID: String) {
+        guard let saved = servers.registered.first(where: { $0.server.id == serverID && !$0.signedIn }) else { return }
+        presented = false
+        signInRequest = saved
+    }
 
     // MARK: Choosing
 
