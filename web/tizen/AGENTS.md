@@ -29,3 +29,22 @@ refused. Keep it that way, and keep code free of `import.meta` beyond
 `import.meta.env`, which the build replaces. `pnpm build:tizen-core` bundles the core separately.
 `pnpm typecheck`, `pnpm lint` and `pnpm test` include this entry. Run both existing
 web and receiver builds when shared code changes.
+
+CI checks this entry in its own `samsung` job, and the `web` job leaves it out
+(`pnpm lint:web`, `typecheck:web`, `test:web`). The job runs `pnpm lint:tizen`,
+`pnpm test:tizen`, `pnpm build:tizen` (types first) and `pnpm check:tizen`, and
+keeps the unsigned build as the `samsung-tv-unsigned` artifact for a week. It
+runs for this folder, `../vite.tizen.config.ts`, `../vite.tizen-core.config.ts`,
+`deploy/samsung/`, the `../src/lib/` and `../src/api/` code this entry may
+import, the web's dependencies and configs, and the packed icon (`samsung` in
+`deploy/ci/changes.py`). A new file outside this folder that only this entry
+reads goes in `SAMSUNG` there, or the web job starts for it and this one doesn't.
+
+`pnpm check:tizen` (`deploy/samsung/bundle.py`) reads `../dist-tizen/`: one
+classic script and one stylesheet, `config.xml` and `icon.png`, no module script
+or `crossorigin`, and no JS or CSS newer than Chrome 108 that the build leaves
+as written (`toSorted` and the other copying array methods, `Object.groupBy`,
+`Promise.withResolvers`, `Array.fromAsync`, the new `Set` methods,
+`color-mix()`, `oklch()`, `light-dark()`, nested rules). The build lowers
+syntax, never the browser's methods, so a library update can break this too.
+Add an API to its lists when one newer than Chrome 108 turns up.

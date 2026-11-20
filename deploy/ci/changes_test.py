@@ -17,9 +17,10 @@ spec.loader.exec_module(changes)
 # The areas each job waits for. scripts runs for every change, and
 # windows-signing only when asked by hand.
 GATES = {'server': ['server'], 'server-macos': ['server'], 'server-race': ['race'], 'contract': ['contract'],
-         'web': ['web'], 'docker': ['docker'], 'android': ['android'], 'apple': ['apple', 'apple-api'],
-         'apple-tv': ['apple-tv'], 'windows-server': ['windows'], 'windows-live-tv': ['windows'],
-         'windows-app': ['windows'], 'linux-packages': ['linux-packages'], 'linux-packages-install': ['linux-packages']}
+         'web': ['web'], 'samsung': ['samsung'], 'docker': ['docker'], 'android': ['android'],
+         'apple': ['apple', 'apple-api'], 'apple-tv': ['apple-tv'], 'windows-server': ['windows'],
+         'windows-live-tv': ['windows'], 'windows-app': ['windows'], 'linux-packages': ['linux-packages'],
+         'linux-packages-install': ['linux-packages']}
 UNGATED = {'changes', 'scripts', 'windows-signing'}
 
 
@@ -43,7 +44,16 @@ class RulesTest(unittest.TestCase):
                 # How the server starts is also what the Linux packages rely on.
                 (['server/cmd/server/main.go'], server | {'linux-packages'}),
                 (['web/src/App.tsx'], {'web', 'docker'}),
-                (['web/src/api/schema.d.ts'], {'web', 'docker', 'contract'}),
+                (['web/receiver/main.ts', 'web/vite.receiver.config.ts'], {'web', 'docker'}),
+                # The Samsung TV app's own files are its job's alone, and
+                # what it shares with the web app runs both.
+                (['web/tizen/App.tsx'], {'samsung'}),
+                (['web/vite.tizen.config.ts', 'web/vite.tizen-core.config.ts', 'deploy/samsung/bundle.py'], {'samsung'}),
+                (['brand/export/android/play-store-icon-512.png'], {'samsung'}),
+                (['web/src/lib/play/rules.ts'], {'web', 'docker', 'samsung'}),
+                (['web/src/api/schema.d.ts'], {'web', 'docker', 'contract', 'samsung'}),
+                (['web/pnpm-lock.yaml'], {'web', 'docker', 'contract', 'samsung'}),
+                (['web/tizen/App.tsx', 'web/src/App.tsx'], {'web', 'docker', 'samsung'}),
                 (['android/tv/src/main/kotlin/Home.kt'], {'android'}),
                 (['apple/App/Screens/Home.swift', 'apple/UITests/HomeTests.swift'], {'apple'}),
                 (['apple/TV/Screens/Home.swift', 'apple/TVUITests/HomeTests.swift'], {'apple-tv'}),
@@ -127,7 +137,7 @@ class RulesTest(unittest.TestCase):
         self.assertTrue(changes.matches('Makefile', 'Makefile'))
         self.assertFalse(changes.matches('deploy/linux/Makefile', 'Makefile'))
         self.assertFalse(changes.matches('Makefile.old', 'Makefile'))
-        for area, names in changes.AREAS.items():
+        for area, names in [*changes.AREAS.items(), *changes.ELSEWHERE.items()]:
             for name in names:
                 with self.subTest(area=area, name=name):
                     # Written as git lists paths, with no patterns, and
@@ -135,6 +145,18 @@ class RulesTest(unittest.TestCase):
                     self.assertNotRegex(name, r'^(\./|/)|[*?\[]|//')
                     found = ROOT / name
                     self.assertTrue(found.is_dir() if name.endswith('/') else found.is_file(), 'is not there')
+
+    def test_what_an_area_leaves_to_another_job_starts_that_job(self):
+        # The Samsung app's files are in web/, and only the samsung job
+        # builds them: none falls between the two.
+        for area, names in changes.ELSEWHERE.items():
+            for name in names:
+                path = name + 'App.tsx' if name.endswith('/') else name
+                with self.subTest(area=area, path=path):
+                    self.assertTrue(any(changes.matches(path, listed) for listed in changes.AREAS[area]))
+                    started = running(changes.plan([path], None, ''))
+                    self.assertNotIn(area, started)
+                    self.assertTrue(started)
 
     def test_every_apple_script_starts_a_job_or_is_named_as_one_ci_does_not_run(self):
         # A script the apps' make targets run starts their jobs; a new one
