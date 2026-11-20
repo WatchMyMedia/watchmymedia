@@ -45,20 +45,6 @@ export function useLivePlayback(): { live: LivePlayback; preview: boolean } | un
   return made
 }
 
-/**
- * The AVPlay plane sits behind the page: while video shows, the page is
- * transparent (`.playing-surface` on <html>, kit.css). The player screens
- * share this; it is Live TV's until the player feature's helper replaces it.
- */
-export function useVideoSurface(on: boolean) {
-  useEffect(() => {
-    if (!on) return
-    const root = document.documentElement
-    root.classList.add('playing-surface')
-    return () => root.classList.remove('playing-surface')
-  }, [on])
-}
-
 // A reminder banner's Watch while the Live TV player is open changes its
 // channel rather than opening another player on top.
 let tuner: ((channelId: string) => void) | undefined
