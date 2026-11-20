@@ -242,7 +242,8 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
         <div ref={seasonsRef} className="dt-seasons">
           <SeasonBar tabs={tabs} chosen={tab} showMissing={missingOn} line={seasonLine(here, season.episodes, missingOn, today)} mark={sMark} marking={markSeason.isPending}
             actions={seasonOwn} searching={searched === searchKey()} start={!top.request && !top.search && !top.monitor && !top.inbox && !e.hasFile}
-            onTab={pickTab} onShowMissing={setShowMissing} onRequest={() => setDialog({ request: [season.number] })} onSearch={() => doSearch()} onMonitor={doMonitor}
+            // The switch goes with Show missing: focus goes to the chosen tab rather than nowhere.
+            onTab={pickTab} onShowMissing={(on) => { setShowMissing(on); if (!on) focus.restore([`tab/${tab}`, 'season/mark']) }} onRequest={() => setDialog({ request: [season.number] })} onSearch={() => doSearch()} onMonitor={doMonitor}
             onMark={(watched) => markSeason.mutate({ showId: show.id, number: season.number, watched }, { onSuccess: () => say({ title: markedMessage(watched) }), onError: (err) => fail('Couldn’t change the watched marks', err) })}/>
           <div data-zone="episodes">
             <EpisodeRow show={show.title} season={season.number} episodes={listed} onTopId={e.id} options={options.data} today={today} onPick={pick} onOk={toTop}/>

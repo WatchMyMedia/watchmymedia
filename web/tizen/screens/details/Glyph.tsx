@@ -15,7 +15,6 @@ const GLYPHS = {
   pause: { d: 'M7 5h3.5v14H7zM13.5 5H17v14h-3.5z', fill: true },
   check: { d: 'M5 12l5 5 9-10', fill: false },
   down: { d: 'M6 9l6 6 6-6', fill: false },
-  ring: { d: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z', fill: false },
 } as const
 
 export type GlyphName = keyof typeof GLYPHS

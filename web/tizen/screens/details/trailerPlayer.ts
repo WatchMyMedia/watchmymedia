@@ -126,7 +126,7 @@ export function pausedLine(timeMs: number, durationMs: number): string {
  * browser preview the fakes' stand-in (`srcdoc`), so the preview reaches
  * nothing on the network. The fakes set it; the TV build never does.
  */
-export type TrailerEmbed = { origin: string; src?: (key: string) => string; srcdoc?: (key: string) => string }
+export type TrailerEmbed = { origin: string; srcdoc?: (key: string) => string }
 
 const youtube: TrailerEmbed = { origin: YOUTUBE_EMBED_ORIGIN }
 let embed: TrailerEmbed = youtube

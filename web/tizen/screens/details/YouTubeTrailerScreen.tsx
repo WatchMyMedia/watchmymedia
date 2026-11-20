@@ -140,7 +140,7 @@ function TrailerPlayer({ trailers, start, movie, backdropPath }: { trailers: You
   })
 
   const name = (s.phase === 'refused' ? trailers[0] : trailer)?.name || 'Trailer'
-  const src = trailer && (embed.srcdoc ? { srcDoc: embed.srcdoc(trailer.key) } : { src: embed.src?.(trailer.key) ?? embedUrl(trailer.key, location.origin) })
+  const src = trailer && (embed.srcdoc ? { srcDoc: embed.srcdoc(trailer.key) } : { src: embedUrl(trailer.key, location.origin) })
   return <div ref={root} className="dt-trailer" tabIndex={-1}>
     {mounted && trailer && <iframe key={`${trailer.key}/${s.attempt}`} ref={frame} {...src} title={`${name}: YouTube’s player`} tabIndex={-1}
       className={`dt-trailer__frame${shown ? ' dt-trailer__frame--shown' : ''}`} allow="autoplay; encrypted-media"
