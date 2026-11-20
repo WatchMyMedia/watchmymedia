@@ -188,6 +188,16 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   it; a `LaunchedEffect` a frame later finds focus already elsewhere. A
   `FocusRequester` whose element has left the composition throws on
   `requestFocus()`; use `tryFocus()` (`tv/src/main/kotlin/media/watchmy/client/tv/components/Focus.kt`).
+- **A list beside other controls.** A focus search in a direction takes
+  only what starts further that way than the focused item, and it judges a
+  scrolling list by the list's own bounds, not its cards'. Search's results
+  on the TV started under the keyboard's last column with their cards inset,
+  so ▶ from 0, p, ' and - found nothing, and only the bottom row's wider
+  keys reached a result. Start the list itself past the controls beside it
+  and inset its content less (`ResultsInset` in
+  `tv/src/main/kotlin/media/watchmy/client/tv/search/SearchScreen.kt`), or
+  name the way across, as the rail does with `focusProperties { right = … }`.
+  `SearchFocusTest` presses ▶ from the last key of every row.
 - **Passwords in fields.** `rememberModelTextField` keeps its text across
   process death, so password fields use a plain `remember`ed state
   (`ChangePasswordScreen`): a password never outlives the process.

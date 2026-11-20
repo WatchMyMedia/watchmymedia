@@ -112,6 +112,19 @@ class SearchFocusTest {
     }
 
     @Test
+    fun `right from the microphone reaches the results`() {
+        installRecognizer()
+        typeHar()
+        compose.onAllNodesWithText("1").onFirst().performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.waitForIdle()
+        press(Key.DirectionUp)
+        press(Key.DirectionRight)
+        assertEquals("Voice typing", focused())
+        press(Key.DirectionRight)
+        assertTrue("right from the microphone reached ${focused()}, not a result", focused() in RESULTS)
+    }
+
+    @Test
     fun `up from the keyboard's top row reaches the search box, and right from there the microphone`() {
         installRecognizer()
         assertEquals("q", focused())
