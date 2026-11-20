@@ -5,6 +5,22 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 1.8.0
+
+The server gets ready for WatchMyMedia's Samsung TV app, signs app requests in by their own token
+alone, and the web's Search now stops saying it failed.
+
+- This release doesn't change the server's database, so going back to 1.7.0 needs no backup.
+- The Samsung TV app, coming through Samsung's store, runs from the TV's own storage rather than
+  from the server's address. The server now lets such an app link by code and use the server
+  with its device token, and answers its pages without opening the server to other websites.
+  The Samsung app needs this release or newer.
+- A request that carries an app's device token is now signed in by that token alone. Before, a
+  browser's sign-in cookie sent beside it took over, and a token the server didn't know fell
+  back to the cookie's account.
+- On a show's page, Search now for missing episodes no longer says it failed when Sonarr took
+  the search.
+
 ## 1.7.0
 
 Films keep their surround and lossless sound when the server has to convert it, Android TV plays
