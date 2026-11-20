@@ -70,8 +70,9 @@ files.play({ kind: 'trailer', fileId, title })             // from 0, and leaves
 | `askStillWatching` | Ask before the next episode |
 | `scrub` | While seeking with the remote: `targetMs`, `step` ("+30 s"), `holding`, `thumbnail` (a box `width` × `height` with CSS `background` fields, and `loaded`) |
 | `recording` | `now` (still recording), `goToNow`, `starting` (the server isn't ready yet) |
+| `segments`, `upNext` | The decision's segments (the scrubber's bands) and, for a file, its next episode whenever there is one |
 | `adminStop` | An admin stopped it: their `message` |
-| `error`, `exited` | Words for a failure; `exited` when the play ended by itself and the player should close |
+| `error`, `failure`, `exited` | Words for a failure, and its `kind` and HTTP `status` (for the TV's list of playback errors); `exited` when the play ended by itself and the player should close |
 
 Commands: `pause`, `resume`, `togglePause`, `seekTo`, `seekBy`,
 `beginScrub(±1)` on a seek key's first press, `scrubStep(±1)` on its repeats,

@@ -6,6 +6,8 @@ import { registerLive } from './live'
 import { registerRequests } from './requests'
 import { registerSearch } from './search'
 import { registerSettings } from './settings'
+import { registerDetails } from './details'
+import { registerPlayer } from './player'
 
 // The browser preview's fictional server (`pnpm dev:tizen`, then open
 // /?fakes). Development only: main.tsx imports this behind
@@ -20,13 +22,20 @@ export const AWAY_ORIGIN = 'http://203.0.113.20:27587'
 export function createFakeServer(mode = ''): FakeServer {
   const server = new FakeServer(FAKE_ORIGIN)
   registerStart(server, mode)
-  // Live TV first, so its capabilities, channels, reminders and listings search answer before the others' copies.
+  // ?fakes=player plays from its own shows and files, so they answer first there.
+  if (mode === 'player') registerPlayer(server, mode)
+  // Live TV next, so its capabilities, channels, reminders and listings search answer before the others' copies.
   registerLive(server, mode)
-  // Before Browse: its request options are static, these follow the Inbox.
+  // The first registration of a route answers. Details first: in
+  // ?fakes=member it makes the account a member and answers request options
+  // as one. Then Requests, whose options follow the Inbox, before Browse's
+  // static ones.
+  registerDetails(server, mode)
   registerRequests(server, mode)
   registerBrowse(server, mode)
   registerSearch(server)
   registerSettings(server, mode)
+  if (mode !== 'player') registerPlayer(server, mode)
   return server
 }
 

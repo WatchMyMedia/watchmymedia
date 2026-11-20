@@ -1,8 +1,11 @@
-import { useBack, useNav } from '../../app/hooks'
+import { useMemo } from 'react'
+import { useNav, usePlayer } from '../../app/hooks'
 import type { ScreenProps } from '../../app/routes'
+import { ProblemScreen } from '../../ui/States'
 import { YouTubeTrailerScreen } from '../details/YouTubeTrailerScreen'
 import { LivePlayerScreen } from '../live/LivePlayerScreen'
-import { Placeholder } from '../Placeholder'
+import { FilePlayer } from './FilePlayer'
+import { fileRequest } from './playerSession'
 
 /**
  * The player route. Live channels go to the Live TV player and YouTube
@@ -16,14 +19,16 @@ export function PlayerScreen({ route }: ScreenProps<'player'>) {
   return <FilePlayerScreen route={route} />
 }
 
-/** Files, recordings and trailer files, until the player feature draws its controls. */
+/** Files, recordings and trailer files; where nothing can play (the TV build in a desktop browser), says so. */
 function FilePlayerScreen({ route }: ScreenProps<'player'>) {
   const nav = useNav()
-  useBack(() => { nav.back(); return true })
-  const play = route.play
-  const what = play.kind === 'file' ? play.title ?? `File ${play.fileId}` : play.kind === 'recording' ? play.title ?? 'A recording'
-    : play.kind === 'trailer' ? play.title ?? 'A trailer' : 'A channel'
-  return <Placeholder full kicker={`Player · ${play.kind} · placeholder`} title={what}>
-    The player engine (player/) plays this; its controls, pickers and Next episode come with the player feature.
-  </Placeholder>
+  const player = usePlayer()
+  const request = useMemo(() => fileRequest(route.play), [route.play])
+  if (!player || !request) {
+    return <ProblemScreen icon="alert" title={player ? 'This can’t play here' : 'Playing needs the TV'}
+      actions={[{ id: 'back', label: 'Back', onPress: () => nav.back() }]}>
+      {player ? 'There is no file to play for this.' : 'This browser has no Samsung player. Open WatchMyMedia on the TV to watch.'}
+    </ProblemScreen>
+  }
+  return <FilePlayer play={route.play} request={request} player={player}/>
 }

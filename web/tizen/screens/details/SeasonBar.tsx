@@ -1,0 +1,84 @@
+import { useLayoutEffect, useRef, type FocusEvent } from 'react'
+import type { components } from '../../../src/api/schema'
+import { Button } from '../../ui/Button'
+import { Glyph } from './Glyph'
+import { seasonName, tabCount } from './showLabels'
+
+type Season = components['schemas']['Season']
+
+export type SeasonBarProps = {
+  tabs: Season[]
+  /** The chosen tab: it changes at once as focus reaches a tab. */
+  chosen: number
+  showMissing: boolean
+  /** "6 episodes · 4 watched · E09 airs Nov 18". */
+  line?: string
+  mark?: { label: string; watched: boolean }
+  marking: boolean
+  /** With Show missing on: the season's own actions. */
+  actions?: { request: boolean; requested: boolean; search: boolean; monitor: boolean }
+  searching: boolean
+  /** Whether to start the screen's focus here: the episode on top has nothing to press. */
+  start: boolean
+  onTab(n: number): void
+  onMark(watched: boolean): void
+  onRequest(): void
+  onSearch(): void
+  onMonitor(): void
+  onShowMissing(on: boolean): void
+}
+
+/**
+ * The season tabs (ShowPage's `.season`, Specials last), the chosen one in
+ * gold, then the season's line, Mark season watched and, with Show missing
+ * on, the season's Request, Search now and Monitor and the switch that turns
+ * it off. ◀ ▶ go along the bar in order; focus on a tab changes the season at
+ * once. A one-season show has a plain heading in place of the tabs.
+ */
+export function SeasonBar(p: SeasonBarProps) {
+  const track = useRef<HTMLDivElement>(null)
+  const view = useRef<HTMLDivElement>(null)
+  const shift = useRef(0)
+  // Keeps a tab in view when there are more than fit beside the season's buttons: the
+  // focused one, and the chosen one as it changes (Show missing adds tabs and buttons).
+  const keepInView = (tab: HTMLElement | null | undefined) => {
+    const t = track.current, v = view.current
+    if (!tab || !t || !v) return
+    const left = tab.offsetLeft, right = left + tab.offsetWidth
+    let next = shift.current
+    if (right - next > v.clientWidth) next = right - v.clientWidth
+    else if (left < next) next = left
+    next = Math.max(0, next)
+    if (next === shift.current) return
+    shift.current = next
+    t.style.transform = `translateX(${-next}px)`
+  }
+  const onFocus = (e: FocusEvent) => keepInView((e.target as HTMLElement).closest<HTMLElement>('[role="tab"]'))
+  const count = p.tabs.length
+  const extras = [p.showMissing, !!p.mark, !!p.actions?.request, !!p.actions?.search, !!p.actions?.monitor].join()
+  useLayoutEffect(() => keepInView(track.current?.querySelector<HTMLElement>('[aria-selected="true"]')), [p.chosen, count, extras])
+  const one = p.tabs.length <= 1
+  return <div className="dt-season-bar" data-row data-zone="seasons" role="group" aria-label="Seasons">
+    {one
+      ? <h2 className="dt-season-heading">{seasonName(p.chosen)}</h2>
+      : <div ref={view} className="dt-tabs" role="tablist" aria-label="Seasons" onFocus={onFocus}>
+        <div ref={track} className="dt-tabs__track">
+          {p.tabs.map((t) => <button key={t.number} type="button" role="tab" aria-selected={t.number === p.chosen} data-focus={`tab/${t.number}`}
+            data-autofocus={(p.start && t.number === p.chosen) || undefined}
+            className={`dt-tab${t.availableCount === 0 && t.number !== p.chosen ? ' dt-tab--none' : ''}`}
+            onFocus={() => p.onTab(t.number)} onClick={() => p.onTab(t.number)}>
+            {seasonName(t.number)}<span className="dt-tab__count">{tabCount(t, p.showMissing)}</span>
+          </button>)}
+        </div>
+      </div>}
+    {p.line && <span className="dt-season-line">{p.line}</span>}
+    {p.mark && <span className="dt-small"><Button id="season/mark" busy={p.marking} autoFocus={p.start && one} onPress={() => p.onMark(p.mark!.watched)}>{p.mark.label}</Button></span>}
+    {p.actions?.request && <span className="dt-small"><Button id="season/request" onPress={p.onRequest}><Glyph name="plus"/>Request {seasonName(p.chosen).toLowerCase()}</Button></span>}
+    {p.actions?.requested && <span className="dt-requested">Requested</span>}
+    {p.actions?.search && <span className="dt-small"><Button id="season/search" busy={p.searching} onPress={p.onSearch}>{p.searching ? 'Sonarr is searching' : 'Search now'}</Button></span>}
+    {p.actions?.monitor && <span className="dt-small"><Button id="season/monitor" onPress={p.onMonitor}>Monitor</Button></span>}
+    {p.showMissing && <button type="button" role="switch" aria-checked="true" data-focus="season/missing" className="dt-switch" onClick={() => p.onShowMissing(false)}>
+      <span className="dt-switch__knob" aria-hidden="true"/>Show missing
+    </button>}
+  </div>
+}
