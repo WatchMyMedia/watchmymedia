@@ -151,9 +151,10 @@ class LiveStore {
 
   private seed() {
     const now = this.opened
-    // Recording now: the evening news on 2.1, part of a series rule.
-    const news = this.find('2.1', 'Harbor Evening News', now)
-    const newsRule: Rule = { id: this.id('rule'), kind: 'series', title: 'Harbor Evening News', userName: 'Robin', newOnly: false, anyChannel: false, keep: 5, padBefore: 1, padAfter: 2, canCancel: true, channelId: news.channel.id, number: '2.1', seriesKey: 'series-harbor-evening-news' }
+    // Recording now: what is on 2.1, part of a series rule.
+    const ch21 = this.channels.find((c) => c.number === '2.1')!
+    const news = { channel: ch21, programme: this.onAt(ch21.id, now)! }
+    const newsRule: Rule = { id: this.id('rule'), kind: 'series', title: news.programme.title, userName: 'Robin', newOnly: false, anyChannel: false, keep: 5, padBefore: 1, padAfter: 2, canCancel: true, channelId: ch21.id, number: '2.1', seriesKey: news.programme.seriesKey ?? 'series-harbor' }
     const recordingNow = this.recordingFor(news, 'recording', { ruleId: newsRule.id, series: true, startedAt: iso(Math.min(now, Date.parse(news.programme.start))) })
     // Tonight's clash: two recordings hold both tuners when Coastline Rescue would record.
     const vane = this.find('4.2', 'Inspector Vane', now + HOUR, true)

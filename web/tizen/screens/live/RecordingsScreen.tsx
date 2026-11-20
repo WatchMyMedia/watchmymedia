@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type FocusEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import type { LiveChannel, LiveProgramme } from '../../../src/api/liveTV'
 import { liveTVRecordingsQuery } from '../../../src/api/queries'
 import { cancelRecording, deleteRecordingFile, deleteRecordingRule, updateRecordingRule, type Recording, type RecordingRule } from '../../../src/api/recordings'
 import { formatBytes } from '../../../src/lib/format'
 import { RECORDING_SECTIONS, type RecordingSection } from '../../../src/lib/liveRecordings'
-import { useEntry, useHold, useNav, useSession } from '../../app/hooks'
+import { useEntry, useFocus, useHold, useNav, useSession } from '../../app/hooks'
 import { Dialog, Modal } from '../../ui/Overlays'
 import { problemWords } from '../../ui/problemWords'
 import { ProblemScreen, SkeletonRow } from '../../ui/States'
@@ -96,6 +96,7 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
   const [dontRecord, setDontRecord] = useState(true)
   const [note, setNote] = useState<string>()
   const list = useRef<HTMLDivElement>(null)
+  const focus = useFocus()
   const rules = sections.series.data?.pages.flatMap((p) => p.rules ?? []) ?? []
   const first = sections.upcoming.data?.pages[0]
 
@@ -126,6 +127,12 @@ function Recordings({ canRecord }: { canRecord: boolean }) {
     }
   }
   useHold(list, () => { if (current && actions(current).length) setMenu(current) })
+  // A card that went (stopped, deleted, given way) leaves focus nowhere: the card now in its place takes it.
+  const currentId = current ? `rec-${current.section}/${entryKey(current)}` : undefined
+  useLayoutEffect(() => {
+    const active = document.activeElement
+    if (currentId && (!active || active === document.body) && !focus.scope('modal')) focus.focusId(currentId)
+  }, [focus, currentId, all.length])
   const onFocus = (e: FocusEvent) => {
     const id = (e.target as HTMLElement).dataset?.focus
     if (id?.startsWith('rec-')) setFocused(id.replace(/^rec-[a-z]+\//, ''))

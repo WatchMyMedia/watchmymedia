@@ -1,7 +1,8 @@
+import { useLayoutEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { liveTVChannelsQuery, liveTVRemindersQuery, useLiveReminder } from '../../../src/api/queries'
 import { leadMinutes } from '../../../src/lib/liveReminders'
-import { useNav } from '../../app/hooks'
+import { useFocus, useNav } from '../../app/hooks'
 import { problemWords } from '../../ui/problemWords'
 import { ProblemScreen, Skeleton } from '../../ui/States'
 import { VScroll } from '../../ui/VScroll'
@@ -21,7 +22,19 @@ export function RemindersScreen() {
   const reminders = useQuery(liveTVRemindersQuery)
   const channels = useQuery(liveTVChannelsQuery)
   const change = useLiveReminder()
+  const focus = useFocus()
   const items = reminders.data?.items ?? []
+  // A removed row's neighbour takes focus once the list has redrawn without it.
+  const next = useRef<string>(undefined)
+  useLayoutEffect(() => {
+    if (next.current && focus.focusId(next.current)) next.current = undefined
+  })
+  const remove = (id: string) => {
+    if (change.isPending) return
+    const i = items.findIndex((r) => r.id === id)
+    const neighbour = items[i + 1] ?? items[i - 1]
+    change.mutate({ reminderId: id }, { onSuccess: () => { next.current = neighbour ? `reminder/${neighbour.id}/remove` : undefined } })
+  }
   const lead = leadMinutes(reminders.data?.leadMinutes)
   const head = <header className="live-page__head">
     <p className="live-page__crumb">Live TV › Reminders</p>
@@ -50,7 +63,7 @@ export function RemindersScreen() {
               </button>
               <span className="live-req__remove">
                 <button type="button" className="tv-btn tv-btn--ghost" data-focus={`reminder/${r.id}/remove`} aria-label={`Remove the reminder for ${r.title}`} aria-disabled={change.isPending || undefined}
-                  onClick={() => { if (!change.isPending) change.mutate({ reminderId: r.id }) }}>Remove</button>
+                  onClick={() => remove(r.id)}>Remove</button>
               </span>
             </div>
           })}

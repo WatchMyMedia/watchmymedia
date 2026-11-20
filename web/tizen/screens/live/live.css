@@ -350,7 +350,7 @@
 .live-rstatus--warn { color: var(--warn); }
 .live-rstatus--done { color: var(--text-3); }
 .live-rstatus--muted { color: var(--muted); }
-.live-recordings__rows { position: absolute; left: var(--content-left); right: 0; top: 28.25rem; bottom: 0; overflow: hidden; }
+.live-recordings__rows { position: absolute; left: var(--content-left); right: 0; top: 28.25rem; bottom: 0; }
 .live-recordings__row { padding-bottom: 1.75rem; }
 .live-recordings .live-art__progress span { background: var(--danger-line); }
 .live-bdg { margin-left: auto; display: inline-flex; align-items: center; gap: .4375rem; padding: .1875rem .5625rem; border-radius: .3125rem; background: rgba(0, 0, 0, .72); color: var(--text-2); font-size: .8125rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
