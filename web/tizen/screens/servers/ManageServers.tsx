@@ -4,7 +4,7 @@ import { displayAddress } from '../../session/address'
 import { Icon } from '../../ui/Icon'
 import { Dialog, Modal } from '../../ui/Overlays'
 import { SwitchFailed } from './ServersPanel'
-import { ADD_FOCUS, addLine, manageDetail, removeWords, RETRY_FOCUS, serverRows, versionLine } from './serverRows'
+import { ADD_FOCUS, addLine, manageDetail, manageLede, removeWords, RETRY_FOCUS, serverRows, versionLine } from './serverRows'
 import './servers.css'
 
 const rowFocus = (id: string) => `manage/server/${id}`
@@ -49,7 +49,7 @@ export function ManageServers({ onClose }: { onClose(): void }) {
     return <Modal key="list" onClose={onClose} className="">
       <aside role="dialog" aria-modal="true" aria-label="Servers" className="tv-panel servers-side">
         <h2 className="servers-title">Servers</h2>
-        <p className="servers-lede">This TV is signed in to each of these. Search looks in all of them.</p>
+        <p className="servers-lede">{manageLede(rows.length)}</p>
         <ul className="servers-list" aria-label="Servers this TV is signed in to">
           {rows.map((r) => {
             const s = servers.find((x) => x.id === r.id)
@@ -69,7 +69,7 @@ export function ManageServers({ onClose }: { onClose(): void }) {
         <div className="servers-rule" aria-hidden="true"/>
         <button type="button" data-focus={ADD_FOCUS} className="servers-row" aria-disabled={full || undefined} onClick={full ? undefined : () => app.addServer()}>
           <span className="servers-row__icon servers-row__icon--plain" aria-hidden="true"><Icon name="plus"/></span>
-          <span className="servers-row__text"><span className="servers-row__label">Add a server</span><span className="servers-row__detail">{addLine(full)}</span></span>
+          <span className="servers-row__text"><span className="servers-row__label">Add a server</span><span className={`servers-row__detail${full ? ' servers-row__detail--wrap' : ''}`}>{addLine(full)}</span></span>
         </button>
         <p className="servers-foot">Return closes this panel.</p>
       </aside>

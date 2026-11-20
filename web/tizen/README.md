@@ -187,16 +187,18 @@ fixture server and the live test were not run for this checkpoint. A real
 remote, the TV's keyboard, screensaver, suspend and wake, AVPlay and the
 packaged app's networking remain unverified on a TV.
 
-Several servers, 2026-11-20: 366 unit tests pass. In the browser preview
+Several servers, 2026-11-20: 368 unit tests pass. In the browser preview
 at 1280×720, on `?fakes=servers` and against two throwaway servers with
 different libraries (the second reached through a small local proxy that
 drops `Origin`, `Sec-Fetch-*` and cookies, as the TV's requests arrive):
 Servers from the account button and Return back to it, a switch both ways,
 a server that doesn't answer and Try again, a sign-in on a server signed
 out here and Cancel, Add a server to its last step, Remove, Sign out moving
-to another server, and Search finding a word on both servers, opening the
-other server's title, playing it (in that server's Activity only) and
-searching again with one server stopped. Not on a TV: a real remote, the
+to another server, an address already added being refused, and Search
+finding a word on both servers, opening the other server's title, playing
+it (in that server's Activity only), searching again with one server
+stopped, the lines for a server signed out here and for the current server
+answering late, and Try again. Not on a TV: a real remote, the
 packaged app reaching two servers, and AVPlay after a switch.
 
 ## Signing and testing on a TV

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '../../../src/api/schema'
-import { ASK_AGAIN_MS, CrossSearch, mergeResults, resultKey, SERVER_MS, SLOW_MS, type Asked, type Part } from './crossSearch'
-import { askingAgain, didNotAnswer, emptyWords, noMatchWords, stillAsking } from './searchResults'
+import { ASK_AGAIN_MS, CrossSearch, CURRENT, mergeResults, noneAnswered, resultKey, searchLines, SERVER_MS, SLOW_MS, type Asked, type Part } from './crossSearch'
+import { askingAgain, didNotAnswer, emptyWords, leftOutLine, noMatchWords, stillAsking } from './searchResults'
 
 type Results = components['schemas']['SearchResults']
 
@@ -138,6 +138,50 @@ describe('search across servers', () => {
     cross.stop()
   })
 
+  it('leaves out for the visit a server whose failure asking again won’t change', async () => {
+    const cabin = server('cabin', 'Cabin server'), den = server('den', 'Den server')
+    const signedOut = new Error('401')
+    const cross = new CrossSearch([cabin, den], (error) => error === signedOut ? 'signedOut' : undefined)
+    cross.search('harbor')
+    cabin.asked[0].reject(signedOut)
+    den.asked[0].reject(new TypeError('Failed to fetch'))
+    await flush()
+    expect(mergeResults(results(), true, cross.snapshot()).failed).toEqual([{ id: 'cabin', name: 'Cabin server', reason: 'signedOut' }, { id: 'den', name: 'Den server' }])
+    // Try again does nothing for it, and neither does waiting.
+    cross.retry('cabin')
+    await vi.advanceTimersByTimeAsync(ASK_AGAIN_MS)
+    cross.search('harbour')
+    expect(cabin.asked).toHaveLength(1)
+    expect(den.asked).toHaveLength(2)
+    expect(cross.snapshot()[0]).toMatchObject({ state: 'failed', reason: 'signedOut' })
+    cross.stop()
+  })
+
+  it('lines up the servers whose titles aren’t listed: the current one, the others, then those never asked', () => {
+    const part = (id: string, name: string, state: Part['state'], reason?: Part['reason']): Part => ({ id, name, state, slow: false, ...(reason ? { reason } : {}) })
+    const parts = [part('cabin', 'Cabin server', 'done'), part('den', 'Den server', 'failed'), part('loft', 'Loft server', 'failed', 'tooOld'), part('shed', 'Shed server', 'asking')]
+    const leftOut = [{ id: 'attic', name: 'Attic server', reason: 'signedOut' as const }]
+    expect(searchLines({ current: { name: 'Living room server', failed: false, again: false }, parts, again: [], leftOut })).toEqual([
+      { id: 'den', name: 'Den server', kind: 'failed' },
+      { id: 'loft', name: 'Loft server', kind: 'tooOld' },
+      { id: 'attic', name: 'Attic server', kind: 'signedOut' },
+    ])
+    // The current server gets a line like any other when it fails and another answers; Try again shows as asking.
+    expect(searchLines({ current: { name: 'Living room server', failed: true, again: false }, parts, again: ['shed'], leftOut: [] })).toEqual([
+      { id: CURRENT, name: 'Living room server', kind: 'failed' },
+      { id: 'den', name: 'Den server', kind: 'failed' },
+      { id: 'loft', name: 'Loft server', kind: 'tooOld' },
+      { id: 'shed', name: 'Shed server', kind: 'asking' },
+    ])
+    expect(searchLines({ current: { name: 'Living room server', failed: true, again: true }, parts, again: [], leftOut: [] })[0]).toEqual({ id: CURRENT, name: 'Living room server', kind: 'asking' })
+    // When none answers there are no lines: it is the search that didn't work.
+    const down = [part('den', 'Den server', 'failed'), part('loft', 'Loft server', 'failed', 'tooOld')]
+    expect(noneAnswered(true, down)).toBe(true)
+    expect(searchLines({ current: { name: 'Living room server', failed: true, again: false }, parts: down, again: [], leftOut })).toEqual([])
+    expect(noneAnswered(true, parts)).toBe(false)
+    expect(noneAnswered(false, down)).toBe(false)
+  })
+
   it('lists the others when the current server’s search fails, and counts who answered', () => {
     const parts: Part[] = [{ id: 'cabin', name: 'Cabin server', state: 'done', slow: false, results: results([movie(3, 'Harbour Run')]) }]
     expect(titles(parts, undefined, true)).toEqual(['Harbour Run (Cabin server)'])
@@ -154,5 +198,7 @@ describe('search across servers', () => {
     expect(stillAsking(['Cabin server', 'Den server'])).toBe('Still asking Cabin server and Den server…')
     expect(didNotAnswer('Den server')).toBe('Den server didn’t answer, so its titles aren’t listed.')
     expect(askingAgain('Den server')).toBe('Asking Den server again…')
+    expect(leftOutLine('Den server', 'signedOut')).toBe('You’re signed out of Den server here, so its titles aren’t listed.')
+    expect(leftOutLine('Den server', 'tooOld')).toBe('Den server is too old for this app, so its titles aren’t listed.')
   })
 })

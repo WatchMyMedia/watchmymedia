@@ -19,7 +19,10 @@ export type Asked = { id: string; name: string; search(q: string, signal: AbortS
  * still the last words' (as the current server's are), so its cards stay
  * where they are until the new ones replace them.
  */
-export type Part = { id: string; name: string; state: 'asking' | 'done' | 'failed'; slow: boolean; results?: SearchResults }
+export type Part = { id: string; name: string; state: 'asking' | 'done' | 'failed'; slow: boolean; results?: SearchResults; reason?: LeftOutReason }
+
+/** Why a server's titles aren't listed when it did answer: this TV's sign-in ended there, or it is too old for this app. Asking again won't change either. */
+export type LeftOutReason = 'signedOut' | 'tooOld'
 
 /** Each server gets this long to answer. */
 export const SERVER_MS = 4000
@@ -49,9 +52,11 @@ export class CrossSearch {
   private interrupted = false
   private calls = new Map<string, Call>()
   private failedAt = new Map<string, number>()
+  private leftOut = new Map<string, LeftOutReason>()
   private listeners = new Set<() => void>()
 
-  constructor(private servers: readonly Asked[], private timers: Timers = realTimers) {}
+  /** `why` reads a failure: a reason it gives leaves that server out for the rest of the visit. */
+  constructor(private servers: readonly Asked[], private why: (error: unknown) => LeftOutReason | undefined = () => undefined, private timers: Timers = realTimers) {}
 
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
   readonly snapshot = () => this.parts
@@ -74,9 +79,9 @@ export class CrossSearch {
     if (!q) { this.emit([]); return }
     const now = this.timers.now()
     const before = new Map(this.parts.map((p) => [p.id, p]))
-    const waiting = (id: string) => { const at = this.failedAt.get(id); return at !== undefined && now - at < ASK_AGAIN_MS }
+    const waiting = (id: string) => { const at = this.failedAt.get(id); return this.leftOut.has(id) || (at !== undefined && now - at < ASK_AGAIN_MS) }
     this.emit(this.servers.map((s): Part => waiting(s.id)
-      ? { id: s.id, name: s.name, state: 'failed', slow: false }
+      ? { id: s.id, name: s.name, state: 'failed', slow: false, ...(this.leftOut.has(s.id) ? { reason: this.leftOut.get(s.id) } : {}) }
       : { id: s.id, name: s.name, state: 'asking', slow: false, results: before.get(s.id)?.results }))
     for (const s of this.servers) if (!waiting(s.id)) this.ask(s, q)
   }
@@ -89,11 +94,13 @@ export class CrossSearch {
       this.timers.clearTimeout(call.limit)
       this.calls.delete(server.id)
     }
-    const fail = () => {
+    const fail = (error?: unknown) => {
       if (!mine()) return
       end()
+      const reason = error === undefined ? undefined : this.why(error)
+      if (reason) this.leftOut.set(server.id, reason)
       this.failedAt.set(server.id, this.timers.now())
-      this.update(server.id, { state: 'failed', slow: false, results: undefined })
+      this.update(server.id, { state: 'failed', slow: false, results: undefined, reason })
     }
     const call: Call = {
       controller,
@@ -123,7 +130,7 @@ export class CrossSearch {
   /** Try again, on a server that didn't answer: asked now, whatever it did a moment ago. */
   retry(id: string) {
     const server = this.servers.find((s) => s.id === id)
-    if (!server || !this.q || this.calls.has(id)) return
+    if (!server || !this.q || this.calls.has(id) || this.leftOut.has(id)) return
     this.failedAt.delete(id)
     this.update(id, { state: 'asking', slow: false, results: undefined })
     this.ask(server, this.q)
@@ -145,8 +152,8 @@ export type Merged = {
   episodes: Tagged<SearchEpisode>[]
   /** The servers still out after a second, in Servers' order. */
   asking: string[]
-  /** The servers whose titles aren't listed. */
-  failed: { id: string; name: string }[]
+  /** The servers whose titles aren't listed, with why when asking again won't help. */
+  failed: { id: string; name: string; reason?: LeftOutReason }[]
   /** Every server has answered or failed for these words. */
   settled: boolean
   /** How many answered, the current one included. */
@@ -166,7 +173,7 @@ export function mergeResults(current: SearchResults | undefined, currentDone: bo
     movies: (current?.movies ?? []).map((item) => ({ item })),
     episodes: (current?.episodes ?? []).map((item) => ({ item })),
     asking: parts.filter((p) => p.state === 'asking' && p.slow).map((p) => p.name),
-    failed: parts.filter((p) => p.state === 'failed').map((p) => ({ id: p.id, name: p.name })),
+    failed: parts.filter((p) => p.state === 'failed').map((p) => ({ id: p.id, name: p.name, ...(p.reason ? { reason: p.reason } : {}) })),
     settled: currentDone && parts.every((p) => p.state !== 'asking'),
     answered: (currentDone && current ? 1 : 0) + parts.filter((p) => p.state === 'done').length,
   }
@@ -186,4 +193,45 @@ export function mergeResults(current: SearchResults | undefined, currentDone: bo
 /** A result's key in its row: its id, with its server's when it is on another one (ids are each server's own). */
 export function resultKey(tagged: Tagged<{ id: number }>): string {
   return tagged.server ? `${tagged.server.id}:${tagged.item.id}` : String(tagged.item.id)
+}
+
+/** The current server's own line in `searchLines`: it has no id among the other servers. */
+export const CURRENT = '(current)'
+
+/**
+ * A line at the end of the results for a server whose titles aren't
+ * listed: 'failed' has Try again, 'asking' is that server being asked
+ * again, and the last two say why asking wouldn't help.
+ */
+export type Line = { id: string; name: string; kind: 'failed' | 'asking' | LeftOutReason }
+
+/**
+ * The lines under the results when Search looks in several servers, in
+ * Servers' order: the current server first when it failed for these words
+ * (it gets the same few seconds as the others), then each other server
+ * that failed or is being asked again, then the servers a search never
+ * asks (signed out here, or too old for this app). None when every server
+ * failed: that is the plain "Search didn't work".
+ */
+export function searchLines({ current, parts, again, leftOut }: {
+  current?: { name: string; failed: boolean; again: boolean }
+  parts: readonly Part[]
+  /** The servers Try again is asking. */
+  again: readonly string[]
+  leftOut: readonly { id: string; name: string; reason: LeftOutReason }[]
+}): Line[] {
+  if (noneAnswered(!!current?.failed, parts)) return []
+  const lines: Line[] = []
+  if (current?.failed) lines.push({ id: CURRENT, name: current.name, kind: current.again ? 'asking' : 'failed' })
+  for (const p of parts) {
+    if (p.state === 'failed') lines.push({ id: p.id, name: p.name, kind: p.reason ?? 'failed' })
+    else if (p.state === 'asking' && again.includes(p.id)) lines.push({ id: p.id, name: p.name, kind: 'asking' })
+  }
+  for (const l of leftOut) if (!parts.some((p) => p.id === l.id)) lines.push({ id: l.id, name: l.name, kind: l.reason })
+  return lines
+}
+
+/** The current server failed and no other server answered or may yet: Search as a whole didn't work. */
+export function noneAnswered(currentFailed: boolean, parts: readonly Part[]): boolean {
+  return currentFailed && parts.every((p) => p.state === 'failed')
 }

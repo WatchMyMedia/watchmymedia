@@ -76,6 +76,19 @@ export function serverProblem(info: Pick<ServerInfo, 'apiLevel' | 'setupRequired
   return undefined
 }
 
+/** Whether a remembered server last said it is below the level this app needs. */
+export function tooOldForApp(server: Pick<RememberedServer, 'apiLevel'>): boolean {
+  return server.apiLevel !== undefined && server.apiLevel < REQUIRED_API_LEVEL
+}
+
+/** Add a server, with the address of a server this TV already has: nothing switches, and the screen says where to choose it. */
+export class AlreadyAddedError extends Error {
+  constructor(readonly server: string) {
+    super('already added')
+    this.name = 'AlreadyAddedError'
+  }
+}
+
 function cancelled(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError'
 }
@@ -254,13 +267,16 @@ export class AppSession {
     const target = { id: info.id, name: info.name, baseUrl, version: info.version }
     const problem = serverProblem(info)
     if (problem) { this.set({ screen: 'problem', problem, server: target }); return }
-    // Add a server, with the address of the server the app is on: it is there already.
-    if (this.back && info.id === this.back.session.server.id) { this.comeBack(); return }
     const known = this.store.get(info.id)
+    // Add a server never offers a server this TV has. Its address typed there says so, and nothing switches.
+    if (this.back?.adding && known) {
+      if (this.state.screen === 'servers') this.set({ ...this.state, busy: undefined, error: new AlreadyAddedError(known.name) })
+      return
+    }
     const account = known?.account
     const facts = { id: info.id, name: info.name, baseUrl, version: info.version, apiLevel: info.apiLevel }
-    // From the signed-in app nothing is remembered until the server is signed in to, so leaving its sign-in
-    // leaves nothing behind, and the server the app is on stays the one a launch opens.
+    // A server being added is remembered once it is signed in to, so leaving its sign-in leaves nothing
+    // behind, and the server the app is on stays the one a launch opens.
     if (!this.back) this.store.remember(facts)
     if (!account) { this.showSignIn(info, baseUrl); return }
     try {
@@ -269,8 +285,7 @@ export class AppSession {
       if (!this.current(gen)) return
       const updated = { ...account, name: me.name, isAdmin: me.isAdmin }
       this.store.remember({ ...facts, account: updated })
-      // Typed into Add a server, a server this TV already has is a switch to it.
-      await this.attach(this.session(info, baseUrl, updated), gen, arrival ?? (this.back ? { how: 'switched' } : undefined))
+      await this.attach(this.session(info, baseUrl, updated), gen, arrival)
     } catch (error) {
       if (!this.current(gen) || cancelled(error) && signal.aborted) return
       if (error instanceof ApiError && error.status === 401) {
@@ -322,9 +337,9 @@ export class AppSession {
     if (this.state.screen !== 'signIn') return
     const { server, info } = this.state
     const account = { userId: grant.user.id, name: grant.user.name, isAdmin: grant.user.isAdmin, token: grant.token, sessionId: grant.sessionId }
-    // From the signed-in app: a server this TV didn't have was added; one it had (signed out here) was switched to.
+    // From the signed-in app: Add a server added one; the sign-in of one signed out here switched to it.
     const arrival: Arrival | undefined = this.back
-      ? { how: this.store.get(server.id) ? 'switched' : 'added', ...(this.back.open ? { open: this.back.open } : {}) }
+      ? { how: this.back.adding ? 'added' : 'switched', ...(this.back.open ? { open: this.back.open } : {}) }
       : undefined
     this.store.remember({ id: server.id, name: server.name, baseUrl: server.baseUrl, version: server.version, apiLevel: info.apiLevel, account })
     await this.attach(this.session(info, server.baseUrl, account), gen, arrival)

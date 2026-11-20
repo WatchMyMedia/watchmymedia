@@ -86,7 +86,7 @@ export function ServersPanel({ from, onClose, onManage }: {
         <button type="button" data-focus={ADD_FOCUS} data-autofocus={start === ADD_FOCUS || undefined} className="servers-row" aria-disabled={full || undefined}
           onClick={full ? undefined : () => app.addServer()}>
           <span className="servers-row__icon servers-row__icon--plain" aria-hidden="true"><Icon name="plus"/></span>
-          <span className="servers-row__text"><span className="servers-row__label">Add a server</span><span className="servers-row__detail">{addLine(full)}</span></span>
+          <span className="servers-row__text"><span className="servers-row__label">Add a server</span><span className={`servers-row__detail${full ? ' servers-row__detail--wrap' : ''}`}>{addLine(full)}</span></span>
         </button>
         <button type="button" data-focus={MANAGE_FOCUS} data-autofocus={start === MANAGE_FOCUS || undefined} className="servers-row servers-row--short" onClick={onManage}>
           <span className="servers-row__icon servers-row__icon--plain" aria-hidden="true"><Icon name="settings"/></span>

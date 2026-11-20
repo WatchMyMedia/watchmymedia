@@ -1,6 +1,6 @@
 import { displayAddress } from '../../session/address'
 import { MAX_SERVERS, type RememberedServer } from '../../session/servers'
-import { MIN_SERVER_VERSION, REQUIRED_API_LEVEL, type SwitchView } from '../../session/session'
+import { tooOldForApp, type SwitchView } from '../../session/session'
 
 // Servers, wherever the app draws them: the panel the rail's account button
 // opens, Settings' Servers page and a server's page there. Which rows, in
@@ -28,7 +28,7 @@ export type ServerRow = {
 
 function stateOf(server: RememberedServer, currentId: string, switching?: SwitchView): ServerRowState {
   if (server.id === currentId) return 'current'
-  if (server.apiLevel !== undefined && server.apiLevel < REQUIRED_API_LEVEL) return 'tooOld'
+  if (tooOldForApp(server)) return 'tooOld'
   if (!server.account) return 'signedOut'
   return switching?.state === 'switching' && switching.id === server.id ? 'switching' : 'ready'
 }
@@ -87,15 +87,23 @@ export function versionLine(version: string | undefined): string {
   return version ? `WatchMyMedia ${version.replace(/^v/, '')}` : 'Not known yet'
 }
 
-/** Settings › Account & devices › Servers: "Living room server and 2 more", or the one server and its address. */
-export function serversLine(current: { name: string; baseUrl: string }, count: number): string {
-  return count > 1 ? `${current.name} and ${count - 1} more` : `${current.name} · ${displayAddress(current.baseUrl)}`
+/** Settings › Account & devices › Servers: "Living room and 2 more" (a name ending in " server" loses the word beside the count), or the one server's name whole. */
+export function serversLine(current: string, count: number): string {
+  return count > 1 ? `${current.replace(/ server$/i, '') || current} and ${count - 1} more` : current
+}
+
+/** Settings' Servers page, under its title. */
+export function manageLede(count: number): string {
+  return count > 1 ? 'This TV is signed in to each of these. Search looks in all of them.' : 'This TV is signed in to this server. Add another and search looks in both.'
 }
 
 /** Under Add a server: how (there is no discovery on this TV), or why not yet. */
 export function addLine(full: boolean): string {
-  return full ? `This TV keeps ${MAX_SERVERS} servers. Remove one first.` : 'By its address'
+  return full ? `This TV keeps up to ${MAX_SERVERS} servers. Remove one in Settings › Account & devices › Servers, then add this one.` : 'By its address'
 }
+
+/** Add a server, with the address of a server this TV already has. */
+export const alreadyAddedLine = (name: string) => `${name} is already added. Choose it in Servers to switch to it.`
 
 /** Under Add a server's field: the servers it doesn't offer again. */
 export function alreadyAdded(names: readonly string[]): string {
@@ -117,7 +125,7 @@ export function switchFailedWords(failed: Extract<SwitchView, { state: 'failed' 
     case 'moved':
       return { title: `${failed.name} isn’t at this address now`, body: `Another WatchMyMedia server answers at ${server ? displayAddress(server.baseUrl) : 'its address'}. ${still}` }
     case 'tooOld':
-      return { title: `${failed.name} is too old for this app`, body: `This TV needs WatchMyMedia ${MIN_SERVER_VERSION} or newer on it. ${still}` }
+      return { title: `${failed.name} is too old for this app`, body: `Update it, then switch. ${still}` }
     case 'notSetUp':
       return { title: `${failed.name} isn’t set up yet`, body: `Finish setting it up in a browser on your phone or computer. ${still}` }
     default:

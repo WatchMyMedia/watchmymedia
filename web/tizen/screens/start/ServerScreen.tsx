@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useApp } from '../../app/hooks'
 import { displayAddress, isNotEncrypted } from '../../session/address'
-import { MIN_SERVER_VERSION } from '../../session/session'
+import { AlreadyAddedError, MIN_SERVER_VERSION } from '../../session/session'
 import type { StartState } from '../../session/session'
 import { Button, KeyHints } from '../../ui/Button'
 import { Brand, Icon } from '../../ui/Icon'
 import { TextField } from '../../ui/TextField'
 import { problemWords } from '../../ui/problemWords'
-import { alreadyAdded } from '../servers/serverRows'
+import { alreadyAdded, alreadyAddedLine } from '../servers/serverRows'
 import { serverDetail } from './startWords'
 
 type Servers = Extract<StartState, { screen: 'servers' }>
@@ -15,13 +15,14 @@ type Servers = Extract<StartState, { screen: 'servers' }>
 function AddressForm({ state, first }: { state: Servers; first: boolean }) {
   const app = useApp()
   const connecting = state.busy === 'address'
-  const error = state.error ? problemWords(state.error) : undefined
+  const words = state.error ? problemWords(state.error) : undefined
+  const error = state.error instanceof AlreadyAddedError ? alreadyAddedLine(state.error.server) : words && `${words.title}. ${words.body}`
   return <>
     <span className="tv-label">Server address</span>
     <TextField id="address" label="Server address" type="url" value={state.address} autoFocus={first && !connecting}
       placeholder="192.168.1.20:27587 or https://home.example.net" onChange={(v) => app.editAddress(v)} onSubmit={() => void app.connect()}/>
     {connecting ? <p role="status" className="start-status"><span className="tv-spinner" aria-hidden="true"/>Connecting to {state.address.trim()}…</p>
-      : error ? <p role="alert" className="tv-error"><Icon name="alert"/>{error.title}. {error.body}</p>
+      : error ? <p role="alert" className="tv-error"><Icon name="alert"/>{error}</p>
         : first ? <p className="start-status"><span className="tv-kbd">OK</span>Press OK to type with the TV’s keyboard</p> : null}
     {state.adding && state.adding.registered.length > 0 && <p className="tv-note">{alreadyAdded(state.adding.registered)}</p>}
     <div className="tv-actions start-actions">

@@ -24,6 +24,7 @@
 .servers-row__text { display: flex; flex-direction: column; gap: .25rem; flex: 1; min-width: 0; }
 .servers-row__label { font-size: 1.3125rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .servers-row__detail { font-size: 1.0625rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.servers-row__detail--wrap { white-space: normal; line-height: 1.4; }
 .servers-row__value { margin-left: auto; display: inline-flex; align-items: center; gap: .625rem; font-size: 1.1875rem; color: var(--text-3); white-space: nowrap; flex: none; }
 .servers-row__chevron { display: inline-grid; place-items: center; color: var(--text-3); flex: none; }
 .servers-row__chevron svg { width: 1.375rem; height: 1.375rem; transform: rotate(-90deg); }

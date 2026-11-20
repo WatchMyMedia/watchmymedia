@@ -7,7 +7,7 @@ import { searchTerm } from '../../../src/lib/liveReminders'
 import { isOn, progress } from '../../../src/lib/liveGuide'
 import { SUGGEST_DELAY_MS, SUGGEST_MIN_CHARS } from '../../../src/lib/searchSuggestions'
 import { useApp, useAppState, useEntry, useFocus, useHold, useKeys, useMediaUrls, useNav, useSession, useBack } from '../../app/hooks'
-import { otherServers, type PeerServer } from '../../session/peers'
+import { leftOutReason, otherServers, serversLeftOut, type LeftOut, type PeerServer } from '../../session/peers'
 import type { OpenTarget } from '../../session/session'
 import { KeyHints } from '../../ui/Button'
 import { Card } from '../../ui/Card'
@@ -17,11 +17,11 @@ import { TextField } from '../../ui/TextField'
 import { problemWords } from '../../ui/problemWords'
 import { placeholderTone } from '../../ui/tones'
 import { RequestDialog, type RequestTarget } from '../requests/RequestDialog'
-import { CrossSearch, mergeResults, resultKey, type Tagged } from './crossSearch'
+import { CrossSearch, CURRENT, mergeResults, noneAnswered, resultKey, searchLines, SERVER_MS, type Tagged } from './crossSearch'
 import { keepSearch, keptSearch, searchScope } from './keptSearch'
 import { keyRows, typeKey, type KeyboardMode, type KeyPress } from './keyboard'
 import { ResultsRow } from './ResultsRow'
-import { askingAgain, didNotAnswer, emptyWords, episodeSub, libraryBand, liveAction, liveLine, liveWhen, movieSub, noMatchWords, notInLibrary, requestableAction, requestableSub, requestBadge, showSub, stillAsking, suggestionChips } from './searchResults'
+import { askingAgain, didNotAnswer, emptyWords, leftOutLine, episodeSub, libraryBand, liveAction, liveLine, liveWhen, movieSub, noMatchWords, notInLibrary, requestableAction, requestableSub, requestBadge, showSub, stillAsking, suggestionChips } from './searchResults'
 import './search.css'
 
 type LiveHit = components['schemas']['LiveTVSearchHit']
@@ -34,12 +34,14 @@ type SearchEpisode = components['schemas']['SearchEpisode']
  * Search: each through a client of its own, never the session's. Their
  * pictures come with their own media tokens, drawn as those arrive.
  */
-function useOtherServers(): { peers: PeerServer[]; cross: CrossSearch } {
+function useOtherServers(): { peers: PeerServer[]; cross: CrossSearch; leftOut: LeftOut[] } {
   const app = useApp()
   const [made] = useState(() => {
     const peers = otherServers(app)
     return {
-      peers, cross: new CrossSearch(peers),
+      peers, cross: new CrossSearch(peers, leftOutReason),
+      // The servers a search doesn't ask get a line each, but only beside servers that are asked.
+      leftOut: peers.length ? serversLeftOut(app) : [],
       subscribe: (listener: () => void) => { const offs = peers.map((p) => p.tokens.subscribe(listener)); return () => offs.forEach((off) => off()) },
       version: () => peers.reduce((n, p) => n + p.tokens.snapshot(), 0),
     }
@@ -151,11 +153,13 @@ export function SearchScreen() {
   const setText = (t: string) => { keepSearch(scope, t); setTextState(t) }
   const q = useDebounced(text).trim()
   const searching = q.length >= SUGGEST_MIN_CHARS
-  const { peers, cross } = useOtherServers()
+  const { peers, cross, leftOut } = useOtherServers()
   const parts = useSyncExternalStore(cross.subscribe, cross.snapshot)
   const several = peers.length > 0
   const resultsRef = useRef<HTMLElement>(null)
   const [again, setAgain] = useState<string[]>([])
+  const [late, setLate] = useState<string>()
+  const [retrying, setRetrying] = useState(false)
   // A server asked again that answers takes its line away, and focus with it: focus goes to a card.
   const answered = again.filter((id) => parts.find((p) => p.id === id)?.state !== 'asking')
   if (answered.length) setAgain(again.filter((id) => !answered.includes(id)))
@@ -163,7 +167,7 @@ export function SearchScreen() {
     if (document.activeElement !== document.body) return
     const card = resultsRef.current?.querySelector<HTMLElement>('.tv-card[data-focus]')
     if (card) focus.focus(card)
-  }, [again, focus])
+  }, [again, retrying, focus])
   // A keystroke cancels every call still out; the other servers are asked a moment after typing stops, as the current one is.
   useEffect(() => {
     cross.cancel()
@@ -190,14 +194,30 @@ export function SearchScreen() {
   const remind = useLiveReminder()
   const media = useMediaUrls()
 
+  // With other servers to list, the current one gets the same few seconds they do: past that, or when it fails,
+  // its titles aren't listed for these words (its late answer is dropped, so nothing moves) and the others' are.
+  const currentIn = searching && library.isSuccess && !library.isPlaceholderData
+  const fetching = library.isFetching
+  const queryClient = session.queryClient
+  useEffect(() => {
+    if (!several || !searching || currentIn || !fetching) return
+    const timer = setTimeout(() => {
+      setLate(q)
+      void queryClient.cancelQueries({ queryKey: searchQuery(q).queryKey })
+    }, SERVER_MS)
+    return () => clearTimeout(timer)
+  }, [several, searching, q, currentIn, fetching, queryClient])
+  const currentFailed = several && searching && !currentIn && (library.isError || late === q)
+  const allFailed = noneAnswered(currentFailed, parts)
+
   // The current server's results first; each other server's after them, as mergeResults orders them.
-  const results = searching ? library.data : undefined
-  const merged = mergeResults(results, searching && (library.isError || (library.isSuccess && !library.isPlaceholderData)), searching ? parts : [])
+  const results = searching && !currentFailed ? library.data : undefined
+  const merged = mergeResults(results, searching && (currentIn || currentFailed || library.isError), searching ? parts : [])
   const { shows, movies, episodes } = merged
   const nil = searching ? notInLibrary(requestable.data?.items, results) : []
   const chips = !inResults && text.trim().length >= SUGGEST_MIN_CHARS ? suggestionChips(library.data, text) : []
   // With one server it says so as it always has; with several, only once each has answered for these words.
-  const nothing = searching && (several ? merged.settled : library.isSuccess) && !library.isError && !shows.length && !movies.length && !episodes.length && !hits.length && !nil.length && !requestable.isPending
+  const nothing = searching && (several ? merged.settled && !currentFailed : library.isSuccess) && !library.isError && !shows.length && !movies.length && !episodes.length && !hits.length && !nil.length && !requestable.isPending
   const switching = appState.screen === 'signedIn' && appState.switching?.state === 'switching' ? appState.switching : undefined
 
   const toKeyboard = () => {
@@ -272,10 +292,17 @@ export function SearchScreen() {
   }
   // Try again keeps its line, and focus on it, while the server is asked: it stays if the server fails again.
   const askAgain = (id: string) => {
-    setAgain((ids) => ids.includes(id) ? ids : [...ids, id])
-    cross.retry(id)
+    if (id !== CURRENT) {
+      setAgain((ids) => ids.includes(id) ? ids : [...ids, id])
+      cross.retry(id)
+      return
+    }
+    setRetrying(true)
+    void library.refetch().then((r) => { if (r.isSuccess) setLate(undefined) }).finally(() => setRetrying(false))
   }
-  const lines = searching ? parts.filter((p) => p.state === 'failed' || (p.state === 'asking' && again.includes(p.id))) : []
+  const lines = searching && several
+    ? searchLines({ current: { name: session.server.name, failed: currentFailed, again: retrying }, parts, again, leftOut })
+    : []
   const waiting = merged.asking.filter((name) => !lines.some((l) => l.name === name))
   const empty = emptyWords(1 + peers.length, liveTV)
   const none = noMatchWords(q, merged.answered)
@@ -305,8 +332,9 @@ export function SearchScreen() {
     <section ref={resultsRef} className="search-results" aria-label="Results">
       <VScroll pad={36}>
         {!searching && <div className="search-hint" data-vitem><h2>{empty.title}</h2><p className="tv-note">{empty.body}</p></div>}
-        {searching && library.isPending && <div className="search-hint" data-vitem><p className="tv-note"><span className="tv-spinner" aria-hidden="true"/> Searching…</p></div>}
-        {searching && library.isError && <div className="search-hint" data-vitem role="alert"><h2>Search didn’t work</h2><p className="tv-note">{problemWords(library.error).body}</p></div>}
+        {searching && library.isPending && !currentFailed && <div className="search-hint" data-vitem><p className="tv-note"><span className="tv-spinner" aria-hidden="true"/> Searching…</p></div>}
+        {searching && (several ? allFailed : library.isError) && <div className="search-hint" data-vitem role="alert"><h2>Search didn’t work</h2>
+          <p className="tv-note">{problemWords(library.error ?? new DOMException('The server took too long', 'TimeoutError')).body}</p></div>}
         {nothing && <div className="search-hint" data-vitem role="status"><h2>{none.title}</h2><p className="tv-note">{none.body}</p></div>}
 
         {(shows.length > 0 || movies.length > 0) && (!stacked
@@ -327,16 +355,18 @@ export function SearchScreen() {
         {waiting.length > 0 && <p role="status" className="search-tail" data-vitem><span className="tv-spinner" aria-hidden="true"/>{stillAsking(waiting)}</p>}
         {/* The whole line takes focus, so ▼ from any card reaches it; the ring is drawn on Try again. */}
         {lines.map((f) => <div key={f.id} role="status" data-vitem>
-          {f.state === 'failed'
+          {f.kind === 'failed'
             ? <button type="button" data-focus={`search/again/${f.id}`} className="search-tail search-tail--again" onClick={() => askAgain(f.id)}>
               <Icon name="alert"/>
               <span>{didNotAnswer(f.name)}</span>
               <span className="search-tail__again">Try again</span>
             </button>
-            : <button type="button" data-focus={`search/again/${f.id}`} className="search-tail search-tail--again" aria-busy="true">
-              <span className="tv-spinner" aria-hidden="true"/>
-              <span>{askingAgain(f.name)}</span>
-            </button>}
+            : f.kind === 'asking'
+              ? <button type="button" data-focus={`search/again/${f.id}`} className="search-tail search-tail--again" aria-busy="true">
+                <span className="tv-spinner" aria-hidden="true"/>
+                <span>{askingAgain(f.name)}</span>
+              </button>
+              : <p className="search-tail"><Icon name="alert"/><span>{leftOutLine(f.name, f.kind)}</span></p>}
         </div>)}
         {switching && <p role="status" className="search-tail" data-vitem><span className="tv-spinner" aria-hidden="true"/>Switching to {switching.name}…</p>}
 

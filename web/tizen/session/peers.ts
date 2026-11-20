@@ -1,10 +1,10 @@
-import { unwrap, type ApiClient } from '../../src/api/client'
+import { ApiError, unwrap, type ApiClient } from '../../src/api/client'
 import type { components } from '../../src/api/schema'
 import type { ServerInfo } from './active'
 import { bearerClient } from './client'
 import { MediaTokens, MediaUrls } from './media'
 import type { Account, RememberedServer } from './servers'
-import { serverProblem, type AppSession, type StartProblem } from './session'
+import { serverProblem, tooOldForApp, type AppSession, type StartProblem } from './session'
 
 export type SearchResults = components['schemas']['SearchResults']
 
@@ -84,18 +84,36 @@ export class PeerServer {
 }
 
 /**
- * The other servers this TV is signed in to, in the order Servers lists
- * them (the most recently used first), each to be asked by itself. The
- * caller stops them when it is done.
+ * The other servers this TV is signed in to and can use, in the order
+ * Servers lists them (the most recently used first), each to be asked by
+ * itself. The caller stops them when it is done.
  */
 export function otherServers(app: AppSession): PeerServer[] {
   const state = app.snapshot()
   if (state.screen !== 'signedIn') return []
   const current = state.session.server.id
   return app.store.list()
-    .filter((s): s is RememberedServer & { account: Account } => s.id !== current && !!s.account)
+    .filter((s): s is RememberedServer & { account: Account } => s.id !== current && !!s.account && !tooOldForApp(s))
     .map((s) => new PeerServer(s, {
       onSignedOut: () => app.signedOutOf(s.id),
       onInfo: (info) => app.store.note(s.id, { name: info.name, version: info.version, apiLevel: info.apiLevel }),
     }))
+}
+
+/** What a failed search says about a server, when asking again wouldn't help: its sign-in ended there, or it is too old for this app. */
+export function leftOutReason(error: unknown): 'signedOut' | 'tooOld' | undefined {
+  if (error instanceof PeerError) return error.reason === 'tooOld' ? 'tooOld' : undefined
+  return error instanceof ApiError && error.status === 401 ? 'signedOut' : undefined
+}
+
+/** Why a server this TV has isn't asked: this TV is signed out of it, or it is too old for this app. */
+export type LeftOut = { id: string; name: string; reason: 'signedOut' | 'tooOld' }
+
+/** The other servers this TV has that a search doesn't ask, in Servers' order, each with why. */
+export function serversLeftOut(app: AppSession): LeftOut[] {
+  const state = app.snapshot()
+  if (state.screen !== 'signedIn') return []
+  const current = state.session.server.id
+  return app.store.list().filter((s) => s.id !== current && (tooOldForApp(s) || !s.account))
+    .map((s) => ({ id: s.id, name: s.name, reason: tooOldForApp(s) ? 'tooOld' as const : 'signedOut' as const }))
 }

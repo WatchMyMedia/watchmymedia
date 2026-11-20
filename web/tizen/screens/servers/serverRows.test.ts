@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { nearest } from '../../app/geometry'
 import { REQUIRED_API_LEVEL } from '../../session/session'
 import type { RememberedServer } from '../../session/servers'
-import { accountWords, ACCOUNT_FOCUS, ADD_FOCUS, addedWords, addLine, alreadyAdded, MANAGE_FOCUS, manageDetail, nowOn, panelFocus, panelReturn, removeWords, RETRY_FOCUS, serverFocus,
+import { accountWords, ACCOUNT_FOCUS, ADD_FOCUS, addedWords, addLine, alreadyAdded, alreadyAddedLine, MANAGE_FOCUS, manageDetail, manageLede, nowOn, panelFocus, panelReturn, removeWords, RETRY_FOCUS, serverFocus,
   serverRows, serversLine, signOutMove, switchFailedWords, versionLine } from './serverRows'
 
 const account = { userId: 4, name: 'Sam', isAdmin: false, token: 't', sessionId: 's' }
@@ -76,18 +76,23 @@ describe('Servers’ words', () => {
     const failed = (problem: 'unreachable' | 'moved' | 'tooOld' | 'notSetUp') => switchFailedWords({ state: 'failed', id: 'cabin', name: 'Cabin server', problem }, cabin, 'Living room server')
     expect(failed('unreachable')).toEqual({ title: 'Couldn’t reach Cabin server', body: 'It may be off, or only reachable on its own network. You’re still on Living room server.' })
     expect(failed('moved')).toEqual({ title: 'Cabin server isn’t at this address now', body: 'Another WatchMyMedia server answers at 192.0.2.31:27587. You’re still on Living room server.' })
-    expect(failed('tooOld').title).toBe('Cabin server is too old for this app')
+    expect(failed('tooOld')).toEqual({ title: 'Cabin server is too old for this app', body: 'Update it, then switch. You’re still on Living room server.' })
     expect(failed('notSetUp').body).toMatch(/You’re still on Living room server\.$/)
   })
 
   it('words Settings’ Servers row, page and a server’s page', () => {
-    expect(serversLine(living, 3)).toBe('Living room server and 2 more')
-    expect(serversLine(living, 1)).toBe('Living room server · home.example.net')
+    // Beside the count a name ending in " server" loses the word; one server shows its name whole.
+    expect(serversLine('Living room server', 3)).toBe('Living room and 2 more')
+    expect(serversLine('Lakeside', 2)).toBe('Lakeside and 1 more')
+    expect(serversLine('Living room server', 1)).toBe('Living room server')
+    expect(manageLede(3)).toBe('This TV is signed in to each of these. Search looks in all of them.')
+    expect(manageLede(1)).toBe('This TV is signed in to this server. Add another and search looks in both.')
     expect(manageDetail(living)).toBe('Sam · home.example.net · v1.8.0')
     expect(manageDetail({ ...cabin, account: undefined })).toBe('Signed out here · 192.0.2.31:27587 · v1.8.0')
     expect(versionLine('v1.8.0')).toBe('WatchMyMedia 1.8.0')
     expect(addLine(false)).toBe('By its address')
-    expect(addLine(true)).toBe('This TV keeps 12 servers. Remove one first.')
+    expect(addLine(true)).toBe('This TV keeps up to 12 servers. Remove one in Settings › Account & devices › Servers, then add this one.')
+    expect(alreadyAddedLine('Cabin server')).toBe('Cabin server is already added. Choose it in Servers to switch to it.')
     expect(alreadyAdded(['Living room server', 'Cabin server'])).toBe('Already added: Living room server, Cabin server.')
     expect(alreadyAdded([])).toBe('')
   })

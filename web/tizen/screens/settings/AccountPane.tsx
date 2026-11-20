@@ -73,7 +73,7 @@ export function AccountPane({ first, servers }: PaneProps) {
 
     <PaneHeading>Account</PaneHeading>
     <SettingRow id={id('password')} label="Change password" detail="On your phone or computer" chevron autoFocus={first && !servers && !others.length} onPress={() => setPassword(true)}/>
-    <SettingRow id={id('servers')} label="Servers" detail={serversLine({ name: session.server.name, baseUrl: session.baseUrl }, remembered.length)} chevron autoFocus={servers} onPress={() => setManaging(true)}/>
+    <SettingRow id={id('servers')} label="Servers" detail={serversLine(session.server.name, remembered.length)} chevron autoFocus={servers} onPress={() => setManaging(true)}/>
     <div className="settings-rule" aria-hidden="true"/>
     <SettingRow id={id('sign-out')} label="Sign out of this TV…" icon="signedOut" tone="danger" onPress={() => setSigningOut(true)}/>
 

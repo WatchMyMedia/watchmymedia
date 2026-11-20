@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../src/api/client'
-import { AppSession, REQUIRED_API_LEVEL } from './session'
+import { AlreadyAddedError, AppSession, REQUIRED_API_LEVEL } from './session'
 import { MAX_SERVERS, ServerStore } from './servers'
 import { accountOn, memoryStorage, sentTo, stubServers, type StubServer } from './testServers'
 
@@ -230,36 +230,25 @@ describe('adding a server from the signed-in app', () => {
     app.shutdown()
   })
 
-  it('switches to a server this TV already has when its address is typed, and stays put on its own', async () => {
-    const a = living(), b = cabin()
-    stubServers([a, b])
-    const { app, first } = await signedInTo([a, b])
+  it('refuses the address of a server this TV already has, and nothing switches', async () => {
+    const a = living(), b = cabin(), c = den()
+    const { calls } = stubServers([a, b, c])
+    const { app, storage, first } = await signedInTo([a, b], [c])
     app.addServer()
-    app.editAddress('192.0.2.10')
-    await app.connect()
-    expect(session(app)).toBe(first)
-
-    app.addServer()
-    app.editAddress('192.0.2.31')
-    await app.connect()
-    expect(app.snapshot()).toMatchObject({ screen: 'signedIn', arrival: { how: 'switched' } })
-    expect(session(app).server.id).toBe('srv-cabin')
-    app.shutdown()
-  })
-
-  it('leaves the list as it was when the sign-in of a server this TV is signed out of is left', async () => {
-    const a = living(), b = cabin()
-    stubServers([a, b])
-    const { app, storage, first } = await signedInTo([a], [b])
-    app.addServer()
-    app.editAddress('192.0.2.31')
-    await app.connect()
-    expect(app.snapshot()).toMatchObject({ screen: 'signIn', server: { id: 'srv-cabin' } })
-    app.cancel()
-    app.cancel()
-    expect(session(app)).toBe(first)
-    // The server the app is on is still the one used last, so a launch opens on it.
+    for (const [address, name] of [['192.0.2.10', 'Living room server'], ['192.0.2.31', 'Cabin server'], ['192.0.2.52', 'Den server']]) {
+      app.editAddress(address)
+      await app.connect()
+      const state = app.snapshot()
+      expect(state).toMatchObject({ screen: 'servers', address, adding: {}, busy: undefined })
+      expect(state.screen === 'servers' && state.error).toBeInstanceOf(AlreadyAddedError)
+      expect(state.screen === 'servers' && state.error instanceof AlreadyAddedError && state.error.server).toBe(name)
+    }
+    // Asked which server it is, and no more: no sign-in went anywhere, and the list is as it was.
+    expect(sentTo(calls, 'token-cabin')).toEqual([])
     expect(new ServerStore(storage).last()?.id).toBe('srv-living')
+    expect(first.detached).toBe(false)
+    app.cancel()
+    expect(session(app)).toBe(first)
     app.shutdown()
   })
 

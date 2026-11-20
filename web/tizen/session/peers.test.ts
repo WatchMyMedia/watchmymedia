@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppSession, REQUIRED_API_LEVEL } from './session'
-import { otherServers, PeerError, PeerServer } from './peers'
+import { ApiError } from '../../src/api/client'
+import { leftOutReason, otherServers, PeerError, PeerServer, serversLeftOut } from './peers'
 import { ServerStore } from './servers'
 import { accountOn, memoryStorage, sentTo, stubServers, type StubServer } from './testServers'
 
@@ -52,6 +53,14 @@ describe('asking a server other than the current one', () => {
     expect(moved.info).toBeUndefined()
   })
 
+  it('tells a failure asking again won’t change from one it might', () => {
+    expect(leftOutReason(new PeerError('tooOld'))).toBe('tooOld')
+    expect(leftOutReason(new ApiError(new Response(null, { status: 401 }), undefined))).toBe('signedOut')
+    expect(leftOutReason(new PeerError('moved'))).toBeUndefined()
+    expect(leftOutReason(new ApiError(new Response(null, { status: 503 }), undefined))).toBeUndefined()
+    expect(leftOutReason(new TypeError('Failed to fetch'))).toBeUndefined()
+  })
+
   it('says when its sign-in ended there', async () => {
     const b = cabin()
     b.routes = { 'GET /api/search': () => new Response(null, { status: 401 }) }
@@ -79,6 +88,7 @@ describe('asking a server other than the current one', () => {
     const peers = otherServers(app)
     // Not the current one, nor the one signed out here; the most recently used first.
     expect(peers.map((p) => p.name)).toEqual(['Den server', 'Cabin server'])
+    expect(serversLeftOut(app)).toEqual([{ id: 'srv-loft', name: 'Loft server', reason: 'signedOut' }])
     await Promise.all(peers.map((p) => p.search('harbor', never)))
     expect(sentTo(calls, 'token-living')).toEqual([a.origin])
     expect(sentTo(calls, 'token-cabin')).toEqual([b.origin])
@@ -89,6 +99,10 @@ describe('asking a server other than the current one', () => {
     app.signedOutOf('srv-cabin')
     expect(app.store.get('srv-cabin')?.account).toBeUndefined()
     expect(otherServers(app).map((p) => p.name)).toEqual(['Den server'])
+    // One that last said it is too old for this app isn't asked either, and says why.
+    app.store.note('srv-den', { name: 'Den server', apiLevel: REQUIRED_API_LEVEL - 1 })
+    expect(otherServers(app)).toEqual([])
+    expect(serversLeftOut(app).map((l) => [l.name, l.reason])).toEqual([['Den server', 'tooOld'], ['Loft server', 'signedOut'], ['Cabin server', 'signedOut']])
     for (const p of peers) p.stop()
     app.shutdown()
   })

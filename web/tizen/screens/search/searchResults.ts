@@ -65,6 +65,11 @@ export const stillAsking = (names: readonly string[]) => `Still asking ${named(n
 /** In place of a server's line while Try again asks it. */
 export const askingAgain = (name: string) => `Asking ${name} again…`
 
+/** A server this TV is signed out of, or one too old for this app: a line at the end of the results, with nothing to try. */
+export function leftOutLine(name: string, reason: 'signedOut' | 'tooOld'): string {
+  return reason === 'tooOld' ? `${name} is too old for this app, so its titles aren’t listed.` : `You’re signed out of ${name} here, so its titles aren’t listed.`
+}
+
 /** A server that failed, at the end of the results, beside Try again. */
 export const didNotAnswer = (name: string) => `${name} didn’t answer, so its titles aren’t listed.`
 

@@ -162,7 +162,8 @@ together but this list, which stays on the TV.
   underneath: Add a server, and the sign-in of a server signed out here.
   Return walks back to the app (`cancel()`), on the screen it was on: the
   shell keeps each session's stack. A server being added is remembered only
-  once it is signed in to.
+  once it is signed in to, and the address of a server this TV already has
+  is refused there (`AlreadyAddedError`): it is switched to from Servers.
 - **`arrival`** in the signed-in state is how the app came to a session:
   `switched` shows "Now on …" for 4 s (a note that takes no focus), `added`
   the last step of Add a server, and `open` builds the stack a search
@@ -179,11 +180,17 @@ together but this list, which stays on the TV.
   asked again, a keystroke cancels the calls out) and `mergeResults` orders
   what is drawn: the current server's titles, then each other server's in
   Servers' order, added only when every server before it has answered or
-  failed, so a card on screen never moves. Only library titles cross
-  servers; suggestions, Live TV and requests stay the current server's.
+  failed, so a card on screen never moves. With other servers to list, the
+  current one gets the same 4 s (its late answer is dropped). `searchLines`
+  gives the lines under the results: a server that didn't answer has Try
+  again; one this TV is signed out of, or one too old for this app, says so
+  and isn't asked (`serversLeftOut`); when none answers it is the plain
+  "Search didn't work". Only library titles cross servers; suggestions,
+  Live TV and requests stay the current server's.
 - **Words and rows** for all of it are `screens/servers/serverRows.ts` and
   `screens/search/searchResults.ts`, tested beside them. A server is called
-  by its name, never "the server".
+  by its name, never "the server". The Android and Apple apps say the same
+  things in the same words: change one, change all three.
 - **Focus.** The rail's account button opens Servers and gets focus back
   when Return closes it (`Modal`'s `returnFocus`). The focus geometry
   prefers an aligned card to a wide line nearer by, so a full-width line
