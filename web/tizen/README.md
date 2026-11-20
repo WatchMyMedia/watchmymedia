@@ -1,52 +1,71 @@
-# Samsung QN90D prototype
+# WatchMyMedia for Samsung TV
 
-S0 development checkpoint, 2026-11-01. The prototype screens are implemented
-against [repo-only boards](../../design/mockups/samsung-tv/prototype.html), as
-approved by the user. They are not on a design canvas. The browser preview works
-against an isolated synthetic server, and the app builds for Chromium 108.
-**Signing and testing on the QN90D are deferred. No signed `.wgt` exists.**
+The Samsung TV app: a packaged Tizen web app for 2024 and later Samsung TVs
+(Tizen 8, Chromium 108), playing with Samsung's AVPlay. It is being built to
+match the Android TV app's features, Live TV included (PLAN-SAMSUNG.md), as
+the screens on the "WatchMyMedia — Samsung TV" canvas. It needs a server at
+API level 32 or newer (WatchMyMedia 1.8), which lets an app on a `file://`
+page pair and send bearer requests. **Signing and testing on the QN90D are
+still to do. No signed `.wgt` exists.**
 
-## What is implemented
+## Where it stands
 
-- Server address entry, remembered-session restoration and readable recovery.
-- Code pairing, countdown/expiry, cancel and new code; the claim secret is never
-  shown. API calls use bearer sessions without browser cookies. Remembered tokens
-  are checked against server identity before use.
-- A file picker with library selection, six-file pages, empty/loading/error states,
-  refresh, compatibility options and sign-out. Card illustrations are local
-  decorative artwork; this is not the production poster library.
-- Pause/resume, ±10-second seek, Stop/Return, progress and resume, administrator
-  stop, file-focus restoration and explicit resume after interruption. Controls
-  stay visible in S0. Native operations use the Samsung AVPlay adapter.
-- Directional navigation, Enter, Return, media keys, focus-trapped dialogs and exit
-  confirmation. Paused/stopped playback re-enables the native screensaver; that
-  API behavior still needs device verification.
-- Explicit H.264/AAC, HEVC, E-AC-3 and 480p conversion experiments, with VOD/event
-  playlist selection. These are test inputs, not certified capability claims or
-  the public client's Automatic quality policy. AVPlay turns on 4K mode
-  (`SET_MODE_4K`) before prepare when the stream is larger than 1080p.
-- Three 60-second synthetic clips and an opt-in live contract test for direct
-  MP4, HLS remux, audio/video conversion delivery, resume and token revocation.
+Built, 2026-11-19, and checked in the browser preview only:
 
-The player engine for the full TV client is in [`player/`](player/README.md),
-2026-11-19: the AVPlay adapter with tracks, live streams and backgrounding; one
-conservative QN90D-class profile; the file, recording and trailer player
-(heartbeats, directives, Automatic, skip, the next episode, Still watching,
-held seeking with thumbnails, WebVTT cues, OpenSubtitles, recovery and token
-renewal); and the Live TV player on the shared tuner controller. It has unit
-tests with fake players and servers only; no screen uses most of it yet, and
-nothing of it has run on a TV.
+- The start: choosing a server (remembered servers with Remove, an address
+  typed with the TV's keyboard, Not encrypted for plain http away from home),
+  signing in with a six-character code and a QR code of the server's link
+  page that renews as it runs out, or a name and password, and the problems
+  (can't reach, not set up, too old for this TV, signed out from another
+  device). The last sign-in comes back on launch once the server's ID is
+  checked.
+- The shell: the section rail (Search, Home, TV Shows, Movies, Live TV when
+  the server has it, Settings with the Inbox count), sections on Home and
+  pages on what opened them, each screen remembering its place, Return
+  walking back and asking before leaving at Home, Hold OK, the remote's media,
+  channel and number keys, and the offline banner.
+- The data layer: the web app's own queries and event table over a bearer
+  client per session, a fresh cache per server and account, media tokens
+  for pictures, and live updates over `GET /api/events`.
+- The kit the screens are built from, in plain CSS for Chromium 108.
+- The player engine in [`player/`](player/README.md): the AVPlay adapter
+  with tracks, live streams and backgrounding; one conservative QN90D-class
+  profile; the file, recording and trailer player (heartbeats, directives,
+  Automatic, skip, the next episode, Still watching, held seeking with
+  thumbnails, WebVTT cues, OpenSubtitles, recovery and token renewal); and
+  the Live TV player on the shared tuner controller. It has unit tests with
+  fake players and servers only.
 
-The development preview labels itself **Browser preview · not AVPlay**. Its
-HTML video/Hls.js adapter is excluded from the production TV bundle. The TV app
-fails clearly when Samsung APIs are unavailable; it never silently substitutes
-browser playback. All app assets are bundled locally. Existing web and Cast
-entries do not import the prototype; server CORS/CSRF and generated APIs are
-unchanged.
+Home and the libraries show placeholder screens drawn with the kit; the
+movie and show pages, the player's screens, Live TV, Search and Settings are
+placeholders that their features replace. Settings already has Switch server
+and Sign out.
+
+The development preview labels nothing as AVPlay: its HTML video and Hls.js
+adapter and its fictional server are left out of the TV build. All app assets
+are bundled locally. The package ids in `public/config.xml` are still the
+development ones (`WMMProto01`): the store's package id, application id and
+author certificate are the maintainers' decision, made before the first
+store submission.
 
 ## Run the browser preview
 
-From the repository/worktree root, with ffmpeg, Go, Node 24 and pnpm 9 available:
+On the fictional server, from `web/`:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev:tizen
+```
+
+Open <http://127.0.0.1:5186/?fakes>. Its server, Lakeside, is at the
+prefilled address; its code signs in by itself after a few seconds, and the
+password form takes Sam and `watching`. `?fakes=away` adds a remembered
+server away from home over http; `?fakes=old`, `?fakes=setup` and
+`?fakes=expire` show the start problems. Nothing on the network is asked:
+every other address fails as an unreachable server would.
+
+Against the synthetic fixture server, from the repository or worktree root,
+with ffmpeg, Go, Node 24 and pnpm 9 available:
 
 ```sh
 python3 deploy/samsung/fixture.py
@@ -69,16 +88,16 @@ pnpm dev:tizen
 ```
 
 Open <http://127.0.0.1:5186>. Keep its prefilled address: Vite proxies `/api` to
-this dedicated fixture. The pairing screen points to the actual server's link
-page at <http://127.0.0.1:27686/link>. Open that in another tab, sign in as the
-fictional viewer from `deploy/fixture/fixture.sh`, and approve the displayed code.
-Keep that approver signed in until the prototype reaches the file picker.
+this dedicated fixture. The sign-in screen names this page's own address, which
+serves no link page: open the server's at <http://127.0.0.1:27686/link> in
+another tab instead, sign in as the fictional viewer from
+`deploy/fixture/fixture.sh`, and approve the code shown.
 
-Use arrows and Enter, or a mouse. Escape represents the remote's Return button;
-Tab also works. Left/right edit the URL while that field has focus. Return leaves
-that field first, then navigates back. Playback options explain each experiment.
-Sign out through the prototype to revoke its session. Stop both temporary servers
-with Ctrl+C afterwards. Never point automated tests at a personal server.
+Use the arrows and Enter, or a mouse. Escape or Backspace is the remote's
+Return, PageUp and PageDown are CH ▲▼, and the digits are the number keys.
+Enter on a field types in it; Enter, Escape or ▲▼ finish. Sign out from
+Settings to revoke the TV's session. Stop both temporary servers with Ctrl+C
+afterwards. Never point automated tests at a personal server.
 
 The local proxy is a development convenience. It cannot establish packaged-app
 CORS, Fetch Metadata, HTTP/HTTPS or native media-request behavior.
@@ -120,15 +139,18 @@ make agents-check
 python3 -I -m unittest discover -s deploy/samsung -p '*_test.py'
 ```
 
-Current verification, 2026-11-01: 144 unit tests (34 Samsung), four packaging/fixture guard
-tests, the live synthetic-server test, types/lint, all four builds, and
-`make agents-check` pass. The tests include mocked session/navigation/lifecycle
-failures. Browser checks cover pairing/retry, stored-session
-restoration, direct playback, HLS remux (including event seek while paused), HEVC
-conversion, progress/resume, modal focus, Return-to-file behavior, sign-out and
-error recovery. Layouts are checked at 1920×1080, 1280×720 and phone width.
-Native remote input, screensaver, suspend/wake, AVPlay decoding and packaging
-acceptance remain unverified on a TV. No signing or store operation was performed.
+Current verification, 2026-11-19: the TV app's 141 unit tests (the shell,
+session, kit and player engine), types, lint, `build:tizen`, `check:tizen`,
+the core build, the web and receiver builds and `make agents-check` pass. In
+the browser preview on the fakes, at 1280×720: a typed address, the code
+signing in by itself, the password form with a wrong and a right password,
+Home's rows (card by card, the run of ◀ stopping at the first card, a single
+◀ opening the rail), each section from the rail and Return to Home with
+focus where it was, the player route, the leave dialog, Sign out, and the
+too old, unreachable (with Not encrypted) and signed-out problems. The
+fixture server and the live test were not run for this checkpoint. A real
+remote, the TV's keyboard, screensaver, suspend and wake, AVPlay and the
+packaged app's networking remain unverified on a TV.
 
 ## Resume signing and QN90D testing later
 
@@ -150,24 +172,23 @@ acceptance remain unverified on a TV. No signing or store operation was performe
 
    It refuses incomplete apps, symlinks and signing material, then checks the
    SDK archive's signature entries. Output will be
-   `build/samsung/watchmymedia-qn90d-prototype.wgt`. Those checks do not establish
+   `build/samsung/watchmymedia-qn90d-prototype.wgt` (the name follows the
+   development package id). Those checks do not establish
    Samsung trust or TV acceptance; actual installation remains required.
-4. Connect only to the authorized QN90D, using the synthetic server. Check the
-   two things most likely to break first: that the app starts (the classic
-   script and `$WEBAPIS/webapis/webapis.js` load), and that pairing gets through.
-   The server log's status for `POST /api/auth/pair` shows whether the origin
-   check refused it (403); [PLAN-SAMSUNG.md](../../PLAN-SAMSUNG.md) §3 predicts
-   that. To see the `Origin` and `Sec-Fetch-*` values, point the app at a small
-   local server that prints only those headers. Then record
-   firmware/Tizen/AVPlay versions, safe Origin/Fetch Metadata observations, direct
-   and HLS playback, audio, seek/resume, Stop/Return, suspend/wake and screensaver
-   restoration. Expose the fixture to the LAN only for that authorized test, keep
-   discovery disabled, and stop it afterwards. Never record tokens or media URLs.
+4. Connect only to the authorized QN90D, using the synthetic server. Check
+   first that the app starts (the classic script and
+   `$WEBAPIS/webapis/webapis.js` load) and that pairing gets through: the
+   server at API level 32 lets `file://` pages pair and send bearer requests,
+   and answers CORS for them, so a 403 or a CORS failure there is the thing to
+   look into. Then record firmware, Tizen and AVPlay versions, the remote's
+   keys and Hold OK, the TV's keyboard in the address and password fields,
+   direct and HLS playback, audio, seek and resume, Stop and Return,
+   suspend and wake, and the screensaver. Expose the fixture to the LAN only
+   for that authorized test, keep discovery disabled, and stop it afterwards.
+   Never record tokens or media URLs.
 
-Keep server security policy unchanged until TV evidence identifies any necessary
-S1 fix. Do not broadly trust `Origin: null`. Production browsing, QR pairing,
-subtitles, HDR, full Automatic quality, token renewal, certification and additional
-model groups remain in [PLAN-SAMSUNG.md](../../PLAN-SAMSUNG.md).
+Do not broadly trust `Origin: null` on the server. HDR, certification and
+more model groups remain in [PLAN-SAMSUNG.md](../../PLAN-SAMSUNG.md).
 
 Samsung references: [certificate setup](https://developer.samsung.com/smarttv/develop/getting-started/setting-up-sdk/creating-certificates.html),
 [TV testing](https://developer.samsung.com/smarttv/develop/getting-started/using-sdk/tv-device.html),
