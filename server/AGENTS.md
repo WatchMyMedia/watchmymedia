@@ -78,6 +78,19 @@ fetch from MDBList, on the admin's key, is limited in
 `internal/api/media_list_limits.go`. Media tokens (`?access_token=`) open
 GET and HEAD media routes only.
 
+**Cross-origin requests.** `sameOrigin` (`internal/api/api.go`) refuses
+writes a browser makes for another site, which the session cookie would
+sign in. Three kinds pass: from the Cast receiver origins while casting is
+on; any request with an `Authorization: Bearer` token, as the Samsung TV
+app sends from its `file://` page; and starting and claiming a pairing,
+which carry no credentials. The bearer exemption is safe only because such
+a request is signed in by its token alone (`auth.TokenFrom`): a bad bearer
+is a 401, never the cookie's user. Keep it so, and keep other schemes
+(a proxy's Basic sign-in, which browsers repeat on their own) under the
+check. `apiCORS` answers CORS for the receiver origins and for media while
+casting is on, and for `file://` either way (the API and media); never for `null` or another
+site, and never with credentials.
+
 **SQL.** Queries go in `internal/db/queries/*.sql` and run through sqlc;
 `internal/activity` keeps its own SQL. The server never runs `ANALYZE`, so
 SQLite plans joins without statistics, and a plan that looks fine after

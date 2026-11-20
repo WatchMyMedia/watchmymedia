@@ -612,16 +612,25 @@ func (s *Service) secureFor(ctx context.Context) bool {
 	return s.secure || info.HTTPS
 }
 
-// TokenFrom extracts the session token from the cookie or an
-// Authorization bearer header.
+// TokenFrom extracts the session token from an Authorization bearer header
+// or, when the request has none, the cookie. A request with a bearer header
+// is authenticated by that header alone: the cookie is not read, so a bad
+// or empty bearer token never falls back to a browser's session. The API
+// relies on that to let bearer requests from other origins past its
+// cross-origin check (sameOrigin in internal/api).
 func TokenFrom(r *http.Request) string {
-	if t := cookieToken(r); t != "" {
+	if t, ok := BearerToken(r); ok {
 		return t
 	}
-	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
-		return strings.TrimSpace(h[len("Bearer "):])
-	}
-	return ""
+	return cookieToken(r)
+}
+
+// BearerToken is the token in the request's Authorization: Bearer header,
+// and whether the request has that header (its token may be empty). Other
+// schemes, such as a reverse proxy's Basic sign-in, are not this server's.
+func BearerToken(r *http.Request) (string, bool) {
+	t, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	return strings.TrimSpace(t), ok
 }
 
 // cookieToken is the session token in the request's cookie, if any.
