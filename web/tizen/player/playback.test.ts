@@ -366,6 +366,16 @@ describe('the next episode and Still watching', () => {
     expect(h.c.snapshot().request).toEqual({ kind: 'file', fileId: 2, title: 'Harbor Lights · S01 E02 · Squall Line' })
   })
 
+  it('says what plays next, and the segments, from the start, with no card yet', async () => {
+    const segments: Decision['segments'] = [{ id: 1, kind: 'intro', startMs: 10_000, endMs: 90_000, confidence: 1, final: true, source: 'manual' }]
+    const h = harness({ decide: () => episode({ segments }) })
+    await started(h)
+    expect(h.c.snapshot()).toMatchObject({ upNext: next, segments, next: undefined })
+    const trailer = harness({ decide: () => episode() })
+    await started(trailer, { kind: 'trailer', fileId: 1 })
+    expect(trailer.c.snapshot().upNext).toBeUndefined()
+  })
+
   it('hides the card for Watch credits until the end, and offers Play now without a countdown when autoplay is off', async () => {
     const h = harness({ decide: () => episode(), settings: { autoplayNext: false } })
     await started(h, { kind: 'file', fileId: 1, startMs: 581_000 })

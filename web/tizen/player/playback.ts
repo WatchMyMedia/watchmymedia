@@ -5,7 +5,7 @@ import { AUTO_DELAY_MS, NEXT_COUNTDOWN, SKIP_LABELS, StallMeter, activeSegment, 
 import { requestedPlaylist, resumePlan, timelineOffset } from '../../src/lib/play/stream'
 import type { StillWatchingSession } from '../../src/lib/stillWatching'
 import { fetchImage, usableTrickplay } from '../../src/lib/trickplay'
-import { call, PlayerError, safeMessage, type ClientInfo, type Decision, type DecisionRequest, type Directive, type PlayerApi, type Preferences, type Profile, type Progress, type SubtitlePreferences, type SubtitleSearch, type SubtitleTrack, type UpNext } from './api'
+import { call, PlayerError, safeMessage, type ClientInfo, type Decision, type DecisionRequest, type Directive, type PlayerApi, type Preferences, type Profile, type Progress, type Segment, type SubtitlePreferences, type SubtitleSearch, type SubtitleTrack, type UpNext } from './api'
 import { PlaybackFailure, type Player, type PlayerFailure, type PlayerState, type PlayerUpdate } from './avplay'
 import { systemClock, type Clock } from './clock'
 import type { Cue } from './vtt'
@@ -107,6 +107,10 @@ export type FilePlaybackState = {
   /** Seek thumbnails exist for this file. */
   trickplay: boolean
   recording?: { now: boolean; goToNow: boolean; starting: boolean }
+  /** The decision's segments (intro, credits, ad breaks), for the scrubber's bands. */
+  segments?: readonly Segment[]
+  /** A file's next episode, whenever there is one (next is the card, which shows only near the end). */
+  upNext?: UpNext
   adminStop?: { message: string }
   error?: string
   /** The play ended by itself (the end, a skip to the end, Still watching's No): leave the player. */
@@ -1049,6 +1053,8 @@ export class FilePlayback {
       scrub: scrub && { ...scrub, step: seekStepLabel(scrub.stepMs), thumbnail: v.thumbnails?.at(scrub.targetMs) },
       trickplay: !!v.thumbnails,
       recording: v.request.kind === 'recording' ? { now: recordingNow, goToNow: showGoToNow(recordingNow, pos, duration), starting: v.starting } : undefined,
+      segments: d.segments,
+      upNext: next,
       error: v.error,
     })
 

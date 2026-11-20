@@ -45,11 +45,11 @@ export function Dialog({ title, children, actions, onCancel }: { title: string; 
 /**
  * The right-hand panel pickers and settings open over a screen (Audio,
  * Subtitles, Quality, a setting's choices). Return closes it; focus goes
- * back to what opened it.
+ * back to what opened it. `className` sizes a screen's own kind of panel.
  */
-export function SidePanel({ title, children, onClose }: { title: string; children: ReactNode; onClose(): void }) {
+export function SidePanel({ title, children, onClose, className }: { title: string; children: ReactNode; onClose(): void; className?: string }) {
   return <Modal onClose={onClose} className="">
-    <aside role="dialog" aria-modal="true" aria-label={title} className="tv-panel">
+    <aside role="dialog" aria-modal="true" aria-label={title} className={`tv-panel${className ? ` ${className}` : ''}`}>
       <h2 className="tv-panel__title">{title}</h2>
       <div className="tv-panel__body">{children}</div>
     </aside>
