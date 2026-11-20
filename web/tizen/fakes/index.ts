@@ -3,6 +3,7 @@ import { FakeServer } from './server'
 import { registerStart } from './start'
 import { registerBrowse } from './browse'
 import { registerRequests } from './requests'
+import { registerSearch } from './search'
 import { registerSettings } from './settings'
 
 // The browser preview's fictional server (`pnpm dev:tizen`, then open
@@ -21,6 +22,7 @@ export function createFakeServer(mode = ''): FakeServer {
   // Before Browse: its request options are static, these follow the Inbox.
   registerRequests(server, mode)
   registerBrowse(server)
+  registerSearch(server)
   registerSettings(server, mode)
   return server
 }
