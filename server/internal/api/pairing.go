@@ -82,11 +82,20 @@ func pairingError(err error) error {
 	return throttled(err)
 }
 
+// The pairing routes a TV calls before it has a token. They carry no
+// credentials, so they work without a sign-in (exemptPath) and from any
+// origin (sameOrigin): what they hand out goes only to whoever holds the
+// pairing's secret, once someone signed in has approved its code.
+const (
+	pairStartPath = Prefix + "/auth/pair"
+	pairClaimPath = Prefix + "/auth/pair/claim"
+)
+
 func registerPairing(h huma.API, deps Deps) {
 	huma.Register(h, huma.Operation{
 		OperationID: "startPairing",
 		Method:      http.MethodPost,
-		Path:        Prefix + "/auth/pair",
+		Path:        pairStartPath,
 		Summary:     "Start signing in a TV with a code",
 		Description: "No sign-in needed. Show the code (and a QR code of linkPath), then poll /auth/pair/claim every intervalMs until someone signed in approves the code at /link or in a phone app. Codes last 10 minutes.",
 		Tags:        []string{"auth"},
@@ -106,7 +115,7 @@ func registerPairing(h huma.API, deps Deps) {
 	huma.Register(h, huma.Operation{
 		OperationID: "claimPairing",
 		Method:      http.MethodPost,
-		Path:        Prefix + "/auth/pair/claim",
+		Path:        pairClaimPath,
 		Summary:     "Poll a pairing: pending, or approved with the device's token",
 		Description: "No sign-in needed. 404 once the code has expired (start again) or after the token was handed out.",
 		Tags:        []string{"auth"},

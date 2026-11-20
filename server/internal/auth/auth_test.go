@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -181,6 +182,54 @@ func TestMiddleware(t *testing.T) {
 	}
 }
 
+// A request with a bearer header is signed in by that token alone: the API
+// lets such requests from other origins past its cross-origin check, so a
+// browser's cookie beside a bad or empty bearer must never sign it in.
+func TestBearerIgnoresCookie(t *testing.T) {
+	s, _ := setup(t)
+	ctx := t.Context()
+	for _, name := range []string{"a", "b"} {
+		if _, err := s.CreateUser(ctx, name, "pass1234", false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a, b := login(t, s, "a", "pass1234"), login(t, s, "b", "pass1234")
+	exempt := func(p string) bool { return p == "/api/health" }
+	h := s.Middleware(exempt, func(string) bool { return false }, nil, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if u, ok := UserFrom(r.Context()); ok {
+			_, _ = w.Write([]byte("user:" + u.Name))
+			return
+		}
+		_, _ = w.Write([]byte("anon"))
+	}))
+	for _, c := range []struct {
+		name, path, authorization string
+		want                      string // the user, or the status
+	}{
+		{"cookie alone", "/api/libraries", "", "user:a"},
+		{"another person's bearer", "/api/libraries", "Bearer " + b, "user:b"},
+		{"a bad bearer", "/api/libraries", "Bearer nope", "401"},
+		{"an empty bearer", "/api/libraries", "Bearer ", "401"},
+		{"a bad bearer on a public route", "/api/health", "Bearer nope", "anon"},
+		{"a proxy's Basic sign-in", "/api/libraries", "Basic YWxpY2U6c2VjcmV0", "user:a"},
+	} {
+		req := httptest.NewRequestWithContext(ctx, http.MethodPost, c.path, nil)
+		req.AddCookie(&http.Cookie{Name: CookieName, Value: a})
+		if c.authorization != "" {
+			req.Header.Set("Authorization", c.authorization)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		got := rec.Body.String()
+		if rec.Code != http.StatusOK {
+			got = strconv.Itoa(rec.Code)
+		}
+		if got != c.want {
+			t.Errorf("%s, beside a's cookie -> %s, want %s", c.name, got, c.want)
+		}
+	}
+}
+
 func TestDeviceSessions(t *testing.T) {
 	s, _ := setup(t)
 	s.SetDeviceTTL(48 * time.Hour)
@@ -333,12 +382,13 @@ func TestCookieRenewedWithSession(t *testing.T) {
 	token := login(t, s, "a", "pass1234")
 	h := s.Middleware(func(string) bool { return false }, func(string) bool { return false }, nil, nil)(
 		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
-	send := func(cookie bool) *http.Cookie {
+	send := func(cookie, bearer bool) *http.Cookie {
 		t.Helper()
 		r := httptest.NewRequestWithContext(ctx, http.MethodGet, "/api/libraries", nil)
 		if cookie {
 			r.AddCookie(&http.Cookie{Name: CookieName, Value: token})
-		} else {
+		}
+		if bearer {
 			r.Header.Set("Authorization", "Bearer "+token)
 		}
 		w := httptest.NewRecorder()
@@ -362,11 +412,11 @@ func TestCookieRenewedWithSession(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if c := send(true); c != nil {
+	if c := send(true, false); c != nil {
 		t.Errorf("cookie sent again on a request just after sign-in: %v", c)
 	}
 	age()
-	c := send(true)
+	c := send(true, false)
 	if c == nil || c.Value != token || c.MaxAge != 3600 || !c.HttpOnly {
 		t.Fatalf("renewed cookie = %v", c)
 	}
@@ -374,12 +424,18 @@ func TestCookieRenewedWithSession(t *testing.T) {
 	if len(list) != 1 || time.Until(list[0].ExpiresAt) < 59*time.Minute {
 		t.Errorf("session expiry not slid: %+v", list)
 	}
-	if c := send(true); c != nil {
+	if c := send(true, false); c != nil {
 		t.Errorf("cookie sent again within the hour: %v", c)
 	}
 	age()
-	if c := send(false); c != nil {
+	if c := send(false, true); c != nil {
 		t.Errorf("bearer client got a cookie: %v", c)
+	}
+	// A bearer request is signed in by its token alone, so it leaves any
+	// cookie beside it as it was.
+	age()
+	if c := send(true, true); c != nil {
+		t.Errorf("bearer request with a cookie got a cookie: %v", c)
 	}
 }
 

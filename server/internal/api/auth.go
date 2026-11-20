@@ -724,7 +724,7 @@ func exemptPath(p string) bool {
 	}
 	switch p {
 	case Prefix + "/health", Prefix + "/auth/status", Prefix + "/auth/login", Prefix + "/setup", Prefix + "/playback/local", DocsPath, OpenAPIPath + ".json", OpenAPIPath + ".yaml",
-		Prefix + "/auth/pair", Prefix + "/auth/pair/claim", Prefix + "/server":
+		pairStartPath, pairClaimPath, Prefix + "/server":
 		return true
 	}
 	// Radarr's and Sonarr's webhooks sign in with the connection's token.

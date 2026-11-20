@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -1037,8 +1038,9 @@ func TestCompression(t *testing.T) {
 	srv := newTestServer(t)
 	gz := []string{"Accept-Encoding", "gzip"}
 	home := doJSON(t, srv.client, http.MethodGet, srv.URL+"/api/home", "", nil, gz...)
-	if home.Header.Get("Content-Encoding") != "gzip" || !strings.Contains(home.Header.Get("Vary"), "Accept-Encoding") {
-		t.Errorf("home Content-Encoding = %q, Vary = %q", home.Header.Get("Content-Encoding"), home.Header.Get("Vary"))
+	// API replies also vary by Origin (apiCORS), in a Vary line of its own.
+	if home.Header.Get("Content-Encoding") != "gzip" || !slices.Contains(home.Header.Values("Vary"), "Accept-Encoding") {
+		t.Errorf("home Content-Encoding = %q, Vary = %q", home.Header.Get("Content-Encoding"), home.Header.Values("Vary"))
 	}
 	if res := doJSON(t, srv.client, http.MethodGet, srv.URL+"/api/home", "", nil, "Accept-Encoding", "identity"); res.Header.Get("Content-Encoding") != "" {
 		t.Error("gzipped for a client that did not ask")

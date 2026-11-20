@@ -12,6 +12,7 @@ import (
 	"maps"
 	"net/http"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -209,7 +210,7 @@ func New(deps Deps) (*chi.Mux, huma.API) {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
 	r.Use(deps.Net.Middleware)
-	r.Use(castCORS(deps.Cast))
+	r.Use(apiCORS(deps.Cast))
 	r.Use(sameOrigin(castTrusted(deps.Cast)))
 	r.Use(securityHeaders(deps.HSTS, deps.Turnstile, deps.Cast.Enabled && deps.Cast.AppID != "", deps.Trailers.YouTube))
 	r.Use(requestLogger(deps.Log))
@@ -356,9 +357,18 @@ func schemaName(t reflect.Type, hint string) string {
 // makes on behalf of another site, including a sibling subdomain, which
 // SameSite=Lax cookies do not stop (CSRF). Browsers say where a request
 // comes from in Sec-Fetch-Site or Origin; native apps and scripts send
-// neither and are not affected. Trusted origins (Cast receiver pages) may:
-// they get no cookies, since CORS never allows credentials, and act with
-// the cast token they were given.
+// neither and are not affected. Three kinds of request from another origin
+// may write, since none can act with the browser's own sign-in:
+//   - from trusted origins (Cast receiver pages): they get no cookies,
+//     since CORS never allows credentials, and act with the cast token they
+//     were given;
+//   - with an Authorization: Bearer token, as the packaged TV apps send
+//     from file:// pages (PLAN-SAMSUNG.md §3): such a request is
+//     authenticated by that token alone, never the cookie (auth.TokenFrom),
+//     and a browser sends the header only when a page's own script sets
+//     it, with a token the page already holds. Other schemes, such as the
+//     Basic sign-in a browser repeats for a proxy, are checked as usual;
+//   - starting and claiming a pairing, which carry no credentials.
 func sameOrigin(trusted []string) func(http.Handler) http.Handler {
 	p := http.NewCrossOriginProtection()
 	for _, o := range trusted {
@@ -366,12 +376,96 @@ func sameOrigin(trusted []string) func(http.Handler) http.Handler {
 			slog.Warn("cast receiver origin ignored", "origin", o, "err", err)
 		}
 	}
+	p.AddInsecureBypassPattern(http.MethodPost + " " + pairStartPath)
+	p.AddInsecureBypassPattern(http.MethodPost + " " + pairClaimPath)
 	p.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(http.StatusForbidden)
 		_ = json.NewEncoder(w).Encode(map[string]any{"title": "Forbidden", "status": http.StatusForbidden, "detail": "cross-origin request refused"})
 	}))
-	return p.Handler
+	return func(next http.Handler) http.Handler {
+		checked := p.Handler(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if token, ok := auth.BearerToken(r); ok && token != "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			checked.ServeHTTP(w, r)
+		})
+	}
+}
+
+// packagedAppOrigin is the origin of the packaged TV apps' pages: Samsung's
+// Tizen apps load from file:// inside the TV. No web page has it, unlike
+// null, which sandboxed frames and pages opened from a disk send.
+const packagedAppOrigin = "file://"
+
+// corsPolicy is what one kind of page on another origin may send.
+type corsPolicy struct{ methods, headers string }
+
+var (
+	// Cast receiver pages call the playback routes with a cast token.
+	receiverCORS = corsPolicy{"GET, HEAD, POST, PUT, DELETE", "Authorization, Content-Type, Range"}
+	// The packaged TV apps call the API with their device's token.
+	packagedAppCORS = corsPolicy{"GET, POST, PUT, PATCH, DELETE", "Authorization, Content-Type"}
+	// Anyone may fetch media, whose token rides in the URL.
+	mediaCORS = corsPolicy{"GET, HEAD", "Range"}
+)
+
+// apiCORS lets pages on other origins use the API, never with cookies: no
+// reply allows credentials, so a page acts only with a token it holds.
+//   - Cast receiver pages, when casting is on, get the playback routes with
+//     an Authorization header.
+//   - The packaged TV apps (packagedAppOrigin) get every route but media,
+//     whether casting is on or not.
+//   - Anyone gets media routes when casting is on. Cast devices fetch HLS
+//     and subtitles with XHR, which needs this even for Google's own
+//     receivers.
+func apiCORS(c CastOptions) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			p := r.URL.Path
+			if !strings.HasPrefix(p, Prefix+"/") {
+				next.ServeHTTP(w, r)
+				return
+			}
+			media := mediaPath(p)
+			origin := r.Header.Get("Origin")
+			h := w.Header()
+			if c.Enabled && media {
+				// The receiver measures completed segment transfers in its own
+				// PerformanceResourceTiming. Media still requires its normal token.
+				h.Set("Timing-Allow-Origin", "*")
+			}
+			// Media replies depend on the origin only when casting is on.
+			if c.Enabled || !media {
+				h.Add("Vary", "Origin")
+			}
+			var allow string
+			var policy corsPolicy
+			switch {
+			case c.Enabled && origin != "" && slices.Contains(c.ReceiverOrigins, origin):
+				allow, policy = origin, receiverCORS
+			case origin == packagedAppOrigin && !media:
+				allow, policy = origin, packagedAppCORS
+			case c.Enabled && media:
+				allow, policy = "*", mediaCORS
+			default:
+				next.ServeHTTP(w, r)
+				return
+			}
+			h.Set("Access-Control-Allow-Origin", allow)
+			h.Set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges")
+			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+				h.Set("Access-Control-Allow-Methods", policy.methods)
+				h.Set("Access-Control-Allow-Headers", policy.headers)
+				h.Set("Access-Control-Max-Age", "600")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func castTrusted(c CastOptions) []string {
