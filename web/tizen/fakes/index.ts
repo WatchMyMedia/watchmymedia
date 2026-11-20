@@ -16,7 +16,7 @@ export const AWAY_ORIGIN = 'http://203.0.113.20:27587'
 export function createFakeServer(mode = ''): FakeServer {
   const server = new FakeServer(FAKE_ORIGIN)
   registerStart(server, mode)
-  registerBrowse(server)
+  registerBrowse(server, mode)
   return server
 }
 

@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
 import { HomeScreen } from '../screens/browse/HomeScreen'
-import { LibraryScreen } from '../screens/browse/LibraryScreen'
+import { LibraryScreen, SeeAllScreen } from '../screens/browse/LibraryScreen'
 import { ListScreen } from '../screens/browse/ListScreen'
 import { MovieScreen } from '../screens/details/MovieScreen'
 import { ShowScreen } from '../screens/details/ShowScreen'
@@ -37,7 +37,7 @@ export type Route =
   | { name: 'settings'; group?: SettingsGroup; rowsScreen?: 'home' | 'movie' | 'tv' }
   // Pages: each opens on top of what opened it.
   /** A row's See all: its library sorted the row's way (PLAN-SEE-ALL.md). */
-  | { name: 'seeAll'; libraryId: number; title: string; sort?: string; filter?: string; genre?: string }
+  | { name: 'seeAll'; libraryId: number; title: string; sort?: string; filter?: string; genre?: string; decade?: number }
   | { name: 'list'; id: number }
   | { name: 'movie'; id: number }
   /** The show page (PLAN-SHOW-PAGE.md): up next on top, or a season's start, or an episode. */
@@ -69,7 +69,7 @@ export const ROUTES: { [N in Route['name']]: RouteDef<N> } = {
   library: { screen: LibraryScreen, section: (r) => r.type === 'tv' ? 'shows' : 'movies' },
   live: { screen: LiveScreen, section: () => 'live' },
   settings: { screen: SettingsScreen, section: () => 'settings' },
-  seeAll: { screen: ListScreen },
+  seeAll: { screen: SeeAllScreen },
   list: { screen: ListScreen },
   movie: { screen: MovieScreen },
   show: { screen: ShowScreen },
