@@ -1,16 +1,17 @@
 # WatchMyMedia for Samsung TV
 
-The Samsung TV app: a packaged Tizen web app for 2024 and later Samsung TVs
-(Tizen 8, Chromium 108), playing with Samsung's AVPlay. It is being built to
-match the Android TV app's features, Live TV included (PLAN-SAMSUNG.md), as
-the screens on the "WatchMyMedia — Samsung TV" canvas. It needs a server at
-API level 32 or newer (WatchMyMedia 1.8), which lets an app on a `file://`
-page pair and send bearer requests. **Signing and testing on the QN90D are
-still to do. No signed `.wgt` exists.**
+The Samsung TV app: a packaged Tizen web app for 2024 and later Samsung TVs,
+playing with Samsung's AVPlay. It is built for Chromium 108, the engine those
+TVs shipped with; the first test TV, a 2024 QN90D, has since been updated to
+Tizen 9.0 with Chrome 120. It matches the Android TV app's features, Live TV
+included (PLAN-SAMSUNG.md), as the screens on the "WatchMyMedia — Samsung TV"
+canvas. It needs a server at API level 32 or newer (WatchMyMedia 1.8). It has
+been signed with a Samsung certificate and run on that TV (below); the store
+package id and the submission are still to come.
 
 ## Where it stands
 
-Built, 2026-11-19, and checked in the browser preview only:
+Built on 2026-11-19 and checked in the browser preview; the first TV session (below) checked sign-in, browsing and playback on a QN90D:
 
 - The start: choosing a server (remembered servers with Remove, an address
   typed with the TV's keyboard, Not encrypted for plain http away from home),
@@ -174,40 +175,64 @@ fixture server and the live test were not run for this checkpoint. A real
 remote, the TV's keyboard, screensaver, suspend and wake, AVPlay and the
 packaged app's networking remain unverified on a TV.
 
-## Resume signing and QN90D testing later
+## Signing and testing on a TV
 
-1. Finish Samsung certificate setup. On this Mac, Tizen SDK 10 CLI is installed at
-   `~/tizen-studio` (CLI 2.5.25, sdb 4.2.36), with Rosetta for its Intel utilities
-   and the official VS Code Tizen TV extension. The SDK reported no profiles.
-   Samsung Certificate Extension 2.0.73 was downloaded and registered as a local
-   package source, but package-manager installation stopped with “Network
-   disconnected.” Samsung signing is not ready.
-2. When the user is ready, enable Developer Mode, authorize this Mac, identify
-   the QN90D IP/DUID and create/select a **Samsung TV** signing profile with that
-   DUID in its distributor certificate. Account login and certificate custody
-   stay with the user. Keep the future store author-identity decision separate.
-3. After `pnpm build:tizen`, from the root, the prepared helper can sign the app:
+Done on 2026-11-20 with a 2024 QN90D. In order:
+
+1. **Developer Mode on the TV.** On 2024 and later TVs the code goes in the
+   Apps screen's own settings (its gear), not the Apps screen itself: open
+   Apps, then its settings, and enter 1 2 3 4 5 with the remote's 123 number
+   pad, or SmartThings' remote with its number pad on. Switch Developer mode
+   on, enter this computer's address as the Host PC IP, and restart the TV
+   fully (hold the power button until the logo shows). Port 26101 opens about
+   a minute after the TV starts.
+2. **A Samsung certificate profile.** Only Tizen Studio's Certificate Manager
+   with Samsung's certificate extension makes one: install the IDE
+   (`web-ide_Tizen_Studio_*_macos-64.dmg` from download.tizen.org; the
+   command-line-only SDK has no Certificate Manager, and VS Code's Tizen TV
+   extension makes only Tizen certificates, which retail TVs refuse), add
+   **Samsung Certificate Extension** from its Package Manager, then in
+   Certificate Manager: **+**, Samsung, TV, a profile name, a new author
+   certificate (the maintainers sign in with their Samsung account and keep
+   the password), and a new distributor certificate with the Public privilege
+   and the TV's DUID (`sdb shell 0 getduid`, or the TV's Support menu). The
+   files land in `~/SamsungCertificate/<profile>/`; back them up, since every
+   store update must be signed with the same author certificate. They expire
+   after a year.
+3. **Sign** the built app, naming that SDK's `tizen`:
 
    ```sh
-   python3 deploy/samsung/package.py --profile PROFILE_NAME --app web/dist-tizen
+   python3 deploy/samsung/package.py --profile PROFILE --app web/dist-tizen --tizen ~/path/to/tizen-sdk/tools/ide/bin/tizen
    ```
 
-   It refuses incomplete apps, symlinks and signing material, then checks the
-   SDK archive's signature entries. Output will be
+   It refuses incomplete apps, symlinks and signing material, and writes
    `build/samsung/watchmymedia-qn90d-prototype.wgt` (the name follows the
-   development package id). Those checks do not establish
-   Samsung trust or TV acceptance; actual installation remains required.
-4. Connect only to the authorized QN90D, using the synthetic server. Check
-   first that the app starts (the classic script and
-   `$WEBAPIS/webapis/webapis.js` load) and that pairing gets through: the
-   server at API level 32 lets `file://` pages pair and send bearer requests,
-   and answers CORS for them, so a 403 or a CORS failure there is the thing to
-   look into. Then record firmware, Tizen and AVPlay versions, the remote's
-   keys and Hold OK, the TV's keyboard in the address and password fields,
-   direct and HLS playback, audio, seek and resume, Stop and Return,
-   suspend and wake, and the screensaver. Expose the fixture to the LAN only
-   for that authorized test, keep discovery disabled, and stop it afterwards.
-   Never record tokens or media URLs.
+   development package id).
+4. **Install and launch** with that SDK's tools: `sdb connect <TV address>`,
+   `tizen install -n <the .wgt> -s <TV address>:26101`, then
+   `sdb -s <TV address>:26101 shell 0 debug WMMProto01.Prototype`, which
+   prints a port for Chrome's inspector (`sdb forward tcp:<local> tcp:<port>`,
+   then `http://127.0.0.1:<local>/json`). If `sdb connect` keeps failing while
+   port 26101 answers, `sdb kill-server` and connect again.
+5. **A server at API level 32**: until a release has it, build one from `main`
+   and run the synthetic fixture above with `WATCHMYMEDIA_HOST=0.0.0.0`, on
+   the home network only for the test, discovery off, and stop it afterwards.
+
+What the first session on the QN90D found:
+
+- The signed package installs and starts in about 2.3 s to first content, with
+  about 10 MB of JavaScript memory.
+- The app's requests carry **no `Origin` and no `Sec-Fetch-*` headers** and no
+  cookies, only the bearer token. Pairing, sign-in, browsing, playback and
+  progress all returned 200. (API level 32's exemptions are not what let this
+  TV through; they cover a runtime that does send those headers.)
+- AVPlay played MKV with HEVC and E-AC-3, and MP4 and MKV with H.264 and AAC,
+  directly from the file, picture and sound confirmed on the TV; and a 480p
+  conversion, as HLS with HEVC video, picking up where the direct play left
+  off. Seeking (applied on key-up), WebVTT subtitles in time, resume, Continue
+  watching and watched marks, and the remote's keys all worked.
+- Not yet tried there: HDR, 4K, surround, image subtitles, Live TV against a
+  tuner, trailers from YouTube, suspend and wake, long sessions.
 
 Do not broadly trust `Origin: null` on the server. HDR, certification and
 more model groups remain in [PLAN-SAMSUNG.md](../../PLAN-SAMSUNG.md).
