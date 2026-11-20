@@ -1,10 +1,28 @@
 import type { components } from '../src/api/schema'
-import { ApiError, result, safeError, serverUrl, timed, UserError, type TVClient } from './server'
+import { ApiError, mediaUrl, result, safeError, serverUrl, timed, UserError, type TVClient } from './server'
 import { clearSession, deviceInfo, pair, readSession, restoreSession, saveSession } from './session'
-import { PlaybackController, type PlaybackState } from './player/playback'
+import { DEFAULT_SETTINGS, FilePlayback, type FilePlaybackState } from './player/playback'
 import type { Player } from './player/avplay'
-import type { MediaFile, PairingStart, SavedSession } from './types'
-import type { ProfileId } from './player/profile'
+import { StillWatchingSession } from '../src/lib/stillWatching'
+import type { Decision, MediaFile, PairingStart, SavedSession } from './types'
+import { prototypeProfile, type ProfileId } from './experiments'
+import { fileTitle } from './presentation'
+
+/** The prototype screen's view of a play, from the engine's state. */
+export type PlaybackState = {
+  state: 'idle' | 'buffering' | 'playing' | 'paused' | 'ended' | 'error'
+  file?: MediaFile
+  decision?: Pick<Decision, 'mode' | 'durationMs'>
+  positionMs: number
+  error?: string
+  reportError?: string
+}
+
+function prototypePlayback(s: FilePlaybackState, file?: MediaFile): PlaybackState {
+  const state = s.phase === 'loading' ? 'buffering' : s.phase === 'ended' ? 'idle' : s.phase
+  return { state, file: s.phase === 'idle' && !s.request ? undefined : file, positionMs: s.positionMs,
+    decision: s.mode ? { mode: s.mode, durationMs: s.durationMs } : undefined, error: s.error ?? s.adminStop?.message }
+}
 
 type Library = components['schemas']['Library']
 export type AppState = {
@@ -38,7 +56,8 @@ export class AppModel {
   private pageRequest?: AbortController
   private generation = 0
   private playing = 0
-  private playback?: PlaybackController
+  private playback?: FilePlayback
+  private stillWatching = new StillWatchingSession()
   private unsubscribe?: () => void
   private closing: Promise<void> = Promise.resolve()
   private lastFile?: MediaFile
@@ -52,7 +71,6 @@ export class AppModel {
   readonly snapshot = () => this.state
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
   private update(patch: Partial<AppState>) { this.state = { ...this.state, ...patch }; for (const listener of this.listeners) listener() }
-  readonly onPlayerUpdate: PlaybackController['onPlayerUpdate'] = (event) => this.playback?.onPlayerUpdate(event)
 
   start() { if (this.saved) void this.connect(this.saved.baseUrl) }
   editAddress(address: string) { if (!this.state.busy) this.update({ address }) }
@@ -96,9 +114,10 @@ export class AppModel {
       return response
     } })
     this.unsubscribe?.()
-    this.playback = new PlaybackController(api, saved.baseUrl, deviceInfo(this.storage), this.player)
+    this.playback = new FilePlayback({ api, player: this.player, mediaUrl: (path, token) => mediaUrl(saved.baseUrl, path, token),
+      client: deviceInfo(this.storage), settings: () => DEFAULT_SETTINGS, stillWatching: this.stillWatching })
     this.unsubscribe = this.playback.subscribe(() => {
-      const playback = this.playback!.snapshot()
+      const playback = prototypePlayback(this.playback!.snapshot(), this.lastFile)
       this.update({ playback, ...(['playing', 'paused', 'error'].includes(playback.state) ? { busy: false } : {}) })
     })
     this.update({ screen: 'library', serverName, canRestore: true, pairing: undefined,
@@ -144,12 +163,12 @@ export class AppModel {
     this.update({ screen: 'player', busy: true, notice: undefined, error: undefined, focus: 'stop', playback: { state: 'buffering', file, positionMs: 0 } })
     await this.closing
     if (playing !== this.playing || player !== this.playback) return
-    await player.play(file, this.state.profile, this.state.playlist)
+    await player.play({ kind: 'file', fileId: file.id, title: fileTitle(file), diagnostics: { profile: prototypeProfile(this.state.profile), playlist: this.state.playlist } })
     if (playing === this.playing && player === this.playback) this.update({ busy: false, focus: player.snapshot().error ? 'replay' : 'pause' })
   }
   replay() { if (this.lastFile) void this.play(this.lastFile) }
-  pause() { void this.playback?.togglePause() }
-  seek(delta: number) { void this.playback?.seek(delta) }
+  pause() { this.playback?.togglePause() }
+  seek(delta: number) { this.playback?.seekBy(delta) }
 
   stopToFiles() {
     ++this.playing
@@ -164,7 +183,7 @@ export class AppModel {
     }
     if (this.state.screen === 'player') {
       ++this.playing
-      this.closing = this.playback?.stop('closed') ?? Promise.resolve()
+      this.closing = this.playback?.stop() ?? Promise.resolve()
       this.update({ busy: false, notice: 'Playback stopped while you were away. Resume when you’re ready.', focus: 'replay' })
     }
   }
@@ -173,7 +192,7 @@ export class AppModel {
     ++this.generation; ++this.playing
     this.authRequest?.abort(); this.pageRequest?.abort()
     this.api = undefined; this.unsubscribe?.(); this.unsubscribe = undefined
-    this.closing = this.playback?.stop('closed') ?? Promise.resolve()
+    this.closing = this.playback?.stop() ?? Promise.resolve()
     this.playback = undefined
     this.update({ playback: { state: 'idle', positionMs: 0 } })
     return this.closing
@@ -189,7 +208,7 @@ export class AppModel {
     ++this.generation; ++this.playing
     this.authRequest?.abort(); this.pageRequest?.abort()
     this.api = undefined; this.unsubscribe?.(); this.unsubscribe = undefined
-    this.closing = this.playback?.stop('closed') ?? Promise.resolve()
+    this.closing = this.playback?.stop() ?? Promise.resolve()
     this.playback = undefined; this.lastFile = undefined
     this.forget()
     this.update({ screen: 'server', busy: false, libraries: [], files: [], total: 0, libraryId: undefined,

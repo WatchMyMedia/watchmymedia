@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppModel, PAGE_SIZE } from './app-model'
-import type { Player } from './player/avplay'
+import { FakePlayer } from './player/fake-player'
 import { readSession, saveSession } from './session'
 import type { SavedSession } from './types'
 
@@ -24,12 +24,12 @@ function setup(overrides: { page?: (request: Request) => Promise<Response>; appr
     if (path === '/api/libraries/1/files') return overrides.page?.(request) ?? Response.json({ items: [file], total: 1, offset: 0, limit: PAGE_SIZE })
     if (path === '/api/auth/logout') return new Response(null, { status: 204 })
     if (path === '/api/files/1/playback') return Response.json({ protocol: 'file', mode: 'direct', url: '/api/files/1/stream', playId: 'test-play', durationMs: 60_000, resumeMs: 0, startMs: 0,
-      video: { copy: true, codec: 'h264', toneMap: false, width: 1280, height: 720 } })
+      video: { copy: true, codec: 'h264', toneMap: false, width: 1280, height: 720 }, audio: { copy: true, index: 0 }, audioTracks: [], subtitles: [], segments: [], reasons: [], creditsMs: 0, upNextMs: 0, watchedAtMs: 55_000 })
     if (path === '/api/auth/media-token') return Response.json({ token: 'media-only' })
     if (path === '/api/files/1/progress') return Response.json({ playId: 'test-play' })
     throw new Error(`Unexpected fixture route ${path}`)
   })
-  const player: Player = { name: 'Test only', open: vi.fn(async () => {}), stop: vi.fn(async () => {}), pause: vi.fn(async () => {}), resume: vi.fn(async () => {}), seek: vi.fn(async () => {}) }
+  const player = new FakePlayer()
   return { storage, calls, player, create: () => new AppModel(storage, player) }
 }
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
@@ -111,7 +111,7 @@ describe('prototype screen and session lifetime', () => {
     model.suspend()
     expect(model.snapshot()).toMatchObject({ screen: 'player', busy: false, focus: 'replay', playback: { state: 'idle' } })
     expect(model.snapshot().notice).toContain('Resume when')
-    expect(f.player.open).toHaveBeenCalledTimes(1)
+    expect(f.player.opened).toHaveLength(1)
     model.stopToFiles()
     expect(model.snapshot()).toMatchObject({ screen: 'library', focus: 'file-1' })
     await model.shutdown()
