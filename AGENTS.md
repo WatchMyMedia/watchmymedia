@@ -19,11 +19,13 @@ Where an `AGENTS.private.md` sits beside an `AGENTS.md`, read it too. It holds
 the maintainers' rules for releases, the site and the plans, which are kept
 outside the public repository, and it comes first where the two differ.
 
-Everything in this repository is public. Cite a plan or a mockup by its name
-(`PLAN-ROWS.md §4`, `design/mockups/web/`), never as a link: those files are
-not here ([CONTRIBUTING.md](CONTRIBUTING.md#files-this-repository-does-not-have)),
-so a link opens a 404. Keep out the address of a design canvas or of the
-maintainers' own servers, and anything else they keep to themselves.
+Everything in this repository is public, and the maintainers' plans, design
+mockups and design boards are not in it
+([CONTRIBUTING.md](CONTRIBUTING.md#what-is-not-here)). Don't name or link
+them in a comment or a document, by file name, section or address: say the
+reason in the comment itself, in words that stand without the plan.
+`make agents-check` fails on a file that names one. Keep out the address of
+the maintainers' own servers too, and anything else they keep to themselves.
 
 ## What this is
 
