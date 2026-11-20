@@ -83,6 +83,7 @@ pnpm typecheck
 pnpm lint
 pnpm test
 pnpm build:tizen
+pnpm check:tizen
 pnpm build:tizen-core
 pnpm build
 pnpm build:receiver
@@ -93,7 +94,12 @@ WMM_TIZEN_TEST_SERVER=http://127.0.0.1:27686 pnpm vitest run tizen/live.test.ts
 to ignored `web/dist-tizen/`, as one classic deferred script with no
 `crossorigin` attributes. The package loads from `file://`, where module scripts
 can be refused: in desktop Chrome the earlier module build ran nothing from
-`file://`, while this one starts. `pnpm dev:tizen` still serves modules. The optional core build writes to ignored
+`file://`, while this one starts. `pnpm dev:tizen` still serves modules. `pnpm check:tizen`
+then fails a build that Chromium 108 can't load: a missing file, a module script,
+or JS or CSS newer than Chrome 108 that the build leaves as written
+([deploy/samsung/bundle.py](../../deploy/samsung/bundle.py)). CI's `samsung` job lints,
+tests, builds and checks the app, and keeps the unsigned build as an artifact; the
+core build and the live test stay local. The optional core build writes to ignored
 `build/samsung/core/`; it cannot be installed as an app. The live test requires
 loopback port 27686 and the dedicated server name before any sign-in or writes.
 It revokes its test device and approver sessions afterwards.
