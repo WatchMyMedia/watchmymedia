@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { revokeSession, sessionsQuery, type Session } from '../../../src/api/account'
 import { deviceName, signOutError } from '../../../src/lib/youSettings'
-import { useApp, useFocus, useSession } from '../../app/hooks'
+import { useApp, useAppState, useFocus, useSession } from '../../app/hooks'
 import { thisTvLine } from './thisTv'
-import { displayAddress } from '../../session/address'
 import { Dialog } from '../../ui/Overlays'
+import { ManageServers } from '../servers/ManageServers'
+import { serversLine, signOutMove } from '../servers/serverRows'
 import { InfoPanel, PanelQr } from './Panels'
 import type { PaneProps } from './SettingsScreen'
 import { paneRowId } from './settingsGroups'
@@ -17,17 +18,22 @@ const id = (row: string) => paneRowId('account', row)
 /**
  * Settings › Account & devices: this TV,
  * the signed-in devices (each other one asks before it is signed out),
- * Change password on a phone, Switch server, and Sign out of this TV apart
- * at the foot with its confirmation.
+ * Change password on a phone, Servers (the servers this TV has: switch to
+ * one, add one, remove one), and Sign out of this TV apart at the foot with
+ * its confirmation.
  */
-export function AccountPane({ first }: PaneProps) {
+export function AccountPane({ first, servers }: PaneProps) {
   const app = useApp()
+  useAppState()
   const session = useSession()
   const focus = useFocus()
   const qc = useQueryClient()
   const sessions = useQuery(sessionsQuery(false))
   const [password, setPassword] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const [managing, setManaging] = useState(!!servers)
+  const remembered = app.store.list()
+  const moveTo = signOutMove(remembered, session.server.id)
   const [revoking, setRevoking] = useState<{ session: Session; state: 'asking' | 'working' | 'failed'; text?: string }>()
   const list = sessions.data?.items ?? []
   const mine = list.find((s) => s.current)
@@ -60,14 +66,14 @@ export function AccountPane({ first }: PaneProps) {
     {sessions.isPending && <PaneNote>Loading…</PaneNote>}
     {sessions.isError && <SettingRow id={id('devices-failed')} label="Couldn’t load the list" detail="Check that the server is on, then try again." value="Try again" onPress={() => void sessions.refetch()}/>}
     {mine && <InfoRow label={deviceName(mine)} detail={deviceLine(mine)} value={<span className="settings-badge">This TV</span>}/>}
-    {others.map((s, i) => <SettingRow key={s.id} id={id(`device/${s.id}`)} label={deviceName(s)} detail={deviceLine(s)} autoFocus={first && i === 0}
+    {others.map((s, i) => <SettingRow key={s.id} id={id(`device/${s.id}`)} label={deviceName(s)} detail={deviceLine(s)} autoFocus={first && !servers && i === 0}
       value={revoking?.session.id === s.id && revoking.state === 'working' ? 'Signing out…' : 'Sign out'} chevron
       onPress={() => setRevoking({ session: s, state: 'asking' })}/>)}
     {sessions.data && !others.length && <PaneNote>No other devices are signed in.</PaneNote>}
 
     <PaneHeading>Account</PaneHeading>
-    <SettingRow id={id('password')} label="Change password" detail="On your phone or computer" chevron autoFocus={first && !others.length} onPress={() => setPassword(true)}/>
-    <SettingRow id={id('switch')} label="Switch server" detail={`${session.server.name} · ${displayAddress(session.baseUrl)} · goes back to the server screen`} chevron onPress={() => app.switchServer()}/>
+    <SettingRow id={id('password')} label="Change password" detail="On your phone or computer" chevron autoFocus={first && !servers && !others.length} onPress={() => setPassword(true)}/>
+    <SettingRow id={id('servers')} label="Servers" detail={serversLine({ name: session.server.name, baseUrl: session.baseUrl }, remembered.length)} chevron autoFocus={servers} onPress={() => setManaging(true)}/>
     <div className="settings-rule" aria-hidden="true"/>
     <SettingRow id={id('sign-out')} label="Sign out of this TV…" icon="signedOut" tone="danger" onPress={() => setSigningOut(true)}/>
 
@@ -78,12 +84,15 @@ export function AccountPane({ first }: PaneProps) {
       </PanelQr>
     </InfoPanel>}
 
+    {managing && <ManageServers onClose={() => setManaging(false)}/>}
+
     {signingOut && <Dialog title="Sign out of this TV?" onCancel={() => setSigningOut(false)} actions={[
       { id: 'dialog/keep', label: 'Stay signed in', safe: true, onPress: () => setSigningOut(false) },
       { id: 'dialog/sign-out', label: 'Sign out of this TV', variant: 'danger', onPress: () => app.signOut() },
     ]}>
       <div><span className="settings-label">Stays</span><p className="tv-body">Your account on {session.server.name}, with what you’ve watched and your settings.</p></div>
-      <p className="tv-body" style={{ color: 'var(--text-3)' }}>This TV goes back to the sign-in screen and shows a code to link it again.</p>
+      <p className="tv-body" style={{ color: 'var(--text-3)' }}>{moveTo ? `This TV stays signed in to ${moveTo}, and moves to it.`
+        : 'This TV goes back to the sign-in screen and shows a code to link it again.'}</p>
       <p className="tv-faint">Return keeps things as they are.</p>
     </Dialog>}
 

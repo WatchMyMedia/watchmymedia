@@ -1,6 +1,6 @@
 import { useRef, useState, type CSSProperties } from 'react'
 import { useHold } from '../app/hooks'
-import { PlayGlyph } from './Icon'
+import { Icon, PlayGlyph } from './Icon'
 import { placeholderTone } from './tones'
 
 export type CardVariant = 'poster' | 'wide' | 'episode' | 'continue' | 'live'
@@ -13,6 +13,8 @@ export type CardProps = {
   variant: CardVariant
   title: string
   subtitle?: string
+  /** The server the title is on, when that isn't the one the app is on (Search): a line under the title. */
+  server?: string
   /** A full address from useMediaUrls().imageUrl (w342 for posters, w780 for wide cards). */
   image?: string
   /** How far through, 0–1: the gold bar along the bottom. */
@@ -38,11 +40,11 @@ function Picture({ src }: { src: string }) {
  * continue (with a play mark and progress) and live (a channel). Focus
  * draws the gold ring around the picture and scales the card slightly.
  */
-export function Card({ id, variant, title, subtitle, image, progress, badges, live, label, onPress, onHold }: CardProps) {
+export function Card({ id, variant, title, subtitle, server, image, progress, badges, live, label, onPress, onHold }: CardProps) {
   const ref = useRef<HTMLButtonElement>(null)
   useHold(ref, onHold)
   const tone = placeholderTone(title)
-  return <button ref={ref} type="button" data-focus={id} className={`tv-card tv-card--${variant}`} aria-label={label ?? [title, subtitle].filter(Boolean).join(', ')} onClick={onPress}>
+  return <button ref={ref} type="button" data-focus={id} className={`tv-card tv-card--${variant}`} aria-label={label ?? [title, server && `on ${server}`, subtitle].filter(Boolean).join(', ')} onClick={onPress}>
     <span className="tv-card__art" style={{ '--ph-a': tone[0], '--ph-b': tone[1] } as CSSProperties}>
       {live ? <>
         <span className="tv-card__channel"><b>{live.number}</b><span>{live.name}</span></span>
@@ -56,6 +58,7 @@ export function Card({ id, variant, title, subtitle, image, progress, badges, li
       {progress !== undefined && progress > 0 && <span className="tv-card__progress"><span style={{ width: `${Math.min(100, Math.round(progress * 100))}%` }}/></span>}
     </span>
     {!live && <span className="tv-card__title">{title}</span>}
+    {!live && server && <span className="tv-card__server"><Icon name="server"/><span>{server}</span></span>}
     {!live && subtitle && <span className="tv-card__sub">{subtitle}</span>}
     {live && subtitle && <span className="tv-card__sub" style={{ marginTop: '.625rem' }}>{subtitle}</span>}
   </button>

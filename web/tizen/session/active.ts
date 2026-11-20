@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { setApiClient, unwrap, type ApiClient } from '../../src/api/client'
+import { api as currentApi, setApiClient, unwrap, type ApiClient } from '../../src/api/client'
 import type { components } from '../../src/api/schema'
 import { changeAuthScope } from '../../src/lib/authScope'
 import { eventInvalidations, invalidateAfterReconnect } from '../../src/api/eventInvalidation'
@@ -33,6 +33,7 @@ export class ActiveSession {
   private events: EventStream
   private listeners = new Map<string, Set<(data: unknown) => void>>()
   private ended = false
+  private attached = false
   private online = true
   private onlineListeners = new Set<() => void>()
   /** A number per session, so the shell starts afresh for each one. */
@@ -88,16 +89,26 @@ export class ActiveSession {
   }
 
   /**
+   * Gets this session ready without touching the one in use: resolves once
+   * its first media token is in (or a few seconds pass; pictures appear when
+   * it comes). A switch waits here while the old session still runs.
+   */
+  ready(): Promise<void> {
+    return Promise.race([this.tokens.start(), new Promise<void>((r) => setTimeout(r, 3000))])
+  }
+
+  /**
    * Makes this the session every query and mutation uses: the web's `api`
    * becomes this bearer client and the auth scope moves on, so a reply from
-   * before can't fill this cache. Resolves once the first media token is in
-   * (or a few seconds pass; pictures appear when it comes).
+   * before can't fill this cache. The session before it is detached after,
+   * and leaves this client in place.
    */
-  async attach(): Promise<void> {
+  attach() {
+    if (this.ended) return
+    this.attached = true
     setApiClient(this.api)
     changeAuthScope()
     this.events.start()
-    await Promise.race([this.tokens.start(), new Promise((r) => setTimeout(r, 3000))])
   }
 
   /** Ends this session here: closes the stream, drops the cache and the token. Does not sign out on the server. */
@@ -110,8 +121,10 @@ export class ActiveSession {
     this.onlineListeners.clear()
     void this.queryClient.cancelQueries()
     this.queryClient.clear()
+    if (!this.attached) return
     changeAuthScope()
-    setApiClient(bearerClient(this.baseUrl))
+    // Only while the queries still use this client: after a switch they already use the next session's.
+    if (currentApi === this.api) setApiClient(bearerClient(this.baseUrl))
   }
 
   get detached() { return this.ended }

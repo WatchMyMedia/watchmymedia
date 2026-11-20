@@ -26,6 +26,8 @@ export type PaneProps = {
   first: boolean
   /** Home rows: the screen a library's Edit rows asked for. */
   rowsScreen?: 'home' | 'movie' | 'tv'
+  /** Account & devices: open on its Servers page (Servers' Manage servers). */
+  servers?: boolean
 }
 
 /** Each group's line at the left: what is chosen in it. */
@@ -142,7 +144,7 @@ export function SettingsScreen({ route }: ScreenProps<'settings'>) {
     <section key={shown} ref={paneRef} className="settings-pane" role="tabpanel" aria-label={GROUP_TITLES[shown]} data-group={paneGroupId(shown)} onFocus={() => setInPane(true)}>
       <PaneScroll>
         <h2 className="settings-pane__title">{GROUP_TITLES[shown]}</h2>
-        <Pane first={startInPane && shown === route.group} rowsScreen={route.rowsScreen}/>
+        <Pane first={startInPane && shown === route.group} rowsScreen={route.rowsScreen} servers={startInPane && shown === 'account' && !!route.servers}/>
       </PaneScroll>
     </section>
     <p className="settings-hints" aria-hidden="true">

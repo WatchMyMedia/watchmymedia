@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type FocusEvent } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FocusEvent } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { liveTVCapabilitiesQuery, liveTVRemindersQuery, liveTVSearchQuery, searchQuery, useLiveReminder } from '../../../src/api/queries'
 import { requestableSearchQuery, requestOptionsQuery, type Requestable } from '../../../src/api/requests'
@@ -6,8 +6,10 @@ import type { components } from '../../../src/api/schema'
 import { searchTerm } from '../../../src/lib/liveReminders'
 import { isOn, progress } from '../../../src/lib/liveGuide'
 import { SUGGEST_DELAY_MS, SUGGEST_MIN_CHARS } from '../../../src/lib/searchSuggestions'
-import { useEntry, useFocus, useHold, useMediaUrls, useNav, useSession, useBack } from '../../app/hooks'
-import { KeyHints } from '../../ui/Button'
+import { useApp, useAppState, useEntry, useFocus, useHold, useMediaUrls, useNav, useSession, useBack } from '../../app/hooks'
+import { otherServers, type PeerServer } from '../../session/peers'
+import type { OpenTarget } from '../../session/session'
+import { Button, KeyHints } from '../../ui/Button'
 import { Card } from '../../ui/Card'
 import { Icon } from '../../ui/Icon'
 import { VScroll } from '../../ui/VScroll'
@@ -15,17 +17,40 @@ import { TextField } from '../../ui/TextField'
 import { problemWords } from '../../ui/problemWords'
 import { placeholderTone } from '../../ui/tones'
 import { RequestDialog, type RequestTarget } from '../requests/RequestDialog'
+import { CrossSearch, mergeResults, resultKey, type Tagged } from './crossSearch'
+import { keepSearch, keptSearch, searchScope } from './keptSearch'
 import { keyRows, typeKey, type KeyboardMode, type KeyPress } from './keyboard'
 import { ResultsRow } from './ResultsRow'
-import { episodeSub, libraryBand, liveAction, liveLine, liveWhen, movieSub, notInLibrary, requestableAction, requestableSub, requestBadge, showSub, suggestionChips } from './searchResults'
+import { didNotAnswer, emptyWords, episodeSub, libraryBand, liveAction, liveLine, liveWhen, movieSub, noMatchWords, notInLibrary, requestableAction, requestableSub, requestBadge, showSub, stillAsking, suggestionChips } from './searchResults'
 import './search.css'
 
 type LiveHit = components['schemas']['LiveTVSearchHit']
 type Movie = components['schemas']['Movie']
 type Show = components['schemas']['Show']
+type SearchEpisode = components['schemas']['SearchEpisode']
 
-/** What was typed, kept for this Search while pages open on top of it, so coming back finds the same results. */
-let kept: { scope: string; text: string } | undefined
+/**
+ * The other servers this TV is signed in to, asked for this visit to
+ * Search: each through a client of its own, never the session's. Their
+ * pictures come with their own media tokens, drawn as those arrive.
+ */
+function useOtherServers(): { peers: PeerServer[]; cross: CrossSearch } {
+  const app = useApp()
+  const [made] = useState(() => {
+    const peers = otherServers(app)
+    return {
+      peers, cross: new CrossSearch(peers),
+      subscribe: (listener: () => void) => { const offs = peers.map((p) => p.tokens.subscribe(listener)); return () => offs.forEach((off) => off()) },
+      version: () => peers.reduce((n, p) => n + p.tokens.snapshot(), 0),
+    }
+  })
+  useSyncExternalStore(made.subscribe, made.version)
+  useEffect(() => () => {
+    made.cross.stop()
+    for (const p of made.peers) p.stop()
+  }, [made])
+  return made
+}
 
 /** The typed text, the query asked a moment after typing stops. */
 function useDebounced(text: string): string {
@@ -115,15 +140,28 @@ function NotInLibraryCard({ item, focusId, onPress }: { item: Requestable; focus
  * the results goes back to the keyboard.
  */
 export function SearchScreen() {
+  const app = useApp()
+  const appState = useAppState()
   const session = useSession()
   const entry = useEntry()
   const focus = useFocus()
   const nav = useNav()
-  const scope = `${session.serial}/${entry?.key}`
-  const [text, setTextState] = useState(() => kept?.scope === scope ? kept.text : '')
-  const setText = (t: string) => { kept = { scope, text: t }; setTextState(t) }
+  const scope = searchScope(session.serial, entry?.key)
+  const [text, setTextState] = useState(() => keptSearch(scope))
+  const setText = (t: string) => { keepSearch(scope, t); setTextState(t) }
   const q = useDebounced(text).trim()
   const searching = q.length >= SUGGEST_MIN_CHARS
+  const { peers, cross } = useOtherServers()
+  const parts = useSyncExternalStore(cross.subscribe, cross.snapshot)
+  const several = peers.length > 0
+  const resultsRef = useRef<HTMLElement>(null)
+  // A keystroke cancels every call still out; the other servers are asked a moment after typing stops, as the current one is.
+  useEffect(() => {
+    cross.cancel()
+    const words = text.trim()
+    const timer = setTimeout(() => cross.search(words.length >= SUGGEST_MIN_CHARS ? words : ''), SUGGEST_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [cross, text])
   const [inResults, setInResults] = useState(false)
   const [asking, setAsking] = useState<RequestTarget>()
   const [focused, setFocused] = useState<string>()
@@ -143,20 +181,24 @@ export function SearchScreen() {
   const remind = useLiveReminder()
   const media = useMediaUrls()
 
+  // The current server's results first; each other server's after them, as mergeResults orders them.
   const results = searching ? library.data : undefined
-  const shows = results?.shows ?? []
-  const movies = results?.movies ?? []
-  const episodes = results?.episodes ?? []
+  const merged = mergeResults(results, searching && (library.isError || (library.isSuccess && !library.isPlaceholderData)), searching ? parts : [])
+  const { shows, movies, episodes } = merged
   const nil = searching ? notInLibrary(requestable.data?.items, results) : []
   const chips = !inResults && text.trim().length >= SUGGEST_MIN_CHARS ? suggestionChips(library.data, text) : []
-  const nothing = searching && library.isSuccess && !shows.length && !movies.length && !episodes.length && !hits.length && !nil.length && !requestable.isPending
+  const nothing = searching && merged.settled && !library.isError && !shows.length && !movies.length && !episodes.length && !hits.length && !nil.length && !requestable.isPending
+  const switching = appState.screen === 'signedIn' && appState.switching?.state === 'switching' ? appState.switching : undefined
 
+  const toKeyboard = () => {
+    const last = entry?.memory.groups['search/keys']
+    if (!(last && focus.focusId(last))) focus.focusId('key/1-0')
+  }
   // Return from the results goes back to the keyboard, on the key left last.
   useBack(() => {
     const active = document.activeElement
     if (!active?.closest('.search-results')) return false
-    const last = entry?.memory.groups['search/keys']
-    if (!(last && focus.focusId(last))) focus.focusId('key/1-0')
+    toKeyboard()
     return true
   })
 
@@ -178,8 +220,43 @@ export function SearchScreen() {
     if (act?.kind === 'request') setAsking({ kind: r.mediaType, tmdbId: r.tmdbId, title: r.title })
     else if (act) nav.push({ name: act.kind, id: act.id })
   }
-  const showCard = (s: Show, id: string) => <Card id={id} variant="poster" title={s.title} subtitle={showSub(s)} image={media.imageUrl(s.posterPath, 'w342')} onPress={() => nav.push({ name: 'show', id: s.id })}/>
-  const movieCard = (m: Movie, id: string) => <Card id={id} variant="poster" title={m.title} subtitle={movieSub(m)} image={media.imageUrl(m.posterPath, 'w342')} onPress={() => nav.push({ name: 'movie', id: m.id })}/>
+  // A result on another server: its pictures come from that server, and OK switches the app to it, then opens the title there.
+  const mediaOf = (t: Tagged<unknown>) => t.server ? peers.find((p) => p.id === t.server?.id)?.media : media
+  const openOn = (server: { id: string }, target: OpenTarget) => {
+    const info = peers.find((p) => p.id === server.id)?.info
+    void app.switchTo(server.id, { ...(info ? { info } : {}), open: { text: text.trim(), target } })
+  }
+  const showCard = (t: Tagged<Show>, id: string) => {
+    const s = t.item
+    return <Card id={id} variant="poster" title={s.title} server={t.server?.name} subtitle={showSub(s)} image={mediaOf(t)?.imageUrl(s.posterPath, 'w342')}
+      onPress={() => t.server ? openOn(t.server, { kind: 'show', id: s.id }) : nav.push({ name: 'show', id: s.id })}/>
+  }
+  const movieCard = (t: Tagged<Movie>, id: string) => {
+    const m = t.item
+    return <Card id={id} variant="poster" title={m.title} server={t.server?.name} subtitle={movieSub(m)} image={mediaOf(t)?.imageUrl(m.posterPath, 'w342')}
+      onPress={() => t.server ? openOn(t.server, { kind: 'movie', id: m.id }) : nav.push({ name: 'movie', id: m.id })}/>
+  }
+  const episodeCard = (t: Tagged<SearchEpisode>, id: string) => {
+    const e = t.item
+    const open = () => t.server ? openOn(t.server, { kind: 'show', id: e.showId, season: e.seasonNumber, episodeId: e.id })
+      : nav.push({ name: 'show', id: e.showId, season: e.seasonNumber, episodeId: e.id })
+    // Hold OK plays an episode on this server; on another it opens there first, as OK does.
+    return <Card id={id} variant="episode" title={e.showTitle} server={t.server?.name} subtitle={episodeSub(e)} image={mediaOf(t)?.imageUrl(e.stillPath ?? e.showPosterPath, 'w780')}
+      label={`${e.showTitle}, season ${e.seasonNumber} episode ${e.number}, ${e.title}${t.server ? `, on ${t.server.name}` : ''}`}
+      onPress={open} onHold={t.server ? open : () => nav.play({ kind: 'file', fileId: e.fileId, title: e.showTitle, subtitle: episodeSub(e) })}/>
+  }
+  // Try again takes its line away: focus moves to a card first, or back to the keyboard.
+  const askAgain = (id: string) => {
+    const card = resultsRef.current?.querySelector<HTMLElement>('.tv-card[data-focus]')
+    if (card) focus.focus(card)
+    else toKeyboard()
+    cross.retry(id)
+  }
+  const empty = emptyWords(1 + peers.length, liveTV)
+  const none = noMatchWords(q, merged.answered)
+  // With several servers the groups stack and keep room for a card's server line, so one that grows moves nothing.
+  const stacked = several || libraryBand(shows.length, movies.length) === 'rows'
+  const room = (card: string) => several ? `calc(${card} + 5.375rem)` : undefined
 
   return <div className="search" onFocus={onFocus}>
     <section className="search-left">
@@ -200,30 +277,35 @@ export function SearchScreen() {
       <Keyboard text={text} setText={setText} dim={inResults} onTvKeyboard={openTvKeyboard}/>
     </section>
 
-    <section className="search-results" aria-label="Results">
+    <section ref={resultsRef} className="search-results" aria-label="Results">
       <VScroll pad={36}>
-        {!searching && <div className="search-hint" data-vitem><h2>Find anything in your library</h2><p className="tv-note">Type part of a title. Shows, movies and episodes appear here as you type{liveTV ? ', with what’s on Live TV' : ''}.</p></div>}
+        {!searching && <div className="search-hint" data-vitem><h2>{empty.title}</h2><p className="tv-note">{empty.body}</p></div>}
         {searching && library.isPending && <div className="search-hint" data-vitem><p className="tv-note"><span className="tv-spinner" aria-hidden="true"/> Searching…</p></div>}
         {searching && library.isError && <div className="search-hint" data-vitem role="alert"><h2>Search didn’t work</h2><p className="tv-note">{problemWords(library.error).body}</p></div>}
-        {nothing && <div className="search-hint" data-vitem><h2>Nothing matches</h2><p className="tv-note">No titles in your library match “{q}”.</p></div>}
+        {nothing && <div className="search-hint" data-vitem role="status"><h2>{none.title}</h2><p className="tv-note">{none.body}</p></div>}
 
-        {(shows.length > 0 || movies.length > 0) && (libraryBand(shows.length, movies.length) === 'band'
+        {(shows.length > 0 || movies.length > 0) && (!stacked
           ? <div className="search-band" data-row data-group="search/library" data-vitem>
             {shows.length > 0 && <div className="search-band__group"><h2 className="tv-h2">TV Shows <small>{shows.length}</small></h2>
-              <div className="search-band__cards">{shows.map((s) => <div key={s.id}>{showCard(s, `search/library/show-${s.id}`)}</div>)}</div></div>}
+              <div className="search-band__cards">{shows.map((t) => <div key={resultKey(t)}>{showCard(t, `search/library/show-${resultKey(t)}`)}</div>)}</div></div>}
             {movies.length > 0 && <div className="search-band__group"><h2 className="tv-h2">Movies <small>{movies.length}</small></h2>
-              <div className="search-band__cards">{movies.map((m) => <div key={m.id}>{movieCard(m, `search/library/movie-${m.id}`)}</div>)}</div></div>}
+              <div className="search-band__cards">{movies.map((t) => <div key={resultKey(t)}>{movieCard(t, `search/library/movie-${resultKey(t)}`)}</div>)}</div></div>}
           </div>
           : <>
-            {shows.length > 0 && <ResultsRow id="search/shows" title="TV Shows" count={shows.length} items={shows} itemKey={(s) => String(s.id)} cell="var(--poster-w)" visible={4} renderItem={showCard}/>}
-            {movies.length > 0 && <ResultsRow id="search/movies" title="Movies" count={movies.length} items={movies} itemKey={(m) => String(m.id)} cell="var(--poster-w)" visible={4} renderItem={movieCard}/>}
+            {shows.length > 0 && <ResultsRow id="search/shows" title="TV Shows" count={shows.length} items={shows} itemKey={resultKey} cell="var(--poster-w)" visible={4} renderItem={showCard} room={room('var(--poster-h)')}/>}
+            {movies.length > 0 && <ResultsRow id="search/movies" title="Movies" count={movies.length} items={movies} itemKey={resultKey} cell="var(--poster-w)" visible={4} renderItem={movieCard} room={room('var(--poster-h)')}/>}
           </>)}
 
-        {episodes.length > 0 && <ResultsRow id="search/episodes" title="Episodes" count={episodes.length} items={episodes} itemKey={(e) => String(e.id)} cell="var(--search-wide-w)" visible={3}
-          renderItem={(e, id) => <Card id={id} variant="episode" title={e.showTitle} subtitle={episodeSub(e)} image={media.imageUrl(e.stillPath ?? e.showPosterPath, 'w780')}
-            label={`${e.showTitle}, season ${e.seasonNumber} episode ${e.number}, ${e.title}`}
-            onPress={() => nav.push({ name: 'show', id: e.showId, season: e.seasonNumber, episodeId: e.id })}
-            onHold={() => nav.play({ kind: 'file', fileId: e.fileId, title: e.showTitle, subtitle: episodeSub(e) })}/>}/>}
+        {episodes.length > 0 && <ResultsRow id="search/episodes" title="Episodes" count={episodes.length} items={episodes} itemKey={resultKey} cell="var(--search-wide-w)" visible={3}
+          renderItem={episodeCard} room={room('10.40625rem')}/>}
+
+        {searching && merged.asking.length > 0 && <p role="status" className="search-tail" data-vitem><span className="tv-spinner" aria-hidden="true"/>{stillAsking(merged.asking)}</p>}
+        {searching && merged.failed.map((f) => <div key={f.id} role="status" className="search-tail" data-vitem>
+          <Icon name="alert"/>
+          <span>{didNotAnswer(f.name)}</span>
+          <Button id={`search/again/${f.id}`} onPress={() => askAgain(f.id)}>Try again</Button>
+        </div>)}
+        {switching && <p role="status" className="search-tail" data-vitem><span className="tv-spinner" aria-hidden="true"/>Switching to {switching.name}…</p>}
 
         {liveTV && hits.length > 0 && <ResultsRow id="search/live" title="On Live TV" count={hits.length} items={hits} itemKey={(h) => h.programme.id} cell="var(--search-wide-w)" visible={3}
           renderItem={(h, id) => <LiveHitCard hit={h} focusId={id} now={now} onHold={() => toggleReminder(h)} onPress={() => {

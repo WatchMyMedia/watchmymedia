@@ -15,12 +15,15 @@ export type RememberedServer = {
   name: string
   baseUrl: string
   version?: string
+  /** The API level it last reported, so a server too old for this app says so before it is asked again. */
+  apiLevel?: number
   account?: Account
   lastUsedAt: number
 }
 
 const KEY = 'watchmymedia.tizen.servers.v1'
-const MAX = 12
+/** How many servers this TV keeps. */
+export const MAX_SERVERS = 12
 
 function str(v: unknown): v is string { return typeof v === 'string' && v.length > 0 }
 
@@ -39,6 +42,7 @@ function readServer(v: unknown): RememberedServer | undefined {
   return {
     id: s.id, name: s.name, baseUrl,
     ...(str(s.version) ? { version: s.version } : {}),
+    ...(typeof s.apiLevel === 'number' ? { apiLevel: s.apiLevel } : {}),
     ...(readAccount(s.account) ? { account: readAccount(s.account) } : {}),
     lastUsedAt: typeof s.lastUsedAt === 'number' ? s.lastUsedAt : 0,
   }
@@ -73,10 +77,20 @@ export class ServerStore {
   remember(server: Omit<RememberedServer, 'lastUsedAt' | 'account'> & { account?: Account | null }, now = Date.now()) {
     const old = this.get(server.id)
     const account = server.account === null ? undefined : server.account ?? old?.account
-    const next: RememberedServer = { id: server.id, name: server.name, baseUrl: server.baseUrl, ...(server.version ? { version: server.version } : {}), ...(account ? { account } : {}), lastUsedAt: now }
-    this.write([next, ...this.list().filter((s) => s.id !== server.id)].slice(0, MAX))
+    const apiLevel = server.apiLevel ?? old?.apiLevel
+    const next: RememberedServer = { id: server.id, name: server.name, baseUrl: server.baseUrl, ...(server.version ? { version: server.version } : {}),
+      ...(apiLevel !== undefined ? { apiLevel } : {}), ...(account ? { account } : {}), lastUsedAt: now }
+    this.write([next, ...this.list().filter((s) => s.id !== server.id)].slice(0, MAX_SERVERS))
     return next
   }
+
+  /** What a server said of itself when it was asked without connecting to it (a search): its name, version and level, in place. */
+  note(id: string, facts: Pick<RememberedServer, 'name' | 'version' | 'apiLevel'>) {
+    this.write(this.list().map((s) => s.id === id ? { ...s, name: facts.name, ...(facts.version ? { version: facts.version } : {}), ...(facts.apiLevel !== undefined ? { apiLevel: facts.apiLevel } : {}) } : s))
+  }
+
+  /** Whether another server can be added. */
+  get full() { return this.list().length >= MAX_SERVERS }
 
   /** Forgets the account's token (signed out), keeping the server. */
   signOut(id: string) {

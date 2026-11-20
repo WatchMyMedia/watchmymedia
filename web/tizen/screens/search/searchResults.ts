@@ -42,6 +42,29 @@ export function suggestionChips(results: SearchResults | undefined, typed: strin
   }).slice(0, max).map((s) => ({ key: `${s.kind}-${s.id}`, title: s.title, parts: highlight(s.title, typed) }))
 }
 
+/** Names in a sentence: "Cabin server", "Cabin server and Den server", "A, B and C". */
+function named(names: readonly string[]): string {
+  return names.length <= 1 ? names[0] ?? '' : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/** Before anything is typed. With two or more servers to look in, it says Search looks in all of them. */
+export function emptyWords(servers: number, liveTV: boolean): { title: string; body: string } {
+  if (servers > 1) return { title: 'Search your servers', body: `Find a show, a movie or an episode on any of your ${servers} servers.` }
+  return { title: 'Find anything in your library', body: `Type part of a title. Shows, movies and episodes appear here as you type${liveTV ? ', with what’s on Live TV' : ''}.` }
+}
+
+/** Nothing found, once every server asked has answered: `answered` counts those that did. */
+export function noMatchWords(q: string, answered: number): { title: string; body: string } {
+  if (answered > 1) return { title: `No matches on your ${answered} servers`, body: `Nothing is called “${q}” on any of them. Check the spelling, or try fewer words.` }
+  return { title: 'Nothing matches', body: `No titles in your library match “${q}”.` }
+}
+
+/** At the end of the results while a server is still out after a second. */
+export const stillAsking = (names: readonly string[]) => `Still asking ${named(names)}…`
+
+/** A server that failed, at the end of the results, beside Try again. */
+export const didNotAnswer = (name: string) => `${name} didn’t answer, so its titles aren’t listed.`
+
 /** A movie's line: "2018 · 1 h 52 min". */
 export function movieSub(m: Pick<Movie, 'year' | 'runtimeMin'>): string {
   return [m.year, m.runtimeMin ? formatRuntime(m.runtimeMin) : undefined].filter(Boolean).join(' · ')

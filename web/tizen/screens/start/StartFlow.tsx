@@ -19,7 +19,9 @@ function view(state: Start) {
 /**
  * The screens before a session: connecting, the server picker, signing in
  * and the problems. Return cancels what is under way and goes back to the
- * servers; on the servers it asks before leaving.
+ * servers; on the servers it asks before leaving. Opened from the signed-in
+ * app (Add a server, or the sign-in of a server signed out here), Return
+ * walks back to the app instead, which is still on its server.
  */
 export function StartFlow({ state, exit }: { state: Start; exit(): void }) {
   const app = useApp()
@@ -36,7 +38,7 @@ export function StartFlow({ state, exit }: { state: Start; exit(): void }) {
   }, [input, memory, key, failed])
 
   const onBack = useEffectEvent(() => {
-    if (state.screen === 'servers' && !state.busy) setLeaving(true)
+    if (state.screen === 'servers' && !state.busy && !state.adding) setLeaving(true)
     else app.cancel()
     return true
   })

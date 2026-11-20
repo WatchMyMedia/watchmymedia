@@ -33,8 +33,8 @@ export type Route =
   | { name: 'search' }
   | { name: 'library'; type: 'movie' | 'tv' }
   | { name: 'live' }
-  /** Settings, opened at a group (Home's Edit rows opens `homeRows` at that screen). */
-  | { name: 'settings'; group?: SettingsGroup; rowsScreen?: 'home' | 'movie' | 'tv' }
+  /** Settings, opened at a group (Home's Edit rows opens `homeRows` at that screen; Manage servers opens Account & devices on its Servers page). */
+  | { name: 'settings'; group?: SettingsGroup; rowsScreen?: 'home' | 'movie' | 'tv'; servers?: boolean }
   // Pages: each opens on top of what opened it.
   /** A row's See all: its library sorted the row's way. */
   | { name: 'seeAll'; libraryId: number; title: string; sort?: string; filter?: string; genre?: string; decade?: number }
