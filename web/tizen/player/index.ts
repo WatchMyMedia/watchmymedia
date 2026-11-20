@@ -4,6 +4,7 @@ export { PlayerError, safeMessage, type ClientInfo, type LiveChannel, type LiveS
 export { systemClock, randomId, type Clock } from './clock'
 export { FakePlayer } from './fake-player'
 export { DEFAULT_SETTINGS, FilePlayback, TICK_MS, playbackSettings, type AudioOption, type Diagnostics, type FilePhase, type FilePlaybackState, type FileRequest, type OnlineOption, type PlaybackContext, type PlaybackSettings, type SubtitleOption } from './playback'
+export { LivePlayback, channelNumberHint, editChannelNumber, exactChannel, tvLiveTransport, type LiveContext, type LivePhase, type LivePlaybackState } from './live-tv'
 export { fallbackProfile, samsungLiveProfile, samsungProfile, uhd } from './profile'
 export { seekStepLabel } from './seek'
 export { SUBTITLE_PX, type SubtitleSize } from './subtitles'
