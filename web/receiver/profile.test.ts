@@ -41,7 +41,7 @@ describe('castProfile', () => {
   })
 })
 
-// A TV as CAF and its platform could describe it (PLAN-HDR-PROFILE.md §6.3):
+// A TV as CAF and its platform could describe it:
 // what it shows, whether canDisplayType reads eotf, and the Dolby Vision
 // profiles MSE takes.
 function hdrTv(o: { hdr: boolean; dv?: boolean; eotf?: 'none' | 'pq' | 'both'; dovi?: string[] }) {

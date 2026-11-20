@@ -2,11 +2,11 @@ import Foundation
 import WMMModel
 import WMMTopShelf
 
-/// What the Apple TV's Top Shelf shows, made from Home (TvTopShelfSections.dc.html,
-/// PLAN-APPLE-REVIEW.md §6.2): Continue watching as 16:9 cards with the
+/// What the Apple TV's Top Shelf shows, made from Home:
+/// Continue watching as 16:9 cards with the
 /// system's progress bar, and Recently added as posters, movies and shows in
 /// turn. A row the person hid from Home isn't on the shelf either. Each card
-/// carries two links the app publishes for its server (§2.5): Select opens
+/// carries two links the app publishes for its server: Select opens
 /// the page, Play/Pause plays it, as Play/Pause on the card in the app does
 /// (``CardPlayPause``: a show's card opens, having no single episode to play).
 public struct TopShelfPlan: Hashable, Sendable {
@@ -96,8 +96,7 @@ public struct TopShelfPlan: Hashable, Sendable {
 
 extension ContinueItem {
     /// The card's title on the Top Shelf, which the system draws under the
-    /// focused card: "The Quiet Meridian · S2, E4", or the movie's title
-    /// (TvTopShelfSections.dc.html).
+    /// focused card: "The Quiet Meridian · S2, E4", or the movie's title.
     public var topShelfTitle: String {
         guard kind == .episode, let season, let episode else { return title }
         return "\(title) · S\(season), E\(episode)"
@@ -105,7 +104,7 @@ extension ContinueItem {
 }
 
 /// Writes the Top Shelf's snapshot into the App Group whenever Home's rows
-/// change, saving each picture as a file there (PLAN-APPLE-REVIEW.md §2.2),
+/// change, saving each picture as a file there,
 /// and clears it when the person signs out or another person or server is
 /// signed in. The pictures are fetched with the app's own sign-in and saved
 /// as bytes: no address, token or image URL goes into the group, so the

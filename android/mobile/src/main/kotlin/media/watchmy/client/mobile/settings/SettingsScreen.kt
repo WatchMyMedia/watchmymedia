@@ -85,8 +85,7 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.rememberTabletLayout
 
 /**
- * Settings as groups (PLAN-ANDROID-SETTINGS.md §4.1–§4.2; the
- * SettingsOverview and TabSettingsOverview boards). On a phone, [open] null
+ * Settings as groups. On a phone, [open] null
  * is the overview, a row per group with what is chosen under its name, and
  * a group's route shows its page with Up. On a tablet (600 wide and up) the
  * list sits beside the open group's page, Playback's when [open] is null.
@@ -117,7 +116,7 @@ fun SettingsScreen(
     val downloads by downloadsVm.state.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.events.collect { if (it == SettingsViewModel.Event.SignedOut) onSignedOut() } }
     val online = rememberOnline()
-    // Back online, what didn't load for want of a connection comes back by itself (§4.5).
+    // Back online, what didn't load for want of a connection comes back by itself.
     LaunchedEffect(online) {
         if (online) {
             if (vm.state.value.account is AccountLoad.Failed) vm.reloadAccount()
@@ -133,7 +132,7 @@ fun SettingsScreen(
     val reminders = rememberReminderSettings()
     val apiLevel = state.server?.server?.apiLevel ?: 0
     val rowsAvailable = ServerFeatures(apiLevel).rows
-    // Following shows (PLAN-NEW-EPISODES.md §7.2): the group's line, and the one card with reminders' (§7.3).
+    // Following shows: the group's line, and the one card with reminders'.
     val followsAvailable = ServerFeatures(apiLevel).follows
     val notifications = if (followsAvailable) notificationsModel().state.collectAsStateWithLifecycle().value else null
     val following = notifications?.count?.let { it > 0 } == true
@@ -271,7 +270,7 @@ fun SettingsScreen(
             }
         }
         else -> Column(modifier.fillMaxSize().background(WmmColors.Ground)) {
-            // The page's title matches its row; system Back and Up do the same (§4.4).
+            // The page's title matches its row; system Back and Up do the same.
             BackTopBar(groups.firstOrNull { it.group == open }?.title ?: open.title, onBack)
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(bottom = 24.dp)) {
                 page(open, Modifier)

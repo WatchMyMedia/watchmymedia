@@ -86,7 +86,7 @@ import androidx.compose.material3.OutlinedSecureTextField
 import media.watchmy.client.ui.rememberModelTextField
 
 /**
- * Password sign-in (Main.dc.html). Linking a TV needs a signed-in phone, so
+ * Password sign-in. Linking a TV needs a signed-in phone, so
  * the Link a TV row (or a watchmymedia://link deep link, [linkTv]) marks the
  * sign-in as one that goes on to Link a TV; [onLinkTv] records that.
  */
@@ -97,7 +97,7 @@ fun SignInScreen(onSwitchServer: () -> Unit, linkTv: DeepLink.LinkTv? = null, on
     val state by vm.state.collectAsStateWithLifecycle()
     val server by vm.server.collectAsStateWithLifecycle()
     val nameFocus = remember { FocusRequester() }
-    // The fields hold their text (§3.3.3); the model hears it as it is typed.
+    // The fields hold their text; the model hears it as it is typed.
     val nameField = rememberModelTextField(state.name, state.revision, vm::setName)
     val passwordField = rememberModelTextField(state.password, state.revision, vm::setPassword)
     val submit = {
@@ -246,7 +246,7 @@ fun SignInScreen(onSwitchServer: () -> Unit, linkTv: DeepLink.LinkTv? = null, on
 /**
  * The server being signed in to, with Change (the server picker). Over plain
  * http beyond this network, [warnNotEncrypted] adds that the password can be
- * read on the way (ServerNotEncrypted.dc.html).
+ * read on the way.
  */
 @Composable
 private fun ServerCard(server: SavedServer?, onChange: (() -> Unit)?, warnNotEncrypted: Boolean = false) {

@@ -1,7 +1,7 @@
 // Package watchstate makes every change to people's watch state: progress
 // from players, watched and unwatched marks on items, seasons and shows,
-// playback starts, rematches and, later, imports from another server
-// (PLAN-PLEX-SYNC.md). Each change runs in one transaction that takes the
+// playback starts, rematches and, later, imports from another server.
+// Each change runs in one transaction that takes the
 // next revision and leaves a guard per user and item saying whether the
 // user's own choice or an import decided it. An import may only fill an item
 // with no guard, so a local mark, unfinished play, rewatch or unwatch always

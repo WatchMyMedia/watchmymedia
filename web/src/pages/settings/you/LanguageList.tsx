@@ -8,8 +8,8 @@ const commonLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'pt-BR', 'nl', 'ar'
 const MAX_LANGUAGES = 16
 
 /**
- * An ordered list of languages by name, with move, remove and add
- * (PLAN-ADMIN-SETTINGS.md §5.10): a person's audio and subtitle languages,
+ * An ordered list of languages by name, with move, remove and add:
+ * a person's audio and subtitle languages,
  * and the server's fallback languages. Languages not in `saved` are marked
  * Added until the draft is saved.
  */

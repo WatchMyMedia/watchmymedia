@@ -10,7 +10,7 @@ enum GridFocus: Hashable {
     case letter(String)
 }
 
-/// The letter index at the grid's right edge (TvLibraryAZ.dc.html): # and A
+/// The letter index at the grid's right edge: # and A
 /// to Z, the letters with no title dimmed and passed over. The letter of the
 /// focused poster is gold; with focus on the index, the focused letter lifts
 /// and a bubble beside it says how many titles it holds. The rules are

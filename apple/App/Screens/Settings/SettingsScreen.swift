@@ -7,7 +7,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// A page pushed from the Settings root (Settings2*.dc.html), one per row.
+/// A page pushed from the Settings root, one per row.
 enum SettingsPage: String, Hashable, CaseIterable {
     case playback, subtitles, notifications, account, requests, downloads, server, inbox, about
 
@@ -23,10 +23,10 @@ enum SettingsPage: String, Hashable, CaseIterable {
     }
 }
 
-/// Settings (Settings2Root.dc.html, PLAN-APPLE-SETTINGS.md §5.1): the root is
+/// Settings: the root is
 /// the hub, in the web's groups and order. The account at the top opens
 /// Account & devices; then You, This iPhone, Server and About, each row with
-/// how things stand at its right. On iPad (Pad2Settings2.dc.html) the root is
+/// how things stand at its right. On iPad the root is
 /// the sidebar of a split view and the page it selects stands beside it. Link
 /// a TV and Switch server are tasks in a sheet over either (Switch server
 /// stays in the iPad's detail column, as Pad2SwitchServer drew it).
@@ -150,7 +150,7 @@ private struct SettingsSplit: View {
 
 /// A Settings page by name. Your requests, Downloads and Audio & subtitles
 /// say why they aren't offered when the server or the account keeps them
-/// out (Settings2KeptOut.dc.html), since a link can still open them.
+/// out, since a link can still open them.
 struct SettingsPageView: View {
     let page: SettingsPage
     let model: SettingsModel
@@ -232,7 +232,7 @@ private struct SettingsRoot: View {
             VStack(alignment: .leading, spacing: 16) {
                 accountCard
 
-                // One Next step, only when there is something to do (§5.1).
+                // One Next step, only when there is something to do.
                 if let step = settingsNextStep(facts) { nextStepCard(step) }
                 // The server can't be reached: what shows is what was last saved.
                 if let banner = model.banner {
@@ -306,7 +306,7 @@ private struct SettingsRoot: View {
     @ViewBuilder private func hubRow(_ row: SettingsHubRow) -> some View {
         switch row.destination {
         case .homeRows:
-            // Home rows (HomeEditRows.dc.html), from API level 22: the same sheet as Edit Home.
+            // Home rows, from API level 22: the same sheet as Edit Home.
             Button { editingRows = true } label: {
                 SettingsRow(icon: "rectangle.grid.1x2", style: .neutral, title: row.title, value: row.value)
             }

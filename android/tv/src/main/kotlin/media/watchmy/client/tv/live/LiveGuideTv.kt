@@ -59,9 +59,9 @@ internal val ChannelColumn = 220.dp
 internal val RowHeight = 72.dp
 
 /**
- * What the TV guide can do with the person's favourites and reminders
- * (PLAN-LIVE-TV-GUIDE.md §6.5, android-tv/LiveGuideExtras): Hold OK on a
- * channel stars it, on a programme opens Remind me and Watch.
+ * What the TV guide can do with the person's favourites and reminders:
+ * Hold OK on a channel stars it,
+ * on a programme opens Remind me and Watch.
  */
 internal class TvGuideExtras(
     val onStar: (LiveChannel) -> Unit,

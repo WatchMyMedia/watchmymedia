@@ -7,7 +7,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 /**
  * Where a screen showing Live TV channels says whether it is on screen: the
  * nav host provides its LiveChannelsViewModel's `showing`, which keeps the
- * channel list fresh only while one is (PLAN-ANDROID-REVIEW.md §4.1.3).
+ * channel list fresh only while one is.
  */
 val LocalLiveChannelsShown = staticCompositionLocalOf<(screen: Any, shown: Boolean) -> Unit> { { _, _ -> } }
 

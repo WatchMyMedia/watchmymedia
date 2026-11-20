@@ -3,8 +3,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// A list's page, from a list row's See all (ListPage.dc.html, PLAN-ROWS.md
-/// Decision 8): its name, where it is from and when it was read, how much of
+/// A list's page, from a list row's See all:
+/// its name, where it is from and when it was read, how much of
 /// it the library has and whose it is, then every title in rank order. What
 /// the library has opens as usual; a missing title is dimmed with TMDB's
 /// poster and Request (the request sheet), Requested or Downloading; an

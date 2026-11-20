@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// Change password (PLAN-APPLE-SETTINGS.md Decision 9; Settings2Password.dc.html):
+/// Change password:
 /// the other devices by name with their count on the button, each refusal
 /// saying nothing was changed, and the banner and reloaded list once changed.
 @MainActor

@@ -83,7 +83,7 @@ import media.watchmy.client.ui.rememberTabletLayout
 import media.watchmy.client.ui.ReportShown
 
 /**
- * A list's page (ListPage.dc.html), from its row's See all: the list's name,
+ * A list's page, from its row's See all: the list's name,
  * where it comes from, how much of it the library has and why it couldn't
  * update, then every title in rank order: the library's as posters, the
  * missing ones dimmed with Request (through the request sheet) or where

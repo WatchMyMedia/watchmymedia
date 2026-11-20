@@ -3,7 +3,7 @@ import Testing
 import WMMModel
 @testable import WMMFeatures
 
-/// The quiet-reload state machine the screen models share (PLAN-APPLE-REVIEW.md §5.5).
+/// The quiet-reload state machine the screen models share.
 @Suite @MainActor
 struct LoadControllerTests {
     @Test func theFirstLoadShowsTheSpinnerAndALaterQuietOneKeepsTheScreen() {

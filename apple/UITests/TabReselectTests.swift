@@ -1,6 +1,6 @@
 import XCTest
 
-/// Tapping the tab already shown goes back to its first page (PLAN-APPLE-REVIEW.md §6.3).
+/// Tapping the tab already shown goes back to its first page.
 final class TabReselectTests: XCTestCase {
     override func setUp() async throws { continueAfterFailure = false }
 

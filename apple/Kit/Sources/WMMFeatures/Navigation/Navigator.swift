@@ -38,7 +38,7 @@ public enum AppTab: String, CaseIterable, Hashable, Sendable {
 
 /// A screen pushed onto a tab's stack.
 public enum Route: Hashable, Sendable, Codable {
-    /// A show's page (PLAN-SHOW-PAGE.md) with its up-next episode on top, or
+    /// A show's page with its up-next episode on top, or
     /// on `season` with that season's first unfinished one. With `episode`
     /// it is pushed as ``episode(showID:season:id:)``.
     case show(id: Int, season: Int? = nil, episode: Int? = nil)
@@ -52,14 +52,14 @@ public enum Route: Hashable, Sendable, Codable {
     case myRequests
     /// Settings › Inbox, for admins.
     case inbox
-    /// Settings › Downloads, on iPhone and iPad (PLAN-DOWNLOADS.md D3).
+    /// Settings › Downloads, on iPhone and iPad.
     case downloads
-    /// Live TV › Reminders (PLAN-LIVE-TV-GUIDE.md §6.5), from the guide's toolbar or Settings.
+    /// Live TV › Reminders, from the guide's toolbar or Settings.
     case liveRecordings
     case liveReminders
     /// Search listings, from the guide's search button on iPhone: listings only.
     case liveSearch
-    /// A list's page (PLAN-ROWS.md §5): every title on it, in rank order, from a list row's See all.
+    /// A list's page: every title on it, in rank order, from a list row's See all.
     case mediaList(id: Int)
 }
 
@@ -101,7 +101,7 @@ public final class Navigator {
     /// ⌘F asked for Search: the Search screen puts the cursor in its field, then clears this.
     public var searchFieldRequested = false
 
-    /// A row's See all for a library (PLAN-SEE-ALL.md §4.4), kept for the
+    /// A row's See all for a library, kept for the
     /// tab that shows it until that tab's grid takes it: one a tab, used once.
     @ObservationIgnored private var browseLinks: [AppTab: RowLink] = [:]
 
@@ -118,7 +118,7 @@ public final class Navigator {
         browseLinks.removeValue(forKey: tab)
     }
 
-    /// ⌘F on a hardware keyboard (PLAN-APPLE-REVIEW.md §6.3): the Search tab,
+    /// ⌘F on a hardware keyboard: the Search tab,
     /// with the cursor in its field. Nothing while a player is open.
     public func findInSearch() {
         guard playbackPresentation == nil else { return }
@@ -132,7 +132,7 @@ public final class Navigator {
     public func setPath(_ path: [Route], for tab: AppTab) { paths[tab] = path }
 
     /// Pushes `route` onto the current tab's stack. A show, a season and an
-    /// episode are one page (PLAN-SHOW-PAGE.md), pushed once, so Back leaves
+    /// episode are one page, pushed once, so Back leaves
     /// the show in one step.
     public func open(_ route: Route) {
         switch route {
@@ -155,8 +155,7 @@ public final class Navigator {
 
     /// Counts the times Menu went from a section's root to Home
     /// (``exitSection()``), not a tab chosen in the tab bar: Apple TV's Home
-    /// puts focus back on a row's See all after Menu from the grid it opened
-    /// (PLAN-SEE-ALL.md §3).
+    /// puts focus back on a row's See all after Menu from the grid it opened.
     public private(set) var exitsToHome = 0
 
     /// Menu (Back) on the Siri Remote, past what the stacks handle: pops the

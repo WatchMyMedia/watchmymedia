@@ -5,12 +5,12 @@ import { nextMeta, runtimeWords } from './labels'
 import { PlayerIcon } from './PlayerIcons'
 import { MiniProgress, NextButton } from './Ticking'
 
-// What comes over the video: the Next episode card (PlayerNext), Still
+// What comes over the video: the Next episode card, Still
 // watching, an administrator's stop or an error, the spinner and the note
 // that takes no focus. The prompts sit in the screen, so the screen's own
 // Return and keys answer them (Return keeps watching, or leaves).
 
-/** PlayerNext's card: the next episode's still, its title, the countdown button and Watch credits. */
+/** Next episode: the next episode's still, its title, the countdown button and Watch credits. */
 export function NextCard({ playback, episode, heading }: { playback: FilePlayback; episode: UpNext; heading: string }) {
   const media = useMediaUrls()
   const still = episode.stillPath ? media.imageUrl(episode.stillPath, 'w780') : undefined
@@ -55,7 +55,7 @@ function Prompt({ kicker, title, children, foot, actions }: {
 
 export const PROMPT_FOCUS = 'prompt/first'
 
-/** Asked before the next episode starts by itself after a long while with no press (PlayerNext's Still watching). */
+/** Asked before the next episode starts by itself after a long while with no press (Still watching). */
 export function StillWatching({ episode, heading, onKeep, onStop }: { episode?: UpNext; heading?: string; onKeep(): void; onStop(): void }) {
   const body = heading ? `${heading} is up next. ` : ''
   return <Prompt kicker={episode?.showTitle} title="Still watching?" foot="Any press on the remote counts as an answer."

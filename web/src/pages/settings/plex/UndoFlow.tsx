@@ -9,7 +9,7 @@ import { when } from '../../activity/shared'
 import { FlowWaiting, ListCard, Metrics, PlexNote } from './parts'
 import { plexCrumbs, plexHref, useClock, usePlexConnection } from './state'
 
-/** Undo an import: Check undo → Confirm → Undone (§5.1). The check runs
+/** Undo an import: Check undo → Confirm → Undone. The check runs
  * first, so the numbers on Confirm are real. */
 export function UndoFlow({ run, step }: { run?: string; step?: string }) {
   const { query, connection } = usePlexConnection()

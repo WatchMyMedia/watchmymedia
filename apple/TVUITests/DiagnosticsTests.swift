@@ -1,7 +1,7 @@
 import XCTest
 
-/// Settings › About › Diagnostics on Apple TV (TvDiagnostics.dc.html,
-/// PLAN-APPLE-REVIEW.md §6.4), on the fakes: About's row, with the panel at
+/// Settings › About › Diagnostics on Apple TV,
+/// on the fakes: About's row, with the panel at
 /// the right saying nothing is sent, the code to scan beside a summary of what
 /// it holds (no server name, address or account), Show as text in pages, and
 /// Done and Menu. `-settingsGroup about` shows About's page and `-diagnostics`

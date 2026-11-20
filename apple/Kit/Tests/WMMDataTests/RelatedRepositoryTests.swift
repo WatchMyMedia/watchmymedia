@@ -3,7 +3,7 @@ import Testing
 @testable import WMMData
 import WMMModel
 
-/// Related titles (PLAN-RELATED.md §6, API level 30) from replies shaped as
+/// Related titles (API level 30) from replies shaped as
 /// api/openapi.json has them.
 @MainActor
 @Suite(.timeLimit(.minutes(1)))

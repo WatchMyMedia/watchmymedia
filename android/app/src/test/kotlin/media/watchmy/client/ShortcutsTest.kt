@@ -13,8 +13,8 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * The launcher's shortcuts (res/xml/shortcuts.xml, PLAN-ANDROID-REVIEW
- * §6.3): Search, Live TV and Downloads, each a link the app opens and that
+ * The launcher's shortcuts (res/xml/shortcuts.xml):
+ * Search, Live TV and Downloads, each a link the app opens and that
  * reaches MainActivity through its watchmymedia:// filter.
  */
 @RunWith(RobolectricTestRunner::class)

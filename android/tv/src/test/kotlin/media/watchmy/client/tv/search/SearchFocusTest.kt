@@ -35,7 +35,7 @@ import org.robolectric.shadows.ShadowLooper
 import java.util.concurrent.TimeUnit
 import media.watchmy.client.tv.quietTvFakes
 
-/** Back from a search result puts focus back on it, not on the keyboard (PLAN-ANDROID-REVIEW.md §3.2.3). */
+/** Back from a search result puts focus back on it, not on the keyboard. */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w960dp-h540dp-land-television-xhdpi")

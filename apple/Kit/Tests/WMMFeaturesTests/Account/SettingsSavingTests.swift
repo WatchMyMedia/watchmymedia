@@ -4,8 +4,8 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// Each control kept on the server saves on its own and says so in its row
-/// (PLAN-APPLE-SETTINGS.md §3.1): saving, saved with what the change did and
+/// Each control kept on the server saves on its own and says so in its row:
+/// saving, saved with what the change did and
 /// back to rest after a few seconds, or failed with the control back at the
 /// saved value. The clock is moved by hand.
 @MainActor
@@ -229,8 +229,8 @@ import WMMModel
     }
 }
 
-/// The two settings kept on the device say Saved too, worded for the device
-/// (PLAN-APPLE-SETTINGS.md §3.1): Quality, and the device's name.
+/// The two settings kept on the device say Saved too, worded for the device:
+/// Quality, and the device's name.
 @MainActor
 @Suite struct DeviceSettingsSavedTests {
     init() { FakeLatency.duration = .zero }

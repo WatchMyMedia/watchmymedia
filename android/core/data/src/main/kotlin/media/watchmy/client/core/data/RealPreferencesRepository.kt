@@ -34,7 +34,7 @@ import media.watchmy.client.model.ApiException
  * them); the streaming quality and the [device] settings are this device's
  * own. A change sends only the fields it alters: the server turns on
  * subtitles for foreign audio for someone saving their first audio languages
- * only while they have never sent a subtitle mode (PLAN-LANGUAGES.md §5.3).
+ * only while they have never sent a subtitle mode.
  */
 internal class RealPreferencesRepository(private val store: LocalStore, private val http: Http) : PreferencesRepository {
     private val prefs = MutableStateFlow(cachedPreferences())
@@ -217,7 +217,7 @@ internal class RealPreferencesRepository(private val store: LocalStore, private 
  * The subtitle fields [after] changes from [before], or null for none. A
  * changed choice sends the mode (and, from [AUDIO_LANGUAGES_API_LEVEL],
  * foreignAudio); an unchanged one sends neither, since a mode sent counts as
- * chosen (PLAN-LANGUAGES.md §5.3).
+ * chosen.
  */
 internal fun subtitlePatch(before: SubtitlePreferences, after: SubtitlePreferences, apiLevel: Int): UpdateSubtitlePreferences? {
     val flag = ServerFeatures(apiLevel).audioLanguages

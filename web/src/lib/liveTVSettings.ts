@@ -1,4 +1,4 @@
-// The rules behind Settings › Live TV (PLAN-ADMIN-SETTINGS.md §5.4): which
+// The rules behind Settings › Live TV: which
 // step each task opens, the hub's setup guide, the numbers the screens show,
 // and the words for every refusal.
 import { ApiError } from '../api/client'
@@ -41,7 +41,7 @@ export function liveViewers(sessions: readonly SessionLike[], sourceId?: string)
   return { sessions: active, names, count: names.length }
 }
 
-/** The Save button of Who can watch: the cost is on the button first (§3.6). */
+/** The Save button of Who can watch: the cost is on the button first. */
 export function accessSaveLabel(viewers: number, changed: boolean) {
   if (!changed || viewers === 0) return 'Save'
   return `Save and stop ${viewers} ${viewers === 1 ? 'viewer' : 'viewers'}`
@@ -129,7 +129,7 @@ export function asksAccess(sources: readonly Pick<SourceLike, 'id'>[], addedId?:
 
 /**
  * The step an Add a tuner address opens. Once the tuner is saved there is no
- * going back to Address or What was found (§3.2); before it, What was found
+ * going back to Address or What was found; before it, What was found
  * needs a tested address.
  */
 export function addTunerStep({ requested, tested, added, askAccess }: { requested?: string; tested: boolean; added: boolean; askAccess: boolean }): AddTunerStep {
@@ -192,7 +192,7 @@ export function tunerSwitchNote(enabled: boolean) {
   return enabled ? 'Its channels can be watched again.' : 'Its channels are off, and anyone watching on it was stopped.'
 }
 
-/** Remove a tuner: what stops, what is deleted, what stays, with the server's numbers (§3.8). */
+/** Remove a tuner: what stops, what is deleted, what stays, with the server's numbers. */
 export function tunerRemoval(source: { name: string }, channels: readonly Pick<ChannelLike, 'number'>[], viewers: readonly SessionLike[], removal?: { scheduledRecordings: number; recordingNow: number }) {
   const stops: string[] = []
   const byPerson = new Map<string, string[]>()
@@ -369,7 +369,7 @@ export function recordingSaveError(error: unknown, tvPath: string): Wording {
 export type LiveGuideKey = 'tuner' | 'access' | 'guide' | 'recordings'
 
 /**
- * The hub's setup guide (§5.4): Add a tuner, Who can watch, then the optional
+ * The hub's setup guide: Add a tuner, Who can watch, then the optional
  * Guide listings and Recordings, each waiting for a tuner. Who can watch is
  * asked with the first tuner and starts as Admins, so it's done once one is.
  * The guide shows until every task is done or put away with Not now.

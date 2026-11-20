@@ -2,10 +2,10 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Home (Home.dc.html, HomeScrolled.dc.html): the hero, Continue watching,
+/// Home: the hero, Continue watching,
 /// Recently added shows, Recently aired, Recently added and Recently
 /// released movies, and the library totals. From ``rowsAPILevel`` the rows
-/// come in the person's order instead (`HomeData.rows`, PLAN-ROWS.md).
+/// come in the person's order instead (`HomeData.rows`).
 /// Refetches when the library or the rows change and on pull to refresh,
 /// keeping what is on screen meanwhile.
 @MainActor
@@ -45,10 +45,10 @@ public final class HomeModel {
 
     public var offersSetup: Bool { isAdmin && emptyState?.offersSetup == true }
 
-    /// The offline Home (HomeOffline.dc.html) with `downloads` to watch: Home's
+    /// The offline Home with `downloads` to watch: Home's
     /// request failed, or, while it is still out, the server check
     /// (``ServerRepository/reachable``) found no server. That check gives up
-    /// in seconds where Home's request takes 30 (PLAN-APPLE-REVIEW.md §4.1.5);
+    /// in seconds where Home's request takes 30;
     /// the request carries on, and Home shows if it answers.
     public func showsOffline(reachable: Bool?, downloads: Bool) -> Bool {
         guard downloads else { return false }
@@ -135,7 +135,7 @@ public final class HomeModel {
         }
     }
 
-    /// What a row's See all card and heading link say (PLAN-SEE-ALL.md §3),
+    /// What a row's See all card and heading link say,
     /// or nil when the row has none: no link (Continue watching, Live TV, a
     /// row mixing two libraries of a type), or a library this Home doesn't know.
     public func seeAll(_ row: ScreenRow) -> SeeAllWords? {

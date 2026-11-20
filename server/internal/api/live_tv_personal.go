@@ -13,7 +13,7 @@ import (
 )
 
 // A viewer's own Live TV: favourite channels, searching the listings and
-// reminders (PLAN-LIVE-TV-GUIDE.md §5.7, G6, API level 15).
+// reminders (API level 15).
 
 type LiveTVFavouriteInput struct {
 	ID string `path:"id" maxLength:"64" doc:"The channel's id."`

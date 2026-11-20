@@ -898,7 +898,7 @@ func TestSettingsLibrariesAndBackups(t *testing.T) {
 
 // A server whose config file is outside the data folder, as the Linux
 // packages' is, says where it is so the restore steps can, and its backups
-// hold that file (PLAN-LINUX.md §4).
+// hold that file.
 func TestBackupOfAConfigFileElsewhere(t *testing.T) {
 	t.Parallel()
 	loaded := filepath.Join(t.TempDir(), "config.yaml")

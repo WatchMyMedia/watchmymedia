@@ -32,7 +32,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The frame both TV players draw in (PLAN-ANDROID-REVIEW.md §5.3): the
+ * The frame both TV players draw in: the
  * controls hide after five seconds without a press, a press starts the wait
  * again, the screen stays on while asked, focus goes where the player says,
  * and Back reaches the player by either path until it leaves.

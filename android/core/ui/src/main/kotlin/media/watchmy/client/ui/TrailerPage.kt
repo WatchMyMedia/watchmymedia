@@ -38,8 +38,8 @@ object TrailerState {
 fun trailerBaseUrl(applicationId: String): String = "https://$applicationId/"
 
 /**
- * The page the trailer screens' WebView shows (PLAN-TRAILERS.md §6.2,
- * PLAN-TV-TRAILERS.md §4.1): YouTube's IFrame player filling it, with [key].
+ * The page the trailer screens' WebView shows:
+ * YouTube's IFrame player filling it, with [key].
  * It runs YouTube's script in the WebView only, never in the app, and tells
  * the app what happens through [TRAILER_BRIDGE] ([TrailerEvent]). [origin]
  * is the page's own origin, [trailerBaseUrl] without its slash, which the

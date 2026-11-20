@@ -16,8 +16,8 @@ sealed interface LoadStatus {
 }
 
 /**
- * A page's loading, error and empty states in one place
- * (PLAN-ANDROID-REVIEW.md §5.4): [content] once [status] is null, else the
+ * A page's loading, error and empty states in one place:
+ * [content] once [status] is null, else the
  * spinner ([loading], a skeleton where the page has one), the message with
  * Try again ([onRetry]), or the empty state with its action.
  */

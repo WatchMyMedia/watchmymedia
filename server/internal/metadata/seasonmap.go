@@ -17,7 +17,7 @@ import (
 	"watchmymedia/server/internal/tmdb"
 )
 
-// Season line-ups (PLAN-SEASON-MAPPING.md): where a season starts when TMDB
+// Season line-ups: where a season starts when TMDB
 // numbers it differently from the files in a show folder.
 
 // SeasonRule says that files numbered from FromSeason and FromEpisode on

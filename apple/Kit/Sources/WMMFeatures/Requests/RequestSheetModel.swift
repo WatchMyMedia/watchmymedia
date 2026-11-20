@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import WMMModel
 
-/// The request sheet (SearchRequest.dc.html, PadShowMissing.dc.html's form
-/// sheet, TvSearchRequest.dc.html's dialog): the poster, year and overview,
+/// The request sheet (the iPad's form
+/// sheet, Apple TV's dialog): the poster, year and overview,
 /// a show's seasons to tick, the approval line, the button, then the
 /// confirmation. Opened from search's Not in your library, or from a show
 /// page's Request season (`preselect`) and Request missing seasons.

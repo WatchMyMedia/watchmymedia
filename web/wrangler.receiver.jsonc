@@ -1,4 +1,4 @@
-// The Google Cast receiver at https://cast.watchmy.media (PLAN-CAST.md §4):
+// The Google Cast receiver at https://cast.watchmy.media:
 // the static files `pnpm build:receiver` writes to dist-receiver/, served by
 // a Worker with no code of its own. Its _headers file (receiver/public/)
 // sets the receiver's CSP. The custom domain makes Cloudflare create the DNS

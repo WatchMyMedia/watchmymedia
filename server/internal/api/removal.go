@@ -11,7 +11,7 @@ import (
 )
 
 // The numbers Settings shows before something is removed or shortened, so
-// the dialog can say what goes (PLAN-ADMIN-SETTINGS.md). They only read.
+// the dialog can say what goes. They only read.
 
 // LibraryRemoval is what removing a library takes with it.
 type LibraryRemoval struct {

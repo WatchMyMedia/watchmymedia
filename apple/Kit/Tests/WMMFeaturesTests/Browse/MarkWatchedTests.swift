@@ -4,7 +4,7 @@ import WMMFakes
 import WMMModel
 @testable import WMMFeatures
 
-/// Mark watched, the one way every screen does it (PLAN-APPLE-REVIEW.md §5.5).
+/// Mark watched, the one way every screen does it.
 @Suite @MainActor
 struct MarkWatchedTests {
     init() { FakeLatency.duration = .zero }

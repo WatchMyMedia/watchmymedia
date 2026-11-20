@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 import WMMModel
 @testable import WMMUI
 
-/// The artwork pipeline (PLAN-APPLE-REVIEW.md §3.3.3, §4.3.2): the cache's
+/// The artwork pipeline: the cache's
 /// key and size rule, its byte budget, one load per picture, cancellation, and
 /// decoding off the main actor.
 @Suite struct ImagePipelineTests {

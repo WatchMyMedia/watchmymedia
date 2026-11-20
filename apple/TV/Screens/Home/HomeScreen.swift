@@ -3,8 +3,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Home (TvHomeStart.dc.html, TvHomeRow.dc.html): one row a screen
-/// (PLAN-HOME.md §7). The first screen is the hero with Play and Go to show
+/// Home: one row a screen.
+/// The first screen is the hero with Play and Go to show
 /// and the first row of the person's layout; every row after it fills a
 /// screen of its own, the focused card's picture, kicker, title, facts and
 /// overview above the row and the next row's name along the bottom. ▼ pages
@@ -12,8 +12,8 @@ import WMMUI
 /// last screen is Edit rows, Back to the top and the totals. Select on a
 /// Continue watching card resumes it; a Recently aired card opens its
 /// episode. Long press marks watched. The rows come in the person's order
-/// from API level 22 (PLAN-ROWS.md), arranged in Settings › Home rows; below
-/// it Home keeps its fixed rows on one scrolling page (TvHome.dc.html).
+/// from API level 22, arranged in Settings › Home rows; below
+/// it Home keeps its fixed rows on one scrolling page.
 struct HomeScreen: View {
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
@@ -34,7 +34,7 @@ private struct HomeView: View {
     @State private var editingRows = false
     /// The row screen a See all left for its library's tab, and the count of
     /// Menu's returns to Home then (``Navigator/exitsToHome``): Menu back from
-    /// that grid brings focus back to the row's See all (PLAN-SEE-ALL.md §3).
+    /// that grid brings focus back to the row's See all.
     @State private var seeAllLeft: (page: HomePage, exits: Int)?
 
     private var liveAvailable: Bool { services.liveTV.capabilities?.available == true }
@@ -117,7 +117,7 @@ private struct HomeView: View {
         }
     }
 
-    /// Screen 1: the hero and the first row (TvHomeStart.dc.html).
+    /// Screen 1: the hero and the first row.
     private func startScreen(_ home: HomeData, rows: [ScreenRow]) -> some View {
         ZStack(alignment: .topTrailing) {
             if let hero = home.hero { ScreenBackdrop(url: url(hero.backdropPath, .w1280), seed: hero.title) }
@@ -150,7 +150,7 @@ private struct HomeView: View {
         .modifier(ScreenFocus(page: .start, paging: paging))
     }
 
-    /// A row's screen (TvHomeRow.dc.html), a view of its own: moving along
+    /// A row's screen, a view of its own: moving along
     /// its row redraws that screen alone, not the others.
     private func rowScreen(_ row: ScreenRow, index: Int, rows: [ScreenRow], page: HomePage) -> some View {
         HomeRowScreen(
@@ -384,7 +384,7 @@ private struct ScreenFocus: ViewModifier {
 
 private extension TVRowActions {
     /// Home's card actions. A row's See all opens a list's page, or the
-    /// library's tab at its grid sorted the row's way (PLAN-SEE-ALL.md §4.3),
+    /// library's tab at its grid sorted the row's way,
     /// for a link Home can open; `leaving` hears of the second first.
     @MainActor init(_ model: HomeModel, leaving: @escaping () -> Void = {}) {
         self.init(
@@ -405,8 +405,8 @@ private extension TVRowActions {
     }
 }
 
-/// A row's screen: the focused card's picture and panel, then the row
-/// (TvHomeRow.dc.html). It holds its row's focused card itself, so moving
+/// A row's screen: the focused card's picture and panel, then the row.
+/// It holds its row's focused card itself, so moving
 /// along the row redraws this screen and not every screen on Home; the card
 /// actions are made here, from the model, for the same reason.
 private struct HomeRowScreen: View {
@@ -472,7 +472,7 @@ private struct HomeRowScreen: View {
     }
 }
 
-/// The next row's name along the bottom edge, with a chevron (TvHomeRow.dc.html's `.peek`).
+/// The next row's name along the bottom edge, with a chevron.
 private struct NextRowLine: View {
     let name: String
     let index: Int
@@ -541,13 +541,13 @@ private extension View {
 }
 
 /// Above a row screen's row: the focused card's kicker, title, facts with the
-/// quality tags and rating, two lines of overview and what Select does
-/// (TvHomeRow.dc.html's "Focused title"). VoiceOver reads it as one element,
+/// quality tags and rating, two lines of overview and what Select does.
+/// VoiceOver reads it as one element,
 /// before the row.
 private struct FocusPanel: View {
     let panel: RowPanel
     let moreInRow: Bool
-    /// The row's first card: the hint offers only ▶ (RowStartBest.dc.html).
+    /// The row's first card: the hint offers only ▶.
     var atStart = false
 
     var body: some View {

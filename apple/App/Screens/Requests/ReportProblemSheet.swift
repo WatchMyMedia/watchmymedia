@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Report a problem (ReportProblem.dc.html), from a movie's or show's More
+/// Report a problem, from a movie's or show's More
 /// menu: what it is about, the kind (Video, Audio, Subtitles, Other), a note,
 /// and what the server attaches; then Send report.
 struct ReportProblemSheet: View {

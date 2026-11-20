@@ -59,7 +59,7 @@ import media.watchmy.client.ui.ShowsLiveChannels
 /**
  * LiveGuide: with listings (API level 13 and `capabilities.guide`) the guide
  * with its hero; without them (listings=none) every available channel remains
- * watchable without programme data, as L7 built it.
+ * watchable without programme data.
  */
 @Composable
 fun LiveChannelsScreen(

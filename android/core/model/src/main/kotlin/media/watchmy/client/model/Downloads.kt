@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * The server API level that brought offline downloads (PLAN-DOWNLOADS.md):
+ * The server API level that brought offline downloads:
  * /api/offline, RequestOptions.offline and /api/settings/offline. The apps
  * offer Download only from it.
  */
@@ -68,7 +68,7 @@ sealed interface DownloadStatus {
     enum class Reason { Turn, Wifi, Network, Storage }
 }
 
-/** What the server said of a held download at its last sync (PLAN-DOWNLOADS.md §5): the copy still plays. */
+/** What the server said of a held download at its last sync: the copy still plays. */
 enum class DownloadMark { None, RemovedFromServer, NewVersion }
 
 /** A download held on this device for the signed-in account. */
@@ -153,7 +153,7 @@ data class DownloadChoice(
 
 /** The space downloads take and what is left, on the volume that holds them. */
 data class DownloadStorage(val usedBytes: Long, val freeBytes: Long, val totalBytes: Long) {
-    /** A download of [sizeBytes] fits when 1 GB would still be free after it (PLAN-DOWNLOADS.md §5). */
+    /** A download of [sizeBytes] fits when 1 GB would still be free after it. */
     fun fits(sizeBytes: Long): Boolean = sizeBytes + RESERVE_BYTES <= freeBytes
 
     companion object {
@@ -164,7 +164,7 @@ data class DownloadStorage(val usedBytes: Long, val freeBytes: Long, val totalBy
 data class DownloadSettings(val quality: DownloadQuality = DownloadQuality.Original, val wifiOnly: Boolean = true)
 
 /**
- * Downloads to watch offline on a phone or tablet (PLAN-DOWNLOADS.md §10).
+ * Downloads to watch offline on a phone or tablet.
  * Everything here is for the account signed in now. Methods that talk to
  * the server throw [ApiException]. [Unavailable] where there are none: the
  * TV app, and previews.
@@ -262,7 +262,7 @@ fun freeSize(bytes: Long): String = String.format(Locale.ROOT, "%.1f GB", bytes 
 
 private const val GB = 1_073_741_824.0
 
-/** The download button's words for [status] (MovieDownload.dc.html). */
+/** The download button's words for [status]. */
 fun downloadLabel(status: DownloadStatus): String = when (status) {
     is DownloadStatus.Waiting -> if (status.reason == DownloadStatus.Reason.Wifi) "Waiting for Wi-Fi" else "Waiting"
     DownloadStatus.Preparing -> "Preparing"
@@ -279,7 +279,7 @@ fun downloadHelp(status: DownloadStatus): String? = when {
     else -> null
 }
 
-/** The menu's title for a download in [status] (DownloadMenu.dc.html). */
+/** The menu's title for a download in [status]. */
 fun downloadMenuTitle(status: DownloadStatus): String = when (status) {
     is DownloadStatus.Paused -> "Paused at ${status.percent}%"
     else -> downloadLabel(status)
@@ -381,7 +381,7 @@ private fun OfflineDownload.offlineVersion() = MediaVersion(
     audioSummary = null, durationMs = durationMs.takeIf { it > 0 },
 )
 
-/** "8 episodes · 2 downloaded", "8 episodes · downloading 5": the season header with downloads (ShowDownloadSeason.dc.html). */
+/** "8 episodes · 2 downloaded", "8 episodes · downloading 5": the season header with downloads. */
 fun seasonDownloadsLine(episodes: Int, downloaded: Int, coming: Int): String {
     val base = plural(episodes, "episode")
     return when {

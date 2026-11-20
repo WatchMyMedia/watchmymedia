@@ -7,7 +7,7 @@ import { EditLibraryFlow } from './libraries/EditFlow'
 import { ReviewUnmatched } from './libraries/ReviewQueue'
 
 /**
- * Settings › Libraries (PLAN-ADMIN-SETTINGS.md §5.3): the hub, one page per
+ * Settings › Libraries: the hub, one page per
  * library, and the tasks under them — Add a library, Name and folder, and
  * Review unmatched. Flows draw their own kept-out and member screens.
  */

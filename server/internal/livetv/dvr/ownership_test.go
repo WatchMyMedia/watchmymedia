@@ -71,8 +71,8 @@ func TestLateCollisionPublishesBesideTheOtherFile(t *testing.T) {
 	f.clock.Store(start.Add(2 * time.Minute).Unix())
 	f.s.tick(ctx, unix(f.clock.Load()))
 	// A file that took the final name while this recorded stays the other
-	// file's: the recording is published beside it under the next free name
-	// (§1), instead of waiting hidden for a name that never frees.
+	// file's: the recording is published beside it under the next free
+	// name, instead of waiting hidden for a name that never frees.
 	published, err := f.s.get(ctx, rec.ID)
 	want := strings.TrimSuffix(filepath.Base(raw.Path), ".ts") + " (2).ts"
 	if err != nil || published.Reason == "finish_pending" || filepath.Base(published.Path) != want {

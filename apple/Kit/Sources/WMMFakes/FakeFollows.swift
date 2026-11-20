@@ -1,7 +1,7 @@
 import Foundation
 import WMMModel
 
-/// Following shows on the fakes (PLAN-NEW-EPISODES.md; every title is
+/// Following shows on the fakes (every title is
 /// fictional): Sam follows Harbor Lights, Northfield Precinct and Orbital
 /// Decay, and The Tidewater Array, which has left the library. The feed gives
 /// a first check its cursor, the next one what arrived (Harbor Lights' three

@@ -28,7 +28,7 @@ public struct PlayRequest: Hashable, Sendable, Identifiable {
     public var showID: Int?
     public var seasonNumber: Int?
     /// What the page that played it already knows, for the Apple TV player's
-    /// Info panel (PLAN-APPLE-REVIEW.md §6.2): the description, the year, the
+    /// Info panel: the description, the year, the
     /// certification ("TV-14") and the genres. Nil or empty shows nothing.
     public var overview: String?
     public var year: Int?
@@ -278,8 +278,8 @@ public enum PlayerStatus: String, Hashable, Sendable { case loading, playing, pa
 /// How long auto-delay fills the Skip button before skipping.
 public let skipAutoDelayMs = 3_000
 
-/// How far before the saved position a resume starts, so people pick up the thread
-/// (PLAN-RESUME.md §3.8). The server's resumeMs already starts there; a device applies
+/// How far before the saved position a resume starts, so people pick up the thread.
+/// The server's resumeMs already starts there; a device applies
 /// it to the positions it keeps itself, for offline plays.
 public let resumeRewindMs = 5_000
 
@@ -407,8 +407,8 @@ public enum PlayerEvent: Hashable, Sendable {
 }
 
 /// One viewing at a time: asks the server how to play, drives the player,
-/// reports progress and runs Skip, Next Episode and Still watching
-/// (PLAN-CLIENTS.md §2.3). The screen renders `state`, shows `player`'s
+/// reports progress and runs Skip, Next Episode and Still watching.
+/// The screen renders `state`, shows `player`'s
 /// video, and calls the methods below.
 @MainActor
 public protocol PlaybackController: AnyObject, Observable {

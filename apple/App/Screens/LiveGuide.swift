@@ -3,12 +3,12 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The guide with listings (PLAN-LIVE-TV-GUIDE.md §6.4): iPhone `LiveGuide`
+/// The guide with listings: iPhone `LiveGuide`
 /// and iPad `Pad2LiveGuide`. The selected programme sits in a card above the
 /// grid on iPhone, with its details in a sheet, and in a panel beside the
 /// grid on a wide iPad. Only servers with listings get here; the others keep
-/// the channel list. From API level 15 (§6.5, `LiveGuideExtras`,
-/// `Pad2LiveExtras`) each channel has a star, Favourites leads the chips,
+/// the channel list. From API level 15
+/// each channel has a star, Favourites leads the chips,
 /// later programmes offer Remind me and show a bell, and the toolbar has
 /// Search listings and Reminders: pushed on iPhone, in the panel on iPad.
 struct LiveGuideScreen: View {
@@ -505,7 +505,7 @@ struct LiveGuideGrid: View {
 
 /// One cell of the guide: a view of its own, compared by what it shows, so
 /// a change of selection or a pass of the grid redraws only the cells it
-/// changes (PLAN-APPLE-REVIEW.md §4.3.4).
+/// changes.
 private struct LiveGuideCell: View, Equatable {
     let clock: LiveClock
     let row: LiveGuideModel.Row

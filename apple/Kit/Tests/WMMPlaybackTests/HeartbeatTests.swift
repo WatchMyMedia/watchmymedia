@@ -174,7 +174,7 @@ import WMMModel
     }
 
     @Test func aServerOutOfReachGetsOnlyTheNewestPositionThenTheStop() async {
-        // PLAN-APPLE-REVIEW.md §3.1.4: each report waits for its time-out, so positions pile up behind it.
+        // Each report waits for its time-out, so positions pile up behind it.
         await startPlaying()
         h.gateway.holdReports = true
         await advanceHeld(10_000)

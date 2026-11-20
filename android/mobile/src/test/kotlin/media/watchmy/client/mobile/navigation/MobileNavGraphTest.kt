@@ -21,7 +21,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The phone's navigation graph is built once (PLAN-ANDROID-REVIEW §4.3.5):
+ * The phone's navigation graph is built once:
  * the account, Live TV and a TV connecting change what the pages show, not
  * the graph, which Navigation rebuilds whenever its builder changes.
  */

@@ -631,11 +631,11 @@ func (m *Matcher) record(ctx context.Context, fileID int64, status string, movie
 // NewWindow is how long a file counts as new after it was added (its
 // added_at: when a scan found it, or its date on disk in a library's first
 // scan). It is the New badge's window, and the window in which a file can
-// announce an episode (PLAN-NEW-EPISODES.md §4, decision 4).
+// announce an episode.
 const NewWindow = 7 * 24 * time.Hour
 
-// recordArrivals notes the episodes a file is being linked to as arrived
-// (PLAN-NEW-EPISODES.md §5.2). An arrival belongs to the TMDB episode (the
+// recordArrivals notes the episodes a file is being linked to as arrived.
+// An arrival belongs to the TMDB episode (the
 // show's TMDB id, season and number), not the episode row, and a TMDB
 // episode arrives once, the first time any file is linked to it in any
 // library. Followers hear of it only when that file is new by the New
@@ -728,7 +728,7 @@ func (m *Matcher) storeMovie(ctx context.Context, lib db.Library, tmdbID int) (i
 	}
 	genres, _ := json.Marshal(genreNames(mv.Genres))
 	// The details came with what related titles need too, so the movie's
-	// tags are stored with it (PLAN-RELATED.md §3.9).
+	// tags are stored with it.
 	var id int64
 	err = m.q.Transaction(ctx, func(q *db.Queries) error {
 		row, err := q.UpsertMovie(ctx, db.UpsertMovieParams{
@@ -749,7 +749,7 @@ func (m *Matcher) storeMovie(ctx context.Context, lib db.Library, tmdbID int) (i
 			Credits:       creditsJSON(mv.Credits),
 			ContentRating: new(mv.ReleaseDates.Certification(RatingCountry)),
 			// The videos came with the details, so the trailers are checked
-			// now too (PLAN-TRAILERS.md §5.1).
+			// now too.
 			Trailers:          trailers.Encode(trailers.Choose(mv.Videos.Results)),
 			TrailersCheckedAt: new(db.FormatTime(time.Now())),
 		})
@@ -958,8 +958,7 @@ func (m *Matcher) storeShow(ctx context.Context, lib db.Library, tmdbID int) (db
 		if err != nil {
 			return err
 		}
-		// The details came with what related titles need too
-		// (PLAN-RELATED.md §3.9).
+		// The details came with what related titles need too.
 		if err := related.StoreShow(ctx, q, show.ID, tv, time.Now()); err != nil {
 			return err
 		}

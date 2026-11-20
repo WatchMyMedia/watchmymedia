@@ -12,10 +12,10 @@ import { changePasswordLabel, deviceName, passwordChangeError, passwordChangedBa
 import { setFlash, useLeaveAfterSave } from './hooks'
 
 /**
- * Change your password (PLAN-ADMIN-SETTINGS.md §5.10): one step that names
+ * Change your password: one step that names
  * the devices it will sign out and puts their count on its button. It ends
- * on Account & devices with a banner and the devices list fetched again
- * (loose end 6). The password is typed once.
+ * on Account & devices with a banner and the devices list fetched
+ * again. The password is typed once.
  */
 export function ChangePasswordFlow() {
   const auth = useAuth()

@@ -71,7 +71,7 @@ function stops(column: HTMLElement): HTMLElement[] {
 }
 
 /**
- * Settings (SettingsGroups on the Samsung TV canvas, as Android TV's): the
+ * Settings (as Android TV's): the
  * groups down the left, each with what is chosen in it, and the focused
  * group's rows on the right. Focus on a group swaps the pane; ▶ or OK goes
  * into it, on the row left last time or its top row; ◀ or Return go back to

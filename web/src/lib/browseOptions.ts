@@ -1,5 +1,5 @@
 // The library grid's sorts and filters, shared by the grid, its address
-// (See all from a row) and a list made from the library (PLAN-ROWS.md §5).
+// (See all from a row) and a list made from the library.
 
 export type LibraryType = 'movie' | 'tv'
 export type ItemSort = 'title' | 'added' | 'year' | 'rating' | 'released' | 'runtime' | 'aired'

@@ -56,7 +56,7 @@ function RuleEditor({ rule, onClose, onNote }: { rule: RecordingRule; onClose():
 }
 
 /**
- * Recordings (LiveRecordings on the canvas): the focused card's details on
+ * Recordings: the focused card's details on
  * top, then rows for Recording now, Won't record, Upcoming, Series and
  * Recorded. OK does the first of a card's actions (Watch from the start,
  * Watch, Record this instead, Edit series); Hold OK lists them all.

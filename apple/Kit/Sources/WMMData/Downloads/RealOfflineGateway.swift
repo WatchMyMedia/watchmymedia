@@ -2,7 +2,7 @@ import Foundation
 import WMMAPI
 import WMMModel
 
-/// The offline routes (PLAN-DOWNLOADS.md §9) for WMMDownloads
+/// The offline routes for WMMDownloads
 /// (android/core/data/.../RealOfflineGateway.kt). Each call goes to its
 /// owner's server as that account, so a download keeps its tokens and sync
 /// while another server is in use; once the account is signed out there,
@@ -65,7 +65,7 @@ final class RealOfflineGateway: OfflineGateway {
     }
 
     func plan(_ owner: OfflineOwner, fileID: Int, profile: PlaybackProfile) async throws -> DownloadPlan {
-        // An older server refuses the HDR profile's fields (PLAN-HDR-PROFILE.md).
+        // An older server refuses the HDR profile's fields.
         let body = Components.Schemas.OfflinePlanInputBody(profile: PlaybackMapping.profile(profile.forAPILevel(level(owner))))
         let plan = try await call(owner) {
             try await $0.planOfflineDownload(path: .init(id: Int64(fileID)), body: .json(body)).ok.body.json
@@ -110,7 +110,7 @@ final class RealOfflineGateway: OfflineGateway {
     }
 
     /// Nil for an address that isn't on the owner's server as it is kept now:
-    /// the sign-in goes only to the server that issued it (PLAN-APPLE-REVIEW.md §3.4.8).
+    /// the sign-in goes only to the server that issued it.
     func authorizedRequest(_ owner: OfflineOwner, url: URL) -> URLRequest? {
         guard let (_, credential) = try? access(owner) else { return nil }
         return store.signer(baseURL: baseURL(owner), token: credential.token).signedRequest(url)
@@ -180,7 +180,7 @@ final class RealOfflineGateway: OfflineGateway {
             quality: DownloadQuality(id: d.quality),
             createdAt: d.createdAt,
             item: item(d.item),
-            // A copy plays from the device, so its decision carries no seek thumbnails (PLAN-TRICKPLAY.md).
+            // A copy plays from the device, so its decision carries no seek thumbnails.
             decision: d.decision.flatMap { try? PlaybackMapping.decision($0, base: base, apiLevel: 0) }
         )
     }

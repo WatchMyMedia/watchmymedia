@@ -124,12 +124,12 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.ReportShown
 
 /**
- * Home (Home.dc.html, HomeScrolled.dc.html): the hero, then Continue
+ * Home: the hero, then Continue
  * watching, Recently added shows, Recently aired, Recently added movies,
  * Recently released and the library totals, with pull to refresh.
  * Long-press a card to mark it watched or unwatched. A Recently aired
- * episode, and the hero when it is one, opens the episode's page
- * (PLAN-EPISODE-PAGE.md); Continue watching resumes straight away.
+ * episode, and the hero when it is one, opens the episode's page;
+ * Continue watching resumes straight away.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -164,7 +164,7 @@ fun HomeScreen(
     ReportDrawnWhen { state.home != null || state.error != null || (state.offline && held.enabled) }
 
     Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
-        // Offline there is nothing to search (HomeOffline.dc.html).
+        // Offline there is nothing to search.
         val offline = state.home == null && state.offline && held.enabled
         MainTopBar("Home", user?.name, onSearch = { onNavigate(MobileRoutes.Search) }.takeIf { !offline }, onAvatar = { onNavigate(MobileRoutes.Settings) })
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -183,7 +183,7 @@ fun HomeScreen(
                     onSeeAll = { onNavigate(MobileRoutes.Downloads) },
                     tablet = layout.isTablet,
                 )
-                // Loading, failed or empty: the shared states (PLAN-ANDROID-REVIEW §5.4), with Home's skeleton.
+                // Loading, failed or empty: the shared states, with Home's skeleton.
                 else -> LoadContent(homeStatus(state, home, liveChannels, user?.isAdmin == true, server, uri, vm::retry, vm::say), vm::retry, Modifier.fillMaxSize(), loading = { HomeSkeleton() }) {
                     if (home == null) return@LoadContent
                     val pull = rememberPullToRefreshState()
@@ -210,10 +210,10 @@ fun HomeScreen(
                             }
                         }
                         // LiveHome puts On now after Continue watching; the channel row, or On now on an empty library, stays first.
-                        // Arranged rows put it where the person placed it (PLAN-ROWS.md Decision 4).
+                        // Arranged rows put it where the person placed it.
                         val arranged = home.arranged
                         val liveFirst = !arranged && (!liveListings || state.isEmpty)
-                        // A tablet shows arranged Home one row a screen (PLAN-HOME.md §7.5); phones keep the scrolling page.
+                        // A tablet shows arranged Home one row a screen; phones keep the scrolling page.
                         if (arranged && layout.isTablet && !state.isEmpty) {
                             TabletPagedHome(
                                 home = home,
@@ -373,7 +373,7 @@ private fun LazyListScope.homeRows(
 }
 
 /**
- * Home in the person's order (PLAN-ROWS.md §8.2): the hero, then each row by
+ * Home in the person's order: the hero, then each row by
  * its style, Live TV in its place ([live], when there are channels), Edit
  * Home and the totals. A row with somewhere to go ends in See all, on the
  * phone as on the tablet ([homeSeeAll]). The tablet keeps Continue beside
@@ -449,7 +449,7 @@ private fun LazyListScope.section(
 
 /**
  * The compact panel keeps [count] resumable titles beside the hero (three
- * on the scrolling Home, six on the paged one, TabHomeStart.dc.html);
+ * on the scrolling Home, six on the paged one);
  * See all opens the complete list. [counter] is the paged Home's "Row 1 of 7".
  */
 @Composable
@@ -509,8 +509,8 @@ private fun ContinueRow(item: ContinueItem, library: LibraryRepository, onSetWat
 }
 
 /**
- * Home's hero, on the phone, the tablet and the paged tablet Home alike
- * (PLAN-ANDROID-REVIEW §5.4): Play plays it, and the second button opens
+ * Home's hero, on the phone, the tablet and the paged tablet Home alike:
+ * Play plays it, and the second button opens
  * its page. An episode's page needs its season, which comes from its card
  * in [episodes]; without one the hero opens the show. [height] null fills
  * the height the parent gives it.

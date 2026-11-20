@@ -5,8 +5,8 @@ import AVKit
 import Foundation
 
 // What the file player (``AVMediaPlayer``) and the Live TV player
-// (``AVLiveMediaPlayer``) do alike with AVPlayer, written once
-// (PLAN-APPLE-REVIEW.md §5.1): an item's making and clearing, its first
+// (``AVLiveMediaPlayer``) do alike with AVPlayer, written once:
+// an item's making and clearing, its first
 // frame, the link measured from its access log, the metadata the system
 // shows, the audio session, and what a failure was.
 

@@ -3,7 +3,7 @@ import { filterOptions, itemFilter, itemSort, sortOptions, type ItemFilter, type
 import { formatDate, relativeTime } from './format'
 import { screenLibraryId, webLink } from './screenRows'
 
-// Make a list (PLAN-ROWS.md §5, §6.3): what the builder's options become
+// Make a list: what the builder's options become
 // in the API, what a list's page says about where it comes from, and the
 // state of each title on it.
 

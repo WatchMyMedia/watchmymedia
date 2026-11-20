@@ -1,7 +1,7 @@
 # swift-openapi-generator settings for the client in Generated/. Regenerate
 # with `make apple-api` after `make gen-api`; CI fails when it is stale.
 # Only the operations an app makes are generated: admin, setup, activity and
-# statistics stay in the web UI (PLAN-CLIENTS.md §6).
+# statistics stay in the web UI.
 generate:
   - types
   - client

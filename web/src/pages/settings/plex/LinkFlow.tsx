@@ -35,7 +35,7 @@ import {
 import { FlowWaiting, ListCard, PlexNote, RowTable } from './parts'
 import { keptImport, linkKey, plexCrumbs, plexHref, setAsideCheck, useClock, usePlexConnection, useStored } from './state'
 
-/** Link people and libraries: People → Libraries → Review → Saved (§5.1).
+/** Link people and libraries: People → Libraries → Review → Saved.
  * Only Review saves; the choices before it are kept in this tab. */
 export function LinkFlow({ step }: { step?: string }) {
   const { query, connection } = usePlexConnection()

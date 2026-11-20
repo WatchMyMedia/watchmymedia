@@ -1,4 +1,4 @@
-/* The start screens: Main (server), SignIn and ServerProblems on the Samsung TV canvas. */
+/* The start screens. */
 .start-brand { position: absolute; left: var(--gutter); top: 3rem; }
 .start-main { position: absolute; left: 10rem; top: 12.5rem; width: 56.25rem; display: flex; flex-direction: column; gap: 1.75rem; }
 .start-main--list { top: 9.375rem; width: 53.75rem; }

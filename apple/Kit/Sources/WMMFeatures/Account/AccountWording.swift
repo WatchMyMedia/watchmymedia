@@ -28,7 +28,7 @@ public let tmdbCredit = "Metadata and artwork from TMDB. This product uses the T
 
 // MARK: - Pairing codes
 
-/// Pairing codes have six characters (PLAN-CLIENTS.md §3.2).
+/// Pairing codes have six characters.
 public let pairingCodeLength = 6
 
 /// How long a pairing code lasts on the server.
@@ -239,7 +239,7 @@ public func linkTVRowSubtitle(pending: Bool, code: String?, codeSignIn: Bool) ->
 
 // MARK: - Apple TV
 
-/// The pairing code's line on Apple TV (TvMain.dc.html): "Waiting for the code
+/// The pairing code's line on Apple TV: "Waiting for the code
 /// · refreshes in 4:52 · this Apple TV signs in by itself once it is entered",
 /// counting down to the new code.
 public func tvPairingWaitingLine(expiresAt: Date, now: Date = .now) -> String {
@@ -290,7 +290,7 @@ public let openSourceNotices: [(name: String, licence: String)] = [
     ("Swift HTTP Types", "Apache License 2.0"),
 ]
 
-// MARK: - Words both apps' sign-in and server screens share (PLAN-APPLE-REVIEW.md §5.8)
+// MARK: - Words both apps' sign-in and server screens share
 
 public let chooseServerTitle = "Choose a server"
 public let lookingForServers = "Looking for servers…"

@@ -16,11 +16,11 @@ import WMMPlayback
 /// `-fakesAudioLanguages` makes the server take audio languages (API level
 /// 21); followed by a list ("es,en") the person has saved those, with
 /// subtitles for foreign audio, as the server sets them. `-fakesRows` puts
-/// the server at API level 22, with arranged rows and lists (PLAN-ROWS.md).
+/// the server at API level 22, with arranged rows and lists.
 /// `-fakesFollows` puts it at API level 29: the bell on a show's page,
-/// Settings › Notifications' list and Home's New from shows you follow
-/// (PLAN-NEW-EPISODES.md). `-fakesRelated` puts it at API level 30: movie
-/// and show pages end in their collection and More like this (PLAN-RELATED.md).
+/// Settings › Notifications' list and Home's New from shows you follow.
+/// `-fakesRelated` puts it at API level 30: movie
+/// and show pages end in their collection and More like this.
 @MainActor
 enum ServicesFactory {
     static func make(arguments: [String]) -> AppServices {
@@ -33,7 +33,7 @@ enum ServicesFactory {
             gateway: APIPlaybackGateway(api: { try data.api() }, apiLevel: { data.apiLevel }),
             preferences: data.preferences,
             client: { data.client },
-            // Asks for the output's audio channels at every request (PLAN-APPLE-REVIEW.md §3.1.1).
+            // Asks for the output's audio channels at every request.
             profile: profile,
             library: data.library,
             // Now Playing's picture. No `servers`: the AirPlay restart is the sender's, never the TV's.
@@ -43,8 +43,8 @@ enum ServicesFactory {
     }
 
     #if DEBUG
-    /// The fakes, when the arguments ask for them. Debug builds only
-    /// (PLAN-APPLE-REVIEW.md §2.9): a Release build ignores `-fakes…` and doesn't link WMMFakes.
+    /// The fakes, when the arguments ask for them. Debug builds only:
+    /// a Release build ignores `-fakes…` and doesn't link WMMFakes.
     private static func fakes(_ arguments: [String]) -> AppServices? {
         let member = arguments.contains("-fakesMember")
         guard arguments.contains("-fakes") || member || arguments.contains("-fakesSignedOut") || arguments.contains("-fakesNoServer") else { return nil }

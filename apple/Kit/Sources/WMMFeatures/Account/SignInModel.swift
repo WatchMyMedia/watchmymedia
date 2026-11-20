@@ -2,17 +2,17 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Signing in to the server in use (Main.dc.html, SignInPairing.dc.html):
+/// Signing in to the server in use:
 /// with a password, or by pairing when the server's sign-in protection
 /// (Turnstile) refuses app passwords. A server with no accounts yet sends the
 /// person to its web page to make the first one. Success needs no event:
 /// ``AuthRepository/user`` changes and the root moves on
 /// (android/.../SignInViewModel.kt).
 ///
-/// Apple TV (`pairsByDefault`, TvMain.dc.html) signs in by pairing first:
+/// Apple TV (`pairsByDefault`) signs in by pairing first:
 /// the code and its QR code show at once and a new code replaces one that
 /// runs out, with "Sign in with a password instead" while the server allows
-/// passwords (TvSignInPassword.dc.html).
+/// passwords.
 @MainActor
 @Observable
 public final class SignInModel {
@@ -262,8 +262,8 @@ extension Navigator {
 
 /// A sign-in form kept above the screens that show it, as the server switch
 /// is: an iPad window resized during sign-in swaps the iPhone and iPad
-/// screens, and each used to make its own form, losing what was typed
-/// (PLAN-APPLE-REVIEW.md §3.3.4). One per server; ``forget()`` on a sign-in
+/// screens, and each used to make its own form, losing what was typed.
+/// One per server; ``forget()`` on a sign-in
 /// or sign-out, so the next starts afresh.
 @MainActor
 public final class SignInForm {

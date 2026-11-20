@@ -1,5 +1,5 @@
 /* The Samsung TV app's tokens, from the web's @theme (src/index.css) and the
-   Samsung TV canvas's boards. Sizes are in rem at 16px for a 1920px-wide
+   Samsung TV boards. Sizes are in rem at 16px for a 1920px-wide
    screen (1rem = 100vw / 120), so the boards' pixels divide by 16 and the
    layout scales to 1280px or 3840px alike. Plain CSS for Chromium 108: no
    color-mix, oklch, nesting or :has. */

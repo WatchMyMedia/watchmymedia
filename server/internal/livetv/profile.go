@@ -54,9 +54,9 @@ type LivePlan struct {
 }
 
 // Live audio conversions are AAC: stereo at 192 kbps, as before, or up to 5.1
-// at 64 kbps a channel (PLAN-AUDIO.md §3.6). A converted picture below
+// at 64 kbps a channel. A converted picture below
 // liveSurroundVideoKbps is a play kept small for a slow link, which keeps
-// stereo (PLAN-AUDIO.md decision 8).
+// stereo.
 const (
 	liveStereoAudioKbps     = 192
 	liveAudioKbpsPerChannel = 64
@@ -172,7 +172,7 @@ func liveAudioFits(profile *LiveProfile, source SourceInfo, format string) bool 
 // liveAudioChannels is how many channels a conversion keeps: up to 5.1 for a
 // device that says it takes six channels or more, else stereo. A profile that
 // sends no limit (the web's and the Cast receiver's) stays stereo until AAC
-// 5.1 in MPEG-TS is checked on them (PLAN-AUDIO.md §3.6).
+// 5.1 in MPEG-TS is checked on them.
 func liveAudioChannels(profile *LiveProfile, source SourceInfo) int {
 	if profile == nil || profile.MaxAudioChannels < 6 || source.AudioChannels <= 2 {
 		return 2

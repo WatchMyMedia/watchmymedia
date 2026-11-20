@@ -47,7 +47,7 @@ public struct PlayerSource: Hashable, Sendable {
 }
 
 /// What the Apple TV player's Info panel shows about the item beside its
-/// title and subtitle (PLAN-APPLE-REVIEW.md §6.2): from the play request and
+/// title and subtitle: from the play request and
 /// the picture Now Playing loads, so no request is added for it.
 public struct ItemDetails: Hashable, Sendable {
     public var overview: String?
@@ -69,8 +69,7 @@ public struct ItemDetails: Hashable, Sendable {
 
 /// The decision's audio track as the player finds it: the `ordinal`th of
 /// the file's `count` tracks, in the order the decision lists them. A
-/// player's options that don't number `count` don't line up
-/// (PLAN-LANGUAGES.md §5.2, §8).
+/// player's options that don't number `count` don't line up.
 public struct AudioStart: Hashable, Sendable {
     public var ordinal: Int
     public var count: Int
@@ -120,7 +119,7 @@ public struct MediaPlayerListener {
 }
 
 /// What the controller needs from a player: ``AVMediaPlayer`` in the app, a
-/// fake in tests, so the §2.3 machine runs on the Mac with virtual time.
+/// fake in tests, so the controller runs on the Mac with virtual time.
 /// Positions are player time; the controller maps them to file positions
 /// (android/core/playback/.../player/MediaPlayer.kt).
 @MainActor

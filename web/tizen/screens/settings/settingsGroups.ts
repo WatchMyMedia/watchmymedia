@@ -1,6 +1,6 @@
 import type { SettingsGroup } from '../../app/routes'
 
-// Settings' groups down the left (SettingsGroups on the canvas): which show,
+// Settings' groups down the left: which show,
 // in what order, and how focus ids tie a pane's rows to their group, so
 // coming back to Settings opens the pane focus was in.
 

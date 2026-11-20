@@ -17,7 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
-/** Favourites, search and reminders against the server (PLAN-LIVE-TV-GUIDE.md §5.7), and nothing asked below API level 15. */
+/** Favourites, search and reminders against the server, and nothing asked below API level 15. */
 class LivePersonalTest {
     private val h = Harness()
     private val server get() = h.server

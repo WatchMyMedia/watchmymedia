@@ -109,7 +109,7 @@ data class PlayerFailure(
 
 /**
  * What the controller needs from a player: ExoPlayer in the app
- * ([ExoMediaPlayer]), a fake in tests, so the §2.3 machine runs on the JVM.
+ * ([ExoMediaPlayer]), a fake in tests, so the controller runs on the JVM.
  * Positions are player time; the controller maps them to file positions.
  * Called on one thread (the main thread in the app).
  */
@@ -132,7 +132,7 @@ interface MediaPlayer {
     /** Fresh completed HLS segment bytes, excluding manifests and direct-file pacing. Cold segment preparation can lower this estimate. */
     val transfer: TransferSample? get() = null
 
-    /** Buffering since the last [load], after it was first ready, that no seek caused (PLAN-AUTO-QUALITY.md §3.1). */
+    /** Buffering since the last [load], after it was first ready, that no seek caused. */
     val stalls: Stalls
 
     /** The playing video's frames a second, from its format; null until the tracks or the decoder say. A change calls [Listener.onChanged]. */

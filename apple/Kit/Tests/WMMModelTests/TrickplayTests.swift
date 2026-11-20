@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import WMMModel
 
-/// The tile locator (PLAN-TRICKPLAY.md §2), as android/core/model's TrickplayTest has it.
+/// The tile locator, as android/core/model's TrickplayTest has it.
 @Suite struct TrickplayTests {
     let t = Trickplay(intervalMs: 10_000, width: 320, height: 180, columns: 10, rows: 10, count: 724, sheets: 8,
                       urlTemplate: "http://192.168.1.20:27587/api/files/42/trickplay/9c1e07a2/{sheet}.jpg")!

@@ -19,7 +19,7 @@ function HowTo({ summary, open, children }: { summary: string; open: boolean; ch
 
 /**
  * The TMDB key, and in Settings (`trailers`) the Trailers from YouTube
- * checkbox under it (PLAN-TRAILERS.md §6.1); setup asks only for the key.
+ * checkbox under it; setup asks only for the key.
  */
 export function TMDBSection({ onSaved, trailers = false }: { onSaved?: () => void; trailers?: boolean }) {
   const settings = useQuery(settingsQuery)

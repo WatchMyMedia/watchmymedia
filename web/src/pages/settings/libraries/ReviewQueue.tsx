@@ -15,7 +15,7 @@ type Library = components['schemas']['Library']
 type Group = components['schemas']['UnmatchedGroup']
 
 /**
- * Review unmatched (boards lib-review, lib-review-done): the library's
+ * Review unmatched: the library's
  * unmatched files as a queue under Settings, one group at a time, with a
  * count, the list beside it on wide screens, Previous, Skip for now and the
  * action. Each card is the Unmatched view's own, with its dialogs. Nothing

@@ -85,15 +85,13 @@ import media.watchmy.client.ui.components.rememberSystemCaptionLook
 import media.watchmy.client.ui.rememberTabletLayout
 
 /**
- * The phone player: landscape, full screen, touch controls over the video.
- * Mockups: design/mockups/android/PlayerControls.dc.html (controls and Skip
- * Intro), PlayerNext.dc.html (Next Episode card), PlayerPicker.dc.html
- * (audio, subtitles and quality). It renders a [PlaybackController] from
- * the app's services, which does the playing and the rules of
- * PLAN-CLIENTS.md §2.3; this screen only shows its state and passes on
- * what the viewer does.
+ * The phone player: landscape, full screen, touch controls over the video,
+ * with Skip Intro, the Next Episode card and the picker for audio,
+ * subtitles and quality. It renders a [PlaybackController] from the app's
+ * services, which does the playing and its rules; this screen only shows
+ * its state and passes on what the viewer does.
  *
- * While casting (PLAN-CAST.md §5.2) it is the TV's remote instead: the same
+ * While casting it is the TV's remote instead: the same
  * controls over the backdrop, driving the cast service's remote controller,
  * in any orientation. The play moves across as casting starts (the TV takes
  * over from this position, with these tracks) and ends (it offers to carry on
@@ -599,7 +597,7 @@ private fun PlayingOn(device: String, modifier: Modifier = Modifier) {
  * left or right seeks (see [DoubleTapSeek]), and further taps on that side
  * keep seeking without waiting for a double tap. A tap in the middle, where
  * a double tap doesn't seek, shows or hides the controls at once rather
- * than after the double-tap wait (PLAN-ANDROID-REVIEW §6.3); a quick second
+ * than after the double-tap wait; a quick second
  * tap there is taken as part of it. Pinching out fills the screen with the
  * picture and pinching in fits it ([onPinch]: true to fill).
  */

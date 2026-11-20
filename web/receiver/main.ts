@@ -25,9 +25,9 @@ import type { LiveScreen } from './ui'
 import './style.css'
 
 /**
- * The WatchMyMedia Cast receiver (PLAN-CAST.md §4). A sender's LOAD names
+ * The WatchMyMedia Cast receiver. A sender's LOAD names
  * a server and a file and carries a cast token; from there this page runs
- * the play itself, as the web player does (PLAN-CLIENTS.md §2.3): it asks
+ * the play itself, as the web player does: it asks
  * the server how to play with this device's profile, reports heartbeats,
  * and runs Skip, Next Episode and Still watching. Senders are remotes: they
  * read our state messages and send commands (protocol.ts).
@@ -75,7 +75,7 @@ type Play = {
   nextDueAt?: number
   lastBeat: number
   beatState: BeatState
-  // A seek has landed since the last report (PLAN-RESUME.md §3.6).
+  // A seek has landed since the last report.
   seekLanded: boolean
   /** An admin stopped it: no more reports. */
   adminStopped: boolean
@@ -286,8 +286,8 @@ async function prepare(req: framework.messages.LoadRequestData, sequence: number
     if (!restore && d.sessionId) void api.DELETE('/api/playback/{session}', { params: { path: { session: d.sessionId } } }).catch(() => undefined)
     throw new StaleLoad()
   }
-  // No explicit start: pick up where this user resumes. A server from
-  // PLAN-RESUME.md §3.7 starts an event session there itself; an older one
+  // No explicit start: pick up where this user resumes. The server
+  // starts an event session there itself; an older one
   // is asked again.
   const resume = fromMs === undefined ? resumePlan(d) : undefined
   if (resume) {
@@ -725,7 +725,7 @@ window.setInterval(() => {
 // ---------------------------------------------------------------- Live TV
 
 /**
- * A channel cast from a sender (PLAN-LIVE-TV.md §4.1). The session is the
+ * A channel cast from a sender. The session is the
  * sender's, through the cast token, and runs through the web player's own
  * controller, which stops one channel's session before starting the next:
  * the household's tuners are few. The TV shows the channel's banner;
@@ -1234,7 +1234,7 @@ for (const [type, state] of [
     broadcast()
   })
 }
-// Stalls (PLAN-AUTO-QUALITY.md §3.1), counted as the web player counts
+// Stalls, counted as the web player counts
 // them: buffering after the first frame that no seek or resume brought.
 // CAF's BUFFERING is the signal: under Shaka (HLS) the video holds still
 // on a rebuffer and fires neither waiting nor playing.

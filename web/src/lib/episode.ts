@@ -60,7 +60,7 @@ export type EpisodeActions = {
 
 /**
  * What an episode's page offers, by whether it has a file, has aired and how
- * far it was watched (PLAN-EPISODE-PAGE.md §2): "Play · 52 min", or "Resume
+ * far it was watched: "Play · 52 min", or "Resume
  * from 23:10" and "From the start"; Mark watched or Mark unwatched beside it.
  */
 export function episodeActions(e: Pick<Episode, 'aired' | 'airDate' | 'hasFile' | 'files' | 'watch' | 'runtimeMin'>): EpisodeActions {
@@ -72,7 +72,7 @@ export function episodeActions(e: Pick<Episode, 'aired' | 'airDate' | 'hasFile' 
   const mark = e.watch?.completed ? { label: 'Mark unwatched', watched: false } : { label: 'Mark watched', watched: true }
   if (e.watch && isPartlyWatched(e)) {
     // Resume the version the saved position belongs to. No start: the
-    // server resumes a few seconds before it (PLAN-RESUME.md §3.8).
+    // server resumes a few seconds before it.
     const file = e.files.find((f) => f.id === e.watch?.fileId) ?? best
     return {
       primary: { kind: 'play', label: `Resume from ${formatDuration(e.watch.positionMs)}`, fileId: file.id },
@@ -105,7 +105,7 @@ export function showYears(s: { year?: number; lastAirDate?: string; status?: str
 
 /**
  * The episode a Recently added show card stands for when it was the only one
- * added (PLAN-EPISODE-PAGE.md §10): the card opens that episode's page rather
+ * added: the card opens that episode's page rather
  * than the show's. Season 0 is Specials, so only a missing number means none.
  */
 export function addedEpisode(item: Pick<BrowseItem, 'kind' | 'id' | 'episodeId' | 'seasonNumber'>): { showId: string; number: string; episodeId: string } | undefined {

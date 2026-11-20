@@ -4,8 +4,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The info panel's Episodes tab (TvPlayerEpisodes.dc.html,
-/// PLAN-APPLE-REVIEW.md §6.2): after Info, for episodes only. The show's
+/// The info panel's Episodes tab:
+/// after Info, for episodes only. The show's
 /// name and its seasons as buttons, focus reaching one choosing it; under
 /// them the chosen season's episodes on disk, focus starting on the one
 /// playing; what the focused one is, and how to leave. Select or Play/Pause

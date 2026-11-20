@@ -28,7 +28,7 @@ const hint = 'mt-1.5 text-[13px] leading-snug text-neutral-400'
 const tabLines: Record<ListKind, string> = { tmdb: 'Charts and searches', mdblist: 'Lists that follow other charts', library: 'A saved filter', import: 'Paste or a file' }
 const tabNames: Record<ListKind, string> = { tmdb: 'TMDB', mdblist: 'MDBList', library: 'Your library', import: 'Import' }
 
-/** Make a list (design/mockups/web/MakeList): its row goes at the top of screen. */
+/** Make a list: its row goes at the top of screen. */
 export function MakeListPage({ screen, back }: { screen: string; back?: 'settings' }) {
   return <Loaded>{(sources, libraries) => <Builder screen={screen} back={back} sources={sources} libraries={libraries} />}</Loaded>
 }

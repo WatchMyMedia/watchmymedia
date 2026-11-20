@@ -3,7 +3,7 @@ import WMMAPI
 import WMMModel
 
 /// GET /api/server for the server in use, read once for everyone who asks
-/// within a short while (PLAN-APPLE-REVIEW.md §4.1.3): the foreground
+/// within a short while: the foreground
 /// refresh of the API level and Cast's check ask together at launch and on
 /// every return to the app. Unsigned, on the probe's session, so a server
 /// that doesn't answer is known in seconds.

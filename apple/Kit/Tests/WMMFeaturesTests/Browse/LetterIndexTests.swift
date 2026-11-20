@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// The Apple TV grid's A–Z index (TvLibraryAZ.dc.html): which letter goes
+/// The Apple TV grid's A–Z index: which letter goes
 /// where, its counts and wording, Page Up/Down, and a jump that keeps the
 /// grid's start.
 @MainActor

@@ -3,7 +3,7 @@ package media.watchmy.client.model
 // What the show page works out from a show, the same on the phone and the TV
 // (the Apple apps' WMMFeatures ShowModel and EpisodeModel).
 
-/** How the show page was opened (PLAN-SHOW-PAGE.md §3): the show, one of its seasons, or one episode. */
+/** How the show page was opened: the show, one of its seasons, or one episode. */
 sealed interface ShowArrival {
     data object Show : ShowArrival
 
@@ -55,8 +55,8 @@ fun arrivalSeason(show: ShowDetail, arrival: ShowArrival): Int? {
 }
 
 /**
- * The episode on top once [season] (the one [arrivalSeason] picked) is in
- * (PLAN-SHOW-PAGE.md §3), the same on the phone and the TV:
+ * The episode on top once [season] (the one [arrivalSeason] picked) is in,
+ * the same on the phone and the TV:
  *
  * - the show: the server's up-next episode ("Up next · resume" when it is
  *   part watched, "Start here" when nothing is watched yet, else "Up next");
@@ -100,7 +100,7 @@ fun seasonStart(season: SeasonDetail): EpisodeDetail? =
 
 /**
  * After the episode on top is deleted: the next one in [row], else the one
- * before, else none (PLAN-SHOW-PAGE.md §3).
+ * before, else none.
  */
 fun afterDelete(row: List<EpisodeDetail>, deleted: Long): EpisodeDetail? {
     val i = row.indexOfFirst { it.id == deleted }

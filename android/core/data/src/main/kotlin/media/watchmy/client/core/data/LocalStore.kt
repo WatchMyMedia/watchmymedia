@@ -73,7 +73,7 @@ internal data class StoredServer(
     val subtitlePreferences: StoredSubtitlePreferences? = null,
     /**
      * The people (user ids) who turned new-episode notifications off on this
-     * device for this server (PLAN-NEW-EPISODES.md §7.2): the switch is kept
+     * device for this server: the switch is kept
      * on the device for each account, on by default.
      */
     val newEpisodesOff: List<Long> = emptyList(),

@@ -15,7 +15,7 @@ public enum SegmentKind: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// "Intro", the Settings row, in the web's words (PLAN-APPLE-SETTINGS.md §6).
+    /// "Intro", the Settings row, in the web's words.
     public var settingsLabel: String {
         switch self {
         case .intro: "Intro"
@@ -37,8 +37,8 @@ public enum SegmentKind: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// What the part is, for the Apple TV's panel beside the focused row
-    /// (TvSettings2.dc.html): "The end titles of an episode or a film."
+    /// What the part is, for the Apple TV's panel beside the focused row:
+    /// "The end titles of an episode or a film."
     public var settingsAbout: String {
         switch self {
         case .intro: "The opening titles and theme of an episode."
@@ -67,7 +67,7 @@ public enum SegmentKind: String, CaseIterable, Hashable, Sendable {
 public enum SkipMode: String, CaseIterable, Hashable, Sendable {
     case none, ask, autoDelay = "auto-delay", auto
 
-    /// The web's words (PLAN-APPLE-SETTINGS.md §6).
+    /// The web's words.
     public var label: String {
         switch self {
         case .none: "Do nothing"
@@ -77,7 +77,7 @@ public enum SkipMode: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// The line under the choice in its menu (Settings2PlaybackStates.dc.html).
+    /// The line under the choice in its menu.
     public var line: String {
         switch self {
         case .none: "The part plays through"
@@ -121,7 +121,7 @@ public struct PlaybackPreferences: Hashable, Sendable {
     ]
 }
 
-/// Per-person audio languages, from API level 21 (PLAN-LANGUAGES.md): a
+/// Per-person audio languages, from API level 21: a
 /// play starts on the best track in the first of them the file has.
 public struct AudioPreferences: Hashable, Sendable {
     /// Ordered BCP 47 tags; empty plays the file's default track.
@@ -169,7 +169,7 @@ public enum SubtitleMode: String, CaseIterable, Hashable, Sendable {
     case off, forced, on
 }
 
-/// How subtitles start (PLAN-LANGUAGES.md §5.6). ``foreign`` is saved as
+/// How subtitles start. ``foreign`` is saved as
 /// mode forced with foreignAudio.
 public enum SubtitleChoice: String, CaseIterable, Hashable, Sendable {
     case off, forced, foreign, on
@@ -222,7 +222,7 @@ public enum SubtitleChoice: String, CaseIterable, Hashable, Sendable {
 /// A change on the Audio & subtitles page: only the fields that change.
 /// The server reads a subtitle mode in a save as the person choosing one,
 /// and gives someone who saves their first audio language without ever
-/// having chosen subtitles for foreign audio (PLAN-LANGUAGES.md §5.3), so a
+/// having chosen subtitles for foreign audio, so a
 /// save never sends what the person didn't touch.
 public struct LanguageChange: Hashable, Sendable {
     public var audioLanguages: [String]?
@@ -252,7 +252,7 @@ public struct LanguageChange: Hashable, Sendable {
 
 /// Streaming quality, remembered per device. The caps narrow the device's
 /// profile. Automatic has none: the server picks the step and lowers it when
-/// the connection cannot keep up (PLAN-AUTO-QUALITY.md).
+/// the connection cannot keep up.
 public enum StreamQuality: String, CaseIterable, Hashable, Sendable {
     case auto, original, uhd = "2160", fullHD = "1080", hd = "720", sd = "480", low = "360"
 
@@ -357,7 +357,7 @@ public protocol PreferencesRepository: AnyObject, Observable {
     func setAutoplayNext(_ enabled: Bool) async throws
 
     /// Saves an Audio & subtitles change. The reply can turn on more than
-    /// was sent (the foreign-audio choice, §5.3), so read ``playback`` after.
+    /// was sent (the foreign-audio choice), so read ``playback`` after.
     func setLanguages(_ change: LanguageChange) async throws
 
     /// This device's streaming quality (kept on the device).

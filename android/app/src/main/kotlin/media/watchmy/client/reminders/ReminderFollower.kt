@@ -12,7 +12,7 @@ import media.watchmy.client.model.LiveReminders
 import media.watchmy.client.model.LiveRepository
 
 /**
- * Live TV reminders on a phone or tablet (PLAN-LIVE-TV-GUIDE.md §6.5): every
+ * Live TV reminders on a phone or tablet: every
  * read or change of the list sets the alarms again, and a sign-out or another
  * account cancels them. The list is read at start and on each return to the
  * foreground, and again on the server's live.reminders.changed while the app

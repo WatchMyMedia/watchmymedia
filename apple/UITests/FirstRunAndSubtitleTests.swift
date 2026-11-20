@@ -80,7 +80,7 @@ final class FirstRunAndSubtitleTests: XCTestCase {
         add(shot)
     }
 
-    /// PLAN-LANGUAGES.md §5.6: the first audio language turns on subtitles
+    /// The first audio language turns on subtitles
     /// for foreign audio, and the page says so once.
     @MainActor
     func testTheFirstAudioLanguageStartsSubtitlesForForeignAudio() {

@@ -1,7 +1,7 @@
 import XCTest
 
-/// A focused button that disables itself keeps focus (PLAN-APPLE-REVIEW.md
-/// §3.2.1, checked on the tvOS 27 simulator): dimmed, it holds focus while
+/// A focused button that disables itself keeps focus
+/// (checked on the tvOS 27 simulator): dimmed, it holds focus while
 /// its request runs or at the end of a list, and the remote moves on from it.
 /// These guard that, for sign-in, Mark watched and Move up. On the fakes every
 /// request takes 350 ms. Runs in `make apple-tv-test-sim`.

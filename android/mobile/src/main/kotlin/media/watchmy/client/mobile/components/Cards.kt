@@ -99,7 +99,7 @@ val LocalCardPointer = compositionLocalOf { CardPointer() }
 /**
  * Opens on tap; a long-press shows [actions] as a menu (mark watched or
  * unwatched), as phones do instead of the TV's long-press toggle. With a
- * mouse or a keyboard (a tablet's, PLAN-ANDROID-REVIEW §6.3), a right-click
+ * mouse or a keyboard (a tablet's), a right-click
  * opens the menu where the pointer is, and the Menu key (or Shift+F10)
  * below the focused card. The card tells its content how it is pointed at
  * through [LocalCardPointer].
@@ -196,13 +196,13 @@ fun CardCaption(title: String, subtitle: String?, titleSize: TextUnit = 14.sp, s
 
 /**
  * A 2:3 poster card for a show or movie: the New badge, the watched check
- * and the progress strip; no quality badge (PLAN-HOME.md §5: quality is a
+ * and the progress strip; no quality badge (quality is a
  * fact on the hero and the detail pages, not a chip on every poster). The
  * title under it names the card, so the artwork has no description of its
  * own. With [onSetWatched], a long-press offers Mark as watched or
  * unwatched. The card builds that menu itself, so a grid recomposing passes
  * it the same values and the card skips. [outlined] rings the artwork in
- * gold: the leading card of a tablet Home row (TabHomeRow.dc.html).
+ * gold: the leading card of a tablet Home row.
  */
 @Composable
 fun PosterCard(
@@ -240,7 +240,7 @@ private fun BoxScope.ArtBadges(item: BrowseItem) {
     item.progress?.takeIf { it > 0f && !item.watched }?.let { ProgressStrip(it, Modifier.align(Alignment.BottomStart)) }
 }
 
-/** The gold ring on the leading card of a tablet Home row (TabHomeRow.dc.html `.card.lead`). */
+/** The gold ring on the leading card of a tablet Home row. */
 private fun Modifier.leadRing(outlined: Boolean): Modifier =
     if (outlined) border(2.dp, WmmColors.Accent, RoundedCornerShape(8.dp)) else this
 

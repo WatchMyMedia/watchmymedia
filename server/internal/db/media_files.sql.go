@@ -504,7 +504,7 @@ type ListScanFilesRow struct {
 // What a scan compares the disk with: every file of a library, without the
 // probe JSON (kilobytes per file), so a library loads in one query.
 // dv_outdated is 1 for a Dolby Vision file whose stored probe lacks the
-// record's base layer and level (PLAN-HDR-PROFILE.md, The probe), which the
+// record's base layer and level, which the
 // scan probes again; only those rows' probes are read, inside SQLite.
 func (q *Queries) ListScanFiles(ctx context.Context, libraryID int64) ([]ListScanFilesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listScanFiles, libraryID)

@@ -14,7 +14,7 @@ import (
 	"watchmymedia/server/internal/events"
 )
 
-// Problem is a report of something wrong with a movie or episode (§9).
+// Problem is a report of something wrong with a movie or episode.
 type Problem struct {
 	ID         int64     `json:"id"`
 	ReportedBy string    `json:"reportedBy"`

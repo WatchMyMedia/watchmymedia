@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Requests on the fakes: the boards' sample rows (SearchRequest, MyRequests
-/// and Inbox.dc.html; every title and name is fictional). Asking for a season
+/// Requests on the fakes: the boards' sample rows
+/// (every title and name is fictional). Asking for a season
 /// of a library show marks its missing episodes requested on the show page,
 /// and Search now and Monitor change them, so every screen runs without a server.
 @MainActor

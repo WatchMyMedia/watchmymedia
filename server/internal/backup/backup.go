@@ -55,7 +55,7 @@ func ConfigElsewhere(dataDir, configFile string) string {
 // Write streams a .tar.gz of the database and config to w. configFile is
 // the config file the server loaded (config.Config.File), saved as
 // config.yaml whatever it is called and wherever it is: the Linux packages
-// keep it in /etc/watchmymedia (PLAN-LINUX.md §4). Empty means config.yaml
+// keep it in /etc/watchmymedia. Empty means config.yaml
 // in the data directory.
 func Write(ctx context.Context, conn *sql.DB, dataDir, configFile string, w io.Writer) error {
 	tmp, err := os.MkdirTemp(dataDir, ".backup-*")
@@ -85,7 +85,7 @@ func Write(ctx context.Context, conn *sql.DB, dataDir, configFile string, w io.W
 		}
 	}
 	// What cannot be fetched again: downloaded subtitles, and the pictures
-	// admins chose in place of TMDB's (PLAN-POSTERS.md).
+	// admins chose in place of TMDB's.
 	for _, name := range []string{DownloadedSubtitlesDir, ArtworkDir} {
 		err = filepath.WalkDir(filepath.Join(dataDir, name), func(path string, d os.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
@@ -112,8 +112,7 @@ func Write(ctx context.Context, conn *sql.DB, dataDir, configFile string, w io.W
 //
 //   - The Plex grants stay out of the archive, so the copy must not refer to
 //     them or have sync on: restoring it leaves the connection waiting for a
-//     new sign-in (PLAN-PLEX-SYNC.md, "Security, credentials and recovery
-//     controls").
+//     new sign-in.
 //   - Signed-in sessions and the media token key. Media, cast and offline
 //     tokens are signed with the key over the SHA-256 of a session's token,
 //     which is exactly what sessions.token_hash holds, so an archive with

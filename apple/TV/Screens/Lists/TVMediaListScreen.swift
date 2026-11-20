@@ -3,15 +3,15 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// A list's page on Apple TV, from the See all card at the end of a list row
-/// (TvListPage.dc.html, PLAN-ROWS.md Decision 8): the name; where it is from,
+/// A list's page on Apple TV, from the See all card at the end of a list row:
+/// the name; where it is from,
 /// when it was read, how much of it the library has and whose it is; then
 /// every title in rank order, seven a row. A title the library has opens its
 /// page; selecting a missing one opens the request dialog (where the person
 /// may request it); an imported title TMDB couldn't find says Not found. A
 /// list whose last fetch failed says so, with Try again for whoever may.
 /// Page Up and Page Down move two rows, as on the library grids
-/// (TvLibraryAZ.dc.html, `GridPaging`).
+/// (`GridPaging`).
 struct TVMediaListScreen: View {
     let id: Int
     @Environment(AppServices.self) private var services

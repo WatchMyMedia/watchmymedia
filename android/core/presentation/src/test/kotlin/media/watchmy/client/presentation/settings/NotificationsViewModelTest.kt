@@ -19,7 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** Settings › Notifications (PLAN-NEW-EPISODES.md §7.2): the list, Stop notifying and this device's switch. */
+/** Settings › Notifications: the list, Stop notifying and this device's switch. */
 class NotificationsViewModelTest {
     @get:Rule val main = MainDispatcherRule()
 

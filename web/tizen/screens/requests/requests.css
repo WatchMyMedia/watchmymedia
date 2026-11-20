@@ -1,4 +1,4 @@
-/* Requests on the Samsung TV canvas: the request dialog, Your requests and the Inbox. */
+/* Requests: the request dialog, Your requests and the Inbox. */
 
 /* The dialog, over the whole screen. */
 .request-hero { position: absolute; left: 0; top: 0; width: 100%; height: 40rem; background: radial-gradient(56.25rem 26.25rem at 72% 18%, rgba(255, 182, 18, .08), transparent 60%), linear-gradient(180deg, var(--ph-a, var(--surface-3)) 0%, var(--surface) 55%, var(--ground) 100%); }

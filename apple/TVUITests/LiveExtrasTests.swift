@@ -1,7 +1,6 @@
 import XCTest
 
-/// Favourites, search and reminders on Apple TV (PLAN-LIVE-TV-GUIDE.md G9,
-/// TvLiveGuideExtras, TvLiveSearch, TvLiveReminder) on the fakes, driven with
+/// Favourites, search and reminders on Apple TV on the fakes, driven with
 /// the Siri Remote. Each step keeps a screenshot in the result bundle.
 final class LiveExtrasTests: XCTestCase {
     @MainActor private var remote: XCUIRemote { XCUIRemote.shared }

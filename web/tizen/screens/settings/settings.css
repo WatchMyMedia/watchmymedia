@@ -1,4 +1,4 @@
-/* Settings: SettingsGroups, SettingsPlayback, SettingsAccount and SettingsHomeRows on the Samsung TV canvas. */
+/* Settings. */
 .settings-head { position: absolute; left: var(--content-left); top: 3.5rem; display: flex; flex-direction: column; gap: .5rem; }
 .settings-head__title { font-size: 2.875rem; font-weight: 800; letter-spacing: -.02em; }
 .settings-head__sub { font-size: 1.25rem; color: var(--muted); }

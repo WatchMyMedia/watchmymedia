@@ -1,7 +1,6 @@
 import XCTest
 
-/// Related titles at the end of movie and show pages on iPhone and iPad
-/// (PLAN-RELATED.md §7; MovieRelated, ShowRelated and their Pad2 boards), on
+/// Related titles at the end of movie and show pages on iPhone and iPad, on
 /// the fakes at API level 30 (`-fakesRelated`): the collection, then More
 /// like this, after everything else; a card opens its title's page over
 /// this one and Back comes back to the row; a page with nothing related, or

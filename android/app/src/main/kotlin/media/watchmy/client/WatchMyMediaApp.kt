@@ -129,10 +129,10 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
      */
     private fun realServices(): AppServices {
         val data = traced("WMM DataServices") { allowingStartupReads { DataServices.create(this, tv = isTv, version = BuildConfig.VERSION_NAME) } }.also { data = it }
-        // The event stream and the start-up checks wait for the app to be in front (PLAN-ANDROID-REVIEW.md §4.1.5).
+        // The event stream and the start-up checks wait for the app to be in front.
         appScope.launch { ProcessLifecycleOwner.get().lifecycle.currentStateFlow.collect { data.setInFront(it.isAtLeast(Lifecycle.State.STARTED)) } }
         fun account() = media.watchmy.client.model.watchNextAccount(data.servers.current.value?.server, data.auth.user.value)
-        // Downloads (PLAN-DOWNLOADS.md) are for phones and tablets: the TV app never shows them.
+        // Downloads are for phones and tablets: the TV app never shows them.
         lateinit var engine: PlaybackEngine
         val downloads = if (isTv) {
             null
@@ -188,8 +188,8 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
     }
 
     /**
-     * New episodes of the shows the person follows (PLAN-NEW-EPISODES.md
-     * §6.1): the check's periodic work follows this device's switch and the
+     * New episodes of the shows the person follows:
+     * the check's periodic work follows this device's switch and the
      * permission, and a sign-out or another account cancels it and takes
      * away what is showing.
      */
@@ -233,7 +233,7 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
                 }
             },
             openLive = { load ->
-                // A channel needs a server that lets cast tokens play Live TV (PLAN-LIVE-TV.md §4.1).
+                // A channel needs a server that lets cast tokens play Live TV.
                 reach(load)?.takeIf { it.apiLevel >= LIVE_CAST_API_LEVEL }?.let { server ->
                     val cast = data.castLivePlayback(server, load.token, expires(load), StreamQuality.byId(load.live?.quality ?: load.quality))
                     CastConnectLive(playback.liveFor(cast.gateway, cast.preferences), cast.live)

@@ -20,8 +20,8 @@ type FeedChannel struct {
 // Arts) and the Live TV fixture's extra channels (22.1 Cedar Sports, 42.3
 // Willow Cinema); 42.3 has no logo.
 //
-// Their display names follow SiliconDust's order (PLAN-LIVE-TV-GUIDE.md
-// §7.1), with Q callsigns, which no station has: 3 to 6 names, one of them
+// Their display names follow SiliconDust's order,
+// with Q callsigns, which no station has: 3 to 6 names, one of them
 // the lineup's GuideName, and 42.3 has the blank callsign ("42.3 " and "").
 var StandardChannels = []FeedChannel{
 	{Number: "7.1", Names: []string{"QMDWDT", "7.1 QMDWDT", "7.1 QMDW-DT", "7.1", "QMDW-DT", "Meadow News"}},

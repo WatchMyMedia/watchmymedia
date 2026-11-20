@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import WMMModel
 
-/// The clash shown when Record finds the tuners booked (PLAN-LIVE-TV-DVR.md §3.1).
+/// The clash shown when Record finds the tuners booked.
 @Suite struct LiveRecordingClashTests {
     private static let zone = TimeZone(identifier: "America/New_York")!
     private static func calendar() -> Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = zone; return c }

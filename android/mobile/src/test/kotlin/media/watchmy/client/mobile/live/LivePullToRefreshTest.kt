@@ -19,7 +19,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Pulling Live TV's channel list down asks the server again (PLAN-ANDROID-REVIEW §6.3). */
+/** Pulling Live TV's channel list down asks the server again. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xxhdpi")
 class LivePullToRefreshTest {

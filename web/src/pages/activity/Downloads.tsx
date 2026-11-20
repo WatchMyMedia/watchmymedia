@@ -42,8 +42,8 @@ function QualityChip({ quality, mode }: { quality: string; mode: string }) {
 }
 
 /**
- * Activity › Downloads (admins; PLAN-DOWNLOADS.md §8,
- * design/mockups/web/ActivityDownloads): what is downloading now and every
+ * Activity › Downloads (admins):
+ * what is downloading now and every
  * download kept, with Revoke (from an admin network). A download is not a
  * play, so none of this is in History.
  */

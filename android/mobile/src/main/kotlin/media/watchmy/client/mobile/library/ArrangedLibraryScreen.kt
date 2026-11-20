@@ -74,7 +74,7 @@ import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.open
 
 /**
- * The Movies or TV screen with its rows above the grid (LibraryRows.dc.html):
+ * The Movies or TV screen with its rows above the grid:
  * the library's rows in the person's order, Edit rows, then All movies with
  * its count and sort, the chips and the grid, all in one scroll.
  */
@@ -176,7 +176,7 @@ internal fun libraryRowActions(
 /**
  * The library's rows as full-width items of a grid, reaching the screen's
  * edges. A row's See all opens a list's page, or sorts the grid below the
- * row's way ([onOpen], PLAN-SEE-ALL.md §4.4).
+ * row's way ([onOpen]).
  */
 internal fun LazyGridScope.libraryRows(
     rows: List<media.watchmy.client.model.ScreenRow>,

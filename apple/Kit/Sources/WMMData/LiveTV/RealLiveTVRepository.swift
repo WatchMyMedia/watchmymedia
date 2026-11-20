@@ -23,7 +23,7 @@ final class RealLiveTVRepository: LiveTVRepository {
 
     /// The capabilities and channels, one request of each for every caller at
     /// once (launch, sign-in, the foreground refresh, a link); a caller after
-    /// a Live TV event asks again (PLAN-APPLE-REVIEW.md §4.1.3).
+    /// a Live TV event asks again.
     func refresh() async throws {
         try await flight.run(stamp: "\(store.revision)#\(events?.received[.liveTV] ?? 0)") { [weak self] in try await self?.load() }
     }

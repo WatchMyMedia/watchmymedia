@@ -43,7 +43,7 @@ import media.watchmy.client.presentation.Load
 import media.watchmy.client.presentation.ShownPage
 
 /**
- * A library's Movies or TV rows, above its grid (PLAN-ROWS.md Decision 11),
+ * A library's Movies or TV rows, above its grid,
  * for the phone, tablet and TV library screens. [show] names the library
  * once the screen knows it. Read again when the library, the screen's
  * layout or a list changes; a failure keeps what is on screen, since the
@@ -124,8 +124,8 @@ class LibraryRowsViewModel(private val library: LibraryRepository, private val r
 }
 
 /**
- * Edit Home, Settings › Home rows and a library's Edit rows (PLAN-ROWS.md
- * §5, §8.2; HomeEditRows.dc.html, AddRow.dc.html): the screen's rows in
+ * Edit Home, Settings › Home rows and a library's Edit rows:
+ * the screen's rows in
  * order, moved up and down (or dragged), hidden and shown, and Add a row
  * from the hidden ones. [screenName] ("Home", "Movies") is how the notes
  * name the screen.
@@ -292,7 +292,7 @@ class RowLayoutViewModel(
 }
 
 /**
- * A list's page, from its row's See all (PLAN-ROWS.md §5, Decision 8), on
+ * A list's page, from its row's See all, on
  * the phone, tablet and TV: every entry in rank order, the library's as
  * cards, the missing ones with Request where the person may ask, and
  * imports' unmatched titles as Not found. Refresh now and Delete for the

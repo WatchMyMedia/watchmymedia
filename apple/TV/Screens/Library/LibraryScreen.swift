@@ -3,17 +3,17 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The TV Shows or Movies grid (TvLibrary.dc.html): the title and the
+/// The TV Shows or Movies grid: the title and the
 /// library's counts, Sort as a menu, the filter and genre chips with a
 /// Decade menu, and seven posters a row, a page at a time. Long press marks
 /// a poster watched. From API level 22 the library's rows come first, then
-/// Edit rows, then the grid as All movies or All shows (TvLibraryRows.dc.html).
-/// Sorted by title, the letter index runs down the right edge
-/// (TvLibraryAZ.dc.html): right from the last column enters it at the
+/// Edit rows, then the grid as All movies or All shows.
+/// Sorted by title, the letter index runs down the right edge:
+/// right from the last column enters it at the
 /// focused poster's letter, the grid follows the letters up and down, Select
 /// or left lands on the letter's first title, and Menu goes back to the
-/// poster. Page Up and Page Down move two rows in any sort. A row's See all
-/// (PLAN-SEE-ALL.md §4.3), on Home or in the rows above, opens the grid
+/// poster. Page Up and Page Down move two rows in any sort. A row's See all,
+/// on Home or in the rows above, opens the grid
 /// sorted the row's way, with focus on its first poster.
 struct LibraryScreen: View {
     let type: LibraryType
@@ -52,7 +52,7 @@ private struct LibraryView: View {
                 }
                 .onChange(of: focus) { old, new in focusMoved(from: old, to: new, proxy) }
                 // Home's See all opened the tab: the grid has loaded sorted the row's way, so focus goes to
-                // its first poster, below the tab's own rows (PLAN-SEE-ALL.md §11.2).
+                // its first poster, below the tab's own rows.
                 .onChange(of: model.gridJump) { Task { await focusFirstItem(proxy) } }
                 .onPageKeys(enabled: gridFocused) { page(by: $0, proxy) }
         }
@@ -296,7 +296,7 @@ private struct LibraryView: View {
 
     // MARK: The letter index
 
-    /// Beside the index the page is 1,670 wide (TvLibraryAZ.dc.html), else 1,740.
+    /// Beside the index the page is 1,670 wide, else 1,740.
     private var trailingGutter: CGFloat { model.letterIndex == nil ? TVLayout.gutter : 160 }
 
     private var gridFocused: Bool {

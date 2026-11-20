@@ -27,8 +27,8 @@ import media.watchmy.client.model.RowIds
 import java.net.URLEncoder
 
 /**
- * The app's one preview channel on the Android TV home screen
- * (PLAN-ANDROID-REVIEW.md §6.2): Recently added, the newest movies and
+ * The app's one preview channel on the Android TV home screen:
+ * Recently added, the newest movies and
  * shows from Home, each with its poster (through [WatchNextArtProvider])
  * and opening its page. Like the Watch Next row, its programmes are the
  * signed-in account's: another account's, or none signed in, leave it

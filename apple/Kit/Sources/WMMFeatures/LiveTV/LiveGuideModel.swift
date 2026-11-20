@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import WMMModel
 
-/// The guide grid on every Apple screen (PLAN-LIVE-TV-GUIDE.md §6.1, §6.4):
+/// The guide grid on every Apple screen:
 /// channels down, a span of time across from a half hour, the days listings
 /// reach, Now, earlier and later, category chips and Go to channel, and the
 /// selected (or, on Apple TV, focused) programme for the card, panel or hero.
@@ -72,8 +72,8 @@ public final class LiveGuideModel {
     @ObservationIgnored private let repository: any LiveTVRepository
     @ObservationIgnored private let now: @MainActor () -> Date
 
-    // What reading the grid would otherwise recompute on every read
-    // (PLAN-APPLE-REVIEW.md §4.3.4): kept until something they read changes,
+    // What reading the grid would otherwise recompute on every read:
+    // kept until something they read changes,
     // which observation reports at once; each revision tells the views.
     @ObservationIgnored private var rowsKept: [Row]?
     private var rowsRevision = 0

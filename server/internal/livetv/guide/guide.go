@@ -1,6 +1,6 @@
 // Package guide keeps programme listings for live channels: it fetches
 // SiliconDust's XMLTV feed, matches it to the lineup, stores it and answers
-// window queries (PLAN-LIVE-TV-GUIDE.md §5). Listings are off until an
+// window queries. Listings are off until an
 // admin turns them on, and a guide outage never stops a channel playing.
 package guide
 
@@ -128,10 +128,10 @@ type Options struct {
 	ArtDir string
 	// Now is the clock; nil is time.Now.
 	Now func() time.Time
-	// Enrich runs after each successful refresh: TMDB matching (G3).
+	// Enrich runs after each successful refresh: TMDB matching.
 	Enrich func(context.Context) error
 	// Bus carries live.favourites.changed and live.reminders.changed to a
-	// person's devices (G6); nil sends nothing.
+	// person's devices; nil sends nothing.
 	Bus *events.Bus
 }
 
@@ -341,7 +341,7 @@ func programmeView(r db.LiveTvProgramme) livetv.Programme {
 		Description: r.Description, DescriptionSource: r.DescriptionSource,
 		PictureURL: art.URL(r.Picture), PictureSource: r.PictureSource, PosterURL: art.URL(r.Poster), StillURL: r.Still,
 	}
-	// A picture G3 filled in from TMDB is already a path on /api/images.
+	// A picture filled in from TMDB is already a path on /api/images.
 	if r.PictureSource == "tmdb" {
 		p.PictureURL = r.Picture
 	}

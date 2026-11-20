@@ -1,5 +1,5 @@
 /**
- * The player rules of PLAN-CLIENTS.md §2.3 that the browser player and the
+ * The player rules that the browser player and the
  * Cast receiver share, so the two cannot drift: which segment the Skip
  * button offers and when it skips by itself, when the Next Episode card
  * shows, and how often heartbeats go out. Times are seconds of the file.
@@ -73,11 +73,11 @@ export type BeatState = 'playing' | 'paused' | 'buffering' | 'stopped' | 'closed
  * Heartbeats go out at every state change, every 10 s while playing and
  * every 30 s otherwise. At Automatic quality they go every 5 s while
  * playing or buffering, so the server hears soon when the stream falls
- * behind (PLAN-AUTO-QUALITY.md §2).
+ * behind.
  */
 export function beatDue(state: BeatState, lastBeatAt: number, now: number, auto = false, seeked = false) {
   // A landed seek is saved at once, at most once a second while scrubbing,
-  // so a backward seek is not lost to the next beat (PLAN-RESUME.md §3.6).
+  // so a backward seek is not lost to the next beat.
   if (seeked) return now - lastBeatAt >= SEEK_BEAT_GAP_MS
   const every = auto && (state === 'playing' || state === 'buffering') ? 5_000 : state === 'playing' ? 10_000 : 30_000
   return now - lastBeatAt >= every
@@ -126,7 +126,7 @@ export function waitingAtJoint(buffered: Ranges, t: number): boolean {
 }
 
 /**
- * Counts a player's stalls for the heartbeat (PLAN-AUTO-QUALITY.md §3.1):
+ * Counts a player's stalls for the heartbeat:
  * buffering after the stream's first frame that no seek, reload or resume
  * caused, and the time they took; and, once, how long the first stream took
  * from asking for its decision to its first frame. Times are milliseconds.

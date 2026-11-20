@@ -8,7 +8,7 @@ android {
     testOptions { unitTests.isIncludeAndroidResources = true }
 }
 
-// Offline downloads on phones and tablets (PLAN-DOWNLOADS.md §10): Media3's
+// Offline downloads on phones and tablets: Media3's
 // DownloadManager and DownloadService over the server's offline routes, which
 // it reaches through core:model's OfflineGateway (core:data implements it).
 dependencies {

@@ -1,8 +1,7 @@
 import Foundation
 import WMMModel
 
-/// The guide boards' fictional listings (design/mockups/ios/LiveGuide and
-/// friends, PLAN-LIVE-TV-GUIDE.md §6.4), for `-fakesLiveGuide`. The boards
+/// The guide boards' fictional listings, for `-fakesLiveGuide`. The boards
 /// stop the clock at 8:12 PM, in their 8:00 half hour. Here the half hour now
 /// is in plays the boards' 8:00, so what is on now is what the boards show at
 /// any minute; only how far in it is differs (0–29 minutes, where the boards
@@ -20,7 +19,7 @@ public struct FakeLiveGuide: Sendable {
     public let conference: Conference
     /// The extras boards' `filter` Tweak: Sam starts with five favourites, or none.
     public let favourites: Bool
-    /// Favourites, search and reminders (API level 15); false keeps the server at G5's level 13.
+    /// Favourites, search and reminders (API level 15); false keeps the server at level 13.
     public let extras: Bool
     /// A reminder whose alert comes `soonAfter` seconds after launch (20 by
     /// default) with the default lead time, to watch one arrive.

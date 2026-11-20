@@ -55,8 +55,8 @@ internal fun followKey(tmdbId: Long) = "follow:$tmdbId"
 private const val FOLLOWS_FAILED_KEY = "follows-failed"
 
 /**
- * Settings › Notifications on the TV (PLAN-NEW-EPISODES.md §7.2; the boards'
- * `tv-settings`): who notifies, then Shows you follow, a row a show with its
+ * Settings › Notifications on the TV:
+ * who notifies, then Shows you follow, a row a show with its
  * poster and line. No switch: this TV doesn't notify. OK on a show opens the
  * side panel ([onShow]); a stop the server refused says so in the row, and OK
  * tries it again. When the row that had focus goes, focus moves to the next,

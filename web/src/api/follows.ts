@@ -3,7 +3,7 @@ import { api, unwrap } from './client'
 import type { components } from './schema'
 
 // Following shows and the episodes that arrive for them
-// (PLAN-NEW-EPISODES.md §5.3, §5.4; API level 29). Keys: ['follows'] for the
+// (API level 29). Keys: ['follows'] for the
 // person's list; a show's following is in its own reply, ['show', id].
 
 export type Follow = components['schemas']['Follow']
@@ -21,7 +21,7 @@ export const followsQuery = queryOptions({
 /**
  * What arrived for the person's shows after a cursor; without one, only the
  * current cursor. Undefined when the server can't be reached or refuses, so
- * the caller keeps its cursor and the next check catches up (§6.1).
+ * the caller keeps its cursor and the next check catches up.
  */
 export async function fetchNewEpisodes(after?: string): Promise<NewEpisodes | undefined> {
   try {
@@ -93,7 +93,7 @@ function settled(qc: QueryClient) {
 }
 
 /**
- * Notify me on a show, and pressing it again (§7.1): shown at once, and put
+ * Notify me on a show, and pressing it again: shown at once, and put
  * back if the server refuses, as stars and reminders are.
  */
 export function useFollowShow() {

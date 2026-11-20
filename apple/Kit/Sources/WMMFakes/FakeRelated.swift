@@ -1,7 +1,7 @@
 import Foundation
 import WMMModel
 
-/// Related titles on the fakes (PLAN-RELATED.md §3; every title is
+/// Related titles on the fakes (every title is
 /// fictional), as the server sends them from API level 30
 /// (`-fakesRelated`): Cold Harbour Road, Low Tide at Carrow and Dead
 /// Reckoning Bay are the Carrow Coast Collection, so each of their pages has

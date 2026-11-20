@@ -2,8 +2,8 @@ import { Fragment, useLayoutEffect, useRef, type FocusEvent, type HTMLAttributes
 import type { FocusHintWords } from './browseHooks'
 
 // The remote's keys the browsing screens name: a row of key caps along the
-// foot (LibraryAZ), and the hint for whatever has focus (LibraryRows' pill,
-// ListPage's header), read from the focused card's data-hint and data-hold.
+// foot, and the hint for whatever has focus (the library rows' pill,
+// a list's header), read from the focused card's data-hint and data-hold.
 
 export type Hint = { keys: string[]; label: string } | { note: string }
 

@@ -1,9 +1,8 @@
 import Foundation
 import WMMModel
 
-// Link a TV and Switch server as stepped tasks (PLAN-APPLE-SETTINGS.md §5.5,
-// §5.6; Settings2LinkTv*.dc.html, Settings2Switch*.dc.html,
-// Pad2Settings2LinkTv.dc.html, TvSettings2Switch*.dc.html): each step's
+// Link a TV and Switch server as stepped tasks:
+// each step's
 // number and name and the next one's, each button's label and why it is
 // off, every failure ending in what was or wasn't done, and the finished
 // screen's What changed and What happens next.
@@ -70,7 +69,7 @@ func linkLookUpProblem(_ error: any Error, serverName: String?) -> SettingsNotic
     }
 }
 
-/// The server refused a code with too many wrong ones (Settings2LinkTvCode.dc.html, `tooMany`).
+/// The server refused a code with too many wrong ones.
 let linkTooManyCodes = SettingsNotice(title: "Too many wrong codes", body: "Nothing was linked. Try again in a minute.")
 
 /// Why approving failed, ending in what wasn't done.

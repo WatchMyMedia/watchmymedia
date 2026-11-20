@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-// A row's See all (PLAN-SEE-ALL.md): what its card says, and the library
+// A row's See all: what its card says, and the library
 // link handed to that library's grid once. The phone, the tablet and the TV
 // use these.
 
@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 data class SeeAllWords(val title: String, val detail: String?, val spoken: String)
 
 /**
- * The See all card's words for [link] (PLAN-SEE-ALL.md §3): "See all TV
+ * The See all card's words for [link]: "See all TV
  * shows" over "By last aired" for a library of [type], read aloud "See all
  * TV shows, by last aired"; "See all" over "With the ones you don’t have"
  * for a list, read aloud "See all of [rowName]". The second line is the
@@ -31,7 +31,7 @@ fun seeAllWords(link: RowLink, type: LibraryType?, rowName: String): SeeAllWords
 
 /**
  * A library grid's choices from a row's See all: the grid takes them once,
- * as if the person had picked them (PLAN-SEE-ALL.md decision 3). Null
+ * as if the person had picked them. Null
  * fields are left to the grid: no sort keeps its sort, no filter is All.
  */
 data class BrowseRequest(
@@ -60,7 +60,7 @@ fun HomeData.libraryType(link: RowLink.Library): LibraryType? = when (link.libra
 fun HomeData.seeAllType(row: ScreenRow): LibraryType? = (row.seeAll as? RowLink.Library)?.let(::libraryType)
 
 /**
- * A row's See all on its way to its library's grid (PLAN-SEE-ALL.md §4.4).
+ * A row's See all on its way to its library's grid.
  * Home [post]s the link's choices and opens the tab; the tab's grid [take]s
  * them, once, when it starts or, already open in the background, as they
  * arrive. A route argument would come back with the tab's saved state and

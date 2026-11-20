@@ -110,8 +110,7 @@ private val ErrorGround = Color(0xFF1F1010)
 private val ErrorRim = Color(0xFF7F1D1D)
 
 /**
- * Change password (PLAN-ANDROID-SETTINGS.md §5.3; the SettingsPassword and
- * TabSettingsPassword boards): the current password and a new one, each
+ * Change password: the current password and a new one, each
  * typed once with the eye to check it, the other devices the change signs
  * out by name, and one button that says how many.
  *

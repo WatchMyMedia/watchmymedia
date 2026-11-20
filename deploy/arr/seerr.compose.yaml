@@ -1,5 +1,5 @@
-# A throwaway Seerr for testing it as the request backend (PLAN-ARR.md §7.3,
-# §15), with the Jellyfin it needs to finish setup: Seerr signs its first
+# A throwaway Seerr for testing it as the request backend,
+# with the Jellyfin it needs to finish setup: Seerr signs its first
 # admin in through Plex, Jellyfin or Emby and has no other way. Jellyfin has
 # an empty library; Seerr looks titles up on TMDB itself, so it needs the
 # internet.

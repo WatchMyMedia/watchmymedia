@@ -61,7 +61,7 @@ import media.watchmy.client.model.PairingState
 import media.watchmy.client.ui.rememberModelTextField
 
 /**
- * Sign in on the TV (mockup: design/mockups/android-tv/Main.dc.html): a
+ * Sign in on the TV: a
  * pairing code and QR code for the link page, renewed when it runs out, or a
  * name and password typed on the on-screen keyboard.
  */
@@ -196,7 +196,7 @@ private enum class Field { Name, Password }
 @Composable
 private fun PasswordSignIn(vm: SignInViewModel, state: SignInViewModel.State, serverName: String, onUseCode: () -> Unit) {
     val form = state
-    // The fields hold their text (§3.3.3), which the keyboard edits; the model hears it as it is typed.
+    // The fields hold their text, which the keyboard edits; the model hears it as it is typed.
     val nameField = rememberModelTextField(state.name, state.revision, vm::setName)
     val passwordField = rememberModelTextField(state.password, state.revision, vm::setPassword)
     val submit = {

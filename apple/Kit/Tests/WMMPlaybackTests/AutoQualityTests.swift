@@ -3,7 +3,7 @@ import Testing
 @testable import WMMPlayback
 import WMMModel
 
-/// Automatic quality (PLAN-AUTO-QUALITY.md §6): what the player asks for,
+/// Automatic quality: what the player asks for,
 /// what it measures and reports, and how it follows the server's step down.
 @MainActor
 @Suite struct AutoQualityTests {

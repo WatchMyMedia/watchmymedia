@@ -26,8 +26,8 @@ import media.watchmy.client.tv.rows.TvRowActions
 import media.watchmy.client.tv.rows.cardKey
 
 /**
- * The page's last rows (PLAN-RELATED.md §7; android-tv/MovieRelated.dc.html
- * and ShowRelated.dc.html): the movie's collection, with "In release order"
+ * The page's last rows:
+ * the movie's collection, with "In release order"
  * beside its name, then More like this, drawn as Home's poster rows. ▼ from
  * what is above comes to the row's first card, or the one it had; the page
  * scrolls to show the whole row, heading and all. OK opens the title's page

@@ -21,9 +21,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * What the device can decode (PLAN-ANDROID-REVIEW.md §6.1): the size limit
+ * What the device can decode: the size limit
  * is the decoders', not the display's, hardware first; and a video decoder
- * that fails on a stream is asked around once a viewing (§3.1.3).
+ * that fails on a stream is asked around once a viewing.
  */
 class DecoderCapabilitiesTest {
     private val uhd = VideoSize(3840, 2160)

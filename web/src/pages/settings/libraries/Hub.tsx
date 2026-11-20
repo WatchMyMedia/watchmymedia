@@ -11,7 +11,7 @@ import { settingsCrumbs, settingsHref } from '../../../lib/settingsRoutes'
 import { LinkButton, MatchingOff } from './parts'
 import { useFlash } from './flash'
 
-/** The Libraries hub (board lib-hub): a row per library with its state in
+/** The Libraries hub: a row per library with its state in
  * words, Needs you when files are unmatched, and the scan schedule. */
 export function LibrariesHub() {
   const libraries = useQuery(librariesQuery)

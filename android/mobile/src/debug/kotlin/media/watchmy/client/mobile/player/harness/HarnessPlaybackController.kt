@@ -37,7 +37,7 @@ enum class Scenario(val title: String, val startMs: Long) {
     Auto("Automatic lowers the quality", 12 * 60_000L + 30_000),
     AutoRecovery("Automatic lowers then recovers", 12 * 60_000L + 30_000),
 
-    // Live TV cast to a TV (PLAN-LIVE-TV.md §4.1): the live player as the TV's remote.
+    // Live TV cast to a TV: the live player as the TV's remote.
     LiveCasting("Live TV: the TV's remote", 0),
     LiveHandover("Live TV: a TV turns up while playing", 0),
     LiveNotLive("Live TV: a TV that can't play it", 0),

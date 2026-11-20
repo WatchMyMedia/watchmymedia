@@ -30,7 +30,7 @@ function useConnectionId() {
 }
 
 /**
- * Add Radarr or Sonarr (§5.2): Connect → Folders → Requests → Webhook →
+ * Add Radarr or Sonarr: Connect → Folders → Requests → Webhook →
  * Connected. Connect saves the connection; its id rides in the address from
  * then on, so a reload stays put and Exit leaves the rest to do on its page.
  */
@@ -95,7 +95,7 @@ function ArrConnected({ connection: c, frame }: { connection: Integration; frame
   )
 }
 
-/** Connect Seerr (§5.2): Connect → Link people → Connected. Only one Seerr can be connected. */
+/** Connect Seerr: Connect → Link people → Connected. Only one Seerr can be connected. */
 export function SeerrFlow({ step }: { step?: string }) {
   const go = useGo()
   const upsert = useUpsertConnection()

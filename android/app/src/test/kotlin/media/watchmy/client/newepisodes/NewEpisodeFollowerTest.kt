@@ -42,8 +42,8 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * When the app checks for new episodes and keeps the periodic work
- * (PLAN-NEW-EPISODES.md §6.1, §7.3): scheduled whenever this device could
+ * When the app checks for new episodes and keeps the periodic work:
+ * scheduled whenever this device could
  * notify (signed in to a server at level 29, the switch on, Android allowing
  * them), whatever it last saw of the list; cancelled otherwise and on a
  * sign-out; a check at each foreground and three minutes after the last

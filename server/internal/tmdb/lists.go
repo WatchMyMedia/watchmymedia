@@ -8,7 +8,7 @@ import (
 )
 
 // ListItem is a movie or show in one of TMDB's lists: trending, a chart,
-// discover's results, a public list or a collection (PLAN-ROWS.md 7.2).
+// discover's results, a public list or a collection.
 type ListItem struct {
 	// MediaType is "movie" or "tv".
 	MediaType  string

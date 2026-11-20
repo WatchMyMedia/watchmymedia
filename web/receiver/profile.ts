@@ -9,7 +9,7 @@ type Decision = components['schemas']['Decision']
 export const SEPARATE_AUDIO_LEVEL = 4
 
 /** The apiLevel from which a server takes maxPcmChannels and converts
- * audio to E-AC-3 or FLAC (PLAN-AUDIO.md). */
+ * audio to E-AC-3 or FLAC. */
 export const PCM_CHANNELS_LEVEL = 31
 
 const AUDIO_CODECS: Record<string, string> = { ac3: 'ac-3', eac3: 'ec-3', opus: 'Opus', flac: 'fLaC', mp3: 'mp4a.40.34' }
@@ -102,7 +102,7 @@ export function castCaps(ctx: framework.CastReceiverContext) {
 }
 
 /**
- * What this Cast device can play (PLAN-CAST.md §4.3), from the receiver
+ * What this Cast device can play, from the receiver
  * SDK's own probes: a codec is listed when it decodes at 1080p, and the size
  * limit is 4K when every listed codec also decodes at 4K. AC-3 and E-AC-3
  * are listed only where the device decodes them or passes them through over
@@ -111,7 +111,7 @@ export function castCaps(ctx: framework.CastReceiverContext) {
  * rendition, which the TVs tried so far take; muxed with video they do not,
  * so older servers send those TVs AAC. MKV is always remuxed; ASS becomes
  * WebVTT; image subtitles burn in. Servers from apiLevel 8 also get the HDR
- * the TV shows and the Dolby Vision keys (PLAN-HDR-PROFILE.md §6.3).
+ * the TV shows and the Dolby Vision keys.
  */
 export function castProfile(ctx: framework.CastReceiverContext, level = 0): Profile {
   const separateAudio = level >= SEPARATE_AUDIO_LEVEL

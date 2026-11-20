@@ -1,10 +1,9 @@
 import Foundation
 
-// How arranged rows and lists are worded (PLAN-ROWS.md §5), word for word as
-// the boards say it (design/mockups/ios/HomeEditRows, AddRow, ListPage and
-// apple-tv/TvSettingsHomeRows), the same on iPhone, iPad and Apple TV.
+// How arranged rows and lists are worded, word for word as
+// the boards say it, the same on iPhone, iPad and Apple TV.
 
-/// Add a row's note: lists are made on the web (PLAN-ROWS.md Decision 10).
+/// Add a row's note: lists are made on the web.
 public let listsMadeOnTheWeb = "Lists are made in WatchMyMedia on the web."
 /// Under it on iPhone and iPad.
 public let listsMadeOnTheWebDetail = "A list made there shows up here, ready to add."

@@ -48,8 +48,8 @@ public func isLocalNetworkHost(_ host: String) -> Bool {
     return h.hasSuffix(".local") || h == "localhost" || isIPv4Address(h) || h.contains(":")
 }
 
-/// A host an Apple TV on the same network should reach, for AirPlay
-/// (PLAN-IOS.md §5): a private IPv4 address (10/8, 172.16/12, 192.168/16) or
+/// A host an Apple TV on the same network should reach, for AirPlay:
+/// a private IPv4 address (10/8, 172.16/12, 192.168/16) or
 /// a `.local` name. Not a tailnet name or address, loopback, or a public
 /// name, which needs the router to loop it back (hairpin NAT).
 public func isLANHost(_ host: String) -> Bool {
@@ -148,7 +148,7 @@ public protocol ServerRepository: AnyObject, Observable {
     /// Whether the server in use answered the last ``refreshCurrent()``: nil
     /// before one has, or for a server since chosen. The check gives up within
     /// seconds, so a screen can show what works offline (the offline Home)
-    /// before its own request times out (PLAN-APPLE-REVIEW.md §4.1.5).
+    /// before its own request times out.
     var reachable: Bool? { get }
 }
 

@@ -9,7 +9,7 @@ import (
 	"watchmymedia/server/internal/probe"
 )
 
-// AudioPreferences follow a person between players (PLAN-LANGUAGES.md).
+// AudioPreferences follow a person between players.
 // Unlike subtitles, no request opts in: a request that names no audioIndex
 // starts on the preferred track, and every client already plays and shows
 // the decision's track.

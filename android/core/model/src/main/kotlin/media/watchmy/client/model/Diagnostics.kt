@@ -2,8 +2,8 @@ package media.watchmy.client.model
 
 /**
  * What the app can tell about its own health on this device, for a "Copy
- * diagnostics" row in Settings (PLAN-ANDROID-REVIEW §6.4; the row waits for
- * its board). Nothing leaves the device unless the person copies it.
+ * diagnostics" row in Settings.
+ * Nothing leaves the device unless the person copies it.
  */
 interface Diagnostics {
     /**

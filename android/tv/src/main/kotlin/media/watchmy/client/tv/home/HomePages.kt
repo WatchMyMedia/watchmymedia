@@ -59,7 +59,7 @@ import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
 /**
- * Home as screens (PLAN-HOME.md §7, HomeStart.dc.html and HomeRow.dc.html):
+ * Home as screens:
  * the first screen is the hero and the first drawn row, every row after it
  * fills a screen of its own, and the last screen is Edit rows and the
  * totals. Without a hero every row is a row screen.
@@ -112,12 +112,12 @@ private val CardTarget.hint: String
 
 private const val MORE = " · ◀ ▶ more in this row · ▼ next row"
 
-/** On the row's first card, where ◀ leaves the row for the rail (RowStartBest.dc.html). */
+/** On the row's first card, where ◀ leaves the row for the rail. */
 private const val MORE_FIRST = " · ▶ more in this row · ◀ menu · ▼ next row"
 
 /**
- * The focused card's picture filling the top of a row screen (HomeRow.dc.html:
- * 1360 wide from 560 in, 660 tall, faded into the ground from the left and
+ * The focused card's picture filling the top of a row screen (1360
+ * wide from 560 in, 660 tall, faded into the ground from the left and
  * the bottom), crossfading over 200 ms as focus moves along the row. The
  * seeded gradient shows until the image is in.
  */
@@ -153,7 +153,7 @@ internal fun PrefetchNeighbours(row: ScreenRow, index: Int, channels: List<LiveC
 }
 
 /**
- * The kicker, title, facts, two-line overview and OK hint over a row screen's backdrop (HomeRow.dc.html `Focused title`).
+ * The kicker, title, facts, two-line overview and OK hint over a row screen's backdrop.
  * [first]: the panel is the row's first card's, and the hint says ◀ goes to the menu.
  */
 @Composable
@@ -206,7 +206,7 @@ internal fun FocusPanel(panel: CardPanel, modifier: Modifier = Modifier, first: 
     }
 }
 
-/** The name of the next row (or the one before, [up]) along the screen's bottom edge, with a chevron (HomeRow.dc.html `.peek`). */
+/** The name of the next row (or the one before, [up]) along the screen's bottom edge, with a chevron. */
 @Composable
 internal fun PeekLine(text: String, up: Boolean, modifier: Modifier = Modifier) {
     Row(

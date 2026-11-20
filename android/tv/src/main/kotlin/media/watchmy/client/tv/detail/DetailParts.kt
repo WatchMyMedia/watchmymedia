@@ -104,7 +104,7 @@ fun StatusPill(text: String, gold: Boolean) {
 
 /**
  * A cast member: a 72 dp circle, the name and the role. [focusable] lets
- * focus stop on it (the movie page's cast, MovieRelated.dc.html): the
+ * focus stop on it (the movie page's cast): the
  * circle takes the gold ring and grows, and TalkBack reads the name and the
  * role as one. OK does nothing.
  */

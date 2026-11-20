@@ -18,7 +18,7 @@ type Settings = components['schemas']['Settings']
 
 const LEDE = 'When a device can’t play a file as it is, the server converts it while it streams. A hardware encoder keeps that fast and quiet.'
 
-/** Settings › Server › Transcoding: each section leads with what is in use (board tx-hub). */
+/** Settings › Server › Transcoding: each section leads with what is in use. */
 export function TranscodingHub() {
   const settings = useQuery({ ...settingsQuery, refetchInterval: (q) => hardwarePoll(q) || 15_000 })
   const server = useQuery(serverQuery)
@@ -160,7 +160,7 @@ function CapabilityDetails({ s }: { s: Settings }) {
   )
 }
 
-/** Seek thumbnails: the switch saves at once; Delete asks first (board tx-thumbs). */
+/** Seek thumbnails: the switch saves at once; Delete asks first. */
 function ThumbnailsSection() {
   const status = useQuery({ ...trickplayQuery, refetchInterval: (q) => pollInterval(q.state.data) })
   const update = useUpdateSettings()

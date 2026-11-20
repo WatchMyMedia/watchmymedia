@@ -83,8 +83,8 @@ internal fun notificationsModel(): NotificationsViewModel {
 }
 
 /**
- * Settings › Notifications (PLAN-NEW-EPISODES.md §7.2; the boards'
- * `settings` and `off`): the card when Android won't show new episodes
+ * Settings › Notifications:
+ * the card when Android won't show new episodes
  * (while the switch is on), the lede, On this phone (the switch, the
  * Notifications row, the limits and, where Playback shows them, where Live
  * TV reminders are), then Shows you follow, newest first, each with Stop

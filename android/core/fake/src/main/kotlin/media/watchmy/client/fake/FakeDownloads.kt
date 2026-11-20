@@ -27,7 +27,7 @@ import media.watchmy.client.model.SubtitleOption
 import media.watchmy.client.model.WatchProgress
 
 /**
- * Downloads on the fakes (PLAN-DOWNLOADS.md §10.1), as the Downloads board
+ * Downloads on the fakes, as the Downloads board
  * draws them: a finished movie, one with a new version, Harbor Lights' three
  * episodes with one coming, one removed from the server and one waiting for
  * Wi-Fi. A new download waits, then goes up a step every [stepMs] on

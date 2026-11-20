@@ -29,7 +29,7 @@ function useWide() {
   }, () => window.matchMedia('(min-width: 640px)').matches)
 }
 
-/** The guide with listings (PLAN-LIVE-TV-GUIDE.md §6.2): the selected programme above a grid of channels against half hours. From API level 15 it adds favourites, listings search and reminders (§6.5). */
+/** The guide with listings: the selected programme above a grid of channels against half hours. From API level 15 it adds favourites, listings search and reminders. */
 export function ListingsGuide({ admin, playback, open }: { admin: boolean; playback: boolean; open?: GuideSearch }) {
   const wide = useWide()
   const hours = wide ? 2 : 1
@@ -145,7 +145,7 @@ export function ListingsGuide({ admin, playback, open }: { admin: boolean; playb
       <div><p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400">Your antenna, anywhere</p><h1 className="text-3xl font-semibold tracking-tight">Live TV</h1></div>
       <p className="text-sm tabular-nums text-neutral-400">{all.length} channels · {timeOfDay(now)}</p>
     </header>
-    {/* On a phone, search and the Reminders button come first (the LiveExtrasPhone board). */}
+    {/* On a phone, search and the Reminders button come first. */}
     {extras && !wide && <>
       <div className="flex items-center gap-2">{searchBox}{remindersToggle}<RecordingsLink /></div>
       {remindersPanel}
@@ -174,7 +174,7 @@ export function ListingsGuide({ admin, playback, open }: { admin: boolean; playb
         {(filters.length > 0 || favouritesChip) && <div role="group" aria-label="Show channels with" className="-mx-4 flex w-[calc(100%+2rem)] gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:px-0">
           {[...(favouritesChip ? [{ id: FAVOURITES, label: 'Favourites' }] : []), { id: '', label: 'All channels' }, ...filters].map((f) => <button key={f.id || 'all'} type="button" aria-pressed={filter === f.id} onClick={() => setFilterId(f.id)} className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm ${filter === f.id ? 'border-neutral-100 bg-neutral-100 font-medium text-ground' : 'border-line-2 text-neutral-300'}`}>{f.id === FAVOURITES && <StarIcon size={13} filled />}{f.label}</button>)}
         </div>}
-        {/* Below level 15 the phone keeps G2's order: Go to channel last. */}
+        {/* Below level 15 the phone keeps its order: Go to channel last. */}
         {!wide && !extras && goToChannel}
       </>}
       {wide && <div className="relative ml-auto flex flex-wrap items-center gap-2">
@@ -257,7 +257,7 @@ export function ChannelName({ channel, star }: { channel: Pick<LiveGuideChannel,
   </>
 }
 
-/** The selected programme's details (§6.1): its 16:9 picture, episode line, times, tags, description and Watch. */
+/** The selected programme's details: its 16:9 picture, episode line, times, tags, description and Watch. */
 function ProgrammePanel({ channel, programme: p, now, playback, loading, extras, wide, reminder, lead }: { channel: LiveGuideChannel; programme?: LiveProgramme; now: number; playback: boolean; loading: boolean; extras: boolean; wide: boolean; reminder?: LiveReminder; lead: number }) {
   const picture = p ? panelPicture(p) : undefined
   const [brokenPicture, setBrokenPicture] = useState('')
@@ -301,7 +301,7 @@ function ProgrammePanel({ channel, programme: p, now, playback, loading, extras,
       <div className="flex flex-wrap items-center gap-3 pt-1">
         {canWatch && (later && p ? <>
           <span className="basis-full font-semibold sm:basis-auto">{extras ? onAt(channel.number, ms(p.start), now) : `On ${channel.number} at ${timeOfDay(ms(p.start))}`}</span>
-          {/* A later programme's first action is Remind me (§6.5); Watch now stays beside it. */}
+          {/* A later programme's first action is Remind me; Watch now stays beside it. */}
           {extras && <RemindControls programme={p} reminder={reminder} lead={lead} now={now} />}
           <Link to="/live-tv/watch/$channelId" params={{ channelId: channel.id }} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-line-2 px-4 text-sm font-medium hover:bg-surface-2"><span aria-hidden="true">▶</span> Watch {channel.number} now</Link>
         </> : <Link to="/live-tv/watch/$channelId" params={{ channelId: channel.id }} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md btn-primary px-6 font-semibold sm:w-auto"><span aria-hidden="true">▶</span> Watch {channel.number}</Link>)}
@@ -336,7 +336,7 @@ function FavouriteButton({ channel, label }: { channel: Pick<LiveGuideChannel, '
   </button>
 }
 
-/** A reminder whose programme left the listings, opened from the Reminders list (the LiveGuideExtras board's gone state). */
+/** A reminder whose programme left the listings, opened from the Reminders list. */
 function GoneReminder({ reminder: r, channel, onRemoved }: { reminder: LiveReminder; channel?: Pick<LiveGuideChannel, 'logoUrl'>; onRemoved: () => void }) {
   const change = useLiveReminder()
   const ep = episodeLine(reminderProgramme(r))
@@ -360,7 +360,7 @@ function GoneReminder({ reminder: r, channel, onRemoved }: { reminder: LiveRemin
 }
 
 /**
- * Search listings (§6.5): what is on now and later whose titles have the
+ * Search listings: what is on now and later whose titles have the
  * words, in place of the grid. Each result opens the guide at it, with
  * Watch while on and Remind me later.
  */
@@ -421,7 +421,7 @@ function Chevron({ left }: { left?: boolean }) {
   return <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d={left ? 'm15 6-6 6 6 6' : 'm9 6 6 6-6 6'} /></svg>
 }
 
-/** The player's channel banner with listings (§6.1): logo and number, the programme's series card, episode line, times, progress and Next. */
+/** The player's channel banner with listings: logo and number, the programme's series card, episode line, times, progress and Next. */
 export function ChannelBanner({ channel, now, children }: { channel: LiveChannel; now: number; children: ReactNode }) {
   const { now: p, next } = nowAndNext(channel, now)
   const [brokenLogo, setBrokenLogo] = useState(false)

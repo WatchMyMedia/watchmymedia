@@ -33,7 +33,7 @@ final class RealRequestsRepository: RequestsRepository {
 
     /// One request (and the admin's auth status) for every caller at once:
     /// launch, the sign-in and the foreground refresh ask together. A caller
-    /// after a requests event asks again (PLAN-APPLE-REVIEW.md §4.1.3).
+    /// after a requests event asks again.
     func refreshOptions() async {
         await flight.run(stamp: "\(store.revision)#\(events.received[.requests] ?? 0)") { [weak self] in await self?.loadOptions() }
     }

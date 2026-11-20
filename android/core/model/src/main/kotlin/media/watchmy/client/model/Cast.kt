@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Casting from the phone to a Google Cast device (PLAN-CAST.md §5.2). The
+ * Casting from the phone to a Google Cast device. The
  * TV runs the play itself; the phone is a remote.
  */
 sealed interface CastState {
@@ -61,7 +61,7 @@ interface CastService {
     /** Ends the cast session, which stops the TV. */
     fun disconnect()
 
-    /** A Live TV channel on the TV as a remote (PLAN-LIVE-TV.md §4.1); [LiveCastRemote.None] where there is none. */
+    /** A Live TV channel on the TV as a remote; [LiveCastRemote.None] where there is none. */
     val live: LiveCastRemote get() = LiveCastRemote.None
 
     companion object {
@@ -75,7 +75,7 @@ interface CastService {
     }
 }
 
-/** Where a channel cast to the TV is, from the receiver's `state` (PLAN-LIVE-TV.md §4.1). */
+/** Where a channel cast to the TV is, from the receiver's `state`. */
 enum class LiveCastPhase {
     /** No channel on the TV. */
     Idle,
@@ -200,7 +200,7 @@ interface CastGateway {
 }
 
 /**
- * A play cast to this TV app (Cast Connect, PLAN-CAST.md §6): [controller]
+ * A play cast to this TV app (Cast Connect): [controller]
  * plays as the person who cast, with their cast token, whatever this TV is
  * signed in as. The player screen takes it over: it starts [request] and
  * stops and releases the controller when it leaves.
@@ -217,7 +217,7 @@ data class LiveCastSender(
 )
 
 /**
- * A Live TV channel cast to this TV app (Cast Connect, PLAN-LIVE-TV.md §4.1):
+ * A Live TV channel cast to this TV app (Cast Connect):
  * [controller] plays as the person who cast, with their cast token, and
  * [live] reads their channels and pictures. The TV's live player takes it
  * over as the file player takes a [CastedPlay]: it starts [target] and stops

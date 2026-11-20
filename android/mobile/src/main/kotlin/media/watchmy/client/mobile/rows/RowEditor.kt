@@ -98,8 +98,8 @@ private val RowTitle = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Med
 private val RowLine = TextStyle(fontFamily = Inter, fontSize = 12.sp)
 
 /**
- * Edit Home, or a library's Edit rows (HomeEditRows.dc.html on the phone,
- * TabHomeEditRows.dc.html as a dialog on the tablet): the screen's rows with
+ * Edit Home, or a library's Edit rows
+ * (a dialog on the tablet): the screen's rows with
  * a drag handle, ⋮ for Move up, Move down, Hide or Show and a list's Open
  * list, Show on a hidden row, Add a row and Reset. Done saves the changes;
  * Close leaves without saving. [name] names the screen: "Home", "Movies".
@@ -243,7 +243,7 @@ private fun EditorList(state: RowLayoutViewModel.State, vm: RowLayoutViewModel, 
                             // The row moves to the slot it is over; it stays under the finger.
                             offset += me.offset - target.offset
                             vm.drag(from, to)
-                            // A tick each time the row takes another's place (§6.3).
+                            // A tick each time the row takes another's place.
                             haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                         }
                     },
@@ -353,7 +353,7 @@ private fun MenuItem(label: String, icon: ImageVector, onClick: () -> Unit) {
 }
 
 /**
- * Add a row (AddRow.dc.html; a dialog on the tablet): the hidden built-in
+ * Add a row (a dialog on the tablet): the hidden built-in
  * rows, the household's lists and the person's own, each coming back where
  * it was, and that lists are made on the web, with Open the web app.
  */

@@ -318,7 +318,7 @@ final class NoRequests: RequestsRepository {
     func changes() -> AsyncStream<Void> { AsyncStream { _ in } }
 }
 
-/// Your requests and the Inbox keep the newest reply (PLAN-APPLE-REVIEW.md §5.5).
+/// Your requests and the Inbox keep the newest reply.
 @MainActor
 @Suite struct RequestListOrderTests {
     private func request(_ id: Int) -> MediaRequest {

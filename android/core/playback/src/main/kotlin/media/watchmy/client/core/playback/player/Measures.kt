@@ -74,8 +74,7 @@ internal class StallCounter(private val now: () -> Long) {
  * throughputBps. Only for HLS, and only while recent: the meter rates a
  * download from its start to its end, and a direct-play file is one download
  * that sits idle while the buffer is full, so its rate is the stream's, not
- * the link's. Without one the server works the link out itself
- * (PLAN-AUTO-QUALITY.md §3.2).
+ * the link's. Without one the server works the link out itself.
  */
 internal class ThroughputMeter(private val now: () -> Long) {
     private var estimate = 0L

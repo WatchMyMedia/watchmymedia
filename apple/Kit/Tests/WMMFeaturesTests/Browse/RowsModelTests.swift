@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// Arranged Home, the library rows, Edit Home and the list page (PLAN-ROWS.md HR6) on the fakes.
+/// Arranged Home, the library rows, Edit Home and the list page on the fakes.
 @MainActor
 @Suite struct RowsModelTests {
     let navigator = Navigator()

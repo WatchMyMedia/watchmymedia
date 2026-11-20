@@ -17,7 +17,7 @@
 #   Harbor Lights (2019)   also a 20 s teaser in its Trailers folder (MKV: remux)
 #   Copper Valley (2018)   H.264 MP4 with English (default, 440 Hz), Spanish (660 Hz) and an English
 #                          commentary (880 Hz, comment disposition), and a Spanish forced sidecar:
-#                          audio languages (PLAN-LANGUAGES.md)
+#                          audio languages
 #   Static Bloom (2016)    HEVC MKV, DTS 5.1, a forced subtitle: audio transcode
 #   Glass Tide (2023)      HEVC Main 10 720p with HDR10 tags (only with libx265): HDR, tone mapping
 #   Night Shift Diner      two seasons of three 200 s episodes with the same theme song and end
@@ -90,7 +90,7 @@ media() {
     -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -ac 2 -movflags +faststart
   srt "$MEDIA/Movies/Paper Moons (2021)/Paper Moons (2021).en.srt" "00:00:02,000|00:00:05,000|A sidecar subtitle, next to the file."
 
-  # Trailer files (PLAN-TRAILERS.md §5.2): one named after its movie's file,
+  # Trailer files: one named after its movie's file,
   # one in a Trailers folder. Made-up, like the rest.
   render "$MEDIA/Movies/Paper Moons (2021)/Paper Moons (2021)-trailer.mp4" \
     -f lavfi -i "testsrc=size=1280x720:rate=30" -f lavfi -i "sine=frequency=880:sample_rate=48000" -t 30 \

@@ -55,7 +55,7 @@ public func bellShowsSystemRefused(following: Bool, permission: NotificationPerm
 
 /// This device's New episodes switch (Settings › Notifications): kept on the
 /// device, so it can't fail; says Saved with what the change did for a few
-/// seconds (PLAN-APPLE-SETTINGS.md §3.1). Turned on while iOS hasn't asked,
+/// seconds. Turned on while iOS hasn't asked,
 /// it asks iOS at once, with no explainer; Don’t Allow leaves it off.
 @MainActor @Observable
 public final class NewEpisodeSwitch {

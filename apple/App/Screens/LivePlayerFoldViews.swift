@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-// Live TV on the iPhone Duo half open (PLAN-IPHONE-DUO.md §5): on a table,
+// Live TV on the iPhone Duo half open: on a table,
 // the channel on the upright half and its controls and the channels on the
 // half lying flat (`DuoTabletopLive`); like a book, the channel and its
 // controls on the left page and On now on the right (`DuoBookLive`).

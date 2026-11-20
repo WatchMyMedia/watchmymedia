@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// The panel above a row screen (PLAN-HOME.md §7.1), worded per row style as the boards say.
+/// The panel above a row screen, worded per row style as the boards say.
 @Suite struct RowPanelTests {
     let home = FakeData.home(now: testToday)
 

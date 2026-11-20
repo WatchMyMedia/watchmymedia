@@ -280,7 +280,7 @@ function LibrarySkeleton() {
 
 /**
  * The library's rows (its Overview, arranged), Edit rows, then its grid,
- * in one vertical scroll (LibraryRows; without rows, LibraryAZ). The grid's
+ * in one vertical scroll. The grid's
  * choices come back with the screen; `initial` is a See all's.
  */
 function LibraryView({ library, type, initial, toGrid }: { library: Library; type: LibraryType; initial: GridChoices; toGrid: boolean }) {
@@ -358,7 +358,7 @@ export function LibraryScreen({ route }: ScreenProps<'library'>) {
 }
 
 /**
- * A row's See all (route `seeAll`, PLAN-SEE-ALL.md): its library's screen
+ * A row's See all (route `seeAll`): its library's screen
  * sorted and filtered the row's way, focus on the grid's first card.
  */
 export function SeeAllScreen({ route }: ScreenProps<'seeAll'>) {

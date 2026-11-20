@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Change password on iPhone and iPad (PLAN-APPLE-SETTINGS.md Decision 9,
-/// §5.4; Settings2Password.dc.html; the web's ChangePassword.tsx): one step
+/// Change password on iPhone and iPad
+/// (the web's ChangePassword.tsx): one step
 /// that names the other devices it signs out and puts their count on its
 /// button. Each refusal says nothing was changed. Once changed, the page's
 /// devices load again and a banner says what happened (``SettingsModel/accountBanner``).
@@ -185,7 +185,7 @@ public func changePasswordURL(_ server: Server) -> URL {
 }
 
 extension SettingsWords {
-    /// Apple TV's row (TvSettings2Account.dc.html).
+    /// Apple TV's row.
     public static let changePasswordTVLine = "Typing a password with the remote is slow, so this shows a code to scan"
     public static let changePasswordTVValue = "On your phone or computer"
 

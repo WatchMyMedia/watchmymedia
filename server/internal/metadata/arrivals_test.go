@@ -62,7 +62,7 @@ func age(t *testing.T, e env, f db.MediaFile, by time.Duration) {
 	}
 }
 
-// PLAN-NEW-EPISODES.md section 5.2's cases: a TMDB episode arrives once,
+// A TMDB episode arrives once,
 // in any library, the first time a file is linked to it, and the arrival
 // is announced only when that file is new by the New badge's measure.
 func TestEpisodeArrivals(t *testing.T) {

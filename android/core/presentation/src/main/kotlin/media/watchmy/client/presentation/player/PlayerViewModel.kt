@@ -22,7 +22,7 @@ data class PlayerSelection(val request: PlayRequest, val generation: Long = 0) {
 
 /**
  * A player screen's play, held on the player's nav entry so it outlives the
- * composition (PLAN-ANDROID-REVIEW §3.1.5): the local [controller], the
+ * composition: the local [controller], the
  * [selection] that started it, the file playing now ([fileId]: the
  * request's, or a later episode's once the play moved on by itself), and
  * whether the play is on a TV ([remote]; [onTv] when it opens while

@@ -150,7 +150,7 @@ fun ListRow(
 }
 
 /**
- * "Not encrypted" in orange with an open lock (ServerNotEncrypted.dc.html):
+ * "Not encrypted" in orange with an open lock:
  * a server reached over plain http beyond this network.
  */
 @Composable

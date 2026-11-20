@@ -6,9 +6,9 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Signing in to the chosen server (Main.dc.html): the password form, the
-/// pairing card when the server's sign-in protection is on
-/// (SignInPairing.dc.html), or the setup card when it has no accounts yet.
+/// Signing in to the chosen server: the password form, the
+/// pairing card when the server's sign-in protection is on,
+/// or the setup card when it has no accounts yet.
 /// The root moves on by itself once signed in.
 struct SignInScreen: View {
     @Environment(AppServices.self) private var services
@@ -22,7 +22,7 @@ struct SignInScreen: View {
 
 /// The sign-in form, the pairing card or the setup card, with Link a TV
 /// (once the server has accounts to link one with). `pane` is the
-/// iPad's right-hand side of PadSignIn.dc.html: no brand, glow or footer of
+/// iPad's right-hand side: no brand, glow or footer of
 /// its own (the screen has them), and the server is the one chosen on the left.
 struct SignInContent: View {
     private enum Field { case name, password }

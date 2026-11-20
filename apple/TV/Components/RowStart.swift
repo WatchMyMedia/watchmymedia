@@ -1,7 +1,7 @@
 import SwiftUI
 import WMMUI
 
-/// Where a row of cards starts (RowStartBest.dc.html; Android TV's `RowStart`).
+/// Where a row of cards starts (Android TV's `RowStart`).
 /// Moving back along a row, tvOS keeps the focused card at the row's leading
 /// margin, so the 2nd card sat where the 1st does and only a sliver of the
 /// 1st showed at the screen's edge: nothing said whether the row went on.

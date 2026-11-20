@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The Next Episode card (PlayerNext.dc.html): the still, the episode, and a
+/// The Next Episode card: the still, the episode, and a
 /// button that fills as the countdown runs ("Next episode in 7"), or "Play
 /// now" when autoplay is off; "Watch credits" hides the card.
 struct NextEpisodeCard: View {

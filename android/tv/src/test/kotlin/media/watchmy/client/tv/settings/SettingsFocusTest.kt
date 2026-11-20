@@ -40,8 +40,8 @@ import org.robolectric.shadows.ShadowDialog
 import java.io.IOException
 
 /**
- * Settings as groups on the D-pad (PLAN-ANDROID-SETTINGS.md §4.3, §8,
- * §12), on the fakes at a 1080p TV's size: where focus starts, moving
+ * Settings as groups on the D-pad,
+ * on the fakes at a 1080p TV's size: where focus starts, moving
  * through the groups swapping the pane, ▶ into it and ◀ or Back out of it,
  * focus after a panel closes and after a device is signed out,
  * confirmations starting on the button that changes nothing, and Back

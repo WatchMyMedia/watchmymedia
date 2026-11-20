@@ -48,9 +48,8 @@ const focusedId = () => (document.activeElement as HTMLElement | null)?.dataset?
 const waiting = (phase: FilePlaybackState['phase']) => phase === 'loading' || phase === 'buffering'
 
 /**
- * Files, recordings and trailer files over the engine's FilePlayback
- * (PlayerControls, PlayerPicker, PlayerEpisodes, PlayerNext, RecordingPlayer
- * and TrailerPlayer's trailer file). One play per screen: it starts when the
+ * Files, recordings and trailer files over the engine's
+ * FilePlayback. One play per screen: it starts when the
  * screen opens and stops when it goes, and the page is see-through over the
  * video while it shows.
  */

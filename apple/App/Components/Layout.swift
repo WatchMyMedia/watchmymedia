@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// The measures of the iPad artboards (design/mockups/ipad-revised/), for a regular
+/// The measures of the iPad artboards, for a regular
 /// width: an iPad full screen, or in a Split View wider than half. A compact
 /// width (every iPhone, Slide Over, a 50/50 Split View) keeps the iPhone
-/// screens (PLAN-IOS.md §11.1).
+/// screens.
 enum PadLayout {
     /// Space at the sides of an iPad screen; the iPhone's is 16.
     static let margin: CGFloat = 24

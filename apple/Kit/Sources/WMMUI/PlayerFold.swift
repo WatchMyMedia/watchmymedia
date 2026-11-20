@@ -1,7 +1,6 @@
 import CoreGraphics
 
-/// The window a player shows in, as its orientation rule sees it
-/// (PLAN-IPHONE-DUO.md §4.3).
+/// The window a player shows in, as its orientation rule sees it.
 ///
 /// Only a window regular both ways is `wide`: an iPad's, or the iPhone Duo's
 /// inner screen held either way (951 × 669, 669 × 951). The largest iPhones
@@ -20,8 +19,8 @@ public enum PlayerWindow: Sendable, Equatable {
     }
 }
 
-/// Which folded layout a player draws, and *Use the whole screen*
-/// (PLAN-IPHONE-DUO.md §3, decisions 4, 5 and 8).
+/// Which folded layout a player draws, and *Use the whole
+/// screen*.
 ///
 /// Half open with the fold across, the film player and Live TV take the
 /// tabletop layout by themselves. Held like a book, Live TV puts a page each
@@ -96,7 +95,7 @@ public struct SafeInsets: Sendable, Equatable {
     }
 }
 
-/// Where a player's pieces go in its window (PLAN-IPHONE-DUO.md §4.4): the
+/// Where a player's pieces go in its window: the
 /// picture (the video with whatever is drawn over it), a panel beside it,
 /// and what sits under it or on the other page. The picture is always the
 /// same view moved and resized, never another one, so a fold or a panel

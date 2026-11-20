@@ -18,7 +18,7 @@ import type { components } from '../../../api/schema'
 
 type Library = components['schemas']['Library']
 
-/** One library's page (board lib-one): Scan and Match report beside their
+/** One library's page: Scan and Match report beside their
  * buttons, working and failing; Name and folder; Remove, apart. */
 export function LibraryPage({ id }: { id: number }) {
   const libraries = useQuery(librariesQuery)
@@ -183,7 +183,7 @@ function watchNote(w: NonNullable<Library['watch']>): string {
 }
 
 /**
- * Remove (board lib-remove): type the library's name; away from home the
+ * Remove: type the library's name; away from home the
  * server asks for the password. Removing deletes no plays: Activity keeps
  * them. What goes is the titles and everyone's watched marks and resume
  * points on them.

@@ -167,7 +167,7 @@ func TestOversizedImageIsNotCached(t *testing.T) {
 }
 
 // A picture an admin chose is scaled from the server's own copy, once for
-// a burst of requests, and never asked of TMDB (PLAN-POSTERS.md).
+// a burst of requests, and never asked of TMDB.
 func TestCustomPictures(t *testing.T) {
 	var fetches atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

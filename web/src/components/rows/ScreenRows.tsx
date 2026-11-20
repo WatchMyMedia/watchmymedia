@@ -10,8 +10,8 @@ import { SeeAllCard } from './SeeAllCard'
 type LibraryRef = { id: number; type: string }
 
 /**
- * A screen's rows in the person's order, each drawn by its style
- * (PLAN-ROWS.md §6.1). Rows with nothing in them, live (the web has no
+ * A screen's rows in the person's order, each drawn by its style.
+ * Rows with nothing in them, live (the web has no
  * Live TV row yet) and styles the web doesn't know draw nothing.
  */
 export function ScreenRows({ rows, libraries }: { rows: readonly ScreenRow[]; libraries: readonly LibraryRef[] }) {
@@ -25,8 +25,8 @@ export function ScreenRows({ rows, libraries }: { rows: readonly ScreenRow[]; li
 }
 
 /**
- * One row, ending in a See all card when it has a link the web can follow
- * (PLAN-SEE-ALL.md decision 4): poster-shaped in a poster row, 16:9 in an
+ * One row, ending in a See all card when it has a link the web can follow:
+ * poster-shaped in a poster row, 16:9 in an
  * episode or wide row. Continue watching has no link, so no card.
  */
 function ScreenRowView({ row, libraries }: { row: ScreenRow; libraries: readonly LibraryRef[] }) {

@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import type { CardSegment, CardTarget } from '../lib/cardLinks'
 
-// The pieces a row card is drawn from (PLAN-HOME.md §6.1, board HomeCards):
+// The pieces a row card is drawn from:
 // a picture, a title and a line, each part a link of its own. Link parts
 // underline in gold on hover; the picture keeps the card's gold ring.
 

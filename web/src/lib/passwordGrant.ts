@@ -1,5 +1,5 @@
-// How long a confirmed admin password still lasts in this browser
-// (PLAN-ADMIN-SETTINGS.md §3.3). The server keeps the grant for ten minutes
+// How long a confirmed admin password still lasts in this browser.
+// The server keeps the grant for ten minutes
 // from the confirmation; the page counts from its own confirmation, and from
 // the server's `adminConfirmedUntil` when another tab confirmed.
 

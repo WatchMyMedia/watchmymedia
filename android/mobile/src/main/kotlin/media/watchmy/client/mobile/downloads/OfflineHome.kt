@@ -62,7 +62,7 @@ import media.watchmy.client.ui.components.ProgressStrip
 import media.watchmy.client.ui.components.WmmIcons
 
 /**
- * Home with no server (HomeOffline.dc.html; TabHomeOffline.dc.html): You're
+ * Home with no server: You're
  * offline with Try again, then the downloads partway through to resume, and
  * what is on this device. [tryingAgain] shows Try again at work.
  */

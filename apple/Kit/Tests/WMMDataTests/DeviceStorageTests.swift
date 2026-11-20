@@ -48,7 +48,7 @@ final class FakeKeychain: KeychainItems {
     }
 }
 
-/// Sign-ins and the device ID stay on this device (PLAN-APPLE-REVIEW.md §3.4.2, §2.6).
+/// Sign-ins and the device ID stay on this device.
 @MainActor
 @Suite struct DeviceStorageTests {
     let keychain = FakeKeychain()
@@ -100,7 +100,7 @@ final class FakeKeychain: KeychainItems {
     }
 }
 
-/// A launch before the first unlock (PLAN-APPLE-REVIEW.md §3.4.3).
+/// A launch before the first unlock.
 @MainActor
 @Suite struct UnreadableSignInTests {
     @Test func aSignInUnreadableAtLaunchIsReadOnceTheDeviceUnlocks() async throws {

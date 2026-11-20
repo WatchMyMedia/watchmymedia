@@ -12,7 +12,7 @@ import { leaveNotice } from './notice'
 
 const hub = settingsHref('general')
 
-/** Add a TMDB key: one step. Test saves nothing; Save checks the key with TMDB first (board gen-tmdb). */
+/** Add a TMDB key: one step. Test saves nothing; Save checks the key with TMDB first. */
 export function TmdbFlow() {
   const settings = useQuery(settingsQuery)
   const update = useUpdateSettings()

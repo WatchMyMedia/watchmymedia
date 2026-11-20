@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Link a TV (LinkTv.dc.html), the phone's side of pairing: type the TV's
+/// Link a TV, the phone's side of pairing: type the TV's
 /// code, check which device it is, approve it (android/.../LinkTvViewModel.kt).
 @MainActor
 @Observable
@@ -21,7 +21,7 @@ public final class LinkTVModel {
     public private(set) var busy = false
     public private(set) var error: String?
     /// The last failure as its step says it, ending in what was done:
-    /// "Nothing was linked." (PLAN-APPLE-SETTINGS.md §5.5).
+    /// "Nothing was linked.".
     public private(set) var problem: SettingsNotice?
     /// The server's name, for "Couldn’t reach Living room server".
     public var serverName: String?

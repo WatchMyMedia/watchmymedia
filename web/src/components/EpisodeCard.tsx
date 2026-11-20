@@ -10,7 +10,7 @@ export type EpisodeCardData = components['schemas']['EpisodeCard']
 /**
  * 16:9 still, 304px wide, for Recently aired rows. The show's title opens
  * the show, "S03" the season, "E07" and the still the season at this
- * episode (lib/cardLinks.ts, PLAN-HOME.md §6); the third line says when it aired.
+ * episode (lib/cardLinks.ts); the third line says when it aired.
  */
 export function EpisodeCard({ ep }: { ep: EpisodeCardData }) {
   const code = seCode(ep.seasonNumber, ep.episodeNumber)

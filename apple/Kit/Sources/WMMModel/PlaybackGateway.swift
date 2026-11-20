@@ -1,7 +1,7 @@
 import Foundation
 
 /// What this device can play, sent with every playback request
-/// (PLAN-CLIENTS.md §4.4; the server's `Profile`).
+/// (the server's `Profile`).
 public struct PlaybackProfile: Hashable, Sendable {
     public var name: String
     /// mp4, mov.
@@ -26,7 +26,7 @@ public struct PlaybackProfile: Hashable, Sendable {
     public var hdrTypes: [String]?
     /// The player chooses among a direct-play file's audio tracks itself and
     /// starts on the decision's, so a track other than the file's default
-    /// stays direct play (PLAN-LANGUAGES.md §5.2). Nil for a server before
+    /// stays direct play. Nil for a server before
     /// ``audioPreferencesAPILevel``, which refuses it.
     public var selectsAudioTrack: Bool?
 
@@ -174,7 +174,7 @@ public struct PlaybackDecision: Hashable, Sendable {
     /// The profile's key for the video when it is sent as it is (direct play
     /// or a remux): h264, hevc, hevc10, av1, dovi5…; nil when it is converted,
     /// or the server didn't say. A decoder that fails on it asks again
-    /// without it (PLAN-APPLE-REVIEW.md §3.1.2).
+    /// without it.
     public var copiedVideoCodec: String?
     /// A media token sent with the decision, from ``decisionTokenAPILevel``;
     /// the player then fetches none of its own.
@@ -271,8 +271,8 @@ public struct ProgressReport: Hashable, Sendable {
     public var playID: String?
     public var state: PlayState
     public var bufferedMs: Int
-    /// What the player measures for Automatic quality (PLAN-AUTO-QUALITY.md
-    /// §3.1), sent for every play: its estimate of the link in bits per
+    /// What the player measures for Automatic quality,
+    /// sent for every play: its estimate of the link in bits per
     /// second, nil where it has none.
     public var throughputBps: Int?
     /// Age of a completed transfer measurement; absent estimates cannot raise quality.

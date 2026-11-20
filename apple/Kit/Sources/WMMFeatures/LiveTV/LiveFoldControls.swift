@@ -1,8 +1,8 @@
 import Foundation
 import WMMModel
 
-/// Live TV's controls on the iPhone Duo's folded layouts (`DuoTabletopLive`,
-/// `DuoBookLive`; PLAN-IPHONE-DUO.md §5): Ch −, the button between, Ch +.
+/// Live TV's controls on the iPhone Duo's folded layouts:
+/// Ch −, the button between, Ch +.
 /// The flat player keeps its own play/pause and Go live over the picture.
 public enum LiveFoldMiddle: Hashable, Sendable {
     /// Behind live: back to the broadcast.

@@ -40,7 +40,7 @@ struct MainTabView: View {
                         // alive while the Settings pane changes accounts.
                         Palette.ground
                     } else if tab == .settings && sizeClass.isWide {
-                        // Its root beside the page it shows, with Link a TV as a sheet (PadSettings.dc.html).
+                        // Its root beside the page it shows, with Link a TV as a sheet.
                         SettingsScreen()
                     } else {
                         NavigationStack(path: Binding(get: { flow.serverSwitch == nil ? navigator.path(for: tab).pushed : [] }, set: {
@@ -54,7 +54,7 @@ struct MainTabView: View {
                     }
                 }
                 .unavailableDuringServerSwitch(flow.serverSwitch != nil && tab != .settings)
-                // Admins: what waits in the Inbox (Inbox.dc.html).
+                // Admins: what waits in the Inbox.
                 .badge(tab == .settings ? services.requests.options.inbox : 0)
             }
         }
@@ -85,7 +85,7 @@ struct MainTabView: View {
         .messageToast(Binding(get: { navigator.toast }, set: { navigator.toast = $0 }))
         .fullScreenCover(isPresented: Binding(get: { cast.remotePresented }, set: { cast.remotePresented = $0 }), onDismiss: continueOnDevice) { CastRemoteScreen() }
         // What the user may request, and the Inbox's count, follow the server's
-        // events; Live TV follows its own (PLAN-APPLE-REVIEW.md §4.1.8).
+        // events; Live TV follows its own.
         .task {
             for await _ in services.requests.changes() {
                 await services.requests.refreshOptions()
@@ -131,8 +131,7 @@ struct MainTabView: View {
 }
 
 /// What the tabs do besides showing: ⌘F for Search on a hardware keyboard,
-/// and keeping where the person was for when the system evicts the app
-/// (PLAN-APPLE-REVIEW.md §6.3).
+/// and keeping where the person was for when the system evicts the app.
 private struct TabShellKeys: ViewModifier {
     @Environment(Navigator.self) private var navigator
     @Environment(AppFlow.self) private var flow

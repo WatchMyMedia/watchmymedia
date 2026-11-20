@@ -4,8 +4,8 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// A row's See all on iPhone and iPad (PLAN-SEE-ALL.md §4.4, S3) and Apple
-/// TV (S5): the card's words, Home handing the row's link to the library's
+/// A row's See all on iPhone, iPad and Apple
+/// TV: the card's words, Home handing the row's link to the library's
 /// tab once, and the grid taking it.
 @MainActor
 @Suite struct SeeAllTests {
@@ -23,7 +23,7 @@ import WMMModel
         .library(id: id, sort: sort, filter: filter, genre: genre, decade: nil)
     }
 
-    // MARK: The words (§3)
+    // MARK: The words
 
     @Test func aLibraryLinkNamesTheLibraryAndTheSortAsTheSortMenuDoes() {
         let aired = SeeAllWords(library: .tv, sort: .aired)
@@ -80,10 +80,10 @@ import WMMModel
         #expect(RowPanel.leadingCard(settledOn: nil, was: "movie-512") == nil)
     }
 
-    // MARK: Apple TV's card (S5)
+    // MARK: Apple TV's card
 
     @Test func appleTVsCardKeepsTheListCardsCountAndNamesALibrarysSort() throws {
-        // A list's card says "See all" over its count, as TvLibraryRows.dc.html draws it.
+        // A list's card says "See all" over its count, as the design draws it.
         let list = ScreenRow(id: "list:9001", style: .poster, title: "Top rated this year", subtitle: "18 of 1,204 · From TMDB",
                              items: [FakeData.movies[0]], seeAll: .list(id: 9001), listID: 9001)
         let listWords = try #require(SeeAllWords(row: list, libraryType: nil))

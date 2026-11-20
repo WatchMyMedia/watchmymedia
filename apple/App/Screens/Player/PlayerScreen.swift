@@ -5,9 +5,9 @@ import WMMUI
 
 /// The full-screen player, landscape in a phone's window: the video, subtitles,
 /// the touch controls, Skip, the Next Episode card, the picker, Still
-/// watching and the stopped and can't-play states (design/mockups/ios/
-/// Player*.dc.html). It renders a ``PlaybackController`` from the app's
-/// services, which does the playing (PLAN-CLIENTS.md §2.3), through
+/// watching and the stopped and can't-play states.
+/// It renders a ``PlaybackController`` from the app's
+/// services, which does the playing, through
 /// ``PlayerChromeModel``, which decides what shows. On iPad the controls are
 /// the tablet sizes, options open beside the video, and portrait puts the
 /// season below it. The same player surface survives rotation.
@@ -51,7 +51,7 @@ struct PlayerScreen: View {
 /// position does; what ticks is read only by the small views that draw it
 /// (``PlayerClock``).
 ///
-/// On the iPhone Duo (PLAN-IPHONE-DUO.md §4.4) the same picture moves and
+/// On the iPhone Duo the same picture moves and
 /// resizes as the window does: beside a panel on the inner screen held wide,
 /// above the fold half open on a table, over the season held upright. The
 /// video view keeps its place in this view's tree whatever the layout, so a

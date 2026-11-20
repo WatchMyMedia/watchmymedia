@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings › Server (Settings2Server.dc.html, PLAN-APPLE-SETTINGS.md §5.6):
+/// Settings › Server:
 /// which server this is, Switch server (a task of three steps), and, for
 /// admins only, Server settings, which opens the web app in Safari. Away from
 /// home it says the web app asks for the password; where the server keeps
@@ -35,7 +35,7 @@ struct ServerSettingsPage: View {
                 SectionNote(SettingsWords.switchServerLine)
             }
 
-            // Server settings: admins only, once the server has said where they stand (§5.6).
+            // Server settings: admins only, once the server has said where they stand.
             if let row = model.serverSettingsRow, let server = model.server {
                 SettingsSection(title: SettingsWords.serverSettings) {
                     Button { openURL(serverSettingsURL(server)) } label: {
@@ -79,8 +79,8 @@ struct ServerSettingsPage: View {
     }
 }
 
-/// Settings › About WatchMyMedia (SettingsAbout.dc.html): the version, the
-/// privacy policy, Diagnostics under Help (Diagnostics.dc.html) and the
+/// Settings › About WatchMyMedia: the version, the
+/// privacy policy, Diagnostics under Help and the
 /// credits the data sources ask for.
 struct AboutSettingsPage: View {
     let model: SettingsModel

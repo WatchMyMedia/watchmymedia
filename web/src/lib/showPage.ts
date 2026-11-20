@@ -6,9 +6,9 @@ type Episode = components['schemas']['Episode']
 type Season = components['schemas']['Season']
 type NextEpisode = components['schemas']['NextEpisode']
 
-// The one show page (PLAN-SHOW-PAGE.md): /shows/:id, /shows/:id/seasons/:n
+// The one show page: /shows/:id, /shows/:id/seasons/:n
 // and /shows/:id/seasons/:n/episodes/:id draw the same page; only the
-// episode on top differs (§3).
+// episode on top differs.
 
 /** How the page was reached: the show's address, a season's, or an episode's. */
 export type Arrival = { kind: 'show' } | { kind: 'season' } | { kind: 'episode'; id: number }
@@ -33,7 +33,7 @@ export function episodePath(showId: number, season: number, episodeId: number): 
 
 /**
  * The season tabs: those with episodes on disk, or every one with Show
- * missing on, and always the open one; by number with Specials last (§2.4).
+ * missing on, and always the open one; by number with Specials last.
  */
 export function seasonTabs<S extends Pick<Season, 'number' | 'availableCount'>>(seasons: S[], showMissing: boolean, open?: number): S[] {
   const order = (n: number) => (n === 0 ? Number.MAX_SAFE_INTEGER : n)
@@ -66,7 +66,7 @@ export type OnTop<E> = {
 }
 
 /**
- * Which of a season's episodes goes on top (§3):
+ * Which of a season's episodes goes on top:
  *  - the show's address: the up-next episode from the server's
  *    `nextEpisode`, "Up next · resume" when partly watched and "Start here"
  *    when nothing of the show is watched yet; with no up-next and something
@@ -100,7 +100,7 @@ export function episodeOnTop<E extends Pick<Episode, 'id' | 'number' | 'hasFile'
 }
 
 /**
- * Where the page goes after deleting the episode on top (§3): the next
+ * Where the page goes after deleting the episode on top: the next
  * episode in the season's row, else the one before. None when it was the only one.
  */
 export function afterEpisodeDelete<E extends Pick<Episode, 'id' | 'number'>>(listed: E[], id: number): { episode: E; which: 'next' | 'previous' } | undefined {
@@ -152,7 +152,7 @@ export function askableSeasons(seasons: Pick<Season, 'number' | 'episodeCount' |
   return seasons.filter((s) => s.number > 0 && canRequestSeason(s, today)).map((s) => s.number)
 }
 
-/** What can be done about a missing episode on top (design/mockups/web/ShowPageMissing). */
+/** What can be done about a missing episode on top. */
 export type MissingActions = {
   /** Request this episode's season, the main action. */
   request: boolean
@@ -198,7 +198,7 @@ export const seasonRequested = (s: Pick<Season, 'request'>) => isOpen(s.request)
 
 /**
  * Where the player's Back goes once it moves on to the next episode: that
- * episode's address when Back was on the show (PLAN-SHOW-PAGE.md §4.1), else
+ * episode's address when Back was on the show, else
  * where it was (Home, a list).
  */
 export function backAfterNext(back: string | undefined, next: { showId: number; seasonNumber: number; episodeId: number }): string | undefined {

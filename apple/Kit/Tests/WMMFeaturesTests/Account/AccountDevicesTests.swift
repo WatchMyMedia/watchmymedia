@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// Account & devices (PLAN-APPLE-SETTINGS.md §5.4): Rename as a task, the
+/// Account & devices: Rename as a task, the
 /// page's lines, and what signing out of this device or another says.
 @MainActor
 @Suite struct AccountDevicesTests {

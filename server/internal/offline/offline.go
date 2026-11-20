@@ -1,5 +1,5 @@
 // Package offline holds what the server keeps for offline downloads
-// (PLAN-DOWNLOADS.md) outside the database: who may download, and the
+// outside the database: who may download, and the
 // transfers running now, which Activity › Downloads shows. A download is
 // not a play: it has no row in History and no heartbeats, so its transfer
 // is tracked here, from the bytes its routes send.

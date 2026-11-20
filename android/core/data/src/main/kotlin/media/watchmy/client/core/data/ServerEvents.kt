@@ -51,7 +51,7 @@ internal fun eventField(data: String, name: String): String? {
 internal data class ServerEvent(val event: String, val data: String, val id: String? = null)
 
 /**
- * What [e] says changed in the library (PLAN-ANDROID-REVIEW.md §4.1.2), or
+ * What [e] says changed in the library, or
  * null for an event about something else. watch.changed names its item type
  * and ids; the scan events and library.changed their libraryId. One the app
  * can't read counts as [LibraryChange.Everything].
@@ -175,8 +175,8 @@ internal class EventStreamException(val status: Int) : IOException("event stream
  * Connected only while collected (shared by every
  * collector, and kept 5 s after the last one leaves so moving between screens
  * does not reconnect), and only while the app is in front ([setInFront]) and
- * the device has a default network ([network]): PLAN-ANDROID-REVIEW.md
- * §4.1.5. A dropped stream reconnects with backoff; the return to the front,
+ * the device has a default network ([network]).
+ * A dropped stream reconnects with backoff; the return to the front,
  * or to a network, reconnects at once. Each reconnection emits once on every
  * flow, since events may have been missed, and calls [onReconnect].
  */
@@ -288,7 +288,7 @@ internal class ServerEvents(
 
     /**
      * rows.changed (with its screen) and lists.changed (with its list), to the
-     * person (PLAN-ROWS.md §6.2, §6.3); a reconnection emits both for every
+     * person; a reconnection emits both for every
      * screen and list, since either may have been missed.
      */
     val rowChanges: Flow<RowsChange> = events.filter { it.event == RECONNECTED || it.event in ROW_EVENTS }.transform { e ->
@@ -304,15 +304,15 @@ internal class ServerEvents(
 
     /**
      * live.favourites.changed and live.reminders.changed, private to the
-     * person signed in (PLAN-LIVE-TV-GUIDE.md §5.7), by their event names; a
+     * person signed in, by their event names; a
      * reconnection emits both, since either may have been missed.
      */
     val liveChanges: Flow<String> = names.filter { it == RECONNECTED || it in LIVE_EVENTS }
         .transform { if (it == RECONNECTED) LIVE_EVENTS.forEach { e -> emit(e) } else emit(it) }
 
     /**
-     * follows.changed, private to the person signed in (PLAN-NEW-EPISODES.md
-     * §5.3): they followed or stopped following a show on another device. A
+     * follows.changed, private to the person signed in:
+     * they followed or stopped following a show on another device. A
      * reconnection emits too, since one may have been missed.
      */
     val followChanges: Flow<Unit> = names.filter { it == RECONNECTED || it == FOLLOWS_CHANGED }.map { }
@@ -320,7 +320,7 @@ internal class ServerEvents(
     /**
      * library.changed alone: a library's contents changed. The scan events
      * aren't in it, so a scheduled scan that changes nothing doesn't put back
-     * what waits for a change (the new-episode check, PLAN-NEW-EPISODES.md §6.1).
+     * what waits for a change (the new-episode check).
      */
     val contentsChanged: Flow<Unit> = names.filter { it == LIBRARY_CHANGED }.map { }
 

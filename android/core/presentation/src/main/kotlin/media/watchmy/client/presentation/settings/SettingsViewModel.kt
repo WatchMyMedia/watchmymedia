@@ -46,10 +46,10 @@ import media.watchmy.client.presentation.Load
  * device: quality on mobile data, and on a TV frame rate, passthrough and
  * subtitle size), playback, skip, audio and subtitle preferences (kept on
  * the server), the account's signed-in devices, and signing out, which the
- * screen hears of through [events]. Audio & subtitles is PLAN-LANGUAGES.md
- * §5.6: each change saves at once, and only what it changes.
+ * screen hears of through [events]. In Audio & subtitles
+ * each change saves at once, and only what it changes.
  *
- * Settings as groups (PLAN-ANDROID-SETTINGS.md §4.5): each change is a
+ * Settings as groups: each change is a
  * [SettingKey] whose row says Saving… while it goes and keeps its
  * [SaveFailure] until it is tried again ([retry]) or changed. The account's
  * settings can't be changed until they have loaded ([accountReady]), so a
@@ -350,7 +350,7 @@ class SettingsViewModel(
     private companion object {
         const val GENERIC_SAVE_FAILURE = "Couldn't save the setting."
 
-        /** At most 16 of each, as the server takes (PLAN-LANGUAGES.md §4). */
+        /** At most 16 of each, as the server takes. */
         const val MAX_LANGUAGES = 16
 
         fun added(list: List<String>, tag: String): List<String> =

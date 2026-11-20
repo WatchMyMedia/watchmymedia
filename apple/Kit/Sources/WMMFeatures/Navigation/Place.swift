@@ -1,7 +1,7 @@
 import Foundation
 
 /// Where the person was: the tab and each tab's pages, kept so the app
-/// reopens there after the system evicts it (PLAN-APPLE-REVIEW.md §6.3).
+/// reopens there after the system evicts it.
 /// Never the player and never Settings, which is a sheet over the tabs on a
 /// server with Live TV; restored only for the account and server that left it.
 public struct SavedPlace: Equatable, Sendable {

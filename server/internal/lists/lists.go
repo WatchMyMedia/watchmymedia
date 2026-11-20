@@ -1,5 +1,5 @@
 // Package lists makes the lists that rows on Home and the library screens
-// come from (PLAN-ROWS.md 7.2): a Source per kind (TMDB, MDBList, a saved
+// come from: a Source per kind (TMDB, MDBList, a saved
 // library filter, an import), the entries each one fetches, and the
 // Service whose refresh job (Run) fetches them again in the background,
 // like trailers.Refresher. Matching entries to the library is done when a
@@ -28,7 +28,7 @@ const (
 // Kinds are every source, in the order the builder offers them.
 var Kinds = []string{KindTMDB, KindMDBList, KindLibrary, KindImport}
 
-// Limits (PLAN-ROWS.md Decision 13).
+// Limits.
 const (
 	MaxEntries     = 250
 	MaxImportBytes = 1 << 20
@@ -191,7 +191,7 @@ func Describe(err error) string {
 	return "Couldn't fetch the list; it is tried again later"
 }
 
-// Every is how often a list is fetched again (PLAN-ROWS.md 7.2): trending
+// Every is how often a list is fetched again: trending
 // lists, charts, TMDB lists and MDBList lists daily, discover and
 // collections weekly; an import's TMDB details every three months, inside
 // TMDB's six months. Library lists are never fetched (0).

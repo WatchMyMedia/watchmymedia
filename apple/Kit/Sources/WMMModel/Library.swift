@@ -275,7 +275,7 @@ public enum ItemSort: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// The sorts offered for a library type (PLAN.md §10).
+    /// The sorts offered for a library type.
     public static func options(for type: LibraryType) -> [ItemSort] {
         switch type {
         case .tv: [.title, .added, .aired, .year, .rating]
@@ -683,7 +683,7 @@ public struct MovieDetail: Hashable, Sendable, Identifiable {
     public var managedBy: String?
     /// A download of it in Radarr's queue, such as an upgrade.
     public var download: QueueDownload?
-    /// Its trailers, best first: files in the library, then YouTube's (PLAN-TRAILERS.md §5.3).
+    /// Its trailers, best first: files in the library, then YouTube's.
     public var trailers: [MovieTrailer]
 
     public init(id: Int, libraryID: Int, title: String, year: Int?, tagline: String?, overview: String, releaseDate: String?, runtimeMin: Int?, genres: [String], rating: Double?, posterPath: String?, backdropPath: String?, quality: QualityLabel?, hdr: Bool, versions: [MediaVersion], cast: [Person], watch: WatchProgress?, contentRating: String? = nil, managedBy: String? = nil, download: QueueDownload? = nil, trailers: [MovieTrailer] = []) {
@@ -750,7 +750,7 @@ extension LibraryRepository {
     public func relatedRows(_ title: RelatedTitle) async throws -> [ScreenRow] { [] }
 }
 
-/// The page whose related titles are asked for (PLAN-RELATED.md §6): a
+/// The page whose related titles are asked for: a
 /// movie's lists movies, a show's lists shows.
 public enum RelatedTitle: Hashable, Sendable {
     case movie(id: Int)
@@ -786,16 +786,16 @@ public protocol LibraryRepository: AnyObject {
     func playRequest(fileID: Int) async throws -> PlayRequest
 
     /// The page of the movie or episode `fileID` plays, for a play link the
-    /// app didn't publish, which opens the page rather than playing
-    /// (PLAN-APPLE-REVIEW.md §3.4.7); nil for a file without one.
+    /// app didn't publish, which opens the page rather than playing;
+    /// nil for a file without one.
     func filePage(fileID: Int) async throws -> FilePage?
 
     /// The server works out related titles (``ServerFeatures/related``):
     /// below it a page asks for none and ends as it did.
     var offersRelated: Bool { get }
 
-    /// The rows at the end of a movie's or a show's page (PLAN-RELATED.md
-    /// §6), as ``ScreenRow``s Home's rows draw: the movie's collection
+    /// The rows at the end of a movie's or a show's page,
+    /// as ``ScreenRow``s Home's rows draw: the movie's collection
     /// (`collection`, titled with its name, in release order), then More like
     /// this (`similar`, best first), each with `items`. Empty when nothing
     /// qualifies, and below ``ServerFeatures/related``.

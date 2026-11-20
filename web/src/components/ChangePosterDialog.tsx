@@ -14,7 +14,7 @@ type Pick =
   | { by: 'link'; url: string }
 
 /**
- * Change poster (design/mockups/web/PosterDialog, PLAN-POSTERS.md): an admin
+ * Change poster: an admin
  * picks one of TMDB's posters, uploads a picture, or gives a link the server
  * copies once. With more than one target (a show and its open season) a
  * switch at the top says which poster is being changed.

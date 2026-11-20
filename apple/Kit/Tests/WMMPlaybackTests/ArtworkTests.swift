@@ -43,7 +43,7 @@ import WMMModel
     }
 
     @Test func theAppleTVInfoPanelGetsTheRequestsDetailsAndThePicture() async throws {
-        // PLAN-APPLE-REVIEW.md §6.2: from the request and Now Playing's picture, with no request of its own.
+        // From the request and Now Playing's picture, with no request of its own.
         var r = episode
         r.overview = "The harbour freezes over."
         r.year = 2024

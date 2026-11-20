@@ -21,14 +21,14 @@ struct RowSeeAll {
     let open: () -> Void
 }
 
-/// One arranged row (PLAN-ROWS.md §6.1), drawn by its style with Home's
+/// One arranged row, drawn by its style with Home's
 /// cards: posters, 16:9 cards, episodes, Continue watching, or the app's
 /// Live TV row in the `live` slot. A list row shows its line under the
-/// heading ("18 of 50 · From TMDB", LibraryRows.dc.html). On the iPad's Home
-/// screens (PLAN-HOME.md §7.6) `counter` is "Row 2 of 7" and `leading` holds
+/// heading ("18 of 50 · From TMDB"). On the iPad's Home
+/// screens `counter` is "Row 2 of 7" and `leading` holds
 /// the leading card's key, which the row outlines in gold and keeps up to
 /// date as the row snaps. A poster, 16:9 or episode row with a See all ends
-/// in a ``SeeAllCard`` (PLAN-SEE-ALL.md §4.4) and has See all in its heading.
+/// in a ``SeeAllCard`` and has See all in its heading.
 struct ArrangedRow: View {
     let row: ScreenRow
     let actions: RowActions
@@ -73,7 +73,7 @@ struct ArrangedRow: View {
                 LiveOnNowRow(counter: counter, leading: leading)
             }
         case .continue:
-            // Continue watching has no See all (PLAN-SEE-ALL.md decision 4).
+            // Continue watching has no See all.
             CardRow(heading.title, detail: heading.detail, subtitle: row.subtitle, spacing: wide ? 18 : 12, counter: counter, leading: leading) {
                 ForEach(row.continueItems, id: \.cardKey) { item in
                     ContinueCard(item: item, actions: actions, width: wideCardWidth, leading: isLeading(item.cardKey, first: row.continueItems.first?.cardKey))
@@ -108,7 +108,7 @@ struct ArrangedRow: View {
     }
 }
 
-/// The card at the end of a row (HomeSeeAll.dc.html, Pad2HomeRowSeeAll.dc.html):
+/// The card at the end of a row:
 /// as big as the row's artwork, with no title under it. A grid glyph on a gold
 /// tint (a list's glyph for a list), "See all TV shows" and "By last aired".
 /// It opens what the heading's See all opens. On iPad's Home screens it is
@@ -167,7 +167,7 @@ struct SeeAllCard: View {
     }
 }
 
-// MARK: Home's cards, wherever a row draws them (PLAN-APPLE-REVIEW.md §5.7)
+// MARK: Home's cards, wherever a row draws them
 
 /// A Continue watching card: resumes on a tap; Mark watched and the page on a long press.
 struct ContinueCard: View {

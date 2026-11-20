@@ -1,6 +1,6 @@
 import XCTest
 
-/// A Home row's See all on Apple TV (PLAN-SEE-ALL.md S5), on the fakes with
+/// A Home row's See all on Apple TV, on the fakes with
 /// arranged rows: Recently aired ends in a card that says where it goes; with
 /// it focused the panel stays on the row's last episode; Select opens TV
 /// Shows (already visited, so its grid is alive) sorted Last aired with focus

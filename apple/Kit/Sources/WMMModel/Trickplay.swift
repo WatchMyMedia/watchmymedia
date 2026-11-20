@@ -1,6 +1,6 @@
 import Foundation
 
-/// A file's seek thumbnails (PLAN-TRICKPLAY.md §2): tiles of `width` ×
+/// A file's seek thumbnails: tiles of `width` ×
 /// `height` pixels, one every `intervalMs`, `columns` × `rows` to a JPEG
 /// sheet. Tile i covers [i × intervalMs, (i+1) × intervalMs); the last
 /// sheet is partly filled (android/core/model's `Trickplay`).
@@ -33,7 +33,7 @@ public struct Trickplay: Hashable, Sendable {
     /// The tiles a full sheet holds.
     public var perSheet: Int { columns * rows }
 
-    /// The tile showing `ms` (§2's locator): the first before the start, the last past the end.
+    /// The tile showing `ms`: the first before the start, the last past the end.
     public func tile(atMs ms: Int) -> TrickplayTile {
         let i = min(max(ms, 0) / intervalMs, count - 1)
         let cell = i % perSheet

@@ -4,7 +4,7 @@ import WMMModel
 @testable import WMMData
 
 /// MetricKit's daily background exit counts, kept as one summary
-/// (PLAN-APPLE-REVIEW.md §6.4, "Exits in the background" on Diagnostics.dc.html).
+/// ("Exits in the background" on the Diagnostics page).
 @Suite struct DiagnosticsExitsTests {
     let at = Date(timeIntervalSince1970: 1_800_000_000)
 

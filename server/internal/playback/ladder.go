@@ -154,7 +154,7 @@ func (f *vodFamily) warmLoop() {
 	}
 }
 
-// StartVODLadder is the internal A0 two-rung prototype. It does not change
+// StartVODLadder is the internal two-rung prototype. It does not change
 // ordinary playback decisions and has no public request flag yet. Both
 // compatible software variants must prepare under reserved capacity before
 // either is advertised. A failed second start releases the first claim.

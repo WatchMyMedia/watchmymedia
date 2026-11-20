@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// The weights of More like this (PLAN-RELATED.md §5). TMDB's
+// The weights of More like this. TMDB's
 // recommendations count most; then what titles share, rare things more than
 // common ones.
 const (

@@ -21,7 +21,7 @@ const crumbs = settingsCrumbs('transcoding', { label: 'Choose an encoder' })
 const stepHref = (key: string) => settingsHref('transcoding', 'encoder', key)
 const hub = settingsHref('transcoding')
 
-/** Choose an encoder: Choose → Test → In use (boards tx-enc-1, tx-enc-2, tx-enc-done). */
+/** Choose an encoder: Choose → Test → In use. */
 export function EncoderFlow({ step }: { step?: string }) {
   const settings = useQuery({ ...settingsQuery, refetchInterval: hardwarePoll })
   const server = useQuery(serverQuery)
@@ -29,7 +29,7 @@ export function EncoderFlow({ step }: { step?: string }) {
   const s = settings.data
   const test = encoderTest(s?.hwaccel ?? 'auto', s?.capabilities)
   const current = encoderStep(step, test)
-  // An address whose step isn't open yet goes to the one that is (§4).
+  // An address whose step isn't open yet goes to the one that is.
   useEffect(() => {
     if (s && step !== current.key) go(stepHref(current.key), { replace: true })
   }, [s, step, current.key, go])

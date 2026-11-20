@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-// Offline tokens let an app's downloader fetch one download's media
-// (PLAN-DOWNLOADS.md §4.2): the original file, the HLS playlists and
+// Offline tokens let an app's downloader fetch one download's media:
+// the original file, the HLS playlists and
 // segments of its download session, or its subtitles. A token names its
 // download record and opens only that record's routes, so one seen in a
 // log is worth one download for a few hours. It is tied to the device

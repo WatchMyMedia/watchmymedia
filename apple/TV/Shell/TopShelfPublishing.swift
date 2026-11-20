@@ -4,7 +4,7 @@ import WMMFeatures
 import WMMModel
 import WMMTopShelf
 
-/// The Top Shelf (TvTopShelfSections.dc.html, PLAN-APPLE-REVIEW.md §6.2):
+/// The Top Shelf:
 /// Home publishes Continue watching and Recently added into the App Group
 /// the app shares with its extension (`apple/TopShelf`), with each picture
 /// saved there as a file, and tells the system; signing out or switching

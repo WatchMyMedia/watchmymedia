@@ -2,7 +2,7 @@
 <!--
   Servers are whatever address someone types or finds on the network, often
   http:// to a LAN address or a .local name, so cleartext is allowed. The
-  sign-in screen nudges hostnames towards https (PLAN-CLIENTS.md §5.5).
+  sign-in screen nudges hostnames towards https.
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">

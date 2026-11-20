@@ -11,7 +11,7 @@ import (
 	"watchmymedia/server/internal/events"
 )
 
-// Screens a person arranges (PLAN-ROWS.md §6): Home, and each library's
+// Screens a person arranges: Home, and each library's
 // Movies or TV screen as library-<id>.
 const (
 	ScreenHome          = "home"
@@ -30,8 +30,8 @@ const (
 	RowStyleLive     = "live"     // no items: the app draws its Live TV row here
 )
 
-// ScreenRow is one row of a screen, in the person's order (PLAN-ROWS.md
-// §6.1). Only rows with something to show are sent, except live, which the
+// ScreenRow is one row of a screen, in the person's order.
+// Only rows with something to show are sent, except live, which the
 // app fills.
 type ScreenRow struct {
 	ID       string           `json:"id" doc:"On Home: continue, followed (from API level 29), live, recentlyAddedShows, recentlyAired, recentlyAddedMovies, recentlyReleased. On a library: recentlyAdded, recentlyAired (TV), recentlyReleased (movies). A list: list:<id>."`

@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// Add language by name (PLAN-APPLE-SETTINGS.md §5.3): the system's names,
+/// Add language by name: the system's names,
 /// sorted and searchable, the list's marked, the device's suggested, the
 /// variants people use, and the limit of 16. No codes.
 @MainActor

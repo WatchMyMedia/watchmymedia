@@ -88,7 +88,7 @@ internal fun About(show: ShowDetail, flags: AboutFlags, vm: ShowPageActions, lib
                 }
             }
             if (show.overview.isNotBlank()) Text(show.overview, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.TextSoft, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 1100.dp))
-            // Notify me, first of the show's buttons (PLAN-NEW-EPISODES.md §7.1, the boards' `tv-bell`), with who notifies under the buttons while it has focus.
+            // Notify me, first of the show's buttons, with who notifies under the buttons while it has focus.
             var bellFocused by remember { mutableStateOf(false) }
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 flags.following?.let { following ->

@@ -21,7 +21,7 @@ import (
 	"watchmymedia/server/internal/memo"
 )
 
-// List limits (PLAN-ROWS.md Decision 13).
+// List limits.
 const (
 	maxListsPerPerson = 25
 	maxListsOnServer  = 200
@@ -29,8 +29,8 @@ const (
 	maxImportBytes    = 1 << 20
 )
 
-// MediaListSource says where a list comes from and with what options
-// (PLAN-ROWS.md §3, §7.2). One flat object for every kind: each kind reads
+// MediaListSource says where a list comes from and with what options.
+// One flat object for every kind: each kind reads
 // the fields it names and ignores the rest.
 type MediaListSource struct {
 	Kind string `json:"kind" doc:"tmdb, mdblist, library or import. A plain string: show a list whose kind you don't know, and don't offer to edit it."`

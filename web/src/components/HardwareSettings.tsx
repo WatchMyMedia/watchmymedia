@@ -18,7 +18,6 @@ const stages: Record<string, string> = {
   selection: 'Backend selection', device: 'Adapter selection', encoders: 'List encoders', filters: 'List filters',
 }
 
-/** Repository boards: design/mockups/web-windows/Transcoding.html. */
 export function HardwareSettings({ setup = false }: { setup?: boolean }) {
   const settings = useQuery({
     ...settingsQuery,

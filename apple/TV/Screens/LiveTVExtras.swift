@@ -3,8 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-// Favourites, search and reminders on Apple TV (PLAN-LIVE-TV-GUIDE.md §6.5):
-// design/mockups/apple-tv/TvLiveGuideExtras, TvLiveSearch and TvLiveReminder.
+// Favourites, search and reminders on Apple TV.
 // tvOS notifications carry only badges, so a reminder is a banner while the
 // app is open. Only from servers at API level 15 with listings.
 

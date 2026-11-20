@@ -21,7 +21,7 @@ import type { Crumb } from '../../../lib/settingsRoutes'
 import { FlowWaiting, ListCard, PlexNote, Working } from './parts'
 import { plexCrumbs, plexHref, signInKey, usePlexConnection, useStored } from './state'
 
-/** Connect a Plex server: Sign in → Choose server → Connected (§5.1).
+/** Connect a Plex server: Sign in → Choose server → Connected.
  * With a server already connected it is Reconnect, which keeps the links. */
 export function ConnectFlow({ step }: { step?: string }) {
   const { query, connection } = usePlexConnection()

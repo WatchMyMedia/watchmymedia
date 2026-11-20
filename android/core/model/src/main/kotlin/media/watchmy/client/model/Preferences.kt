@@ -31,7 +31,7 @@ data class PlaybackPreferences(
 /**
  * Streaming quality, remembered per device. The caps narrow the device's
  * profile. [Auto] has none: the server picks the step and lowers it when the
- * connection can't keep up (PLAN-AUTO-QUALITY.md), from [AUTO_API_LEVEL].
+ * connection can't keep up, from [AUTO_API_LEVEL].
  */
 enum class StreamQuality(val id: String, val label: String, val maxWidth: Int?, val maxHeight: Int?, val maxBitrate: Long?) {
     Auto("auto", "Automatic", null, null, null),
@@ -43,7 +43,7 @@ enum class StreamQuality(val id: String, val label: String, val maxWidth: Int?, 
     Low("360", "360p · 1 Mbps", 640, 360, 1_000_000),
     ;
 
-    /** The quality in a row's value, where there is little room: "Original", "4K", "1080p" (android/SettingsMobileData.dc.html). */
+    /** The quality in a row's value, where there is little room: "Original", "4K", "1080p". */
     val shortLabel: String
         get() = when (this) {
             Auto -> "Automatic"
@@ -69,7 +69,7 @@ enum class AudioPassthrough(val label: String, val description: String) {
     Off("Off", "Stereo or surround as PCM"),
 }
 
-/** The TV's subtitle size; [scale] is against Normal (android-tv/SettingsPlayback.dc.html: 22, 28, 34 and 42 px). */
+/** The TV's subtitle size; [scale] is against Normal (22, 28, 34 and 42 px). */
 enum class SubtitleSize(val label: String, val scale: Float) {
     Smaller("Smaller", 22f / 28f),
     Normal("Normal", 1f),
@@ -111,8 +111,8 @@ interface PreferencesRepository {
     /**
      * Saves the audio languages (from [AUDIO_LANGUAGES_API_LEVEL]). True when
      * the server turned on subtitles for foreign audio with them, as it does
-     * on the first save for someone who never chose how subtitles start
-     * (PLAN-LANGUAGES.md §5.3); the settings page says so once.
+     * on the first save for someone who never chose how subtitles start;
+     * the settings page says so once.
      */
     suspend fun setAudioLanguages(languages: List<String>): Boolean {
         throw ApiException(503, "Update the server to choose audio languages.")

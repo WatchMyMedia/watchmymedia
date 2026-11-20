@@ -31,7 +31,7 @@ section.idle p { margin-top: 3vh; }
 aside.next { position: absolute; right: 4vw; bottom: 9vh; display: flex; gap: 1.4vw; align-items: center; max-width: 42vw; padding: 1.4vw; background: rgba(15, 15, 16, 0.92); border: 0.15vw solid var(--gold); border-radius: 0.8vw; }
 aside.next img { width: 14vw; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 0.4vw; }
 
-/* Live TV (PLAN-LIVE-TV.md §4.1): the web canvas's LiveReceiver board, its sizes at 1920 × 1080. */
+/* Live TV: the design's sizes at 1920 × 1080. */
 :root { --live: #b42318; --soft: #e5e5e5; --dim: #bdbdbd; --panel: #1c1c1f; }
 .tvb { position: absolute; left: 4vw; right: 4vw; bottom: 9vh; display: flex; align-items: stretch; border-radius: 0.8vw; border: 0.1vw solid rgba(255, 255, 255, 0.14); background: rgba(15, 15, 16, 0.92); box-shadow: 0 1.25vw 3.1vw rgba(0, 0, 0, 0.55); overflow: hidden; }
 .tvnum { display: flex; flex-direction: column; justify-content: center; gap: 0.2vw; min-width: 10.4vw; padding: 1.25vw 1.7vw; box-sizing: border-box; background: rgba(255, 255, 255, 0.06); border-right: 0.1vw solid rgba(255, 255, 255, 0.1); }

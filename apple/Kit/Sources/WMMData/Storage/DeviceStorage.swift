@@ -29,7 +29,7 @@ final class SystemKeychain: KeychainItems {
 /// The device's storage: the device ID and each server's sign-in in the
 /// Keychain (readable after the first unlock, kept across reinstalls, and
 /// never leaving this device: a phone restored from a backup signs in again
-/// and makes a device ID of its own, PLAN-APPLE-REVIEW.md §2.6), everything
+/// and makes a device ID of its own), everything
 /// else as JSON in UserDefaults. Items saved before as `AfterFirstUnlock`
 /// are moved to `…ThisDeviceOnly` as they are read; a move that fails leaves
 /// the item as it was, and a sign-in is never deleted for it.

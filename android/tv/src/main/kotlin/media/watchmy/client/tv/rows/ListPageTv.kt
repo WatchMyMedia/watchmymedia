@@ -91,7 +91,7 @@ import media.watchmy.client.ui.rememberNotMatchedNotice
 import media.watchmy.client.ui.ReportShown
 
 /**
- * A list's page on the TV (android-tv/ListPage.dc.html), from its row's See
+ * A list's page on the TV, from its row's See
  * all card: the kicker, name, where it comes from and how much the library
  * has (or why it couldn't update), and every title in rank order in an
  * 8-column grid. OK opens a title the library has; on a missing one it

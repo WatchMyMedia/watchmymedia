@@ -4,8 +4,8 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// Link a TV and Switch server as stepped tasks (PLAN-APPLE-SETTINGS.md §5.5,
-/// §5.6): each step's number and names, each button and why it is off, every
+/// Link a TV and Switch server as stepped tasks:
+/// each step's number and names, each button and why it is off, every
 /// failure ending in what was or wasn't done, and the finished screen.
 @MainActor
 @Suite struct FlowStepsTests {
@@ -203,8 +203,8 @@ import WMMModel
     }
 }
 
-/// After too many wrong codes, Check this code is off for a minute and says why
-/// (Settings2LinkTvCode.dc.html, `tooMany`).
+/// After too many wrong codes, Check this code is off for a minute and says
+/// why.
 @MainActor
 @Suite struct LinkTVTooManyCodesTests {
     init() { FakeLatency.duration = .zero }
@@ -249,8 +249,8 @@ import WMMModel
     }
 }
 
-/// Switch server's Sign in by a code from a signed-in device
-/// (Settings2SwitchSignIn.dc.html), and Apple TV's starting on the code.
+/// Switch server's Sign in by a code from a signed-in device,
+/// and Apple TV's starting on the code.
 @MainActor
 @Suite struct SwitchServerCodeSignInTests {
     init() { FakeLatency.duration = .zero }

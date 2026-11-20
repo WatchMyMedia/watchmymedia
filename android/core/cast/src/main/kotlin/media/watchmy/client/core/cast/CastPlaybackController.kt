@@ -41,7 +41,7 @@ import media.watchmy.client.model.segmentKindOf
 import media.watchmy.client.model.skipLabel
 
 /**
- * The TV's play as a remote (PLAN-CAST.md §5.2): the receiver runs the play
+ * The TV's play as a remote: the receiver runs the play
  * and its rules (heartbeats, Skip, Next Episode, Still watching); this only
  * turns its MEDIA_STATUS and `state` messages into [PlayerUiState] and the
  * viewer's taps into commands, so the phone's player screen renders it as

@@ -8,9 +8,9 @@ import android.os.Build
 import androidx.core.net.toUri
 
 /**
- * Where the TV can't show YouTube's player in a WebView ([TrailerWebViews];
- * PLAN-TV-TRAILERS.md §4.4), it hands YouTube trailers to the YouTube app
- * (PLAN-TRAILERS.md §6.2): an `ACTION_VIEW` of the watch link, which the
+ * Where the TV can't show YouTube's player in a WebView
+ * ([TrailerWebViews]), it hands YouTube trailers to the YouTube app:
+ * an `ACTION_VIEW` of the watch link, which the
  * YouTube app takes, as Jellyfin's Android TV app does. Google TV ships with
  * YouTube. The trailer screen's Open in YouTube uses it too.
  */
@@ -39,7 +39,7 @@ internal fun Context.canOpenYouTube(): Boolean {
  * all. The extras ask the YouTube app to play it full screen and to come
  * back here when it ends, instead of playing another video and leaving
  * people four Backs from the movie page. They are the retired YouTube
- * Android Player API's and undocumented, but TV0 saw both work on a Google
+ * Android Player API's and undocumented, but both worked on a Google
  * TV Streamer (2026-11-18): YouTube opened its StandalonePlayerActivity and
  * returned to the app by itself at the end. Other apps that take the link
  * ignore them.

@@ -9,11 +9,11 @@ export type BrowseItem = components['schemas']['BrowseItem']
 
 /**
  * 2:3 poster with the New badge; fixed width inside rows, fluid in grids. Its
- * parts are links of their own (lib/cardLinks.ts, PLAN-HOME.md §6): the
+ * parts are links of their own (lib/cardLinks.ts): the
  * title opens the title, a Recently added show card's season and episode
  * open the show there, and the picture is a bigger target for the most
- * specific of them. rank puts a list's place where New goes
- * (design/mockups/web/ListPage). subtitle is the plain end of the second
+ * specific of them. rank puts a list's place where New goes.
+ * subtitle is the plain end of the second
  * line; without it the line is the year and count.
  */
 export function PosterCard({ item, inRow = false, subtitle, showCount = false, rank }: { item: BrowseItem; inRow?: boolean; subtitle?: string; showCount?: boolean; rank?: number }) {

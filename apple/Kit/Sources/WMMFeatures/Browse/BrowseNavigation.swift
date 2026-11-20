@@ -12,8 +12,8 @@ public enum ItemOpening: Hashable, Sendable {
 }
 
 extension BrowseItem {
-    /// A Recently added card for one episode opens that episode's page
-    /// (PLAN-EPISODE-PAGE.md §10); other show cards open the show.
+    /// A Recently added card for one episode opens that episode's page;
+    /// other show cards open the show.
     public var opening: ItemOpening {
         switch kind {
         case .movie: return .page(.movie(id: id))
@@ -44,8 +44,8 @@ extension Navigator {
     }
 }
 
-/// A screen model's hold on the library's changes (PLAN-APPLE-REVIEW.md
-/// §4.1.1–2). It subscribes the first time the screen shows and keeps
+/// A screen model's hold on the library's changes.
+/// It subscribes the first time the screen shows and keeps
 /// listening for as long as the model lives, so what changes while the
 /// screen is away (another tab, a page pushed over it, the player) is kept
 /// and applied when it shows again. Returning to a screen loads nothing
@@ -149,7 +149,7 @@ func merge(_ changes: AsyncStream<LibraryChange>, unknown other: AsyncStream<Voi
 }
 
 /// Runs one load at a time: a load that a newer one replaces is cancelled,
-/// so its request stops rather than finishing for nothing (§4.1.1).
+/// so its request stops rather than finishing for nothing.
 @MainActor
 final class LatestLoad {
     private var current: Task<Void, Never>?
@@ -172,8 +172,8 @@ final class LatestLoad {
 
 extension Navigator {
     /// A row's See all: a list's page, or the library's tab at its grid,
-    /// which takes the link's sort and filters once (``takeBrowseLink(for:)``,
-    /// PLAN-SEE-ALL.md §4.4). `home` says which library is the TV one and
+    /// which takes the link's sort and filters once
+    /// (``takeBrowseLink(for:)``). `home` says which library is the TV one and
     /// which the movies'; a library it doesn't know goes nowhere. A page
     /// pushed on the tab is closed, so its grid shows.
     public func open(_ link: RowLink, home: HomeData?) {

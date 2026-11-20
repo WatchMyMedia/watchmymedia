@@ -31,7 +31,7 @@ export type AboutProps = {
 }
 
 /**
- * About the show (ShowPage's About, past the row): the poster, title, facts
+ * About the show (past the row): the poster, title, facts
  * and status, the overview, then Notify me, Mark show watched, Show missing
  * episodes, Request missing seasons and Cast & details, with who notifies
  * under them while the bell has focus.

@@ -28,7 +28,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 
-/** Copy diagnostics in Settings › About (PLAN-ANDROID-REVIEW §6.4, the Diagnostics board); its words are tested in core:model. */
+/** Copy diagnostics in Settings › About; its words are tested in core:model. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xxhdpi")
 class DiagnosticsTest {

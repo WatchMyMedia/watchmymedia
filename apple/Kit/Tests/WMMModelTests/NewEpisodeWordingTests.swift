@@ -2,8 +2,7 @@ import Foundation
 import Testing
 import WMMModel
 
-/// New episodes' words, as the boards' wording table has them
-/// (design/proposals/new-episodes/apple/README.md).
+/// New episodes' words, as the boards' wording table has them.
 @Suite struct NewEpisodeWordingTests {
     private func episode(_ season: Int, _ number: Int, _ title: String? = nil) -> ArrivedEpisode {
         ArrivedEpisode(id: season * 100 + number, season: season, number: number, title: title, arrivedAt: .now)

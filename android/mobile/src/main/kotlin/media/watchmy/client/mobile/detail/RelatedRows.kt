@@ -20,9 +20,7 @@ import media.watchmy.client.model.ScreenRow
 import media.watchmy.client.ui.LocalAppServices
 
 /**
- * The rows at the end of a movie's or a show's page (PLAN-RELATED.md §7;
- * MovieRelated.dc.html, ShowRelated.dc.html and the tablet's
- * TabMovieRelated.dc.html and TabShowRelated.dc.html): the movie's
+ * The rows at the end of a movie's or a show's page: the movie's
  * collection and More like this, each named as the page's other sections
  * are, over Home's poster cards. A card opens its title's page on top of
  * this one. Nothing is drawn while there are no rows. [edge] is the space

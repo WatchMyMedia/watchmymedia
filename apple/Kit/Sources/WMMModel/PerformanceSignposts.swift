@@ -1,7 +1,7 @@
 import Foundation
 import os
 
-/// The intervals PLAN-APPLE-REVIEW.md §4.3.1 measures, as signposts in
+/// The intervals the app measures, as signposts in
 /// Instruments (subsystem `media.watchmy.client`, category `Performance`) and
 /// for `XCTOSSignpostMetric` in the performance tests.
 public enum PerformanceInterval: String, CaseIterable, Sendable {
@@ -68,7 +68,7 @@ public final class OSPerformanceRecorder: PerformanceRecorder {
     }
 }
 
-/// The app's performance signposts (PLAN-APPLE-REVIEW.md §4.3.1). Each call is
+/// The app's performance signposts. Each call is
 /// safe from any thread and in any order: an end without its begin, or a
 /// second end, does nothing, so a call site can't unbalance an interval.
 ///

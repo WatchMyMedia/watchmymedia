@@ -27,8 +27,7 @@ import (
 )
 
 const (
-	// maxPicture bounds one picture. The largest the feed named was 82 KB
-	// (PLAN-LIVE-TV-GUIDE.md §7.1).
+	// maxPicture bounds one picture. The largest the feed named was 82 KB.
 	maxPicture = 1 << 20
 	// maxFolder bounds the folder. Two days' pictures came to about 40 MB.
 	maxFolder = 256 << 20
@@ -333,7 +332,7 @@ func (c *Cache) receive(tmp *os.File, body io.Reader) (picture, error) {
 	if !types[p.contentType] {
 		return picture{}, fmt.Errorf("%w (%s)", errNotPicture, p.contentType)
 	}
-	// The feed's declared sizes are wrong (§7.1), so they are measured.
+	// The feed's declared sizes are wrong, so they are measured.
 	// The standard library reads no WebP, whose size stays unknown.
 	var cfg image.Config
 	switch p.contentType {

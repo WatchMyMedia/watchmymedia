@@ -47,7 +47,7 @@ fun versionTitle(v: MediaVersion): String =
 /**
  * A version's tags: container, codec, HDR, audio and size. [spelledOut] is
  * for the TV, whose Versions panel has room for "Dolby Vision · P8" where the
- * phone says "DV P8" (android-tv/Movie.dc.html, android/Movie.dc.html).
+ * phone says "DV P8".
  */
 fun versionTags(v: MediaVersion, spelledOut: Boolean = false): List<String> = listOfNotNull(
     v.container?.uppercase(Locale.ROOT),

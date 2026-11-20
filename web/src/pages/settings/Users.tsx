@@ -6,7 +6,7 @@ import { UsersHub } from './users/Hub'
 import { PersonPage } from './users/Person'
 
 /**
- * Settings › Users (PLAN-ADMIN-SETTINGS.md §5.5): the hub with everyone and
+ * Settings › Users: the hub with everyone and
  * what everyone can do, a page for each person, and Add a person as a flow.
  */
 export function UsersSettings() {

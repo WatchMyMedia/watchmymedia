@@ -1,7 +1,7 @@
 import Foundation
 
-/// What Settings › About › Diagnostics shows on iPhone and iPad
-/// (design/mockups/ios/Diagnostics.dc.html): the parts of a
+/// What Settings › About › Diagnostics shows on iPhone and iPad:
+/// the parts of a
 /// ``DiagnosticsReport`` laid out in groups, and ``text``, which Copy puts on
 /// the clipboard. Every value on the page went through the same
 /// ``DiagnosticsRedactor`` as the text, so the page never shows what Copy

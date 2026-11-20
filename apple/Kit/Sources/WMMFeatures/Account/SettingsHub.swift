@@ -1,8 +1,8 @@
 import Foundation
 import WMMModel
 
-// The Settings root as a hub (PLAN-APPLE-SETTINGS.md §5.1, §5.9;
-// Settings2Root.dc.html, Pad2Settings2.dc.html, TvSettings2.dc.html): the
+// The Settings root as a hub:
+// the
 // web's groups in the web's order, each row with how things stand, one Next
 // step when there is something to do, and a banner when the server can't be
 // reached. Pure functions of what the app knows, so every variant is tested.
@@ -156,7 +156,7 @@ extension SettingsHubFacts {
 
 // MARK: - iPhone and iPad
 
-/// The root's groups on iPhone and iPad, in the web's order (§5.1): You
+/// The root's groups on iPhone and iPad, in the web's order: You
 /// (Playback, Audio & subtitles, Notifications, Home rows, Account & devices,
 /// Your requests), This iPhone (Downloads), Server (the server, and the Inbox for
 /// an admin allowed here), About. A row the server or account doesn't offer
@@ -198,7 +198,7 @@ public func settingsHub(_ f: SettingsHubFacts, locale: Locale = .current) -> [Se
 
 // MARK: - Apple TV
 
-/// Apple TV's list of groups beside the page (§5.9), in the web's order:
+/// Apple TV's list of groups beside the page, in the web's order:
 /// Playback, Audio & subtitles, Notifications, Home rows, Account & devices, Your requests,
 /// Server, About; each `value` is the line under its name and `about` the
 /// panel's while it is focused. The Inbox is on Server's page.
@@ -247,9 +247,9 @@ public func tvSignedInLine(_ user: User?) -> String { user.map { "Signed in as \
 
 // MARK: - Next step
 
-/// The one card under the account, when there is something to do (§5.1):
+/// The one card under the account, when there is something to do:
 /// first a language to watch in when none is chosen, then notifications that
-/// are off while reminders are set. Not on Apple TV (§12, not drawn).
+/// are off while reminders are set. Not on Apple TV (not drawn).
 public enum SettingsNextStep: Hashable, Sendable {
     /// No audio language yet; `suggested` is the device's, when it has one.
     case chooseLanguage(suggested: String?)

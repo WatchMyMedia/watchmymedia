@@ -1,6 +1,6 @@
 // Package seerr is a client for Seerr's v1 API (Seerr 3 and later, the
-// merged Overseerr and Jellyseerr). It covers what WatchMyMedia uses
-// (PLAN-ARR.md §0, §7.3), not the whole API.
+// merged Overseerr and Jellyseerr). It covers what WatchMyMedia uses,
+// not the whole API.
 //
 // Calls carry the API key, which acts as Seerr's first user. Calls made for
 // a person add X-Api-User, so Seerr applies that user's permissions, quotas

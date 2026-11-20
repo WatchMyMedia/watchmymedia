@@ -3,7 +3,7 @@ import Testing
 @testable import WMMPlayback
 import WMMModel
 
-/// The pieces the file and Live TV controllers share (PLAN-APPLE-REVIEW.md §5.1).
+/// The pieces the file and Live TV controllers share.
 @MainActor
 @Suite struct SharedPiecesTests {
     @Test func aSwitchIsTakenOnceAndReportedUntilHeard() {

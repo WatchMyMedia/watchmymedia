@@ -39,8 +39,7 @@ type Tab = { to: SettingsPath; label: string; extra?: (current: boolean) => Reac
  * time; wider screens keep the tabs beside the page and open on Playback.
  *
  * Each tab opens on its hub; pages under it keep the tabs beside them, and a
- * task's flow takes the whole window with its own Exit
- * (PLAN-ADMIN-SETTINGS.md §3.1, §3.2).
+ * task's flow takes the whole window with its own Exit.
  */
 export function SettingsLayout() {
   const path = useRouterState({ select: (s) => s.location.pathname.replace(/\/$/, '') })
@@ -60,7 +59,7 @@ function SettingsWithTabs({ path }: { path: string }) {
   const options = useQuery(requestOptionsQuery)
   const canRequest = !!(options.data?.movies || options.data?.shows)
   const inbox = options.data?.inbox ?? 0
-  // Following shows comes with API level 29 (PLAN-NEW-EPISODES.md §7.2).
+  // Following shows comes with API level 29.
   const follows = useCanFollow()
 
   const you: Tab[] = [
@@ -146,7 +145,7 @@ function SettingsWithTabs({ path }: { path: string }) {
 
 /**
  * Wraps a Server page: its content for admins the gate lets in, else why it
- * is not shown (PLAN-ADMIN-SETTINGS.md §3.4): the approved away wording for
+ * is not shown: the approved away wording for
  * an admin kept out, and one line for a member, with no form and no buttons.
  */
 export function ServerOnly({ children, tab }: { children: ReactNode; tab?: SettingsTab }) {

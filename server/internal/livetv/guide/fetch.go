@@ -21,7 +21,7 @@ import (
 // transport, never the address.
 const feedURL = "https://api.hdhomerun.com/api/xmltv"
 
-// The feed's size limits, G0's measurement of 14 days times four (§5.1),
+// The feed's size limits, a measurement of 14 days times four,
 // past which a fetch fails rather than keeping part of the listings.
 var (
 	maxCompressed int64 = 32 << 20

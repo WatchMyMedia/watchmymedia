@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import WMMModel
 
-/// One movie's or episode's download (MovieDownload.dc.html,
-/// DownloadSheet.dc.html; android ItemDownloadViewModel): the button's
+/// One movie's or episode's download
+/// (android ItemDownloadViewModel): the button's
 /// state, the sheet's qualities with their sizes and the space free, and
 /// what the menu does. `fileID` is the version the page plays first, the one
 /// a new download is of; nil when there is no file. A download of any of

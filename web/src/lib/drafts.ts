@@ -1,4 +1,4 @@
-// The save rule (PLAN-ADMIN-SETTINGS.md §3.6): a switch or a choice saves at
+// The save rule: a switch or a choice saves at
 // once; typed fields and forms whose fields depend on each other are drafts,
 // held against what was saved until Save or Discard.
 

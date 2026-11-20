@@ -18,7 +18,7 @@ object WmmIcons {
     val Tv = stroke("M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z", "M8 21h8")
     val Movie = stroke("M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", "M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4")
     val Settings = stroke("M15.5 12a3.5 3.5 0 1 1-7 0a3.5 3.5 0 1 1 7 0", "M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1")
-    /** Voice typing (TvSearchKeyboard.dc.html). */
+    /** Voice typing. */
     val Microphone = stroke("M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z", "M19 11a7 7 0 0 1-14 0", "M12 18v3")
     val Server = stroke("M4.5 4h15A1.5 1.5 0 0 1 21 5.5v3A1.5 1.5 0 0 1 19.5 10h-15A1.5 1.5 0 0 1 3 8.5v-3A1.5 1.5 0 0 1 4.5 4z", "M4.5 14h15a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5v-3A1.5 1.5 0 0 1 4.5 14z", "M7 7h.01M7 17h.01")
     val Globe = stroke("M21 12a9 9 0 1 1-18 0a9 9 0 1 1 18 0", "M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18")
@@ -55,7 +55,7 @@ object WmmIcons {
     val Question = stroke(RING, "M12 8v5M12 16h.01")
     val Paperclip = stroke("M21 11.5 12.5 20a5 5 0 0 1-7-7l9-9a3.3 3.3 0 0 1 4.7 4.7l-9 9a1.7 1.7 0 0 1-2.4-2.4l8.3-8.3")
 
-    // The episode page (PLAN-EPISODE-PAGE.md): its More menu and Mark unwatched.
+    // The episode page: its More menu and Mark unwatched.
     val ChevronLeft = stroke("m15 18-6-6 6-6")
     val Flag = stroke("M5 21V4h11l-1.5 4L16 12H5")
     val Replace = stroke("M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5")
@@ -67,7 +67,7 @@ object WmmIcons {
     val File = stroke("M14 3H6v18h12V7zM14 3v4h4")
     val Ring = stroke(RING)
 
-    // Casting Live TV (PLAN-LIVE-TV.md §4.1): the Cast glyph on the TV's cast screens, as the phone draws it.
+    // Casting Live TV: the Cast glyph on the TV's cast screens, as the phone draws it.
     val Cast = stroke("M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6", "M2 12a9 9 0 0 1 8 8", "M2 16a5 5 0 0 1 4 4", "M2 20h.01")
 
     /** Three filled dots in a row: TV's More. */
@@ -85,10 +85,10 @@ object WmmIcons {
         .addPath(PathParser().parsePathString("M7 5h3v14H7zM14 5h3v14h-3z").toNodes(), fill = SolidColor(Color.White))
         .build()
 
-    // Trailers (PLAN-TRAILERS.md): Open in YouTube's arrow out of a box, and the TV's filled clapperboard.
+    // Trailers: Open in YouTube's arrow out of a box, and the TV's filled clapperboard.
     val External = stroke("M14 4h6v6M20 4l-9 9", "M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5")
 
-    /** The TV's Trailer button (Android TV MovieTrailer.dc.html). */
+    /** The TV's Trailer button. */
     val Clapper: ImageVector = ImageVector.Builder("clapper", 24.dp, 24.dp, 24f, 24f)
         .addPath(PathParser().parsePathString("M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z").toNodes(), fill = SolidColor(Color.White))
         .build()
@@ -110,10 +110,10 @@ object WmmIcons {
         .addPath(PathParser().parsePathString("M10.3 21a1.94 1.94 0 0 0 3.4 0").toNodes(), stroke = SolidColor(Color.White), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round)
         .build()
 
-    // Rows (PLAN-ROWS.md): the editor, Add a row and the list page.
+    // Rows: the editor, Add a row and the list page.
     val ListBullets = stroke("M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01")
 
-    /** Four rounded tiles: a library's grid, on a row's See all card (HomeSeeAll.dc.html). */
+    /** Four rounded tiles: a library's grid, on a row's See all card. */
     val Grid = stroke(
         "M5.5 4h3.5a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 1-1.5 1.5h-3.5a1.5 1.5 0 0 1-1.5-1.5v-3.5a1.5 1.5 0 0 1 1.5-1.5z",
         "M15 4h3.5a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 1-1.5 1.5h-3.5a1.5 1.5 0 0 1-1.5-1.5v-3.5a1.5 1.5 0 0 1 1.5-1.5z",
@@ -128,7 +128,7 @@ object WmmIcons {
     val NotFound = stroke("M18 11a7 7 0 1 1-14 0a7 7 0 1 1 14 0", "m20 20-3.5-3.5M9 9.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4M11 14.5h.01")
     val Warning = stroke("M12 3 2 20h20L12 3z", "M12 10v4M12 17h.01")
 
-    /** A cloud struck through: the TV's trailer screen when YouTube can't be reached (TvTrailerPlayer.dc.html). */
+    /** A cloud struck through: the TV's trailer screen when YouTube can't be reached. */
     val Offline = stroke("M3 3l18 18", "M8 18h9a4 4 0 0 0 .8-7.9A6 6 0 0 0 7.2 8", "M5 10.5A4 4 0 0 0 6 18")
 
     /** Six dots: a row's drag handle. */

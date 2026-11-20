@@ -22,7 +22,7 @@ import (
 
 // An admin chooses a poster: it goes out as posterPath on the routes every
 // client already uses, stays through a refresh from TMDB, and goes back to
-// TMDB's on reset (PLAN-POSTERS.md).
+// TMDB's on reset.
 func TestPosters(t *testing.T) {
 	t.Parallel()
 	fake := tmdbtest.New(t)

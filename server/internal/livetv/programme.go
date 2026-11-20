@@ -2,7 +2,7 @@ package livetv
 
 import "time"
 
-// Programme is one listing on a channel (PLAN-LIVE-TV-GUIDE.md §4.1). The
+// Programme is one listing on a channel. The
 // provider may leave out any field but the first four, and every field added
 // later is optional too.
 type Programme struct {
@@ -33,7 +33,7 @@ type Programme struct {
 	// The provider's picture is the series' card on every episode, so a
 	// matched TMDB still goes first where there is room for it.
 	StillURL string `json:"stillUrl,omitempty" required:"false" doc:"A TMDB episode still or movie backdrop matched to this programme: a path on this server. The wide details panel and the TVs' hero show it before pictureUrl, credited as from TMDB; everywhere else shows pictureUrl."`
-	// The viewer's own (§5.7).
+	// The viewer's own.
 	Reminder  bool           `json:"reminder,omitempty" required:"false" doc:"The viewer has a reminder for this programme (API level 15), in the guide and search replies."`
 	Recording *RecordingMark `json:"recording,omitempty" required:"false" doc:"Household recording state, only for people who may record (API level 19)."`
 }

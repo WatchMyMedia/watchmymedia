@@ -47,7 +47,7 @@ class LiveNavigationFlowTest {
         }
     }
 
-    // These cover L6's navigation on the channel-only screens; LiveGuideScreenTest covers listings.
+    // These cover navigation on the channel-only screens; LiveGuideScreenTest covers listings.
     @Before fun noLatency() {
         fakeLatencyMs = 0
         fake.live.listings = false
@@ -78,7 +78,7 @@ class LiveNavigationFlowTest {
         tab("Live TV").performClick()
         compose.onAllNodes(hasContentDescription("Settings") and hasClickAction()).onFirst().performClick()
         assertTrue(compose.onAllNodes(hasText("Settings")).fetchSemanticsNodes().isNotEmpty())
-        // Settings' overview: signing out is in Account & devices (PLAN-ANDROID-SETTINGS.md §4.1).
+        // Settings' overview: signing out is in Account & devices.
         assertTrue(compose.onAllNodes(hasText("Account & devices") and hasClickAction()).fetchSemanticsNodes().isNotEmpty())
     }
 

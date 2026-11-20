@@ -2,7 +2,7 @@ import type { components } from '../../../src/api/schema'
 import { episodeMinutes, isPartlyWatched } from '../../../src/lib/episode'
 import { seasonName, seasonTabs } from '../../../src/lib/showPage'
 
-// The Episodes panel's rules (PlayerEpisodes, Android TV's
+// The Episodes panel's rules (Android TV's
 // PlayerEpisodesViewModel): which show and season the file playing belongs
 // to, the season tabs, the episodes that can play, and each one's line.
 

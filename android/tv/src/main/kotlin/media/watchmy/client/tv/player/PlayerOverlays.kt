@@ -238,7 +238,7 @@ internal fun ErrorBanner(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * Automatic quality's note (PlayerAuto.dc.html): "Lowered to 720p for your
+ * Automatic quality's note: "Lowered to 720p for your
  * connection." It shows for a few seconds and never takes focus.
  */
 @Composable

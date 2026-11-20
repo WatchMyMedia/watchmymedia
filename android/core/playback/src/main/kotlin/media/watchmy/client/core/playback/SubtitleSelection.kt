@@ -12,7 +12,7 @@ import media.watchmy.client.model.requiresBurnIn
 /*
  * How an offline play chooses its starting tracks on the device, with no
  * server: the mirror of server/internal/playback/audio_preferences.go and
- * subtitle_preferences.go (PLAN-LANGUAGES.md §5.1 and §5.3), and of
+ * subtitle_preferences.go, and of
  * SubtitleSelection.swift in the Apple apps. Change them together; the tests
  * copy the Go test tables.
  */

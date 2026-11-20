@@ -16,7 +16,7 @@ import { LoadFailed, Loading, StayCheck } from './Parts'
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString([], { weekday: 'long', hour: 'numeric', minute: '2-digit' }) : '')
 
 /**
- * Get guide listings (PLAN-ADMIN-SETTINGS.md §5.4): Turn on → Pictures → On.
+ * Get guide listings: Turn on → Pictures → On.
  * Turn on saves; Pictures saves at Finish. The HDHomeRun account email shows
  * only when the tuner's firmware asks for one.
  */
@@ -141,7 +141,7 @@ function GuideOn({ frame, data }: { frame: Frame; data: LiveGuideSettings }) {
   )
 }
 
-/** Guide listings once they're on (board tv-guide): Refresh now, pictures, the account, channels, and turning off at the bottom. */
+/** Guide listings once they're on: Refresh now, pictures, the account, channels, and turning off at the bottom. */
 export function GuidePage() {
   const go = useGo()
   const guide = useGuideSettings()

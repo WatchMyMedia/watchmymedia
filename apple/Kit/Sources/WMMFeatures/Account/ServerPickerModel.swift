@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Choosing a server (ServerPicker.dc.html): found on this network, remembered,
+/// Choosing a server: found on this network, remembered,
 /// or typed. Every way probes the address first (GET /api/server), refuses a
 /// server that is too old, then selects it (android/.../ServerPickerViewModel.kt).
 @MainActor

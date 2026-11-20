@@ -5,8 +5,8 @@ import WMMFakes
 import WMMModel
 
 /// The account screens as the Apple TV app uses them: sign-in by pairing
-/// first (TvMain.dc.html) with the password form as the fallback
-/// (TvSignInPassword.dc.html), the server picker, and the TV's wording.
+/// first with the password form as the fallback,
+/// the server picker, and the TV's wording.
 @MainActor
 @Suite struct AppleTVAccountTests {
     init() { FakeLatency.duration = .zero }

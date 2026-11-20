@@ -46,7 +46,7 @@ import WMMModel
     }
 
     @Test func anEventSessionThatStartsAtTheResumePointNeedsNoSecondRequest() async {
-        // The server started where the play resumes, on the keyframe 5 s before it (PLAN-RESUME.md §3.7).
+        // The server started where the play resumes, on the keyframe 5 s before it.
         await h.start(resumeRequest) { _ in decision(vod: false, startMs: 295_000, resumeMs: 300_000) }
         #expect(h.gateway.decisions.count == 1)
         #expect(h.gateway.decisions.first?.startMs == nil)

@@ -2,8 +2,7 @@ import { Link, type LinkProps } from '@tanstack/react-router'
 import type { SeeAllWords } from '../../lib/screenRows'
 
 /**
- * A row's last card (PLAN-SEE-ALL.md §5.1, drawn for the phones in
- * design/mockups/ios/HomeSeeAll): the size of the row's pictures, with no
+ * A row's last card: the size of the row's pictures, with no
  * title under it, a grid glyph for a library or the list glyph for a list,
  * and the card's two lines. It goes where the heading's See all goes.
  */

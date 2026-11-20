@@ -11,7 +11,7 @@ import { tvHref, useGuideSettings, useLiveLevels, useLiveSettings } from './data
 import { LoadFailed, Loading } from './Parts'
 
 /**
- * Channels (board tv-channels): a switch per channel that saves as it is
+ * Channels: a switch per channel that saves as it is
  * flipped, with the result in its row; a locked row says why. The listings
  * column shows each channel's match, and wrong listings can be turned off.
  */

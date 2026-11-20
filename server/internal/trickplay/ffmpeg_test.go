@@ -177,7 +177,7 @@ func TestRealSheets(t *testing.T) {
 	}
 }
 
-// Dolby Vision 5 tiles, from H1's test clip (10-bit PQ HEVC with a profile
+// Dolby Vision 5 tiles, from a test clip (10-bit PQ HEVC with a profile
 // 5 record and no RPU): through tonemapx where ffmpeg has it, else from the
 // base layer tagged HDR10, as transcodes do. Either way a picture, neither
 // black nor blown out.

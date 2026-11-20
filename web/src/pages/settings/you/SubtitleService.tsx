@@ -30,7 +30,7 @@ const fallbackHref = settingsHref('subtitles', 'fallback-languages')
 
 /**
  * The server subtitle service, below a person's own choices on Audio &
- * subtitles, for admins only (PLAN-ADMIN-SETTINGS.md §5.10). Its state in
+ * subtitles, for admins only. Its state in
  * words first; the login and the fallback languages are one-step tasks;
  * Who can download saves at once; Sign out asks first. Nothing here asks
  * for the password away from home. Members see nothing.

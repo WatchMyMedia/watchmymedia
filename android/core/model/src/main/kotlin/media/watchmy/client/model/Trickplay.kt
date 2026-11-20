@@ -2,11 +2,11 @@ package media.watchmy.client.model
 
 import android.graphics.Bitmap
 
-/** The API level whose decisions carry seek thumbnails ([PlaybackDecision.trickplay]; PLAN-TRICKPLAY.md). */
+/** The API level whose decisions carry seek thumbnails ([PlaybackDecision.trickplay]). */
 const val TRICKPLAY_API_LEVEL = 9
 
 /**
- * A file's seek thumbnails (PLAN-TRICKPLAY.md §2): JPEG sheets of [columns] ×
+ * A file's seek thumbnails: JPEG sheets of [columns] ×
  * [rows] tiles, each [width] × [height] px, one tile every [intervalMs]; [count]
  * tiles in all over [sheets] sheets, the last partly filled. [url] is a
  * sheet's absolute URL with `{sheet}` for its number from 0. It names the

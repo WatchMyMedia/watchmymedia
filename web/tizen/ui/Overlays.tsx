@@ -86,8 +86,8 @@ export function Banner({ icon = 'bell', title, children, hints, onDismiss, onHol
 }
 
 /**
- * A modal over the whole screen, as the request dialog is (Requests on the
- * canvas): it draws its own page, takes every key while open, and Return
+ * A modal over the whole screen, as the request dialog is:
+ * it draws its own page, takes every key while open, and Return
  * closes it, putting focus back on what opened it.
  */
 export function Sheet({ label, children, onClose }: { label: string; children: ReactNode; onClose(): void }) {

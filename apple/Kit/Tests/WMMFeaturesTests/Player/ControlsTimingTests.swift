@@ -196,7 +196,7 @@ import WMMModel
     }
 }
 
-/// A tap on hidden controls shows them at once (PLAN-APPLE-REVIEW.md §6.3):
+/// A tap on hidden controls shows them at once:
 /// only the hide waits to see whether a second tap follows.
 @MainActor
 @Suite struct ImmediateTapTests {
@@ -254,7 +254,7 @@ import WMMModel
     }
 }
 
-/// Keys on a hardware keyboard in the film player (PLAN-APPLE-REVIEW.md §6.3).
+/// Keys on a hardware keyboard in the film player.
 @MainActor
 @Suite struct PlayerKeyTests {
     @Test func spacePlaysAndPausesAndBringsTheControlsBack() async {

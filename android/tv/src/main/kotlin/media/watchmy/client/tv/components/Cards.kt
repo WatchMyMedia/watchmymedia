@@ -122,7 +122,7 @@ fun MediaCard(
                 contentDescription = null,
                 modifier = Modifier.scaledSize(artWidth, artHeight, scale),
                 shape = RoundedCornerShape(12.dp),
-                // Decoded at the size a focused row draws it, not the resting size it is first laid out at (§4.3.6).
+                // Decoded at the size a focused row draws it, not the resting size it is first laid out at.
                 decodeSize = row?.let { DpSize(artWidth, artHeight) * ((if (landscape) CardRowFocus.FOCUSED_LANDSCAPE else CardRowFocus.FOCUSED_POSTER) * focusedScale) },
                 overlay = { Box(Modifier.fillMaxSize(), content = overlay) },
             )
@@ -333,7 +333,7 @@ internal val CardGap = 24.dp
 /**
  * Fades a row into the ground at its leading edge while there are cards
  * before the ones showing, so a row that has more to the left looks unlike
- * one at its start (RowStartBest.dc.html). Drawn over the row rather than
+ * one at its start. Drawn over the row rather than
  * masked, which would put every row in a layer of its own.
  */
 internal fun Modifier.fadePassedCards(list: LazyListState): Modifier = drawWithContent {
@@ -355,7 +355,7 @@ private fun HoldFocusedCard(row: CardRowFocus, leading: Float, trailing: Float, 
 
 /**
  * A row heading (`.h2`): "Recently added" with a grey "TV Shows" beside it,
- * and [trailing] ("Row 2 of 7", HomeRow.dc.html) at the far right when given.
+ * and [trailing] ("Row 2 of 7") at the far right when given.
  */
 @Composable
 fun SectionHeader(title: String, modifier: Modifier = Modifier, small: String? = null, start: Dp = ContentStart, trailing: String? = null) {

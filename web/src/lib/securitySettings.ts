@@ -1,4 +1,4 @@
-// The rules of Settings › Security (PLAN-ADMIN-SETTINGS.md §5.6): where this
+// The rules of Settings › Security: where this
 // browser is, the steps of Turn on sign-in protection, and the words for
 // every refusal the server can give.
 

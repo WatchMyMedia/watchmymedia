@@ -1,9 +1,7 @@
 import Foundation
 import WMMModel
 
-// The episode page's wording (PLAN-EPISODE-PAGE.md §2 and §3; EpisodePage,
-// EpisodeMenu, TvEpisodePage and TvEpisodeDelete.dc.html), as the Android app
-// words it.
+// The episode page's wording, as the Android app words it.
 
 extension EpisodeDetail {
     /// The page's main button: "Play · 52 min", or "Resume from 23:10" partway
@@ -66,7 +64,7 @@ extension EpisodeDetail {
 /// "Season 3", or "Specials" for season 0.
 public func seasonName(_ number: Int) -> String { number == 0 ? "Specials" : "Season \(number)" }
 
-/// The episode menu's season mark (PLAN-EPISODE-PAGE.md §10): "Mark Season 3
+/// The episode menu's season mark: "Mark Season 3
 /// watched", or "Mark Specials unwatched" once every episode on disk is watched.
 public func markSeasonLabel(_ number: Int, watched: Bool) -> String {
     "Mark \(seasonName(number)) \(watched ? "unwatched" : "watched")"
@@ -96,7 +94,7 @@ extension SeasonSummary {
     }
 }
 
-/// A dialog over the episode page (PLAN-EPISODE-PAGE.md §3): the
+/// A dialog over the episode page: the
 /// confirmation before deleting, the one that says the file can't be
 /// deleted here, and Replace file's.
 public struct EpisodeDialog: Hashable, Sendable, Identifiable {
@@ -118,7 +116,7 @@ public struct EpisodeDialog: Hashable, Sendable, Identifiable {
     /// A file WatchMyMedia recorded: offer "Don’t record it again if it’s shown again", ticked.
     public var recordAgainChoice = false
 
-    /// The recording's choice, ticked by default (PLAN-LIVE-TV-DVR.md §3.1).
+    /// The recording's choice, ticked by default.
     public static let dontRecordAgain = "Don’t record it again if it’s shown again"
 
     public var id: String { "\(kind) \(title)" }

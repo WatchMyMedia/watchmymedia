@@ -3,7 +3,7 @@ import UIKit
 
 /// New episodes against a real server, one step at a time, with the server's
 /// side (a file added, a scan, the two-minute hold, the background task)
-/// done between steps from outside (PLAN-NEW-EPISODES.md §10, Apple). Each
+/// done between steps from outside. Each
 /// step is its own test, run alone with `-only-testing`, on a fresh
 /// simulator. Skipped unless `WMM_NE_SERVER` (with `WMM_NE_USER`,
 /// `WMM_NE_PASSWORD`, `WMM_NE_SHOW` and `WMM_NE_SHOW_TITLE`, passed to xcodebuild as

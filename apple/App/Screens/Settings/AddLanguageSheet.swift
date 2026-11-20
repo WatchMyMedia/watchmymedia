@@ -3,8 +3,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Add a language (Settings2AddLanguage.dc.html, PLAN-APPLE-SETTINGS.md
-/// §5.3): every language by name (the Kit's ``LanguagePicker``), to search,
+/// Add a language:
+/// every language by name (the Kit's ``LanguagePicker``), to search,
 /// in place of a menu of fifteen and a box for a code. The device's language
 /// is suggested at the top while the list lacks it; those already in the
 /// list are marked Added; choosing another adds it at the end of the list,

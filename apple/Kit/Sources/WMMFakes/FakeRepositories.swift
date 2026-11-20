@@ -298,11 +298,11 @@ public final class FakeLibraryRepository: LibraryRepository {
     /// `-fakesTrailerKeys a,b` tries real videos in YouTube's player on a
     /// simulator, such as one whose owner keeps it on YouTube.
     public var trailerKeys: [String]?
-    /// First-run previews (PLAN-IOS-COMPLETION), with fictional library errors.
+    /// First-run previews, with fictional library errors.
     public var firstRun: FakeFirstRunState?
     /// The Movies library holds ``FakeData/largeMovies`` (about 1,200), for measuring the grid (`-fakesLargeLibrary`).
     public var largeLibrary = false
-    /// Arranged rows (PLAN-ROWS.md): from ``rowsAPILevel``, Home comes as its rows in order.
+    /// Arranged rows: from ``rowsAPILevel``, Home comes as its rows in order.
     public var rows: FakeRowsRepository?
     /// Follows, so a show's page says whether Sam follows it (API level 29).
     public var follows: FakeFollowsRepository?
@@ -633,7 +633,7 @@ public final class FakePreferencesRepository: PreferencesRepository {
         throw refusal.error
     }
 
-    /// The server's rule (PLAN-LANGUAGES.md §5.3): someone who saves their
+    /// The server's rule: someone who saves their
     /// first audio language and never chose how subtitles start gets
     /// subtitles for foreign audio.
     public func setLanguages(_ change: LanguageChange) async throws {

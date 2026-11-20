@@ -5,7 +5,7 @@ import { errorText } from '../../../components/settings/hooks'
 import { turnOffRefusal } from '../../../lib/securitySettings'
 
 /**
- * Turn sign-in protection off (board sec-ts-off). Asks for the password away
+ * Turn sign-in protection off. Asks for the password away
  * from home. `onDone` runs even if the page under it has moved on, as Try
  * it's does once protection is off.
  */
@@ -29,7 +29,7 @@ export function TurnOffProtectionDialog({ onClose, onStart, onDone, onFailed }: 
 }
 
 /**
- * Turn admin settings away from home off (board sec-ra-off). Away from
+ * Turn admin settings away from home off. Away from
  * home it says first that it closes server settings for this admin too, and
  * it asks for the password.
  */

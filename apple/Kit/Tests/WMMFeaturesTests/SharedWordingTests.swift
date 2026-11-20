@@ -3,7 +3,7 @@ import Testing
 import WMMModel
 @testable import WMMFeatures
 
-/// Words both apps' views used to write themselves, now shared (PLAN-APPLE-REVIEW.md §5.8).
+/// Words both apps' views used to write themselves, now shared.
 @Suite struct SharedWordingTests {
     @Test func signInAndServerScreens() {
         #expect(pairingCodeAccessibilityLabel("") == "No code yet")

@@ -4,8 +4,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// About's Diagnostics row (TvDiagnostics.dc.html, PLAN-APPLE-REVIEW.md
-/// §6.4), which opens the redacted diagnostics as a QR code to scan with a
+/// About's Diagnostics row,
+/// which opens the redacted diagnostics as a QR code to scan with a
 /// phone (Apple TV has no clipboard to paste from), beside a summary of what
 /// it holds, with Show as text. Nothing is sent; the panel at Settings' right
 /// says so while the row has focus.

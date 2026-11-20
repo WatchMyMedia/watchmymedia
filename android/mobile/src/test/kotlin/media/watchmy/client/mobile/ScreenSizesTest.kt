@@ -33,7 +33,7 @@ import org.robolectric.annotation.Config
 
 /**
  * Home, the show page, the guide and the player's controls at the sizes
- * phones and tablets come in (PLAN-ANDROID-REVIEW §3.3): a phone upright and
+ * phones and tablets come in: a phone upright and
  * held sideways (the phone layouts, not the tablet's), a 1280 × 800 tablet,
  * and a phone at font size 2.0, where no text may be cut off.
  */
@@ -115,7 +115,7 @@ class ScreenSizesTest {
     @Test @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
     fun `phone held sideways keeps the phone layouts`() {
         open()
-        // 891 dp wide, but 411 tall: not a tablet (§2.7), so the bottom bar and the scrolling Home.
+        // 891 dp wide, but 411 tall: not a tablet, so the bottom bar and the scrolling Home.
         assertTrue("bottom bar", tabAtBottom())
         assertTrue("phone Home", !tabletHome())
         assertTrue("Harbor Lights", shown("Harbor Lights"))

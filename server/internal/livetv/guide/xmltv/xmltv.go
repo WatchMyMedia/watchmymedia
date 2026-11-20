@@ -1,5 +1,5 @@
-// Package xmltv reads SiliconDust's XMLTV listings feed
-// (PLAN-LIVE-TV-GUIDE.md §5.2, §7.1). It streams the feed, keeping only the
+// Package xmltv reads SiliconDust's XMLTV listings feed.
+// It streams the feed, keeping only the
 // channels and window asked for, and resolves no entities: a feed that
 // defines its own fails, and nothing outside the feed is ever read.
 package xmltv
@@ -367,7 +367,7 @@ func parseTime(s string) (time.Time, bool) {
 var onscreenRe = regexp.MustCompile(`(?i)^S(\d{1,4}) ?E(\d{1,5})$`)
 
 // episodeNumbers fills the season, episode, label and kind. An onscreen
-// SxxEyy wins over xmltv_ns, which counts from zero; G0 found they always
+// SxxEyy wins over xmltv_ns, which counts from zero; they always
 // agree when both are there.
 func episodeNumbers(prog *Programme, nums []rawSystem) {
 	onscreen, ns, progid := "", "", ""

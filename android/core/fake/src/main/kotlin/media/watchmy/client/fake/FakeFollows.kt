@@ -19,7 +19,7 @@ import media.watchmy.client.model.NewEpisodeOpen
 import media.watchmy.client.model.NewEpisodes
 
 /**
- * Following shows on the fakes (PLAN-NEW-EPISODES.md), from
+ * Following shows on the fakes, from
  * [FOLLOWS_API_LEVEL], as with a real server. The person starts out
  * following Harbor Lights and Copperline, and Ashgrove, which has left the
  * library; the feed has Harbor Lights' S3 E7 once, after the first check.

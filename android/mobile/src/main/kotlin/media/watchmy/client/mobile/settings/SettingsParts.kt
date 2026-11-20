@@ -66,7 +66,7 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
-// The pieces every Settings page draws (PLAN-ANDROID-SETTINGS.md §4.4–§4.7):
+// The pieces every Settings page draws:
 // whose settings a heading is over, a row's Saving… and its failure, the
 // cards at the top of a page, and the account's rows held until they load.
 
@@ -114,7 +114,7 @@ internal fun SubHeading(text: String, modifier: Modifier = Modifier) {
 
 /**
  * A run of rows: straight on the page on a phone, in a rounded panel at most
- * 720 wide on a tablet (TabSettingsOverview.dc.html's `.panel`).
+ * 720 wide on a tablet.
  */
 @Composable
 internal fun SettingsRows(tablet: Boolean, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
@@ -128,7 +128,7 @@ internal fun SettingsRows(tablet: Boolean, modifier: Modifier = Modifier, conten
 
 /**
  * The rows under Your account, dimmed and inert until the account's settings
- * have loaded (§4.5), so a default is never saved over someone's choice. The
+ * have loaded, so a default is never saved over someone's choice. The
  * rows pass [ready] on to their controls.
  */
 @Composable
@@ -200,7 +200,7 @@ internal fun SavingLine(modifier: Modifier = Modifier) {
 }
 
 /**
- * Under a row whose change didn't save (§4.5): what it is back to, and Try
+ * Under a row whose change didn't save: what it is back to, and Try
  * again. It stays until it is tried again or changed.
  */
 @Composable
@@ -222,7 +222,7 @@ internal fun FailureLine(text: String, onRetry: () -> Unit, modifier: Modifier =
 
 /**
  * Says "Saved" to TalkBack, politely, when [key]'s change has saved: the
- * row's value is the confirmation for everyone else (§4.5).
+ * row's value is the confirmation for everyone else.
  */
 @Composable
 internal fun SavedAnnouncement(state: SettingsViewModel.State, key: SettingKey) {
@@ -255,7 +255,7 @@ internal fun RowFailure(failure: SaveFailure?, still: String, onRetry: () -> Uni
     if (failure != null) FailureLine(failure.rowLine(still), onRetry)
 }
 
-/** A remove, apart at the bottom of its page in the danger colour, its label ending in an ellipsis (§4.4). */
+/** A remove, apart at the bottom of its page in the danger colour, its label ending in an ellipsis. */
 @Composable
 internal fun DangerRow(title: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier, subtitle: String? = null, enabled: Boolean = true) {
     Row(

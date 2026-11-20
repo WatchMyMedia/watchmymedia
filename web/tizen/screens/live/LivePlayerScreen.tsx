@@ -22,7 +22,7 @@ import { matchWords, qualityShort, streamLine } from './liveWords'
 import './live.css'
 
 /**
- * The Live TV player (LivePlayer on the canvas), which the player route
+ * The Live TV player, which the player route
  * draws for a channel: one LivePlayback for the session, the channel
  * banner, the controls, On now, Quality, Go to channel, Still watching and
  * the problems.

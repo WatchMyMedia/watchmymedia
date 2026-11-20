@@ -37,7 +37,7 @@ function Tile({ focusId, icon, title, line, label, onPress }: { focusId: string;
 }
 
 /**
- * The On now row (LiveHome on the canvas): each channel's programme, then
+ * The On now row: each channel's programme, then
  * Full guide, Recordings (for people who may record) and Reminders. The
  * line under it says what OK watches. Without listings, channel tiles.
  * Home can draw it too, where the server's rows place Live TV.

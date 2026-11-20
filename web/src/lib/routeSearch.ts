@@ -3,9 +3,8 @@ import { itemFilter, itemSort, type ItemFilter, type ItemSort } from './browseOp
 /**
  * A season address's search, kept so older links still land: ?episode=
  * named the episode a season opened in place before episodes had pages of
- * their own, ?at= the one a Home card outlined in the season's list
- * (PLAN-HOME.md §6.2). Both now redirect to the episode's address
- * (PLAN-SHOW-PAGE.md §2.1).
+ * their own, ?at= the one a Home card outlined in the season's list.
+ * Both now redirect to the episode's address.
  */
 export type SeasonSearch = { episode?: number; at?: number }
 
@@ -42,7 +41,7 @@ export function validatePlaySearch(s: Record<string, unknown>): PlaySearch {
   }
 }
 
-/** The guide's search: a programme to open it at, from the Search page's On Live TV (PLAN-LIVE-TV-GUIDE.md §6.5). */
+/** The guide's search: a programme to open it at, from the Search page's On Live TV. */
 export type GuideSearch = { channel?: string; programme?: string; at?: string }
 
 export function validateGuideSearch(s: Record<string, unknown>): GuideSearch {
@@ -53,7 +52,7 @@ export function validateGuideSearch(s: Record<string, unknown>): GuideSearch {
 
 /**
  * The Movies and TV pages' search: a search term, the view, and the grid's
- * options when a row's See all opens it (PLAN-ROWS.md §6.1). library names
+ * options when a row's See all opens it. library names
  * a library other than the first of its type.
  */
 export type BrowseSearch = EditSearch & {

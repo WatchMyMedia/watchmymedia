@@ -1,5 +1,5 @@
 /**
- * "Are you still watching?" (PLAN-CLIENTS.md §2.3.6). The player asks before
+ * "Are you still watching?". The player asks before
  * starting the next episode by itself when the session has run 90 minutes
  * and either 3 episodes have played without input or there has been no
  * input for 90 minutes. The rule is shared; where the counts live is not:

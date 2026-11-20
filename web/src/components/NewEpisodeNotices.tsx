@@ -29,7 +29,7 @@ const schedule = createCheckSchedule({
 
 /**
  * Checks for new episodes of the shows this person follows while a tab is
- * open (PLAN-NEW-EPISODES.md §6.1, §7.5), from the one tab holding the
+ * open, from the one tab holding the
  * new episodes' Web Lock: when it takes the lock and 3 minutes after the
  * last library.changed (lib/newEpisodeSchedule.ts), only while they follow
  * a show, this browser's switch is on, the page is a secure context and
@@ -86,7 +86,7 @@ export function NewEpisodeNotices({ banner }: { banner: boolean }) {
     const reply = await runCheck(before, fetchNewEpisodes)
     // Signed out or in as someone else meanwhile, or another tab (without Web Locks) checked first.
     if (!reply || scope !== authScope() || !signedInHere(userId) || loadCursor(person) !== before) return
-    // Show, then keep the cursor (§6.1). A hidden tab without the permission leaves the banner for when it is seen.
+    // Show, then keep the cursor. A hidden tab without the permission leaves the banner for when it is seen.
     if (reply.shows.length && deliveryFor(document.visibilityState === 'visible', notifyPermission()) === 'banner') {
       const next = bannerFor(reply.shows, reply.cursor)
       if (next) {
@@ -116,7 +116,7 @@ export function NewEpisodeNotices({ banner }: { banner: boolean }) {
 }
 
 /**
- * The banner-one and banner-more boards: quieter than a reminder's, with
+ * The banner: quieter than a reminder's, with
  * no filled button, and it takes no focus. Open goes to the show's page
  * with the earliest new episode on top; the link under the divider opens
  * Home for the rest.

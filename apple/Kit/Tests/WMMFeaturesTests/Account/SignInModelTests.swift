@@ -351,7 +351,7 @@ import WMMModel
     }
 }
 
-/// The form kept above the iPhone and iPad sign-in screens (PLAN-APPLE-REVIEW.md §3.3.4).
+/// The form kept above the iPhone and iPad sign-in screens.
 @MainActor
 @Suite struct SignInFormTests {
     init() { FakeLatency.duration = .zero }

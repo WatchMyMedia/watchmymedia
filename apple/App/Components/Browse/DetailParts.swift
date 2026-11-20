@@ -53,10 +53,10 @@ struct DetailHeader<Info: View>: View {
     }
 }
 
-/// The top of Show and Movie on iPad (PadShow.dc.html, PadMovie.dc.html):
+/// The top of Show and Movie on iPad:
 /// the backdrop across the page, darker on the left and fading into the
 /// ground, the poster at the left and `info` beside it. `portrait` is
-/// PadShowPortrait.dc.html's: a taller poster lower down, the backdrop
+/// the portrait layout's: a taller poster lower down, the backdrop
 /// darkened only towards the bottom.
 struct WideDetailHeader<Info: View>: View {
     let title: String

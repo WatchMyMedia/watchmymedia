@@ -13,14 +13,14 @@ export function timelineOffset(decision: Timeline): number {
 /**
  * Where the player starts in its own time to show the file at
  * requestedSeconds. A VOD timeline is the file's. An event session of copied
- * video starts on the keyframe before the time asked for (PLAN-RESUME.md
- * §3.1), so the player starts that far into it rather than at its start.
+ * video starts on the keyframe before the time asked for,
+ * so the player starts that far into it rather than at its start.
  */
 export function hlsStartPosition(decision: Timeline, requestedSeconds: number): number {
   return Math.max(0, requestedSeconds - timelineOffset(decision))
 }
 
-/** Players resume only past this (PLAN-CLIENTS.md §2.3). */
+/** Players resume only past this. */
 export const RESUME_MIN_MS = 5_000
 
 /** How far before the start asked for an event decision may begin, on a keyframe. */
@@ -29,7 +29,7 @@ const EVENT_START_TOLERANCE_MS = 15_000
 /**
  * Where a play that asked for no start picks up, and whether an event session
  * has to be asked for again there. The server starts an event session where
- * the play resumes, on the keyframe before it (PLAN-RESUME.md §3.7); an older
+ * the play resumes, on the keyframe before it; an older
  * one started it at 0, and the player asked again. undefined: play from the
  * start.
  */

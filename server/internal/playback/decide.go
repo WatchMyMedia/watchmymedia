@@ -33,7 +33,7 @@ const (
 
 // Profile is what a client can play. The web client builds it from
 // MediaSource.isTypeSupported and mediaCapabilities. Native apps build theirs
-// at launch (PLAN-CLIENTS.md §4.4 and §5.4) and ask for VOD playlists:
+// at launch and ask for VOD playlists:
 //
 //   - Apple TV and iOS (AVPlayer): containers mp4; videoCodecs h264, hevc,
 //     hevc10 when the device can show HDR, av1 where it decodes it; audio aac,
@@ -46,7 +46,7 @@ const (
 //     truehd only where they decode or pass through over HDMI; subtitleFormats
 //     webvtt and ass; size and hdr from the display.
 //
-// From apiLevel 8 (PLAN-HDR-PROFILE.md) apps also send hdrTypes and the
+// From apiLevel 8 apps also send hdrTypes and the
 // dovi keys, and offer hevc10 with any Main 10 decoder, whatever the screen.
 // HDR is copied only to a screen that shows it, for every profile; a
 // profile with hdrTypes also has Dolby Vision classified by its base layer
@@ -63,7 +63,7 @@ type Profile struct {
 	// pcm is copied only in direct play: in HLS ffmpeg writes it as ipcm,
 	// which the players don't read, so it is converted (to FLAC where flac
 	// is listed). A track that doesn't fit is converted to flac, eac3 or ac3
-	// where they are listed, else aac (PLAN-AUDIO.md §3.1).
+	// where they are listed, else aac.
 	AudioCodecs      []string `json:"audioCodecs" nullable:"false" required:"false"`
 	MaxWidth         int      `json:"maxWidth,omitempty"`
 	MaxHeight        int      `json:"maxHeight,omitempty"`
@@ -71,12 +71,12 @@ type Profile struct {
 	MaxAudioChannels int      `json:"maxAudioChannels,omitempty" doc:"0 means any."`
 	// MaxPcmChannels: an Android TV on a soundbar over ARC passes E-AC-3
 	// through (eight channels) but takes two channels of PCM, so a track
-	// converted to FLAC or AAC would reach it as stereo (PLAN-AUDIO.md §3.5).
+	// converted to FLAC or AAC would reach it as stereo.
 	MaxPcmChannels int  `json:"maxPcmChannels,omitempty" required:"false" doc:"The most channels the device's output takes as decoded audio (PCM), when that is fewer than maxAudioChannels, which also counts formats passed through to a receiver as they are. A converted track that the device decodes is sent within it. 0 means the same as maxAudioChannels. From apiLevel 31; older servers reject it."`
 	HDR            bool `json:"hdr" required:"false" doc:"True when the client can display HDR. Without hdrTypes, HDR video is copied only when this is true; otherwise transcodes tone-map to SDR."`
 	// HDRTypes is a list of plain strings, not an enum: generated clients
 	// refuse enum values they do not know.
-	HDRTypes []string `json:"hdrTypes,omitempty" nullable:"false" required:"false" doc:"The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means the profile follows PLAN-HDR-PROFILE: HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it."`
+	HDRTypes []string `json:"hdrTypes,omitempty" nullable:"false" required:"false" doc:"The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it."`
 	// SubtitleFormats the client renders itself: webvtt, ass.
 	SubtitleFormats []string `json:"subtitleFormats" nullable:"false" required:"false"`
 	SeparateAudio   bool     `json:"separateAudio,omitempty" required:"false" doc:"VOD playlists carry the audio as its own rendition (EXT-X-MEDIA TYPE=AUDIO, audio.m3u8) instead of muxed with the video. Cast receivers ask for it: they take AC-3 and E-AC-3 only in an audio SourceBuffer of their own. From apiLevel 4."`
@@ -111,7 +111,7 @@ type Request struct {
 	// master playlist also offers the text subtitles as renditions.
 	Playlist string `json:"playlist,omitempty" enum:"event,vod" doc:"HLS playlist kind: event (default) or vod (the whole file, for native players)."`
 	// Download is an offline download's decision, which never converts to
-	// FLAC: a download is kept on the device (PLAN-AUDIO.md §2.3).
+	// FLAC: a download is kept on the device.
 	Download bool `json:"-"`
 }
 
@@ -187,7 +187,7 @@ type VideoPlan struct {
 
 type AudioPlan struct {
 	Index    int    `json:"index"`
-	Codec    string `json:"codec,omitempty" doc:"The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3 (PLAN-AUDIO.md)."`
+	Codec    string `json:"codec,omitempty" doc:"The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3."`
 	Copy     bool   `json:"copy"`
 	Channels int    `json:"channels,omitempty"`
 	// Bitrate is a converted track's encoder rate (for FLAC an estimate),
@@ -214,7 +214,7 @@ type Decision struct {
 	DurationMs  int64           `json:"durationMs"`
 	Growing     *Growing        `json:"growing,omitempty" required:"false" doc:"A recording still being written. Use event playback and extend the recorded duration from the clock, up to endsAt (API level 19)."`
 	StartMs     int64           `json:"startMs" doc:"Where the HLS session starts; add to the player's time to get the file position. An event session of copied video starts on the keyframe at or before the time asked for, so this can be up to 12 s earlier than the request."`
-	ResumeMs    int64           `json:"resumeMs" doc:"Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread (PLAN-RESUME.md §3.8)."`
+	ResumeMs    int64           `json:"resumeMs" doc:"Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread."`
 	Bitrate     int64           `json:"bitrate" required:"false" doc:"About how many bits per second the stream needs: the file's average when its video is copied, else the video encoder's cap plus the audio; 0 when unknown."`
 	Auto        *AutoChoice     `json:"auto,omitempty" doc:"Set when the request asked for quality auto: the step the server picked."`
 	Video       VideoPlan       `json:"video"`
@@ -241,7 +241,7 @@ type Growing struct {
 	EndsAt    time.Time `json:"endsAt" required:"false"`
 }
 
-// Trickplay describes a file's seek thumbnails (PLAN-TRICKPLAY.md §2): JPEG
+// Trickplay describes a file's seek thumbnails: JPEG
 // sheets of Columns × Rows tiles, each Width × Height, one tile every
 // IntervalMs. Tile i covers [i × intervalMs, (i+1) × intervalMs) and shows
 // the last keyframe at or before its start; it is in sheet i / (columns ×
@@ -367,8 +367,7 @@ func videoKey(v probe.VideoStream) string {
 	return v.Codec
 }
 
-// sentVideo is how a video stream goes to a profile when it is copied
-// (PLAN-HDR-PROFILE.md §3).
+// sentVideo is how a video stream goes to a profile when it is copied.
 type sentVideo struct {
 	Key     string // the profile key it needs: h264, hevc10, dovi5…
 	HDR     string // what the screen gets: "", hdr10, hlg or dolbyvision
@@ -383,14 +382,14 @@ type sentVideo struct {
 }
 
 // keptProfiles are the Dolby Vision profiles a dovi key keeps. AV1
-// (profile 10) and AVC (9) keys wait (PLAN-HDR-PROFILE.md §9).
+// (profile 10) and AVC (9) keys wait.
 var keptProfiles = []int{5, 7, 8}
 
 func doviKey(profile int) string { return "dovi" + strconv.Itoa(profile) }
 
 // classify says how v would go to p if copied. A profile without hdrTypes
 // keeps the classification older apps were built for: a 10-bit Dolby
-// Vision HEVC stream is hevc10 and sent as it is (decision 8). With
+// Vision HEVC stream is hevc10 and sent as it is. With
 // hdrTypes, Dolby Vision is kept only for its dovi key, and otherwise sent
 // as its base layer, or not copied when it has none worth showing.
 func classify(v probe.VideoStream, p Profile) sentVideo {
@@ -430,7 +429,7 @@ func baseClass(v probe.VideoStream) sentVideo {
 // its RPU ("" for SDR), and whether a plain decoder shows it right; other
 // streams' HDR is their own. Profile 5 has no such base layer. A probe
 // that did not read the record counts profile 8 as 8.1, by far the most
-// common, and other profiles as having none (decision 10); profile 7 is
+// common, and other profiles as having none; profile 7 is
 // always an HDR10 base under an enhancement layer.
 func baseLayer(v probe.VideoStream) (string, bool) {
 	if v.HDR != "dolbyvision" {
@@ -487,7 +486,7 @@ func hdrName(kind string) string {
 }
 
 // copyable reports whether p takes sent as it is copied: its codec key and
-// the HDR rule (PLAN-HDR-PROFILE.md decision 1). Size and bit rate are
+// the HDR rule. Size and bit rate are
 // checked apart.
 func copyable(sent sentVideo, p Profile) (bool, []string) {
 	var why []string
@@ -638,8 +637,8 @@ func Decide(info *probe.MediaInfo, ext string, req Request, sidecars []Sidecar, 
 		d.Reasons = append(d.Reasons, sent.Why)
 	}
 	if audio != nil && audioOK && audioKey(*audio) == "pcm" && (!videoOK || burn || !containerOK || containerOf(ext) != "mkv") {
-		// PCM is copied only in direct play of Matroska (PLAN-AUDIO.md
-		// §3.4). ffmpeg writes it into fMP4 as ipcm, which the players
+		// PCM is copied only in direct play of Matroska.
+		// ffmpeg writes it into fMP4 as ipcm, which the players
 		// don't read, and ExoPlayer (Media3 1.11) reads no in24 or fl32 in
 		// MOV, which ffmpeg writes for 24-bit, nor PCM in MPEG-TS.
 		audioOK = false

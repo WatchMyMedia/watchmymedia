@@ -60,7 +60,7 @@ internal fun downloadsModel(): DownloadsViewModel {
 internal fun downloadsHeld(downloads: DownloadsViewModel.State): String = "${plural(downloads.all.size, "download")}, ${usedSize(downloads.usedBytes)}."
 
 /**
- * Settings › Downloads (PLAN-ANDROID-SETTINGS.md §5.4, SettingsDownloadsPage):
+ * Settings › Downloads:
  * the state in a line, the quality new downloads are made at, Wi-Fi only,
  * the space they take (to Downloads), and Remove all downloads apart at the
  * bottom, which asks first.
@@ -120,7 +120,7 @@ internal fun DownloadsPage(tablet: Boolean, onSpace: () -> Unit, modifier: Modif
     }
 }
 
-/** Download quality (SettingsDownloads.dc.html, dialog quality): Original, said in full, then the steps. */
+/** Download quality: Original, said in full, then the steps. */
 @Composable
 internal fun DownloadQualityDialog(current: DownloadQuality, device: String, onDismiss: () -> Unit, onPick: (DownloadQuality) -> Unit) {
     AlertDialog(
@@ -157,7 +157,7 @@ internal fun DownloadQualityDialog(current: DownloadQuality, device: String, onD
 }
 
 /**
- * Remove all downloads? (§4.6, SettingsConfirm's removeDownloads): what is
+ * "Remove all downloads?": what is
  * deleted and what stays. Removing works on the files one by one; when some
  * are still here a few seconds later it says how many went, and tries again.
  */

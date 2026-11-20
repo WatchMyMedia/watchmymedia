@@ -11,7 +11,7 @@ import media.watchmy.client.model.PlayRequest
 /**
  * Where a tap on a poster card goes. Movies and shows open their page, and a
  * Recently added show that stands for one episode opens that episode's page
- * when [onOpenEpisode] is given (PLAN-EPISODE-PAGE.md §10). A file the server
+ * when [onOpenEpisode] is given. A file the server
  * hasn't matched yet has no page (its ID is the file's): a single file plays
  * as it is, and a folder of them (a show nobody has matched) waits for a
  * match in the web app, so [onNotMatched] says so.

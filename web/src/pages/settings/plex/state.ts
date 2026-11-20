@@ -6,7 +6,7 @@ import { settingsCrumbs, settingsHref } from '../../../lib/settingsRoutes'
 
 // What the Plex tab's pages and flows share: the connection, the names of
 // who and what is linked, and the bits of a flow kept in this tab while the
-// admin is away from it (§3.2: steps carry on and pick up where they were).
+// admin is away from it (steps carry on and pick up where they were).
 
 export const plexHref = (...segments: (string | number | undefined)[]) => settingsHref('plex', ...segments)
 

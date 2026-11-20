@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// The profiles of PLAN-AUDIO.md §5.1, as the apps build them.
+// The profiles, as the apps build them.
 var (
 	androidTVTrueHD = Profile{Name: "android", Containers: []string{"mkv", "mp4", "webm", "mpegts"}, VideoCodecs: []string{"h264", "hevc"},
 		AudioCodecs: []string{"aac", "mp3", "opus", "flac", "vorbis", "ac3", "eac3", "dts", "truehd", "pcm"}, MaxAudioChannels: 8}

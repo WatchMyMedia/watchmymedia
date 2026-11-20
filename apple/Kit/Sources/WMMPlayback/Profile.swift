@@ -42,7 +42,7 @@ public struct DeviceDescription: Hashable, Sendable {
     }
 }
 
-/// PLAN-CLIENTS.md §4.4, PLAN-IOS.md §3 and PLAN-HDR-PROFILE.md §6.2: what
+/// The device's profile: what
 /// this device can play, sent with every playback request. Containers mp4
 /// and mov (MKV always remuxes); h264 and hevc as decoded, hevc10 with a
 /// Main 10 decoder whatever the screen, av1 where it decodes, and a Dolby
@@ -50,8 +50,8 @@ public struct DeviceDescription: Hashable, Sendable {
 /// Dolby Vision; the audio AVPlayer decodes (never DTS or TrueHD); 4K where
 /// HEVC decodes at 4K, 1080p otherwise; WebVTT subtitles only (ASS is
 /// converted and image subtitles burn in). HDR and its types from the
-/// display. It selects a direct-play file's audio track itself
-/// (PLAN-LANGUAGES.md §5.2). Servers below level 8 or 21 get it through
+/// display. It selects a direct-play file's audio track itself.
+/// Servers below level 8 or 21 get it through
 /// ``PlaybackProfile/forAPILevel(_:)``.
 public func buildProfile(_ d: DeviceDescription) -> PlaybackProfile {
     var video: [String] = []
@@ -94,14 +94,14 @@ public func displayHDRTypes(eligible: Bool, modes: Set<String>) -> Set<String> {
     return modes.isEmpty ? ["hdr10", "hlg"] : modes
 }
 
-/// Whether an iPhone or iPad says it takes surround (PLAN-APPLE-REVIEW.md §2.1,
-/// PLAN-AUDIO.md §3.7). On: it asks for six channels or more, so a 5.1 film
+/// Whether an iPhone or iPad says it takes surround.
+/// On: it asks for six channels or more, so a 5.1 film
 /// keeps direct play and AVPlayer mixes it down to the speaker or headphones
 /// itself (AirPods with Spatial Audio spatialize it). Off, it would ask for two
 /// and the server would convert every 5.1 track to stereo. The device check is
 /// still to do on hardware: 5.1 AC-3, E-AC-3 and FLAC on the speaker, on wired
-/// and Bluetooth headphones, and on AirPods with Spatial Audio (PLAN-AUDIO.md
-/// §5.3). If it fails, turning surround off is this one line.
+/// and Bluetooth headphones, and on AirPods with Spatial Audio.
+/// If it fails, turning surround off is this one line.
 public let handheldSurroundChecked = true
 
 /// The audio channels a profile asks for. An Apple TV asks for what its
@@ -142,7 +142,7 @@ extension DeviceProbe {
 /// The codec strings the probe asks about: High, Main and Main 10 at levels a
 /// 1080p stream needs, Main at 5.1 for 4K, AV1 Main 8-bit, and Dolby Vision
 /// profiles 5 and 8 at level 6 (4K at 24 fps) under `dvh1`, the sample entry
-/// the server remuxes them under (PLAN-HDR-PROFILE.md §6.2).
+/// the server remuxes them under.
 enum CodecProbe {
     static let h264 = #"video/mp4; codecs="avc1.640028""#
     static let hevc = #"video/mp4; codecs="hvc1.1.6.L123.B0""#

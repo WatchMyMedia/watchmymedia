@@ -3,7 +3,7 @@ import { AUTO, autoNow, type Quality } from '../lib/quality'
 
 /**
  * The player's quality menu: a button that opens the list above it, with
- * Automatic's current step under its row (design/mockups/web/PlayerPicker).
+ * Automatic's current step under its row.
  * The list is a menu of radio items: arrows move, Escape and Tab close.
  * The player's own keys leave it alone (it carries data-player-keys="off").
  */

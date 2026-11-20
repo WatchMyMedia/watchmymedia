@@ -250,7 +250,7 @@ func TestLiveTVRouterOwnershipAndMediaTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A cast token plays its sender's channel (PLAN-LIVE-TV.md §4.1): the
+	// A cast token plays its sender's channel: the
 	// playlist carries it on to the segments, and the session is the
 	// sender's own, so a retry of the sender's request finds the same one.
 	castBearer := []string{"Authorization", "Bearer " + castToken}

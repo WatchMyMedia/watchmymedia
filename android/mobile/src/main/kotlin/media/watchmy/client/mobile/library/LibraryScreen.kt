@@ -90,7 +90,7 @@ import media.watchmy.client.ui.components.skeletonLine
 import media.watchmy.client.ui.ReportShown
 
 /**
- * The TV Shows or Movies grid (Library.dc.html): the count and sort menu,
+ * The TV Shows or Movies grid: the count and sort menu,
  * the filter, genre and decade chips, and three posters a row, a page at a
  * time. Long-press a poster to mark it watched or unwatched.
  */
@@ -105,12 +105,12 @@ fun LibraryScreen(
 ) {
     val services = LocalAppServices.current
     val notMatched = rememberNotMatchedNotice()
-    // A row's See all from Home reaches the grid through the app's browse requests (PLAN-SEE-ALL.md §4.4).
+    // A row's See all from Home reaches the grid through the app's browse requests.
     val vm = viewModel(key = "library-$type") { LibraryViewModel(services.library, type, saved = createSavedStateHandle(), requests = services.browseRequests) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val user by services.auth.user.collectAsStateWithLifecycle()
-    // The library's rows above the grid, from servers that arrange them (PLAN-ROWS.md Decision 11).
+    // The library's rows above the grid, from servers that arrange them.
     val rowsVm = viewModel(key = "library-rows-$type") { LibraryRowsViewModel(services.library, services.rows) }
     ReportShown(rowsVm::setShown)
     val rows by rowsVm.state.collectAsStateWithLifecycle()
@@ -137,7 +137,7 @@ fun LibraryScreen(
     grid.GoToGridWhenAsked(state, heading = 0, onShown = vm::gridShown)
 
     val title = if (type == LibraryType.Tv) "TV Shows" else "Movies"
-    // The first page on its way: the outline of the grid (HomeLoading.dc.html, library), with the sort as it is.
+    // The first page on its way: the outline of the grid, with the sort as it is.
     val firstLoad = state.loading && state.items.isEmpty() && state.libraryId == null
     // Swept only while there is a skeleton to sweep: an endless animation would keep the screen drawing.
     val sheen = if (state.loading && state.items.isEmpty()) rememberSheen(1_600) else Sheen.Still

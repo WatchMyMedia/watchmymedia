@@ -1,4 +1,4 @@
-// Settings addresses (PLAN-ADMIN-SETTINGS.md §4). Each tab keeps its address
+// Settings addresses. Each tab keeps its address
 // for its hub; tasks and item pages get addresses under it, so the browser's
 // back button is Back, a step can be linked to and a reload stays put.
 

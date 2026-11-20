@@ -201,7 +201,7 @@ export type GroupOutcome = { how: 'matched' | 'seasons' | 'ignored'; text: strin
 /**
  * One group's card, as the Unmatched view draws it, with the same match,
  * search and season line-up dialogs: the Settings review queue shows these
- * one at a time (PLAN-ADMIN-SETTINGS.md §5.3).
+ * one at a time.
  */
 export function UnmatchedGroupCard({ g, libraryId, type, onSorted }: { g: Group; libraryId: number; type: LibraryType; onSorted: (o: GroupOutcome) => void }) {
   const health = useQuery(healthQuery)

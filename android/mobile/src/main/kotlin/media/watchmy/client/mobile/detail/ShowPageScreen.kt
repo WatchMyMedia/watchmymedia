@@ -73,16 +73,15 @@ import androidx.compose.ui.platform.LocalContext
 import media.watchmy.client.ui.ReportShown
 
 /**
- * One page for a show, its seasons and its episodes (ShowPage.dc.html,
- * ShowPageMissing.dc.html and, from 1000 dp, TabShowPage.dc.html;
- * PLAN-SHOW-PAGE.md §4.2). The chosen episode is on top with Play, Mark
+ * One page for a show, its seasons and its episodes (the tablet's
+ * layout from 1000 dp). The chosen episode is on top with Play, Mark
  * watched and its ⋮ (Report a problem, Replace file, Delete episode…); the
  * season chips (Specials last) and the season's row of episodes under it,
  * with Mark season watched and Show missing; then About the show with Mark
  * show watched and Request missing seasons. A chip or a card changes the
  * episode on top here, never the back stack, so Back leaves the show.
  * [arrival] says which episode goes on top first. The page ends with More
- * like this (ShowRelated.dc.html), whose cards open their page through
+ * like this, whose cards open their page through
  * [onOpenShow].
  */
 @Composable
@@ -136,7 +135,7 @@ fun ShowPageScreen(
                         if (turningOn) followAsk.after(context, show.title)
                     },
                 )
-                // The row at the page's end, More like this (PLAN-RELATED.md §7).
+                // The row at the page's end, More like this.
                 val related: @Composable (Modifier) -> Unit = { placed ->
                     RelatedRows(state.related, onOpenMovie, onOpenShow, layout.isTablet, placed, edge = if (twoPane) 32.dp else 16.dp)
                 }
@@ -216,7 +215,7 @@ private val ColumnMax = 720.dp
 /** The still's height at most, on a tablet under 1000 dp. */
 internal val StillMax = 360.dp
 
-/** The phone: the still edge to edge, the episode, the seasons and their row, then About the show (ShowPage.dc.html). */
+/** The phone: the still edge to edge, the episode, the seasons and their row, then About the show. */
 @Composable
 private fun PhoneContent(
     show: ShowDetail,
@@ -250,7 +249,7 @@ private fun PhoneContent(
 }
 
 /**
- * From 1000 dp (TabShowPage.dc.html): the episode on the left with its still
+ * From 1000 dp: the episode on the left with its still
  * beside its title, About the show on the right, the chips and the row
  * across the bottom.
  */
@@ -305,7 +304,7 @@ private fun TabletContent(
             )
         }
         SeasonsSection(show, state, vm, downloads, page, still = TabletStill, modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 32.dp))
-        // Under the season's row, across the page (TabShowRelated.dc.html).
+        // Under the season's row, across the page.
         related(Modifier.padding(top = 28.dp))
     }
 }

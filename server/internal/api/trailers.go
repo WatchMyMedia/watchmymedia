@@ -22,7 +22,7 @@ const (
 )
 
 // MovieTrailer is one of a movie's trailers; the server lists them best
-// first (PLAN-TRAILERS.md §5.3).
+// first.
 type MovieTrailer struct {
 	// Source is a plain string, not an enum, so a source added later can't
 	// break decoding in an older app; apps skip sources they don't know.

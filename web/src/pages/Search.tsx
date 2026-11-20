@@ -107,7 +107,7 @@ const stateLabel: Record<Requestable['state'], string> = {
 
 /**
  * TMDB's results the library may not have, each with Request or where it
- * stands (PLAN-ARR.md §7.1). Fetched beside the library search, never
+ * stands. Fetched beside the library search, never
  * holding it up.
  */
 function NotInLibrary({ q }: { q: string }) {

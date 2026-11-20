@@ -1,7 +1,7 @@
 import Foundation
 import WMMModel
 
-// The numbers and rules of PLAN-CLIENTS.md §2.3, which are the web player's,
+// The player's numbers and rules, which are the web player's,
 // as small pure functions (android/core/playback/.../Rules.kt).
 
 /// Without an explicit start, resume only past this.
@@ -40,10 +40,10 @@ let tokenMinLifetimeMs = 30 * 60_000
 let eventSeekSlackMs = 500
 
 /// Event playlists: a session started this close to where the viewer seeked meanwhile is close enough,
-/// as is one that starts this far before the start asked for, on the keyframe before it (PLAN-RESUME.md §3.1).
+/// as is one that starts this far before the start asked for, on the keyframe before it.
 let eventStartToleranceMs = 15_000
 
-/// A landed seek is reported at once, at most this often while scrubbing (PLAN-RESUME.md §3.6).
+/// A landed seek is reported at once, at most this often while scrubbing.
 let seekBeatGapMs = 1_000
 
 /// The player's tick: state, prompts and heartbeats.
@@ -150,7 +150,7 @@ func heartbeatDue(_ state: PlayState, lastReported: PlayState?, sinceLastBeatMs:
 
 extension PlaybackDecision {
     /// Whether an event decision already starts at `fileMs`, on the keyframe up to
-    /// `eventStartToleranceMs` before it. A server from PLAN-RESUME.md §3.7 starts an
+    /// `eventStartToleranceMs` before it. A newer server starts an
     /// event play that asked for no start where it resumes; an older one started it
     /// at 0, and the player asked again.
     func startsAt(_ fileMs: Int) -> Bool {
@@ -161,8 +161,8 @@ extension PlaybackDecision {
 /// After a seek or a pause, buffering is the seek's or the resume's until the video has played this long.
 let excuseMs = 1_000
 
-/// A decision's start and its rebuffers, as heartbeats report them
-/// (PLAN-AUTO-QUALITY.md §3.1). A rebuffer is buffering after the first
+/// A decision's start and its rebuffers, as heartbeats report them.
+/// A rebuffer is buffering after the first
 /// frame that no seek, reload or resume caused: a seek or a pause excuses
 /// the buffering that follows, until the video has played on for ``excuseMs``.
 struct StreamMeasure {
@@ -285,7 +285,7 @@ func nowPlayingImage(_ request: PlayRequest) -> ArtworkImage? {
 }
 
 /// Over AirPlay, the stream from the server's address on this network
-/// rather than the one in use (PLAN-IOS.md §5): `from` is the base URL in
+/// rather than the one in use: `from` is the base URL in
 /// use, `to` the same server's LAN address, path and all.
 struct LocalRoute: Hashable {
     var from: URL

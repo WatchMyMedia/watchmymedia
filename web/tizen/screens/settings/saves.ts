@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { components } from '../../../src/api/schema'
 import { useUpdatePreferences } from '../../../src/api/queries'
 
-// A setting that saves at once (SettingsPlayback, Tweak `save`): its row
+// A setting that saves at once: its row
 // says Saving… while the server answers, and when it refuses, what the
 // setting is still, with OK to try again.
 

@@ -3,7 +3,7 @@ import Testing
 @testable import WMMData
 import WMMModel
 
-/// Favourites, search and reminders against the server's routes (API level 15, PLAN-LIVE-TV-GUIDE.md §5.7).
+/// Favourites, search and reminders against the server's routes (API level 15).
 @Suite(.timeLimit(.minutes(1))) @MainActor struct LiveExtrasRepositoryTests {
     private let capabilities = #"{"enabled":true,"allowed":true,"playback":true,"guide":true}"#
     private let channels = #"{"items":[{"id":"c1","sourceId":"s1","number":"4.1","name":"NFLD-HD","enabled":true,"available":true,"favourite":true},{"id":"c2","sourceId":"s1","number":"4.3","name":"Coast Shop","enabled":true,"available":true}]}"#

@@ -64,7 +64,7 @@ type Settings struct {
 	Upload            *upload.Snapshot         `json:"upload,omitempty" required:"false" doc:"Remote media ceiling and live delivery accounting. The configured, reserved and delivered rates have different meanings."`
 	Storage           *PlaybackCacheLoad       `json:"storage,omitempty" required:"false" doc:"Owned temporary playback storage usage and configured limits. Library files and recordings are excluded."`
 	TrailersYouTube   bool                     `json:"trailersYouTube" required:"false" doc:"Movie pages offer TMDB's trailers, which play from YouTube (on by default). Absent on older servers."`
-	// MDBList's key for lists (PLAN-ROWS.md §3): write-only, like the TMDB key.
+	// MDBList's key for lists: write-only, like the TMDB key.
 	ListsMDBListConfigured bool   `json:"listsMdblistConfigured" required:"false" doc:"An MDBList key is stored, so lists can come from MDBList (API level 22)."`
 	ListsMDBListKeyHint    string `json:"listsMdblistKeyHint,omitempty" required:"false" doc:"Last four characters of the stored MDBList key."`
 }
@@ -136,8 +136,8 @@ type UpdateSettingsInput struct {
 		// TrickplayEnabled turns seek thumbnails on, which starts making
 		// them now, or off, which stops and keeps those already made.
 		TrickplayEnabled *bool `json:"trickplayEnabled,omitempty" doc:"Make seek thumbnails for every file (on by default)."`
-		// TrailersYouTube turns YouTube trailers on or off (PLAN-TRAILERS.md
-		// §4.5). Trailer files in the library are not affected.
+		// TrailersYouTube turns YouTube trailers on or off.
+		// Trailer files in the library are not affected.
 		TrailersYouTube *bool `json:"trailersYouTube,omitempty" doc:"List movies' TMDB trailers, which play from YouTube, and let the web app show YouTube's player (on by default)."`
 		// ListsMDBListKey is checked against MDBList before it is stored.
 		ListsMDBListKey *string `json:"listsMdblistKey,omitempty" required:"false" maxLength:"200" doc:"New MDBList API key, checked with MDBList before it is kept; empty string clears it; omit to keep (API level 22)."`
@@ -978,7 +978,7 @@ func saveMDBListKey(ctx context.Context, deps Deps, key string) error {
 
 // forgetLibraryRows clears a deleted library's screen: everyone's layout
 // of it and the household's default go, and lists made on it first show
-// on Home (PLAN-ROWS.md 7.1).
+// on Home.
 func forgetLibraryRows(ctx context.Context, deps Deps, libraryID int64) {
 	ref := screenRef{Name: libraryScreenName(libraryID), LibraryID: libraryID}
 	if err := deps.Queries.DeleteUserPreferencesByKey(ctx, ref.prefKey()); err != nil {

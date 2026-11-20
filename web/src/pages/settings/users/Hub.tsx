@@ -10,7 +10,7 @@ import { cantRequest, deleteSavedNote, downloadSavedNote, personLine, seerrState
 import { usePeople } from './data'
 import { clearAddDraft, noteDeleted, useAddDraft, useDeletedNotice } from './store'
 
-/** Settings › Users: people as rows that open a page each, and what everyone can do (§5.5). */
+/** Settings › Users: people as rows that open a page each, and what everyone can do. */
 export function UsersHub() {
   const go = useGo()
   const auth = useAuth()

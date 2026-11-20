@@ -7,7 +7,7 @@ import WMMModel
 /// one after, so paging later doesn't wait. A window is asked for again once
 /// it is half an hour old, so a day's new listings arrive. A new server or
 /// sign-in drops everything, and replies for the previous one are thrown away
-/// (PLAN-LIVE-TV-GUIDE.md §6.3–§6.4, the same rules as Android's).
+/// (the same rules as Android's).
 @MainActor @Observable
 public final class LiveGuideStore {
     nonisolated public static let windowHours = 6

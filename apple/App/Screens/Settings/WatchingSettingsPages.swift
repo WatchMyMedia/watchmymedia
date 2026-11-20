@@ -4,8 +4,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings › Playback (Settings2Playback.dc.html, Pad2Settings2.dc.html;
-/// PLAN-APPLE-SETTINGS.md §5.2): the web's page. Quality, which is this
+/// Settings › Playback:
+/// the web's page. Quality, which is this
 /// device's alone and says so in its heading; Skipping, a menu per part;
 /// Next episode; and Live TV reminders, where the server has listings. Every
 /// control is a choice, so each saves at once and says so in its own row.
@@ -79,8 +79,8 @@ struct PlaybackSettingsPage: View {
     }
 }
 
-/// Playback's Live TV reminders (PLAN-APPLE-SETTINGS.md §4, which folds the
-/// old Settings › Live TV in): how long before a programme to remind you
+/// Playback's Live TV reminders (the old Settings › Live TV, folded
+/// in): how long before a programme to remind you
 /// (kept on the server), this device's reminders, and whether iOS lets them
 /// through. Notifications asks iOS at first, then opens iOS Settings.
 struct LiveRemindersSettingsSection: View {

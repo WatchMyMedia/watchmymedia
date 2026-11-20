@@ -71,8 +71,8 @@ public enum FakeData {
         )
     }
 
-    /// About 1,200 movies for measuring a large grid (`-fakesLargeLibrary`,
-    /// PLAN-APPLE-REVIEW.md §4.3): the sample's, then made-up titles built
+    /// About 1,200 movies for measuring a large grid
+    /// (`-fakesLargeLibrary`): the sample's, then made-up titles built
     /// from invented words, so none is a real film's.
     public static let largeMovies: [BrowseItem] = {
         let starts = ["Al", "Bren", "Cor", "Dav", "Ev", "Fen", "Gar", "Hal", "Is", "Jor", "Kel", "Lun", "Mar", "Nor", "Ost",
@@ -133,7 +133,7 @@ public enum FakeData {
     public static func home(now: Date = .now) -> HomeData {
         let addedShows = ["S03 E07 · added today", "Season 1 · yesterday", "S02 E10 · 2 days ago", "Complete series · 3 days ago", "S01 E05 · 4 days ago"]
         let addedMovies = ["added today", "added yesterday", "added 3 days ago", "added 4 days ago", "added 5 days ago"]
-        // A card for one episode names it, as the server does (PLAN-EPISODE-PAGE.md §10), where the show has it.
+        // A card for one episode names it, as the server does, where the show has it.
         let addedEpisodes: [(season: Int, episode: Int)?] = [(3, 7), nil, (2, 10), nil, (1, 5)]
         return HomeData(
             hero: Hero(
@@ -166,7 +166,7 @@ public enum FakeData {
     public static func tmdbID(showID: Int) -> Int { 70_000 + showID }
 
     /// Harbor Lights' season 2 is missing its first three episodes, each for
-    /// another reason (ShowMissing.dc.html): not monitored, downloading, and
+    /// another reason: not monitored, downloading, and
     /// monitored with Sonarr looking.
     static let missing: [Int: [Int: [Int]]] = [100: [2: [1, 2, 3]]]
 

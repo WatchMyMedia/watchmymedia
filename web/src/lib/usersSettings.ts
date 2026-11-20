@@ -1,4 +1,4 @@
-// The rules of Settings › Users (PLAN-ADMIN-SETTINGS.md §5.5): the steps of
+// The rules of Settings › Users: the steps of
 // Add a person, what each person's row says, what a choice saved, and the
 // words for every refusal the server can give.
 

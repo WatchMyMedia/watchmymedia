@@ -1,6 +1,6 @@
 import Foundation
 
-/// One request of a kind in flight at a time (PLAN-APPLE-REVIEW.md §4.1.3):
+/// One request of a kind in flight at a time:
 /// a caller while one runs waits for that one's answer, unless it needs an
 /// answer newer than that one's start, which a different `stamp` says (an
 /// event came, or the sign-in changed), when it asks again itself.
@@ -41,7 +41,7 @@ extension SingleFlight where Value == Void {
 }
 
 /// Runs `operations` side by side on the main actor and returns when all
-/// have: the foreground refresh's independent requests (PLAN-APPLE-REVIEW.md §4.1.4).
+/// have: the foreground refresh's independent requests.
 @MainActor
 public func together(_ operations: @Sendable @MainActor () async -> Void...) async {
     await withTaskGroup(of: Void.self) { group in

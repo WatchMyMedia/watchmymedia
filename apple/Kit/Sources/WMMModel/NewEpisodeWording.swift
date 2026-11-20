@@ -1,10 +1,9 @@
 import Foundation
 
-// New episodes' words (PLAN-NEW-EPISODES.md §6.2, §6.3, §7), written once for
-// the iPhone, iPad and Apple TV apps, verbatim from the boards' wording table
-// (design/proposals/new-episodes/apple/README.md in the private repository),
-// as LiveWording.swift is for Live TV. The web and Android boards are drawn
-// from the same list.
+// New episodes' words, written once for
+// the iPhone, iPad and Apple TV apps, verbatim from the boards' wording
+// table, as LiveWording.swift is for Live TV. The web and Android boards
+// are drawn from the same list.
 
 public enum NewEpisodeWords {
     // MARK: The bell (iPhone, iPad, Apple TV)
@@ -52,7 +51,7 @@ public enum NewEpisodeWords {
         "When a new episode of \(show) reaches the library, this \(device) shows a notification."
     }
 
-    /// The limits (§6.3), on the explainer and under Settings' switch; iPadOS and the iPad on an iPad.
+    /// The limits, on the explainer and under Settings' switch; iPadOS and the iPad on an iPad.
     public static func limits(device: String) -> String {
         "\(systemName(device: device)) decides when to check, so it can take a few hours. If you close WatchMyMedia from the app switcher, checks stop until you open it again. Your \(device) has to be able to reach your server."
     }

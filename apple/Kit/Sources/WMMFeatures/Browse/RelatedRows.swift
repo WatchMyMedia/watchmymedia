@@ -2,8 +2,7 @@ import Foundation
 import Observation
 import WMMModel
 
-/// The rows at the end of a movie's or a show's page (PLAN-RELATED.md §6 and
-/// §7; MovieRelated, ShowRelated and their iPad and Apple TV boards): the
+/// The rows at the end of a movie's or a show's page: the
 /// movie's collection, then More like this, as the server works them out,
 /// drawn with Home's poster rows.
 ///
@@ -20,7 +19,7 @@ import WMMModel
 @Observable
 public final class RelatedRows {
     /// What the page draws at its end, in the server's order: rows of
-    /// posters (or 16:9 cards) that hold something, without See all (§3.7).
+    /// posters (or 16:9 cards) that hold something, without See all.
     public private(set) var rows: [ScreenRow] = []
 
     @ObservationIgnored private let title: RelatedTitle
@@ -80,7 +79,7 @@ public final class RelatedRows {
     }
 
     /// The rows a page draws from a reply: those of cards, with cards in
-    /// them, and no See all, which has nothing to open (§3.7).
+    /// them, and no See all, which has nothing to open.
     static func drawn(_ reply: [ScreenRow]) -> [ScreenRow] {
         reply.compactMap { row in
             guard row.style == .poster || row.style == .wide, !row.items.isEmpty else { return nil }

@@ -3,8 +3,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings › Account & devices (Settings2Account.dc.html,
-/// Pad2Settings2Account.dc.html; PLAN-APPLE-SETTINGS.md §5.4): the web's tab.
+/// Settings › Account & devices:
+/// the web's tab.
 /// This device's name opens Rename; Change password; Signed-in devices, which
 /// says under the list what became of a device signed out; Link a TV; and
 /// Sign out of this iPhone as a red row apart at the bottom. Every sign-out
@@ -225,7 +225,7 @@ private struct DeviceRow: View {
     }
 }
 
-/// Rename this iPhone (Settings2Rename.dc.html): a short sheet with Cancel,
+/// Rename this iPhone: a short sheet with Cancel,
 /// the field, and Rename, which is off until there is a name and says so.
 /// Swiping it away with a new name typed asks first. Its model is
 /// ``AppFlow``'s, so a resized iPad window keeps what was typed.
@@ -309,7 +309,7 @@ private struct RenameSheet: View {
     }
 }
 
-/// Change password (Settings2Password.dc.html; Decision 9): the system's
+/// Change password: the system's
 /// password fields, so the keychain offers to fill and update itself; the
 /// devices it signs out, by name; and its button with their count. Each
 /// refusal says nothing was changed: a wrong password under its field, too

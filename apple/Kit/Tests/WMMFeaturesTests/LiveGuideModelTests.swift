@@ -185,7 +185,7 @@ struct LiveGuideModelTests {
         #expect(channel.programme(at: end)?.title == "Conference Football")
     }
 
-    // MARK: Kept, not recomputed (PLAN-APPLE-REVIEW.md §4.3.4)
+    // MARK: Kept, not recomputed
 
     @Test func theRowsAreBuiltOnceUntilWhatTheyShowChanges() async throws {
         let (_, model) = try await make()

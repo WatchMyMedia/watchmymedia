@@ -267,8 +267,8 @@ public final class RealLivePlaybackController: LivePlaybackController {
                     }
                     guard version == generation else { continue }
                     guard let request = desired, !released, identityMatches else { continue }
-                    // A channel change keeps a token with time left: they last six hours
-                    // (PLAN-APPLE-REVIEW.md §4.2.2). This controller is pinned to one sign-in.
+                    // A channel change keeps a token with time left: they last six hours.
+                    // This controller is pinned to one sign-in.
                     let fetched: MediaToken? = tokens.valid ? nil : try await bound.mediaToken()
                     guard version == generation, !released, identityMatches else { continue }
                     let selectedProfile = liveProfile()
@@ -451,8 +451,8 @@ public final class RealLivePlaybackController: LivePlaybackController {
     }
 
     /// Now Playing, the lock screen's and Control Center's controls, and the
-    /// audio session's interruptions, as the file player has them
-    /// (PLAN-APPLE-REVIEW.md §6.3). Play and pause are the screen's own: a
+    /// audio session's interruptions, as the file player has them.
+    /// Play and pause are the screen's own: a
     /// pause keeps the tuner within its allowance and Play goes back to live
     /// once it passed the buffer. There is nothing to skip or scrub.
     private func openSystemSession() {

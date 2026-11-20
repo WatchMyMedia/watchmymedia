@@ -16,7 +16,7 @@ import { usePeople } from './data'
 import { ResetPasswordDialog } from './ResetPasswordDialog'
 import { noteDeleted } from './store'
 
-/** One person's page (§5.5): record history, the Seerr user, the Plex link, Reset password and Delete. */
+/** One person's page: record history, the Seerr user, the Plex link, Reset password and Delete. */
 export function PersonPage({ id }: { id: number }) {
   const auth = useAuth()
   const people = usePeople()
@@ -211,7 +211,7 @@ function PlexRow({ person, people }: { person: Person; people: ReturnType<typeof
 }
 
 /**
- * Delete a person (§3.8): what goes, that it can't be undone, and for an
+ * Delete a person: what goes, that it can't be undone, and for an
  * admin with Plex connected, that Plex stops if they were the one who
  * connected it. The server doesn't say who connected Plex, so it says "If".
  */

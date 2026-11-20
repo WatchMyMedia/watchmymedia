@@ -49,7 +49,7 @@ const (
 	// YouTube, off ("0"); they are on unless it is set.
 	KeyTrailersYouTube = "trailers.youtube"
 	// KeyListsMDBListKey is the admin's MDBList API key, for lists from
-	// MDBList (PLAN-ROWS.md 3).
+	// MDBList.
 	KeyListsMDBListKey = "lists.mdblist.api_key" //nolint:gosec // G101: a setting's name, not its value
 	// KeyLibrariesSeeded ("1") is set once the server has had a library,
 	// after which the configured library folders are never added again.

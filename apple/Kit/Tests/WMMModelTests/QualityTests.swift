@@ -1,7 +1,7 @@
 import Testing
 import WMMModel
 
-/// The quality steps, Automatic and what a server's API level allows (PLAN-AUTO-QUALITY.md §1).
+/// The quality steps, Automatic and what a server's API level allows.
 @Suite struct QualityTests {
     @Test func automaticIsOfferedFirstFromAPILevel3() {
         #expect(StreamQuality.offered(apiLevel: 3) == StreamQuality.allCases)

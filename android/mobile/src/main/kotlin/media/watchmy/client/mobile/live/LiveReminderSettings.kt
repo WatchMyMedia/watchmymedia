@@ -76,11 +76,11 @@ private fun reminderModel(): LiveRemindersViewModel {
 }
 
 /**
- * Playback › Live TV reminders (PLAN-ANDROID-SETTINGS.md §5.1, the
- * SettingsPlaybackPage board): Reminder time, the same on all the person's
+ * Playback › Live TV reminders:
+ * Reminder time, the same on all the person's
  * devices, and the reminders' notification channel. With notifications off
  * a card says reminders can't show here, and its button opens Android's
- * screen for them (§4.7). [enabled] is false while the account's settings
+ * screen for them. [enabled] is false while the account's settings
  * haven't loaded.
  */
 @Composable

@@ -31,7 +31,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/** The movie page's Trailer and the trailer screen on a phone (MovieTrailer.dc.html, TrailerPlayer.dc.html). */
+/** The movie page's Trailer and the trailer screen on a phone. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xxhdpi")
 class TrailerScreenTest {

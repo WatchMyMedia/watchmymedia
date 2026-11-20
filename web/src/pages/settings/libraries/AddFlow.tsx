@@ -37,7 +37,7 @@ function writeDraft(draft: AddDraft) {
 const href = (step: string) => settingsHref('libraries', 'add', step)
 
 /**
- * Add a library (boards lib-add-1 … lib-add-done): Type → Folder → Name
+ * Add a library: Type → Folder → Name
  * and add → Added. Only Name and add saves, and away from home it asks for
  * the password. What was chosen lasts for this browser tab, so a reload
  * stays on its step.

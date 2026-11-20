@@ -37,8 +37,8 @@ extension LiveMediaPlayer {
     public var stalls: Int { 0 }
 }
 
-/// A live stream's stalls, counted as they happen (PLAN-APPLE-REVIEW.md
-/// §3.1.7) rather than when a heartbeat reads the player: from the item's
+/// A live stream's stalls, counted as they happen
+/// rather than when a heartbeat reads the player: from the item's
 /// stall notification and the player starting to wait while it played. One
 /// stall until it plays again; the wait after a pause or a seek isn't one.
 struct LiveStallCounter: Equatable {

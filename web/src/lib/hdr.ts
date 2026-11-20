@@ -1,8 +1,8 @@
 import type { Profile } from './capabilities'
 
 /**
- * The API level whose servers read Profile.hdrTypes and the dovi keys
- * (PLAN-HDR-PROFILE.md). Older ones refuse hdrTypes with a 422.
+ * The API level whose servers read Profile.hdrTypes and the dovi keys.
+ * Older ones refuse hdrTypes with a 422.
  */
 export const HDR_PROFILE_API_LEVEL = 8
 
@@ -20,10 +20,10 @@ export const DOVI_CODECS: readonly (readonly [key: string, codec: string])[] = [
 export type Screen = { hdr10: boolean; hlg: boolean; dolbyVision: boolean }
 
 /**
- * The profile's HDR fields (PLAN-HDR-PROFILE.md §2, §6.3): `hdrTypes` lists
+ * The profile's HDR fields: `hdrTypes` lists
  * what the screen shows, even when that is nothing, and a dovi key needs a
- * decoder for that profile and a screen that shows Dolby Vision
- * (decision 4).
+ * decoder for that profile and a screen that shows Dolby
+ * Vision.
  */
 export function hdrFields(screen: Screen, decodes: (codec: string) => boolean): { hdrTypes: string[]; doviKeys: string[] } {
   const doviKeys = screen.dolbyVision ? DOVI_CODECS.filter(([, codec]) => decodes(codec)).map(([key]) => key) : []
@@ -33,7 +33,7 @@ export function hdrFields(screen: Screen, decodes: (codec: string) => boolean): 
 
 /**
  * The profile for a server at `level`: below HDR_PROFILE_API_LEVEL, the one
- * sent before, without hdrTypes or dovi keys (decision 9).
+ * sent before, without hdrTypes or dovi keys.
  */
 export function forApiLevel(p: Profile, level: number): Profile {
   if (level >= HDR_PROFILE_API_LEVEL) return p

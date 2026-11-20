@@ -28,7 +28,7 @@ final class AppFlow {
     @ObservationIgnored private var linkTV: LinkTVModel?
     /// The sign-in form, kept here like the server switch, so an iPad window
     /// resized during sign-in (which swaps the iPhone and iPad screens) keeps
-    /// what was typed (PLAN-APPLE-REVIEW.md §3.3.4).
+    /// what was typed.
     @ObservationIgnored private let signIn = SignInForm()
 
     func signInModel(_ services: AppServices) -> SignInModel {
@@ -59,7 +59,7 @@ final class AppFlow {
 
 /// Server picker until a server is chosen, sign-in until someone is signed
 /// in, then the tabs. On iPad (a regular width) the picker and the sign-in
-/// form share one screen (PadSignIn.dc.html).
+/// form share one screen.
 struct RootView: View {
     @Environment(AppServices.self) private var services
     @Environment(\.scenePhase) private var scenePhase
@@ -106,8 +106,8 @@ struct RootView: View {
                 resetAccountViews(preservingLink: old.user == nil)
             }
         }
-        // A switch that finished shows what changed until Done
-        // (Settings2SwitchDone.dc.html); cancelled or overtaken, it ends at once.
+        // A switch that finished shows what changed until Done;
+        // cancelled or overtaken, it ends at once.
         .onChange(of: flow.serverSwitch?.outcome) { _, outcome in
             guard let outcome, outcome != .switched else { return }
             endServerSwitch(outcome)
@@ -120,8 +120,8 @@ struct RootView: View {
         // At launch, on every return to the app and on every sign-in (which
         // doesn't change scenePhase): one task, so launch asks once. A server
         // upgraded meanwhile may do more (Automatic quality from API 3), so its
-        // level comes first; the rest don't wait for each other
-        // (PLAN-APPLE-REVIEW.md §4.1.3–4).
+        // level comes first; the rest don't wait for each
+        // other.
         .task(id: Refresh(account: account, active: scenePhase == .active)) {
             guard scenePhase == .active else { return }
             await services.servers.refreshCurrent()
@@ -131,15 +131,15 @@ struct RootView: View {
                 { await services.requests.refreshOptions() },
                 // Live TV's access, then its reminders, which need it.
                 { try? await services.liveTV.refresh(); await extras.refresh() },
-                // Offline progress and what the server decided of the downloads (PLAN-DOWNLOADS.md §6).
+                // Offline progress and what the server decided of the downloads.
                 { await services.downloads.sync() },
-                // The shows followed, then new episodes of them (PLAN-NEW-EPISODES.md §6.1).
+                // The shows followed, then new episodes of them.
                 { await follows.refresh(); await newEpisodes.check() }
             )
         }
         // While the app is open, new episodes are looked for 3 minutes after the last library change.
         .task(id: account) { await newEpisodes.checker.followLibrary(services.library.libraryChanges()) }
-        // Reminders as notifications (PLAN-LIVE-TV-GUIDE.md §6.5): the soonest 64,
+        // Reminders as notifications: the soonest 64,
         // again whenever they or the lead time change, once the list is loaded.
         // A server that keeps none clears them; offline, they stay as they were.
         // The quick actions on the app's icon follow the sign-in and what its server offers.

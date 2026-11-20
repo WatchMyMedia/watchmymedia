@@ -3,8 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Switch server on iPhone (Settings2SwitchChoose, Settings2SwitchSignIn,
-/// Settings2SwitchDone; PLAN-APPLE-SETTINGS.md §5.6): three steps in a
+/// Switch server on iPhone: three steps in a
 /// sheet, Choose a server, Sign in, Switched. A server this device is
 /// already signed in to skips the second. Every failure says you're still on
 /// the first server, and swiping the sheet away is Cancel, which asks first

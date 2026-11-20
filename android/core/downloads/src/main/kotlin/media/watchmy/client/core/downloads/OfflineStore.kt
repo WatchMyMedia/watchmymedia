@@ -63,7 +63,7 @@ internal data class StoredRecord(
 }
 
 /**
- * Progress made on a downloaded item (PLAN-DOWNLOADS.md §6): a position, or a
+ * Progress made on a downloaded item: a position, or a
  * mark, with when it happened by this device's clock. [seq] tells entries
  * apart, so a sync drops exactly the ones it sent.
  */
@@ -98,7 +98,7 @@ internal data class StoredState(
 )
 
 /**
- * The offline queue's rule (PLAN-DOWNLOADS.md §6): per file, the newest
+ * The offline queue's rule: per file, the newest
  * position with its time, and the mark made after it, if any. A position
  * drops the marks before it; a mark replaces the one before it.
  */

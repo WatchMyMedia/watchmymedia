@@ -5,7 +5,7 @@ import WMMModel
 @testable import WMMUI
 
 /// The Apple TV diagnostics code stays a size a phone reads from a sofa
-/// (TvDiagnostics.dc.html, `DiagnosticsCode.maxBytes`): at most a version 25
+/// (`DiagnosticsCode.maxBytes`): at most a version 25
 /// QR code, 117 modules a side, whatever the log holds.
 @Suite struct DiagnosticsCodeSizeTests {
     @Test func theLargestTextTheCodeHoldsIsVersion25AtMost() throws {

@@ -1,7 +1,7 @@
 import XCTest
 
-/// Settings › About › Diagnostics (PLAN-APPLE-REVIEW.md §6.4,
-/// design/mockups/ios/Diagnostics.dc.html), on the fakes, on iPhone and
+/// Settings › About › Diagnostics,
+/// on the fakes, on iPhone and
 /// iPad: the Help row with its count, the page's groups, and Copy turning
 /// into Copied with a Copied note. The page must not show the fake server's
 /// name or address, even when the log holds them (`-diagnosticsLog`).

@@ -201,7 +201,7 @@ export function itemLink(it: PlayItem): { to: '/movies/$movieId'; params: { movi
   return null
 }
 
-/** An episode's own page, for its "S01E02 · Title" line (PLAN-EPISODE-PAGE.md decision 1). */
+/** An episode's own page, for its "S01E02 · Title" line. */
 export function episodeLink(it: PlayItem) {
   if (it.type !== 'episode' || !it.showId || it.seasonNumber == null || !it.episodeId) return null
   return {

@@ -1,7 +1,7 @@
 import XCTest
 import UIKit
 
-/// Trailer on the movie page (PLAN-TRAILERS.md §6.3), on the fakes: Dead
+/// Trailer on the movie page, on the fakes: Dead
 /// Reckoning Bay has a YouTube trailer, The Paper Kite a trailer file. The
 /// YouTube player needs the network; the screen around it doesn't.
 final class TrailerTests: XCTestCase {

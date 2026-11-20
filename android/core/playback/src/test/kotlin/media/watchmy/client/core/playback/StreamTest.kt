@@ -85,7 +85,7 @@ class StreamTest {
 
     @Test
     fun anEventSessionThatStartsAtTheResumePointNeedsNoSecondRequest() {
-        // The server started where the play resumes, on the keyframe 5 s before it (PLAN-RESUME.md §3.7).
+        // The server started where the play resumes, on the keyframe 5 s before it.
         h.start(resumeRequest) { decision(vod = false, startMs = 295_000, resumeMs = 300_000) }
         assertEquals(1, h.gateway.decisions.size)
         assertEquals(null, h.gateway.decisions.single().startMs)

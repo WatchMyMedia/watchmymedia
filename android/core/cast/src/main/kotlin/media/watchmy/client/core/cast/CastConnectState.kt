@@ -51,7 +51,7 @@ internal fun castConnectState(fileId: Long, state: PlayerUiState, imageUrl: (Str
     )
 }
 
-/** What this TV app plays beyond files, in every `state` it sends (PLAN-LIVE-TV.md §4.1). */
+/** What this TV app plays beyond files, in every `state` it sends. */
 internal val CAST_CONNECT_FEATURES = listOf(CastProtocol.FEATURE_LIVE, CastProtocol.FEATURE_LIVE_AUTO)
 
 /**

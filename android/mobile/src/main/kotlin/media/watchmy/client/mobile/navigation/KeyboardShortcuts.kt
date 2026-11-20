@@ -4,8 +4,8 @@ import android.view.KeyEvent
 import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
- * A keyboard's app-wide shortcuts on a phone or tablet (PLAN-ANDROID-REVIEW
- * §6.3, PLAN-TABLETS §8): Ctrl+F, / or a keyboard's Search key opens
+ * A keyboard's app-wide shortcuts on a phone or tablet:
+ * Ctrl+F, / or a keyboard's Search key opens
  * Search. The activity passes on the key presses no screen took
  * ([onKeyDown]), so a field being typed in keeps its /, and Compose needs no
  * focus to see them. It reads the press, not the release: Ctrl may be let go

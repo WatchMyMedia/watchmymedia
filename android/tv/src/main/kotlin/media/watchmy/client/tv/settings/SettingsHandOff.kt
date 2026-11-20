@@ -34,8 +34,8 @@ import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.WmmColors
 
 /**
- * Change password on a TV (android-tv/SettingsGroupAccount.dc.html, Tweak
- * `overlay`: `password`): a remote types a character at a time on a shared
+ * Change password on a TV:
+ * a remote types a character at a time on a shared
  * screen, so the panel hands it to a phone or computer, with the web app's
  * Account & devices at [url] and a code to scan. Nothing in it takes focus;
  * Back closes it, back on its row.
@@ -78,10 +78,10 @@ internal fun ChangePasswordPanel(url: String, onDismiss: () -> Unit) {
 }
 
 /**
- * Server settings on a TV (android-tv/SettingsGroups.dc.html, Tweak `group`:
- * `server`): the server's settings are in the web app, so the pane shows the
- * address of its Settings and a code to scan, as Privacy policy does
- * (PLAN-ANDROID-SETTINGS.md §5.8). It has no rows, so focus stays on its group.
+ * Server settings on a TV:
+ * the server's settings are in the web app, so the pane shows the
+ * address of its Settings and a code to scan, as Privacy policy does.
+ * It has no rows, so focus stays on its group.
  */
 @Composable
 internal fun ColumnScope.ServerSettingsPane(url: String, serverName: String, userName: String?) {

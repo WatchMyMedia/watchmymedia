@@ -2,7 +2,7 @@ import Testing
 import WMMModel
 @testable import WMMFeatures
 
-/// PLAN-IPHONE-DUO.md §5: Live TV half open on a table, or like a book.
+/// Live TV half open on a table, or like a book.
 @Suite struct LiveFoldControlsTests {
     @Test func theMiddleButtonIsGoLiveOnlyBehindLive() {
         #expect(LiveFoldMiddle.of(status: .playing, atLiveEdge: false) == .goLive)

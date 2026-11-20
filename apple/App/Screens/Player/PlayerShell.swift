@@ -114,14 +114,14 @@ struct PlayerFrame {
     }
 }
 
-/// The one shell the film and Live TV players share on iPhone and iPad
-/// (PLAN-APPLE-REVIEW.md §5.3): black under the whole screen, the status bar
+/// The one shell the film and Live TV players share on iPhone and iPad:
+/// black under the whole screen, the status bar
 /// and home indicator hidden, a phone's window turned while it shows, the scene
 /// phase and Picture in Picture passed to the model (which gives Picture in
 /// Picture its moment to start), the controls held up for VoiceOver, and
 /// Escape for VoiceOver's scrub, and a hardware keyboard's keys (space,
-/// the arrows, Escape) passed to the model, which says what each does
-/// (PLAN-APPLE-REVIEW.md §6.3). The content draws the video and its
+/// the arrows, Escape) passed to the model, which says what each does.
+/// The content draws the video and its
 /// controls, as its own boards draw them.
 struct PlayerShell<Content: View>: View {
     let model: any PlayerShellModel

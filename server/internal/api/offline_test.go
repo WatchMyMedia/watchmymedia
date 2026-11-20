@@ -115,7 +115,7 @@ func get(t *testing.T, url string, header ...string) (int, http.Header, []byte) 
 	return r.StatusCode, r.Header, r.Body
 }
 
-// PLAN-DOWNLOADS.md §4.3: who may download, for admins and members under
+// Who may download, for admins and members under
 // none, admins (the default) and everyone, on every route.
 func TestOfflineAccess(t *testing.T) {
 	t.Parallel()
@@ -207,7 +207,7 @@ func TestOfflineAccess(t *testing.T) {
 	}
 }
 
-// PLAN-DOWNLOADS.md §4.2: an offline token opens its own record's media
+// An offline token opens its own record's media
 // and nothing else; media tokens never open offline routes; a revoked
 // record or a signed-out device is refused.
 func TestOfflineTokenScope(t *testing.T) {
@@ -349,7 +349,7 @@ func TestOfflineDirectDownload(t *testing.T) {
 	}
 }
 
-// Revoking and removing (PLAN-DOWNLOADS.md §4.1, §8): an admin revokes a
+// Revoking and removing: an admin revokes a
 // member's download, which stays listed until its device syncs and removes
 // it; the owner's app removes its own record; a device downloading a file
 // again replaces its download.
@@ -418,7 +418,7 @@ func TestOfflineRevokeAndRemove(t *testing.T) {
 	}
 }
 
-// syncOffline's table (PLAN-DOWNLOADS.md §6) through the API: offline
+// syncOffline's table through the API: offline
 // progress applies by when it happened, corrected for the device's clock;
 // a play since on the server stays; a position past the watched point
 // marks the item watched; a gone file is dropped; History is untouched.
@@ -579,8 +579,8 @@ func TestOfflineWaitsForASlot(t *testing.T) {
 	}
 }
 
-// HLS downloads against an HEVC file with E-AC-3 audio (PLAN-DOWNLOADS.md
-// §13): a remux and a 720p transcode, each fetched in order with an offline
+// HLS downloads against an HEVC file with E-AC-3 audio:
+// a remux and a 720p transcode, each fetched in order with an offline
 // token; the session made again after it went, with the same init segment;
 // a differing init answering 409 until the device starts over.
 func TestOfflineHLSDownloads(t *testing.T) {

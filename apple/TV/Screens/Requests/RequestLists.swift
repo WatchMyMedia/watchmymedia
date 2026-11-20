@@ -4,7 +4,7 @@ import WMMModel
 import WMMUI
 
 /// Settings › Your requests on Apple TV: the iPhone's list
-/// (MyRequests.dc.html) at ten feet, each request a focusable row with its
+/// at ten feet, each request a focusable row with its
 /// state; Select cancels one that waits, after asking, or opens one in the library.
 struct MyRequestsScreen: View {
     @Environment(AppServices.self) private var services
@@ -101,7 +101,7 @@ private struct RequestRow: View {
 }
 
 /// Settings › Inbox on Apple TV, for admins: the iPhone's Inbox
-/// (Inbox.dc.html) at ten feet. Requests to approve or decline (with an
+/// at ten feet. Requests to approve or decline (with an
 /// optional note from the keyboard or dictation), and problems to mark resolved.
 struct InboxScreen: View {
     @Environment(AppServices.self) private var services

@@ -1,7 +1,7 @@
 import Foundation
 
 /// A controller's beat on its ``PlaybackClock``: the file player's every
-/// ``tickMs`` and Live TV's every half second (PLAN-APPLE-REVIEW.md §5.1).
+/// ``tickMs`` and Live TV's every half second.
 /// The next beat is set before `tick` runs, so a tick that stops the ticker,
 /// or starts it again, has the last word.
 @MainActor

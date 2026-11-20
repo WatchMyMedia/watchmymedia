@@ -15,7 +15,7 @@ import media.watchmy.client.model.NewEpisodesCursor
 import media.watchmy.client.model.NewEpisodesCursors
 
 /**
- * The check with the app closed (PLAN-NEW-EPISODES.md §6.1): the app's one
+ * The check with the app closed: the app's one
  * periodic work, every [PERIOD_HOURS] hour with a network, its first run a
  * period after it is scheduled (the app checks for itself when it schedules
  * it). Android runs it when it chooses within each period, later while the
@@ -82,7 +82,7 @@ class NewEpisodeWorker(context: Context, params: WorkerParameters) : CoroutineWo
 }
 
 /**
- * The cursor the device keeps (§6.1), for one server and person at a time, in
+ * The cursor the device keeps, for one server and person at a time, in
  * the app's own preferences. Left out of backups (data_extraction_rules.xml),
  * since a cursor restored on another phone would skip what arrived meanwhile.
  */

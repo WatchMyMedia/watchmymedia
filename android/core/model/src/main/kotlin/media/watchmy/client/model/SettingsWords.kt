@@ -1,6 +1,6 @@
 package media.watchmy.client.model
 
-// Settings as groups (PLAN-ANDROID-SETTINGS.md §4–§5): the groups, their state
+// Settings as groups: the groups, their state
 // lines and the sentences the phone, the tablet and the TV share, named and
 // ordered as the web app's Settings tabs so the same setting is found in the
 // same place on every platform.
@@ -18,7 +18,7 @@ enum class SettingsGroup(val title: String) {
     Downloads("Downloads"),
     HomeRows("Home rows"),
 
-    /** The shows the person follows and this device's switch (PLAN-NEW-EPISODES.md §7.2), from [FOLLOWS_API_LEVEL]. */
+    /** The shows the person follows and this device's switch, from [FOLLOWS_API_LEVEL]. */
     Notifications("Notifications"),
     Account("Account & devices"),
     Requests("Your requests"),
@@ -82,7 +82,7 @@ fun settingsTheServerLacks(features: ServerFeatures): List<String> = listOfNotNu
 )
 
 /**
- * About's notice when the server is older than [missing] need (PLAN-ANDROID-SETTINGS.md §4.7):
+ * About's notice when the server is older than [missing] need:
  * which version it is on, what this app leaves out, and who can update it.
  */
 fun olderServerNotice(serverName: String, version: String, missing: List<String>, admin: Boolean): SettingsNotice {
@@ -157,7 +157,7 @@ fun passwordChangedNotice(signedOut: Int) = SettingsNotice(
     },
 )
 
-/** The web app's Settings on [baseUrl], which Server settings opens (PLAN-ANDROID-SETTINGS.md §5.8). */
+/** The web app's Settings on [baseUrl], which Server settings opens. */
 fun serverSettingsUrl(baseUrl: String): String = baseUrl.trimEnd('/') + "/settings"
 
 /** The web app's Account & devices on [baseUrl], where a TV sends someone to change their password. */

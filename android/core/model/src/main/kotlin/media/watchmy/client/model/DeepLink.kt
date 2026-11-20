@@ -41,7 +41,7 @@ sealed interface DeepLink {
     /** Downloads, from the phone launcher's shortcut (`downloads`). The TV opens nothing for it. */
     data object Downloads : DeepLink
 
-    /** Home, from the notification for the shows past the first five (PLAN-NEW-EPISODES.md §6.2, `home`). */
+    /** Home, from the notification for the shows past the first five (`home`). */
     data object Home : DeepLink
 
     companion object {
@@ -92,7 +92,7 @@ sealed interface DeepLink {
             "$SCHEME://live/${java.net.URLEncoder.encode(channelId, "UTF-8")}?source=reminder&account=${java.net.URLEncoder.encode(account, "UTF-8")}"
 
         /**
-         * A new-episode notification's link (PLAN-NEW-EPISODES.md §6.2): the
+         * A new-episode notification's link: the
          * show's page with [episodeId] of [season] on top, for [account]
          * ([watchNextAccount]) alone.
          */

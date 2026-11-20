@@ -226,7 +226,7 @@ const EMPTY_HOME: HomeData = {
 }
 
 function libraryRowsReply(id: number): components['schemas']['LibraryRows'] {
-  // The TV library arranges none, so it opens on its grid (LibraryAZ); Movies has rows above it (LibraryRows).
+  // The TV library arranges none, so it opens on its grid; Movies has rows above it.
   if (id !== 1) return { recentlyAdded: [], recentlyAired: [], recentlyReleased: [], rows: [] }
   return {
     recentlyAdded: [], recentlyAired: [], recentlyReleased: [],

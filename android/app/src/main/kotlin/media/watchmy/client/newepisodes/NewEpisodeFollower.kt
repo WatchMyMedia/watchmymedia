@@ -37,8 +37,8 @@ interface NewEpisodeNotices {
 }
 
 /**
- * New-episode notifications on a phone or tablet (PLAN-NEW-EPISODES.md §6.1,
- * §7.3). The check ([check], `checkNewEpisodes` in core:model) runs:
+ * New-episode notifications on a phone or tablet.
+ * The check ([check], `checkNewEpisodes` in core:model) runs:
  *
  * - with the app closed, as periodic work ([NewEpisodeSchedule]), scheduled
  *   whenever this device could notify (signed in to a server at level 29,
@@ -51,7 +51,7 @@ interface NewEpisodeNotices {
  *   ([libraryChanged]); scans that change nothing don't put it back.
  *
  * Turning the switch off, or Android no longer allowing the channel,
- * forgets the cursor, so turning them on again starts from now (§5.4). A
+ * forgets the cursor, so turning them on again starts from now. A
  * sign-out or another server or person ([sessionChanged]) cancels the work,
  * forgets the cursor and takes away what is showing. In a process started in
  * the background Android hasn't been asked yet, so the work is left as it

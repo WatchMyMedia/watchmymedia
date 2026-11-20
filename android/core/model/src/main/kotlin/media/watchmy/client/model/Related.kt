@@ -1,13 +1,13 @@
 package media.watchmy.client.model
 
-// Related titles at the end of movie and show pages (PLAN-RELATED.md): the
+// Related titles at the end of movie and show pages: the
 // server works the rows out and sends them as ScreenRows, which the pages
 // draw as Home draws its poster rows.
 
 /** The server API level that brought the related rows; below it the pages end as they always have. */
 const val RELATED_API_LEVEL = 30
 
-/** The related rows' IDs, in the order the server sends them (PLAN-RELATED.md §3.1). */
+/** The related rows' IDs, in the order the server sends them. */
 object RelatedRowIds {
     /** The movie's TMDB collection: its other films the library has, in release order, named as TMDB names it. */
     const val COLLECTION = "collection"
@@ -16,7 +16,7 @@ object RelatedRowIds {
     const val SIMILAR = "similar"
 }
 
-/** Beside the collection row's name on the TV (android-tv/MovieRelated.dc.html). */
+/** Beside the collection row's name on the TV. */
 const val RELEASE_ORDER = "In release order"
 
 /**

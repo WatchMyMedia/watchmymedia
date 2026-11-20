@@ -148,9 +148,9 @@ fun OnScreenKeyboard(
 
 /**
  * The keyboard typing into [field]: a field's text is held in its
- * TextFieldState (PLAN-ANDROID-REVIEW.md §3.3.3), which the keys edit.
+ * TextFieldState, which the keys edit.
  * Under it, "Use the TV's keyboard" hands the same field to the system's
- * keyboard (TvSearchKeyboard.dc.html), with the TV's languages, accents and
+ * keyboard, with the TV's languages, accents and
  * voice key; its Done, or Back, comes back to that key. [masked] fields
  * (passwords) ask it for a password keyboard. [note] goes under the key.
  */

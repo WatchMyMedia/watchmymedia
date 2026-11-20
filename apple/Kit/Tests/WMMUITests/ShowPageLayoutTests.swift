@@ -2,7 +2,7 @@ import CoreGraphics
 import Testing
 @testable import WMMUI
 
-/// PLAN-IPHONE-DUO.md §3: the show page on the iPhone, the iPad and the iPhone Duo.
+/// The show page on the iPhone, the iPad and the iPhone Duo.
 @Suite struct ShowPageLayoutTests {
     @Test func aCompactWidthStacksWhateverItsSizeOrPosture() {
         for width: CGFloat in [393, 382, 466, 951] {

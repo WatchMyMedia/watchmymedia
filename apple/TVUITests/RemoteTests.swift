@@ -110,7 +110,7 @@ final class RemoteTests: XCTestCase {
         remote.press(.select)
         let delete = app.descendants(matching: .any)["Delete episode…"]
         XCTAssertTrue(delete.waitUntilExists(timeout: 5), "More offers Delete episode…")
-        // The show's group moved to About the show (PLAN-SHOW-PAGE.md §2).
+        // The show's group moved to About the show.
         XCTAssertFalse(app.descendants(matching: .any)["Mark Season 3 watched"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["Cast & details"].exists)
         for _ in 0..<10 where !delete.hasFocus { remote.press(.down) }

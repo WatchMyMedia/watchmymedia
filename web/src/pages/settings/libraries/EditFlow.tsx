@@ -16,7 +16,7 @@ import type { components } from '../../../api/schema'
 
 type Library = components['schemas']['Library']
 
-/** Name and folder (board lib-edit): a one-step task with Cancel and Save.
+/** Name and folder: a one-step task with Cancel and Save.
  * Only a folder change asks for the password away from home. */
 export function EditLibraryFlow({ id }: { id: number }) {
   const libraries = useQuery(librariesQuery)

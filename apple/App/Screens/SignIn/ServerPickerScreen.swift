@@ -6,7 +6,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Choosing a server (ServerPicker.dc.html): found on this network (live
+/// Choosing a server: found on this network (live
 /// while the screen is up), remembered (swipe to forget), or typed.
 struct ServerPickerScreen: View {
     @Environment(AppServices.self) private var services

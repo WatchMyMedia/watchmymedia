@@ -6,7 +6,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The checks each sign-in starts (PLAN-ANDROID-REVIEW.md §4.1.6). */
+/** The checks each sign-in starts. */
 class SessionLoadTest {
     @Test
     fun `the three checks go together, not one after another`() = runBlocking {

@@ -40,9 +40,9 @@ type Pin = { season: number; episodeId: number; why?: OnTopReason; gone?: boolea
 const kept = new Map<number, { tab: number; pin?: Pin }>()
 
 /**
- * One page for a show, its seasons and its episodes (ShowPage and
- * ShowRelated on the Samsung TV canvas; PLAN-SHOW-PAGE.md; the Android TV
- * app's ShowPageScreen). The episode on top, Play focused first; ▼ the
+ * One page for a show, its seasons and its episodes
+ * (the Android TV app's ShowPageScreen).
+ * The episode on top, Play focused first; ▼ the
  * season tabs, where focus changes the season at once; ▼ the episode row,
  * where the episode on top follows focus and OK goes back up to Play; ▼
  * About the show; ▼ More like this. Return leaves the show in one step.

@@ -27,8 +27,8 @@ public enum TabletopTab: Hashable, Sendable, CaseIterable {
     }
 }
 
-/// What the film player shows beside the picture, or under the fold
-/// (PLAN-IPHONE-DUO.md §4.4). It is one choice drawn two ways: the panel
+/// What the film player shows beside the picture, or under the fold.
+/// It is one choice drawn two ways: the panel
 /// chosen beside the picture is the tab shown under the fold, and the tab
 /// chosen there is the panel beside the picture when the screen opens flat.
 /// Nothing chosen shows no panel, and Up next under the fold (audio and

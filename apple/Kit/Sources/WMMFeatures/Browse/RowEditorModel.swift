@@ -2,13 +2,12 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Home rows, or a library's rows (PLAN-ROWS.md §5; HomeEditRows, AddRow,
-/// Pad2HomeEditRows and TvSettingsHomeRows.dc.html): every row the person
+/// Home rows, or a library's rows: every row the person
 /// can place on the screen, in order, to move, hide and show again. Hidden
 /// rows stay in place, greyed, with Show; Add a row lists the same hidden
 /// rows by kind (built-in rows, the household's lists, the person's own) and
 /// shows one in its place. Reset goes back to the household's order. Lists
-/// are made on the web (Decision 10).
+/// are made on the web.
 ///
 /// On iPhone and iPad the changes wait for Done (``save()``); on Apple TV
 /// (`autosave`) each change is saved as it is made, one save at a time.

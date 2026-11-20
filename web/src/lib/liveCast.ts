@@ -5,12 +5,12 @@ import { liveFailure, liveQuality } from './liveTV'
 import { QUALITIES, type Quality } from './quality'
 
 /**
- * Casting a Live TV channel from this browser (PLAN-LIVE-TV.md §4.1, L10c):
+ * Casting a Live TV channel from this browser:
  * when to offer it, what the remote shows, and the LOAD it sends. The
  * receiver plays the channel on the sender's sign-in; this page is a remote.
  */
 
-/** The server level whose cast tokens may play Live TV (L10a). */
+/** The server level whose cast tokens may play Live TV. */
 export const LIVE_CAST_LEVEL = 14
 
 /** The server lets this person cast a channel. */
@@ -110,7 +110,7 @@ export function liveRemoteAction(o: { route: string; receiver?: StateMessage; pe
   return { kind: 'none' }
 }
 
-/** The remote's screens, from the LiveCast board's states. */
+/** The remote's screens. */
 export type RemoteView =
   | { kind: 'tuning'; channelId: string }
   | { kind: 'playing'; channelId: string; paused: boolean; pauseLeftMinutes?: number }
@@ -163,7 +163,7 @@ export type RemoteCard = {
   stop?: boolean
 }
 
-/** The LiveCast board's cards, for a channel ("7.1") and the TV's name. `recording`: the server records, so a recording can take a tuner. */
+/** The remote's cards, for a channel ("7.1") and the TV's name. `recording`: the server records, so a recording can take a tuner. */
 export function remoteCard(view: RemoteView, o: { number: string; name: string; device: string; stopMessage?: string | null; recording?: boolean }): RemoteCard | undefined {
   const ch = o.number || 'this channel'
   switch (view.kind) {
@@ -177,7 +177,7 @@ export function remoteCard(view: RemoteView, o: { number: string; name: string; 
       if (view.reason === 'tuners_busy') return { title: 'All tuners are in use', body: `${o.device} can’t start ${ch} until a tuner is free.${o.recording ? ' A scheduled recording can release a tuner someone is watching on.' : ''}`, retry: true, guide: true }
       if (view.reason === 'not_allowed' || view.reason === 'access_changed' || view.reason === 'access_revoked') return { title: 'Live TV isn’t available to you', body: 'An admin can let everyone watch Live TV on this server.', guide: true }
       if (view.reason) {
-        // The TV can't play a recording still being written (PLAN-LIVE-TV-DVR.md §10).
+        // The TV can't play a recording still being written.
         const f = liveFailure(view.reason, { watchRecording: false })
         return { title: f.title, body: f.detail, retry: true, guide: true }
       }
@@ -225,7 +225,7 @@ export function behindText(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} behind live`
 }
 
-/** The casting bar's live form (the LiveCast board's bar view). */
+/** The casting bar's live form. */
 export type LiveBar = { title: string; sub: string; pct: number; badge: boolean; ask: boolean; controls: boolean }
 
 export function liveBar(o: { receiver: StateMessage; channel: LiveChannel; device: string; now: number }): LiveBar | undefined {

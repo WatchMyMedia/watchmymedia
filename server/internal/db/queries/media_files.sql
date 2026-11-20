@@ -46,7 +46,7 @@ WHERE status <> 'present' AND id IN (sqlc.slice('ids'));
 -- What a scan compares the disk with: every file of a library, without the
 -- probe JSON (kilobytes per file), so a library loads in one query.
 -- dv_outdated is 1 for a Dolby Vision file whose stored probe lacks the
--- record's base layer and level (PLAN-HDR-PROFILE.md, The probe), which the
+-- record's base layer and level, which the
 -- scan probes again; only those rows' probes are read, inside SQLite.
 SELECT id, path, size, mtime, status, parsed, hdr, dv_profile, extra_kind,
     CAST(CASE WHEN hdr <> 'dolbyvision' THEN 0

@@ -23,7 +23,7 @@ import media.watchmy.client.model.canRemind
 import media.watchmy.client.model.errorMessage
 
 /**
- * Search listings (PLAN-LIVE-TV-GUIDE.md §6.5), for the phone's page, the
+ * Search listings, for the phone's page, the
  * tablet's panel and the TV's On Live TV row: titles and episode titles of
  * what is on now and later, with Watch for what is on and Remind me for
  * what starts more than the lead time ahead. Nothing is asked below

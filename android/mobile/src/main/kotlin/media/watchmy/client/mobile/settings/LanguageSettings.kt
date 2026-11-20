@@ -71,13 +71,13 @@ private val Description = TextStyle(fontFamily = Inter, fontSize = 13.sp, lineHe
 private val Foot = TextStyle(fontFamily = Inter, fontSize = 12.sp, lineHeight = 18.sp, color = WmmColors.TextFaint)
 
 /**
- * Settings › Audio & subtitles (PLAN-LANGUAGES.md §5.6; its own page in
- * PLAN-ANDROID-SETTINGS.md §5.2): the audio languages, how subtitles start,
+ * Settings › Audio & subtitles (its own page):
+ * the audio languages, how subtitles start,
  * the subtitle languages and automatic download, each saved as it changes,
  * with Saving… and a failure on the part that changed. The phone stacks
- * them and opens the four choices in a dialog (android/SettingsLanguages.dc.html);
- * a tablet sets them two by two in panels and lists the choices in place
- * (android-tablet/TabSettingsLanguages.dc.html). A server before audio
+ * them and opens the four choices in a dialog;
+ * a tablet sets them two by two in panels and lists the choices in place.
+ * A server before audio
  * languages gets the subtitle sections alone. They follow the account, so
  * they are held until its settings have loaded.
  */
@@ -384,7 +384,7 @@ private fun ColumnScope.OnlineSubtitles(state: SettingsViewModel.State, tablet: 
     if (!available) Footnote(state.automaticBlockedNote, tablet, color = WmmColors.TextSoft)
 }
 
-/** The phone's Start subtitles dialog: the four choices, each with its line (android/SettingsLanguages.dc.html, sheet "choice"). */
+/** The phone's Start subtitles dialog: the four choices, each with its line. */
 @Composable
 private fun ChoiceDialog(current: SubtitleChoice, choices: List<SubtitleChoice>, onDismiss: () -> Unit, onPick: (SubtitleChoice) -> Unit) {
     AlertDialog(

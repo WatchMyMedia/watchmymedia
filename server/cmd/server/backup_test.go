@@ -14,7 +14,7 @@ import (
 
 // A backup holds the config file the server loaded, wherever it is. The
 // Linux packages keep it in /etc/watchmymedia and name it with
-// WATCHMYMEDIA_CONFIG (PLAN-LINUX.md §4); a backup used to save only a
+// WATCHMYMEDIA_CONFIG; a backup used to save only a
 // config.yaml in the data folder, so theirs would have had none.
 func TestBackupSavesTheLoadedConfigFile(t *testing.T) {
 	dataDir, etc := t.TempDir(), t.TempDir()

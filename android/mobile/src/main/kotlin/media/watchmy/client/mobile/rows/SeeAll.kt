@@ -54,7 +54,7 @@ import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
 /**
- * A row's See all (PLAN-SEE-ALL.md §4.4): what it says, and what a tap on
+ * A row's See all: what it says, and what a tap on
  * the row's last card or on its heading's link does.
  */
 internal class RowSeeAll(val words: SeeAllWords, val list: Boolean, val onClick: () -> Unit)
@@ -64,7 +64,7 @@ internal class RowSeeAll(val words: SeeAllWords, val list: Boolean, val onClick:
  * its library's tab at the grid, sorted the row's way ([requests] carries
  * the sort there). Null for a row without a link, and for a library Home
  * has no tab for: one of several of its type, which the server sends no
- * link for anyway (PLAN-SEE-ALL.md decision 6).
+ * link for anyway.
  */
 internal fun homeSeeAll(row: ScreenRow, home: HomeData, requests: BrowseRequests, onNavigate: (Any) -> Unit): RowSeeAll? {
     val link = row.seeAll ?: return null
@@ -107,7 +107,7 @@ internal fun seeAllCardSize(style: RowStyle, tablet: Boolean): Pair<Dp, Float>? 
 }
 
 /**
- * A row's last card (HomeSeeAll.dc.html, TabHomeRowSeeAll.dc.html `.all`):
+ * A row's last card:
  * the size of the row's cards, with no title under it. A grid glyph (the
  * list glyph on a list row) on a gold tint, "See all TV shows" and "By last
  * aired", read aloud as one ("See all TV shows, by last aired"). The phone's

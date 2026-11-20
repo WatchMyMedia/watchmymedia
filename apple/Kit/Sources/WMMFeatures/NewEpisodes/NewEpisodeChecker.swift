@@ -1,7 +1,7 @@
 import Foundation
 import WMMModel
 
-/// The check each iPhone and iPad runs for itself (PLAN-NEW-EPISODES.md §6.1):
+/// The check each iPhone and iPad runs for itself:
 /// ask the feed after this device's cursor, post one notification a show,
 /// then keep the new cursor. It runs in the background refresh after the
 /// downloads' sync, when the app opens or comes back, and three minutes after

@@ -3,7 +3,7 @@ import Foundation
 import ImageIO
 import WMMModel
 
-/// Seek-thumbnail tiles for the scrubber (PLAN-TRICKPLAY.md §7.3), cut from
+/// Seek-thumbnail tiles for the scrubber, cut from
 /// the server's JPEG sheets (android/core/ui's `CoilSeekThumbnails`). A sheet
 /// is fetched through the app's image loader, which signs in and whose URL
 /// cache keeps it (its URL names its version, so it never changes), decoded

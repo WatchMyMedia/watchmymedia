@@ -2,8 +2,7 @@ import Foundation
 import Observation
 import WMMModel
 
-/// One page for a show, its seasons and its episodes (PLAN-SHOW-PAGE.md;
-/// ShowPage, ShowPageMissing, Pad2ShowPage and TvShowPage.dc.html): the
+/// One page for a show, its seasons and its episodes: the
 /// episode on top with Play, Mark watched and its ⋯ (Report a problem,
 /// Replace file for admins, Delete episode…), the season tabs (specials last)
 /// over the season's episodes in a row, then About the show with the show's
@@ -21,7 +20,7 @@ import WMMModel
 /// and, for admins, Search now and Monitor. Opened from Downloads with the
 /// server away, the page is the downloaded copy and its downloaded siblings.
 ///
-/// The page ends with More like this (``RelatedRows``, PLAN-RELATED.md),
+/// The page ends with More like this (``RelatedRows``),
 /// asked for once the show is in.
 @MainActor
 @Observable

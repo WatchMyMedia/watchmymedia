@@ -13,7 +13,7 @@ type Props = {
   type: 'movie' | 'tv'
   q?: string
   groupByGenre?: boolean
-  /** Where the grid starts: a row's See all (PLAN-ROWS.md §6.1). */
+  /** Where the grid starts: a row's See all. */
   initial?: { sort?: ItemSort; filter?: ItemFilter; genre?: string; decade?: number }
 }
 

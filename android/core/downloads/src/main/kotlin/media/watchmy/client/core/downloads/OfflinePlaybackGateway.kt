@@ -33,7 +33,7 @@ internal interface OfflinePlays {
 internal data class OfflinePlay(val download: OfflineDownload, val decision: PlaybackDecision)
 
 /**
- * The player's server calls with downloads in (PLAN-DOWNLOADS.md §10.4): a
+ * The player's server calls with downloads in: a
  * downloaded item always plays from the device, online or not, from the
  * decision stored when it was made, and its heartbeats go to the offline
  * queue rather than the server. Everything else goes to [online].

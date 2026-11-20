@@ -35,12 +35,12 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 /**
- * The guide grid the phone, tablet and TV share (PLAN-LIVE-TV-GUIDE.md §6):
+ * The guide grid the phone, tablet and TV share:
  * a window of half hours from now, the days listed, the category filters and
  * the programme whose details show. It asks only while a screen [show]s it
  * with listings on, so servers without them never see a guide request.
  * From [LIVE_PERSONAL_API_LEVEL] it also keeps the person's favourites (the
- * Favourites filter) and their reminders (PLAN-LIVE-TV-GUIDE.md §6.5).
+ * Favourites filter) and their reminders.
  */
 class LiveGuideViewModel(
     private val live: LiveRepository,

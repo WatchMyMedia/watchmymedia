@@ -40,8 +40,8 @@ internal data class ConfirmLine(val text: String, val label: String? = null)
 internal data class ConfirmFailure(val title: String, val body: String)
 
 /**
- * A remove that asks first (PLAN-ANDROID-SETTINGS.md §4.6, the
- * SettingsConfirm board): the action and the thing as its title, what stays
+ * A remove that asks first:
+ * the action and the thing as its title, what stays
  * and what is deleted, and two buttons that read alone. While it works both
  * buttons are off and it can't be put away; if it fails it says nothing was
  * lost and its button tries again.
@@ -64,7 +64,7 @@ internal fun ConfirmDialog(
         containerColor = WmmColors.Surface2,
         title = { Text(title, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 24.sp, lineHeight = 30.sp, color = WmmColors.Text)) },
         text = {
-            // Scrolls at the largest font and held sideways, keeping the buttons in view (§8).
+            // Scrolls at the largest font and held sideways, keeping the buttons in view.
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 lines.forEach { line ->
                     Column {

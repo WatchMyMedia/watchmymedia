@@ -117,7 +117,7 @@ class DataServices internal constructor(
 
     /**
      * Whether the app is in front, which the app reports from its process
-     * lifecycle (PLAN-ANDROID-REVIEW.md §4.1.5): the event stream connects
+     * lifecycle: the event stream connects
      * only in front, and the return to the front reconnects it at once. The
      * start-up checks of a saved sign-in also wait for it, so a start in the
      * background (a boot, a download's sync) asks the server nothing.
@@ -127,7 +127,7 @@ class DataServices internal constructor(
     /**
      * The event stream reconnected after a gap: the server may have been
      * upgraded meanwhile, and a TV app can stay open for weeks, so its level
-     * is read again (§4.1.6).
+     * is read again.
      */
     private fun reconnected() {
         scope.launch { runCatching { serverRepository.refreshCurrent() } }
@@ -154,7 +154,7 @@ class DataServices internal constructor(
     /** A sender's calls for casting to a TV. */
     val castGateway: CastGateway = RealCastGateway(store, http, liveRepository::capabilities)
 
-    /** The offline routes, for downloads on phones and tablets (PLAN-DOWNLOADS.md). */
+    /** The offline routes, for downloads on phones and tablets. */
     val offlineGateway: OfflineGateway = RealOfflineGateway(store, http, authRepository)
 
     /**
@@ -176,7 +176,7 @@ class DataServices internal constructor(
     }
 
     /**
-     * Cast Connect for a Live TV channel (PLAN-LIVE-TV.md §4.1): the live
+     * Cast Connect for a Live TV channel: the live
      * player's session calls, and the caster's channels and pictures, on
      * [server] with their cast [token], whoever this TV is signed in as.
      * Cast tokens can't ask for media tokens, so the player's come from
@@ -213,8 +213,8 @@ class DataServices internal constructor(
     }
 
     /**
-     * For the player and the downloader (Media3's OkHttpDataSource,
-     * PLAN-ANDROID-REVIEW.md §4.2.1): derived from the API's client, so it
+     * For the player and the downloader (Media3's OkHttpDataSource):
+     * derived from the API's client, so it
      * shares the connection pool and dispatcher and the first playlist
      * request reuses the API's connection. No token interceptor (media URLs
      * carry their own `access_token`), no reply limit, no HTTP cache;
@@ -270,7 +270,7 @@ class DataServices internal constructor(
     /** Lets OS integrations clear account-specific state synchronously on sign-out or switching. */
     fun onSessionChange(listener: () -> Unit) { store.onSessionChange { listener() } }
 
-    /** The three are independent, so they go together rather than one after another (PLAN-ANDROID-REVIEW.md §4.1.6). */
+    /** The three are independent, so they go together rather than one after another. */
     private suspend fun loadSession() = coroutineScope {
         launch { authRepository.refreshUser() }
         launch { runCatching { preferencesRepository.refresh() } }

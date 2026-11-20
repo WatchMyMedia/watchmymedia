@@ -22,7 +22,7 @@ export type FooterAction = {
 }
 
 /**
- * A focused task (PLAN-ADMIN-SETTINGS.md §3.2): the bar with Exit, the
+ * A focused task: the bar with Exit, the
  * breadcrumb and the away chips; the stepper (a progress line on phones);
  * the step's title and why; the fields with help beside them; and the footer
  * with Back, Skip for now and one filled button that names its action.
@@ -51,7 +51,7 @@ export function FlowFrame({
   extra?: ReactNode
   children?: ReactNode
   wide?: boolean
-  /** What was kept when the gate closes in the middle (§3.4). */
+  /** What was kept when the gate closes in the middle. */
   keptOut?: { kept: ReactNode[]; carryOn: ReactNode[] }
 }) {
   const auth = useAuth()
@@ -65,7 +65,7 @@ export function FlowFrame({
   const heading = useRef<HTMLHeadingElement>(null)
   const reduced = usePrefersReducedMotion()
   const index = steps && current ? steps.findIndex((s) => s.key === current) : -1
-  // Steps slide in the direction of travel; focus moves to the new step's heading (§6).
+  // Steps slide in the direction of travel; focus moves to the new step's heading.
   const [travel, setTravel] = useState({ index, direction: '' })
   if (travel.index !== index) setTravel({ index, direction: index > travel.index ? 'settings-step-forward' : 'settings-step-back' })
   const direction = travel.direction

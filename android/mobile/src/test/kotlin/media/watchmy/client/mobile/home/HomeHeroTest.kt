@@ -16,7 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Home's one hero (PLAN-ANDROID-REVIEW §5.4), as the phone, the tablet and
+ * Home's one hero, as the phone, the tablet and
  * the paged tablet Home draw it: Play plays it, and the second button opens
  * the episode, the movie or the show.
  */

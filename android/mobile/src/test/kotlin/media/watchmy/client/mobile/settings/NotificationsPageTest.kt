@@ -30,8 +30,8 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * Settings › Notifications on a phone (PLAN-NEW-EPISODES.md §7.2, §7.3; the
- * boards' `settings` and `off`), on the fakes: the switch, the shows with
+ * Settings › Notifications on a phone,
+ * on the fakes: the switch, the shows with
  * Stop notifying, and one card when Android won't show the notifications.
  */
 @RunWith(RobolectricTestRunner::class)

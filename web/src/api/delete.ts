@@ -20,8 +20,8 @@ export function useCanManage(): boolean {
 
 /**
  * Whether the signed-in user may delete episodes and movies: an admin, or
- * anyone when Settings › Users allows it, with Radarr or Sonarr connected
- * (PLAN-EPISODE-PAGE.md §4). Shows, seasons and Replace file stay with useCanManage.
+ * anyone when Settings › Users allows it, with Radarr or Sonarr connected.
+ * Shows, seasons and Replace file stay with useCanManage.
  */
 export function useCanDelete(): boolean {
   const options = useQuery(requestOptionsQuery)

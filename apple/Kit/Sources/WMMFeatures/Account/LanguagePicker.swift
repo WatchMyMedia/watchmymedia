@@ -1,8 +1,8 @@
 import Foundation
 import WMMModel
 
-/// Add language by name (PLAN-APPLE-SETTINGS.md §5.3; Settings2AddLanguage.dc.html,
-/// TvSettings2AddLanguage.dc.html): every language the system can name,
+/// Add language by name:
+/// every language the system can name,
 /// A to Z and searchable, the ones already in the list marked Added, and the
 /// device's language suggested. Choosing one adds it to the end of the list
 /// and saves at once (``SettingsModel/addLanguage(_:to:)``). No codes are typed.

@@ -1,7 +1,7 @@
 package media.watchmy.client.core.playback
 
 /**
- * "Are you still watching?" bookkeeping (PLAN-CLIENTS.md §2.3.6), kept for
+ * "Are you still watching?" bookkeeping, kept for
  * the app session: one instance for the app, shared by every controller, so
  * it survives leaving the player and coming back. Ask before moving on by
  * itself when the session has run 90 min and either 3 episodes have played

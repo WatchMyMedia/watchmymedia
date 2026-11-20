@@ -3,8 +3,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The shelves at the end of a movie's or a show's page on Apple TV
-/// (PLAN-RELATED.md §7; TvMovieRelated and TvShowRelated.dc.html): the
+/// The shelves at the end of a movie's or a show's page
+/// on Apple TV: the
 /// movie's collection and More like this, drawn with Home's poster shelves,
 /// without See all. Down from the page's last buttons reaches them and Up
 /// leaves them; each shelf is a focus section that lands on the card it had
@@ -38,7 +38,7 @@ struct RelatedShelves: View, Equatable {
 }
 
 /// What lies below the first screen, along its bottom edge: "⌄ Carrow Coast
-/// Collection · More like this" (TvMovieRelated.dc.html's `.peek`), as Home
+/// Collection · More like this", as Home
 /// names its next row. VoiceOver reaches the shelves themselves.
 struct ShelvesBelowLine: View {
     let text: String

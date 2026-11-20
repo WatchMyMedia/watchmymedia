@@ -135,7 +135,7 @@ export type SamsungWindow = Window & {
 
 /**
  * What the screen says of itself: an HDR panel and a UHD one. A claim to
- * check, not proof the player shows HDR10 (PLAN-SAMSUNG.md §3).
+ * check, not proof the player shows HDR10.
  */
 export function samsungDisplay(w: SamsungWindow): { hdr: boolean; uhd: boolean } {
   const ask = (q?: () => boolean) => { try { return !!q?.() } catch { return false } }
@@ -167,7 +167,7 @@ function json(text: string): Record<string, unknown> {
  * keyframe, and ⏪ from just past a keyframe landed on it again. A landing
  * past the latest it may (LANDING_SLACK_MS by default) seeks once more, one
  * usual keyframe gap before where it landed, then FAR_BACK_MS before the
- * frame, so a start never lands past the viewer (PLAN-RESUME.md §3.1). Each
+ * frame, so a start never lands past the viewer. Each
  * seek before the first frame took about 3 s there, so it seeks as few times
  * as it can.
  */

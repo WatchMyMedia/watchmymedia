@@ -47,7 +47,7 @@ private data class RowsScreen(val screen: String, val name: String)
 private const val TV_LISTS_NOTE = "Lists are made in WatchMyMedia on the web. Lists for everyone, and your own, show up here."
 
 /**
- * Settings › Home rows on the TV (android-tv/SettingsHomeRows.dc.html), as
+ * Settings › Home rows on the TV, as
  * the language lists are done: the Screen it arranges (Home, Movies, TV
  * Shows), then its rows numbered in order with their lines, Options (or
  * Hidden) on each, which opens Move up, Move down, Hide or Show and Cancel
@@ -56,8 +56,8 @@ private const val TV_LISTS_NOTE = "Lists are made in WatchMyMedia on the web. Li
  * screen a library's Edit rows opened it on; [focus] then takes focus to
  * its Screen row, which is also the pane's [first].
  *
- * Reset asks first (android-tv/SettingsConfirm.dc.html, Tweak `which`:
- * `resetRows`), since it changes every device the person signs in on.
+ * Reset asks first,
+ * since it changes every device the person signs in on.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

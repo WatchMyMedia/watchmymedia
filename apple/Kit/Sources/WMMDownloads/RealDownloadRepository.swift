@@ -16,7 +16,7 @@ protocol DownloadNotices: AnyObject {
     func removedByAdmin(_ title: String)
 }
 
-/// Downloads on this device (PLAN-DOWNLOADS.md §5, §6, D3): records and
+/// Downloads on this device: records and
 /// progress in the store, bytes in the engine, the server through the
 /// gateway (android/core/downloads/.../RealDownloadRepository.kt).
 ///
@@ -557,7 +557,7 @@ public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
         let s = stored
         let held = s.records.filter { $0.ownerKey == o.key }
         let removals = s.removed.filter { $0.ownerKey == o.key }
-        // A download whose file the server deleted syncs no progress (PLAN-DOWNLOADS.md §5).
+        // A download whose file the server deleted syncs no progress.
         let gone = Set(held.filter { $0.mark == .removedFromServer }.map(\.id))
         let entries = s.progress.filter { $0.ownerKey == o.key }
         let sent = entries.filter { $0.downloadID.map { !gone.contains($0) } ?? true }

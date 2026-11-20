@@ -71,7 +71,7 @@ internal fun nextLetter(from: String, counts: Map<String, Int>, step: Int): Stri
 }
 
 /**
- * The A–Z strip at the grid's right edge (TvLibraryAZ.dc.html), shown when
+ * The A–Z strip at the grid's right edge, shown when
  * the grid is sorted by title. Focus comes in on [current], the letter of
  * the show it came from. ▲ and ▼ move to the next letter that has shows
  * and the grid follows ([onPreview]); OK or ◀ lands on the letter's first
@@ -184,7 +184,7 @@ internal fun LetterStrip(
 }
 
 /**
- * The TV grid's ways to move a long way (§6.2): the A–Z strip's previews,
+ * The TV grid's ways to move a long way: the A–Z strip's previews,
  * picks and Back, and Page Up/Down or CH+/CH− for two rows in the same
  * column. [header] is how many grid items come before the posters.
  */
@@ -318,7 +318,7 @@ internal fun Modifier.pageKeys(jumps: GridJumps): Modifier = onPreviewKeyEvent {
     }
 }
 
-/** A screenful of the grid: two rows (TvLibraryAZ.dc.html). */
+/** A screenful of the grid: two rows. */
 private const val PAGE_ROWS = 2
 
 /** The key hints at the foot of a grid sorted by title. */

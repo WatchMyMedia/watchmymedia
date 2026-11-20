@@ -2,8 +2,8 @@ import SwiftUI
 import WMMModel
 import WMMUI
 
-/// A YouTube trailer on an Apple TV without the YouTube app
-/// (TvTrailerQR.dc.html, PLAN-TRAILERS.md §6.3): a code of the trailer's
+/// A YouTube trailer on an Apple TV without the YouTube app:
+/// a code of the trailer's
 /// YouTube link to scan with a phone, over the dimmed movie page. tvOS has
 /// no web views, so the trailer can't play in the app. Done (focused) and
 /// Menu close it.

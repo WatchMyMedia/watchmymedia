@@ -2252,7 +2252,7 @@ export interface paths {
         };
         /**
          * The rows at the end of a movie's page: its collection and More like this
-         * @description Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
+         * @description Titles from this server's libraries of the same kind, for the end of the page. Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
          */
         get: operations["getMovieRelated"];
         put?: never;
@@ -3335,7 +3335,7 @@ export interface paths {
         };
         /**
          * The row at the end of a show's page: More like this
-         * @description Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
+         * @description Titles from this server's libraries of the same kind, for the end of the page. Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
          */
         get: operations["getShowRelated"];
         put?: never;
@@ -4205,7 +4205,7 @@ export interface components {
         AudioPlan: {
             /** Format: int64 */
             channels?: number;
-            /** @description The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3 (PLAN-AUDIO.md). */
+            /** @description The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3. */
             codec?: string;
             copy: boolean;
             /** Format: int64 */
@@ -4618,7 +4618,7 @@ export interface components {
             reasons: string[];
             /**
              * Format: int64
-             * @description Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread (PLAN-RESUME.md §3.8).
+             * @description Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread.
              */
             resumeMs: number;
             segments: components["schemas"]["Segment"][];
@@ -7706,7 +7706,7 @@ export interface components {
             containers?: string[];
             /** @description True when the client can display HDR. Without hdrTypes, HDR video is copied only when this is true; otherwise transcodes tone-map to SDR. */
             hdr?: boolean;
-            /** @description The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means the profile follows PLAN-HDR-PROFILE: HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it. */
+            /** @description The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it. */
             hdrTypes?: string[];
             /**
              * Format: int64

@@ -45,10 +45,10 @@ function Shell() {
   const live = useQuery({ ...liveActivityQuery, enabled: activityAdmin })
   const liveSessions = useQuery({ ...liveTVActivityQuery, enabled: activityAdmin && showLiveTV })
   const playing = (live.data?.plays.length ?? 0) + (liveSessions.data?.items.length ?? 0)
-  // Casting needs the receiver's App ID from the server (PLAN-CAST.md §5.1).
+  // Casting needs the receiver's App ID from the server.
   const server = useQuery(serverQuery)
   const castAppId = server.data?.castAppId
-  // Live TV's pages offer Cast once a channel can be cast (PLAN-LIVE-TV.md §4.1).
+  // Live TV's pages offer Cast once a channel can be cast.
   const castsLive = serverCastsLive(server.data?.apiLevel, liveTV.data)
   useEffect(() => {
     if (castAppId) startCasting(castAppId)
@@ -70,7 +70,7 @@ function Shell() {
   // moving between them keeps their timers; their banners stay off the players.
   const notices = <Notices banner={!player} />
   if (player) return <><Outlet />{notices}</>
-  // A Settings task is focused: it draws its own bar with Exit (PLAN-ADMIN-SETTINGS.md §3.2).
+  // A Settings task is focused: it draws its own bar with Exit.
   if (isSettingsFlow(path)) return <><><Outlet /><CastBar /></>{notices}</>
 
   return <>
@@ -180,8 +180,8 @@ function Shell() {
 }
 
 /**
- * Live TV reminders and new episodes of followed shows come on every page
- * (PLAN-NEW-EPISODES.md §7.5): their banners stack under the app bar on the
+ * Live TV reminders and new episodes of followed shows come on every page:
+ * their banners stack under the app bar on the
  * right, a new episode's below a reminder's, and stay off the players. The
  * stack scrolls when the window is too short for both (a phone on its side,
  * a page zoomed in), so every button stays reachable.

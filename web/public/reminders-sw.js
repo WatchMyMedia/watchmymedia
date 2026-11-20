@@ -1,5 +1,5 @@
-// WatchMyMedia's Live TV reminders (PLAN-LIVE-TV-GUIDE.md §6.5) and
-// new-episode notices (PLAN-NEW-EPISODES.md §7.5). An open WatchMyMedia tab
+// WatchMyMedia's Live TV reminders and
+// new-episode notices. An open WatchMyMedia tab
 // shows each through this worker (ServiceWorkerRegistration.showNotification
 // works where new Notification() doesn't, such as Android Chrome); choosing
 // one opens its channel, its show's page or Home, in a tab already open when

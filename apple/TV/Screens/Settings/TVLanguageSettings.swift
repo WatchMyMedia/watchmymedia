@@ -3,14 +3,14 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings › Audio & subtitles on Apple TV (TvSettingsLanguages.dc.html,
-/// PLAN-LANGUAGES.md §5.6): a full-screen sheet in three columns, the audio
+/// Settings › Audio & subtitles on Apple TV:
+/// a full-screen sheet in three columns, the audio
 /// languages, how subtitles start (its four choices in a menu) with
 /// automatic download, and the subtitle languages. Each change saves at once.
 struct TVLanguageSettings: View {
     let model: SettingsModel
     @Environment(\.dismiss) private var dismiss
-    /// The list Add a language adds to (TvSettings2AddLanguage.dc.html).
+    /// The list Add a language adds to.
     @State private var adding: AddingLanguage?
 
     var body: some View {

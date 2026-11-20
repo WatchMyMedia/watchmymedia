@@ -25,8 +25,7 @@ import media.watchmy.client.presentation.Load
 import media.watchmy.client.presentation.value
 
 /**
- * Change password on the phone and the tablet (PLAN-ANDROID-SETTINGS.md
- * §5.3; the SettingsPassword and TabSettingsPassword boards), the web's
+ * Change password on the phone and the tablet, the web's
  * task: the current password and a new one, each typed once, and the
  * account's other signed-in devices by name, since the change signs them
  * out. A refusal is a [ChangePasswordRefusal] in the boards' words, shown

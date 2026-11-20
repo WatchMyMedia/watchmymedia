@@ -3,8 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { bellWords, followFailLine, type FollowFailure } from '../lib/newEpisodes'
 import { BellIcon, primaryAction, secondaryAction } from './liveTV/LiveReminders'
 
-// Notify me on a show's page (PLAN-NEW-EPISODES.md §7.1; the show-off,
-// show-on, show-fail and explainer boards). The state and the press are
+// Notify me on a show's page. The state and the press are
 // useNotifyMe's (newEpisodeHooks.ts).
 
 const bellBase = 'inline-flex min-h-[44px] items-center justify-center gap-2 whitespace-nowrap rounded-md px-[18px] text-sm'

@@ -16,8 +16,8 @@ import (
 // them; past it, page views ask nothing more until the job catches up.
 const maxWanted = 256
 
-// Refresher fetches titles' related data from TMDB in the background
-// (PLAN-RELATED.md §3.9): first the titles whose pages were opened with old
+// Refresher fetches titles' related data from TMDB in the background:
+// first the titles whose pages were opened with old
 // data (Want), then, a batch at a time, the titles matched before related
 // titles existed. Matching fetches it for new titles. Pages never wait for
 // it: they use what is stored meanwhile.

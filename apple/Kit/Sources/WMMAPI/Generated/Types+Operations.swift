@@ -12248,7 +12248,7 @@ public enum Operations {
     }
     /// The rows at the end of a movie's page: its collection and More like this
     ///
-    /// Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
+    /// Titles from this server's libraries of the same kind, for the end of the page. Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
     ///
     /// - Remark: HTTP `GET /api/movies/{id}/related`.
     /// - Remark: Generated from `#/paths//api/movies/{id}/related/get(getMovieRelated)`.
@@ -15890,7 +15890,7 @@ public enum Operations {
     }
     /// The row at the end of a show's page: More like this
     ///
-    /// Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
+    /// Titles from this server's libraries of the same kind, for the end of the page. Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.
     ///
     /// - Remark: HTTP `GET /api/shows/{id}/related`.
     /// - Remark: Generated from `#/paths//api/shows/{id}/related/get(getShowRelated)`.

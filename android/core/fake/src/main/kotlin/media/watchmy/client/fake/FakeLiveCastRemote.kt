@@ -18,7 +18,7 @@ import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.forLiveTV
 
 /**
- * A TV that plays Live TV on the fakes (PLAN-LIVE-TV.md §4.1): a channel cast
+ * A TV that plays Live TV on the fakes: a channel cast
  * to it tunes for [tuneMs], then plays; a pause gives the tuner back after
  * five minutes. [receiverLive] false is a TV whose app can't play Live TV,
  * and a channel in [busy] finds every tuner in use. [cast]s are recorded.

@@ -23,13 +23,13 @@ import WMMPlayback
 /// 21); followed by a list ("es,en") the person has saved those, with
 /// subtitles for foreign audio, as the server sets them. `-fakesRows` puts
 /// the server at API level 22: Home and the library screens come arranged,
-/// with list rows and list pages (PLAN-ROWS.md). `-fakesFollows` puts it at
+/// with list rows and list pages. `-fakesFollows` puts it at
 /// API level 29: Notify me on a show's page, Settings › Notifications with
 /// three shows followed and one that left the library, Home's New from shows
-/// you follow, and a second new-episode check that finds two shows' arrivals
-/// (PLAN-NEW-EPISODES.md). `-fakesManyNewEpisodes` makes it seven shows.
+/// you follow, and a second new-episode check that finds two shows' arrivals.
+/// `-fakesManyNewEpisodes` makes it seven shows.
 /// `-fakesRelated` puts it at API level 30: movie and show pages end in their
-/// collection and More like this (PLAN-RELATED.md).
+/// collection and More like this.
 @MainActor
 enum ServicesFactory {
     static func make(arguments: [String]) -> AppServices {
@@ -39,7 +39,7 @@ enum ServicesFactory {
         let data = DataServices.live()
         let profile = DeviceProfileProvider()
         let device = UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
-        // Downloads (PLAN-DOWNLOADS.md D3): made at launch so the background sessions reconnect.
+        // Downloads: made at launch so the background sessions reconnect.
         let downloads = DownloadServices.live(
             gateway: data.offline, online: APIPlaybackGateway(api: { try data.api() }, apiLevel: { data.apiLevel }),
             client: { data.client }, profile: { profile.current() }, deviceKind: device
@@ -59,8 +59,8 @@ enum ServicesFactory {
     }
 
     #if DEBUG
-    /// The fakes, when the arguments ask for them. Debug builds only
-    /// (PLAN-APPLE-REVIEW.md §2.9): a Release build ignores `-fakes…` and doesn't link WMMFakes.
+    /// The fakes, when the arguments ask for them. Debug builds only:
+    /// a Release build ignores `-fakes…` and doesn't link WMMFakes.
     private static func fakes(_ arguments: [String]) -> AppServices? {
         let member = arguments.contains("-fakesMember")
         guard arguments.contains("-fakes") || member || arguments.contains("-fakesSignedOut") || arguments.contains("-fakesNoServer") else { return nil }

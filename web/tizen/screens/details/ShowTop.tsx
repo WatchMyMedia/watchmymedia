@@ -38,7 +38,7 @@ export type TopProps = {
 }
 
 /**
- * The episode on top (ShowPage's top section): the show and its code with
+ * The episode on top: the show and its code with
  * why it is there, its title, facts, overview, file and progress, its
  * buttons, and its still on the right. Play is where the screen's focus
  * starts; for a missing episode, what can be done about it.

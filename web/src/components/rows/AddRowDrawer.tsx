@@ -7,7 +7,7 @@ import { useSettingsAccess } from '../../pages/settings/shared'
 import { Dialog } from '../Dialog'
 
 /**
- * Add a row (PLAN-ROWS.md §5, design/mockups/web/AddRow): a drawer of the
+ * Add a row: a drawer of the
  * screen's hidden rows, the household's lists and the person's own (lists
  * made for other screens among them), and Make a list. An added row goes to
  * the top of the draft; Done saves it.

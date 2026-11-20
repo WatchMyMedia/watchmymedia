@@ -21,7 +21,7 @@ import org.robolectric.annotation.Config
 /**
  * Which of Android's screens Turn on notifications opens, and whether the
  * notifications can show, for both channels: Live TV reminders (public #54)
- * and new episodes (PLAN-NEW-EPISODES.md §7.3).
+ * and new episodes.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])

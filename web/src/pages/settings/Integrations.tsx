@@ -8,7 +8,7 @@ import { ConnectionTaskPage } from './integrations/Task'
 import { ServerOnly } from './SettingsLayout'
 
 /**
- * Settings › Integrations (PLAN-ADMIN-SETTINGS.md §5.2, PLAN-ARR.md): the
+ * Settings › Integrations: the
  * hub, one connection's page, Add Radarr or Sonarr, Connect Seerr, and each
  * of a connection's steps by itself.
  */

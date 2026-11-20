@@ -4,7 +4,7 @@ import WMMFakes
 import WMMModel
 @testable import WMMFeatures
 
-/// The channel watched before this one (PLAN-APPLE-REVIEW.md §6.2), which
+/// The channel watched before this one, which
 /// Ch− (the previous channel in the list) is not.
 @Suite @MainActor
 struct LastChannelTests {

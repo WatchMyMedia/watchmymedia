@@ -33,7 +33,7 @@ internal const val HIDE_AFTER_MS = 5_000L
 
 /**
  * What the TV's two players, the file player and Live TV's, keep about
- * the screen itself (PLAN-ANDROID-REVIEW.md §5.3): whether the viewer is
+ * the screen itself: whether the viewer is
  * leaving, their presses, the focus move an action asked for, and where
  * focus is. [PlayerShell] draws the frame they share.
  */

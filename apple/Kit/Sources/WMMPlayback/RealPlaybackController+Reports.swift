@@ -52,8 +52,8 @@ extension RealPlaybackController {
     /// Adds `message` to the queue. While the server can't be reached each
     /// report waits for its time-out (`behindDelivery`: one is out), so a
     /// progress report replaces the one of the same viewing still waiting:
-    /// only the newest position is worth sending (PLAN-APPLE-REVIEW.md
-    /// §3.1.4). Stops, "closed", session ends and reports that acknowledge or
+    /// only the newest position is worth sending.
+    /// Stops, "closed", session ends and reports that acknowledge or
     /// refuse a quality switch are never dropped, and the rest keep their
     /// order. A dropped report's startup time goes with its replacement.
     static func enqueue(_ message: Outgoing, into outbox: inout [Outgoing], behindDelivery: Bool = true) {

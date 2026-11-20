@@ -5,7 +5,7 @@ import type { Decision, Profile } from './api'
 /**
  * What a 2024 QN90D-class Samsung TV (Tizen 8, AVPlay) plays, in the form
  * the server's playback request takes. Conservative on purpose: each claim
- * below is still to be confirmed in the QN90D session (PLAN-SAMSUNG.md §3),
+ * below is still to be confirmed in the QN90D session,
  * and one that fails there comes out rather than being worked around.
  *
  * - Direct play of MP4 and MKV. MPEG-TS, WebM and AVI are left to a remux.

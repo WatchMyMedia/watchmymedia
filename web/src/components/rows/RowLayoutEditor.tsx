@@ -6,8 +6,8 @@ const square =
   'grid h-11 w-11 shrink-0 place-items-center rounded-md border border-line-2 text-neutral-200 hover:bg-surface-2 hover:text-accent disabled:border-line disabled:bg-transparent disabled:text-neutral-600'
 
 /**
- * A screen's rows folded to bars (design/mockups/web/HomeEditRows and
- * HomeEditRowsPhone): drag one by its handle, or move it with the arrows,
+ * A screen's rows folded to bars:
+ * drag one by its handle, or move it with the arrows,
  * the handle's arrow keys or Move up and Move down, and Hide or Show it.
  * Hidden rows stay in the list, greyed; a row that won't draw says why.
  */
@@ -19,7 +19,7 @@ export function RowLayoutEditor({ rows, view, lineOf, screenName, label, onChang
   label?: string
   onChange: (rows: RowLayoutEntry[]) => void
   disabled?: boolean
-  /** Settings › Lists' Default rows (design/mockups/web/SettingsLists): arrows and Hide only, smaller bars. */
+  /** Settings › Lists' Default rows: arrows and Hide only, smaller bars. */
   compact?: boolean
 }) {
   const [said, setSaid] = useState('')

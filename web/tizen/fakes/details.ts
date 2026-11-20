@@ -3,8 +3,8 @@ import { setTrailerEmbed } from '../screens/details/trailerPlayer'
 import { FAKE_USER, MOVIE_ITEMS, SHOW_ITEMS } from './data'
 import { FakeServer, json, problem } from './server'
 
-// The movie and show pages' fictional data (Movie, MovieRelated, ShowPage and
-// ShowRelated on the Samsung TV canvas): Dead Reckoning Bay with two versions,
+// The movie and show pages' fictional data:
+// Dead Reckoning Bay with two versions,
 // a collection and More like this; trailers of both kinds; Harbor Lights with
 // Specials and a season with missing, downloading and unaired episodes. Marks,
 // follows, deletes and monitoring change it for the visit. Every title and

@@ -5,10 +5,10 @@ import WMMModel
 /// Sends what was watched offline (watched marks and positions, which also
 /// make Continue watching right on the person's other devices) in a
 /// background refresh, so it reaches the server before the app is next
-/// opened (PLAN-APPLE-REVIEW.md §6.3). It is ``DownloadRepository/sync()``,
+/// opened. It is ``DownloadRepository/sync()``,
 /// the same sync the app runs at launch and on each return. Then it checks
-/// for new episodes of the shows the person follows and notifies
-/// (PLAN-NEW-EPISODES.md §7.4): the same check the app runs when it opens,
+/// for new episodes of the shows the person follows and notifies:
+/// the same check the app runs when it opens,
 /// which does nothing unless the person follows a show, this device's switch
 /// is on and iOS allows the notifications. Nothing new is scheduled for it.
 ///

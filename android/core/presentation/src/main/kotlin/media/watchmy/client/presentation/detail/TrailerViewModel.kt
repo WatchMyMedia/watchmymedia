@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.update
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.Trailer
 
-/** What a movie's Trailer button does (PLAN-TRAILERS.md §6.2). */
+/** What a movie's Trailer button does. */
 sealed interface TrailerPlay {
     /** A trailer file: the app's own player, or the TV it is cast to. */
     data class File(val request: PlayRequest) : TrailerPlay
@@ -23,8 +23,8 @@ sealed interface TrailerPlay {
 }
 
 /**
- * The trailer screen on phones, tablets (TrailerPlayer.dc.html) and Android
- * TV (TvTrailerPlayer.dc.html, PLAN-TV-TRAILERS.md §4.2): YouTube's
+ * The trailer screen on phones, tablets and Android
+ * TV: YouTube's
  * player plays [trailers] in turn, best first. When a video's owner doesn't
  * let it play outside YouTube (YouTube's errors 101 and 150), the next one is
  * tried; after the last, the screen says so and offers Open in YouTube, for

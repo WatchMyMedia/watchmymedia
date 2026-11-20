@@ -119,8 +119,7 @@ func cursorOf(t *testing.T, f NewEpisodes) int64 {
 
 // Follow, unfollow and follow again; the bell on the show's page; the list,
 // newest first, with a show that left the library; one follow for a show
-// in two libraries; the limit; and the event, to that person alone
-// (PLAN-NEW-EPISODES.md section 5.3).
+// in two libraries; the limit; and the event, to that person alone.
 func TestFollowShows(t *testing.T) {
 	t.Parallel()
 	e := newFollowEnv(t)
@@ -234,7 +233,7 @@ func TestFollowShows(t *testing.T) {
 	e.follow(e.asMember, tide)
 }
 
-// The feed a device checks (PLAN-NEW-EPISODES.md section 5.4): a first call
+// The feed a device checks: a first call
 // gives only the cursor; then what arrived after both the cursor and the
 // follow, announced, with a file, unfinished and within the week, grouped
 // by show, earliest first with specials last; the wait, which the cursor
@@ -547,8 +546,8 @@ func TestFollowedRowTakesNoSlot(t *testing.T) {
 	check(true)
 }
 
-// Home's row "New from shows you follow" (PLAN-NEW-EPISODES.md section
-// 5.5): left out while empty; after Continue watching by default, also in
+// Home's row "New from shows you follow":
+// left out while empty; after Continue watching by default, also in
 // a layout saved before it existed; newest first, at most 20, within the
 // week and unfinished.
 func TestFollowedHomeRow(t *testing.T) {

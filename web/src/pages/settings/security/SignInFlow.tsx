@@ -17,7 +17,7 @@ const stepHref = (key: string) => settingsHref('security', 'sign-in-protection',
 const hub = settingsHref('security')
 
 /**
- * Turn on sign-in protection (§5.6): Get keys → Enter keys → Try it → On.
+ * Turn on sign-in protection: Get keys → Enter keys → Try it → On.
  * Enter keys saves (the server checks the secret with Cloudflare first, so a
  * wrong key can't lock anyone out). Try it comes while still signed in, as
  * the safeguard against a key that passes the check but fails for this address.

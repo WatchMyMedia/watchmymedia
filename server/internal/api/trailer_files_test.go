@@ -190,7 +190,7 @@ func TestTrailerFiles(t *testing.T) {
 
 // Library sizes, file counts and seek thumbnails leave trailers out.
 // A movie's trailer files come before its YouTube trailers, and stay while
-// Trailers from YouTube is off (PLAN-TRAILERS.md §5.3).
+// Trailers from YouTube is off.
 func TestTrailerFilesBeforeYouTube(t *testing.T) {
 	t.Parallel()
 	srv := newTestServer(t)

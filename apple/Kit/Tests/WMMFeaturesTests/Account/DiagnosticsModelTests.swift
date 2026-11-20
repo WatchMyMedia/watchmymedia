@@ -3,7 +3,7 @@ import Testing
 import WMMModel
 @testable import WMMFeatures
 
-/// Copy diagnostics (Diagnostics.dc.html): Copy copies exactly the page's
+/// Copy diagnostics: Copy copies exactly the page's
 /// text, turns into Copied, and the Copied note goes after a moment.
 @MainActor
 @Suite struct DiagnosticsModelTests {

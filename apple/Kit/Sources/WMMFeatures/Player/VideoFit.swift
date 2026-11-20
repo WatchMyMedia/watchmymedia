@@ -1,8 +1,8 @@
 import Foundation
 import Observation
 
-/// How the picture meets the screen on iPhone and iPad (PLAN-APPLE-REVIEW.md
-/// §6.3, design/mockups/ios/PlayerFitFill.dc.html). Fit shows the whole
+/// How the picture meets the screen on iPhone and iPad.
+/// Fit shows the whole
 /// picture inside the safe area, with bars (`AVLayerVideoGravity.resizeAspect`);
 /// Fill covers the screen, under the Dynamic Island too, and crops the edges
 /// (`.resizeAspectFill`). Fill never stretches.

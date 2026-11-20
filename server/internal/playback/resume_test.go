@@ -81,7 +81,7 @@ func TestKeyframeFinderReadsAroundATime(t *testing.T) {
 // keyframe the next run starts on: every listed segment begins on a source
 // keyframe at the time the playlist gives it, so the player's clock (the
 // session's start plus playlist time) is the file's, window after window.
-// Before, the clip measured 5 s, then 2 s, then 6 s ahead (PLAN-RESUME.md §1.4).
+// Before, the clip measured 5 s, then 2 s, then 6 s ahead.
 func TestEventCopyRunsStartAndEndOnKeyframes(t *testing.T) {
 	t.Parallel()
 	ffmpeg := needFFmpeg(t)

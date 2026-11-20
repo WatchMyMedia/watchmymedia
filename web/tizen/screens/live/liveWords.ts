@@ -3,8 +3,8 @@ import { duration, nowAndNext, progress, timeOfDay } from '../../../src/lib/live
 import { QUALITIES } from '../../../src/lib/quality'
 import { channelNumberHint, exactChannel } from '../../player'
 
-// The words Live TV's screens share, from the Samsung TV boards (LiveHome,
-// LivePlayer, LiveGuide): what is on, how long is left, the qualities.
+// The words Live TV's screens share, from the Samsung TV boards:
+// what is on, how long is left, the qualities.
 
 /** "7.1 LKSD-HD". */
 export const channelLabel = (c: Pick<LiveChannel, 'number' | 'name'>) => `${c.number} ${c.name}`

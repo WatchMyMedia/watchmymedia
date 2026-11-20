@@ -13,10 +13,10 @@ import (
 	"watchmymedia/server/internal/integrations"
 )
 
-// Deleting and replacing files (PLAN-ARR.md §8, §9): the Radarr or Sonarr
+// Deleting and replacing files: the Radarr or Sonarr
 // that manages an item deletes it, after the server has said what will go.
 // Admins delete anything; when Who can delete is "everyone", anyone signed in
-// may delete an episode or a movie too (PLAN-EPISODE-PAGE.md §4).
+// may delete an episode or a movie too.
 
 // DeleteSettings is who may delete episodes and movies.
 type DeleteSettings struct {
@@ -372,7 +372,7 @@ func deleteTarget(ctx context.Context, q *db.Queries, typ string, id, season int
 }
 
 // recordingFiles parts a delete's files into those finished recordings own,
-// which the server deletes itself (PLAN-LIVE-TV-DVR.md §4.5), and the rest,
+// which the server deletes itself, and the rest,
 // which stay with Radarr or Sonarr.
 type recordingFiles struct {
 	paths []string

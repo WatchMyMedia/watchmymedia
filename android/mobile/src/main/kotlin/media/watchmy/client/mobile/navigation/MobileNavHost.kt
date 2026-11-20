@@ -124,7 +124,7 @@ private fun NavDestination.tab(): MobileTab? = when {
     hasRoute<MobileRoutes.LiveRecordings>() -> MobileTab.LiveTV
     hasRoute<MobileRoutes.LiveReminders>() -> MobileTab.LiveTV
     hasRoute<MobileRoutes.Settings>() -> MobileTab.Settings
-    // Settings' pages keep the bottom bar; its tasks (Link a TV, Change password) hide it (§4.4).
+    // Settings' pages keep the bottom bar; its tasks (Link a TV, Change password) hide it.
     hasRoute<MobileRoutes.SettingsPlayback>() -> MobileTab.Settings
     hasRoute<MobileRoutes.SettingsLanguages>() -> MobileTab.Settings
     hasRoute<MobileRoutes.SettingsDownloads>() -> MobileTab.Settings
@@ -188,7 +188,7 @@ private fun NavHostController.openTabRoot(tab: MobileTab) = navigate(tab.route()
 /**
  * [tab] as [openTab] leaves it, then back to its own page: a See all opens
  * the library's grid, not a show opened from the tab before, and keeps the
- * grid's model, which takes the row's sort (PLAN-SEE-ALL.md §4.4).
+ * grid's model, which takes the row's sort.
  */
 private fun NavHostController.openTabPage(tab: MobileTab) {
     openTab(tab)
@@ -219,12 +219,12 @@ fun MobileNavHost(
     val services = LocalAppServices.current
     val liveModel = viewModel { LiveChannelsViewModel(services.live, services.servers, services.auth) }
     val live by liveModel.state.collectAsStateWithLifecycle()
-    // The channel list is polled only while a screen showing channels is on screen (§4.1.3).
+    // The channel list is polled only while a screen showing channels is on screen.
     val showChannels = remember(liveModel) { liveModel::showing }
-    // With a TV connected that plays Live TV, and a server that lets this account cast, Watch casts (PLAN-LIVE-TV.md §4.1).
+    // With a TV connected that plays Live TV, and a server that lets this account cast, Watch casts.
     val castState by services.cast.state.collectAsStateWithLifecycle()
     val liveCast by services.cast.live.state.collectAsStateWithLifecycle()
-    // States, not values: the graph's builder captures them, and a changed capture rebuilds the graph (§4.3.5).
+    // States, not values: the graph's builder captures them, and a changed capture rebuilds the graph.
     val castDevice by remember { derivedStateOf { (castState as? CastState.Connected)?.deviceName?.takeIf { live.castable && liveCast.receiverLive == true } } }
     val notLiveDevice by remember { derivedStateOf { (castState as? CastState.Connected)?.deviceName?.takeIf { live.castable && liveCast.receiverLive == false } } }
     val watchLive = { channel: LiveChannel ->
@@ -292,7 +292,7 @@ fun MobileNavHost(
     val openEpisode = { id: Long, season: Int, episode: Long -> nav.navigate(MobileRoutes.Episode(id, season, episode)) }
     val openMovie = { id: Long -> nav.navigate(MobileRoutes.Movie(id)) }
     val go = { route: Any -> nav.go(route) }
-    // Reminder time is in Settings › Playback (PLAN-ANDROID-SETTINGS.md §5.1).
+    // Reminder time is in Settings › Playback.
     val openReminderTime = {
         go(MobileRoutes.Settings)
         nav.openSettingsPage(SettingsGroup.Playback, beside = layoutIsTablet(nav))
@@ -349,7 +349,7 @@ fun MobileNavHost(
                 },
             ) {
                 Column(Modifier.fillMaxSize().then(sides)) {
-                    // The TV's short fades, not Navigation's 700 ms default (§4.3.5).
+                    // The TV's short fades, not Navigation's 700 ms default.
                     NavHost(
                         nav,
                         startDestination = MobileRoutes.Home,
@@ -443,7 +443,7 @@ fun MobileNavHost(
                                 },
                             )
                         }
-                        // Settings and a route per group (§7), all on the Settings entry's models.
+                        // Settings and a route per group, all on the Settings entry's models.
                         val settings = @Composable { entry: NavBackStackEntry, open: SettingsGroup? ->
                             SettingsRoute(nav, entry) {
                                 SettingsScreen(
@@ -469,7 +469,7 @@ fun MobileNavHost(
                         composable<MobileRoutes.SettingsAccount> { settings(it, SettingsGroup.Account) }
                         composable<MobileRoutes.SettingsAbout> { settings(it, SettingsGroup.About) }
                         composable<MobileRoutes.ChangePassword> { ChangePasswordRoute(nav, it, asDialog = false) }
-                        // Not put away by a tap beside it: what was typed would go (§5.3). Back is the screen's.
+                        // Not put away by a tap beside it: what was typed would go. Back is the screen's.
                         // The window draws under the keyboard and pads for it: on a tablet held sideways the
                         // keyboard takes half the screen, and the surface's middle scrolls with its buttons above it.
                         dialog<MobileRoutes.ChangePasswordDialog>(dialogProperties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
@@ -540,7 +540,7 @@ private fun SettingsRoute(nav: NavHostController, entry: NavBackStackEntry, cont
 }
 
 /**
- * Change password (§5.3): when it is changed, closes and tells Settings,
+ * Change password: when it is changed, closes and tells Settings,
  * whose Account & devices then says how many devices were signed out and
  * lists them again.
  */
@@ -559,7 +559,7 @@ private fun ChangePasswordRoute(nav: NavHostController, entry: NavBackStackEntry
     )
 }
 
-/** The one page for a show, a season or an episode (PLAN-SHOW-PAGE.md §4.2): what goes on top first is [arrival]'s. */
+/** The one page for a show, a season or an episode: what goes on top first is [arrival]'s. */
 @Composable
 private fun ShowPage(nav: NavHostController, showId: Long, arrival: ShowArrival) {
     ShowPageScreen(

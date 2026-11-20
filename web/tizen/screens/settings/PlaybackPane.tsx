@@ -20,7 +20,7 @@ type Panel = { kind: 'quality' } | { kind: 'size' } | { kind: 'lead' } | { kind:
 const id = (row: string) => paneRowId('playback', row)
 
 /**
- * Settings › Playback (SettingsPlayback on the canvas): this TV's Default
+ * Settings › Playback: this TV's Default
  * quality and Subtitle size, then the account's, on every device:
  * Autoplay next episode, the five skip rows and the Live TV reminders'
  * lead time. The account's rows wait for its settings, so a default is

@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Home with no server (HomeOffline.dc.html, Pad2HomeOffline.dc.html):
+/// Home with no server:
 /// You're offline with Try again, then the downloads to watch: those partway
 /// through, and everything on this device. A movie opens its page, which
 /// opens from the download; a show opens Downloads.

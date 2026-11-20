@@ -153,7 +153,7 @@ func sameState(a, b *db.WatchState) bool {
 		(a.MediaFileID == nil) == (b.MediaFileID == nil)
 }
 
-// Every local situation in PLAN-PLEX-SYNC.md's merge rules, against an
+// Every local situation in the merge rules, against an
 // import of the same item: only an item nothing here has decided is marked,
 // and nothing else changes, not even a time.
 func TestImportKeepsLocalChoices(t *testing.T) {
@@ -539,7 +539,7 @@ func TestMoveRules(t *testing.T) {
 // whatever their date. An episode TMDB lists that hasn't aired (no date,
 // or a later one) and isn't here is left alone, without a guard, so it is
 // unwatched when it comes and an import may still mark it. Clearing clears
-// and guards every episode (PLAN-NEW-EPISODES.md section 5.4).
+// and guards every episode.
 func TestMarkLeavesUnairedEpisodes(t *testing.T) {
 	t.Parallel()
 	f := setup(t)

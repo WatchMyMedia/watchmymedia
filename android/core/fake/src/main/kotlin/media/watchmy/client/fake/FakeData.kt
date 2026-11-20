@@ -39,7 +39,7 @@ import media.watchmy.client.model.episodeCode
  * The mockups' sample library (every title and name is fictional). Posters
  * are null, so cards draw their placeholder gradients; a handful of titles
  * carry a fictional backdrop ([backdrop]) so Home's row screens can be
- * judged on an emulator (PLAN-HOME.md §12, item 6).
+ * judged on an emulator.
  */
 object FakeData {
     /** The path of a fictional backdrop in the fakes' assets; [FakeLibraryRepository.imageUrl] turns it into an asset URL. */
@@ -343,7 +343,7 @@ object FakeData {
     }
 
     /**
-     * The movies' trailers (PLAN-TRAILERS.md §9): Dead Reckoning Bay's are on
+     * The movies' trailers: Dead Reckoning Bay's are on
      * YouTube, The Paper Kite's is a file, and the rest have none. The YouTube
      * ones are Blender Studio's own uploads of its open movies Spring and
      * Charge (Creative Commons), standing in for trailers.
@@ -366,8 +366,8 @@ object FakeData {
     val unlike = setOf(507L, 109L)
 
     /**
-     * The rows at the end of a movie's page, as the server sends them
-     * (PLAN-RELATED.md §3): the collection's other films in release order,
+     * The rows at the end of a movie's page, as the server sends them:
+     * the collection's other films in release order,
      * then More like this, those sharing a genre first, without the
      * collection's; none for a title nothing is like.
      */

@@ -3,7 +3,7 @@ import Testing
 @testable import WMMFakes
 import WMMModel
 
-/// The fakes' backdrops (PLAN-HOME.md §12, question 6): a handful of code-drawn scenes, one per title.
+/// The fakes' backdrops: a handful of code-drawn scenes, one per title.
 @Suite struct FakeBackdropsTests {
     @Test(arguments: FakeBackdrops.scenes)
     func everySceneDrawsAPictureAtTheAskedSize(scene: String) async throws {

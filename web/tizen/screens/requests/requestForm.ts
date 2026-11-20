@@ -1,8 +1,8 @@
 import type { components } from '../../../src/api/schema'
 import { plural } from '../../../src/lib/format'
 
-// The request dialog's rules (Requests on the Samsung TV canvas, Tweak
-// `view`: `dialog`), as Android TV's RequestFormViewModel has them: which
+// The request dialog's rules,
+// as Android TV's RequestFormViewModel has them: which
 // seasons can be ticked and which start ticked, the button's words, and
 // what the dialog says once it is asked for.
 

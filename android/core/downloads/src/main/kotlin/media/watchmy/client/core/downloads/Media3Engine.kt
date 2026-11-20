@@ -14,7 +14,7 @@ import androidx.media3.exoplayer.offline.DownloadService
 import androidx.media3.exoplayer.scheduler.Requirements
 
 /**
- * [DownloadEngine] on Media3's DownloadManager (PLAN-DOWNLOADS.md §10.2).
+ * [DownloadEngine] on Media3's DownloadManager.
  * Changes go to the manager directly, and [WmmDownloadService] is started
  * with them where Android lets the app start it (in the foreground): once it
  * has run in a process, Media3 starts it again in the foreground whenever a
@@ -134,7 +134,7 @@ internal class Media3Engine(
         /** The stop reason for Pause download. */
         const val STOP_PAUSED = 1
 
-        /** Wi-Fi only (an unmetered network) or any network, and storage that is not low (PLAN-DOWNLOADS.md §10.2). */
+        /** Wi-Fi only (an unmetered network) or any network, and storage that is not low. */
         fun requirements(wifiOnly: Boolean) = Requirements(
             (if (wifiOnly) Requirements.NETWORK_UNMETERED else Requirements.NETWORK) or Requirements.DEVICE_STORAGE_NOT_LOW,
         )

@@ -2,8 +2,8 @@ import { timeRange } from '../../../src/lib/liveGuide'
 import { AUTO, autoNow, stepName } from '../../../src/lib/quality'
 import type { FilePlaybackState, UpNext } from '../../player'
 
-// The player screen's words, as the Samsung TV boards (PlayerControls,
-// PlayerPicker, PlayerNext, RecordingPlayer) and Android TV's PlayerLabels
+// The player screen's words, as the Samsung TV boards
+// and Android TV's PlayerLabels
 // say them. The engine's own words (the pill, track labels, errors, notes)
 // come from player/labels.ts; nothing here is the server's text.
 
@@ -39,7 +39,7 @@ export type PickRow = { id: string; label: string; detail?: string; checked: boo
 
 /**
  * The Quality panel: Automatic (saying what it sends now, once picked),
- * Original, then the fixed steps with their bitrates (PlayerPicker).
+ * Original, then the fixed steps with their bitrates.
  */
 export function qualityRows(quality: FilePlaybackState['quality']): PickRow[] {
   return quality.options.map((q) => {
@@ -64,7 +64,7 @@ export type SubtitlePanel = {
 }
 
 /**
- * The Subtitles panel (PlayerPicker): Off, the file's own under "In this
+ * The Subtitles panel: Off, the file's own under "In this
  * file", then OpenSubtitles when the server has it: downloaded tracks, the
  * search's results (OK downloads one and turns it on), why they can't be
  * downloaded, and the credit with the downloads left today.
@@ -136,7 +136,7 @@ export function adBreaksWords(segments: FilePlaybackState['segments'], recording
 
 export type PlayerKind = 'file' | 'episode' | 'trailer' | 'recording'
 
-/** The hint line at the foot of the controls (PlayerControls, TrailerPlayer); recordings have none. */
+/** The hint line at the foot of the controls; recordings have none. */
 export function hintWords(kind: PlayerKind, seeking: boolean): { seek: string; ok: string; back: string } | undefined {
   if (kind === 'recording') return undefined
   return {
@@ -146,7 +146,7 @@ export function hintWords(kind: PlayerKind, seeking: boolean): { seek: string; o
   }
 }
 
-/** The Episodes panel's OK hint (PlayerEpisodes). */
+/** The Episodes panel's OK hint. */
 export function episodesOkHint(onTab: boolean, onPlaying: boolean): string {
   if (onTab) return '◀ ▶ changes season at once; ▼ goes to its episodes'
   return onPlaying ? 'Goes back to the video where it is' : 'Plays it; your audio and subtitle choices carry over'

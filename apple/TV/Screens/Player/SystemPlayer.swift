@@ -3,8 +3,8 @@ import SwiftUI
 import WMMFeatures
 import WMMModel
 
-/// `AVPlayerViewController` on a player, for both players (PLAN-APPLE-REVIEW.md
-/// §5.3): the tvOS transport bar, the screen's buttons as contextual actions
+/// `AVPlayerViewController` on a player, for both players:
+/// the tvOS transport bar, the screen's buttons as contextual actions
 /// and transport bar items, the info panel's tabs, and `overlay` between the
 /// video and the controls. Match frame rate and dynamic range follow the
 /// Apple TV's settings (`appliesPreferredDisplayCriteriaAutomatically`, on by
@@ -176,7 +176,7 @@ extension SystemPlayerBehavior where Action == TVPlayerAction {
     /// picture in picture for files: the model pauses and closes the play
     /// when the app goes to the background, and nothing handles AVKit's
     /// picture-in-picture callbacks for it, so starting it would end the
-    /// film (PLAN-APPLE-REVIEW.md §3.1.6). Live TV keeps its own.
+    /// film. Live TV keeps its own.
     /// `episodesTab`, for an episode, makes the Episodes tab, which comes before the others.
     @MainActor static func film(_ model: TVPlayerModel, episodesTab: (@MainActor () -> UIViewController)? = nil) -> Self {
         Self(

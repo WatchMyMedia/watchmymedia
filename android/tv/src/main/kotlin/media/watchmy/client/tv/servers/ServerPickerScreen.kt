@@ -64,7 +64,7 @@ private const val HTTP_NOTE =
     "An IP address or a .local name works over http on your own network. A hostname needs https; Tailscale Serve or a reverse proxy gives it one."
 
 /**
- * Choose a server (mockup: design/mockups/android-tv/ServerPicker.dc.html):
+ * Choose a server:
  * servers on this network, remembered ones, or a typed address. [onBack],
  * when given, leaves without changing the server (picking again from
  * sign-in or Settings).
@@ -78,7 +78,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
     // One list on the TV: found on this network, then remembered.
     val rows = form.discovered?.let { it + form.remembered }
     val needsHttps = form.addressNeedsHttps
-    // Android 17's local network access, offered again in the list's place when nothing is found (§3.4.2).
+    // Android 17's local network access, offered again in the list's place when nothing is found.
     val access = rememberLocalNetworkAccess()
     val showAccess = access.needed && form.discovered?.isEmpty() == true
     val accessRow = remember { FocusRequester() }
@@ -202,7 +202,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
 }
 
 /**
- * "Allow local network access" in the list's place (TvLocalNetwork.dc.html):
+ * "Allow local network access" in the list's place:
  * OK shows the TV's own question, or opens WatchMyMedia's page in the TV's
  * settings once the TV has stopped asking.
  */
@@ -249,7 +249,7 @@ private fun AccessRow(access: LocalNetworkAccess, modifier: Modifier = Modifier)
     }
 }
 
-/** `.tag.warn` (ServerNotEncrypted.dc.html): plain http to a server beyond this network. */
+/** `.tag.warn`: plain http to a server beyond this network. */
 @Composable
 private fun NotEncryptedTag() {
     Row(

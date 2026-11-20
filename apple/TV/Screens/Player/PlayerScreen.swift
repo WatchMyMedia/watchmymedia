@@ -4,13 +4,13 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The player (PLAN-IOS.md §11.2, design/mockups/apple-tv/TvPlayer*.dc.html):
+/// The player:
 /// the system's `AVPlayerViewController` on the controller's player, with
 /// Skip as its contextual action, Next Episode among its transport bar's
 /// buttons, Audio, Subtitles and Quality as tabs of its info panel, and the
 /// app's subtitle cues over the video. The Next Episode card, Are you still watching and the stopped and
 /// can't-play states are the app's own, over it. The controller does the
-/// playing (PLAN-CLIENTS.md §2.3); ``TVPlayerModel`` decides what shows.
+/// playing; ``TVPlayerModel`` decides what shows.
 struct PlayerScreen: View {
     let request: PlayRequest
     @Environment(AppServices.self) private var services
@@ -149,7 +149,7 @@ private struct PlayerContent: View {
 /// Over the video and under the system's controls (`contentOverlayView`):
 /// the subtitle cues, lifted clear of the transport bar while it shows, and
 /// with it the swipe-down hint and how the server is sending the file, with
-/// Automatic's step (TvPlayerControls.dc.html). Automatic's note shows with
+/// Automatic's step. Automatic's note shows with
 /// or without the bar and never takes focus. On the fakes, the backdrop and
 /// what would play.
 struct VideoOverlay: View {

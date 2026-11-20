@@ -21,7 +21,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** The rows at the end of the movie and show pages (PLAN-RELATED.md §6–§7), on both ViewModels. */
+/** The rows at the end of the movie and show pages, on both ViewModels. */
 class RelatedRowsTest {
     @get:Rule val main = MainDispatcherRule()
 

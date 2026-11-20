@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings › Inbox, for admins (Inbox.dc.html): Requests to approve, or
+/// Settings › Inbox, for admins: Requests to approve, or
 /// decline with a note for whoever asked, and Problems to mark resolved.
 /// With Seerr carrying requests out, approvals happen there instead.
 struct InboxScreen: View {

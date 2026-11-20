@@ -2,7 +2,7 @@ import type { components } from '../api/schema'
 import { formatBytes, relativeTime } from './format'
 
 /**
- * Activity › Downloads (PLAN-DOWNLOADS.md §8, design/mockups/web/ActivityDownloads):
+ * Activity › Downloads:
  * how each download and transfer reads. A download is not a play, so these
  * never touch History's wording.
  */
@@ -76,8 +76,8 @@ export function deviceState(d: Pick<OfflineDownload, 'deviceState'>, transfer?: 
 export type Mark = { text: string; tone: 'warn' | 'accent' | 'muted' }
 
 /**
- * What the server has decided that the device learns at its next sync
- * (PLAN-DOWNLOADS.md §5): revoked, the file gone or replaced, or a
+ * What the server has decided that the device learns at its next sync:
+ * revoked, the file gone or replaced, or a
  * download starting over. viewer is the signed-in admin's name, for "Revoked by you".
  */
 export function downloadMark(d: OfflineDownload, viewer?: string): Mark | null {

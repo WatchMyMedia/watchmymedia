@@ -3,7 +3,7 @@ import Testing
 @testable import WMMData
 import WMMModel
 
-/// Server settings' state comes from GET /api/auth/status (PLAN-APPLE-SETTINGS.md §5.6).
+/// Server settings' state comes from GET /api/auth/status.
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct AdminAccessRepositoryTests {

@@ -40,7 +40,7 @@ public func qualityOptionLabel(_ quality: StreamQuality) -> OptionLabel {
 }
 
 /// A quality row in the picker; the one chosen also says what the server
-/// sends now: "Original" with "now remux · 4K HDR10" (PlayerPicker.dc.html),
+/// sends now: "Original" with "now remux · 4K HDR10",
 /// and Automatic the step it is at: "Now 720p · 4 Mbps".
 public func qualityOptionLabel(_ quality: StreamQuality, in state: PlayerState) -> OptionLabel {
     let row = qualityOptionLabel(quality)
@@ -131,10 +131,10 @@ public func streamReason(_ state: PlayerState) -> String? {
     return "\(mode.label): \(state.reasons.joined(separator: "; "))."
 }
 
-/// Over the video while the Apple TV's transport bar shows (TvPlayerControls.dc.html).
+/// Over the video while the Apple TV's transport bar shows.
 public let infoPanelHint = "Swipe down for info, audio and subtitles"
 
-/// The line along the bottom of the Apple TV's info panel (TvPlayerPicker.dc.html).
+/// The line along the bottom of the Apple TV's info panel.
 public let infoPanelFootnote = "Swipe up or press Back to close. Changes apply at once; a burned-in subtitle restarts the stream from here. Subtitle size and style follow the Apple TV’s accessibility settings."
 
 /// Under the quality steps on Apple TV: "Remembered on this Apple TV".
@@ -186,7 +186,7 @@ public func stillWatchingMessage(next: UpNext?) -> String {
 }
 
 /// "Stopped by the server’s admin · 8:42 PM", and with where the video was,
-/// "· 23 min watched" (TvPlayerStopped.dc.html) once that is a minute or more.
+/// "· 23 min watched" once that is a minute or more.
 public func stoppedNote(at date: Date, watchedMs: Int? = nil, time: (Date) -> String = { $0.formatted(date: .omitted, time: .shortened) }) -> String {
     let watched = watchedMs.flatMap { $0 >= 60_000 ? " · \(formatDuration(ms: $0)) watched" : nil } ?? ""
     return "Stopped by the server’s admin · \(time(date))\(watched)"

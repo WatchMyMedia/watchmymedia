@@ -25,7 +25,7 @@ private final class KeysControllerSpy: LivePlaybackController {
 }
 
 /// The channel buttons on Live TV's transport bar and the remote's channel
-/// keys (TvLiveChannelKeys.dc.html). The fakes' channels are 2.1 Cedar One,
+/// keys. The fakes' channels are 2.1 Cedar One,
 /// 5.1 Northline, 5.2 Northline Extra, 8.1 Coast Public and 12.1 Valley News.
 @Suite @MainActor
 struct TVLiveChannelKeysTests {

@@ -69,7 +69,7 @@ export function OptionsPage({ series, number, options, onChange, onSave, onBack,
 }
 
 /**
- * The record side panel (LiveRecord on the canvas), opened from Hold OK on
+ * The record side panel, opened from Hold OK on
  * a programme: Just this episode, Every new episode, Every episode and the
  * options; what is set already (Don't record, Stop, Edit series); and the
  * clash, where one of the recordings holding the tuners can give way.

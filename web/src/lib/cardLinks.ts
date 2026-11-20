@@ -4,8 +4,8 @@ import { relativeTime } from './format'
 type BrowseItem = components['schemas']['BrowseItem']
 type EpisodeCard = components['schemas']['EpisodeCard']
 
-// What the parts of a Home or Overview card link to (PLAN-HOME.md §6.1,
-// PLAN-SHOW-PAGE.md §4.1): the show's title opens the show, the season part
+// What the parts of a Home or Overview card link to:
+// the show's title opens the show, the season part
 // the show on that season, the episode part and the picture the episode's
 // address, which puts that episode on top of the show's page.
 

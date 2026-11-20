@@ -12,7 +12,7 @@ import (
 	"watchmymedia/server/internal/livetv/guide/xmltv"
 )
 
-// The schedule (§3, Freshness; §5.5): a fetch 20–28 hours after the last
+// The schedule: a fetch 20–28 hours after the last
 // success; the first 1–10 minutes after listings are turned on or the
 // server starts without current listings; failures back off 1, 2, 4, 8
 // and then 12 hours.

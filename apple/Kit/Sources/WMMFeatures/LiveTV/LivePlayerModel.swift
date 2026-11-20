@@ -7,8 +7,7 @@ import WMMModel
 /// Picture in Picture, and whether the controls show. They hide by
 /// themselves as the film player's do (``ControlsAutoHide``, 3 s after the
 /// last input), while the channel plays or buffers, with Channels and the
-/// Quality menu closed and nothing over the video (PLAN-APPLE-REVIEW.md
-/// §3.3.1, §5.3).
+/// Quality menu closed and nothing over the video.
 @MainActor @Observable
 public final class LivePlayerModel {
     public let controller: any LivePlaybackController
@@ -152,8 +151,8 @@ public final class LivePlayerModel {
         request = LivePlayRequest(channel: channel, quality: state.quality)
         controller.start(request)
     }
-    /// The channel watched before this one, for a remote's Last key
-    /// (PLAN-APPLE-REVIEW.md §6.2): set by every switch, from a list, a guide
+    /// The channel watched before this one, for a remote's Last key:
+    /// set by every switch, from a list, a guide
     /// or Ch− and Ch+. Nil until the first switch.
     public private(set) var lastChannel: LiveChannel?
     /// Back to ``lastChannel``, as the channel list has it now; pressed

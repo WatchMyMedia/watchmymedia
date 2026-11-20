@@ -3,7 +3,7 @@ import type { CreateRecording, Recording, RecordingRule, UpdateRule } from '../.
 import { duration, episodeLine, isOn, timeOfDay, timeRange } from '../../../src/lib/liveGuide'
 import { PADDING_MINUTES, clashHeading, conflictWords, markLook } from '../../../src/lib/liveRecordings'
 
-// The record side panel (LiveRecord on the canvas): the choice for a
+// The record side panel: the choice for a
 // programme, what is set already, the options and the clash. Words and
 // rules only; RecordPanel.tsx draws them and sends the requests.
 

@@ -32,8 +32,8 @@ interface WatchNextArtSource {
 }
 
 /**
- * The launcher's pictures for the Watch Next row (PLAN-ANDROID-REVIEW.md
- * §2.4, §6.2). The launcher can't sign in to the server, so a card's
+ * The launcher's pictures for the Watch Next row.
+ * The launcher can't sign in to the server, so a card's
  * picture is a content:// address this app answers ([WatchNextArtProvider])
  * rather than the server's: the server's address would need a signed token
  * in it. Each address names the account and the server's image path, and

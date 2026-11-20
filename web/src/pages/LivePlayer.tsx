@@ -27,7 +27,7 @@ const control = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-
 
 /**
  * Plays a channel here, or on the TV while this browser casts to one that
- * plays Live TV (PLAN-LIVE-TV.md §4.1): then the page is the TV's remote,
+ * plays Live TV: then the page is the TV's remote,
  * as Player is for files. The live session here is stopped before the TV
  * starts its own. When casting ends, the remote stays up and offers to
  * carry on here.

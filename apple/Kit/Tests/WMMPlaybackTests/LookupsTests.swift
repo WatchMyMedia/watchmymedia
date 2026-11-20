@@ -48,7 +48,7 @@ import WMMModel
     }
 
     @Test func anUntitledRequestStartsThenIsNamed() async {
-        // PLAN-APPLE-REVIEW.md §4.2.6: the stream doesn't wait for the name.
+        // The stream doesn't wait for the name.
         let lookups = RecordingLookups(named: PlayRequest(fileID: 1, title: "Harbor Lights", subtitle: "S03 E07 · The Long Dark", backdropPath: "/b.jpg"))
         var naming: CheckedContinuation<Void, Never>?
         lookups.naming = { await withCheckedContinuation { naming = $0 } }

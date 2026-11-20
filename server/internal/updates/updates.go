@@ -1,6 +1,6 @@
 // Package updates finds out whether a newer release is out. It reads the
 // release manifest the release workflow publishes next to the downloads
-// (PLAN-RELEASES.md §3) and picks the download that fits how this server
+// and picks the download that fits how this server
 // was installed. It only asks when an admin presses Check for updates in
 // Settings › General: nothing runs in the background.
 package updates
@@ -24,7 +24,7 @@ import (
 
 // How the server was installed, from WATCHMYMEDIA_INSTALL: the menu bar app,
 // the Windows tray app, the Docker image and the Debian and Fedora packages
-// (PLAN-LINUX.md §4) set it, and anything else is a binary someone runs.
+// set it, and anything else is a binary someone runs.
 const (
 	InstallMacApp     = "macos-app"
 	InstallWindowsApp = "windows-app"

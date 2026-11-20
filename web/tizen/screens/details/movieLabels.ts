@@ -4,7 +4,7 @@ import { firstTrailer, type PlayableTrailer } from '../../../src/lib/trailers'
 import type { PlayRequest } from '../../app/routes'
 import { codecWords } from '../../player'
 
-// What the movie page says (Movie and MovieRelated on the Samsung TV canvas),
+// What the movie page says,
 // worded as the Android TV app words it (core/model MediaLabels.kt,
 // TrackLabels.kt, PlaybackGateway.kt and tv/detail/MovieLabels.kt).
 
@@ -204,8 +204,8 @@ export function moviePlay(m: Pick<MovieDetail, 'title' | 'year' | 'backdropPath'
 
 /**
  * Resume plays the version the saved position is on, else the default;
- * the server resumes 5 s before where the viewer stopped (PLAN-RESUME.md
- * §3.8), so the request carries no start.
+ * the server resumes 5 s before where the viewer stopped,
+ * so the request carries no start.
  */
 export function resumeVersion(m: Pick<MovieDetail, 'files' | 'watch'>): MediaFileDetail | undefined {
   const versions = movieVersions(m)

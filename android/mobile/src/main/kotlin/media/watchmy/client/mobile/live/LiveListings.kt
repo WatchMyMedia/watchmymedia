@@ -126,8 +126,8 @@ internal fun ProgrammeTags(programme: LiveProgramme, modifier: Modifier = Modifi
 
 /**
  * "Watch 4.1", or "Watch 4.1 on TV" while Watch casts to [castDevice] (a TV
- * that plays Live TV, connected, with a server that lets this account cast:
- * PLAN-LIVE-TV.md §4.1); [later] adds "now", for a programme still to come.
+ * that plays Live TV, connected, with a server that lets this account
+ * cast); [later] adds "now", for a programme still to come.
  */
 internal fun watchLabel(channel: LiveChannel, castDevice: String?, later: Boolean = false): String =
     "Watch ${channel.number}" + (if (later) " now" else "") + (if (castDevice != null) " on TV" else "")
@@ -186,10 +186,10 @@ private fun whenLabel(programme: LiveProgramme, now: Long, format: LiveClockForm
 }
 
 /**
- * Programme details (PLAN-LIVE-TV-GUIDE.md §6.1): the phone's bottom sheet and
+ * Programme details: the phone's bottom sheet and
  * the tablet's panel beside the grid. Watch 4.1 while it is on; a later one says
- * when it is on and offers Watch 4.1 now. No recording. With [extras]
- * (§6.5), the channel's star, and for a later programme Remind me beside
+ * when it is on and offers Watch 4.1 now. No recording. With [extras],
+ * the channel's star, and for a later programme Remind me beside
  * Watch when it starts more than the lead time ahead, or the reminder's
  * status with Remove; [gone] is a reminder whose programme left this slot,
  * shown in its own words until it is removed.
@@ -599,7 +599,7 @@ internal fun OnNowCard(channel: LiveChannel, now: Long, onWatch: () -> Unit, mod
     Column(modifier.clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button, onClick = onWatch).semantics(mergeDescendants = true) {
         contentDescription = "Watch ${channel.number} ${channel.name}" + (on?.let { ", ${it.title}, ${liveMinutesLeft(now, it.endMs)}" } ?: "")
     }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        // The gold ring marks the leading card of the tablet Home's Live row (TabHomeRow.dc.html).
+        // The gold ring marks the leading card of the tablet Home's Live row.
         val ring = if (outlined) Modifier.border(2.dp, WmmColors.Accent, RoundedCornerShape(8.dp)) else Modifier
         Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).then(ring)) {
             ProgrammePicture(on, channel, Modifier.fillMaxWidth())

@@ -1,5 +1,4 @@
-/* Live TV: LiveHome, LiveGuide, LiveRecord, LivePlayer, LiveReminders,
-   LiveRecordings and LiveProblems on the Samsung TV canvas. Sizes are the
+/* Live TV. Sizes are the
    boards' pixels ÷ 16; colours are the kit's tokens. Plain CSS for
    Chromium 108. */
 
@@ -295,7 +294,7 @@
 .live-takeover p { font-size: 1.4375rem; }
 .live-takeover__hints { display: flex; gap: 1.75rem; }
 
-/* LiveProblems */
+/* Problems */
 .live-problem { position: absolute; inset: 0; }
 .live-problem__chan { position: absolute; left: var(--gutter); top: 3.25rem; display: flex; align-items: center; gap: 1rem; font-size: 1.375rem; color: var(--muted); }
 .live-problem__chan b { font-size: 1.875rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }

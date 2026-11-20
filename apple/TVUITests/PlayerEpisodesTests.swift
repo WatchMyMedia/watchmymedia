@@ -1,6 +1,6 @@
 import XCTest
 
-/// The player's Episodes tab (TvPlayerEpisodes.dc.html) on the fakes: Harbor
+/// The player's Episodes tab on the fakes: Harbor
 /// Lights S03 E07, The Long Dark, is file 9101. The fake player has no item,
 /// so AVKit opens no info panel; `-playerPanel episodes` shows the same tab
 /// over the video. Runs in `make apple-tv-test-sim`.

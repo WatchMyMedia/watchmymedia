@@ -4,10 +4,9 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-// Favourites, search and reminders on iPhone and iPad (PLAN-LIVE-TV-GUIDE.md
-// §6.5): design/mockups/ios/LiveGuideExtras, LiveSearch and LiveReminders,
-// and ipad-revised/Pad2LiveExtras. Only from servers at API level 15 with
-// listings; the guide is G5's otherwise.
+// Favourites, search and reminders on iPhone and iPad.
+// Only from servers at API level 15 with
+// listings; the guide has none of them otherwise.
 
 /// "iPhone" or "iPad", as the reminder notes name this device.
 @MainActor var liveDeviceNoun: String { UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone" }

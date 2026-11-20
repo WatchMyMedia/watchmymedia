@@ -87,14 +87,13 @@ interface ShowPageActions {
     fun askDelete()
     fun say(message: String)
 
-    /** Notify me: follows the show, or stops (PLAN-NEW-EPISODES.md §7.1). */
+    /** Notify me: follows the show, or stops. */
     fun toggleFollow()
 }
 
 /**
  * One page for a show, its seasons and its episodes, on the phone and the TV
- * (PLAN-SHOW-PAGE.md; android/ShowPage.dc.html, android-tablet/TabShowPage.dc.html,
- * android-tv/ShowPage.dc.html; the Apple apps' ShowModel and EpisodeModel).
+ * (the Apple apps' ShowModel and EpisodeModel).
  * The chosen episode is on top with Play, Mark watched and its own More
  * (Report a problem, Replace file, Delete episode…); the season tabs and the
  * season's row of episodes under it; the show's actions (Mark show watched,
@@ -136,19 +135,19 @@ class ShowPageViewModel(
         /** Said once, then [messageShown]. */
         val message: String? = null,
         val options: RequestOptions = RequestOptions.None,
-        /** Lists every season and episode, missing ones too (PLAN-ARR.md §6). */
+        /** Lists every season and episode, missing ones too. */
         val showMissing: Boolean = false,
         /** Mark watched, Search now, Monitor, Cancel request, Replace file or a report is running: one at a time. */
         val acting: Boolean = false,
         /** The running action is a mark. */
         val marking: Boolean = false,
         val deleting: Deleting? = null,
-        /** The server can't be reached: the page is the season's downloads (PLAN-DOWNLOADS.md §6). */
+        /** The server can't be reached: the page is the season's downloads. */
         val offline: Boolean = false,
         /** The server can follow shows (Notify me), from [media.watchmy.client.model.FOLLOWS_API_LEVEL]. */
         val followable: Boolean = false,
         /**
-         * The row at the end of the page, More like this (PLAN-RELATED.md).
+         * The row at the end of the page, More like this.
          * Empty until it arrives, and on servers without it or when it
          * couldn't be had.
          */
@@ -274,7 +273,7 @@ class ShowPageViewModel(
 
     /**
      * Notify me, or Notifications on: follows the show, or stops, at once,
-     * and puts the bell back with a message if the server refuses (§7.1).
+     * and puts the bell back with a message if the server refuses.
      */
     override fun toggleFollow() {
         val now = _state.value.following ?: return
@@ -598,7 +597,7 @@ class ShowPageViewModel(
     }
 
     /**
-     * The related row, once the show is in (PLAN-RELATED.md §6): on its
+     * The related row, once the show is in: on its
      * own, so the page never waits for it, and kept with the page. A
      * failure leaves the page as it is, without the row; the next load that
      * brings the show asks again.

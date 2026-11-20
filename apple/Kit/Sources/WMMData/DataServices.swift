@@ -47,7 +47,7 @@ public final class DataServices {
     public let offline: any OfflineGateway
     public let casting: any CastGateway
     public let rows: any RowsRepository
-    /// Following shows and their new episodes (PLAN-NEW-EPISODES.md).
+    /// Following shows and their new episodes.
     public let follows: any FollowsRepository
 
     let store: LocalStore
@@ -123,7 +123,7 @@ public final class DataServices {
         if store.currentCredential != nil { Task { await loadSession() } }
     }
 
-    /// The API's own HTTP cache under Caches (PLAN-APPLE-REVIEW.md §4.1.6),
+    /// The API's own HTTP cache under Caches,
     /// rather than the app's shared one: the server's replies are
     /// `private, no-cache` with an ETag, which the system keeps and asks
     /// again with If-None-Match, so an unchanged reply comes back as a 304.
@@ -205,7 +205,7 @@ public final class DataServices {
         AppServices(servers: servers, auth: auth, library: library, requests: requests, preferences: preferences, playback: playback, images: images, client: client, liveTV: liveTV, livePlayback: livePlayback, downloads: downloads, casting: casting, rows: rows, follows: follows)
     }
 
-    /// The account and its playback settings, side by side (PLAN-APPLE-REVIEW.md §4.1.4).
+    /// The account and its playback settings, side by side.
     private func loadSession() async {
         async let user: Void = authRepository.refreshUser()
         async let preferences: Void? = try? preferencesRepository.refresh()

@@ -1,4 +1,4 @@
-// The rules behind Change poster (PLAN-POSTERS.md): what the dialog accepts
+// The rules behind Change poster: what the dialog accepts
 // before it asks the server, and what it says about a picture's shape.
 
 /** The server's limit on an uploaded picture. */

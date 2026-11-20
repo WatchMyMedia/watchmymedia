@@ -57,7 +57,7 @@ internal class SignedInAccess(private val http: Http) : ServerAccess {
 /**
  * As the person who cast to this TV (Cast Connect), with their cast token at
  * [baseUrl]. [renew] swaps the token for a fresh one; the receiver does that
- * at every play and before it runs out (PLAN-CAST.md §3.1).
+ * at every play and before it runs out.
  */
 internal class CastTokenAccess(
     val baseUrl: String,
@@ -190,7 +190,7 @@ data class ReachedServer(val baseUrl: String, val apiLevel: Int)
  * that has answered wins, but once any has, earlier ones that haven't get
  * only [graceMs] more: an unreachable first address (the home network's,
  * away from home) no longer holds the cast for the probe's whole timeout
- * while a later one has already answered (PLAN-ANDROID-REVIEW.md §4.2.6).
+ * while a later one has already answered.
  */
 internal suspend fun reachServer(http: Http, serverId: String, urls: List<String>, graceMs: Long = CAST_PROBE_GRACE_MS): ReachedServer? = coroutineScope {
     val candidates = castServerUrls(urls)

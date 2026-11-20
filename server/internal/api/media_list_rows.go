@@ -432,7 +432,7 @@ func listCountsOf(ctx context.Context, deps Deps, ls []db.MediaList) (map[int64]
 	return d.counts, err
 }
 
-// rowItems is how many items a row draws (PLAN-ROWS.md Decision 13).
+// rowItems is how many items a row draws.
 const rowItems = 20
 
 // listScreenRows fills the rows of lists for a screen: the first 20 of

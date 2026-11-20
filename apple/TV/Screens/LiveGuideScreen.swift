@@ -3,12 +3,12 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// TvLiveGuide with listings (PLAN-LIVE-TV-GUIDE.md §6.4): the focused
+/// TvLiveGuide with listings: the focused
 /// programme's hero above (its picture, a matched TMDB still first, the
 /// episode line, times or "Starts in 48 min", tags, categories, description
 /// and channel), the days and category chips, and two hours of channels
 /// below. Select watches the channel, whatever cell is focused. From API
-/// level 15 (§6.5, TvLiveGuideExtras) the chips gain Favourites, a search chip
+/// level 15 the chips gain Favourites, a search chip
 /// and Reminders; a favourite channel shows a star, and a long press on a
 /// channel stars it or on a later programme reminds; the hero says when a
 /// reminder is set. No record buttons.
@@ -267,8 +267,8 @@ struct TVLiveGuideScreen: View {
 }
 
 /// One cell of the guide: a view of its own, compared by what it shows, so a
-/// move of focus redraws the cells it moves between and not every cell
-/// (PLAN-APPLE-REVIEW.md §4.3.4). Each cell's look when focused comes from
+/// move of focus redraws the cells it moves between and not every cell.
+/// Each cell's look when focused comes from
 /// its button style; `focused` is only for the recording mark's colours.
 private struct TVGuideCell: View, Equatable {
     let clock: LiveClock

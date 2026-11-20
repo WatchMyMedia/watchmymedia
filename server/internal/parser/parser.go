@@ -1,6 +1,6 @@
 // Package parser turns file and folder names into a best guess of what a
 // media file is. It is deliberately pure: no I/O, no metadata lookups, so it
-// can be tested exhaustively with tables. The metadata matcher (phase 2)
+// can be tested exhaustively with tables. The metadata matcher
 // turns a Guess into a TMDB match.
 package parser
 
@@ -143,7 +143,7 @@ func filepathToSlash(rel string) string { return strings.ReplaceAll(rel, `\`, "/
 const ExtraTrailer = "trailer"
 
 // Extra is what a file's name says about a file that belongs to a movie
-// rather than being one (PLAN-TRAILERS.md §5.2).
+// rather than being one.
 type Extra struct {
 	// Kind is ExtraTrailer.
 	Kind string

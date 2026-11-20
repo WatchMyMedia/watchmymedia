@@ -2,11 +2,11 @@ import Foundation
 import Observation
 import WMMModel
 
-/// A movie (Movie.dc.html) with its versions, how each would play on this
+/// A movie with its versions, how each would play on this
 /// device (``PlaybackControllerFactory/plans(fileIDs:)``), and the selected
 /// version's tracks. Play and Resume play the selected version (the first
 /// unless another was picked); each version's Play this plays that one. The
-/// page ends with its related titles (``RelatedRows``, PLAN-RELATED.md): the
+/// page ends with its related titles (``RelatedRows``): the
 /// movie's collection and More like this, asked for once the movie is in.
 @MainActor
 @Observable
@@ -21,7 +21,7 @@ public final class MovieModel {
     public var message: String?
     /// YouTube's player for the movie's YouTube trailers, while it is open (iPhone and iPad).
     public var trailerPlayer: TrailerPlayerModel?
-    /// Apple TV's code to scan for a YouTube trailer, while it shows (TvTrailerQR.dc.html).
+    /// Apple TV's code to scan for a YouTube trailer, while it shows.
     public var trailerCode: YouTubeTrailer?
     /// The rows at the end of the page: the collection, then More like this.
     public let related: RelatedRows
@@ -35,7 +35,7 @@ public final class MovieModel {
     @ObservationIgnored private let loads = LoadController<MovieDetail>()
 
     /// `device` names this device in how a version would play: "this phone", "this TV".
-    /// With `downloads`, a downloaded movie's page opens with no server, and its marks wait for one (PLAN-DOWNLOADS.md §6).
+    /// With `downloads`, a downloaded movie's page opens with no server, and its marks wait for one.
     public init(library: any LibraryRepository, playback: any PlaybackControllerFactory, navigator: Navigator, movieID: Int, device: String = "this phone",
                 downloads: (any DownloadRepository)? = nil, now: @escaping @MainActor () -> Date = { Date() }) {
         changes = ScreenChanges(now: now)
@@ -87,14 +87,14 @@ public final class MovieModel {
     public var relatedRows: [ScreenRow] { offline ? [] : related.rows }
 
     /// Along the bottom of Apple TV's first screen while the shelves wait
-    /// below it (TvMovieRelated.dc.html): their names, "Carrow Coast
+    /// below it: their names, "Carrow Coast
     /// Collection · More like this"; nil with none.
     public var relatedLine: String? {
         relatedRows.isEmpty ? nil : relatedRows.map(\.title).joined(separator: " · ")
     }
 
-    /// What Apple TV says under its button row while Trailer has the focus
-    /// (TvMovieTrailer.dc.html); nil for a trailer file, which plays here.
+    /// What Apple TV says under its button row while Trailer has the focus;
+    /// nil for a trailer file, which plays here.
     public func trailerHint(youTubeApp: Bool) -> String? {
         guard trailer?.youTube != nil else { return nil }
         return youTubeApp ? "Opens the YouTube app" : "Shows a code to scan with your phone"
@@ -174,7 +174,7 @@ public final class MovieModel {
         navigator.play(request)
     }
 
-    /// Trailer (PLAN-TRAILERS.md §6.3). A trailer file plays in our player
+    /// Trailer. A trailer file plays in our player
     /// from its start. A YouTube trailer opens YouTube's player in the app
     /// (`trailerPlayer`) on iPhone and iPad. On Apple TV, which passes
     /// `openApp`, it goes to the YouTube app when `openApp` opens its link,

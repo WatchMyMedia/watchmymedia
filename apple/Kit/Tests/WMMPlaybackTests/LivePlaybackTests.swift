@@ -547,7 +547,7 @@ struct LivePlaybackTests {
         await rig.finish()
     }
     @Test func channelChangesKeepAValidToken() async {
-        // PLAN-APPLE-REVIEW.md §4.2.2: tokens last six hours; a change of channel needs no new one.
+        // Tokens last six hours; a change of channel needs no new one.
         let rig = LiveRig(); await rig.start()
         rig.controller.start(.init(channel: rig.repository.channels[1])); await rig.settle()
         rig.controller.start(.init(channel: rig.repository.channels[2])); await rig.settle()
@@ -572,7 +572,7 @@ struct LivePlaybackTests {
     }
 
     @Test func stallsAreCountedAsTheyHappenOncePerWait() {
-        // PLAN-APPLE-REVIEW.md §3.1.7: the stall notification and the player starting to wait both say so.
+        // The stall notification and the player starting to wait both say so.
         var c = LiveStallCounter()
         c.waiting()
         #expect(c.count == 0, "waiting before it ever played is the start, not a stall")
@@ -593,7 +593,7 @@ struct LivePlaybackTests {
     }
 
     @Test func aRefusedTokenIsRenewedOnTheSameTunerNotReportedAsSignalLost() async {
-        // PLAN-APPLE-REVIEW.md §5.1: the file player's new token on a 401 or 403, for Live TV.
+        // The file player's new token on a 401 or 403, for Live TV.
         let rig = LiveRig(); await rig.start()
         rig.media.failed = true
         rig.media.failure = PlayerFailure(kind: .http, detail: "HTTP 403", httpStatus: 403)
@@ -619,7 +619,7 @@ struct LivePlaybackTests {
     }
 
     @Test func nowPlayingAndTheLockScreenFollowTheChannel() async throws {
-        // PLAN-APPLE-REVIEW.md §6.3: Live TV on the lock screen and in Control Center, as films are.
+        // Live TV on the lock screen and in Control Center, as films are.
         let system = FakeSystem()
         let rig = LiveRig(system: system)
         await rig.start()

@@ -22,7 +22,7 @@ import org.robolectric.annotation.Config
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * The size artwork is decoded at (PLAN-ANDROID-REVIEW §4.3.6): the box it is
+ * The size artwork is decoded at: the box it is
  * drawn in, or the larger [Artwork] decodeSize of art that grows after it is
  * first laid out, such as a TV row's cards when the row takes focus.
  */

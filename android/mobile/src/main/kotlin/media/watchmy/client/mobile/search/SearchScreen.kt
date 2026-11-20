@@ -115,7 +115,7 @@ fun SearchScreen(
     var asking by remember { mutableStateOf<Requestable?>(null) }
     val notMatched = rememberNotMatchedNotice()
     val state by vm.state.collectAsStateWithLifecycle()
-    // The field holds its text (§3.3.3); the model searches a moment after it changes.
+    // The field holds its text; the model searches a moment after it changes.
     val query = rememberModelTextField(state.query, state.revision, vm::setQuery)
     // The Search tab (the tablet's rail) tapped again takes the results back to the top.
     val resultsGrid = rememberLazyGridState()
@@ -251,7 +251,7 @@ fun SearchScreen(
 }
 
 /**
- * A movie or show not in the library (SearchRequest.dc.html): Request opens
+ * A movie or show not in the library: Request opens
  * the sheet; one already asked for or downloading says so; one in the
  * library opens it.
  */

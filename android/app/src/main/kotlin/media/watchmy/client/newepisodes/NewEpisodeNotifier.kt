@@ -27,8 +27,7 @@ import media.watchmy.client.model.noticeTitle
 import media.watchmy.client.model.notices
 
 /**
- * New-episode notifications on phones and tablets (PLAN-NEW-EPISODES.md
- * §6.2, §7.3; the boards' notification board), on the `new-episodes`
+ * New-episode notifications on phones and tablets, on the `new-episodes`
  * channel at default importance (a sound, no pop-over). One a show, under the
  * show's own tag, so a later check replaces it; more than five shows at once
  * are those five and one for the rest, which opens Home and sorts last. Two

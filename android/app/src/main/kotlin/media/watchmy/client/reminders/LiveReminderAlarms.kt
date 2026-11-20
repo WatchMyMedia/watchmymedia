@@ -25,7 +25,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Live TV reminders on phones and tablets (PLAN-LIVE-TV-GUIDE.md §6.5): one
+ * Live TV reminders on phones and tablets: one
  * inexact [AlarmManager.setWindow] alarm a reminder, from its time, in a
  * window of [WINDOW_MS], since Play allows the exact-alarm permissions only
  * to alarm and calendar apps. Android 12 and later stretch a window under

@@ -48,7 +48,7 @@ type eventState struct {
 
 	// wantMs is where the viewer asked to start, in file time; the session
 	// may start earlier, on a keyframe, and the playlist's EXT-X-START
-	// says how far in the asked-for frame is (PLAN-RESUME.md §3.3).
+	// says how far in the asked-for frame is.
 	wantMs int64
 	// finder finds keyframes for copied video from a file; nil runs each
 	// window as asked. startUs is where the first run starts in file time
@@ -62,8 +62,8 @@ type eventState struct {
 	nextUs    atomic.Int64
 	runNextUs int64
 	// viewerMs is the play's latest reported position in session time,
-	// once viewerSeen: trimming never reaches into the viewerKeep before it
-	// (PLAN-RESUME.md §3.4). Before the first report today's rule applies.
+	// once viewerSeen: trimming never reaches into the viewerKeep before it.
+	// Before the first report today's rule applies.
 	viewerMs   atomic.Int64
 	viewerSeen atomic.Bool
 }
@@ -546,7 +546,7 @@ func eventStartTag(offsetMs int64) string {
 }
 
 // NoteViewer records where a play has got to, in file time, for its event
-// session's trimming (PLAN-RESUME.md §3.4).
+// session's trimming.
 func (m *Manager) NoteViewer(playID string, userID, fileMs int64) {
 	if playID == "" {
 		return

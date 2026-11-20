@@ -80,7 +80,7 @@ import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.Artwork
 
 /**
- * Your requests (MyRequests.dc.html, Android TV), from Settings: each
+ * Your requests, from Settings: each
  * request with where it stands, and Cancel request on one still waiting.
  * Admins get a second tab, the Inbox: requests to approve or decline (with
  * an optional note), failed ones to send again, and problems to mark

@@ -48,7 +48,7 @@ final class LiveTVTests: XCTestCase {
     }
 
     /// The Live TV player's controls hide by themselves as the film player's
-    /// do, and a tap on the picture brings them back (PLAN-APPLE-REVIEW.md §3.3.1).
+    /// do, and a tap on the picture brings them back.
     @MainActor
     func testLiveControlsHideByThemselvesAndComeBackOnATap() {
         XCUIDevice.shared.orientation = .portrait

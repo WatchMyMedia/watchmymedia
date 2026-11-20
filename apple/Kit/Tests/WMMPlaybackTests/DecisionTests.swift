@@ -3,8 +3,8 @@ import Testing
 @testable import WMMPlayback
 import WMMModel
 
-/// Asking the server how to play (PLAN-APPLE-REVIEW.md §3.1.2, §3.1.3 and
-/// §4.2.1): a codec this device can't decode, a decision a newer request
+/// Asking the server how to play:
+/// a codec this device can't decode, a decision a newer request
 /// overtook, and the media token beside the decision.
 @MainActor
 @Suite struct DecisionTests {
@@ -16,7 +16,7 @@ import WMMModel
         for _ in 0..<times where !condition() { await Task.yield() }
     }
 
-    // MARK: A codec the device can't decode (§3.1.2)
+    // MARK: A codec the device can't decode
 
     @Test func aDecoderFailureAsksAgainWithoutTheCopiedCodec() async throws {
         h.gateway.answer = { r in
@@ -102,7 +102,7 @@ import WMMModel
         #expect(offline.state.error == "This device could not decode the stream.")
     }
 
-    // MARK: A decision a newer request overtook (§3.1.3)
+    // MARK: A decision a newer request overtook
 
     @Test func aDecisionOvertakenByANewerOneEndsItsSession() async {
         await h.start(request, decision())
@@ -168,7 +168,7 @@ import WMMModel
         #expect(h.gateway.reports.contains { $0.switchFailedGeneration == 9 })
     }
 
-    // MARK: The media token beside the decision (§4.2.1)
+    // MARK: The media token beside the decision
 
     @Test func theTokenIsAskedForBesideTheDecision() async {
         var tokenAsked = false

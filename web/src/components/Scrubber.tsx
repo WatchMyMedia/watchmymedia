@@ -21,10 +21,10 @@ type Props = {
 const clock = (seconds: number) => formatDuration(seconds * 1000) || '0:00'
 
 /**
- * The player's seek bar (the PlayerScrub boards): a click or a drag seeks,
+ * The player's seek bar: a click or a drag seeks,
  * and while the pointer hovers or drags, the seek thumbnail for that time
- * sits above it with the time under it, kept within the bar
- * (PLAN-TRICKPLAY.md §7.3). Without thumbnails the time shows alone. The
+ * sits above it with the time under it, kept within the bar.
+ * Without thumbnails the time shows alone. The
  * picture is decorative; the slider says the time.
  */
 export function Scrubber({ time, duration, bufferedEnd, available, trickplay, controlsShown, onSeek, onPreview }: Props) {

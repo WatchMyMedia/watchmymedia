@@ -78,7 +78,7 @@ export async function detectProfile(): Promise<Profile> {
   }
   if (mse('video/webm; codecs="vp9"') || mse('video/mp4; codecs="vp09.00.10.08"')) videoCodecs.push('vp9')
 
-  // HDR as PLAN-HDR-PROFILE.md §6.3 says: the kinds the screen shows, and a
+  // HDR: the kinds the screen shows, and a
   // dovi key where the browser decodes that profile and the screen shows
   // HDR. The browser maps Dolby Vision to the screen itself, so a decoder
   // and an HDR screen are taken as a screen that shows it.

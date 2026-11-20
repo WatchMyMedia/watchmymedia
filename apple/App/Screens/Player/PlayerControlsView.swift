@@ -36,14 +36,13 @@ enum PlayerOptionsRow {
     case panels(PlayerPanelChoice, toggle: (PlayerSidePanel) -> Void)
 }
 
-/// The touch controls (PlayerControls.dc.html): Close, the title, AirPlay
+/// The touch controls: Close, the title, AirPlay
 /// and Picture in Picture along the top; back 10 s, play/pause and forward
 /// 10 s in the middle; the scrubber, the times and "…" (the picker) along
 /// the bottom. `metrics` are the iPhone's or the iPad's sizes; on iPad the
-/// title has the stream line under it (PadPlayerControls.dc.html). While the
+/// title has the stream line under it. While the
 /// scrubber is dragged, the seek thumbnail sits over its thumb, inside the
-/// controls' edges, and the middle buttons make way (PlayerScrub.dc.html,
-/// Pad2PlayerScrub.dc.html).
+/// controls' edges, and the middle buttons make way.
 struct PlayerControlsView: View {
     @Environment(CastService.self) private var cast
     let model: PlayerChromeModel
@@ -53,7 +52,7 @@ struct PlayerControlsView: View {
     var portrait = false
     var options = PlayerOptionsRow.more
     var onEpisodes: (() -> Void)?
-    /// Fit and fill, beside Close (PlayerFitFill.dc.html).
+    /// Fit and fill, beside Close.
     var fitButton: VideoFitButton?
 
     var body: some View {
@@ -289,7 +288,7 @@ struct PlayerScrubber: View {
                     .onEnded { _ in model.endScrub() }
             )
             .animation(.easeOut(duration: 0.12), value: dragging)
-            // A tick as the thumb is taken (PLAN-APPLE-REVIEW.md §6.3).
+            // A tick as the thumb is taken.
             .sensoryFeedback(.impact(weight: .light), trigger: dragging) { _, now in now }
         }
         .frame(height: 44)
@@ -361,7 +360,7 @@ struct ScrubTrackKey: PreferenceKey {
     }
 }
 
-/// The seek thumbnail (PlayerScrub.dc.html): the tile with a light edge, and
+/// The seek thumbnail: the tile with a light edge, and
 /// the time under it. Dark until the tile is cut; decorative, since
 /// VoiceOver reads the scrubber's time.
 struct SeekTile: View {

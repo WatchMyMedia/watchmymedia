@@ -10,7 +10,7 @@ type ContinueItem = components['schemas']['ContinueItem']
 export function ContinueCard({ item }: { item: ContinueItem }) {
   const pct = item.durationMs ? Math.round((item.positionMs / item.durationMs) * 100) : 0
   const remaining = item.durationMs ? formatDuration(item.durationMs - item.positionMs) : ''
-  // Back returns to the episode just played, on top of its show's page (PLAN-SHOW-PAGE.md §4.1).
+  // Back returns to the episode just played, on top of its show's page.
   const back =
     item.kind === 'movie' && item.movieId != null
       ? `/movies/${item.movieId}`

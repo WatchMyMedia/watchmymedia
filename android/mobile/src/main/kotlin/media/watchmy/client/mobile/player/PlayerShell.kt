@@ -26,7 +26,7 @@ import kotlinx.coroutines.delay
 import media.watchmy.client.ui.WmmColors
 
 /*
- * What the phone's two players share (PLAN-ANDROID-REVIEW §5.3): the file
+ * What the phone's two players share: the file
  * player and the Live TV player draw in a PlayerShell, hide their controls
  * with AutoHideControls, keep their controls inside playerControlsInsets, and
  * go into picture in picture with rememberPictureInPicture (PlayerWindow.kt).

@@ -26,7 +26,7 @@ val SkipMode.label: String
         SkipMode.AutoDelay -> "Auto after 3 s"
     }
 
-/** [label] for the phone's narrow segmented buttons, where Auto after 3 s is "Auto 3 s" (android/Settings.dc.html). */
+/** [label] for the phone's narrow segmented buttons, where Auto after 3 s is "Auto 3 s". */
 val SkipMode.shortLabel: String get() = if (this == SkipMode.AutoDelay) "Auto 3 s" else label
 
 /** "Android TV", "Web browser": what kind of device a session is. */

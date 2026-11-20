@@ -13,7 +13,7 @@ import { actionLabel, applyAction, pickScreen, possessive, rowActions, rowLine, 
 const id = (row: string) => paneRowId('homeRows', row)
 
 /**
- * Settings › Home rows (SettingsHomeRows on the canvas): the Screen it
+ * Settings › Home rows: the Screen it
  * arranges (Home, Movies or TV Shows), then that screen's rows in order,
  * hidden ones grey. OK on a row opens Move up, Move down, Hide or Show and
  * Cancel in the side panel, which acts at once and closes; each change is

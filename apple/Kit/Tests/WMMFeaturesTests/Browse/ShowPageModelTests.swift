@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// The one show page (PLAN-SHOW-PAGE.md) on the fakes: Harbor Lights'
+/// The one show page on the fakes: Harbor Lights'
 /// seasons 1 and 2 are watched (season 2 misses its first three episodes);
 /// season 3 has four watched, the fifth partway (the server's next episode),
 /// two new and the ninth yet to air. Sonarr holds Harbor Lights; The Quiet

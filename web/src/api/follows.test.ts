@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from './schema'
 
 // Stop notifying pressed twice quickly, with the server refusing: each
-// refusal puts back its own row and says so for its own show
-// (PLAN-NEW-EPISODES.md §7.2). The API is a stand-in that answers when told.
+// refusal puts back its own row and says so for its own show.
+// The API is a stand-in that answers when told.
 
 type Follow = components['schemas']['Follow']
 type ShowDetail = components['schemas']['ShowDetail']

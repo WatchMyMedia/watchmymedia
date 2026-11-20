@@ -1,8 +1,8 @@
 import Foundation
 import WMMModel
 
-// One page for a show, its seasons and episodes (PLAN-SHOW-PAGE.md §2 and
-// §3): which episode goes on top, why, and the page's wording, as the
+// One page for a show, its seasons and episodes:
+// which episode goes on top, why, and the page's wording, as the
 // Android app words it.
 
 /// How the person came to the show's page: the show's link, a season's, or an episode's.

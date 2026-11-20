@@ -12,8 +12,8 @@ import kotlinx.coroutines.flow.filter
 import media.watchmy.client.mobile.components.MobileTab
 
 /**
- * A tap on the tab already shown, in the bottom bar or the rail
- * (PLAN-ANDROID-REVIEW §6.3): its page goes back to the top, as most apps'
+ * A tap on the tab already shown, in the bottom bar or the rail:
+ * its page goes back to the top, as most apps'
  * tabs do. A page takes it with [OnTabReselected].
  */
 class TabReselect {

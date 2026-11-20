@@ -15,9 +15,9 @@ const CHOICES: [LiveAccess, string, string | undefined][] = [
 ]
 
 /**
- * Who can watch (board tv-watch): a one-step task, because any change stops
+ * Who can watch: a one-step task, because any change stops
  * everyone watching. The viewers who would stop are on the screen and on the
- * button before it saves (§3.6).
+ * button before it saves.
  */
 export function AccessFlow() {
   const settings = useLiveSettings()

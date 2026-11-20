@@ -5,7 +5,7 @@ import WMMModel
 
 /// The fakes refuse what a launch argument names (`-fakesSaveFails`,
 /// `-fakesPasswordFails`), so a debug build shows a row's failed line or a
-/// Change password refusal (PLAN-APPLE-SETTINGS.md §3.1).
+/// Change password refusal.
 @MainActor
 @Suite struct FakeRefusalsTests {
     init() { FakeLatency.duration = .zero }

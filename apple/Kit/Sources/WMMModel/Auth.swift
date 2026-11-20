@@ -143,7 +143,7 @@ public enum AdminLimit: String, Hashable, Sendable {
 }
 
 /// What the signed-in account may do with the server's settings from here
-/// (GET /api/auth/status; PLAN-APPLE-SETTINGS.md §5.6). The apps have no
+/// (GET /api/auth/status). The apps have no
 /// server settings of their own: an admin is handed to the web app.
 public enum AdminAccess: Hashable, Sendable {
     /// Not an admin: Server settings isn't offered.

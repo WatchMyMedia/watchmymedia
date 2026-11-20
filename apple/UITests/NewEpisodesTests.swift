@@ -1,8 +1,8 @@
 import XCTest
 import UIKit
 
-/// Following a show and its new episodes (PLAN-NEW-EPISODES.md §7.1, §7.2,
-/// §7.4) on the fakes at API level 29 (`-fakesFollows`): the bell on a
+/// Following a show and its new episodes
+/// on the fakes at API level 29 (`-fakesFollows`): the bell on a
 /// show's page and the explainer before iOS's question, the notifications a
 /// second check posts, Settings › Notifications and Home's row. Each step
 /// keeps a screenshot in the result bundle, to compare with the

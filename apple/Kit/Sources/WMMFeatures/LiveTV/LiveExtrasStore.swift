@@ -15,7 +15,7 @@ public struct LiveGuideReveal: Hashable, Sendable, Identifiable {
 }
 
 /// The person's favourite channels and reminders, shared by every Live TV
-/// screen of one app (PLAN-LIVE-TV-GUIDE.md §6.5): the guide's stars, the
+/// screen of one app: the guide's stars, the
 /// Favourites filter and bells, Remind me, the Reminders list, search, the
 /// lead time, iOS's notifications and the Apple TV's banner. Changes show at
 /// once and go back when the server refuses them. The server's events from the
@@ -71,7 +71,7 @@ public final class LiveExtrasStore {
     /// The channel list as last indexed, and each channel's star by id (``isFavourite(_:)``).
     @ObservationIgnored private var channelIndex: (channels: [LiveChannel], favourites: [String: Bool]) = ([], [:])
 
-    /// Remind me's save on Settings › Playback (PLAN-APPLE-SETTINGS.md §3.1).
+    /// Remind me's save on Settings › Playback.
     @ObservationIgnored private let saves: SaveStates<SettingKey>
 
     /// - Parameter sleep: waits out how long Remind me says Saved; tests pass a clock they move.
@@ -197,7 +197,7 @@ public final class LiveExtrasStore {
 
     /// Loads the list; at launch, on foreground, after an event and on the
     /// Reminders list. Callers at once share one request; one after a
-    /// reminders event asks again (PLAN-APPLE-REVIEW.md §4.1.3).
+    /// reminders event asks again.
     public func refresh() async {
         await flight.run(stamp: "\(repository.contextID ?? "")#\(heard)") { [weak self] in await self?.load() }
     }
@@ -352,8 +352,8 @@ public final class LiveExtrasStore {
     /// Follows the server's events for the person's other devices: a
     /// reminders event asks for the list again, a favourites event for the
     /// channels' stars; a recordings event is the recordings store's. The
-    /// echo of a change made here asks for nothing (PLAN-APPLE-REVIEW.md
-    /// §4.1.8). Runs while the app does.
+    /// echo of a change made here asks for nothing.
+    /// Runs while the app does.
     public func follow() async {
         for await change in repository.liveChanges() {
             defer { eventsFollowed += 1 }
@@ -395,7 +395,7 @@ public final class LiveExtrasStore {
 }
 
 /// Changes made on this device whose echo from the server's events is still
-/// to come, so it asks for nothing (PLAN-APPLE-REVIEW.md §4.1.8). Expected
+/// to come, so it asks for nothing. Expected
 /// before the request, since the echo can come before the reply; an echo
 /// that never comes is forgotten after ``window``.
 struct LiveEchoes {

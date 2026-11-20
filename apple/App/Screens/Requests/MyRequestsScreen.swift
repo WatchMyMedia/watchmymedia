@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings › Your requests (MyRequests.dc.html): each request with its
+/// Settings › Your requests: each request with its
 /// poster, what was asked for and when, and its state; Cancel request while
 /// it waits for approval. A request in the library opens its page.
 struct MyRequestsScreen: View {
@@ -88,7 +88,7 @@ private struct MyRequestsView: View {
     }
 }
 
-/// Cancel request, which asks first (Settings2Confirm.dc.html, as the web
+/// Cancel request, which asks first (as the web
 /// does since its redesign), from the button that asked.
 private struct CancelRequestButton: View {
     let request: MediaRequest

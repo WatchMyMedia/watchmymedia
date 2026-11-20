@@ -1,5 +1,5 @@
 // Package art fetches, caches and serves the pictures the listings feed
-// names (PLAN-LIVE-TV-GUIDE.md §4.3). A client names a picture by a key the
+// names. A client names a picture by a key the
 // server made from a feed URL, never by a URL, so this is no image proxy.
 package art
 
@@ -12,7 +12,7 @@ import (
 )
 
 // Hosts are the only hosts pictures come from: the one SiliconDust's feed
-// names (G0, §7.1).
+// names.
 var Hosts = map[string]bool{"img.hdhomerun.com": true}
 
 // Path is where pictures are served; a key follows it.

@@ -15,7 +15,7 @@ import media.watchmy.client.model.StreamProtocol
 import media.watchmy.client.model.SubtitleSource
 import media.watchmy.client.model.UP_NEXT_COUNTDOWN_MS
 
-// The numbers of PLAN-CLIENTS.md §2.3, which are the web player's.
+// The numbers here are the web player's.
 
 /** Without an explicit start, resume only past this. */
 internal const val RESUME_MIN_MS = 5_000L
@@ -24,7 +24,7 @@ internal const val RESUME_MIN_MS = 5_000L
 internal const val BEAT_PLAYING_MS = 10_000L
 internal const val BEAT_IDLE_MS = 30_000L
 
-/** Automatic's heartbeats while playing or buffering (PLAN-AUTO-QUALITY.md §2). */
+/** Automatic's heartbeats while playing or buffering. */
 internal const val BEAT_AUTO_MS = 5_000L
 
 /** The Skip button needs a segment this long; skipping by itself, 1 s. */
@@ -54,16 +54,16 @@ internal const val EVENT_SEEK_SLACK_MS = 500L
 
 /**
  * How far before the start asked for an event decision may begin: on the
- * keyframe before it (PLAN-RESUME.md §3.1). Within it the session plays.
+ * keyframe before it. Within it the session plays.
  */
 internal const val EVENT_START_TOLERANCE_MS = 15_000L
 
-/** A landed seek is reported at once, at most this often while scrubbing (PLAN-RESUME.md §3.6). */
+/** A landed seek is reported at once, at most this often while scrubbing. */
 internal const val SEEK_BEAT_GAP_MS = 1_000L
 
 /**
  * Whether an event decision already starts at [fileMs], on the keyframe up
- * to [EVENT_START_TOLERANCE_MS] before it. A server from PLAN-RESUME.md §3.7
+ * to [EVENT_START_TOLERANCE_MS] before it. A newer server
  * starts an event play that asked for no start where it resumes; an older
  * one started it at 0, and the player asked again.
  */
@@ -182,7 +182,7 @@ internal fun errorMessage(failure: PlayerFailure): String = when (failure.kind) 
     PlayerFailure.Kind.Other -> "Playback failed (${failure.detail})."
 }
 
-/** What a viewing's decisions leave out after a video decoder failed on its stream (PLAN-ANDROID-REVIEW.md §3.1.3). */
+/** What a viewing's decisions leave out after a video decoder failed on its stream. */
 internal sealed interface VideoNarrowing {
     /** The codec's keys: the server sends the video another way, or transcodes it. */
     data class LeaveOut(val keys: Set<String>) : VideoNarrowing

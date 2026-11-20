@@ -5,7 +5,7 @@ import WMMUI
 
 /// A 2:3 poster for a show or movie (Home's rows, the library grid): the New
 /// badge, the watched check and the progress strip, then the title and a
-/// line. No quality badge (PLAN-HOME.md §5): quality is a fact on the hero,
+/// line. No quality badge: quality is a fact on the hero,
 /// the row screens' panel and the detail pages. `width` nil fills a grid
 /// column; `leading` draws the gold ring of the iPad's leading card.
 struct PosterCard: View {
@@ -68,7 +68,7 @@ struct WideCard<Overlay: View>: View {
     let imageURL: URL?
     let seed: String
     var width: CGFloat = 220
-    /// The gold ring of the iPad's leading card (PLAN-HOME.md §7.2).
+    /// The gold ring of the iPad's leading card.
     var leading = false
     @ViewBuilder var overlay: () -> Overlay
     @Environment(\.displayScale) private var displayScale
@@ -102,8 +102,8 @@ struct WideCard<Overlay: View>: View {
 
 /// A titled row of cards that scrolls sideways and snaps to them, inset by
 /// the iPhone's margin or the iPad's. `seeAll` adds See all at the right of
-/// the heading. On the iPad's Home screens (PLAN-HOME.md
-/// §7.6) `counter` is "Row 2 of 7" after the heading and `leading` is the
+/// the heading. On the iPad's Home screens
+/// `counter` is "Row 2 of 7" after the heading and `leading` is the
 /// card at the row's start once a swipe has snapped (the cards' identities
 /// are their keys: ``BrowseItem/cardID``, ``EpisodeCard/cardKey``,
 /// ``ContinueItem/cardKey``, a channel's id).
@@ -187,7 +187,7 @@ struct CardRow<Content: View>: View {
 }
 
 extension View {
-    /// The 2 pt gold ring around the iPad's leading card (Pad2HomeRow.dc.html's `.card.lead`).
+    /// The 2 pt gold ring around the iPad's leading card.
     func leadingRing(_ on: Bool, cornerRadius: CGFloat) -> some View {
         overlay {
             if on { RoundedRectangle(cornerRadius: cornerRadius + 2).strokeBorder(Palette.gold, lineWidth: 2).padding(-2) }

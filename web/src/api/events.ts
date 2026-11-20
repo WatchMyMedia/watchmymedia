@@ -79,7 +79,7 @@ function connect(qc: QueryClient) {
     set({ connected: true })
     if (dropped) {
       invalidateAfterReconnect(qc)
-      // A library may have changed while it was down: new episodes check (PLAN-NEW-EPISODES.md §6.1).
+      // A library may have changed while it was down: new episodes check.
       libraryListeners.forEach((l) => l('reopened'))
     }
   }
@@ -100,7 +100,7 @@ function connect(qc: QueryClient) {
     'match.progress': (p: MatchProgress) => set({ matches: { ...state.matches, [p.libraryId]: p } }),
     'match.finished': (r: MatchFinished) =>
       set({ matches: without(state.matches, r.libraryId), lastMatch: { ...state.lastMatch, [r.libraryId]: { finished: r, at: Date.now() } } }),
-    // New episodes are checked for a while after the last change (PLAN-NEW-EPISODES.md §6.1).
+    // New episodes are checked for a while after the last change.
     'library.changed': () => libraryListeners.forEach((l) => l('changed')),
     'activity.stopped': (e: ActivityStopped) => stopListeners.forEach((l) => l(e)),
   } as Record<string, ((data: never) => void) | undefined>

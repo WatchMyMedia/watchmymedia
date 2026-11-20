@@ -12,7 +12,7 @@ export function EditRows(props: ComponentProps<typeof LazyEditRows>) {
   )
 }
 
-/** The way into Edit rows, under a screen's rows (design/mockups/web/Home, LibraryOverview). */
+/** The way into Edit rows, under a screen's rows. */
 export function EditRowsBar({ onEdit, children }: { onEdit: () => void; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

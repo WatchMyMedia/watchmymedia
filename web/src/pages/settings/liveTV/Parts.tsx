@@ -9,7 +9,7 @@ import { clearFlash, peekFlash } from './data'
 /**
  * The leave check for a task whose choices are held across its steps: moving
  * between the task's own steps (addresses under `within`) never asks; leaving
- * the task with something unsaved does (board m-leave). The shared LeaveCheck
+ * the task with something unsaved does. The shared LeaveCheck
  * asks on any change of address, which a stepped draft can't use.
  */
 export function StayCheck({ when, within, what }: { when: boolean; within?: string; what: ReactNode }) {

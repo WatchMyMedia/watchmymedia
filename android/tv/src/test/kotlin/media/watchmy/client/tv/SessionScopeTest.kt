@@ -21,7 +21,7 @@ import org.robolectric.annotation.Config
 
 /**
  * The TV's signed-in screens keep their ViewModels in a session of their
- * own (core:ui SessionViewModels, PLAN-ANDROID-REVIEW §3.3.6): signing out
+ * own (core:ui SessionViewModels): signing out
  * ends it, and the next account starts a new one.
  */
 @RunWith(RobolectricTestRunner::class)

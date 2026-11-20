@@ -21,7 +21,7 @@ type SubtitlePreferences struct {
 
 // StartingSubtitles resolves foreignAudio against the audio track: forced
 // while the person follows the audio, on when they don't. It returns the
-// mode to apply and the languages it uses (PLAN-LANGUAGES.md §5.3).
+// mode to apply and the languages it uses.
 func StartingSubtitles(audioLanguage string, audioLanguages []string, p SubtitlePreferences) (mode string, languages []string) {
 	if p.Mode == "forced" && p.ForeignAudio && !UnderstoodAudio(audioLanguage, audioLanguages, p.Languages) {
 		if len(p.Languages) > 0 {

@@ -5,7 +5,7 @@ import { liveEdge } from '../lib/liveTV'
 import { CREDENTIALS_TYPE, NAMESPACE, PROTOCOL_VERSION, contentId, liveContentId, type CommandMessage, type LoadData, type StateMessage } from './protocol'
 
 /**
- * Casting from this browser to a Google Cast receiver (PLAN-CAST.md §5.1).
+ * Casting from this browser to a Google Cast receiver.
  * The receiver runs the play; this page is a remote. Chrome's Cast sender
  * SDK loads only when it can work: a secure context (HTTPS or localhost),
  * a Chromium browser, and a server with a receiver App ID.
@@ -237,14 +237,14 @@ export type ChannelCastRequest = {
   /**
    * Stops this browser's own live session first, and resolves once its
    * tuner is given back: the household's tuners are few, and the TV needs
-   * one (PLAN-LIVE-TV.md §9).
+   * one.
    */
   stopLocal?: () => Promise<void>
 }
 
 /**
- * Asks the connected TV to play a Live TV channel as the signed-in user
- * (PLAN-LIVE-TV.md §4.1). The receiver starts the live session on the cast
+ * Asks the connected TV to play a Live TV channel as the signed-in user.
+ * The receiver starts the live session on the cast
  * token and plays it as a LIVE stream; offer it only to a receiver whose
  * state lists live (lib/liveCast).
  */
@@ -362,7 +362,7 @@ function senderName(): string {
 
 /**
  * What the local player was doing when casting started, so the TV picks up
- * where the browser was (PLAN-CAST.md §5.1).
+ * where the browser was.
  */
 export type Handover = { fileId: number; positionMs: number; audioIndex?: number; subtitleId?: string; subtitleMode?: 'auto' | 'off'; quality?: string; title?: string }
 let handover: Handover | null = null

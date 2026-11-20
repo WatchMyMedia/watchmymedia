@@ -3,8 +3,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Home rows, or a library's rows (HomeEditRows.dc.html; on iPad the same
-/// sheet as a form sheet, Pad2HomeEditRows.dc.html): every row in order with
+/// Home rows, or a library's rows (on iPad the same
+/// sheet as a form sheet): every row in order with
 /// Hide or Show and a handle to drag it by, Add a row, then Reset to default.
 /// Hidden rows stay in their place, greyed. Done saves; Cancel leaves the
 /// rows as they were. Opened from the end of Home, from Settings › Home rows,
@@ -225,7 +225,7 @@ private struct NoteLabelStyle: LabelStyle {
     }
 }
 
-/// Add a row (AddRow.dc.html): the screen's hidden rows by kind, each with
+/// Add a row: the screen's hidden rows by kind, each with
 /// Add, which shows it in its place in the list; then the line that lists are
 /// made on the web.
 private struct AddRowSheet: View {

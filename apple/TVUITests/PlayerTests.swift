@@ -2,7 +2,7 @@ import XCTest
 
 /// The player on the fakes, driven with the Siri Remote: the Next Episode
 /// card, Still watching, and the stopped and can't-play states, each with
-/// Menu (PLAN-IOS.md §11.2). The fake episode's credits start at 49:30. XCUI
+/// Menu. The fake episode's credits start at 49:30. XCUI
 /// does not see AVKit's contextual actions, so Skip has no test here.
 /// Runs in `make apple-tv-test-sim`.
 final class PlayerTests: XCTestCase {

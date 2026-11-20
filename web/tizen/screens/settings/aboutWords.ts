@@ -1,8 +1,8 @@
 import { timeOfDay } from '../../../src/lib/liveGuide'
 import type { PlaybackErrorRecord } from '../../app/playbackErrors'
 
-// Settings › About's recent playback errors (SettingsAccount, Tweak `pane`:
-// `about`): a short code to read out, what happened in our own words, and
+// Settings › About's recent playback errors:
+// a short code to read out, what happened in our own words, and
 // when. Built from the facts app/playbackErrors.ts keeps, never from what a
 // player or the server said.
 

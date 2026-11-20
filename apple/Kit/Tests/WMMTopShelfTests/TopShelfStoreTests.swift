@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import WMMTopShelf
 
-/// The Top Shelf's snapshot in the App Group (PLAN-APPLE-REVIEW.md §2.2,
-/// §6.2): what may be in it, when the extension stops trusting it, and
+/// The Top Shelf's snapshot in the App Group:
+/// what may be in it, when the extension stops trusting it, and
 /// clearing it.
 @Suite struct TopShelfStoreTests {
     private let store: TopShelfStore

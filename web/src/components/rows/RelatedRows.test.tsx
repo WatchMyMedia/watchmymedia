@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '../../api/schema'
 
-// The rows at the end of a movie's and a show's page (PLAN-RELATED.md §7):
+// The rows at the end of a movie's and a show's page:
 // drawn from the server's reply as Home's poster rows, and nothing at all
 // when there are none or the request fails. The API is a stand-in that
 // answers with the reply each test sets, and records what was asked.

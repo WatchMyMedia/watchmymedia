@@ -38,7 +38,7 @@ function needHref(need: RecordingNeed, firstTuner?: string) {
 }
 
 /**
- * Recordings (boards tv-rec-0 and on): what's needed first, each with the way
+ * Recordings: what's needed first, each with the way
  * to get it; once on, what is set, each part with Change, and turning off
  * apart at the bottom.
  */
@@ -120,7 +120,7 @@ function ReviewRows({ r, tvLib, movieLib, href }: { r: RecordingSettings; tvLib?
 }
 
 /**
- * Set up recordings (PLAN-ADMIN-SETTINGS.md §5.4): Who can record → Folders
+ * Set up recordings: Who can record → Folders
  * → Timing and space → Review → On. Today's ten fields, a few at a time;
  * nothing saves until Review.
  */

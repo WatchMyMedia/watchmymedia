@@ -98,7 +98,7 @@ function PasswordView({ state }: { state: SignIn }) {
 }
 
 /**
- * Signing in (SignIn on the Samsung TV canvas): a six-character code with a
+ * Signing in: a six-character code with a
  * QR code of the link page, a countdown and a new code as each runs out;
  * or a name and password typed with the TV's keyboard, unless the server
  * wants a browser check first (Turnstile), when only the code works.

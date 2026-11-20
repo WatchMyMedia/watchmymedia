@@ -14,9 +14,9 @@ const kindLabel: Record<Problem['kind'], string> = { video: 'Video', audio: 'Aud
 const LEDE = 'Requests waiting for you, and problems people reported.'
 
 /**
- * Settings › Server › Inbox (PLAN-ADMIN-SETTINGS.md §5.9, PLAN-ARR.md §7.2):
+ * Settings › Server › Inbox:
  * Approve, Retry and Mark resolved report in their row, failures included;
- * Decline opens a dialog for the note (boards inbox, inbox-decline).
+ * Decline opens a dialog for the note.
  */
 export function InboxSettings() {
   return (

@@ -613,7 +613,7 @@ func TestListLimits(t *testing.T) {
 	shown, tooMany := 0, 0
 	for _, r := range l.Rows {
 		// New from shows you follow is drawn beside the 30, when it has
-		// anything (PLAN-NEW-EPISODES.md section 5.5).
+		// anything.
 		if r.Shown && r.ID != rowFollowed {
 			shown++
 		}

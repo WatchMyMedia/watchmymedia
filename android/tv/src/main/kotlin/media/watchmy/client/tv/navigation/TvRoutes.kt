@@ -9,13 +9,13 @@ object TvRoutes {
     @Serializable data object Home
     /** [type] is "movie" or "tv". */
     @Serializable data class Library(val type: String)
-    /** The show page (PLAN-SHOW-PAGE.md): up next on top, or [season]'s start, or [episode]. */
+    /** The show page: up next on top, or [season]'s start, or [episode]. */
     @Serializable data class Show(val id: Long, val season: Int? = null, val episode: Long? = null)
     /** The show page with this episode on top, from Home, Search and the other pages that link an episode. */
     @Serializable data class Episode(val showId: Long, val season: Int, val episodeId: Long)
     @Serializable data class Movie(val id: Long)
     /**
-     * A movie's YouTube trailers, played in the app (PLAN-TV-TRAILERS.md §4.2)
+     * A movie's YouTube trailers, played in the app
      * and tried in turn: [keys] are their YouTube ids and [names] their
      * names, best first.
      */
@@ -28,7 +28,7 @@ object TvRoutes {
     @Serializable data object LiveRecordings
     @Serializable data object LiveReminders
     @Serializable data object Settings
-    /** Settings › Home rows on [screen] (home or library-<id>), from a library's Edit rows (PLAN-ROWS.md §8.2). */
+    /** Settings › Home rows on [screen] (home or library-<id>), from a library's Edit rows. */
     @Serializable data class RowSettings(val screen: String)
     /** A list's page, from its row's See all card. */
     @Serializable data class MediaList(val id: Long)

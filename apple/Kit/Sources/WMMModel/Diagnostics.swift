@@ -1,7 +1,7 @@
 import Foundation
 
 /// The kinds of system diagnostic the app keeps the last of (MetricKit on
-/// iPhone and iPad; PLAN-APPLE-REVIEW.md §6.4).
+/// iPhone and iPad).
 public enum DiagnosticKind: String, Codable, Sendable, CaseIterable {
     case launch, hang, crash
     /// Times the system ended the app in the background other than normally
@@ -51,7 +51,7 @@ public struct DiagnosticSummary: Codable, Sendable, Equatable {
     }
 }
 
-/// What a "Copy diagnostics" row copies (PLAN-APPLE-REVIEW.md §6.4): the app
+/// What a "Copy diagnostics" row copies: the app
 /// and device, the server's version and API level, the last launch, hang and
 /// crash summaries, and the app's own recent log lines. It never holds the
 /// server's name or address, a token, a password, an account's name or a

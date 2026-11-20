@@ -377,7 +377,7 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     /**
      * GET /api/movies/{id}/related
      * The rows at the end of a movie&#39;s page: its collection and More like this
-     * Titles from this server&#39;s libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page&#39;s details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home&#39;s are. From API level 30.
+     * Titles from this server&#39;s libraries of the same kind, for the end of the page. Ask once the page&#39;s details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home&#39;s are. From API level 30.
      * @param id 
      * @return RelatedRows
      * @throws IllegalStateException If the request is not correctly configured
@@ -409,7 +409,7 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     /**
      * GET /api/movies/{id}/related
      * The rows at the end of a movie&#39;s page: its collection and More like this
-     * Titles from this server&#39;s libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page&#39;s details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home&#39;s are. From API level 30.
+     * Titles from this server&#39;s libraries of the same kind, for the end of the page. Ask once the page&#39;s details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home&#39;s are. From API level 30.
      * @param id 
      * @return ApiResponse<RelatedRows?>
      * @throws IllegalStateException If the request is not correctly configured
@@ -672,7 +672,7 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     /**
      * GET /api/shows/{id}/related
      * The row at the end of a show&#39;s page: More like this
-     * Titles from this server&#39;s libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page&#39;s details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home&#39;s are. From API level 30.
+     * Titles from this server&#39;s libraries of the same kind, for the end of the page. Ask once the page&#39;s details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home&#39;s are. From API level 30.
      * @param id 
      * @return RelatedRows
      * @throws IllegalStateException If the request is not correctly configured
@@ -704,7 +704,7 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     /**
      * GET /api/shows/{id}/related
      * The row at the end of a show&#39;s page: More like this
-     * Titles from this server&#39;s libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page&#39;s details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home&#39;s are. From API level 30.
+     * Titles from this server&#39;s libraries of the same kind, for the end of the page. Ask once the page&#39;s details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home&#39;s are. From API level 30.
      * @param id 
      * @return ApiResponse<RelatedRows?>
      * @throws IllegalStateException If the request is not correctly configured

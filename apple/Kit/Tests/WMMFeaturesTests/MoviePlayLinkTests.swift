@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// The movie play link the Top Shelf publishes (PLAN-APPLE-REVIEW.md §2.5).
+/// The movie play link the Top Shelf publishes.
 @MainActor
 @Suite struct MoviePlayLinkTests {
     init() { FakeLatency.duration = .zero }

@@ -22,8 +22,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Notify me in the TV's About the show (PLAN-NEW-EPISODES.md §7.1; the
- * boards' `tv-bell`), on the fakes, where Sam follows Harbor Lights: OK
+ * Notify me in the TV's About the show,
+ * on the fakes, where Sam follows Harbor Lights: OK
  * stops or follows at once, and while the bell has focus a line says who
  * notifies.
  */

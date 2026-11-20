@@ -3,8 +3,8 @@ import { relativeTime } from '../../../src/lib/format'
 import { whatLabel } from '../../../src/lib/requests'
 import type { IconName } from '../../ui/Icon'
 
-// Your requests and the Inbox on the TV (Requests on the canvas, Tweak
-// `view`: `list`): how each request's state is drawn, and the lines the
+// Your requests and the Inbox on the TV:
+// how each request's state is drawn, and the lines the
 // Inbox's rows say.
 
 type MediaRequest = components['schemas']['MediaRequest']

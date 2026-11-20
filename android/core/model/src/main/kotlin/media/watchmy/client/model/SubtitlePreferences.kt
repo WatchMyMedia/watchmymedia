@@ -6,7 +6,7 @@ const val SUBTITLE_PREFERENCES_API_LEVEL = 18
 
 /**
  * The server level that takes audio languages, [SubtitlePreferences.foreignAudio]
- * and [PlaybackProfile.selectsAudioTrack] (PLAN-LANGUAGES.md §4). Older servers
+ * and [PlaybackProfile.selectsAudioTrack]. Older servers
  * refuse those fields, so they are left out below it.
  */
 const val AUDIO_LANGUAGES_API_LEVEL = 21
@@ -48,8 +48,8 @@ enum class SubtitleMode(val id: String) {
 }
 
 /**
- * How subtitles start, in the settings pages' order and words
- * (PLAN-LANGUAGES.md §5.6). [ForeignAudio] is saved as [SubtitleMode.Forced]
+ * How subtitles start, in the settings pages' order and words.
+ * [ForeignAudio] is saved as [SubtitleMode.Forced]
  * with [SubtitlePreferences.foreignAudio].
  */
 enum class SubtitleChoice(val mode: SubtitleMode, val label: String, val shortLabel: String, val detail: String) {

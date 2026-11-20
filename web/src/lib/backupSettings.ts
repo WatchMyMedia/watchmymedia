@@ -1,7 +1,7 @@
 import type { components } from '../api/schema'
 import { formatBytes, relativeTime } from './format'
 
-// Settings › Server › Backups (PLAN-ADMIN-SETTINGS.md §5.8): whether there
+// Settings › Server › Backups: whether there
 // is a recent backup, what Back up now made, why it failed, and the restore
 // path for how this server is installed.
 

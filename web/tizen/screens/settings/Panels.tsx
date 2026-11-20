@@ -11,7 +11,7 @@ import { Chevron } from './SettingRow'
 export type Choice<V> = { value: V; label: string; detail?: string | null }
 
 /**
- * A setting's choices in the side panel (SettingsPlayback, Tweak `picker`):
+ * A setting's choices in the side panel:
  * the chosen one ticked and focused, what each does under it, a note, and
  * "Return closes this panel." Choosing closes it, unless `keepOpen` (Subtitle
  * size, whose preview changes as you choose). With no `value` it is a list
@@ -58,8 +58,8 @@ export function HandOff({ url, label, address, children }: { url: string; label:
 }
 
 /**
- * The row at the top of a pane when the account's settings didn't load
- * (SettingsGroups, Tweak `attention`: `notLoaded`): OK loads them again,
+ * The row at the top of a pane when the account's settings didn't
+ * load: OK loads them again,
  * and the rows of this TV's own still work.
  */
 export function AccountNotLoaded({ id, error, retrying, onRetry }: { id: string; error: unknown; retrying: boolean; onRetry(): void }) {

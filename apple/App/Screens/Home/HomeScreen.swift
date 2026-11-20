@@ -3,13 +3,12 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Home (Home.dc.html, HomeScrolled.dc.html): the hero, Continue watching,
+/// Home: the hero, Continue watching,
 /// Recently added shows, Recently aired, Recently added and Recently
 /// released movies, and the totals. Pull to refresh; long-press a card for
-/// Mark watched. From API level 22 the rows come in the person's order
-/// (PLAN-ROWS.md), drawn by style, with Edit Home after them
-/// (HomeEditRows.dc.html). On iPad (Pad2HomeStart, Pad2HomeRow and the
-/// portrait boards; PLAN-HOME.md §7.6) the arranged rows are screens, one a
+/// Mark watched. From API level 22 the rows come in the person's order,
+/// drawn by style, with Edit Home after them.
+/// On iPad the arranged rows are screens, one a
 /// row: the hero beside the first row, then each row under the leading card's
 /// picture and panel, then Edit rows and the totals; a vertical swipe pages.
 struct HomeScreen: View {
@@ -60,13 +59,13 @@ private struct HomeView: View {
     /// and the next row's line sits 16 pt above the edge, as the boards draw it.
     private var bottomBar: CGFloat { bottomInset > 24 ? bottomInset : 0 }
 
-    /// No server, but downloads to watch (HomeOffline.dc.html): as soon as the
+    /// No server, but downloads to watch: as soon as the
     /// server check fails, not only when Home's own request times out.
     private var offline: Bool {
         model.showsOffline(reachable: services.servers.reachable, downloads: services.downloads.enabled)
     }
 
-    /// The iPad draws an arranged Home as screens (PLAN-HOME.md §7.6).
+    /// The iPad draws an arranged Home as screens.
     private var screensShown: Bool {
         guard wide, let home = model.state.value else { return false }
         return home.isArranged && !home.isEmpty
@@ -114,7 +113,7 @@ private struct HomeView: View {
                         }
                 } else {
                     ScrollView {
-                        // Arranged, Live TV is a row in its place (PLAN-ROWS.md Decision 4).
+                        // Arranged, Live TV is a row in its place.
                         if !home.isArranged || home.isEmpty { LiveHomeRow() }
                         if home.isEmpty {
                             LiveOnNowRow()
@@ -188,7 +187,7 @@ private struct HomeView: View {
         services.library.imageURL(path, size: size)
     }
 
-    // MARK: The iPad's screens (PLAN-HOME.md §7.6)
+    // MARK: The iPad's screens
 
     /// The paging screens: the hero and the first row, a screen per further row, the end screen.
     private func screens(_ home: HomeData) -> some View {
@@ -428,7 +427,7 @@ private struct HomeView: View {
                     ForEach(home.continueWatching) { item in ContinueCard(item: item, actions: rowActions, width: wideCardWidth) }
                 }
             }
-            // With listings, On now follows Continue watching (LiveHome); without, L8's channel row stays at the top.
+            // With listings, On now follows Continue watching; without, the channel row stays at the top.
             LiveOnNowRow()
             if !home.recentlyAddedShows.isEmpty {
                 posterRow(recentlyAddedTitle, detail: tvShowsDetail, items: home.recentlyAddedShows, library: .tvShows)
@@ -494,7 +493,7 @@ private struct HomeView: View {
     }
 
     /// What the arranged rows' cards do. Every row with a link Home can open
-    /// has See all, on iPhone as on iPad (PLAN-SEE-ALL.md decision 5): a
+    /// has See all, on iPhone as on iPad: a
     /// list's page, or the library's tab at its grid, sorted the row's way.
     private var rowActions: RowActions {
         RowActions(
@@ -560,8 +559,8 @@ private struct HomeView: View {
         .accessibilityIdentifier("row-continue")
     }
 
-    /// See all on older servers' fixed rows, on iPad only, as before (PLAN-SEE-ALL.md
-    /// decision 8): the row's library, which lists by date added.
+    /// See all on older servers' fixed rows, on iPad only, as before:
+    /// the row's library, which lists by date added.
     private func seeAll(_ tab: AppTab) -> (() -> Void)? {
         wide ? { navigator.select(tab) } : nil
     }

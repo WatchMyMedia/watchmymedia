@@ -94,8 +94,8 @@ struct RootView: View {
         // At launch, on every return to the app and on every sign-in (which
         // may leave scenePhase unchanged): one task, so launch asks once. A
         // server upgraded meanwhile may do more (Automatic quality from API 3),
-        // so its level comes first; the rest don't wait for each other
-        // (PLAN-APPLE-REVIEW.md §4.1.3–4).
+        // so its level comes first; the rest don't wait for each
+        // other.
         .task(id: Refresh(account: account, active: scenePhase == .active)) {
             guard scenePhase == .active else { return }
             await services.servers.refreshCurrent()
@@ -104,7 +104,7 @@ struct RootView: View {
                 { await services.requests.refreshOptions() },
                 // Live TV's access, then its reminders, which need it.
                 { try? await services.liveTV.refresh(); await extras.refresh() },
-                // The shows followed, for the bell and Settings (PLAN-NEW-EPISODES.md §7.4).
+                // The shows followed, for the bell and Settings.
                 { await follows.refresh() }
             )
         }

@@ -1,8 +1,8 @@
 import SwiftUI
 import WMMModel
 
-/// Recording marks always have spoken words; the red dot is never the only cue
-/// (PLAN-LIVE-TV-DVR.md §3.1). Compact, in a guide cell: a red dot for a
+/// Recording marks always have spoken words; the red dot is never the only cue.
+/// Compact, in a guide cell: a red dot for a
 /// programme that will record, a ringed dot when a series records it, REC
 /// while recording and a hollow orange dot for a clash; nothing in any other
 /// state. Full, in details and lists: the words (or `title`), with the same

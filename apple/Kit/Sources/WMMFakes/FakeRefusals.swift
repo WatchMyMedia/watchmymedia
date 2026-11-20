@@ -3,7 +3,7 @@ import WMMModel
 
 /// Saves the fake preferences refuse, as a server without a connection or a
 /// newer one would, so a Settings row's failed line can be seen and tested
-/// (PLAN-APPLE-SETTINGS.md §3.1; `-fakesSaveFails` in a debug build).
+/// (`-fakesSaveFails` in a debug build).
 public struct FakeSaveRefusal: Hashable, Sendable {
     /// What is refused: a Skipping part (`intro`, `recap`, `credits`,
     /// `preview`, `commercial` or `ads`), `autoplay`, `languages` (every

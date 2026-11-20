@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
-// The last playback errors on this TV, for Settings › About (SettingsAccount
-// on the canvas, Tweak `pane`: `about`). Kept on this TV and never sent: the
+// The last playback errors on this TV, for Settings › About.
+// Kept on this TV and never sent: the
 // player records each failure it gives up on, and About words them as codes
 // someone helping can read off the screen. Facts only, so nothing here can
 // carry a title, an address, a token or the server's own text.

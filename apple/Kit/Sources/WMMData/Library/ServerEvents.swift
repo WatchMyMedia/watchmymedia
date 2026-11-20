@@ -108,8 +108,8 @@ enum EventTopic: Hashable, Sendable {
     case follows
 }
 
-/// A change this device made, whose echo from the server is not news
-/// (PLAN-APPLE-REVIEW.md §4.1.1): its own notice reaches every listener.
+/// A change this device made, whose echo from the server is not news:
+/// its own notice reaches every listener.
 enum ExpectedEcho: Hashable, Sendable {
     /// watch.changed for these movies or episodes.
     case watched(WatchKind, ids: Set<Int>)
@@ -128,7 +128,7 @@ enum ExpectedEcho: Hashable, Sendable {
 /// (``notify(_:)-swift.method``), and the server's echo of a mark made here
 /// is dropped (``expect(_:)``), so a mark loads each screen once.
 ///
-/// It follows the network (PLAN-APPLE-REVIEW.md §4.1.7): when a path
+/// It follows the network: when a path
 /// returns, or the app comes back to the foreground (``reconnectNow()``), it
 /// connects again at once rather than at its next backoff. A server without
 /// events (404) is asked again at the longest backoff, so one that comes back

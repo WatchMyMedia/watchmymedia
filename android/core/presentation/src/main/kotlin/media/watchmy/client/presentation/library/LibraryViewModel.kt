@@ -60,7 +60,7 @@ class LibraryViewModel(
     private val pageSize: Int = PAGE_SIZE,
     private val columns: Int = 1,
     private val countsLine: Boolean = false,
-    /** The app's [BrowseRequests]: the grid takes its library's, once (PLAN-SEE-ALL.md §4.4). */
+    /** The app's [BrowseRequests]: the grid takes its library's, once. */
     private val requests: BrowseRequests? = null,
 ) : ViewModel() {
     data class Choices(
@@ -183,7 +183,7 @@ class LibraryViewModel(
     fun clearFilters() = change { it.copy(filter = ItemFilter.All, genre = null, decade = null, text = "") }
 
     /**
-     * A row's See all (PLAN-SEE-ALL.md decision 3): the link's sort when this
+     * A row's See all: the link's sort when this
      * library offers it, its filter (else All), its genre and decade, and no
      * title filter, from the first page. They are kept as the person's own
      * choices would be, until the person changes them. The screen then goes
@@ -491,8 +491,8 @@ class LibraryViewModel(
 /**
  * A page's items that [held] doesn't have yet. An item added or removed
  * during a scan shifts the offsets, so a page can repeat one already shown,
- * and a lazy grid keyed by id throws on a repeated key
- * (PLAN-ANDROID-REVIEW.md §3.3.2). The window's end still moves by the
+ * and a lazy grid keyed by id throws on a repeated key.
+ * The window's end still moves by the
  * whole page, so paging goes on past the repeat.
  */
 internal fun List<BrowseItem>.newTo(held: List<BrowseItem>): List<BrowseItem> {

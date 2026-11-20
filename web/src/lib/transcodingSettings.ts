@@ -3,7 +3,7 @@ import { resolveStep, type FlowStep } from './flowSteps'
 import { adapterChoices, adapterNamespace, hardwareState } from './transcoder'
 import { formatBytes } from './format'
 
-// Settings › Server › Transcoding (PLAN-ADMIN-SETTINGS.md §5.7): which
+// Settings › Server › Transcoding: which
 // encoder is in use and whether it passed its test, the Choose an encoder
 // flow, the remote upload limit and the seek thumbnails dialog.
 

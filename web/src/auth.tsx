@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const onUnauthorized = () => {
       changeAuthScope()
       forgetGrant()
-      // Signed out: the next sign-in starts new episodes from now (PLAN-NEW-EPISODES.md §6.1).
+      // Signed out: the next sign-in starts new episodes from now.
       forgetOnSignOut()
       setState((s) => (s.status === 'ready' ? { ...s, status: 'login', user: null } : s))
       // Sign-in may need Turnstile now, if it was turned on since.

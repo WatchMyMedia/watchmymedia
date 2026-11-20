@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Notice } from '../../../lib/youSettings'
 import { useGo } from '../../../components/settings/hooks'
 
-// Hooks the You tabs share (PLAN-ADMIN-SETTINGS.md §5.10).
+// Hooks the You tabs share.
 
-// A one-step task ends with a banner on its page (§3.7). The task leaves the
+// A one-step task ends with a banner on its page. The task leaves the
 // banner here and the page shows it once.
 const flashes = new Map<string, Notice & { tone?: 'ok' | 'info' }>()
 
@@ -22,7 +22,7 @@ export function useFlash(page: string) {
 export type RowSave<T> = { status: 'idle' | 'saving' | 'saved' | 'failed'; value?: T; message?: string }
 
 /**
- * One row of choices that save at once (§3.6): only that row waits. While it
+ * One row of choices that save at once: only that row waits. While it
  * saves, the control shows the new value; a refusal puts it back and says why.
  */
 export function useRowSave<T>() {

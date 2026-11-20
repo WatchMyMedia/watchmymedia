@@ -16,7 +16,7 @@ import (
 )
 
 // seedRelatedTags gives every movie and show of the large seeded library
-// tags as TMDB's would be (PLAN-RELATED.md §4): 20 recommendations, a
+// tags as TMDB's would be: 20 recommendations, a
 // third of them in the library; 15 keywords from 4,000, the common ones
 // far commoner; three of 19 genres, Drama on half the titles; ten billed
 // cast from 20,000 people and a director or creator from 2,000, a few of
@@ -119,7 +119,7 @@ func seedTags(tb testing.TB, tx *sql.Tx, table, idColumn string, fill func(add f
 }
 
 // TestRelatedSpeed times a movie's and a show's related rows over the large
-// seeded library with tags, alone and ten at once (PLAN-RELATED.md §5), and
+// seeded library with tags, alone and ten at once, and
 // checks the queries' plans without statistics: no whole-table reads.
 func TestRelatedSpeed(t *testing.T) {
 	if testing.Short() {

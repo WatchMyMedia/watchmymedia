@@ -4,7 +4,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The info panel's Audio, Subtitles and Quality (TvPlayerPicker.dc.html):
+/// The info panel's Audio, Subtitles and Quality:
 /// three columns side by side under the system's tabs, with focus starting
 /// on the chosen row of `tab`'s column. Subtitles lists Off, then the
 /// file's own under "In this file", then the OpenSubtitles group

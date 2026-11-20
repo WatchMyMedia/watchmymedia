@@ -1,6 +1,6 @@
 import XCTest
 
-/// Favourites, search and reminders (PLAN-LIVE-TV-GUIDE.md G9) on the fakes'
+/// Favourites, search and reminders on the fakes'
 /// fictional listings, with the extras boards' five favourites and reminders.
 /// Each step keeps a screenshot in the result bundle, to compare with the boards.
 final class LiveExtrasTests: XCTestCase {
@@ -215,7 +215,7 @@ final class LiveExtrasTests: XCTestCase {
         let profile = app.buttons["Settings"].firstMatch
         XCTAssertTrue(profile.waitForExistence(timeout: 20))
         profile.tap()
-        // Live TV reminders are Playback's (PLAN-APPLE-SETTINGS.md §4): Remind me is a menu.
+        // Live TV reminders are Playback's: Remind me is a menu.
         let playback = app.buttons["settings-playback"]
         XCTAssertTrue(playback.waitForExistence(timeout: 10))
         playback.tap()

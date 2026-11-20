@@ -5,7 +5,7 @@ import WMMModel
 /// The player's server calls over the current server's ``ServerAPI``
 /// (android/core/data/.../RealPlaybackGateway.kt). URLs come back absolute
 /// and without a token; the player adds ``mediaToken()``'s `access_token`
-/// itself (PLAN-CLIENTS.md §2.2). The profile goes as the server's level
+/// itself. The profile goes as the server's level
 /// takes it (``PlaybackProfile/forAPILevel(_:)``). Failures are ``APIError``
 /// or ``SignedOutError``.
 public struct APIPlaybackGateway: PlaybackGateway {

@@ -92,7 +92,7 @@ internal val FailRed = Color(0xFFFCA5A5)
  *
  * [status] Saving puts "Saving…" in place of the value; Failed puts its line
  * under the label in red, where it stays until the row is tried again or
- * changed (PLAN-ANDROID-SETTINGS.md §4.5). Not [enabled], the row is dimmed
+ * changed. Not [enabled], the row is dimmed
  * and OK does nothing, though it keeps its focus stop so the path down the
  * pane stays straight.
  */

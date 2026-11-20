@@ -4,7 +4,7 @@ import Testing
 import TVServices
 @testable import WMMTopShelf
 
-/// What the Top Shelf extension hands the system (TvTopShelfSections.dc.html).
+/// What the Top Shelf extension hands the system.
 /// tvOS only: `make apple-tv-test-sim` runs it on the Apple TV simulator.
 @Suite struct TopShelfContentTests {
     private let store = TopShelfStore(folder: FileManager.default.temporaryDirectory

@@ -4,7 +4,7 @@ import WMMFakes
 import WMMModel
 @testable import WMMFeatures
 
-/// Favourites, search and reminders (PLAN-LIVE-TV-GUIDE.md §6.5) on the fakes
+/// Favourites, search and reminders on the fakes
 /// with the extras boards' fictional evening, stopped at Mon 8:12 PM.
 @Suite @MainActor
 struct LiveExtrasModelTests {

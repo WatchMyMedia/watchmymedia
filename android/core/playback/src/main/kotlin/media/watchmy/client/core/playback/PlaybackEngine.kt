@@ -48,7 +48,7 @@ class PlaybackEngine(
     /** Names bare play links and looks up the next episode; without it the player goes by the decision alone. */
     library: LibraryRepository? = null,
     watchNextAccount: String? = null,
-    /** Wraps the players' HTTP data source; the phone app reads downloads through it (PLAN-DOWNLOADS.md §10.4). */
+    /** Wraps the players' HTTP data source; the phone app reads downloads through it. */
     private val playerSources: (DataSource.Factory) -> DataSource.Factory = { it },
     /** Fetches the notification's and lock screen's pictures signed in to the server (the app's image loader). */
     artwork: BitmapLoader? = null,

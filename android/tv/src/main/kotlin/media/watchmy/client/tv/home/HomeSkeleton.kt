@@ -30,11 +30,11 @@ import media.watchmy.client.ui.components.rememberSheen
 import media.watchmy.client.ui.components.skeletonBlock
 import media.watchmy.client.ui.components.skeletonLine
 
-/** The lines under each wide card (android-tv/HomeLoading.dc.html). */
+/** The lines under each wide card. */
 private val WideLines = listOf(230.dp to 160.dp, 190.dp to 120.dp, 250.dp to 150.dp, 170.dp to 130.dp, 210.dp to 110.dp, 200.dp to 140.dp)
 
 /**
- * Home loading on the TV (android-tv/HomeLoading.dc.html): a dim backdrop,
+ * Home loading on the TV: a dim backdrop,
  * the hero's lines and buttons, a row of wide cards and a row of posters,
  * in place of a spinner, beside the rail. TalkBack hears "Loading Home".
  */

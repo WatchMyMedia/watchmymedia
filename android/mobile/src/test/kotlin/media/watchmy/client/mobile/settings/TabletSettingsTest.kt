@@ -25,7 +25,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The tablet's list beside its page (PLAN-ANDROID-SETTINGS.md §4.2, TabSettingsOverview). */
+/** The tablet's list beside its page. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w1280dp-h800dp-land-mdpi")
 class TabletSettingsTest {

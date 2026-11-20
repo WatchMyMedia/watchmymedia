@@ -133,7 +133,7 @@ const MAX_RETRIES = 2
 const IDLE: LivePlaybackState = { phase: 'idle', channels: [], paused: false, behind: false, quality: '1080', qualities: LIVE_QUALITIES.filter((q) => q !== 'auto'), askStillWatching: false }
 
 /**
- * A Live TV player for the TV (PLAN-LIVE-TV.md): the shared LiveTVController
+ * A Live TV player for the TV: the shared LiveTVController
  * owns the tuner (one start/stop lane, idempotent starts, heartbeats), and
  * this puts its session on the Player, follows the channel list's order,
  * keeps the previous channel and a typed number, pauses within the server's

@@ -29,7 +29,7 @@ export type SeasonBarProps = {
 }
 
 /**
- * The season tabs (ShowPage's `.season`, Specials last), the chosen one in
+ * The season tabs (Specials last), the chosen one in
  * gold, then the season's line, Mark season watched and, with Show missing
  * on, the season's Request, Search now and Monitor and the switch that turns
  * it off. ◀ ▶ go along the bar in order; focus on a tab changes the season at

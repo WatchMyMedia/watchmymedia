@@ -12,7 +12,7 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
-/** The phone's three library layouts show the same loading, error and empty states (PLAN-ANDROID-REVIEW.md §5.4). */
+/** The phone's three library layouts show the same loading, error and empty states. */
 class LibraryLoadStatusTest {
     @get:Rule val main = MainDispatcherRule()
 

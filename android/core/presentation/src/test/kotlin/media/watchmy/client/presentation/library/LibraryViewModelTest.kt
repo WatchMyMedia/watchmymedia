@@ -62,7 +62,7 @@ class GridLibrary(private val fake: LibraryRepository = FakeLibraryRepository())
     }
 }
 
-/** One Library model for the phone, the tablet and the TV (PLAN-ANDROID-REVIEW.md §5.1). */
+/** One Library model for the phone, the tablet and the TV. */
 class LibraryViewModelTest {
     @get:Rule val main = MainDispatcherRule(UnconfinedTestDispatcher())
 

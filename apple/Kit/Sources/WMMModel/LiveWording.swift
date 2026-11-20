@@ -1,6 +1,6 @@
 import Foundation
 
-// How listings are worded (PLAN-LIVE-TV-GUIDE.md §6.1), in the device's
+// How listings are worded, in the device's
 // locale, time zone and 12- or 24-hour setting. The same words as the
 // Android app's guide, so the apps read alike.
 
@@ -151,11 +151,9 @@ public func liveAccessibilityLabel(_ programme: LiveProgramme, clock: LiveClock 
     return parts.joined(separator: ", ")
 }
 
-// MARK: Favourites, search and reminders (PLAN-LIVE-TV-GUIDE.md §6.5)
+// MARK: Favourites, search and reminders
 //
-// The boards' words (design/mockups/ios/LiveGuideExtras, LiveSearch,
-// LiveReminders, ipad-revised/Pad2LiveExtras, apple-tv/TvLiveGuideExtras,
-// TvLiveSearch, TvLiveReminder), as Android's `core:model` words them.
+// The boards' words, as Android's `core:model` words them.
 
 /// The Favourites chip, first among the filters once the person has a favourite.
 public let liveFavouritesTitle = "Favourites"
@@ -272,7 +270,7 @@ public func liveRemindersComingUp(_ count: Int) -> String { count == 0 ? "None" 
 /// The Reminders list's note on iPhone: "Each comes 5 min before it starts, on
 /// every device you’re signed in to; change it in Settings › Playback. One set
 /// on another device reaches this iPhone the next time the app opens." Remind
-/// me moved to Playback with the Settings redesign (PLAN-APPLE-SETTINGS.md §5.2).
+/// me moved to Playback with the Settings redesign.
 public func liveRemindersNote(leadMinutes: Int, device: String) -> String {
     let when = leadMinutes <= 0 ? "when it starts" : "\(leadMinutes) min before it starts"
     return "Each comes \(when), on every device you’re signed in to; change it in Settings › Playback. One set on another device reaches this \(device) the next time the app opens."
@@ -432,7 +430,7 @@ public func liveDeviceNotifiesNote(device: String) -> String {
 /// Settings on Apple TV.
 public let liveTVLeadSettingsNote = "Apple TV shows a reminder as a banner while WatchMyMedia is open, and can’t remind you when the app is closed. Kept on the server, so your other devices remind you at the same time."
 
-// MARK: Recording: the programme menus, Recordings and the options form (PLAN-APPLE-REVIEW.md §5.4, §5.8)
+// MARK: Recording: the programme menus, Recordings and the options form
 
 public let liveStopRecording = "Stop recording"
 public let liveDontRecord = "Don’t record"
@@ -494,7 +492,7 @@ public func liveKeepChoice(_ count: Int) -> String { count <= 0 ? "All recording
 /// Start early's and End late's choices: "5 min".
 public func livePaddingChoice(_ minutes: Int) -> String { "\(minutes) min" }
 
-// MARK: The guide and the channel list, as both apps word them (PLAN-APPLE-REVIEW.md §5.8)
+// MARK: The guide and the channel list, as both apps word them
 
 public let liveAllChannels = "All channels"
 public let liveGoToChannel = "Go to channel"

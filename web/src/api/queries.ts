@@ -35,7 +35,7 @@ export function useLibraryByType(type: 'movie' | 'tv', id?: number) {
   return { ...libs, library: ofType?.find((l) => l.id === id) ?? ofType?.[0] }
 }
 
-/** Home in the person's order (PLAN-ROWS.md §6.1): the hero, rows and totals. */
+/** Home in the person's order: the hero, rows and totals. */
 export const homeQuery = queryOptions({
   queryKey: ['home'],
   queryFn: async () => unwrap(await api.GET('/api/home', { params: { query: { arranged: true } } })),
@@ -89,7 +89,7 @@ export const showQuery = (id: number) =>
   })
 
 /**
- * The rows at the end of a movie's or a show's page (PLAN-RELATED.md §6): a
+ * The rows at the end of a movie's or a show's page: a
  * request of their own, made once the page's details have arrived, so the
  * details stay quick. Kept apart from the details' keys, so refetching them
  * doesn't work the rows out again; watched marks and library changes
@@ -450,7 +450,7 @@ export const liveTVRecordingQuery = (id: string) => queryOptions({
   staleTime: 60_000,
 })
 
-// Rows and lists (PLAN-ROWS.md §6.2, §6.3). Keys: ['row-layout', 'me' |
+// Rows and lists. Keys: ['row-layout', 'me' |
 // 'default', screen] for the editor; ['lists'] for every list query (the
 // lists, one list, its entries); ['list-sources'] for the builder's options;
 // ['list-preview', …] for its preview, kept apart so a list changing

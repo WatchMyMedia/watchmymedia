@@ -38,13 +38,13 @@ import media.watchmy.client.presentation.ShownPage
 import media.watchmy.client.presentation.value
 
 /**
- * A movie on the phone and the TV (Movie.dc.html; the Apple apps'
+ * A movie on the phone and the TV (the Apple apps'
  * MovieModel), with its versions and how each would play on this device
  * ([plans]: `PlaybackControllerFactory.plans`), and marking it watched.
  * With no server, a movie downloaded here shows what its download knows,
- * and a mark waits in the offline queue (PLAN-DOWNLOADS.md §6).
+ * and a mark waits in the offline queue.
  *
- * Its trailer (MovieTrailer.dc.html, PLAN-TRAILERS.md §6.2) is the first one
+ * Its trailer is the first one
  * the server lists that this device can play: a file anywhere, and a YouTube
  * video where [youTube] says so (phones and tablets always; a TV when it can
  * show YouTube's player in a WebView, or an app can open YouTube's link).
@@ -72,7 +72,7 @@ class MovieViewModel(
         /** This device can play a YouTube trailer. */
         val youTube: Boolean = true,
         /**
-         * The rows at the end of the page (PLAN-RELATED.md): the movie's
+         * The rows at the end of the page: the movie's
          * collection, then More like this. Empty until they arrive, and
          * on servers without them or when they couldn't be had.
          */
@@ -216,7 +216,7 @@ class MovieViewModel(
     }
 
     /**
-     * The related rows, once the movie is in (PLAN-RELATED.md §6): on their
+     * The related rows, once the movie is in: on their
      * own, so the page never waits for them, and kept with the page. A
      * failure leaves the page as it is, without rows; the next load that
      * brings the movie asks again.

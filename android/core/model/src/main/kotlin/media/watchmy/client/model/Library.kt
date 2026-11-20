@@ -386,7 +386,7 @@ interface LibraryRepository {
     suspend fun movie(id: Long): MovieDetail
 
     /**
-     * The rows at the end of a movie's page (PLAN-RELATED.md §6): its
+     * The rows at the end of a movie's page: its
      * collection, then More like this, as the server sends them; empty when
      * neither has anything, and below [RELATED_API_LEVEL], which is not asked.
      */
@@ -436,7 +436,7 @@ interface LibraryRepository {
 
     /**
      * What changed, as [changes] says that something did: which movies,
-     * episodes and libraries (PLAN-ANDROID-REVIEW.md §4.1.2), so a page can
+     * episodes and libraries, so a page can
      * leave other items' changes alone. A repository that can't tell says
      * [LibraryChange.Everything] each time.
      */

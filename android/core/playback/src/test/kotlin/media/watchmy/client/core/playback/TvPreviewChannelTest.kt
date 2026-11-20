@@ -17,7 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The launcher's Recently added channel (PLAN-ANDROID-REVIEW.md §6.2): Home's
+ * The launcher's Recently added channel: Home's
  * newest movies and shows, alternating, at most twelve, from the fixed rows
  * or the arranged Home's; each opens its page, for its account only.
  */

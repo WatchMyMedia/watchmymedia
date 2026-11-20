@@ -77,7 +77,7 @@ private val Title = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBo
 private val Small = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = WmmColors.TextMuted)
 
 /**
- * A row's heading (LibraryRows.dc.html, HomeSeeAll.dc.html): the title, the
+ * A row's heading: the title, the
  * words beside it ("Movies", or a list's "18 of 50 · From TMDB"), [counter]
  * ("· Row 2 of 7" on the tablet's Home screens) and See all when there is
  * somewhere to go, read aloud as the row's last card is ("See all TV shows,
@@ -109,10 +109,10 @@ internal fun ArrangedRowHeading(row: ScreenRow, tablet: Boolean, seeAll: RowSeeA
  * One arranged row by its style, as Home's rows have always looked: posters,
  * 16:9 cards, Recently aired's episodes or Continue watching. The Live TV row
  * is the screen's to draw. With [seeAll], a poster, 16:9 or episode row ends
- * in a See all card the size of its cards, and its heading has See all
- * (PLAN-SEE-ALL.md §4.4). The tablet's Home screens pass the row's [state]
+ * in a See all card the size of its cards, and its heading has See all.
+ * The tablet's Home screens pass the row's [state]
  * and a snapping [flingBehavior], outline the card at [lead] (the one the
- * row snapped to, PLAN-HOME.md §7.5) and show [counter] by the heading.
+ * row snapped to) and show [counter] by the heading.
  */
 @Composable
 internal fun ArrangedRow(
@@ -231,7 +231,7 @@ private fun EpisodeRowCard(ep: EpisodeCard, library: LibraryRepository, actions:
     }
 }
 
-/** Edit Home, or a library's Edit rows, at the end of its rows (LibraryRows.dc.html). */
+/** Edit Home, or a library's Edit rows, at the end of its rows. */
 @Composable
 internal fun EditRowsButton(label: String, onClick: () -> Unit, tablet: Boolean, modifier: Modifier = Modifier, edge: Dp = if (tablet) 24.dp else 16.dp) {
     Row(modifier.fillMaxWidth().padding(horizontal = edge)) {

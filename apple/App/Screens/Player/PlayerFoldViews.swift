@@ -4,7 +4,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-// The film player's pieces on the iPhone Duo (PLAN-IPHONE-DUO.md §5): the
+// The film player's pieces on the iPhone Duo: the
 // panel beside the picture on the inner screen held wide (`DuoOpenPlayer`)
 // and the controls on the half lying flat (`DuoTabletopPlayer`). Where they
 // go is ``PlayerArrangement``'s; which panel or tab shows is

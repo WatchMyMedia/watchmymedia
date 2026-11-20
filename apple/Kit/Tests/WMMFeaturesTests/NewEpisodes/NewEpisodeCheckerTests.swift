@@ -3,7 +3,7 @@ import Testing
 @testable import WMMFeatures
 import WMMModel
 
-/// The check each iPhone and iPad runs (PLAN-NEW-EPISODES.md §6.1): whenever
+/// The check each iPhone and iPad runs: whenever
 /// this device could notify, a first check keeping the cursor, the feed after
 /// it posting one notification a show, a server that can't be reached
 /// changing nothing, and a check that stops when its task is cancelled.
@@ -61,7 +61,7 @@ struct NewEpisodeCheckerTests {
         #expect(memory.cursor(for: "srv-a:1") == "1846")
     }
 
-    /// Plan decision 1: a show followed on the TV notifies the phone, even
+    /// A show followed on the TV notifies the phone, even
     /// when the list this phone last saw was empty.
     @Test func aShowFollowedOnAnotherDeviceNotifiesHereFromWhenItWasFollowed() async {
         repository.list = []

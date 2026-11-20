@@ -57,7 +57,7 @@ export function useLibraries() {
   return { query: libraries, tv: items.filter((l) => l.type === 'tv'), movies: items.filter((l) => l.type === 'movie') }
 }
 
-// A one-step task ends with a banner on the page it returns to (§3.7). The
+// A one-step task ends with a banner on the page it returns to. The
 // banner waits here for that page, which shows it once.
 type Flash = { title: string; body?: string }
 const flashes = new Map<string, Flash>()

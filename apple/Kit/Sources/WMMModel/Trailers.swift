@@ -1,7 +1,7 @@
 import Foundation
 
-/// One of a movie's trailers, as getMovie lists them, best first
-/// (PLAN-TRAILERS.md §5.3). Servers list them from API level 20; older ones
+/// One of a movie's trailers, as getMovie lists them, best first.
+/// Servers list them from API level 20; older ones
 /// send none, so the Trailer button doesn't show.
 public struct MovieTrailer: Hashable, Sendable {
     public enum Source: Hashable, Sendable {
@@ -78,7 +78,7 @@ public struct YouTubeTrailer: Hashable, Sendable, Identifiable {
 }
 
 extension MovieDetail {
-    /// The trailer Trailer plays: the first the server lists (PLAN-TRAILERS.md §4.4).
+    /// The trailer Trailer plays: the first the server lists.
     public var trailer: MovieTrailer? { trailers.first }
 
     /// The movie's YouTube trailers, best first, as YouTube's player tries them.

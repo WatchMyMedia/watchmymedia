@@ -2,7 +2,7 @@ import Foundation
 import WMMModel
 
 /// An empty Home describes evidence from the library list, rather than asking
-/// someone to wait for a scan that has never started (PLAN-ONBOARDING O7).
+/// someone to wait for a scan that has never started.
 public enum HomeEmptyState: Hashable, Sendable {
     case noLibraries
     case scanning

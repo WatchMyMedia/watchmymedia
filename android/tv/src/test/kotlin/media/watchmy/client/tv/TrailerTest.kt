@@ -35,8 +35,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowWebView
 
 /**
- * The TV's Trailer (Android TV MovieTrailerInApp.dc.html, PLAN-TV-TRAILERS.md
- * §4.5): a YouTube trailer plays in the app where the TV has a usable
+ * The TV's Trailer:
+ * a YouTube trailer plays in the app where the TV has a usable
  * WebView, else in the YouTube app with "Opens the YouTube app" under the
  * button; a file plays in the player.
  */

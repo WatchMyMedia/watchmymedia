@@ -3,8 +3,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Switch server on Apple TV (TvSettings2Switch.dc.html,
-/// TvSettings2SwitchDone.dc.html, PLAN-APPLE-SETTINGS.md §5.6): full-screen
+/// Switch server on Apple TV:
+/// full-screen
 /// steps with their names across the top. Choose a server, sign in there
 /// (skipped for a server this Apple TV is signed in to already), and
 /// Switched, which says what changed and what happens next with focus on Go

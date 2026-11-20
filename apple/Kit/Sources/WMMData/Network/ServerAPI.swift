@@ -216,8 +216,8 @@ public struct ServerAPI: Sendable {
     }
 }
 
-/// How a sign-in goes on a request, in one place (PLAN-APPLE-REVIEW.md
-/// §5.6): the user agent on every request, and the bearer token only on one
+/// How a sign-in goes on a request, in one place:
+/// the user agent on every request, and the bearer token only on one
 /// to the server at ``baseURL`` (``ServerAPI/owns(_:_:)``: the same scheme,
 /// host and port, under its path), so a token never reaches another host.
 /// The generated client's requests, plain fetches, the event stream, images

@@ -24,9 +24,9 @@ import (
 
 // newWindow is how long after its newest file arrived an item can carry the
 // New badge. The badge also needs the signed-in person not to have watched
-// it (PLAN-HOME.md section 4); the window alone marks items for no one. An
-// episode's arrival is announced only by a file this new
-// (PLAN-NEW-EPISODES.md section 5.2), so both read the one constant.
+// it; the window alone marks items for no one. An
+// episode's arrival is announced only by a file this new,
+// so both read the one constant.
 const newWindow = metadata.NewWindow
 
 // BrowseItem is a movie or show as shown on a poster card or grid tile.
@@ -99,7 +99,7 @@ type LibraryRows struct {
 	RecentlyAired    []EpisodeCard `json:"recentlyAired" nullable:"false" doc:"TV libraries only."`
 	RecentlyReleased []BrowseItem  `json:"recentlyReleased" nullable:"false" doc:"Movie libraries only."`
 	// Rows is the screen in the person's order, sent instead of the fixed
-	// arrays when the request asks for arranged=true (PLAN-ROWS.md §6.1).
+	// arrays when the request asks for arranged=true.
 	Rows []ScreenRow `json:"rows,omitempty" required:"false" nullable:"false" doc:"With arranged=true: the library screen's rows in the person's order, and the three arrays above are empty. From API level 22."`
 }
 
@@ -153,7 +153,7 @@ type HomeData struct {
 	Totals              HomeTotals     `json:"totals"`
 	LastScannedAt       *time.Time     `json:"lastScannedAt,omitempty"`
 	// Rows is Home in the person's order, sent instead of the fixed arrays
-	// when the request asks for arranged=true (PLAN-ROWS.md §6.1).
+	// when the request asks for arranged=true.
 	Rows []ScreenRow `json:"rows,omitempty" required:"false" nullable:"false" doc:"With arranged=true: Home's rows in the person's order, and continueWatching and the four arrays above are empty. The hero and totals are sent either way. From API level 22."`
 }
 
@@ -268,7 +268,7 @@ func registerRows(h huma.API, deps Deps) {
 			}
 			return &LibraryRowsOutput{Body: rows}, nil
 		}
-		// The library's screen in the person's order (PLAN-ROWS.md 6.1):
+		// The library's screen in the person's order:
 		// only the rows drawn are filled, and the fixed arrays go empty.
 		c, err := catalogue(ctx, deps, screenRef{Name: libraryScreenName(lib.ID), LibraryID: lib.ID}, signedInUser(ctx))
 		if err != nil {
@@ -307,7 +307,7 @@ func registerRows(h huma.API, deps Deps) {
 			}
 			return &HomeOutput{Body: out}, nil
 		}
-		// Home in the person's order (PLAN-ROWS.md 6.1): the hero and
+		// Home in the person's order: the hero and
 		// totals as ever, only the rows drawn filled, and the fixed arrays
 		// empty. Recently added is always read: the hero comes from it.
 		c, err := catalogue(ctx, deps, screenRef{Name: ScreenHome}, signedInUser(ctx))
@@ -323,7 +323,7 @@ func registerRows(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
-		// New from shows you follow (PLAN-NEW-EPISODES.md 5.5), when drawn.
+		// New from shows you follow, when drawn.
 		var followed []EpisodeCard
 		if user, ok := auth.UserFrom(ctx); ok && want.followed {
 			if followed, err = followedEpisodes(ctx, deps.Queries, user.ID, time.Now()); err != nil {

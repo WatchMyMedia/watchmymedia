@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The A–Z strip's counts and moves (TvLibraryAZ.dc.html). */
+/** The A–Z strip's counts and moves. */
 class LetterStripTest {
     private val letters = listOf(LetterOffset("#", 0), LetterOffset("A", 2), LetterOffset("C", 5), LetterOffset("M", 9))
 

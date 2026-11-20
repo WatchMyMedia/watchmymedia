@@ -22,7 +22,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowSpeechRecognizer
 
-/** TV Search's voice typing, on Robolectric's speech recognizer (TvSearchKeyboard.dc.html). */
+/** TV Search's voice typing, on Robolectric's speech recognizer. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class VoiceTypingTest {

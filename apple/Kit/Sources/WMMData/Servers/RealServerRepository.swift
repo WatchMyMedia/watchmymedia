@@ -68,7 +68,7 @@ final class RealServerRepository: ServerRepository {
 
     /// Tries each URL the address could mean, in order, and returns the first
     /// that answers as a WatchMyMedia server; refuses one that is too old.
-    /// A failure says what was found (PLAN-APPLE-REVIEW.md §3.4.4): a reply
+    /// A failure says what was found: a reply
     /// this app can't read (update), a server error (restarting), something
     /// else answering, or nothing.
     func probe(_ address: String) async throws -> Server {

@@ -18,7 +18,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The TV's controls to TalkBack (PLAN-ANDROID-REVIEW.md §6.2): buttons and
+ * The TV's controls to TalkBack: buttons and
  * the player's controls are buttons, and a chip keeps its own role. (Their
  * growing with the TV's text size is checked on an emulator: Robolectric
  * measures text the same at every font scale.)

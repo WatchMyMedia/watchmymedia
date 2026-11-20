@@ -1,5 +1,5 @@
-// Package trickplay makes seek thumbnails in the background
-// (PLAN-TRICKPLAY.md): for every file, JPEG sheets of small tiles, one tile
+// Package trickplay makes seek thumbnails in the background:
+// for every file, JPEG sheets of small tiles, one tile
 // every few seconds, which players show above the scrubber while someone
 // seeks. They are kept under <data>/trickplay, not in backups, as they can
 // always be made again.

@@ -19,8 +19,8 @@ type YouTubeTrailer = Extract<PlayableTrailer, { kind: 'youtube' }>
 const PLAYER_ID = 1
 
 /**
- * A movie's YouTube trailer inside the app (TrailerPlayer on the Samsung TV
- * canvas; the Android TV app's TvTrailerScreen). The player route hands it
+ * A movie's YouTube trailer inside the app
+ * (the Android TV app's TvTrailerScreen). The player route hands it
  * trailer requests with a YouTube key and no file. It tries the movie's
  * YouTube trailers from the one asked for, as the movie lists them.
  */

@@ -5,7 +5,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /*
- * Fit and fill (the PlayerFitFill board, PLAN-ANDROID-REVIEW §6.3): a film
+ * Fit and fill: a film
  * wider than the screen, or an episode narrower than a tall phone held
  * sideways, either fits whole with bars or fills the screen with its edges
  * cropped.

@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-// Settings' pieces (TvSettings2*.dc.html, PLAN-APPLE-SETTINGS.md §3.3),
+// Settings' pieces,
 // shared by its group pages and its full-screen tasks.
 
 /// A group of rows under an uppercase heading ("SKIPPING"); no heading
@@ -32,7 +32,7 @@ struct SettingsGroup<Content: View>: View {
 }
 
 /// What a row that saves at once says under its title while and after it
-/// saves (§3.1): Saving, Saved and what the change did, or why it failed
+/// saves: Saving, Saved and what the change did, or why it failed
 /// and what it still is.
 enum RowNote: Equatable {
     case saving
@@ -424,7 +424,7 @@ struct TVStepsBar: View {
 
 // MARK: Questions
 
-/// A question before something that signs out (TvSettings2SignOut.dc.html):
+/// A question before something that signs out:
 /// its title and what happens, then the button that keeps things as they
 /// are (which has focus) above the one that acts.
 struct TVQuestion: Identifiable {

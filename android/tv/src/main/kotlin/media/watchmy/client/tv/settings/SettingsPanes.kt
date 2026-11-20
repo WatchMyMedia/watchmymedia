@@ -71,7 +71,7 @@ internal fun AccountNotLoaded(state: SettingsViewModel.State, retrying: Boolean,
 }
 
 /**
- * Playback (android-tv/SettingsGroupPlayback.dc.html): this TV's settings,
+ * Playback: this TV's settings,
  * then the account's, each under its heading. The five skip rows are one
  * focus stop each and open the side panel, in place of a four-way control
  * a row. [reminderLead] is the Live TV reminders row's value, where
@@ -115,7 +115,7 @@ internal fun ColumnScope.PlaybackPane(
         status = state.status(SettingKey.SubtitleSize, state.device.subtitleSize.label),
     ) { Value(state.device.subtitleSize.label, chevron = true) }
 
-    // Held until the account's settings load, so a default is never saved over someone's choice (§4.5).
+    // Held until the account's settings load, so a default is never saved over someone's choice.
     val ready = state.accountReady
     PaneHeading(ON_EVERY_DEVICE)
     val autoplay = state.playback.autoplayNext
@@ -149,11 +149,11 @@ internal fun ColumnScope.PlaybackPane(
 }
 
 /**
- * Account & devices (android-tv/SettingsGroupAccount.dc.html): this TV's
+ * Account & devices: this TV's
  * name, the signed-in devices (each other one a row whose OK asks before it
  * is signed out), Change password and Switch server, and Sign out of this
  * TV apart at the foot. When a device that had focus is signed out, focus
- * goes to the next one, else the one before, else Change password (§8).
+ * goes to the next one, else the one before, else Change password.
  */
 @Composable
 internal fun ColumnScope.AccountPane(state: SettingsViewModel.State, serverLine: String?, first: FocusRequester, calls: SettingsCalls) {
@@ -240,7 +240,7 @@ internal fun ColumnScope.InboxPane(count: Int?, first: FocusRequester, calls: Se
 
 /**
  * About: the server's and the app's versions, a line when the server is
- * older than some settings need (§4.7), Copy diagnostics, the privacy policy
+ * older than some settings need, Copy diagnostics, the privacy policy
  * and licences. Admin tools moved to Server settings.
  */
 @Composable
@@ -257,6 +257,6 @@ internal fun ColumnScope.AboutPane(serverLine: String, appLine: String, olderSer
     ) { Value("", chevron = true) }
     SettingRow("Privacy policy", onClick = { calls.show(Overlay.Privacy) }) { Value(PRIVACY_POLICY_URL.removePrefix("https://"), chevron = true) }
     SettingRow("Open-source licences", onClick = { calls.show(Overlay.Licences) }) { Value("", chevron = true) }
-    // TMDB's terms ask apps that use its API to say so (PLAN-ROWS.md §3).
+    // TMDB's terms ask apps that use its API to say so.
     Note(TMDB_NOTICE, Modifier.padding(top = 6.dp), color = WmmColors.TextFaint)
 }

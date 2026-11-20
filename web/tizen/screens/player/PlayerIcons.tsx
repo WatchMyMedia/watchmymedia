@@ -1,4 +1,4 @@
-// The player's own icons, drawn as on the PlayerControls board (24 × 24, stroked).
+// The player's own icons, drawn as on the boards (24 × 24, stroked).
 
 /** A stroked path, a filled one, or both. */
 type Glyph = { d?: string; fill?: string; width?: number }

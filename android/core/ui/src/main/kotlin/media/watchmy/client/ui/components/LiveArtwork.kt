@@ -54,7 +54,7 @@ import kotlin.math.absoluteValue
 
 /**
  * The time now, moving on at each minute, for progress, minutes left and the
- * move to next at a programme's end (PLAN-LIVE-TV-GUIDE.md §6.3: no polling).
+ * move to next at a programme's end (no polling).
  * It waits off the main thread so a test's clock never has to run it.
  */
 @Composable
@@ -129,7 +129,7 @@ fun ChannelNumberMark(channel: LiveChannel, modifier: Modifier = Modifier, numbe
 }
 
 /**
- * A programme's 16:9 picture (PLAN-LIVE-TV-GUIDE.md §4.1, §6.1): the
+ * A programme's 16:9 picture: the
  * provider's series card, or with [preferStill] (the wide details panel and
  * the TVs' hero) a matched TMDB still first, captioned "Picture: TMDB". With
  * no picture it falls back to the channel's logo, then its number and name.

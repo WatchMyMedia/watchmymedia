@@ -2,7 +2,7 @@ package media.watchmy.client.model
 
 import java.util.Locale
 
-// The episode page and deleting (PLAN-EPISODE-PAGE.md §2, §3). The Apple apps word these the same way.
+// The episode page and deleting. The Apple apps word these the same way.
 
 /**
  * The server API level that says who may delete ([RequestOptions.delete])

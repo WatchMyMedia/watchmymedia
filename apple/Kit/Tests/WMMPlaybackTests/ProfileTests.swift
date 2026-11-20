@@ -3,8 +3,8 @@ import Testing
 @testable import WMMPlayback
 import WMMModel
 
-/// What each device sends as its profile (android/core/playback/.../ProfileTest.kt,
-/// for PLAN-CLIENTS.md §4.4 and PLAN-HDR-PROFILE.md §6.2).
+/// What each device sends as its profile
+/// (android/core/playback/.../ProfileTest.kt).
 @MainActor
 @Suite struct ProfileTests {
     let audio = ["aac", "mp3", "flac", "alac", "ac3", "eac3"]
@@ -33,7 +33,7 @@ import WMMModel
         #expect(p.maxWidth == 3840)
         #expect(p.maxHeight == 2160)
         #expect(p.maxBitrate == nil)
-        // Six on its stereo speaker: it mixes 5.1 down itself (PLAN-AUDIO.md §3.7).
+        // Six on its stereo speaker: it mixes 5.1 down itself.
         #expect(p.maxAudioChannels == 6)
         #expect(p.hdr)
         #expect(p.subtitleFormats == ["webvtt"])
@@ -52,7 +52,7 @@ import WMMModel
         let p = buildProfile(describeDevice(Device(plays: everything, hdrEligible: false, hardwareHEVC: true, hdrModes: allModes)))
         #expect(p.videoCodecs == ["h264", "hevc", "hevc10", "av1"])
         #expect(!p.hdr)
-        // Empty, not nil: the server still classifies by PLAN-HDR-PROFILE.
+        // Empty, not nil: the server still classifies by the HDR profile.
         #expect(p.hdrTypes == [])
         // A server before level 8 gets today's profile: hevc10 only where HDR shows.
         let old = p.forAPILevel(hdrProfileAPILevel - 1)
@@ -112,7 +112,7 @@ import WMMModel
     }
 
     @Test func appleTVHD() {
-        // PLAN-CLIENTS.md §4.4: 1080p, no HDR, h264 and hevc.
+        // 1080p, no HDR, h264 and hevc.
         let p = buildProfile(describeDevice(Device(plays: [CodecProbe.h264, CodecProbe.hevc], hdrEligible: false, hardwareHEVC: true), tv: true))
         #expect(p.name == "tvos")
         #expect(p.videoCodecs == ["h264", "hevc"])
@@ -128,7 +128,7 @@ import WMMModel
     }
 
     @Test func anAppleTVAsksForWhatItsOutputTakes() {
-        // PLAN-APPLE-REVIEW.md §3.1.1: a receiver set to 5.1 or 7.1 gets surround; a TV's speakers stereo.
+        // A receiver set to 5.1 or 7.1 gets surround; a TV's speakers stereo.
         for (output, asked) in [(2, 2), (6, 6), (8, 8), (0, 2)] {
             let p = buildProfile(describeDevice(Device(plays: everything, hdrEligible: true, hardwareHEVC: true, outputChannels: output), tv: true))
             #expect(p.maxAudioChannels == asked, "output \(output)")
@@ -136,7 +136,7 @@ import WMMModel
     }
 
     @Test func anIPhoneOrIPadAsksForSixChannelsOrMore() {
-        // PLAN-APPLE-REVIEW.md §2.1, PLAN-AUDIO.md §3.7: a 5.1 film keeps direct play and the
+        // A 5.1 film keeps direct play and the
         // device mixes it down itself, on the speaker or headphones (two channels out).
         #expect(handheldSurroundChecked)
         let stereoOut = Device(plays: everything, hdrEligible: true, hardwareHEVC: true)

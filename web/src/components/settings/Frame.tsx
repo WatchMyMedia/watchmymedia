@@ -3,8 +3,8 @@ import type { Crumb } from '../../lib/settingsRoutes'
 import type { SaveState } from './hooks'
 import { useAway, useGo } from './hooks'
 
-// The pieces every Settings page and flow is drawn with
-// (PLAN-ADMIN-SETTINGS.md §3): the breadcrumb, the away chips and lock marks,
+// The pieces every Settings page and flow is drawn with:
+// the breadcrumb, the away chips and lock marks,
 // buttons, the hub's parts, messages, fields and choices.
 
 /** A link inside the app by address. Goes through the leave check. */
@@ -137,7 +137,7 @@ export function Pill({ tone = 'off', children }: { tone?: PillTone; children: Re
 }
 
 /**
- * A tab's hub or an item page under it (§3.1): the breadcrumb with the away
+ * A tab's hub or an item page under it: the breadcrumb with the away
  * chips, the title with its state in a line and a pill, an optional banner,
  * then the page. Help, when given, sits beside the page (under it on phones).
  */
@@ -182,7 +182,7 @@ export function HubPage({ crumbs, title, lede, pill, banner, help, actions, chil
   )
 }
 
-/** Help beside the form (§3.2), under it on phones. */
+/** Help beside the form, under it on phones. */
 export function Help({ children }: { children: ReactNode }) {
   return <aside className="border-l-2 border-line pl-4 text-[13.5px] text-neutral-400 [&_h4]:mb-1 [&_h4]:text-[13px] [&_h4]:font-semibold [&_h4]:text-neutral-300 [&_p]:mb-3">{children}</aside>
 }
@@ -210,7 +210,7 @@ export type GuideItem = {
   action?: ReactNode
 }
 
-/** The setup guide (§3.1): never more than five tasks, with a count and a bar. */
+/** The setup guide: never more than five tasks, with a count and a bar. */
 export function SetupGuide({ items, done, total }: { items: GuideItem[]; done: number; total: number }) {
   const id = useId()
   return (
@@ -288,7 +288,7 @@ export function ItemRow({ href, title, pill, detail, control, children }: { href
   return <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5">{body}</div>
 }
 
-/** Removes sit apart, at the bottom of the page they belong to (§3.8). */
+/** Removes sit apart, at the bottom of the page they belong to. */
 export function RemoveSection({ children, title = 'Remove' }: { children: ReactNode; title?: ReactNode }) {
   return (
     <Section title={title}>
@@ -308,7 +308,7 @@ const messageLook: Record<MessageTone, { box: string; title: string }> = {
 }
 
 /**
- * A message (§3.5): what happened, whether anything was saved, and what to
+ * A message: what happened, whether anything was saved, and what to
  * do, with the fix as a button. Refusals are alerts; reports are statuses.
  * `focus` moves focus to it when it appears.
  */
@@ -338,7 +338,7 @@ export function SaveNote({ state, idle }: { state: SaveState; idle?: ReactNode }
 
 export const fieldInput = 'min-h-[44px] w-full rounded-md border border-line-2 bg-ground px-3 text-sm text-neutral-100 placeholder:text-neutral-500 aria-[invalid=true]:border-red-700'
 
-/** A labelled field: its hint, and its mistake under it (§3.5). The child is
+/** A labelled field: its hint, and its mistake under it. The child is
  * the control; give it `id` and `aria-describedby` from the render prop. */
 export function Field({ label, hint, error, children, optional }: {
   label: ReactNode
@@ -398,7 +398,7 @@ export function Switch({ checked, onChange, disabled, label }: { checked: boolea
 }
 
 /**
- * The save bar (§3.6): appears with a draft's first change and holds Discard
+ * The save bar: appears with a draft's first change and holds Discard
  * and Save. Sticks to the top of the page.
  */
 export function SaveBar({ dirty, saving, onDiscard, onSave, guarded, error, saveLabel = 'Save' }: { dirty: boolean; saving?: boolean; onDiscard: () => void; onSave: () => void; guarded?: boolean; error?: ReactNode; saveLabel?: string }) {
@@ -418,7 +418,7 @@ export function SaveBar({ dirty, saving, onDiscard, onSave, guarded, error, save
   )
 }
 
-/** "What changed" and "What happens next", on a finished flow (§3.7). */
+/** "What changed" and "What happens next", on a finished flow. */
 export function Outcome({ changed, next, titles = ['What changed', 'What happens next'] }: { changed: ReactNode[]; next: ReactNode[]; titles?: [string, string] }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">

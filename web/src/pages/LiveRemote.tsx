@@ -27,8 +27,8 @@ type Props = { channelId: string; controller: LiveTVController; onLocal: () => v
 let releaseTimer: number | undefined
 
 /**
- * The live player as the TV's remote while this browser casts a channel
- * (PLAN-LIVE-TV.md §4.1; the LiveCast and LiveCastPhone boards). The TV
+ * The live player as the TV's remote while this browser casts a
+ * channel. The TV
  * plays the channel on this person's sign-in; this page shows its banner
  * and sends Ch− / Ch+, the channel list, Pause, Go live and Quality.
  * Opening it for a channel the TV isn't on casts that channel, after this

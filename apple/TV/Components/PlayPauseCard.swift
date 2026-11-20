@@ -3,8 +3,8 @@ import WMMFeatures
 import WMMModel
 
 extension View {
-    /// Play/Pause on this focused card does what ``CardPlayPause`` says
-    /// (PLAN-APPLE-REVIEW.md §6.2): plays it, tunes it, or does `select`
+    /// Play/Pause on this focused card does what ``CardPlayPause`` says:
+    /// plays it, tunes it, or does `select`
     /// (the card's own Select) when there is nothing single to play. Only the
     /// two players handled the key before; elsewhere it did nothing.
     func playPauseCard(_ card: CardPlayPause, select: @escaping () -> Void) -> some View {

@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import WMMModel
 
-/// A TV Shows or Movies grid (Library.dc.html): a title search, the filter
+/// A TV Shows or Movies grid: a title search, the filter
 /// chips, the genre (and, for movies, decade) chips from the facets, a sort,
 /// and the posters a page at a time.
 @MainActor
@@ -45,12 +45,12 @@ public final class LibraryModel {
         /// Every title up to the letter's, and a page more, after those held:
         /// the grid keeps its start, so its rows stay where the whole list puts
         /// them and the titles before the letter are still there to go back to
-        /// (Apple TV, TvLibraryAZ.dc.html).
+        /// (Apple TV).
         case extend
     }
     /// The most a quiet reload asks for at once: a grid scrolled further is
     /// asked for in pieces, so a library above the server's limit of 1,000 a
-    /// request keeps every title it showed (PLAN-APPLE-REVIEW.md §3.3.2).
+    /// request keeps every title it showed.
     public static let reloadPageSize = 500
     /// Marked titles whose watched state is fetched one by one; more than this
     /// in one event, and the grid is loaded again.
@@ -73,16 +73,16 @@ public final class LibraryModel {
     public private(set) var scrollTargetID: Int?
     /// Changes on every jump, including a repeated tap on the same letter.
     public private(set) var scrollRequestID = 0
-    /// Changes when the grid has loaded with a Home row's See all
-    /// (PLAN-SEE-ALL.md §4.4): the screen scrolls to the grid's heading, below the rows.
+    /// Changes when the grid has loaded with a Home row's See all:
+    /// the screen scrolls to the grid's heading, below the rows.
     public private(set) var gridJump = 0
     /// Home's See all was taken and its options chosen; the grid hasn't loaded with them yet.
     @ObservationIgnored private var browseLinkWaiting = false
     private var changingQuery = false
     public var message: String?
     public var notice: Notice?
-    /// The library's rows in the person's order, above the grid (PLAN-ROWS.md
-    /// Decision 11); empty below ``rowsAPILevel``.
+    /// The library's rows in the person's order, above the grid;
+    /// empty below ``rowsAPILevel``.
     public private(set) var rows: [ScreenRow] = []
 
     @ObservationIgnored private let library: any LibraryRepository
@@ -127,8 +127,8 @@ public final class LibraryModel {
     public var decades: [Int] { decades(includingShows: false) }
 
     /// The decade chips from the facets: for movies always, and for shows too
-    /// where the filter row has the room for them (the iPad's, PadLibrary.dc.html)
-    /// or a Decade menu takes them (Apple TV's, TvLibrary.dc.html).
+    /// where the filter row has the room for them (the iPad's)
+    /// or a Decade menu takes them (Apple TV's).
     public func decades(includingShows: Bool) -> [Int] {
         type == .movie || includingShows ? state.value?.decades ?? [] : []
     }
@@ -187,8 +187,8 @@ public final class LibraryModel {
 
     // MARK: Loading
 
-    /// Loads the grid, then follows what changes until cancelled
-    /// (PLAN-APPLE-REVIEW.md §4.1.1): another library's changes and scans
+    /// Loads the grid, then follows what changes until cancelled:
+    /// another library's changes and scans
     /// are ignored, marks are drawn from the event (one request a title when
     /// the event doesn't say watched or not), and the grid is loaded again,
     /// in pieces, only when this library changed or a show's state can't be
@@ -315,7 +315,7 @@ public final class LibraryModel {
         }
     }
 
-    /// What a row's See all card and heading link say (PLAN-SEE-ALL.md §3);
+    /// What a row's See all card and heading link say;
     /// nil for a row without one. A library link opens the grid below.
     public func seeAll(_ row: ScreenRow) -> SeeAllWords? {
         SeeAllWords(row: row, libraryType: type)
@@ -325,7 +325,7 @@ public final class LibraryModel {
     private var tab: AppTab { type.tab }
 
     /// A library link's sort (when this library offers it) and filters, as the
-    /// person's own choice (PLAN-SEE-ALL.md decision 3): the filter All unless
+    /// person's own choice: the filter All unless
     /// the link names one, the link's genre and decade, no title search.
     private func choose(_ link: RowLink) {
         guard case .library(_, let sort, let filter, let genre, let decade) = link else { return }

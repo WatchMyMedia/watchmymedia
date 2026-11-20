@@ -24,8 +24,7 @@ import media.watchmy.client.presentation.Load
 import media.watchmy.client.presentation.ShownPage
 
 /**
- * Settings › Notifications (PLAN-NEW-EPISODES.md §7.2; the boards'
- * `settings`, `tv-settings`), on the phone, the tablet and the TV: the shows
+ * Settings › Notifications, on the phone, the tablet and the TV: the shows
  * the person follows, newest first, with Stop notifying, and this device's
  * switch. Stop notifying takes the row away at once; if the server refuses,
  * the row comes back with its failure until Try again or the next change.

@@ -9,9 +9,9 @@ import kotlinx.coroutines.flow.emptyFlow
 
 /*
  * Following a show, and a notification when a new episode of it reaches the
- * library (PLAN-NEW-EPISODES.md), from [FOLLOWS_API_LEVEL]. A person follows
+ * library, from [FOLLOWS_API_LEVEL]. A person follows
  * a show on the server, so the list is the same on every device; each phone
- * and tablet checks the server's feed for itself (§6.1) and notifies. TVs
+ * and tablet checks the server's feed for itself and notifies. TVs
  * follow for the person's phone and show the Home row instead.
  */
 
@@ -93,7 +93,7 @@ interface FollowsRepository {
     val libraryChanged: Flow<Unit> get() = emptyFlow()
 
     /**
-     * This device's switch for new-episode notifications (§7.2), kept on the
+     * This device's switch for new-episode notifications, kept on the
      * device and on by default; the system's own permission is apart from it.
      */
     val notifyHere: StateFlow<Boolean>
@@ -116,7 +116,7 @@ interface FollowsRepository {
 
 const val FOLLOWS_UPDATE_SERVER = "Update the server to follow shows."
 
-// --- the check (§6.1) ---
+// --- the check ---
 
 /**
  * Whether this device checks for new episodes: whenever it could notify.
@@ -124,7 +124,7 @@ const val FOLLOWS_UPDATE_SERVER = "Update the server to follow shows."
  * switch is on and the system lets the channel show ([allowed]; null when it
  * hasn't been asked, as in a process started for the check itself). Not
  * whether the person follows a show: a show followed on another device must
- * notify here too (decision 1), and the feed answers an empty reply cheaply.
+ * notify here too, and the feed answers an empty reply cheaply.
  */
 fun newEpisodeChecks(supported: Boolean, notifyHere: Boolean, allowed: Boolean?): NewEpisodeChecks = when {
     !supported || !notifyHere || allowed == false -> NewEpisodeChecks.Stop
@@ -184,7 +184,7 @@ sealed interface NewEpisodeCheck {
 }
 
 /**
- * One check (PLAN-NEW-EPISODES.md §6.1), the same on every trigger: ask the
+ * One check, the same on every trigger: ask the
  * feed with the cursor kept for this server and person, [show] a
  * notification for each show in the reply, then keep the new cursor. The
  * first check for an account asks without a cursor and only keeps the one it
@@ -221,7 +221,7 @@ suspend fun checkNewEpisodes(
     return NewEpisodeCheck.Shown(reply.shows)
 }
 
-/** At most this many shows get a notification of their own from one check; the rest share one (§6.2). */
+/** At most this many shows get a notification of their own from one check; the rest share one. */
 const val NEW_EPISODES_MAX_SHOWN = 5
 
 /** What one check posts: a notification for each of [shows], and one for [more] shows past them when there are. */

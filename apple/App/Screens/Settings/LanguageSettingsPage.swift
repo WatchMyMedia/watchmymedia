@@ -3,12 +3,10 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings › Audio & subtitles (SettingsLanguages.dc.html, and
-/// Pad2SettingsLanguages.dc.html in two columns where the page is wide;
-/// PLAN-LANGUAGES.md §5.6): the audio languages, how subtitles start, the
+/// Settings › Audio & subtitles (in two columns
+/// where the page is wide): the audio languages, how subtitles start, the
 /// subtitle languages and automatic download. Each change saves at once.
-/// Add language opens every language by name, to search
-/// (Settings2AddLanguage.dc.html).
+/// Add language opens every language by name, to search.
 struct LanguageSettingsPage: View {
     let model: SettingsModel
     @State private var width: CGFloat = 0

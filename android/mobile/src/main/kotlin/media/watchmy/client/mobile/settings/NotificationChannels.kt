@@ -18,8 +18,8 @@ import media.watchmy.client.model.NEW_EPISODES_CHANNEL
 import media.watchmy.client.model.NotificationsBlocked
 
 /**
- * Whether the notifications on [channel] can show (PLAN-NEW-EPISODES.md §7.3,
- * after public #54): notifications are on for the app, and the channel isn't
+ * Whether the notifications on [channel] can show:
+ * notifications are on for the app, and the channel isn't
  * off. The same check for Live TV reminders and new episodes; a channel not
  * made yet counts as on, as Android makes it on.
  */
@@ -31,8 +31,8 @@ fun notificationsAllowed(context: Context, channel: String): Boolean {
 }
 
 /**
- * Android's screen where [channel]'s notifications are turned on
- * (PLAN-ANDROID-SETTINGS.md §4.7, PLAN-NEW-EPISODES.md §7.3). With the app's
+ * Android's screen where [channel]'s notifications are turned on.
+ * With the app's
  * notifications off, as they are on Android 13 and later until the
  * permission is given, that is the app's notifications screen: a channel's
  * own screen says the channel is blocked and its switch does nothing until

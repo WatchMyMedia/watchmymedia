@@ -12,7 +12,7 @@ type Episode = components['schemas']['Episode']
 type RequestOptions = components['schemas']['RequestOptions']
 
 /**
- * The season's episodes (ShowPage's row): the one on top ringed in gold
+ * The season's episodes: the one on top ringed in gold
  * with On top. Focus on a card puts its episode on top, and the row follows
  * it as the kit's rows do (the card before it stays in view, only the cards
  * near the view are drawn); OK moves focus back up to its Play and never

@@ -83,7 +83,7 @@ export function LibraryBrowse({ type, search }: { type: 'movie' | 'tv'; search: 
   )
 }
 
-/** The Overview's rows in the person's order, and Edit rows after them, above the grid (PLAN-ROWS.md §5). */
+/** The Overview's rows in the person's order, and Edit rows after them, above the grid. */
 function Rows({ libraryId, type, search }: { libraryId: number; type: 'movie' | 'tv'; search: BrowseSearch }) {
   const rows = useQuery(rowsQuery(libraryId))
   const libraries = useQuery(librariesQuery)

@@ -1,6 +1,6 @@
 import XCTest
 
-/// A Home row's See all on iPhone and iPad (PLAN-SEE-ALL.md §4.4, S3), on the
+/// A Home row's See all on iPhone and iPad, on the
 /// fakes with arranged rows: Recently aired's heading link and the card at the
 /// row's end both read "See all TV shows, by last aired"; the card opens TV
 /// Shows at its grid sorted Last aired; and the link is used once, so a sort

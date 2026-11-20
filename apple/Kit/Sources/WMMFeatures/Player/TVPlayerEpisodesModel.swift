@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import WMMModel
 
-/// The Apple TV player's Episodes tab (TvPlayerEpisodes.dc.html,
-/// PLAN-APPLE-REVIEW.md §6.2): after Info in the system's info panel, for
+/// The Apple TV player's Episodes tab:
+/// after Info in the system's info panel, for
 /// episodes only, the show's seasons above the chosen season's episodes on
 /// disk, opening on the one playing. Choosing another plays it from where
 /// the person left it; the one playing has nothing to choose.

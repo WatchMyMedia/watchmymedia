@@ -4,8 +4,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings on Apple TV (TvSettings2*.dc.html, PLAN-APPLE-SETTINGS.md §3.3
-/// and §5.9): the web's groups as a list at the left, each with how things
+/// Settings on Apple TV:
+/// the web's groups as a list at the left, each with how things
 /// stand in it (`tvSettingsGroups`); the chosen group's page beside it; and
 /// what the focused setting does in a panel at the right.
 ///
@@ -835,7 +835,7 @@ private struct SettingsView: View {
 }
 
 /// Server settings in the web app, as a code to scan beside what it holds
-/// (TvSettings2Server.dc.html, `tvServerSettingsNotice`). Where the server
+/// (`tvServerSettingsNotice`). Where the server
 /// keeps admins out from here, the reason is in the warning colour.
 private struct ServerSettingsLabel: View {
     let server: Server

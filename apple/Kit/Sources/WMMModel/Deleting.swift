@@ -1,7 +1,7 @@
 import Foundation
 
-/// What deleting an episode would do, as the server's `previewDelete` says
-/// (PLAN-ARR.md §8): the Radarrs or Sonarrs that hold it, asked just now.
+/// What deleting an episode would do, as the server's `previewDelete` says:
+/// the Radarrs or Sonarrs that hold it, asked just now.
 public struct DeletePreview: Hashable, Sendable {
     /// Some Radarr or Sonarr manages the item. When false there is no
     /// delete: it is deleted where it was downloaded, or on disk.

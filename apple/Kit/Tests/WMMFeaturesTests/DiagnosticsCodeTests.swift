@@ -3,7 +3,7 @@ import Testing
 @testable import WMMFeatures
 import WMMModel
 
-/// What Apple TV's Diagnostics shows (TvDiagnostics.dc.html): the code's
+/// What Apple TV's Diagnostics shows: the code's
 /// text within its size, oldest log lines left out first, the summary beside
 /// it, and Show as text's pages.
 @Suite struct DiagnosticsCodeTests {

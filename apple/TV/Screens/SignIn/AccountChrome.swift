@@ -3,8 +3,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// What the server picker and the sign-in screens share (TvMain.dc.html,
-/// TvServerPicker.dc.html): the burgundy light, the lockup at the top left
+/// What the server picker and the sign-in screens share:
+/// the burgundy light, the lockup at the top left
 /// and the footer line along the bottom.
 struct AccountChrome<Content: View>: View {
     var footerLeading: String?

@@ -20,7 +20,7 @@ type Tested = { address: string; result: Inspection }
 const crumbs: Crumb[] = settingsCrumbs('live-tv', { label: 'Add a tuner' })
 
 /**
- * Add a tuner (PLAN-ADMIN-SETTINGS.md §5.4): Address → What was found → Who
+ * Add a tuner: Address → What was found → Who
  * can watch (the first tuner only) → Added. The same flow adds every later
  * tuner. Once the tuner is saved, its id is the address's last segment, so a
  * reload stays on the step.

@@ -39,8 +39,8 @@ type Cache struct {
 	// flight shares one download of an image among the requests for it.
 	flight memo.Group
 
-	// custom holds the pictures admins chose in place of TMDB's
-	// (PLAN-POSTERS.md); nil serves none.
+	// custom holds the pictures admins chose in place of TMDB's;
+	// nil serves none.
 	custom *artwork.Store
 }
 

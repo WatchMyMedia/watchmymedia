@@ -32,8 +32,8 @@ import org.robolectric.annotation.Config
 
 /**
  * Moving focus through the TV guide changes its selection, and with it the
- * hero, and nothing else: no row and no programme cell composes again
- * (PLAN-ANDROID-REVIEW.md §4.3.3). Counted with the Compose runtime's
+ * hero, and nothing else: no row and no programme cell composes again.
+ * Counted with the Compose runtime's
  * tracer, which a composable reports to when it runs, not when it skips.
  */
 @OptIn(ExperimentalTestApi::class, InternalComposeTracingApi::class)

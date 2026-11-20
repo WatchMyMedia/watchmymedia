@@ -1,7 +1,7 @@
 import XCTest
 
-/// Fit and fill in both players (PLAN-APPLE-REVIEW.md §6.3,
-/// design/mockups/ios/PlayerFitFill.dc.html), on the fakes, on iPhone and
+/// Fit and fill in both players,
+/// on the fakes, on iPhone and
 /// iPad: the button beside Close, the pinch, the note, the remembered choice,
 /// and that a double tap still seeks. The fakes draw a backdrop rather than
 /// video, so how the picture is cropped is checked by hand against a server.

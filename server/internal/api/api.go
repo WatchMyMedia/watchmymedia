@@ -61,7 +61,7 @@ const (
 // Deps are the services the handlers need. Queries may be nil when the API is
 // only built to emit its OpenAPI document.
 type Deps struct {
-	AdaptiveHLS bool // explicit experimental operator opt-in; false until M2 qualification
+	AdaptiveHLS bool // explicit experimental operator opt-in; false until qualification
 	Version     string
 	// Host is the platform a container install runs on when known
 	// ("unraid"), for ServerInfo.host; empty otherwise.
@@ -74,7 +74,7 @@ type Deps struct {
 	// Images serves cached TMDB artwork at /api/images/{size}/{file}.
 	Images http.Handler
 	// Artwork keeps the pictures admins chose in place of TMDB's posters,
-	// and ImagesDir is where Images caches their sizes (PLAN-POSTERS.md);
+	// and ImagesDir is where Images caches their sizes;
 	// without Artwork, uploads and links are refused.
 	Artwork   *artwork.Store
 	ImagesDir string
@@ -137,8 +137,8 @@ type Deps struct {
 	// Trailers refreshes movies' TMDB trailers and says whether YouTube
 	// trailers are on; nil makes one that reads the setting but doesn't run.
 	Trailers *trailers.Refresher
-	// Related fetches titles' related data from TMDB in the background
-	// (PLAN-RELATED.md); nil fetches nothing.
+	// Related fetches titles' related data from TMDB in the background;
+	// nil fetches nothing.
 	Related *related.Refresher
 	// Offline keeps the offline downloads being fetched now; nil makes one.
 	Offline      *offline.Transfers
@@ -147,8 +147,8 @@ type Deps struct {
 	Recordings   *dvr.Service
 	// Guide keeps Live TV listings; nil leaves them off.
 	Guide *guide.Service
-	// Lists makes the lists rows come from and fetches them again
-	// (PLAN-ROWS.md 7.2); nil makes one that doesn't run its refresh job.
+	// Lists makes the lists rows come from and fetches them
+	// again; nil makes one that doesn't run its refresh job.
 	Lists *lists.Service
 	// listsState keeps the list routes' caches.
 	listsState *listsState
@@ -363,7 +363,7 @@ func schemaName(t reflect.Type, hint string) string {
 //     since CORS never allows credentials, and act with the cast token they
 //     were given;
 //   - with an Authorization: Bearer token, as the packaged TV apps send
-//     from file:// pages (PLAN-SAMSUNG.md §3): such a request is
+//     from file:// pages: such a request is
 //     authenticated by that token alone, never the cookie (auth.TokenFrom),
 //     and a browser sends the header only when a page's own script sets
 //     it, with a token the page already holds. Other schemes, such as the

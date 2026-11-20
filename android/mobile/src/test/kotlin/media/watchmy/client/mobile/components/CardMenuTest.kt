@@ -23,8 +23,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * A card's menu with a mouse or a keyboard (TabCardMenuPointer,
- * PLAN-ANDROID-REVIEW §6.3): a right-click opens it rather than the card,
+ * A card's menu with a mouse or a keyboard:
+ * a right-click opens it rather than the card,
  * and so does the Menu key on the focused card.
  */
 @OptIn(ExperimentalTestApi::class)

@@ -66,7 +66,7 @@ internal fun RenameDialog(current: String, onDismiss: () -> Unit, onSave: (Strin
     )
 }
 
-/** SettingsQuality.dc.html: Automatic first (where the server can do it), with what it does under it. */
+/** Default quality: Automatic first (where the server can do it), with what it does under it. */
 @Composable
 internal fun QualityDialog(current: StreamQuality, options: List<StreamQuality>, onDismiss: () -> Unit, onPick: (StreamQuality) -> Unit) {
     AlertDialog(
@@ -97,7 +97,7 @@ internal fun QualityDialog(current: StreamQuality, options: List<StreamQuality>,
 }
 
 /**
- * SettingsMobileData.dc.html: Same as on Wi-Fi first, with the Default
+ * On mobile data: Same as on Wi-Fi first, with the Default
  * quality under it, then the qualities as Default quality lists them.
  */
 @Composable

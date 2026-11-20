@@ -1,6 +1,6 @@
 import XCTest
 
-/// A hardware keyboard on iPad (PLAN-APPLE-REVIEW.md §6.3): space and the
+/// A hardware keyboard on iPad: space and the
 /// arrows in the players, and ⌘F for Search. On the fakes;
 /// iPad only, since an iPhone is rarely used with a keyboard and the keys
 /// are the same.

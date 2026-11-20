@@ -21,7 +21,7 @@ export function invalidateLibrary(qc: QueryClient, libraryId: number) {
   // An open movie or show page: files came or went (an import, a delete).
   void qc.invalidateQueries({ queryKey: ['movie'] })
   void qc.invalidateQueries({ queryKey: ['show'] })
-  // Its related rows: a title came, or one they list went (PLAN-RELATED.md §7).
+  // Its related rows: a title came, or one they list went.
   void qc.invalidateQueries({ queryKey: ['related'] })
 }
 
@@ -64,18 +64,17 @@ export function eventInvalidations(qc: QueryClient): EventInvalidations {
     'plex.history.changed': (e) => plexHistory(e as PlexHistoryChanged),
     // This person starred a channel or set a reminder, here or on another
     // device; reminders also change when a listings refresh moves or loses
-    // their programme (PLAN-LIVE-TV-GUIDE.md §5.7).
+    // their programme.
     'live.favourites.changed': () => invalidatePersonalLiveTV(qc),
     'live.reminders.changed': () => invalidatePersonalLiveTV(qc),
     'live.recordings.changed': () => invalidateRecordings(qc),
     // This person's rows were arranged on another device, or an admin changed
     // the household's default; a list was made, changed or deleted, or a fetch
-    // changed what is on it (PLAN-ROWS.md §6.2, §6.3).
+    // changed what is on it.
     'rows.changed': () => invalidateRowsAndLists(qc),
     'lists.changed': () => invalidateRowsAndLists(qc),
     // This person followed or stopped following a show, here or on another
-    // device: the bell, Settings › Notifications and Home's row redraw
-    // (PLAN-NEW-EPISODES.md §5.3).
+    // device: the bell, Settings › Notifications and Home's row redraw.
     'follows.changed': () => invalidateFollows(qc),
     // A file's seek thumbnails are made (sent to admins): Settings › Transcoding's count moves on.
     'trickplay.ready': () => void qc.invalidateQueries({ queryKey: ['trickplay'] }),

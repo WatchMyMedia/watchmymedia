@@ -1,7 +1,7 @@
 import type { FilePlaybackState, Segment } from '../../player'
 
-// The scrubber's geometry, in percent of the track (PlayerControls,
-// RecordingPlayer): what has played and is buffered, a seek's target and
+// The scrubber's geometry, in percent of the track:
+// what has played and is buffered, a seek's target and
 // the gap to it, the segment bands, and how much of a growing recording is
 // written. The track is the timeline: a growing recording's planned length.
 

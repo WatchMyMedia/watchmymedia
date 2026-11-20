@@ -9,8 +9,8 @@ import { startProblemWords } from './startWords'
 type Problem = Extract<StartState, { screen: 'problem' }>
 
 /**
- * Why this TV can't go on with a server (ServerProblems on the Samsung TV
- * canvas): it can't be reached, it isn't set up yet, it is too old for this
+ * Why this TV can't go on with a server:
+ * it can't be reached, it isn't set up yet, it is too old for this
  * TV, or this TV was signed out from another device.
  */
 export function StartProblemScreen({ state }: { state: Problem }) {

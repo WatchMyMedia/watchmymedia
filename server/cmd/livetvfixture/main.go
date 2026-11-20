@@ -206,7 +206,7 @@ func run(port int, ffmpeg, ffprobe, receiver string, recording, streaming, share
 	workers.Go(func() { listings.Run(ctx) })
 	defer func() { cancel(); recordings.Close(); live.Close(); workers.Wait() }()
 	// A receiver served on its own origin can play the fixture's channels
-	// with a cast token (PLAN-LIVE-TV.md §4.1).
+	// with a cast token.
 	var cast api.CastOptions
 	if receiver != "" {
 		cast = api.CastOptions{Enabled: true, URL: fmt.Sprintf("http://127.0.0.1:%d", port), ReceiverOrigins: []string{receiver}, Host: "127.0.0.1", Port: port}

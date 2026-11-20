@@ -1,6 +1,6 @@
 import Foundation
 
-// The Apple TV's Top Shelf (PLAN-APPLE-REVIEW.md §2.2, §6.2; TvTopShelfSections.dc.html):
+// The Apple TV's Top Shelf:
 // the app writes this snapshot into the App Group it shares with its Top Shelf
 // extension, and the extension only reads it. This target is Foundation alone,
 // so the extension links nothing else of the Kit: no sign-in, no network, no
@@ -73,7 +73,7 @@ public struct TopShelfSection: Codable, Hashable, Sendable {
 }
 
 extension TopShelfSection.Kind {
-    /// The section's heading (TvTopShelfSections.dc.html).
+    /// The section's heading.
     public var title: String {
         switch self {
         case .continueWatching: "Continue watching"

@@ -1,4 +1,4 @@
-// The rules every stepped flow follows (PLAN-ADMIN-SETTINGS.md §3.2):
+// The rules every stepped flow follows:
 // which step an address opens, what Back goes to, and how the stepper draws.
 
 export type FlowStep = {

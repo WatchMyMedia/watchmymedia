@@ -2,7 +2,7 @@ import { relativeTime } from '../../../src/lib/format'
 import { entryView, inLibraryWords, listMeta, retryWords, type MediaList, type MediaListEntry } from '../../../src/lib/mediaLists'
 import type { RequestTarget } from '../requests/RequestDialog'
 
-// A list's page on the TV (ListPage on the canvas): its header's words and
+// A list's page on the TV: its header's words and
 // what OK and Hold OK do on each title. The rules for which titles are in
 // the library, missing or not found are the web's (mediaLists.ts).
 

@@ -4,8 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// Server settings for admins, and the pages that aren't offered here
-/// (PLAN-APPLE-SETTINGS.md §5.6, §5.8).
+/// Server settings for admins, and the pages that aren't offered here.
 @MainActor
 @Suite struct ServerSettingsTests {
     init() { FakeLatency.duration = .zero }

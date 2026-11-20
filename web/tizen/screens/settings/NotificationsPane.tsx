@@ -11,7 +11,7 @@ import { PaneHeading, PaneNote, SettingRow } from './SettingRow'
 const id = (row: string) => paneRowId('notifications', row)
 
 /**
- * Settings › Notifications (SettingsGroups, Tweak `group`: `notifications`):
+ * Settings › Notifications:
  * the shows this person follows, newest first, each with its newest
  * episode. OK opens Go to show and Stop notifying; stopping keeps the show
  * in the library and only its banners stop, on every device.

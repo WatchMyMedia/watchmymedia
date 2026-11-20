@@ -70,7 +70,7 @@ body {
   }
 }
 
-/* Settings flows (PLAN-ADMIN-SETTINGS.md §6): steps slide in the direction of
+/* Settings flows: steps slide in the direction of
    travel and messages fade in where they appear; nothing moves for people who
    ask for reduced motion. */
 .settings-fade {

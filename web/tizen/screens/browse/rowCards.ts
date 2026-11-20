@@ -235,7 +235,7 @@ export function rowHeading(row: ScreenRow, listings: boolean, clock?: string): [
   return [title, small]
 }
 
-/** The route of a Home row's See all: a list's page, or its library sorted the row's way (PLAN-SEE-ALL.md). */
+/** The route of a Home row's See all: a list's page, or its library sorted the row's way. */
 export function seeAllRoute(target: SeeAllTarget, row: Pick<ScreenRow, 'id' | 'title'>, libraries: readonly LibraryRef[]): Route | undefined {
   if (target.kind === 'list') return { name: 'list', id: target.listId }
   const libraryId = target.search.library ?? libraries.find((l) => l.type === target.type)?.id

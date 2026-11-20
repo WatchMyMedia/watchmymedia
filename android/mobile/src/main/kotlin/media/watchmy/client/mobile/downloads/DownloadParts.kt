@@ -95,8 +95,8 @@ internal val Orange = Color(0xFFFB923C)
 internal val DangerText = Color(0xFFFCA5A5)
 
 /**
- * A movie's or an episode's download (MovieDownload.dc.html and
- * EpisodePageDownload.dc.html): the button under Play and Mark watched in
+ * A movie's or an episode's download:
+ * the button under Play and Mark watched in
  * each of its states, the line that says why it waits, the server's marks,
  * and the sheet and the menu it opens. [fileId] is the version the page
  * plays first, and a download of any of [otherFiles] is shown as its own;
@@ -192,7 +192,7 @@ internal fun ItemDownload(
 
 /**
  * Asks once, on Android 13 and later, to post the downloads' notifications,
- * when the first download starts (PLAN-DOWNLOADS.md §10.3); downloads run
+ * when the first download starts; downloads run
  * whatever the answer.
  */
 @Composable
@@ -289,7 +289,7 @@ internal fun DownloadMarkLine(download: OfflineDownload, onDownloadAgain: () -> 
 @Composable
 private fun Dot(color: Color) = Box(Modifier.size(8.dp).clip(CircleShape).background(color))
 
-/** What the download sheet says of an option (DownloadSheet.dc.html). */
+/** What the download sheet says of an option. */
 internal fun optionLine(o: DownloadOption, tablet: Boolean): String = when (o.mode) {
     PlaybackMode.Direct -> "The file as it is"
     PlaybackMode.Remux, PlaybackMode.AudioTranscode ->
@@ -306,8 +306,8 @@ internal fun subtitlesLine(plan: DownloadPlan): String? {
 }
 
 /**
- * The download sheet (DownloadSheet.dc.html; TabDownloadSheet.dc.html as a
- * centred dialog on a tablet): each quality with its size, the Settings
+ * The download sheet (a centred dialog on a tablet):
+ * each quality with its size, the Settings
  * quality picked; the audio track and an image subtitle to burn in for a
  * converted download; what comes with it, Wi-Fi only and the space free.
  * An option that would leave under 1 GB free says how much it needs.
@@ -514,7 +514,7 @@ private fun SheetDownloadButton(text: String, enabled: Boolean, busy: Boolean, l
 }
 
 /**
- * A held download's options (DownloadMenu.dc.html): what it is and where it
+ * A held download's options: what it is and where it
  * stands, the server's mark explained, then Play (Play this copy beside a new
  * version), Download again, Pause or Resume, Download settings while it waits
  * for Wi-Fi, and Cancel download or Remove download.

@@ -6,7 +6,7 @@ import { parseSettingsPath, type SettingsPage } from '../../lib/settingsRoutes'
 import { visibleConfirmationError } from '../../api/withConfirm'
 import { ApiError } from '../../api/client'
 
-/** The Settings page the address names (PLAN-ADMIN-SETTINGS.md §4). */
+/** The Settings page the address names. */
 export function useSettingsPage(): SettingsPage | null {
   const path = useRouterState({ select: (s) => s.location.pathname })
   return parseSettingsPath(path)
@@ -19,7 +19,7 @@ export function useGo() {
 }
 
 /**
- * Where this browser is, for the password step in place (§3.3): away is an
+ * Where this browser is, for the password step in place: away is an
  * admin allowed in from outside the home network or tailnet. `minutes` is how
  * long a confirmed password still lasts, 0 for none.
  */
@@ -44,7 +44,7 @@ export function useAway() {
 export type SaveState = { status: 'idle' | 'saving' | 'saved' | 'failed'; message?: string }
 
 /**
- * A choice that saves at once and reports in its own row (§3.6): Saving…,
+ * A choice that saves at once and reports in its own row: Saving…,
  * then ✓ Saved with what it did, or why it failed and that the control is
  * back where it was. Cancelling the password dialog says nothing.
  */
@@ -87,7 +87,7 @@ function sentence(text: string) {
 }
 
 /** Moves focus to an element when it appears: a step's heading when the step
- * changes, a refusal when a step is refused (§6). */
+ * changes, a refusal when a step is refused. */
 export function useFocusOnChange<T extends HTMLElement>(key: unknown) {
   const ref = useRef<T>(null)
   const first = useRef(true)

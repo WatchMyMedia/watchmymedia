@@ -43,7 +43,7 @@ import androidx.media3.cast.Cast as Media3Cast
 import com.google.android.gms.cast.framework.CastState as SdkCastState
 
 /**
- * Casting from this phone over the Google Cast SDK (PLAN-CAST.md §5.2).
+ * Casting from this phone over the Google Cast SDK.
  * Build it once, on the main thread, and only where [isSupported]: it is
  * [CastState.Unavailable] until the Cast SDK is up and the server in use
  * says it issues cast tokens. Media notification and lock screen controls

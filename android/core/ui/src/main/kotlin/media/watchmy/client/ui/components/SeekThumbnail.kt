@@ -51,7 +51,7 @@ import media.watchmy.client.ui.WmmColors
 import kotlin.math.roundToInt
 
 /**
- * A seek thumbnail's sizes, from the boards (PLAN-TRICKPLAY.md §7.2): the
+ * A seek thumbnail's sizes, from the boards: the
  * tile [width] wide (its height from the manifest's shape) with a light
  * [edge] and a shadow, and the time under it [gap] below.
  */
@@ -92,8 +92,8 @@ class SeekThumbnailStyle(
 }
 
 /**
- * The picture of the video at [positionMs] while the viewer scrubs or seeks
- * (PLAN-TRICKPLAY.md §7.1): its tile from [trickplay]'s sheets, with the time
+ * The picture of the video at [positionMs] while the viewer scrubs or seeks:
+ * its tile from [trickplay]'s sheets, with the time
  * under it and [chip] beside the time. The tile changes only every
  * [Trickplay.intervalMs] and the time every second, so a drag recomposes
  * little; until a tile's picture comes the last one stays, or a black frame.

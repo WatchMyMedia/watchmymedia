@@ -72,8 +72,8 @@ import media.watchmy.client.ui.components.rememberLiveClockFormat
 import media.watchmy.client.ui.components.rememberLiveNow
 
 /*
- * The phone as the TV's remote for a channel (PLAN-LIVE-TV.md §4.1, L10d):
- * the LiveCast board on phones and TabLiveCast on tablets and in landscape.
+ * The phone as the TV's remote for a channel:
+ * one design on phones and another on tablets and in landscape.
  * The TV runs the channel; this shows what it reports, with the logo,
  * pictures and listings from this phone's own channel list.
  */

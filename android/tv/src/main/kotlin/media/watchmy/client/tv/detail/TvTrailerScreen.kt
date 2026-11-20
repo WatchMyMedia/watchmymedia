@@ -93,8 +93,8 @@ import media.watchmy.client.ui.trailerPage
 import android.view.KeyEvent as AndroidKeyEvent
 
 /**
- * A movie's YouTube trailers on Android TV (TvTrailerPlayer.dc.html,
- * PLAN-TV-TRAILERS.md §4): YouTube's IFrame player in a WebView, as on the
+ * A movie's YouTube trailers on Android TV:
+ * YouTube's IFrame player in a WebView, as on the
  * phone, but filling the screen with nothing of ours drawn on it or beside
  * it while it is shown.
  *
@@ -109,7 +109,7 @@ import android.view.KeyEvent as AndroidKeyEvent
  *   and ours says so, with Open in YouTube where an app takes the link. When
  *   YouTube can't be reached, ours offers Try again.
  * - While the trailer is paused, the player leaves the screen again and our
- *   pause screen takes its place (the user's decision after TV0): the
+ *   pause screen takes its place: the
  *   trailer, the movie and "Paused · 0:13 / 7:45" under a pause sign.
  *   YouTube's own player shows nothing when paused through its API, so a
  *   paused trailer looked frozen. Select or Play shows the player again,
@@ -117,7 +117,7 @@ import android.view.KeyEvent as AndroidKeyEvent
  *   the trailer paused.
  * - A trailer that played and ends closes the screen, as Back does. It
  *   pauses when the screen is hidden, and keeps the TV awake while it plays.
- * - The remote follows §4.3 ([trailerKey]) through YouTube's IFrame API
+ * - The remote's keys ([trailerKey]) go through YouTube's IFrame API
  *   ([trailerScript]); the screen holds the focus and the WebView never
  *   takes it. Back is always ours.
  *
@@ -210,7 +210,7 @@ fun TvTrailerScreen(
         withFrameNanos { }
         player.play()
     }
-    // The screen holds the focus for the remote's keys (§4.3); the WebView never takes it.
+    // The screen holds the focus for the remote's keys; the WebView never takes it.
     LaunchedEffect(ready) {
         if (!ready) return@LaunchedEffect
         withFrameNanos { }
@@ -308,10 +308,10 @@ fun TvTrailerScreen(
     }
 }
 
-/** How long the player has to say it is ready before the screen says YouTube couldn't be reached (§4.4). */
+/** How long the player has to say it is ready before the screen says YouTube couldn't be reached. */
 internal const val READY_TIMEOUT_MS = 20_000L
 
-/** The TV player's near-black ground, under the trailer screen's own states (TvTrailerPlayer.dc.html). */
+/** The TV player's near-black ground, under the trailer screen's own states. */
 private val PlayerGround = Color(0xFF070708)
 
 /** The spinner's grey track, which rings the pause screen's pause sign. */
@@ -381,8 +381,8 @@ private fun TrailerLoading(trailer: String, movie: String, modifier: Modifier = 
 }
 
 /**
- * While the trailer is paused, in the player's place (TvTrailerPlayer.dc.html,
- * `paused`): laid out as the loading screen, with a pause sign in a ring of
+ * While the trailer is paused, in the player's place:
+ * laid out as the loading screen, with a pause sign in a ring of
  * the spinner's track for the spinner, where the trailer is ("Paused · 0:13 /
  * 7:45", in even-width digits) for "Plays from YouTube", and the keys under
  * it. Nothing on it takes focus; the screen has the keys.
@@ -506,7 +506,7 @@ internal class TvTrailerWebView private constructor(
             setBackgroundColor(android.graphics.Color.BLACK)
             // MATCH_PARENT, not the WRAP_CONTENT AndroidView would give it: a WebView whose height wraps
             // its content lays the page out 0 px high, so the page's 100% heights collapse and YouTube's
-            // player frame plays its sound with no picture (seen on a Google TV Streamer, TV0).
+            // player frame plays its sound with no picture (seen on a Google TV Streamer).
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             visibility = View.INVISIBLE
             isFocusable = false

@@ -4,7 +4,7 @@ import WMMModel
 import WMMUI
 
 /// Report a problem on Apple TV, from a movie's or episode's long press: the
-/// iPhone sheet's parts (ReportProblem.dc.html) at ten feet. The kind as a
+/// iPhone sheet's parts at ten feet. The kind as a
 /// row of chips, a note from the keyboard or dictation, what the server
 /// attaches, then Send report.
 struct ReportProblemDialog: View {

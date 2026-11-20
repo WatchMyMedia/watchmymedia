@@ -9,7 +9,7 @@ const kinds: { id: Problem['kind']; label: string }[] = [
   { id: 'other', label: 'Other' },
 ]
 
-/** Reports a problem with a movie or episode to the admins' Inbox, or as a Seerr issue when Seerr takes it (PLAN-ARR.md §9). */
+/** Reports a problem with a movie or episode to the admins' Inbox, or as a Seerr issue when Seerr takes it. */
 export function ReportProblemDialog({ itemType, itemId, fileId, title, onClose }: { itemType: 'movie' | 'episode'; itemId: number; fileId?: number; title: string; onClose: () => void }) {
   const [kind, setKind] = useState<Problem['kind'] | null>(null)
   const [note, setNote] = useState('')

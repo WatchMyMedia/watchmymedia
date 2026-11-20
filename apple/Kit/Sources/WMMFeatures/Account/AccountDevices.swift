@@ -2,12 +2,11 @@ import Foundation
 import Observation
 import WMMModel
 
-// Account & devices (PLAN-APPLE-SETTINGS.md §5.4; Settings2Account.dc.html,
-// Settings2Rename.dc.html, Settings2SignOutOther.dc.html,
-// Settings2SignOutThis.dc.html, TvSettings2Account.dc.html): Rename as a
+// Account & devices:
+// Rename as a
 // task in a sheet, what each sign-out says, and the page's lines.
 
-/// Renaming this device in a short sheet (Settings2Rename.dc.html): Cancel
+/// Renaming this device in a short sheet: Cancel
 /// keeps the name, and Rename is off, saying why, until there is a name. The
 /// name no longer saves by leaving a page.
 @MainActor
@@ -41,7 +40,7 @@ public final class RenameModel {
     /// Why Rename is off: "Rename is off until there is a name. Cancel keeps Sam’s iPhone."
     public var offReason: String? { canRename ? nil : SettingsWords.renameOff(keeping: current) }
 
-    /// Something was typed, so swiping the sheet away asks first (§3.1).
+    /// Something was typed, so swiping the sheet away asks first.
     public var hasChanges: Bool { name != current }
 
     /// What swiping the sheet away with a change asks.
@@ -49,7 +48,7 @@ public final class RenameModel {
 }
 
 extension SettingsWords {
-    /// Swiping away a sheet with something typed (§3.1): "Discard what you typed?"
+    /// Swiping away a sheet with something typed: "Discard what you typed?"
     public static func discardTyped(stays: String) -> ConfirmWords {
         ConfirmWords(title: "Discard what you typed?", lines: [stays], confirm: "Discard", keep: "Keep typing")
     }
@@ -68,7 +67,7 @@ extension SettingsModel {
         return true
     }
 
-    /// Apple TV's names to choose from, this one's first (TvSettings2Rename.dc.html).
+    /// Apple TV's names to choose from, this one's first.
     public var roomNames: [String] { SettingsWords.roomNames(device: facts.family, current: deviceName) }
 
     /// Account & devices' line under its title: "Sam, an admin on Living room

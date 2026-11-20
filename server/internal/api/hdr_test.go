@@ -19,7 +19,7 @@ import (
 	"watchmymedia/server/internal/probe/probetest"
 )
 
-// Level 8's profile end to end on a Dolby Vision 8.1 file (PLAN-HDR-PROFILE.md):
+// Level 8's profile end to end on a Dolby Vision 8.1 file:
 // the server takes hdrTypes, keeps Dolby Vision for dovi8 with the right
 // playlist and record, sends the HDR10 base layer without it, and leaves an
 // older app's profile as it was.
@@ -148,7 +148,7 @@ func TestHDRProfileLevel8(t *testing.T) {
 
 // The stream's audio is what the server converts to, not always AAC: a
 // TrueHD film on an Android phone showed "aac 6" in Activity while its
-// segments held FLAC 5.1 (PLAN-AUDIO.md §5.3, 2026-11-18).
+// segments held FLAC 5.1 (2026-11-18).
 func TestStreamInfoShowsTheConvertedAudio(t *testing.T) {
 	t.Parallel()
 	info := &probe.MediaInfo{Video: []probe.VideoStream{{Codec: "h264", Width: 1280, Height: 720}},

@@ -10,8 +10,8 @@ import { browserState, followLine, setNotifySwitch, stopFailLine, type BrowserSt
 import { settingsCrumbs } from '../../lib/settingsRoutes'
 
 /**
- * Settings › You › Notifications (PLAN-NEW-EPISODES.md §7.2; the
- * settings-* boards): this browser's New episodes switch first, then the
+ * Settings › You › Notifications:
+ * this browser's New episodes switch first, then the
  * shows the person follows, with Stop notifying. The switch is kept in the
  * browser for this person; the follows are the server's, the same on every
  * device, and redraw on follows.changed.

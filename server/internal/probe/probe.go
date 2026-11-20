@@ -152,7 +152,7 @@ type VideoStream struct {
 	Title     string `json:"title,omitempty"`
 	Default   bool   `json:"default"`
 
-	// What only playback reads (PLAN-HDR-PROFILE.md §4): the record's base
+	// What only playback reads: the record's base
 	// layer compatibility ID (dv_bl_signal_compatibility_id: 0 none, 1
 	// HDR10, 2 SDR, 4 HLG, 6 Blu-ray HDR10) and level, and the sample
 	// entry or codec tag (hvc1, hev1, dvh1, dvhe; "" in Matroska). The
@@ -180,8 +180,8 @@ type AudioStream struct {
 	Title         string `json:"title,omitempty"`
 	Default       bool   `json:"default"`
 	// Commentary and Descriptive are ffprobe's comment and visual_impaired
-	// dispositions: tracks a language preference never chooses
-	// (PLAN-LANGUAGES.md). The stored probe keeps them (Encode, Parse); the
+	// dispositions: tracks a language preference never chooses.
+	// The stored probe keeps them (Encode, Parse); the
 	// API does not show them. Probes stored before they were kept have
 	// neither, and track titles stand in.
 	Commentary  bool `json:"-"`

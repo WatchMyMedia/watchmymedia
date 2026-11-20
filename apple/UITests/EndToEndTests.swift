@@ -124,7 +124,7 @@ final class EndToEndTests: XCTestCase {
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: settings)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed)
         settings.tap()
-        // Signed-in devices are on Account & devices (PLAN-APPLE-SETTINGS.md §5.4).
+        // Signed-in devices are on Account & devices.
         let account = app.buttons["settings-account"]
         XCTAssertTrue(account.waitForExistence(timeout: 15), "Settings finished opening")
         shot("6 Settings")

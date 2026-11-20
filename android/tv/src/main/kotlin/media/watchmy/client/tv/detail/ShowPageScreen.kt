@@ -57,9 +57,8 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.ReportShown
 
 /**
- * One page for a show, its seasons and its episodes on TV
- * (android-tv/ShowPage.dc.html and ShowPageMissing.dc.html; PLAN-SHOW-PAGE.md
- * §4.3). The chosen episode is on top over the show's backdrop, its still on
+ * One page for a show, its seasons and its episodes on TV.
+ * The chosen episode is on top over the show's backdrop, its still on
  * the right, with Play focused first, then From the start, Mark watched and
  * More (Report a problem, Replace file, Delete episode…). ▼ reaches the
  * season tabs, where ◀ ▶ changes the season at once, with Mark season
@@ -67,7 +66,7 @@ import media.watchmy.client.ui.ReportShown
  * follows focus and OK moves focus back up to its Play (it never plays).
  * ▼ past the row scrolls to About the show: Mark show watched, Show missing
  * episodes, Request missing seasons and Cast & details; ▼ again More like
- * this (ShowRelated.dc.html), whose cards open their page through
+ * this, whose cards open their page through
  * [onOpenShow]. Back leaves the show in one step; the delete confirmation
  * opens on Cancel.
  */
@@ -212,7 +211,7 @@ private fun PageContent(
         }
     }
     // The episode on top, read where focus searches rather than where the tabs and About compose: moving along
-    // the row changes it, and they don't draw it (PLAN-ANDROID-REVIEW.md §4.3.4).
+    // the row changes it, and they don't draw it.
     val episodeNow by rememberUpdatedState(state.episodeId)
     val episodeFocus: () -> FocusRequester = remember(memory) { { memory.requester("ep:$episodeNow") } }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {

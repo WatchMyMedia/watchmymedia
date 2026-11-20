@@ -33,7 +33,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * A row's See all on the TV, on the fakes (PLAN-SEE-ALL.md §4.2, §7): past
+ * A row's See all on the TV, on the fakes: past
  * a built-in row's last card on Home is a See all card, its panel says where
  * it goes, and OK opens TV Shows or Movies sorted the row's way with focus on
  * the grid's first card. Back comes back to the card, and the rail's TV Shows

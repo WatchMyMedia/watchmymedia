@@ -2,9 +2,9 @@ import Foundation
 import WMMAPI
 import WMMModel
 
-// Arranged rows and lists (PLAN-ROWS.md §6) from the generated types. Styles,
+// Arranged rows and lists from the generated types. Styles,
 // kinds and states are plain strings: what this app doesn't know is skipped,
-// as a trailer source it doesn't know is (PLAN-ROWS.md Decision 2).
+// as a trailer source it doesn't know is.
 
 extension Components.Schemas.ScreenRow {
     /// Nil for a style this app doesn't draw, or a row with nothing to draw.

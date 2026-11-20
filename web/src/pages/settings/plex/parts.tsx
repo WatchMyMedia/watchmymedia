@@ -130,7 +130,7 @@ export function Working({ title, value, children }: { title: ReactNode; value?: 
 
 /**
  * A table on wide screens and one block per row on phones, each value with
- * its column's name (§6). `cells` are in the columns' order.
+ * its column's name. `cells` are in the columns' order.
  */
 export function RowTable({ columns, rows, label }: { columns: string[]; rows: { key: string | number; cells: ReactNode[] }[]; label: string }) {
   return (

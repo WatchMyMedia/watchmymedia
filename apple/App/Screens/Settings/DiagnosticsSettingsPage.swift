@@ -6,8 +6,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings › About's Help group (Diagnostics.dc.html, Tweak screen
-/// "about"): the Diagnostics row, how many system reports are kept, and the
+/// Settings › About's Help group:
+/// the Diagnostics row, how many system reports are kept, and the
 /// note that nothing is sent. On iPad it pushes inside Settings' detail column.
 struct DiagnosticsAboutSection: View {
     let settings: SettingsModel
@@ -68,8 +68,8 @@ enum DiagnosticsSamples {
     }
 }
 
-/// Settings › About › Diagnostics (Diagnostics.dc.html, Tweak screen
-/// "page"; PLAN-APPLE-REVIEW.md §6.4): everything Copy puts on the clipboard,
+/// Settings › About › Diagnostics:
+/// everything Copy puts on the clipboard,
 /// in groups: the app, this device and the server; iOS's last reports; and
 /// the app's recent log. Copy turns into Copied with a short Copied note. No
 /// Share: nothing leaves unless the person pastes it.

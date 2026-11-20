@@ -69,7 +69,7 @@ import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import media.watchmy.client.presentation.requests.RequestFormViewModel
 
-/** A missing episode's colour on the TV, as ShowMissing.dc.html (Android TV) gives each state. */
+/** A missing episode's colour on the TV, as the design gives each state. */
 internal fun MissingEpisode.Kind.tvTone(): Color = when (this) {
     MissingEpisode.Kind.Downloading -> WmmColors.Accent
     MissingEpisode.Kind.DownloadFailed -> WmmColors.Error
@@ -90,7 +90,7 @@ internal fun MissingEpisode.Kind.tvIcon(): ImageVector = when (this) {
     MissingEpisode.Kind.NotInLibrary -> WmmIcons.PlusCircle
 }
 
-/** A request's colour and icon in Your requests (MyRequests.dc.html, Android TV). */
+/** A request's colour and icon in Your requests. */
 internal fun RequestLine.Tone.tvTone(): Color = when (this) {
     RequestLine.Tone.Waiting -> WmmColors.TextSoft
     RequestLine.Tone.Approved -> TextBright
@@ -119,7 +119,7 @@ internal fun TvDownloadBar(progress: Float, width: androidx.compose.ui.unit.Dp =
 
 /**
  * Asking for a movie or some of a show's seasons on the TV (the request
- * dialog on SearchRequest.dc.html): poster, title, overview and Request
+ * dialog): poster, title, overview and Request
  * with Cancel on the left, a show's seasons to tick on the right. [only]
  * ticks that season alone (Request season N). [onSent] gets the message
  * to show once it is asked for.

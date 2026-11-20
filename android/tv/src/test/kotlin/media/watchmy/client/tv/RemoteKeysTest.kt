@@ -21,7 +21,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The remote's Guide opens Live TV from any screen that doesn't take it itself (PLAN-ANDROID-REVIEW.md §6.2). */
+/** The remote's Guide opens Live TV from any screen that doesn't take it itself. */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w960dp-h540dp-land-television-xhdpi")

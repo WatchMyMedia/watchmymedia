@@ -19,7 +19,7 @@ import org.robolectric.annotation.ConscryptMode
 import java.io.FileNotFoundException
 
 /**
- * The launcher's Watch Next pictures (PLAN-ANDROID-REVIEW.md §2.4): an
+ * The launcher's Watch Next pictures: an
  * address names the account and the server's image path and carries this
  * app's signature, and the provider answers only what this app signed, for
  * the account signed in.
