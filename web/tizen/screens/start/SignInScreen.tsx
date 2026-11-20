@@ -43,7 +43,7 @@ function CodeView({ state }: { state: SignIn }) {
           {part.split('').map((c, j) => <span key={j} className={`signin-code__tile${stopped ? ' signin-code__tile--old' : ''}`}>{c.trim()}</span>)}
         </span>)}
       </div>
-      {pairing.state === 'waiting' && <p role="status" className="start-status start-status--muted"><span className="signin-dot" aria-hidden="true"/>Waiting for the code · new code in {clock(remaining)} · this TV signs in by itself once it is entered</p>}
+      {pairing.state === 'waiting' && <p role="status" className="start-status start-status--muted"><span className="signin-dot" aria-hidden="true"/>Waiting for the code · expires in {clock(remaining)} · this TV signs in by itself once it is entered</p>}
       {pairing.state === 'starting' && <p role="status" className="start-status start-status--muted"><span className="tv-spinner" aria-hidden="true"/>Getting a code…</p>}
       {pairing.state === 'approved' && <p role="status" className="start-status" style={{ color: 'var(--accent)' }}><Icon name="check"/>Code accepted. Signing in…</p>}
       {pairing.state === 'expired' && <p role="alert" className="start-status tv-warn-text"><Icon name="clock"/>This code expired. Get a new one to sign in.</p>}
@@ -75,8 +75,8 @@ function PasswordView({ state }: { state: SignIn }) {
       <p className="tv-kicker">Sign in</p>
       <h1 className="tv-h1">Sign in to<br/>{state.server.name}</h1>
       <div className="signin-form">
-        <span className="tv-label">Name</span>
-        <TextField id="name" label="Name" value={name} onChange={setName} placeholder="Your name" autoFocus autoComplete="username"/>
+        <span className="tv-label">Username</span>
+        <TextField id="name" label="Username" value={name} onChange={setName} placeholder="Username" autoFocus autoComplete="username"/>
         <span className="tv-label">Password</span>
         <TextField id="password" label="Password" type="password" value={password} onChange={setPassword} placeholder="Password" autoComplete="current-password" onSubmit={submit}/>
       </div>
@@ -92,6 +92,7 @@ function PasswordView({ state }: { state: SignIn }) {
       <span className="signin-aside__icon"><Icon name="phone"/></span>
       <h2 className="signin-aside__title">A code is quicker</h2>
       <p className="tv-body" style={{ color: 'var(--text-3)' }}>Typing with the remote is slow. With a code, your phone does the typing and this TV signs in by itself.</p>
+      <p className="tv-faint" style={{ lineHeight: 1.5 }}>This choice is hidden while the server’s sign-in protection is on; the code works then.</p>
     </aside>
   </>
 }

@@ -85,3 +85,9 @@ export function emptySubtitleText(d: LanguageDraft): string {
     ? 'No subtitle language yet. Until you add one, subtitles use your audio languages.'
     : 'No subtitle language yet. Add one below.'
 }
+
+/** The languages offered by name when one is added (the TV's Add language). */
+export const commonLanguages: readonly string[] = ['en', 'es', 'fr', 'de', 'it', 'pt', 'pt-BR', 'nl', 'ar', 'ur', 'hi', 'ja', 'ko', 'zh', 'zh-Hant', 'pl', 'ru', 'tr', 'sv', 'da', 'no', 'fi', 'el', 'he', 'id', 'th', 'vi']
+
+/** The most languages the server keeps in one list. */
+export const MAX_LANGUAGES = 16

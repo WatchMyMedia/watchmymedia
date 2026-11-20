@@ -188,3 +188,7 @@ button { border: 0; background: none; padding: 0; text-align: inherit; cursor: p
 
 .tv-boot { position: absolute; inset: 0; display: grid; place-items: center; }
 .tv-boot__inner { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; font-size: 1.375rem; color: var(--muted); }
+
+/* A modal over the whole screen (Sheet): its page draws its own background. */
+.tv-sheet { background: var(--ground); }
+.tv-sheet__page { position: absolute; inset: 0; overflow: hidden; }
