@@ -8,7 +8,7 @@ import { PlayerScreen } from '../screens/player/PlayerScreen'
 import { LiveScreen } from '../screens/live/LiveScreen'
 import { SearchScreen } from '../screens/search/SearchScreen'
 import { SettingsScreen } from '../screens/settings/SettingsScreen'
-import { RequestsScreen } from '../screens/settings/RequestsScreen'
+import { RequestsScreen } from '../screens/requests/RequestsScreen'
 import { LiveGuideScreen } from '../screens/live/LiveGuideScreen'
 import { RecordingsScreen } from '../screens/live/RecordingsScreen'
 import { RemindersScreen } from '../screens/live/RemindersScreen'
@@ -25,7 +25,7 @@ export type PlayRequest =
   | { kind: 'trailer'; movieId: number; title?: string; youtubeKey?: string; fileId?: number }
 
 /** Settings' groups (SettingsGroups on the canvas), in the order the left column lists them. */
-export type SettingsGroup = 'playback' | 'languages' | 'homeRows' | 'notifications' | 'account' | 'requests' | 'about' | 'server'
+export type SettingsGroup = 'playback' | 'languages' | 'homeRows' | 'notifications' | 'account' | 'requests' | 'about' | 'inbox' | 'server'
 
 export type Route =
   // Sections: the rail opens these, on top of Home.

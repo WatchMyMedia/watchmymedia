@@ -2,6 +2,8 @@ import { ServerStore } from '../session/servers'
 import { FakeServer } from './server'
 import { registerStart } from './start'
 import { registerBrowse } from './browse'
+import { registerRequests } from './requests'
+import { registerSettings } from './settings'
 
 // The browser preview's fictional server (`pnpm dev:tizen`, then open
 // /?fakes). Development only: main.tsx imports this behind
@@ -16,7 +18,10 @@ export const AWAY_ORIGIN = 'http://203.0.113.20:27587'
 export function createFakeServer(mode = ''): FakeServer {
   const server = new FakeServer(FAKE_ORIGIN)
   registerStart(server, mode)
+  // Before Browse: its request options are static, these follow the Inbox.
+  registerRequests(server, mode)
   registerBrowse(server)
+  registerSettings(server, mode)
   return server
 }
 
