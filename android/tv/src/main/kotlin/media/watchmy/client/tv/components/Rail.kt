@@ -199,12 +199,13 @@ private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -
             cornerRadius = 30.dp,
             focusedScale = 1.04f,
             role = Role.Button,
-        ) {
+        ) { focused ->
             // The button's own words say who and where: the initial and the names under it aren't read again.
             Row(Modifier.height(60.dp).clearAndSetSemantics {}, verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(60.dp), contentAlignment = Alignment.Center) {
                     // Ringed in gold while its panel is open, as the control that opened it; focus is in the panel.
-                    if (serversOpen) Box(Modifier.size(60.dp).border(3.dp, WmmColors.Accent, CircleShape))
+                    // (Its own focus ring does that while this window still counts it focused: one ring, not two.)
+                    if (serversOpen && !focused) Box(Modifier.size(60.dp).border(3.dp, WmmColors.Accent, CircleShape))
                     Box(Modifier.size(48.dp).background(WmmColors.Brand, CircleShape), contentAlignment = Alignment.Center) {
                         Text(name.take(1).uppercase(), style = inter(20.sp, FontWeight.Bold), color = WmmColors.Text)
                     }
