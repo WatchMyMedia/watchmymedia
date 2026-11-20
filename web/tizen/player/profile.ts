@@ -1,4 +1,4 @@
-import type { Decision, Profile } from './types'
+import type { Decision, Profile } from '../types'
 
 export const PROFILES = [
   { id: 'safe', label: 'H.264 + AAC', description: 'Conservative · unsupported formats convert on the server' },

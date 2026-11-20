@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppModel, PAGE_SIZE } from './app-model'
-import type { Player } from './avplay'
+import type { Player } from './player/avplay'
 import { readSession, saveSession } from './session'
 import type { SavedSession } from './types'
 

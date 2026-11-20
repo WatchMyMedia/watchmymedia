@@ -1,6 +1,6 @@
-import { beatDue, type BeatState } from '../src/lib/play/rules'
-import type { ClientInfo, Decision, MediaFile, ProgressBody } from './types'
-import { ApiError, mediaUrl, result, safeError, timed, type TVClient } from './server'
+import { beatDue, type BeatState } from '../../src/lib/play/rules'
+import type { ClientInfo, Decision, MediaFile, ProgressBody } from '../types'
+import { ApiError, mediaUrl, result, safeError, timed, type TVClient } from '../server'
 import { filePosition, playerPosition, prototypeProfile, uhd, type ProfileId } from './profile'
 import type { Player, PlayerState, PlayerUpdate } from './avplay'
 

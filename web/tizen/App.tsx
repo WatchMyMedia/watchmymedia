@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { AppModel, PAGE_SIZE, type AppState } from './app-model'
 import { focusControl, installRemote } from './remote'
-import { PROFILES } from './profile'
+import { PROFILES } from './player/profile'
 import { clockTime, fileMeta, fileTitle } from './presentation'
 
 type Dialog = 'options' | 'signout' | 'exit' | undefined

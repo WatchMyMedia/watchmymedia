@@ -1,6 +1,6 @@
 import Hls from 'hls.js'
 import type { Player, PlayerEvents } from './avplay'
-import { UserError } from './server'
+import { UserError } from '../server'
 
 /** Development preview only. Passing this backend is not an AVPlay test. */
 export class BrowserPlayer implements Player {

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PlaybackController } from './playback'
-import { tvClient } from './server'
+import { tvClient } from '../server'
 import type { Player } from './avplay'
-import type { Decision, MediaFile, ProgressBody } from './types'
+import type { Decision, MediaFile, ProgressBody } from '../types'
 
 function deferred<T>() {
   let resolve!: (value: T) => void

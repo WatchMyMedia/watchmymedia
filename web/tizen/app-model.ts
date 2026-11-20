@@ -1,10 +1,10 @@
 import type { components } from '../src/api/schema'
 import { ApiError, result, safeError, serverUrl, timed, UserError, type TVClient } from './server'
 import { clearSession, deviceInfo, pair, readSession, restoreSession, saveSession } from './session'
-import { PlaybackController, type PlaybackState } from './playback'
-import type { Player } from './avplay'
+import { PlaybackController, type PlaybackState } from './player/playback'
+import type { Player } from './player/avplay'
 import type { MediaFile, PairingStart, SavedSession } from './types'
-import type { ProfileId } from './profile'
+import type { ProfileId } from './player/profile'
 
 type Library = components['schemas']['Library']
 export type AppState = {

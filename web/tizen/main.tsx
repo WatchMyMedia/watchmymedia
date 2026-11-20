@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { AppModel } from './app-model'
-import { AVPlayPlayer, type Player, type SamsungWindow } from './avplay'
+import { AVPlayPlayer, type Player, type SamsungWindow } from './player/avplay'
 import './app.css'
 
 async function start() {
@@ -22,7 +22,7 @@ async function start() {
     player = new AVPlayPlayer(samsung.webapis.avplay, (event) => model?.onPlayerUpdate(event))
   }
   else if (import.meta.env.DEV) {
-    const { BrowserPlayer } = await import('./browser-player')
+    const { BrowserPlayer } = await import('./player/browser-player')
     document.querySelector('#av-player')?.remove()
     player = new BrowserPlayer(document.querySelector<HTMLVideoElement>('#browser-player')!, (event) => model?.onPlayerUpdate(event))
   } else throw new Error('Samsung AVPlay unavailable')

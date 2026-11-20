@@ -1,4 +1,4 @@
-import { UserError } from './server'
+import { UserError } from '../server'
 
 export type PlayerState = 'idle' | 'buffering' | 'playing' | 'paused' | 'ended' | 'error'
 export type PlayerUpdate = { state?: PlayerState; positionMs?: number; durationMs?: number; error?: string }
