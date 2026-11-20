@@ -1,5 +1,11 @@
-import createClient from 'openapi-fetch'
-import type { paths } from '../src/api/schema'
+// What the prototype's player files (avplay.ts, browser-player.ts,
+// playback.ts, profile.ts) import from here, kept for them until the
+// player engine in player/ replaces them. New code uses session/ and the
+// web's src/api and src/lib directly; delete this file when nothing imports it.
+import type { ApiClient } from '../src/api/client'
+import { withRequestTimeout } from '../src/lib/requestTimeout'
+import { bearerClient } from './session/client'
+import { tokenedUrl } from './session/media'
 
 /** Only locally written messages may be shown directly. */
 export class UserError extends Error {}
@@ -29,43 +35,34 @@ export function serverUrl(input: string): string {
   return url.origin
 }
 
-/** Only same-server API URLs can receive a media token. Never attach a session token. */
+/** Only same-server media routes (session/media.ts) can receive a media token. Never attach a session token. */
 export function mediaUrl(baseUrl: string, path: string, token: string): string {
-  const base = serverUrl(baseUrl)
-  const url = new URL(path, `${base}/`)
-  const mediaPath = /^\/api\/(files\/\d+\/stream|playback\/[^/]+\/.+|files\/\d+\/subtitles\/[^/]+\.(vtt|ass)|images\/.+)$/.test(url.pathname)
-  if (url.origin !== base || url.username || url.password || !mediaPath) {
-    throw new UserError('The server returned an unexpected media address.')
-  }
-  url.hash = ''
-  url.searchParams.set('access_token', token)
-  return url.href
+  const url = tokenedUrl(serverUrl(baseUrl), path, token)
+  if (!url) throw new UserError('The server returned an unexpected media address.')
+  return url
 }
 
-export function tvClient(baseUrl: string, token = '', fetcher: typeof fetch = fetch) {
-  const api = createClient<paths>({ baseUrl: serverUrl(baseUrl), credentials: 'omit', fetch: fetcher })
-  api.use({ onRequest({ request }) {
-    if (token) request.headers.set('Authorization', `Bearer ${token}`)
-    return request
-  } })
-  return api
+export function tvClient(baseUrl: string, token = '', fetcher?: typeof fetch): ApiClient {
+  return bearerClient(serverUrl(baseUrl), { token: token || undefined, fetch: fetcher, timeoutMs: 60_000 })
 }
 
-export type TVClient = ReturnType<typeof tvClient>
+export type TVClient = ApiClient
 
-/** AbortSignal.timeout/any are newer than the stock QN90D browser. */
-export async function timed<T>(operation: (signal: AbortSignal) => Promise<T>, parent?: AbortSignal, ms = 15_000): Promise<T> {
-  const controller = new AbortController()
-  const abort = () => controller.abort()
-  if (parent?.aborted) controller.abort()
-  parent?.addEventListener('abort', abort, { once: true })
-  const timeout = setTimeout(abort, ms)
-  try { return await operation(controller.signal) }
-  finally { clearTimeout(timeout); parent?.removeEventListener('abort', abort) }
+/** A request bounded by `ms` (src/lib/requestTimeout.ts) that also stops with `parent`. */
+export function timed<T>(operation: (signal: AbortSignal) => Promise<T>, parent?: AbortSignal, ms = 15_000): Promise<T> {
+  return withRequestTimeout((signal) => {
+    if (!parent) return operation(signal)
+    const controller = new AbortController()
+    const abort = () => controller.abort()
+    if (parent.aborted || signal.aborted) abort()
+    parent.addEventListener('abort', abort, { once: true })
+    signal.addEventListener('abort', abort, { once: true })
+    return operation(controller.signal).finally(() => parent.removeEventListener('abort', abort))
+  }, ms)
 }
 
 export function safeError(error: unknown): string {
   if (error instanceof UserError) return error.message
-  if (error instanceof DOMException && error.name === 'AbortError') return 'The request timed out or was cancelled. Try again.'
+  if (error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')) return 'The request timed out or was cancelled. Try again.'
   return 'The operation failed. Check the connection and try again.'
 }
