@@ -583,3 +583,17 @@ export function useRefreshMediaList() {
     },
   })
 }
+
+/**
+ * How each version would play with a profile (POST /api/playback/plans),
+ * for a version list's "direct play" or "remux to fMP4, audio to EAC3". It
+ * starts no session. Each app sends its own profile (the Samsung TV app's
+ * is `samsungProfile()`); files the server can't plan are left out.
+ */
+export const playbackPlansQuery = (fileIds: number[], profile: components['schemas']['Profile']) =>
+  queryOptions({
+    queryKey: ['plans', profile.name, fileIds],
+    queryFn: async () => unwrap(await api.POST('/api/playback/plans', { body: { profile, fileIds } })),
+    enabled: fileIds.length > 0,
+    staleTime: 5 * 60_000,
+  })
