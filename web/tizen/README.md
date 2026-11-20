@@ -230,8 +230,10 @@ What the first session on the QN90D found:
   conversion, as HLS with HEVC video, picking up where the direct play left
   off. Seeking (applied on key-up), WebVTT subtitles in time, resume, Continue
   watching and watched marks, and the remote's keys all worked.
-- Not yet tried there: HDR, 4K, surround, image subtitles, Live TV against a
-  tuner, trailers from YouTube, suspend and wake, long sessions.
+- A second session found that Tizen loads YouTube's player in an iframe only
+  where `<tizen:allow-navigation>` names YouTube; without it the frame stayed
+  on `about:blank` and the trailer screen said it couldn't reach YouTube.
+- Not yet tried there: image subtitles, suspend and wake.
 
 Do not broadly trust `Origin: null` on the server. HDR, certification and
 more model groups remain in [PLAN-SAMSUNG.md](../../PLAN-SAMSUNG.md).

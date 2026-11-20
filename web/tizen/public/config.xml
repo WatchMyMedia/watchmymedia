@@ -6,10 +6,14 @@
   <content src="index.html"/>
   <icon src="icon.png"/>
   <tizen:profile name="tv-samsung"/>
+  <!-- Samsung's pre-test checks the screen size the app declares: a 1080p TV app, as in Samsung's templates. -->
+  <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
   <tizen:privilege name="http://tizen.org/privilege/internet"/>
   <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
   <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
   <tizen:metadata key="http://samsung.com/tv/metadata/use.network" value="true"/>
   <access origin="*" subdomains="true"/>
+  <!-- Tizen loads an outside page, in an iframe too, only where allow-navigation names it: YouTube trailers (PLAN-SAMSUNG.md §10.6). -->
+  <tizen:allow-navigation>www.youtube-nocookie.com www.youtube.com</tizen:allow-navigation>
   <tizen:content-security-policy>default-src 'self'; script-src 'self' $WEBAPIS; style-src 'self' 'unsafe-inline'; connect-src http: https:; media-src http: https: blob:; img-src 'self' data: blob: http: https:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; object-src 'self'; base-uri 'self'</tizen:content-security-policy>
 </widget>
