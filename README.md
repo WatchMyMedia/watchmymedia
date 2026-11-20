@@ -5,8 +5,8 @@ a Movies folder and a TV folder and it builds a library with posters and details
 then streams it to any web browser and to the apps for phones, tablets and TVs.
 It is open source under the [GNU AGPL-3.0](LICENSE).
 
-**To use it**, download the Mac or Windows app from
-[watchmy.media/download](https://watchmy.media/download) and follow
+**To use it**, download the Mac or Windows app, or the package for Debian, Ubuntu or
+Fedora, from [watchmy.media/download](https://watchmy.media/download) and follow
 [the guide](https://watchmy.media/guide/). The phone and TV apps are on the
 [App Store](https://apps.apple.com/app/watchmymedia/id6828975407) and
 [Google Play](https://play.google.com/store/apps/details?id=media.watchmy.client).
@@ -116,8 +116,8 @@ checks. Backups exclude Plex grants, so a restored server must reconnect.
 
 ## Install
 
-**Docker (recommended on Linux/NAS).** Copy `deploy/.env.example` to `deploy/.env` and
-set your library folders and `PUID`/`PGID` there, then `make docker-up` (or use the
+**Docker (recommended on a NAS and on other Linux distributions).** Copy
+`deploy/.env.example` to `deploy/.env` and set your library folders and `PUID`/`PGID` there, then `make docker-up` (or use the
 published `ghcr.io/watchmymedia/watchmymedia` image). Git ignores `deploy/.env`, so pulling
 updates never conflicts with your settings. The container reads `/movies` and `/tv`
 (on its first start each becomes a library if it holds anything; after that, libraries are
@@ -161,12 +161,22 @@ so the GPU's driver comes from the distribution. The Linux archives of 1.6.1 and
 only the server: they need FFmpeg on `PATH`, or `ffmpeg.ffmpeg` / `WATCHMYMEDIA_FFMPEG_PATH`
 pointing at one.
 
-**Debian, Ubuntu and Fedora packages (not published yet).** `make linux-packages` builds a
-`.deb` for Debian 13 and 12 and Ubuntu 26.04 and 24.04, and an `.rpm` for Fedora 45 and 44,
-each for amd64 and arm64, into `build/linux-packages/`. Install one with
-`sudo apt install ./watchmymedia_<version>_<arch>.deb` or
-`sudo dnf install ./watchmymedia-<version>-1.<arch>.rpm`. Fedora 45's `rpm -i` refuses a
-package that is not signed; `dnf` installs it with a warning.
+**Debian, Ubuntu and Fedora packages.** Since 1.7.0 every release has a `.deb` for Debian 13
+and 12 and Ubuntu 26.04 and 24.04, and an `.rpm` for Fedora 45 and 44, each for amd64 and
+arm64, on <https://watchmy.media/download> and in WatchMyMedia's own apt and dnf
+repositories. The guides, [Install on Debian or Ubuntu](https://watchmy.media/guide/debian-ubuntu)
+and [Install on Fedora](https://watchmy.media/guide/fedora), go through it step by step. The
+newest package for the machine installs with:
+
+```bash
+# Debian and Ubuntu
+wget -O watchmymedia.deb "https://downloads.watchmy.media/apt/latest?arch=$(dpkg --print-architecture)"
+sudo apt install ./watchmymedia.deb
+
+# Fedora (arm64 in place of amd64 on ARM)
+curl -fLo watchmymedia.rpm "https://downloads.watchmy.media/rpm/latest?arch=amd64"
+sudo dnf install ./watchmymedia.rpm
+```
 
 - **What it installs.** The server and the same FFmpeg in `/usr/lib/watchmymedia`, and a
   systemd service, `watchmymedia`, that runs it as its own `watchmymedia` user and starts
@@ -191,8 +201,19 @@ package that is not signed; `dnf` installs it with a warning.
 - **The firewall** is left alone. Where one is on, open the port with
   `sudo firewall-cmd --permanent --add-service=watchmymedia && sudo firewall-cmd --reload`
   (firewalld) or `sudo ufw allow WatchMyMedia` (ufw).
-- **Updating and removing.** Installing a newer file updates it and restarts the service if
-  it was running. `apt remove` and `dnf remove` stop the service and keep
+- **The repository.** The package adds WatchMyMedia's repository to apt
+  (`/etc/apt/sources.list.d/watchmymedia.sources`) or dnf (`/etc/yum.repos.d/watchmymedia.repo`)
+  with the key its lists are signed with, Eldwick Software's
+  `3C3CE93DA59EBE83C4B3ED24CB959CFB56BCDBB9`
+  ([deploy/linux/repository-key.asc](deploy/linux/repository-key.asc)). The `.rpm` files
+  are signed with the same key; a `.deb` is not, and apt trusts the repository's signed
+  list. Adding the repository first and installing the package from it works too; the
+  guides give the lines. To stop using it, add `Enabled: no` to the `.sources` file or set
+  `enabled=0` in the `.repo` file; updates to the package keep that change.
+- **Updating and removing.** New versions come with the system's other updates
+  (`sudo apt update && sudo apt upgrade`, or `sudo dnf upgrade --refresh`), and Settings ›
+  General › Updates gives the command. Installing a newer file does the same. An update
+  restarts the service if it was running. `apt remove` and `dnf remove` stop the service and keep
   `/var/lib/watchmymedia` and your settings: apt leaves the settings file where it is, and
   dnf keeps one you changed as `config.yaml.rpmsave`, which the next install puts back.
   `apt purge` also removes the settings and the cache, and says the data is still there;
@@ -204,17 +225,14 @@ package that is not signed; `dnf` installs it with a warning.
   have them. All of this is read from the packages: nothing has run on a GPU on Linux yet.
   Without a driver that works, the server transcodes in software, and Settings › Transcoding
   shows which encoder it found.
-- **Not there yet.** A release now builds the packages and attaches them to its GitHub
-  release ([Releasing the Linux packages](#releasing-the-linux-packages)); no release has
-  been tagged since, and they are not on <https://downloads.watchmy.media>. Each carries its
-  repository entry and the public key the repositories are signed with
-  ([deploy/linux/repository-key.asc](deploy/linux/repository-key.asc)),
-  but the apt and dnf repositories that will deliver updates do not exist yet. Until they do,
-  a machine with a package installed gets an error for that entry from `apt update` (its
-  other lists still update), and a 404 notice from `dnf`, which carries on.
-  `make linux-packages LINUX_REPOSITORY_KEY=` builds packages without the entry.
 
-Developers: [deploy/linux](deploy/linux) holds the one [nfpm](https://nfpm.goreleaser.com/)
+Developers: `make linux-packages` builds the same four packages, unsigned, into
+`build/linux-packages/`; install one with `sudo apt install ./watchmymedia_<version>_<arch>.deb`
+or `sudo dnf install ./watchmymedia-<version>-1.<arch>.rpm` (Fedora 45's `rpm -i` refuses a
+package that is not signed; `dnf` installs it with a warning). They carry the repository
+entry, as the released ones do; `make linux-packages LINUX_REPOSITORY_KEY=` builds them
+without it.
+[deploy/linux](deploy/linux) holds the one [nfpm](https://nfpm.goreleaser.com/)
 file both formats are built from, what it packs and the make targets. `make
 linux-smoke-packages` builds an older and a current set, signed by a throwaway key (it needs
 `gpg`; the real signing key is only ever in a release), and
@@ -240,13 +258,15 @@ package in `macos/`; `make macos-dmg` builds the universal DMG the release job s
 `swift test --disable-keychain --package-path macos` checks the startup supervisor
 with disposable data; it does not launch the installed app or open a browser.
 
-**Windows desktop app (development).** The tray app and its bundled server build with
-`make windows-app VERSION=development` into `build/windows-app/`. Copy the folder to a
-PC running Windows 11 25H2 or later on native x64 and open `WatchMyMedia.exe`; setup opens in your browser. Data stays in
-`%LOCALAPPDATA%\WatchMyMedia`. The tray offers status, logs, restart, Start at sign-in
-and Quit. The development NSIS installer builds with `make windows-installer`. Releases
-sign the installer, but Windows downloads and automatic updates are not published yet;
-[windows/README.md](windows/README.md) covers building and testing it.
+**Windows app.** Download the installer from <https://watchmy.media/download> and run it, on
+a PC with Windows 11 25H2 or later on native x64. It installs a notification-area app that
+runs the server with the bundled ffmpeg, keeps its data in `%LOCALAPPDATA%\WatchMyMedia`, and
+opens setup in your browser on first launch. The tray offers status, logs, restart, Start at
+sign-in, **Check for updates…**, which installs a newer release when you agree, and Quit.
+Releases sign the installer. Developers: `make windows-app VERSION=development` builds the
+tray app and its bundled server into `build/windows-app/` (copy the folder to a supported PC
+and open `WatchMyMedia.exe`), and `make windows-installer` builds an unsigned development
+installer; [windows/README.md](windows/README.md) covers building and testing them.
 
 ### Cutting a release
 
@@ -270,9 +290,10 @@ job), which admit only `v*` tags; a build without them still runs, unsigned, and
 The Linux packages are the exception: without their key the job fails and the release has
 none.
 
-A GitHub release is not yet what people are offered. The website, the servers' Check for
-updates and the Mac and Windows apps' updaters read <https://downloads.watchmy.media>,
-which the maintainers publish to from the release's files once it is built.
+A GitHub release on its own is not what people are offered. The website, the servers' Check
+for updates and the Mac and Windows apps' updaters read <https://downloads.watchmy.media>,
+which also serves the apt and dnf repositories; the maintainers publish to it from the
+release's files once it is built.
 
 ### Releasing the Mac app
 
@@ -436,7 +457,8 @@ then and roll each release out in Play Console.
 ## iPhone app
 
 The app is on the [App Store](https://apps.apple.com/app/watchmymedia/id6828975407)
-for iPhone and iPad with iOS or iPadOS 18 or later; the Apple TV app is not out yet.
+for iPhone and iPad with iOS or iPadOS 18 or later, and the Apple TV app (tvOS 18 or later)
+is in the App Store too: search for WatchMyMedia on the Apple TV.
 The iPhone and iPad app is in `apple/` (layout and conventions in
 [apple/README.md](apple/README.md)). It
 needs Xcode with an iOS simulator runtime and XcodeGen 2.45.4 or newer (`brew
@@ -1235,8 +1257,8 @@ films released in the last six months or not yet out and monthly for the rest, 2
 time, with the same TMDB key and pace as matching. They play in YouTube's own player or app, not
 through the server, so they don't cast. **Trailers from YouTube**, under the key in Settings ›
 General › Metadata (TMDB), is on by default; off, movies list no YouTube trailers, the web app
-may not show YouTube's player, and the job asks TMDB nothing. The Trailer button on movie pages
-comes with later releases of the web app and the apps.
+may not show YouTube's player, and the job asks TMDB nothing. Movie pages on the web and in
+the apps have a Trailer button.
 
 Movie libraries also read trailer files: `<movie file name>-trailer.mkv` (or `.trailer`,
 `_trailer`, ` trailer`) next to the movie, `trailer.mkv` or `movie-trailer.mkv` in a folder that
