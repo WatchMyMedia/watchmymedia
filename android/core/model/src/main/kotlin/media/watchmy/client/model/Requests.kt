@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * The server API level that brought requests, problem reports and missing
- * episodes' state (PLAN-ARR.md); older servers show none of it.
+ * episodes' state; older servers show none of it.
  */
 const val REQUESTS_API_LEVEL = 5
 
@@ -180,7 +180,7 @@ data class SeerrInbox(val requestsUrl: String, val pending: Int? = null) {
 }
 
 /**
- * Requests and problem reports on the server in use (PLAN-ARR.md §7, §9).
+ * Requests and problem reports on the server in use.
  * Methods throw [ApiException]; below [REQUESTS_API_LEVEL] [options] is
  * [RequestOptions.None] and nothing else is called.
  */
@@ -265,7 +265,7 @@ interface RequestRepository {
     }
 }
 
-// Wording. The Apple apps word these the same way (PLAN-ARR.md, the "Requests and missing episodes" boards).
+// Wording. The Apple apps word these the same way.
 
 /** "Downloading 45% · 12 min left", "Downloading 45%", "Waiting to import", "Download failed". */
 fun Download.label(nowMs: Long = System.currentTimeMillis(), timeLeft: Boolean = true): String = when (state) {
@@ -335,7 +335,7 @@ fun List<Requestable>.besides(results: SearchResults?): List<Requestable> {
 /** "TV show · 2021" or "Movie · 2020", under a search result. */
 fun Requestable.subtitle(): String = listOfNotNull(if (mediaType == MediaType.Movie) "Movie" else "TV show", year?.toString()).joinToString(" · ")
 
-/** What a missing episode says and offers (ShowMissing boards), in the order PLAN-ARR.md §6 gives. */
+/** What a missing episode says and offers, in the order the design gives. */
 data class MissingEpisode(
     val kind: Kind,
     val label: String,

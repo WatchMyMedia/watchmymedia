@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Settings › About › Diagnostics on iPhone and iPad (PLAN-APPLE-REVIEW.md
-/// §6.4, design/mockups/ios/Diagnostics.dc.html): the page made once as it
+/// Settings › About › Diagnostics on iPhone and iPad:
+/// the page made once as it
 /// opens, and Copy, which puts ``DiagnosticsPage/text`` on the clipboard,
 /// turns into Copied and shows a short Copied note (iOS shows nothing when an
 /// app copies). Nothing is sent: there is no Share.

@@ -20,7 +20,7 @@ const row = (id: string, title: string, o: Partial<RowLayoutEntry> = {}): RowLay
 const list = (listId: number, title: string, owner: 'me' | 'everyone', o: Partial<RowLayoutEntry> = {}): RowLayoutEntry =>
   row(`list:${listId}`, title, { kind: 'list', listId, owner, ...o })
 
-/** The rows each screen starts with; Home's as SettingsHomeRows draws them. */
+/** The rows each screen starts with; Home's as the design draws them. */
 function defaults(): Record<string, RowLayoutEntry[]> {
   return {
     home: [

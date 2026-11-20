@@ -5,8 +5,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /*
- * New episodes' words (PLAN-NEW-EPISODES.md §6.2, §6.3, §7), as the boards
- * in design/proposals/new-episodes/android have them (README, Wording),
+ * New episodes' words, as the boards have them,
  * shared by the phone, the tablet and the TV. Episode codes here are not
  * padded ("S3 E7", "S0 E3"), unlike [episodeCode], so every platform reads
  * alike.
@@ -70,7 +69,7 @@ const val FOLLOW_ASK_TITLE = "Get notified of new episodes"
 fun followAskBody(show: String, device: LiveDevice): String =
     "When a new episode of $show reaches the library, this ${device.word} shows a notification."
 
-/** The limits (§6.3): under the explainer, and Settings' footnote. */
+/** The limits: under the explainer, and Settings' footnote. */
 fun newEpisodesLimits(device: LiveDevice): String =
     "Notifications come about once an hour, and later while the ${device.word} is idle. The ${device.word} has to be able to reach your server."
 

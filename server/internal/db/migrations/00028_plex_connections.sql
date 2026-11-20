@@ -1,7 +1,7 @@
 -- +goose Up
 -- A connected Plex server, and which of its people and libraries are linked
--- to ours (PLAN-PLEX-SYNC.md, P2). Nothing here imports anything: sync stays
--- off (sync_enabled = 0) until the import itself exists (P3).
+-- to ours. Nothing here imports anything: sync stays
+-- off (sync_enabled = 0) until the import itself exists.
 --
 -- The connection's Plex grant, a device key, is a private file under the
 -- data folder, not a value here: credential_ref names the file. Backups

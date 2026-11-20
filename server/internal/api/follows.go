@@ -17,7 +17,7 @@ import (
 )
 
 // Following shows and the episodes that arrive for them
-// (PLAN-NEW-EPISODES.md §5, API level 29). A person follows a show by its
+// (API level 29). A person follows a show by its
 // TMDB id, so one follow covers the show in every library and outlives the
 // show's row; each device keeps its own cursor into the feed of arrivals.
 
@@ -117,7 +117,7 @@ type NewEpisodes struct {
 
 type NewEpisodesOutput struct{ Body NewEpisodes }
 
-// The limits in PLAN-NEW-EPISODES.md §5.
+// The limits.
 const (
 	// maxFollows is how many shows one person may follow.
 	maxFollows = 500
@@ -258,7 +258,7 @@ func publishFollowsChanged(deps Deps, userID, tmdbID int64, following bool) {
 		To: &events.Audience{UserID: userID, Private: true}})
 }
 
-// newEpisodes is the feed a device checks (PLAN-NEW-EPISODES.md §5.4) at
+// newEpisodes is the feed a device checks at
 // now: what arrived for userID's followed shows after the cursor after.
 func newEpisodes(ctx context.Context, q *db.Queries, userID int64, after string, now time.Time) (NewEpisodes, error) {
 	out := NewEpisodes{Shows: []NewEpisodeGroup{}}
@@ -350,8 +350,8 @@ func seasonOrder(n int64) int64 {
 	return n
 }
 
-// followedEpisodes is Home's row "New from shows you follow"
-// (PLAN-NEW-EPISODES.md §5.5): what arrived for the person's followed shows
+// followedEpisodes is Home's row "New from shows you follow":
+// what arrived for the person's followed shows
 // in the last 7 days, by the feed's rules but without its wait, newest
 // first.
 func followedEpisodes(ctx context.Context, q *db.Queries, userID int64, now time.Time) ([]EpisodeCard, error) {

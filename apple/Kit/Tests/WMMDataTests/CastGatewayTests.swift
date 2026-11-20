@@ -35,7 +35,7 @@ import WMMModel
         #expect(h.router.requests("POST /api/auth/cast-token").isEmpty)
     }
 
-    // Cast's check reads GET /api/server through ServerInfoReader (PLAN-APPLE-REVIEW.md §5.6).
+    // Cast's check reads GET /api/server through ServerInfoReader.
 
     private nonisolated static let castingServer = #"{"id":"srv-test","name":"Test server","version":"1","apiLevel":18,"setupRequired":false,"turnstile":false,"casting":true,"castAppId":"0A4D0B6A"}"#
 

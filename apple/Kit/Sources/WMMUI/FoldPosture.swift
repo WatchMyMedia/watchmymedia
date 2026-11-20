@@ -6,7 +6,7 @@ public enum HingeState: Sendable, Equatable {
     case none, closed, partlyOpen, fullyOpen
 }
 
-/// How a window sits on a folding device (PLAN-IPHONE-DUO.md §4.2).
+/// How a window sits on a folding device.
 ///
 /// Nothing reports where the fold is. On the iPhone Duo it runs through the
 /// middle of the inner screen, which reports a regular width held either way;

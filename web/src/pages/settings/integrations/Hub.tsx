@@ -20,7 +20,7 @@ const APPS = [
 ] as const
 
 /**
- * The Integrations hub (§5.2): a card per app with what it is for when
+ * The Integrations hub: a card per app with what it is for when
  * nothing is connected; then a row per connection with its checklist, a
  * banner for one that stopped answering, and who needs approval, which
  * saves at once. Drawn inside ServerOnly, so members never see Add.
@@ -147,7 +147,7 @@ function ConnectionRow({ c, checklist }: { c: Integration; checklist: CheckItem[
   )
 }
 
-/** Who needs approval: a choice that saves at once and says what it did (§3.6). */
+/** Who needs approval: a choice that saves at once and says what it did. */
 function Approval() {
   const settings = useQuery(requestSettingsQuery)
   const update = useUpdateRequestSettings()

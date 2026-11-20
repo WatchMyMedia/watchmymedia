@@ -5,7 +5,7 @@ import WMMModel
 @testable import WMMData
 
 /// MetricKit's payloads reduced to summaries, the store that keeps the last of
-/// each, and the copied text (PLAN-APPLE-REVIEW.md §6.4).
+/// each, and the copied text.
 @Suite struct DiagnosticsDataTests {
     let at = Date(timeIntervalSince1970: 1_800_000_000)
 

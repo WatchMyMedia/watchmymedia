@@ -1,7 +1,6 @@
 import XCTest
 
-/// Following a show on Apple TV (PLAN-NEW-EPISODES.md §7.4; the new-episodes
-/// boards' `tv-bell` and `tv-settings`) on the fakes at API level 29
+/// Following a show on Apple TV on the fakes at API level 29
 /// (`-fakesFollows`): Notify me first in About the show, with the line about
 /// phones while it has focus; Settings › Notifications' list, each show's
 /// panel, and Select's menu. Runs in `make apple-tv-test-sim`.

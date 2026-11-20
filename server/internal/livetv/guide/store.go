@@ -177,7 +177,7 @@ func feedName(names []string) string {
 }
 
 // matchName checks the lineup's name for a channel matched by number
-// against the feed's display names (§5.3). It says how the channel matched
+// against the feed's display names. It says how the channel matched
 // and whether the names disagree. A tuner names channels it can't name
 // "Unknown", which skips the check.
 func matchName(guideName string, names []string) (by string, flagged bool) {

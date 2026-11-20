@@ -4,7 +4,7 @@ import { formatBytes } from './format'
 export type TrickplayStatus = components['schemas']['TrickplayStatus']
 type Current = components['schemas']['TrickplayCurrent']
 
-/** What the Seek thumbnails card shows (the SettingsThumbnails board's states). */
+/** What the Seek thumbnails card shows. */
 export type ThumbnailState = 'working' | 'paused' | 'lowDisk' | 'done' | 'off'
 
 /** Where the job stands: off; waiting for a play to end or for disk space; every file done; else making them. */
@@ -84,7 +84,7 @@ export function usableTrickplay(t: Trickplay | null | undefined): Trickplay | nu
 }
 
 /**
- * The tile at `positionMs` (PLAN-TRICKPLAY.md §2): tile i shows the last
+ * The tile at `positionMs`: tile i shows the last
  * keyframe at or before i × intervalMs, so the one at or before the
  * position, and the last tile past the end.
  */

@@ -18,7 +18,7 @@ import (
 //
 // It answers /titles/<id>.jpg with a 480×270 JPEG, /posters/<id>.jpg with a
 // 320×480 JPEG and /channels/<id>.png with a 360×270 PNG, the sizes the
-// real host's pictures measured (PLAN-LIVE-TV-GUIDE.md §7.1), each a plain
+// real host's pictures measured, each a plain
 // colour made from the id. In any of those folders a few names misbehave:
 //
 //   - big.jpg is a valid JPEG of over 1 MiB, sent without a length;

@@ -26,7 +26,7 @@ val ItemFilter.label: String
         ItemFilter.Unwatched -> "Unwatched"
     }
 
-/** The sorts a library of [type] offers, in menu order (PLAN.md §10). */
+/** The sorts a library of [type] offers, in menu order. */
 fun sortOptions(type: LibraryType): List<ItemSort> = when (type) {
     LibraryType.Tv -> listOf(ItemSort.Title, ItemSort.Added, ItemSort.Aired, ItemSort.Year, ItemSort.Rating)
     LibraryType.Movie -> listOf(ItemSort.Title, ItemSort.Added, ItemSort.Released, ItemSort.Year, ItemSort.Rating, ItemSort.Runtime)

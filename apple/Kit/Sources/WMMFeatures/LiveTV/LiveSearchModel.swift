@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Search listings (PLAN-LIVE-TV-GUIDE.md §6.5): programmes on now and later
+/// Search listings: programmes on now and later
 /// whose title or episode title has every word typed, soonest first, a moment
 /// after typing stops. On the Search tab its On Live TV group follows the
 /// library's; from the guide's search button it is the whole page. Only from

@@ -1,5 +1,5 @@
 // Package related works out the titles shown at the end of a movie's or a
-// show's page (PLAN-RELATED.md): the movie's TMDB collection, and More like
+// show's page: the movie's TMDB collection, and More like
 // this, from TMDB's recommendations and what titles share. It keeps what a
 // title is like as tags (movie_tags, show_tags), written when a title is
 // matched and filled in for older titles by Refresher.
@@ -15,7 +15,7 @@ import (
 	"watchmymedia/server/internal/tmdb"
 )
 
-// The kinds of tag (PLAN-RELATED.md §4).
+// The kinds of tag.
 const (
 	// KindRec is one of TMDB's recommendations: its TMDB ID, ranked in
 	// TMDB's order.

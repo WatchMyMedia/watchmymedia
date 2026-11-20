@@ -3,7 +3,7 @@
 python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'
 
 The template must parse, use only the elements and Config attributes
-Unraid's Docker page and Community Applications read (PLAN-UNRAID.md §2.3),
+Unraid's Docker page and Community Applications read,
 and match the image: its paths, port and variables are the ones
 deploy/Dockerfile and deploy/entrypoint.sh understand.
 """

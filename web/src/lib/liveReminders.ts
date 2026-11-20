@@ -3,7 +3,7 @@ import type { components } from '../api/schema'
 import { duration, episodeLine, timeOfDay, timeRange } from './liveGuide'
 
 /**
- * Live TV reminders and listings search (PLAN-LIVE-TV-GUIDE.md §6.5, G7):
+ * Live TV reminders and listings search:
  * when a reminder is due, what it says, and how search results and the
  * Reminders list word their times. Reminders live on the server; this page
  * only delivers them while it is open.

@@ -6,7 +6,7 @@ import (
 	"watchmymedia/server/internal/plex"
 )
 
-// Kinds of Plex person (PLAN-PLEX-SYNC.md, "Identity and media matching").
+// Kinds of Plex person.
 const (
 	KindOwner   = "owner"
 	KindAccount = "account" // an invited user or Home member who signs in to plex.tv

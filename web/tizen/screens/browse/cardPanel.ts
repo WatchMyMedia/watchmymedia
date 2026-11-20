@@ -6,7 +6,7 @@ import { isListRow, titleParts, type ScreenRow } from '../../../src/lib/screenRo
 import { episodeCode, holdWords, timeLeft, type RowCard } from './rowCards'
 
 // What the panel over a Home row screen says about its focused card
-// (HomeRow on the canvas, Android's CardPanel): a kicker, the title, facts,
+// (Android's CardPanel): a kicker, the title, facts,
 // tags, an overview and what OK does, over the card's picture.
 
 type BrowseItem = components['schemas']['BrowseItem']

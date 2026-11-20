@@ -6,7 +6,7 @@ import media.watchmy.client.core.playback.player.TransferSample
 
 /**
  * Automatic quality's switch to another output, the same machine for a
- * file's step change and a Live TV directive (PLAN-AUTO-QUALITY.md):
+ * file's step change and a Live TV directive:
  *
  * - the server's directive is taken once, by its generation ([take]);
  * - its output loads with what to go back to ([begin]);
@@ -100,7 +100,7 @@ internal class OutputSwitch<F : Any>(private val keepFallbackUntilReported: Bool
 }
 
 /**
- * What a heartbeat reports of the stream (PLAN-AUTO-QUALITY.md §3.1), the
+ * What a heartbeat reports of the stream, the
  * same for a file and Live TV: the buffer ahead, the last media segment's
  * transfer and the player's estimate, the rebuffers, and the switch to
  * report. Made by [measure], on the player's thread.

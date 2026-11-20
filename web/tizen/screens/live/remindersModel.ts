@@ -3,7 +3,7 @@ import {
   dueReminders, movedTo, nextReminderAt, noticeKey, pruneNotices, reminderChannel, reminderProgramme, type LiveReminder,
 } from '../../../src/lib/liveReminders'
 
-// Reminders on the TV (LiveReminders on the canvas): the list's words, and
+// Reminders on the TV: the list's words, and
 // which reminder the banner shows over any screen while the app is open.
 // When a reminder is due and what it says are the web's rules
 // (src/lib/liveReminders.ts); this adds the banner's own bookkeeping.

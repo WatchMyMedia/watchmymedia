@@ -53,7 +53,7 @@ type Config struct {
 	Lists         ListsConfig         `yaml:"lists"`
 }
 
-// ListsConfig is the lists rows can be made from (PLAN-ROWS.md 7.3).
+// ListsConfig is the lists rows can be made from.
 // Enabled false turns off every list from an outside service (TMDB's
 // charts and discover, MDBList), for a server that should ask nothing of
 // them; lists of the library and imports still work.
@@ -61,8 +61,8 @@ type ListsConfig struct {
 	Enabled bool `yaml:"enabled"`
 }
 
-// UpdatesConfig is Check for updates in Settings › General
-// (PLAN-RELEASES.md §5), which reads the release list at URL when an admin
+// UpdatesConfig is Check for updates in Settings › General,
+// which reads the release list at URL when an admin
 // asks. Install is how the server was installed (macos-app, windows-app,
 // docker, deb, rpm or binary), which decides the download it links to or
 // the command it gives; the menu bar app, the Windows tray app, the Docker
@@ -77,7 +77,7 @@ type UpdatesConfig struct {
 	// Host is the platform a Docker install's container runs on, when the
 	// server can tell: "unraid" when Unraid's Docker page started it (it
 	// sets HOST_OS=Unraid in every container), else empty. Settings then
-	// word updates and GPU setup for that platform ([PLAN-UNRAID.md]).
+	// word updates and GPU setup for that platform.
 	Host string `yaml:"-"`
 }
 
@@ -95,7 +95,7 @@ type OpenSubtitlesConfig struct {
 	BaseURL string `yaml:"base_url"`
 }
 
-// CastConfig is casting to Google Cast devices (PLAN-CAST.md). The receiver
+// CastConfig is casting to Google Cast devices. The receiver
 // is a web page hosted for every WatchMyMedia server at one address; each
 // cast tells it which server to talk to.
 type CastConfig struct {
@@ -118,8 +118,8 @@ type LiveTVConfig struct {
 }
 
 // DefaultCastAppID is the production receiver's Cast App ID, registered in
-// the Google Cast SDK Developer Console under Eldwick Software (PLAN-CAST.md
-// R0); DefaultCastReceiverOrigin is where that receiver is hosted.
+// the Google Cast SDK Developer Console under Eldwick Software;
+// DefaultCastReceiverOrigin is where that receiver is hosted.
 const (
 	DefaultCastAppID          = "0A4D0B6A"
 	DefaultCastReceiverOrigin = "https://cast.watchmy.media"
@@ -227,7 +227,7 @@ type TranscodeConfig struct {
 	IdleTimeout time.Duration `yaml:"idle_timeout"`
 	MaxSessions int           `yaml:"max_sessions"`
 	// MaxDownloadSessions is how many of those sessions offline downloads
-	// may use at once (PLAN-DOWNLOADS.md §3.2); they run at low priority
+	// may use at once; they run at low priority
 	// and give way to plays.
 	MaxDownloadSessions int `yaml:"max_download_sessions"`
 	// Playback cache budgets apply to owned file and Live TV session output, not

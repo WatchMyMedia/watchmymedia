@@ -12,7 +12,7 @@ import { FAKE_USER } from './data'
 // Modes (?fakes=…): "nolistings" (channels only), "member" (may watch, not
 // record), "notv" (no tuner: Live TV leaves the rail).
 //
-// Some channels misbehave on purpose, for LiveProblems: 4.4 has no signal,
+// Some channels misbehave on purpose: 4.4 has no signal,
 // 20.1 finds every tuner busy, 36.1 isn't in the tuner's list, and a
 // recording takes 7.1's tuner 45 s after it starts.
 

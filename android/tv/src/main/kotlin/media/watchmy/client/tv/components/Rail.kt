@@ -205,7 +205,7 @@ private fun RailItem(label: String, icon: ImageVector, active: Boolean, expanded
                 .height(60.dp)
                 .width(if (expanded) 250.dp else 60.dp)
                 .drawBehind {
-                    // A gold outline that spreads from the item and fades (RowStartBest.dc.html `pulse`).
+                    // A gold outline that spreads from the item and fades.
                     val p = pulse?.invoke() ?: 0f
                     if (p > 0f) {
                         val out = (1f - p) * 18.dp.toPx()
@@ -224,7 +224,7 @@ private fun RailItem(label: String, icon: ImageVector, active: Boolean, expanded
             Box(Modifier.size(60.dp), contentAlignment = Alignment.Center) {
                 Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(30.dp))
                 if (count > 0) {
-                    // The Inbox's count for admins (ShowMissing.dc.html, Android TV).
+                    // The Inbox's count for admins.
                     Box(
                         Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp).heightIn(min = 24.dp).widthIn(min = 24.dp).background(WmmColors.Accent, CircleShape).padding(horizontal = 6.dp),
                         contentAlignment = Alignment.Center,

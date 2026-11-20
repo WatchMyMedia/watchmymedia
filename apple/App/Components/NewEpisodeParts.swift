@@ -4,9 +4,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-// The pieces of following a show on iPhone and iPad (PLAN-NEW-EPISODES.md
-// §7.1, §7.4; the new-episodes boards' `show-bell`, `explainer` and
-// `settings`): the bell, the explainer before iOS's question, and the
+// The pieces of following a show on iPhone and iPad:
+// the bell, the explainer before iOS's question, and the
 // orange message with its button that the show page and Settings share.
 
 /// Notify me (off: the outline bell on a plain button) or Notifications on

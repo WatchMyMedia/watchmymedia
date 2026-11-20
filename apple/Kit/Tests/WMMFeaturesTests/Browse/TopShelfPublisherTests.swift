@@ -5,8 +5,7 @@ import WMMFakes
 import WMMModel
 import WMMTopShelf
 
-/// The Apple TV's Top Shelf made from Home (TvTopShelfSections.dc.html,
-/// PLAN-APPLE-REVIEW.md §2.2, §2.5, §6.2).
+/// The Apple TV's Top Shelf made from Home.
 @MainActor
 @Suite struct TopShelfPublisherTests {
     init() { FakeLatency.duration = .zero }

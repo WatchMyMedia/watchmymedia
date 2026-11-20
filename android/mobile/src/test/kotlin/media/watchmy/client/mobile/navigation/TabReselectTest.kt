@@ -24,7 +24,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Tapping the tab already shown takes its page back to the top (PLAN-ANDROID-REVIEW §6.3). */
+/** Tapping the tab already shown takes its page back to the top. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xxhdpi")
 class TabReselectTest {

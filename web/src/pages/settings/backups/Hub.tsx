@@ -10,7 +10,7 @@ import { settingsCrumbs, settingsHref } from '../../../lib/settingsRoutes'
 
 const LEDE = 'Copies of the server’s database and settings, so a failed disk or a bad change doesn’t lose your library’s matches, people or history.'
 
-/** Settings › Server › Backups: whether there is a recent backup, and what each button made (board bak-hub). */
+/** Settings › Server › Backups: whether there is a recent backup, and what each button made. */
 export function BackupsHub() {
   const settings = useQuery(settingsQuery)
   const update = useUpdateSettings()

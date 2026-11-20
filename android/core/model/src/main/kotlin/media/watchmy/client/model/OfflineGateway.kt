@@ -3,7 +3,7 @@ package media.watchmy.client.model
 /**
  * The account a download belongs to: the server and the person signed in
  * there when it was made. Downloads stay with it; signing it out deletes
- * them (PLAN-DOWNLOADS.md §5).
+ * them.
  */
 data class OfflineOwner(val serverId: String, val userId: Long, val baseUrl: String, val apiLevel: Int) {
     val key: String get() = "$serverId/$userId"
@@ -58,7 +58,7 @@ data class SyncResult(val outcome: SyncOutcome, val watch: WatchProgress? = null
 data class SyncReply(val offline: Boolean, val downloads: List<OfflineRecord>, val results: List<SyncResult>)
 
 /**
- * The offline routes' calls (PLAN-DOWNLOADS.md §9) and the sign-in they are
+ * The offline routes' calls and the sign-in they are
  * made with. core:data implements it; core:downloads uses it. Calls for an
  * [OfflineOwner] go to its server as it, whichever server is current, and
  * throw [SignedOutException] once it is signed out there (a 401 signs it

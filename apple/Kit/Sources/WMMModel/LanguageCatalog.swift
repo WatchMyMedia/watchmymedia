@@ -2,7 +2,7 @@ import Foundation
 
 /// Every language a person can add to their audio or subtitle languages,
 /// named by the system, so no list is shipped or fetched and no code is
-/// typed (PLAN-APPLE-SETTINGS.md §5.3, §8). It is the languages the system
+/// typed. It is the languages the system
 /// has locale data for, with the ISO 639-1 ones (Latin, Norwegian, Aymara)
 /// that files are tagged with too, and the written varieties people choose
 /// between: Portuguese and Chinese only as their variants, Spanish also as

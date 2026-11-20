@@ -27,12 +27,12 @@ import { PlexNote } from './parts'
 import { EarlierImports, LeftOutItems, RunDetails, RunSummary } from './Runs'
 import { forgetConnection, keptImport, plexHref, useClock, useLinkedNames, usePlexConnection } from './state'
 
-/** A result that stays at the top of the hub until it is closed (board plex-banners). */
+/** A result that stays at the top of the hub until it is closed. */
 type Banner = { kind: 'disconnected'; name: string } | { kind: 'paused' } | { kind: 'message'; message: PlexMessage; retry?: () => void }
 
 const LEDE = 'Bring your watched movies and episodes across from a Plex server you own. Your choices in WatchMyMedia come first, and Plex stays as it is.'
 
-/** The Plex tab's hub (§5.1): not connected, connected with links or an
+/** The Plex tab's hub: not connected, connected with links or an
  * import still to do, or set up and keeping up to date. */
 export function PlexHub() {
   const { query, connection } = usePlexConnection()

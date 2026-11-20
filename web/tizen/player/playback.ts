@@ -119,7 +119,7 @@ export type FilePlaybackState = {
   exited: boolean
 }
 
-// ---------------------------------------------------------------- numbers (PLAN-CLIENTS.md §2.3, Android's Rules.kt)
+// ---------------------------------------------------------------- numbers (Android's Rules.kt)
 
 export const TICK_MS = 250
 const NOTE_MS = 5_000
@@ -130,7 +130,7 @@ const END_SLACK_MS = 1_000
 const EVENT_SEEK_SLACK_MS = 500
 const DECIDE_TIMEOUT_MS = 45_000
 const EVENT_START_TOLERANCE_MS = 15_000
-/** The server resumes this much before where the viewer was (PLAN-RESUME.md §3.8), so a start may land up to there. */
+/** The server resumes this much before where the viewer was, so a start may land up to there. */
 const RESUME_REWIND_MS = 5_000
 const STEP_GAP_MS = 10_000
 
@@ -207,7 +207,7 @@ class Viewing {
 type LoadOptions = { seekMs?: number; subtitleId?: string; burnIn?: boolean; newToken?: boolean; fallback?: boolean; paused?: boolean }
 
 /**
- * The file player's behaviour (PLAN-CLIENTS.md §2.3) around one Player, as
+ * The file player's behaviour around one Player, as
  * Android's RealPlaybackController: asks the server how to play, maps the
  * player's time to the file's, sends heartbeats and obeys their directives,
  * and runs Skip, Next episode, Still watching, subtitles, quality, seek

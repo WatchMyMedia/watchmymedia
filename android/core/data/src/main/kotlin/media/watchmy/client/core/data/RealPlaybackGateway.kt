@@ -41,7 +41,7 @@ import kotlinx.coroutines.coroutineScope
 
 /**
  * The player's server calls. URLs come back absolute and without a token;
- * the player appends [mediaToken]'s `access_token` itself (PLAN-CLIENTS.md §2.2).
+ * the player appends [mediaToken]'s `access_token` itself.
  * The profile goes as the server's level takes it ([PlaybackProfile.forApiLevel]).
  */
 internal class RealPlaybackGateway(

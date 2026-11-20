@@ -112,7 +112,7 @@ final class TabletServerSwitchTests: XCTestCase {
         row.tap()
     }
 
-    /// Switched (Settings2SwitchDone.dc.html): what changed, then Done shows the new server's Home.
+    /// Switched: what changed, then Done shows the new server's Home.
     @MainActor
     private func finishSwitch(_ app: XCUIApplication) {
         let done = app.buttons["switch-done"]

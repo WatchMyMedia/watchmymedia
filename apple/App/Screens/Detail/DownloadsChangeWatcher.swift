@@ -4,7 +4,7 @@ import WMMModel
 /// Calls `changed` when the account's downloads change in a way a show or
 /// movie page shows: one added or removed, a state, a mark or where the
 /// viewer is. Not the progress of one under way, which moves every second
-/// the engine runs (PLAN-APPLE-REVIEW.md §4.3.6). It reads the downloads in
+/// the engine runs. It reads the downloads in
 /// a view of its own, so their ticks redraw this empty view and not the page.
 struct DownloadsChangeWatcher: View {
     let downloads: any DownloadRepository

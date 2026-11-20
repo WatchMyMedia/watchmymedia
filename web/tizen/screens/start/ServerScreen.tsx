@@ -32,7 +32,7 @@ function AddressForm({ state, first }: { state: Servers; first: boolean }) {
 }
 
 /**
- * Choosing a server (Main on the Samsung TV canvas): the servers this TV
+ * Choosing a server: the servers this TV
  * remembers, each with Remove, and an address typed with the TV's keyboard.
  * There is no discovery on Samsung TVs. Plain http to a server away from
  * home is marked Not encrypted.

@@ -11,10 +11,10 @@ import kotlinx.coroutines.flow.flowOf
 /** Channel browsing and live sessions were added at this level; the app minimum stays at 1. */
 const val LIVE_TV_API_LEVEL = 11
 
-/** A cast token may play Live TV from this level (PLAN-LIVE-TV.md §4.1, L10a). */
+/** A cast token may play Live TV from this level. */
 const val LIVE_CAST_API_LEVEL = 14
 
-/** Favourite channels, search across the listings and reminders (PLAN-LIVE-TV-GUIDE.md §5.7, G6). */
+/** Favourite channels, search across the listings and reminders. */
 const val LIVE_PERSONAL_API_LEVEL = 15
 const val LIVE_PROFILE_API_LEVEL = 25
 const val LIVE_AUTOMATIC_API_LEVEL = 26
@@ -131,8 +131,8 @@ interface LiveRepository {
     fun artUrl(path: String?): String? = null
 
     /**
-     * Stars or unstars [channel] for the person signed in (PLAN-LIVE-TV-GUIDE.md
-     * §5.7). Throws [ApiException]; does nothing below [LIVE_PERSONAL_API_LEVEL].
+     * Stars or unstars [channel] for the person signed in.
+     * Throws [ApiException]; does nothing below [LIVE_PERSONAL_API_LEVEL].
      */
     suspend fun setFavourite(channel: LiveChannel, favourite: Boolean) {}
 

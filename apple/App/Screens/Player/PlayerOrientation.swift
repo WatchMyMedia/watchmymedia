@@ -6,7 +6,7 @@ extension View {
     /// Landscape while this shows, and back to portrait when it goes, in a
     /// phone's window. A wide window (an iPad's, the iPhone Duo's inner
     /// screen) keeps turning with the device, under the system's rotation
-    /// lock (PLAN-IOS.md §11.1, PLAN-IPHONE-DUO.md §4.3).
+    /// lock.
     func landscapeWhileShown() -> some View { orientationsWhileShown(.landscape) }
 
     /// `mask` while this shows (the film player: landscape; Live TV: any way

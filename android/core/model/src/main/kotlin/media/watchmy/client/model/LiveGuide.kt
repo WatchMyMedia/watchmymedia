@@ -8,7 +8,7 @@ import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
-/** Programme listings (PLAN-LIVE-TV-GUIDE.md): the guide window, now and next, logos and pictures. */
+/** Programme listings: the guide window, now and next, logos and pictures. */
 const val LIVE_GUIDE_API_LEVEL = 13
 
 /** The server answers at most this much of the guide at once; the app keeps the next window fetched too. */
@@ -169,7 +169,7 @@ fun liveStartsIn(nowMs: Long, startMs: Long): String {
 fun LiveProgramme.progressAt(nowMs: Long): Float =
     if (endMs <= startMs) 0f else ((nowMs - startMs).toFloat() / (endMs - startMs)).coerceIn(0f, 1f)
 
-/** "8:00 to 9:00 PM, The Sleuth Files, season 2 episode 4, New" (PLAN-LIVE-TV-GUIDE.md §6.1, Accessibility). */
+/** "8:00 to 9:00 PM, The Sleuth Files, season 2 episode 4, New". */
 fun LiveProgramme.spokenName(format: LiveClockFormat): String {
     val episodeWords = when {
         season != null && episode != null -> if (season >= 1000) "$season episode $episode" else "season $season episode $episode"
@@ -191,7 +191,7 @@ enum class LiveGuideFilter(val label: String) {
     Favourites("Favourites"), All("All channels"), Movies("Movies"), Sports("Sports"), News("News"), Kids("Kids");
 
     /**
-     * The one rule every client keeps (PLAN-LIVE-TV-GUIDE.md §6.5): under
+     * The one rule every client keeps: under
      * [Favourites] a channel shows when it is a [favourite], with or without
      * listings; a category needs listings whose programme at [timeMs]
      * matches; All shows every channel. The guide keeps channel order.

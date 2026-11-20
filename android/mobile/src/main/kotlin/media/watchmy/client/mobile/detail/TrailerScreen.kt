@@ -88,8 +88,8 @@ import media.watchmy.client.ui.trailerBaseUrl
 import media.watchmy.client.ui.trailerPage
 
 /**
- * A movie's YouTube trailers on phones and tablets (TrailerPlayer.dc.html,
- * TabTrailerPlayer.dc.html; PLAN-TRAILERS.md §6.2): full screen and in
+ * A movie's YouTube trailers on phones and tablets:
+ * full screen and in
  * landscape like the player, our bar (back, the trailer and the movie, and
  * YouTube's terms) above YouTube's own player at 16:9, with nothing of ours
  * drawn over it. [trailers] are tried in turn while their owners keep them
@@ -288,7 +288,7 @@ private class TrailerWebView(
         setBackgroundColor(android.graphics.Color.BLACK)
         // MATCH_PARENT, not the WRAP_CONTENT AndroidView would give it: a WebView whose height wraps
         // its content lays the page out 0 px high, so the page's 100% heights collapse and YouTube's
-        // player frame plays its sound with no picture (seen on a Google TV Streamer, TV0).
+        // player frame plays its sound with no picture (seen on a Google TV Streamer).
         layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         isVerticalScrollBarEnabled = false
         isHorizontalScrollBarEnabled = false

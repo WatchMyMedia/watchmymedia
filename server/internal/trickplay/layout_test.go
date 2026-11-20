@@ -21,7 +21,7 @@ func TestLayoutMaths(t *testing.T) {
 		{45 * 60_000, 270, 3, 70},
 		{1_000_000, 100, 1, 100},
 		{1_000_001, 101, 2, 1},
-		{7_235_000, 724, 8, 24}, // the plan's example: a 2-hour film
+		{7_235_000, 724, 8, 24}, // a 2-hour film
 	} {
 		tiles := l.Tiles(c.durationMs)
 		sheets := l.Sheets(tiles)

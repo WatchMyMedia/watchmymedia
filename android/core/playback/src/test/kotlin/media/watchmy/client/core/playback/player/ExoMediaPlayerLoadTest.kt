@@ -94,7 +94,7 @@ class ExoMediaPlayerLoadTest {
     }
 
     /**
-     * An event playlist as the server serves it (PLAN-RESUME.md §3.3–§3.5):
+     * An event playlist as the server serves it:
      * live, with EXT-X-START where the asked-for frame is. Its segments never
      * answer, so the player stays paused on the timeline the playlists give.
      * The app loads it where the asked-for frame is in the session; Media3

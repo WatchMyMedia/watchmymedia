@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Sign-in by pairing (SignInPairing.dc.html), for a server whose sign-in
+/// Sign-in by pairing, for a server whose sign-in
 /// protection refuses app passwords: the code, the server's sign-in page in an
 /// in-app Safari, and the wait for approval. The phone signs itself in once
 /// the code is approved there.

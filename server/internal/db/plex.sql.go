@@ -241,7 +241,7 @@ const listPlexConnections = `-- name: ListPlexConnections :many
 SELECT id, machine_identifier, name, origin, credential_ref, owner_plex_id, server_version, history_capability, authorized_by, generation, sync_enabled, problem, created_at, updated_at, source_epoch, next_sync_at, history_cursor_user, history_cursor_section, enabled_by FROM plex_connections ORDER BY id
 `
 
-// Plex connections and their links (PLAN-PLEX-SYNC.md, P2), and the exact
+// Plex connections and their links, and the exact
 // lookups that match Plex items to local ones.
 func (q *Queries) ListPlexConnections(ctx context.Context) ([]PlexConnection, error) {
 	rows, err := q.db.QueryContext(ctx, listPlexConnections)

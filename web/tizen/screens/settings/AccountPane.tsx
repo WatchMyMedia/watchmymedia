@@ -15,7 +15,7 @@ import { deviceLine, webAppUrl } from './settingsWords'
 const id = (row: string) => paneRowId('account', row)
 
 /**
- * Settings › Account & devices (SettingsAccount on the canvas): this TV,
+ * Settings › Account & devices: this TV,
  * the signed-in devices (each other one asks before it is signed out),
  * Change password on a phone, Switch server, and Sign out of this TV apart
  * at the foot with its confirmation.

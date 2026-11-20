@@ -1,6 +1,6 @@
 -- name: GetMediaFileAddedAt :one
 -- When a file counts as added, as the New badge reads it, for the arrival
--- rule (PLAN-NEW-EPISODES.md section 5.2).
+-- rule.
 SELECT added_at FROM media_files WHERE id = ?;
 
 -- name: RecordEpisodeArrival :exec
@@ -67,7 +67,7 @@ WHERE f.user_id = sqlc.arg(user_id)
 ORDER BY f.created_at DESC, f.since_arrival DESC, f.tmdb_id DESC;
 
 -- name: ListFollowedArrivals :many
--- What a person hears about (section 5.4), in the order it arrived: the
+-- What a person hears about, in the order it arrived: the
 -- announced arrivals of shows they follow, after both the device's cursor
 -- and the follow and up to upto, since a date (the week, or the wait),
 -- that they haven't finished in any library, as the show page says.
@@ -102,7 +102,7 @@ ORDER BY a.id
 LIMIT sqlc.arg(max_rows);
 
 -- name: ListNewestFollowedArrivals :many
--- Home's row "New from shows you follow" (section 5.5): the same
+-- Home's row "New from shows you follow": the same
 -- arrivals as ListFollowedArrivals since a date, newest first, with what
 -- an episode card shows and the episode row's tallest present file.
 SELECT a.id, a.tmdb_id, a.arrived_at, a.season AS season_number, a.number AS episode_number,

@@ -33,7 +33,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Change password on a phone and a tablet (SettingsPassword.dc.html, TabSettingsPassword.dc.html), on the fakes. */
+/** Change password on a phone and a tablet, on the fakes. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xxhdpi")
 class ChangePasswordScreenTest {

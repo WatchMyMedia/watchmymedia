@@ -32,8 +32,7 @@ import media.watchmy.client.presentation.settings.SettingsViewModel
 import media.watchmy.client.ui.WmmColors
 
 /**
- * Settings › Playback (PLAN-ANDROID-SETTINGS.md §5.1, SettingsPlaybackPage
- * and TabSettingsOverview): On this phone, Default quality and On mobile
+ * Settings › Playback: On this phone, Default quality and On mobile
  * data; under Your account, Autoplay next episode, Skipping and Live TV
  * reminders, held until the account's settings have loaded.
  */
@@ -160,7 +159,7 @@ internal fun ValueRow(
 }
 
 /**
- * The card at the top of a page with account settings (§4.5): they didn't
+ * The card at the top of a page with account settings: they didn't
  * load, with Try again; or the device is offline, and they come back by
  * themselves. [held] says what can't be done until then.
  */

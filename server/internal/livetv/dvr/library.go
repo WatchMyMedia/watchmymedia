@@ -605,7 +605,7 @@ func (s *Service) validateOwned(ctx context.Context, r record, path string, fini
 // effect, an atomic no-replace rename. That checkpoint also reconciles a
 // crash between publication and the final recording-state write. When
 // something else took the final name while this recorded, the recording is
-// published beside it under the next free name, as §1 says: the other file
+// published beside it under the next free name: the other file
 // is never claimed, replaced or deleted.
 func (s *Service) publishSealed(ctx context.Context, r *record) error {
 	if r.Bytes <= 0 || r.FileMtimeNano == 0 {

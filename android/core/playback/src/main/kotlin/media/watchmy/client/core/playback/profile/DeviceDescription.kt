@@ -107,7 +107,7 @@ fun decodedAudioCodec(mimeType: String): String? = when (mimeType) {
 }
 
 /**
- * PLAN-CLIENTS.md §5.4 and PLAN-HDR-PROFILE.md §6.1: what this device can
+ * What this device can
  * play, sent with every playback request. Video codecs from the decoders
  * that count ([decodersFor], hardware first): hevc10 when one decodes Main
  * 10, AV1 and VP9 only in hardware, and a Dolby Vision profile's dovi key
@@ -119,8 +119,8 @@ fun decodedAudioCodec(mimeType: String): String? = when (mimeType) {
  * are fewer. The size is the largest the offered codecs' decoders
  * take, whatever the screen (a phone whose hardware decodes 4K plays a 4K
  * file directly), or the display's when no decoder says; a codec whose
- * decoder takes less is asked for again at its own size if it fails
- * (PLAN-ANDROID-REVIEW.md §2.1, §6.1). HDR and the HDR types from the
+ * decoder takes less is asked for again at its own size if it fails.
+ * HDR and the HDR types from the
  * display. The player picks a direct-play file's audio track itself.
  * Servers below level 8 (HDR), 21 (the audio track) and 31 (PCM) get it
  * through [PlaybackProfile.forApiLevel].
@@ -149,7 +149,7 @@ fun buildProfile(d: DeviceDescription): PlaybackProfile {
         if (d.display.dolbyVision) add("dovi")
     }
     val audio = buildList {
-        // The server copies PCM only in direct play of MKV (PLAN-AUDIO.md §3.4): Media3 reads no
+        // The server copies PCM only in direct play of MKV: Media3 reads no
         // QuickTime in24, in32, fl32 or fl64, which ffmpeg writes for 24-bit PCM in MOV.
         addAll(listOf("aac", "mp3", "opus", "flac", "vorbis", "pcm"))
         if (decodesAudio(Mime.AC3) || "ac3" in d.passthrough) add("ac3")
@@ -169,7 +169,7 @@ fun buildProfile(d: DeviceDescription): PlaybackProfile {
         maxBitrate = null,
         maxAudioChannels = channels.takeIf { it > 0 },
         // A soundbar on ARC takes E-AC-3 5.1 but two channels of PCM: said apart, a conversion
-        // for it keeps its surround as E-AC-3 rather than being decoded to stereo (PLAN-AUDIO.md §3.5).
+        // for it keeps its surround as E-AC-3 rather than being decoded to stereo.
         maxPcmChannels = d.maxPcmChannels.takeIf { it in 1 until channels },
         hdr = d.display.hdr,
         subtitleFormats = listOf("webvtt", "ass"),
@@ -179,7 +179,7 @@ fun buildProfile(d: DeviceDescription): PlaybackProfile {
     )
 }
 
-/** The Dolby Vision profiles the server has keys for (PLAN-HDR-PROFILE.md decision 4). */
+/** The Dolby Vision profiles the server has keys for. */
 private val DOVI_PROFILES = listOf(5, 7, 8)
 
 private val PASSTHROUGH_CHANNELS = mapOf("ac3" to 6, "eac3" to 8, "dts" to 8, "truehd" to 8)

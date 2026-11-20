@@ -2,7 +2,7 @@ import CoreGraphics
 import Testing
 @testable import WMMUI
 
-/// PLAN-IPHONE-DUO.md §3 and §4.3–4.4: the players on a folding device.
+/// The players on a folding device.
 @Suite struct PlayerWindowTests {
     @Test func onlyAWindowRegularBothWaysTurnsWithTheDevice() {
         // An iPad, or the Duo's inner screen held either way.

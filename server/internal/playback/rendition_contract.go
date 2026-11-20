@@ -36,7 +36,7 @@ func renditionContract(spec Spec) (string, error) {
 	}
 	// Function-valued subtitle and I-frame suppliers are not transferable
 	// between viewers. Their advertised text/thumbnail metadata is included,
-	// but A0 never shares the supplier itself or any per-viewer playlist.
+	// but the supplier itself or a per-viewer playlist is never shared.
 	var iframe *struct {
 		Bandwidth int64
 		Codecs    string

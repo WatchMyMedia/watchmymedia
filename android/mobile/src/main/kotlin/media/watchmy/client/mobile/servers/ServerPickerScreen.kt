@@ -75,7 +75,7 @@ import media.watchmy.client.presentation.servers.localNetworkOffMessage
 import androidx.compose.foundation.border
 
 /**
- * Choosing a server (ServerPicker.dc.html): on this network, remembered, or
+ * Choosing a server: on this network, remembered, or
  * a typed address. [onBack] is null when there is nowhere to go back to (no
  * server chosen yet).
  */
@@ -85,9 +85,9 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
     val vm = viewModel { ServerPickerViewModel(services.servers) }
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.chosen.collect { onServerChosen() } }
-    // The field holds its text (§3.3.3); the model hears it as it is typed.
+    // The field holds its text; the model hears it as it is typed.
     val address = rememberModelTextField(state.address, state.revision, vm::setAddress)
-    // Android 17's local network access, offered again here when nothing is found (§3.4.2).
+    // Android 17's local network access, offered again here when nothing is found.
     val access = rememberLocalNetworkAccess()
     val offline = access.needed && state.addressError != null && isLocalAddress(address.text.toString())
     val connect = {
@@ -222,7 +222,7 @@ private fun ErrorNote(message: String, onDismiss: () -> Unit) {
     }
 }
 
-/** "Allow local network access" (LocalNetwork.dc.html), or "Open settings" once Android has stopped asking. */
+/** "Allow local network access", or "Open settings" once Android has stopped asking. */
 @Composable
 private fun LocalNetworkCard(access: LocalNetworkAccess) {
     val stopped = access.stopped

@@ -5,8 +5,8 @@ import UserNotifications
 import WMMFeatures
 import WMMModel
 
-/// Live TV reminders as local notifications on iPhone and iPad
-/// (PLAN-LIVE-TV-GUIDE.md §6.5): the soonest 64 the server keeps
+/// Live TV reminders as local notifications on iPhone and iPad:
+/// the soonest 64 the server keeps
 /// (``LiveExtrasStore/alerts(limit:)``), scheduled again at launch, on
 /// foreground, on the server's event and after every change here. A tap
 /// opens the channel's player, through a link the app publishes for the
@@ -15,8 +15,8 @@ import WMMModel
 /// (``DeepLink/opening(_:signedInServer:)``). Permission is asked at the
 /// first Remind me, after the app's own explainer; Not now keeps the
 /// reminder on the server. The notification offers Watch (as a tap) and
-/// Remind again, which notifies once more five minutes later
-/// (PLAN-APPLE-REVIEW.md §6.3). ``NotificationRouter`` is the delegate and
+/// Remind again, which notifies once more five minutes later.
+/// ``NotificationRouter`` is the delegate and
 /// hands the reminders' category here.
 @MainActor
 final class LiveReminderNotifier {

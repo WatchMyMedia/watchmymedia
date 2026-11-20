@@ -20,7 +20,7 @@ import (
 	"watchmymedia/server/internal/trickplay"
 )
 
-// Seek thumbnails (PLAN-TRICKPLAY.md): a file's manifest, its sheets, and
+// Seek thumbnails: a file's manifest, its sheets, and
 // the job's progress and switch in Settings › Transcoding.
 
 type TrickplayOutput struct{ Body playback.Trickplay }
@@ -104,8 +104,8 @@ func fileTrickplay(ctx context.Context, deps Deps, row db.MediaFile) (*playback.
 	return &m, true
 }
 
-// iframeStream is the I-frame stream a VOD session for playback offers
-// (PLAN-TRICKPLAY.md §7.3): the file's seek thumbnails, when they are made
+// iframeStream is the I-frame stream a VOD session for playback offers:
+// the file's seek thumbnails, when they are made
 // and ffmpeg has libx264 to encode them; nil otherwise. Downloads offer
 // none.
 func iframeStream(ctx context.Context, deps Deps, row db.MediaFile, durationMs int64) *playback.IFrameStream {

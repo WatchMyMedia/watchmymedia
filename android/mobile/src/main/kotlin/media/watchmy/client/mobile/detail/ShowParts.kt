@@ -51,7 +51,7 @@ import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
-// The show page's parts that are the phone's own wording and controls (ShowPage.dc.html).
+// The show page's parts that are the phone's own wording and controls.
 
 /** With [missing] on, a season says how much of it is here: "8 of 10", nothing when none is. */
 @Composable
@@ -97,7 +97,7 @@ internal fun missingMeta(ep: EpisodeDetail): String {
 }
 
 /**
- * The season's ⋮ beside its summary (ShowDownloadSeason.dc.html): Download
+ * The season's ⋮ beside its summary: Download
  * season, every episode with a file not downloaded yet, at the Settings quality.
  */
 @Composable

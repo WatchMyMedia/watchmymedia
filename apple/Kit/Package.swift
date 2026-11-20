@@ -13,7 +13,7 @@
 //                screens (the ViewModels android/ keeps in tv/ and mobile/)
 //   WMMTopShelf  the Apple TV Top Shelf's snapshot in the App Group: its format,
 //                what it may hold, when it is stale. Foundation only, so the
-//                Top Shelf extension links nothing else (PLAN-APPLE-REVIEW.md §6.2)
+//                Top Shelf extension links nothing else
 //
 // Everything but WMMUI's UIKit bits builds for macOS too, so `swift test`
 // runs the unit tests on the Mac without a simulator.

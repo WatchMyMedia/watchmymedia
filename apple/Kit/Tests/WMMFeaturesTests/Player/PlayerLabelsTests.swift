@@ -124,7 +124,7 @@ import WMMModel
 
     @Test func theStopAndFailureSmallPrint() {
         #expect(stoppedNote(at: Date(timeIntervalSince1970: 0), time: { _ in "8:42 PM" }) == "Stopped by the server’s admin · 8:42 PM")
-        // On Apple TV, with how far in the video was (TvPlayerStopped.dc.html).
+        // On Apple TV, with how far in the video was.
         #expect(stoppedNote(at: Date(timeIntervalSince1970: 0), watchedMs: 23 * 60_000 + 10_000, time: { _ in "8:42 PM" }) == "Stopped by the server’s admin · 8:42 PM · 23 min watched")
         #expect(stoppedNote(at: Date(timeIntervalSince1970: 0), watchedMs: 40_000, time: { _ in "8:42 PM" }) == "Stopped by the server’s admin · 8:42 PM")
         #expect(failedNote(mode: .remux, serverName: "Living room", serverVersion: "0.9.3") == "Remux · Living room v0.9.3")

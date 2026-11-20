@@ -78,7 +78,7 @@ internal fun SkipButton(prompt: SkipPrompt, onSkip: () -> Unit, modifier: Modifi
 }
 
 /**
- * Automatic quality's note (PlayerAuto.dc.html): "Lowered to 720p for your
+ * Automatic quality's note: "Lowered to 720p for your
  * connection." It shows for a few seconds, with or without the controls, and
  * takes no touch.
  */
@@ -118,7 +118,7 @@ internal fun PlayerNote(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * The Next Episode card (PlayerNext.dc.html): the still, the episode, and
+ * The Next Episode card: the still, the episode, and
  * a button that fills as the countdown runs ("Next episode in 7"), or
  * "Play now" when autoplay is off; "Watch credits" hides the card.
  */
@@ -200,7 +200,7 @@ internal fun SeekRipple(burst: SeekBurst, modifier: Modifier = Modifier) {
     }
 }
 
-/** What shows over the dimmed video while the picker is open (PlayerPicker.dc.html): the title, faded. */
+/** What shows over the dimmed video while the picker is open: the title, faded. */
 @Composable
 internal fun PickerBackdrop(title: String, subtitle: String?, paused: Boolean) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f))) {

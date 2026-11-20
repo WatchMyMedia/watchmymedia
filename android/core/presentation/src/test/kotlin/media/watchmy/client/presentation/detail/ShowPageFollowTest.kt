@@ -17,7 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** Notify me on the show page (PLAN-NEW-EPISODES.md §7.1): at once, and put back if the server refuses. */
+/** Notify me on the show page: at once, and put back if the server refuses. */
 class ShowPageFollowTest {
     @get:Rule val main = MainDispatcherRule()
 

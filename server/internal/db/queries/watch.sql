@@ -27,7 +27,7 @@ WHERE w.user_id = ? AND w.item_type = 'episode' AND e.show_id = ?;
 -- Marks the season's episodes that can have been watched: those that have
 -- aired by today, and those with a file present. An episode TMDB lists
 -- that hasn't aired and isn't here is left alone, so it is unwatched and
--- new when it comes (PLAN-NEW-EPISODES.md section 5.4).
+-- new when it comes.
 INSERT INTO watch_state (user_id, item_type, item_id, position_ms, completed)
 SELECT sqlc.arg(user_id), 'episode', e.id, 0, 1 FROM episodes e
 WHERE e.season_id = sqlc.arg(season_id)
@@ -81,7 +81,7 @@ WHERE w.user_id = ? AND w.item_type = 'episode' AND w.completed = 1
 GROUP BY e.show_id;
 
 -- name: NextUnwatchedEpisode :one
--- A show's up-next episode for one person (PLAN-SHOW-PAGE.md, decision 10), among episodes
+-- A show's up-next episode for one person, among episodes
 -- with a present file outside Specials: the one in progress that was played most recently;
 -- else the first unfinished one after the most recently finished episode (ties, as when a
 -- whole season is marked at once, go to the latest in order); else the first unfinished one.
@@ -180,8 +180,8 @@ LIMIT ?;
 
 -- name: ListShowsWithNewEpisodes :many
 -- Shows with an episode whose present file arrived since the cutoff and
--- which the user has not finished: what keeps a show card's New badge
--- (PLAN-HOME.md section 4). Each library's added_at index is walked from
+-- which the user has not finished: what keeps a show card's New badge.
+-- Each library's added_at index is walked from
 -- the cutoff, so only the window's files are read, not every episode.
 -- Episode files are reached through episode_files, which leaves trailer
 -- files out. Only the show id is needed, so the watch_state lookup is a
@@ -298,8 +298,7 @@ JOIN shows sh ON sh.id = e.show_id
 WHERE e.id = ?;
 
 -- name: UpsertWatchStateAt :exec
--- A change made offline, saved with when it happened rather than now
--- (PLAN-DOWNLOADS.md, section 6).
+-- A change made offline, saved with when it happened rather than now.
 INSERT INTO watch_state (user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET

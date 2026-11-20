@@ -116,7 +116,7 @@ function useList(id: number) {
 }
 
 /**
- * A list's page (route `list`, ListPage on the canvas), a list row's See
+ * A list's page (route `list`), a list row's See
  * all: its kicker, name, where it comes from and how much the library has,
  * then every title in rank order in eight columns. OK opens a title the
  * library has, or asks for a missing one when the person may (the request

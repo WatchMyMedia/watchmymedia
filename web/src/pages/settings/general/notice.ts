@@ -1,4 +1,4 @@
-// The line General shows once after the Add a TMDB key task saves (§3.7: a
+// The line General shows once after the Add a TMDB key task saves (a
 // one-step task ends with a banner on its page). Kept for the next visit only.
 
 let pending: string | null = null

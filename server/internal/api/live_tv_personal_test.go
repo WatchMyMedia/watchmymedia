@@ -12,8 +12,8 @@ import (
 	"watchmymedia/server/internal/livetv"
 )
 
-// TestLiveTVFavouritesSearchReminders covers G6's routes
-// (PLAN-LIVE-TV-GUIDE.md §5.7): each person's own favourites and
+// TestLiveTVFavouritesSearchReminders covers the routes:
+// each person's own favourites and
 // reminders, search on the channels they may watch, the lead time, and who
 // may call them.
 func TestLiveTVFavouritesSearchReminders(t *testing.T) {

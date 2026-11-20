@@ -58,7 +58,7 @@ func TestConnectSignsInAndKeepsOnlyTheGrant(t *testing.T) {
 		t.Fatalf("connection = %+v", c)
 	}
 	// The server refused the resource token with 401, so the owner's
-	// device token was used, as P0 found.
+	// device token was used.
 	if len(e.f.ReadsBy(plextest.OwnerDeviceToken)) == 0 {
 		t.Error("the owner's device token was not used after the resource token was refused")
 	}

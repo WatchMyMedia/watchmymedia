@@ -17,7 +17,7 @@ import (
 	"watchmymedia/server/internal/memo"
 )
 
-// Seerr as the request backend (PLAN-ARR.md §7.3). With Seerr connected,
+// Seerr as the request backend. With Seerr connected,
 // requests go to Seerr as each person's linked Seerr user, so Seerr's
 // permissions, quotas, approvals and notifications apply; the server's own
 // requests table is left as it was. Problem reports become Seerr issues.
@@ -642,7 +642,7 @@ func issueMessage(kind, note, details string) string {
 // --- deletes ---------------------------------------------------------------
 
 // SeerrForget clears Seerr's record of a movie or show after it was deleted,
-// so Seerr stops calling it available and it can be requested again (§8.1).
+// so Seerr stops calling it available and it can be requested again.
 // seasons are the seasons deleted when only some were. Seerr can't take one
 // season back from available, so then it clears the show's record and
 // reruns Seerr's Sonarr sync, which rebuilds it from what Sonarr still has;

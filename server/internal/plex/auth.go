@@ -85,7 +85,7 @@ func deviceKey(private ed25519.PrivateKey) *DeviceKey {
 
 // PIN binds a linking attempt to its original client and device key. The local
 // deadline never exceeds ten minutes, even when Plex gives the PIN a longer life.
-// It is not a durable, single-use authorization record; that belongs to P2.
+// It is not a durable, single-use authorization record.
 type PIN struct {
 	ID        int64     `json:"id"`
 	Code      string    `json:"-"`

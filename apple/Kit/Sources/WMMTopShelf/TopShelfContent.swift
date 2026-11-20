@@ -3,7 +3,7 @@ import Foundation
 import TVServices
 
 extension TopShelfStore {
-    /// The shelf the system draws from the snapshot (TvTopShelfSections.dc.html):
+    /// The shelf the system draws from the snapshot:
     /// a section per row with its heading, 16:9 cards with the system's
     /// progress bar for Continue watching, posters for Recently added, each
     /// card's picture from its file in the App Group, Select opening the page

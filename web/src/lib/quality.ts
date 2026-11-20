@@ -5,7 +5,7 @@ import type { Profile } from './capabilities'
  * the browser can handle; the steps cap size and bitrate, which makes the
  * server transcode anything above them (for slow connections away from home).
  * "Automatic" leaves the step to the server: it starts at the original and
- * adjusts it when the connection changes (PLAN-STREAMING.md).
+ * adjusts it when the connection changes.
  */
 export type Quality = { id: string; label: string; maxWidth?: number; maxHeight?: number; maxBitrate?: number }
 

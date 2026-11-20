@@ -185,7 +185,7 @@ func streamInfo(info *probe.MediaInfo, ext string, d playback.Decision, req play
 		}
 		if !d.Audio.Copy {
 			// What the server writes: FLAC, E-AC-3 or AC-3 since API level
-			// 31 (PLAN-AUDIO.md), else AAC.
+			// 31, else AAC.
 			out.AudioDecision, out.AudioCodec = "transcode", d.Audio.Codec
 			if out.AudioCodec == "" {
 				out.AudioCodec = "aac"
@@ -224,8 +224,7 @@ func playStart(ctx context.Context, deps Deps, r *http.Request, user auth.User, 
 	if u, err := deps.Queries.GetUser(ctx, user.ID); err == nil {
 		s.RecordHistory = u.RecordHistory == 1
 	}
-	// Trailers show in Now playing but stay out of history and statistics
-	// (PLAN-TRAILERS.md §4.6).
+	// Trailers show in Now playing but stay out of history and statistics.
 	if f.ExtraKind != nil {
 		s.RecordHistory = false
 	}

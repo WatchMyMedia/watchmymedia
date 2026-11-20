@@ -9,12 +9,12 @@ const link = 'text-neutral-200 underline'
 
 /**
  * Settings › You › About, for everyone: the version, and where titles,
- * artwork and lists come from. TMDB's terms ask for its notice here
- * (PLAN-ROWS.md §3, Decision 7); its logo is still to add beside it.
+ * artwork and lists come from. TMDB's terms ask for its notice here;
+ * its logo is still to add beside it.
  *
  * The version is read every 30 seconds. When it changes while the page is
  * open, the server was updated and this web app with it, so the page offers
- * to reload (PLAN-ADMIN-SETTINGS.md §5.10).
+ * to reload.
  */
 export function AboutSettings() {
   const health = useQuery(healthQuery)

@@ -4,7 +4,7 @@ import UIKit
 #endif
 
 /// Keeps the app running, while it is away, until the next download is
-/// handed to the system (PLAN-APPLE-REVIEW.md §3.1.5).
+/// handed to the system.
 ///
 /// When a download finishes in the background the system wakes the app,
 /// delivers the session's events, and suspends it again once the session's

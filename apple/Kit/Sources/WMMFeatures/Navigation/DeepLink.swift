@@ -12,7 +12,7 @@ import Foundation
 ///
 /// A link that starts playback or takes a tuner (`play/…`, `movies/{id}?play=1`, `live-tv/{id}`)
 /// does so only when the app published it for the server signed in
-/// (PLAN-APPLE-REVIEW.md §2.5, §3.4.7, as Android's DeepLink.open): such a
+/// (as Android's DeepLink.open): such a
 /// link carries `source=` and `server=` (``url(publishedFor:source:)``), and
 /// one for another server opens nothing. Any other play link, from a web
 /// page, a QR code or another app, opens the file's page with Play ready

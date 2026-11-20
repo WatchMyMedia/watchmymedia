@@ -47,10 +47,10 @@ internal class LanguageFocus {
 private val LanguageList.key: SettingKey get() = if (this == LanguageList.Audio) SettingKey.AudioLanguages else SettingKey.SubtitleLanguages
 
 /**
- * Audio & subtitles (android-tv/SettingsLanguages.dc.html, PLAN-LANGUAGES.md
- * §5.6), its content as approved, under the account's heading: each change
+ * Audio & subtitles,
+ * its content as approved, under the account's heading: each change
  * saves at once, Saving… shows on the row that changed, and a failure stays
- * on it until OK tries again (PLAN-ANDROID-SETTINGS.md §5.2). The rows wait
+ * on it until OK tries again. The rows wait
  * for the account's settings to load.
  */
 @Composable

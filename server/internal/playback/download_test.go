@@ -10,8 +10,7 @@ import (
 )
 
 // Download sessions run within their own limit, inside the manager's, and
-// a play that finds every slot taken stops the newest download's ffmpeg
-// (PLAN-DOWNLOADS.md §3.2).
+// a play that finds every slot taken stops the newest download's ffmpeg.
 func TestDownloadSessionsGiveWay(t *testing.T) {
 	t.Parallel()
 	m := NewManager("ffmpeg", t.TempDir(), Capabilities{}, time.Minute, 2, testLog)

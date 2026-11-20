@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The check's rule (PLAN-NEW-EPISODES.md §6.1) and what a notification says (§6.2). */
+/** The check's rule and what a notification says. */
 class NewEpisodesTest {
     private class Cursors(var kept: NewEpisodesCursor? = null) : NewEpisodesCursors {
         override fun read() = kept

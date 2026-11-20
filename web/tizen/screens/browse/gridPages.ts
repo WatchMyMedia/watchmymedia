@@ -4,7 +4,7 @@
 // yet is a placeholder in its place. The A–Z strip jumps by the offsets the
 // server sends with a title sort; CH ▲ ▼ move two rows.
 
-/** Eight posters across (LibraryAZ on the canvas). */
+/** Eight posters across. */
 export const COLUMNS = 8
 /** Six rows a page. */
 export const PAGE_SIZE = COLUMNS * 6

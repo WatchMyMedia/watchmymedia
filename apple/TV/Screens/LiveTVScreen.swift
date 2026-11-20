@@ -140,7 +140,7 @@ struct TVLiveChannelCard: View {
 }
 
 /// Channels remain reachable on Home even if file-library loading fails or
-/// there are no files. On Home's screens (PLAN-HOME.md §7.4) `counter` is "Row
+/// there are no files. On Home's screens `counter` is "Row
 /// 7 of 7" and `focusedChannel` receives the focused channel's id, or
 /// ``TVLiveHomeRow/guideKey`` on the All channels or Full guide card.
 struct TVLiveHomeRow: View {
@@ -195,7 +195,7 @@ struct TVLiveHomeRow: View {
                 .defaultFocus($focused, remembered ?? channels.first.map { .channel($0.id) } ?? .all, priority: .userInitiated)
                 .onChange(of: focused) { old, value in
                     guard let value else { return }
-                    // Coming in from another row lands on the card last focused, else the first (PLAN-HOME.md §7.2).
+                    // Coming in from another row lands on the card last focused, else the first.
                     if old == nil, let wanted = remembered ?? channels.first.map({ .channel($0.id) }), wanted != value {
                         focused = wanted
                         return

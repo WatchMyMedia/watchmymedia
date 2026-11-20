@@ -27,7 +27,7 @@ import media.watchmy.client.ui.components.rememberSheen
 import media.watchmy.client.ui.components.skeletonBlock
 import media.watchmy.client.ui.components.skeletonLine
 
-// The phone's loading skeletons (android/HomeLoading.dc.html): the shape of
+// The phone's loading skeletons: the shape of
 // the page to come in place of a spinner, so launch goes from the splash
 // screen to the page's outline and then the page.
 

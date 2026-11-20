@@ -106,7 +106,7 @@ function NotInLibraryCard({ item, focusId, onPress }: { item: Requestable; focus
 }
 
 /**
- * Search (Search on the Samsung TV canvas): the on-screen keyboard, with
+ * Search: the on-screen keyboard, with
  * Use the TV's keyboard for accents, other alphabets and the voice key, and
  * titles suggested as you type; on the right the library's shows, movies
  * and episodes (OK opens, Hold OK plays an episode), On Live TV (OK watches

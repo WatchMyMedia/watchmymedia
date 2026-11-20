@@ -1,8 +1,8 @@
 import Foundation
 import WMMModel
 
-/// What a Live TV programme offers, decided once for every menu that shows it
-/// (PLAN-APPLE-REVIEW.md §5.4): the Apple TV guide's and search's long-press
+/// What a Live TV programme offers, decided once for every menu that shows it:
+/// the Apple TV guide's and search's long-press
 /// menus, and the iPhone and iPad guide's card, its details and search's
 /// button. Each menu draws what this lists, in its own board's way; a menu
 /// may leave a part out (search offers no Record), never add one.

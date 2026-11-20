@@ -8,7 +8,7 @@ private let log = Logger(subsystem: "media.watchmy.client", category: "Playback"
 // to another screen that is unlikely to reach the address in use.
 
 extension RealPlaybackController {
-    /// Follows the video onto another screen (PLAN-IOS.md §5). The Apple TV
+    /// Follows the video onto another screen. The Apple TV
     /// fetches the stream itself, so when the server's address in use is one
     /// it is unlikely to reach (a tailnet name, a public name, localhost), the
     /// play restarts at its position on the same server's LAN address, as a

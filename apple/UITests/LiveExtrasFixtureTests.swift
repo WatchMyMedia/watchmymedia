@@ -110,7 +110,7 @@ final class LiveExtrasFixtureTests: XCTestCase {
         // The lead time is the server's preference.
         app.navigationBars.buttons.firstMatch.tap()
         app.buttons["Settings"].firstMatch.tap()
-        // Live TV reminders are Playback's (PLAN-APPLE-SETTINGS.md §4): Remind me is a menu.
+        // Live TV reminders are Playback's: Remind me is a menu.
         let row = app.buttons["settings-playback"]
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         // The iPad's Settings sheet keeps its rows disabled while it comes up.

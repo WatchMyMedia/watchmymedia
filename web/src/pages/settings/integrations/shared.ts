@@ -38,7 +38,7 @@ export function useAfterSave() {
   return { saved: then !== null, done: (fn: () => void) => setThen(() => fn) }
 }
 
-// A banner for the page a task or a remove returns to (§3.7): what changed
+// A banner for the page a task or a remove returns to: what changed
 // and what happens next, in a sentence. Kept until the page is left.
 type Flash = { href: string; title: string; body?: string }
 let flash: Flash | null = null

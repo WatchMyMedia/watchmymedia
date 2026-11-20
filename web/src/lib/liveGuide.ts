@@ -1,6 +1,6 @@
 import type { LiveChannel, LiveGuideChannel, LiveProgramme } from '../api/liveTV'
 
-// The guide's listings (PLAN-LIVE-TV-GUIDE.md §6.1–§6.2). Times are instants:
+// The guide's listings. Times are instants:
 // the grid is laid out by elapsed time, so the hour that repeats when daylight
 // saving ends takes its real hour, and Intl labels it twice.
 
@@ -12,10 +12,10 @@ export function showListings(apiLevel: number | undefined, capabilities: { guide
   return (apiLevel ?? 0) >= GUIDE_API_LEVEL && !!capabilities?.guide
 }
 
-/** The API level with favourite channels, listings search and reminders (G6, PLAN-LIVE-TV-GUIDE.md §5.7). */
+/** The API level with favourite channels, listings search and reminders. */
 export const GUIDE_EXTRAS_LEVEL = 15
 
-/** Favourites, search and reminders show only in the guide with listings, from a server that has them; below it the guide is G2's. */
+/** Favourites, search and reminders show only in the guide with listings, from a server that has them. */
 export function showGuideExtras(apiLevel: number | undefined, capabilities: { guide?: boolean } | undefined): boolean {
   return showListings(apiLevel, capabilities) && (apiLevel ?? 0) >= GUIDE_EXTRAS_LEVEL
 }
@@ -228,7 +228,7 @@ export function channelInFilter(channel: Pick<LiveGuideChannel, 'programmes'>, f
   return !filter || channel.programmes.some((p) => ms(p.end) > start && ms(p.start) < end && inFilter(p, filter))
 }
 
-/** The Favourites chip's id: it comes first among the filters (§6.5). */
+/** The Favourites chip's id: it comes first among the filters. */
 export const FAVOURITES = 'favourites'
 
 /** The Favourites chip shows once the person has a favourite, and stays while it is chosen so its empty state can show. */
@@ -239,7 +239,7 @@ export function showFavouritesChip(channels: Pick<LiveGuideChannel, 'favourite'>
 /**
  * The guide's rows, in channel order. Under Favourites, a channel shows
  * when it is a favourite, with or without listings: the rule every client
- * shares (§6.5). Under a category, a channel shows while a programme in
+ * shares. Under a category, a channel shows while a programme in
  * the window has it, and a channel without listings always shows.
  */
 export function guideRows<T extends Pick<LiveGuideChannel, 'listings' | 'programmes' | 'favourite'>>(channels: T[], filterId: string, start: number, end: number): T[] {

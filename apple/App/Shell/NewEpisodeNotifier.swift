@@ -5,8 +5,8 @@ import UserNotifications
 import WMMFeatures
 import WMMModel
 
-/// New-episode notifications on iPhone and iPad (PLAN-NEW-EPISODES.md §6,
-/// §7.4): runs the Kit's ``NewEpisodeChecker`` and posts what it finds at
+/// New-episode notifications on iPhone and iPad:
+/// runs the Kit's ``NewEpisodeChecker`` and posts what it finds at
 /// once through UNUserNotificationCenter, in the `new-episode` category,
 /// threaded by show, each check's with its own identifier so a later one
 /// stacks on the show's. The check runs in the background refresh after the

@@ -1,13 +1,13 @@
 import Foundation
 import WMMModel
 
-/// Mark watched or unwatched, the one way every screen does it
-/// (PLAN-APPLE-REVIEW.md §5.5), and the note to show: "Marked as watched",
+/// Mark watched or unwatched, the one way every screen does it,
+/// and the note to show: "Marked as watched",
 /// or why it failed.
 ///
 /// Nothing is loaded again here, and a caller mustn't either: the mark's own
 /// notice (`LibraryChange.watched`) reloads every screen showing the title,
-/// this one included, once (§4.1.1). What a caller may do:
+/// this one included, once. What a caller may do:
 ///
 /// - `drawn`: draw the mark at once in what the screen holds (a poster's
 ///   check, a search result), after the server has it.

@@ -51,7 +51,7 @@ import media.watchmy.client.ui.components.WmmIcons
  */
 @Composable
 fun TvDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    // A dialog's window starts from the system density; keep the TV canvas's (see TvTheme).
+    // A dialog's window starts from the system density; keep the TV theme's (see TvTheme).
     val density = LocalDensity.current
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         val window = (LocalView.current.parent as? DialogWindowProvider)?.window

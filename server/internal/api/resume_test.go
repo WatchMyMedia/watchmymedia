@@ -21,8 +21,7 @@ import (
 // H.264 MP4 with a keyframe every 10 s and AC-3 sound, which a player that
 // takes AAC only gets as copied video with converted sound. The server has
 // no keyframe list for it (no Keyframes), so every play of it gets an event
-// playlist, as a file's first play does while its keyframes are scanned
-// (PLAN-RESUME.md §1.2).
+// playlist, as a file's first play does while its keyframes are scanned.
 type resumeEnv struct {
 	*testEnv
 	mgr    *playback.Manager
@@ -95,8 +94,7 @@ func (e resumeEnv) playlist(t *testing.T, d playback.Decision) string {
 
 // An event play of copied video starts on the keyframe before the asked-for
 // time and says so, and its playlist tells the player to start at the asked-
-// for frame rather than near the end of what is prepared (PLAN-RESUME.md
-// §3.1, §3.3).
+// for frame rather than near the end of what is prepared.
 func TestEventPlaybackStartsOnAKeyframe(t *testing.T) {
 	t.Parallel()
 	e := newResumeEnv(t)
@@ -120,7 +118,7 @@ func TestEventPlaybackStartsOnAKeyframe(t *testing.T) {
 // Resuming starts 5 s before where the person stopped, from one request:
 // with no start in it, an event play starts there (on the keyframe before),
 // while the saved position stays where it was. An explicit start, 0
-// included, is not moved (PLAN-RESUME.md §3.7, §3.8).
+// included, is not moved.
 func TestResumeStartsFiveSecondsBack(t *testing.T) {
 	t.Parallel()
 	e := newResumeEnv(t)

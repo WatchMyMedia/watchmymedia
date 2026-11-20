@@ -163,7 +163,7 @@ internal fun EpisodeFacts(ep: EpisodeDetail, state: ShowPageViewModel.State) {
     }
 }
 
-/** The file's tags, subtitles and size, and its name under File (decision 7: the chosen episode's file is enough). */
+/** The file's tags, subtitles and size, and its name under File (the chosen episode's file is enough). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun EpisodeFile(ep: EpisodeDetail) {
@@ -267,8 +267,8 @@ private fun AirsLine(ep: EpisodeDetail) {
 }
 
 /**
- * The episode's ⋮ beside Mark watched (ShowPage.dc.html, Tweak menu
- * "episode"): Report a problem, Replace file (admins) and, last, Delete
+ * The episode's ⋮ beside Mark watched:
+ * Report a problem, Replace file (admins) and, last, Delete
  * episode… in the danger colour. The show's actions are in About the show.
  */
 @Composable

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
-// The banner a one-step task or a remove leaves on the page it returns to
-// (PLAN-ADMIN-SETTINGS.md §3.7): said once, on the next visit to that page.
+// The banner a one-step task or a remove leaves on the page it returns to:
+// said once, on the next visit to that page.
 
 export type Flash = { tone: 'ok' | 'warn'; title: string; text?: string }
 

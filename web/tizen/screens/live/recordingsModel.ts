@@ -7,7 +7,7 @@ import type { PlayRequest } from '../../app/routes'
 import type { MenuItem } from './guideModel'
 import { seriesWords } from './recordModel'
 
-// Recordings (LiveRecordings on the canvas): the focused card's details
+// Recordings: the focused card's details
 // above rows for Recording now, Won't record, Upcoming, Series and
 // Recorded, and what OK and Hold OK do on each.
 

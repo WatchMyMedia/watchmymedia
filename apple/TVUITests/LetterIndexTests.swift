@@ -1,7 +1,7 @@
 import XCTest
 
-/// The letter index on the Apple TV grid (TvLibraryAZ.dc.html,
-/// PLAN-APPLE-REVIEW.md §6.2), on the fakes' large Movies library (about
+/// The letter index on the Apple TV grid,
+/// on the fakes' large Movies library (about
 /// 1,200 made-up titles, so most letters are beyond the first page): right
 /// from the last column enters it at the poster's letter, Down moves through
 /// the letters, Select lands on a letter's first title, Menu goes back to

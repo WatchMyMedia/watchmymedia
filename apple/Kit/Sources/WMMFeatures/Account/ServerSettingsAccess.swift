@@ -1,9 +1,8 @@
 import Foundation
 import WMMModel
 
-// Server settings and the pages that aren't offered (PLAN-APPLE-SETTINGS.md
-// §5.6, §5.8; Settings2Server.dc.html, TvSettings2Server.dc.html,
-// Settings2KeptOut.dc.html). Admin tools becomes Server settings, for admins
+// Server settings and the pages that aren't offered.
+// Admin tools becomes Server settings, for admins
 // only, and says what to expect in the web app; a page opened by a link when
 // its row is hidden says why and who can change that.
 
@@ -48,7 +47,7 @@ public func serverSettingsURL(_ server: Server) -> URL {
     server.baseURL.appending(path: "settings")
 }
 
-/// Apple TV's card beside the code (TvSettings2Server.dc.html): Server
+/// Apple TV's card beside the code: Server
 /// settings are in the web app, at this address.
 public func tvServerSettingsNotice(_ server: Server, access: AdminAccess) -> SettingsNotice? {
     guard let row = ServerSettingsRow(access) else { return nil }
@@ -69,7 +68,7 @@ extension SettingsModel {
     public var serverLede: String? { server.map { SettingsWords.serverLede($0, user: user) } }
 }
 
-// MARK: - Kept out (§5.8)
+// MARK: - Kept out
 
 /// What a page needs from the server that it doesn't have.
 public enum SettingsFeature: Hashable, Sendable, CaseIterable {

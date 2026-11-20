@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!--
-  The Unraid Docker template (PLAN-UNRAID.md). This is the working copy;
+  The Unraid Docker template. This is the working copy;
   the copy Community Applications reads lives in the public templates
   repository, templates/watchmymedia.xml, which deploy/unraid/mirror.sh
   assembles. Change this file, run the test, then mirror it; bump Date and

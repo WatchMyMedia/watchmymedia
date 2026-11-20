@@ -40,7 +40,7 @@ android {
         buildConfigField("boolean", "FAKE_OFFLINE", providers.gradleProperty("fakesOffline").getOrElse("false"))
         // Combine with -Pfakes=true for a fake TV, Living Room TV, connected from the start: casting Live TV and files.
         buildConfigField("boolean", "FAKE_CAST", providers.gradleProperty("fakesCast").getOrElse("false"))
-        // The Google Cast receiver (PLAN-CAST.md): the production App ID unless -PcastAppId=ABCD1234
+        // The Google Cast receiver: the production App ID unless -PcastAppId=ABCD1234
         // names another, such as a development receiver. -PcastAppId= (empty) builds without
         // casting: no Cast button, and the TV app takes no casts.
         buildConfigField("String", "CAST_APP_ID", "\"${providers.gradleProperty("castAppId").getOrElse("0A4D0B6A").filter(Char::isLetterOrDigit)}\"")

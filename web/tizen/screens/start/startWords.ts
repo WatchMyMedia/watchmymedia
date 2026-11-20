@@ -13,10 +13,10 @@ export function serverDetail(server: RememberedServer, now: number): string {
   return parts.join(' · ')
 }
 
-/** What a start problem says (ServerProblems on the Samsung TV canvas): an address to open in a browser, or a note, when it has one. */
+/** What a start problem says: an address to open in a browser, or a note, when it has one. */
 export type StartProblemWords = { icon: IconName; title: string; body: string; retry: string; address?: { label: string; value: string }; note?: string }
 
-/** The start screen's problems (ServerProblems on the Samsung TV canvas). */
+/** The start screen's problems. */
 export function startProblemWords(problem: StartProblem, server: Target): StartProblemWords {
   const address = displayAddress(server.baseUrl)
   switch (problem) {

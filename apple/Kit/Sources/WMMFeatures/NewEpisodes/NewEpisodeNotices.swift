@@ -1,8 +1,8 @@
 import Foundation
 import WMMModel
 
-/// One notification the check posts (PLAN-NEW-EPISODES.md §6.2; the boards'
-/// `notification`): one a show a check, threaded by show, each with its own
+/// One notification the check posts:
+/// one a show a check, threaded by show, each with its own
 /// identifier, so a later check adds to the show's stack rather than
 /// replacing it; and, past five shows, one more that opens Home, in a thread
 /// of its own.
@@ -80,9 +80,9 @@ public func newEpisodePostingOrder(_ notices: [NewEpisodeNotice]) -> [NewEpisode
 }
 
 /// Which feature a notification belongs to, so the app's one delegate hands
-/// it to its owner (PLAN-NEW-EPISODES.md §7.4).
+/// it to its owner.
 public enum NotificationOwner: Hashable, Sendable {
-    /// Live TV reminders (PLAN-LIVE-TV-GUIDE.md §6.5).
+    /// Live TV reminders.
     case liveReminder
     /// New episodes of followed shows.
     case newEpisode

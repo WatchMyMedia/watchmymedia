@@ -3,8 +3,8 @@ import SwiftUI
 import WMMFeatures
 import WMMUI
 
-// Fit and fill on iPhone and iPad (PLAN-APPLE-REVIEW.md §6.3,
-// design/mockups/ios/PlayerFitFill.dc.html): the button beside Close, the
+// Fit and fill on iPhone and iPad:
+// the button beside Close, the
 // pinch on the picture and the note under the top bar. The rule and the
 // remembered choice are ``VideoFitModel``'s; the shell (``PlayerShell``) owns
 // one for whichever player it holds and hands it out in ``PlayerFrame``.

@@ -1,8 +1,8 @@
 import XCTest
 
-/// VoiceOver reads each Settings row as its name, then its value (PLAN-APPLE-
-/// REVIEW.md §3.2.4), now that Skipping and Remind me are rows that open a
-/// menu (PLAN-APPLE-SETTINGS.md §3.3) rather than groups of chips. Runs in
+/// VoiceOver reads each Settings row as its name, then its value,
+/// now that Skipping and Remind me are rows that open a
+/// menu rather than groups of chips. Runs in
 /// `make apple-tv-test-sim`.
 final class GroupLabelTests: XCTestCase {
     override func setUp() async throws { continueAfterFailure = false }

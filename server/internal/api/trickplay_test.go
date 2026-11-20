@@ -211,7 +211,7 @@ func TestTrickplayReadyEventIsDocumented(t *testing.T) {
 }
 
 // A VOD play offers the file's seek thumbnails as an I-frame stream once
-// they are made (PLAN-TRICKPLAY.md §7.3): the master playlist lists it, its
+// they are made: the master playlist lists it, its
 // playlist lists the track by byte range, and the track, made on the first
 // ask, answers ranges; all with the player's media token. A server whose
 // ffmpeg has no libx264 offers none.

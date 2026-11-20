@@ -4,8 +4,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings › Notifications (PLAN-NEW-EPISODES.md §7.2; the new-episodes
-/// boards' `settings`), in the You group: "On this iPhone" first, with this
+/// Settings › Notifications, in the You group:
+/// "On this iPhone" first, with this
 /// device's New episodes switch, iOS's state and the limits; then the shows
 /// the person follows, from the server, newest first, each opening its page
 /// and with Stop notifying. On an iPad's wide page the two stand side by side.

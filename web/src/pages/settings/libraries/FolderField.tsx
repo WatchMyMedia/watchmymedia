@@ -14,8 +14,8 @@ import type { components } from '../../../api/schema'
 type PathCheck = components['schemas']['PathCheck']
 
 /**
- * The server folder field with Browse… and its check (boards lib-add-2,
- * lib-edit). The check runs when a folder is picked, when the field is
+ * The server folder field with Browse… and its check.
+ * The check runs when a folder is picked, when the field is
  * left, and from Check again; one result shows at a time.
  */
 export function FolderField({ type, path, onPath, folder, label = 'Server folder', error, children }: {

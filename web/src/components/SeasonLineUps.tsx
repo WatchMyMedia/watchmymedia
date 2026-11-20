@@ -26,7 +26,7 @@ type GroupResult = components['schemas']['GroupResult']
 export type SeasonsMatched = (text: string, r: GroupResult) => void
 
 /**
- * The seasons of a group that TMDB numbers differently (PLAN-SEASON-MAPPING.md):
+ * The seasons of a group that TMDB numbers differently:
  * one row each with the server's suggestion and why, and one button to match
  * them all once every row has a target.
  */

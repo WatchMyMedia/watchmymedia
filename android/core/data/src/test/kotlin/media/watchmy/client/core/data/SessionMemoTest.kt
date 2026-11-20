@@ -18,7 +18,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Reference data asked once per sign-in while it is fresh (PLAN-ANDROID-REVIEW.md §4.1.4). */
+/** Reference data asked once per sign-in while it is fresh. */
 class SessionMemoTest {
     private val h = Harness()
     private val libraries = SessionMemoTest::class.java.getResource("/golden/libraries.json")!!.readText()

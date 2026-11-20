@@ -18,7 +18,7 @@ type Panel = { kind: 'language'; list: LanguageListKind; tag: string } | { kind:
 const id = (row: string) => paneRowId('languages', row)
 
 /**
- * Settings › Audio & subtitles (SettingsPlayback, Tweak `pane`: `audio`):
+ * Settings › Audio & subtitles:
  * the account's audio languages, how subtitles start, its subtitle
  * languages and Automatic download, each change saved at once.
  */

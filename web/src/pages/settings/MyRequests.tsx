@@ -15,11 +15,11 @@ import { cancelError, cancelLine, requestTitle, requestsOff, requestsSummary } f
 import { without } from './you/hooks'
 
 /**
- * Settings › You › Your requests (PLAN-ARR.md §7.1, §7.3,
- * PLAN-ADMIN-SETTINGS.md §5.10): what the signed-in person asked for and
+ * Settings › You › Your requests:
+ * what the signed-in person asked for and
  * where each stands, in Seerr when it carries requests out. Cancel asks
  * first. Opened by its address when requests are off, it says why and who
- * can change it (loose end 10).
+ * can change it.
  */
 export function MyRequestsSettings() {
   const auth = useAuth()

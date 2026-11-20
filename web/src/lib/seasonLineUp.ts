@@ -1,7 +1,7 @@
 import type { components } from '../api/schema'
 
 /**
- * Wording and small rules for season line-ups (PLAN-SEASON-MAPPING.md): a
+ * Wording and small rules for season line-ups: a
  * season as the files number it, and where it starts on TMDB.
  */
 export type SeasonLineUp = components['schemas']['SeasonLineUp']

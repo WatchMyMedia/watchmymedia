@@ -14,15 +14,15 @@ struct WatchMyMediaApp: App {
     @State private var navigator = Navigator()
     @State private var cast: CastService
     @Environment(\.scenePhase) private var scenePhase
-    /// Live TV favourites and reminders, shared by every screen (PLAN-LIVE-TV-GUIDE.md §6.5).
+    /// Live TV favourites and reminders, shared by every screen.
     @State private var extras: LiveExtrasStore
     @State private var recordings: LiveRecordingsStore
-    /// The shows the person follows, and this device's new-episode check (PLAN-NEW-EPISODES.md §7).
+    /// The shows the person follows, and this device's new-episode check.
     @State private var follows: FollowsStore
     @State private var newEpisodes: NewEpisodeNotifier
 
     init() {
-        // Launch to Home's first content, and MetricKit's reports for Copy diagnostics (PLAN-APPLE-REVIEW.md §4.3.1, §6.4).
+        // Launch to Home's first content, and MetricKit's reports for Copy diagnostics.
         PerformanceSignposts.shared.launchBegan()
         Diagnostics.start()
         let services = ServicesFactory.make(arguments: ProcessInfo.processInfo.arguments)

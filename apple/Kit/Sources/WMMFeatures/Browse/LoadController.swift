@@ -1,8 +1,8 @@
 import Foundation
 import WMMModel
 
-/// The quiet-reload state machine the screen models share
-/// (PLAN-APPLE-REVIEW.md §5.5): the first load shows a spinner; a later,
+/// The quiet-reload state machine the screen models share:
+/// the first load shows a spinner; a later,
 /// quiet one keeps what is on screen and says why it failed as a message;
 /// the newest load wins. Each load gets a ``Load`` ticket, and a reply lands
 /// only while its ticket is still the newest, so an older reply never

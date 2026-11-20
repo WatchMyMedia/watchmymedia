@@ -10,8 +10,8 @@ import { RecordingsPage, RecordingsSetupFlow } from './liveTV/Recordings'
 import { ChannelsPage } from './liveTV/Channels'
 
 /**
- * Settings › Live TV and every page under it (PLAN-ADMIN-SETTINGS.md §4,
- * §5.4). Flows draw their own frame, which keeps members and admins the gate
+ * Settings › Live TV and every page under it.
+ * Flows draw their own frame, which keeps members and admins the gate
  * keeps out; the hub and item pages sit inside ServerOnly.
  */
 export function LiveTVSettings() {

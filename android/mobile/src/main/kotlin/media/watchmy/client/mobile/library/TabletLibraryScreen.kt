@@ -100,7 +100,7 @@ internal fun TabletLibraryScreen(
     rowsVm: LibraryRowsViewModel? = null,
 ) {
     val library = LocalAppServices.current.library
-    // The library's rows above the grid (TabLibraryRows.dc.html), from servers that arrange them.
+    // The library's rows above the grid, from servers that arrange them.
     val arranged = rowsVm?.arranges == true && state.libraryId != null
     val drawn = if (arranged) rows.rows.drawn(live = false) else emptyList()
     val rowActions = rowsVm?.let { libraryRowActions(onPlay, onOpenShow, onOpenMovie, onNavigate, onNotMatched, it) }
@@ -110,7 +110,7 @@ internal fun TabletLibraryScreen(
     val noun = if (type == LibraryType.Tv) "show" else "movie"
     // A new sort or filter goes back up to the grid; a letter jumped to, to its first title, under the rows when there are any.
     grid.FollowLibrary(state, top = 0, first = if (arranged) drawn.size + 2 else 0, loadMore = vm::loadMore)
-    // A row's See all, here or on Home, lands on the grid's heading, under the rows (TabLibrarySeeAll.dc.html).
+    // A row's See all, here or on Home, lands on the grid's heading, under the rows.
     grid.GoToGridWhenAsked(state, heading = if (arranged) drawn.size + 1 else 0, onShown = vm::gridShown)
 
     Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
@@ -146,7 +146,7 @@ internal fun TabletLibraryScreen(
                                 item(key = "all", span = { GridItemSpan(maxLineSpan) }, contentType = "all") {
                                     Column(Modifier.padding(top = 4.dp)) {
                                         androidx.compose.material3.HorizontalDivider(color = WmmColors.Line)
-                                        // "All shows 142 · Last aired": the heading says the sort a See all opened it with (TabLibrarySeeAll.dc.html).
+                                        // "All shows 142 · Last aired": the heading says the sort a See all opened it with.
                                         Row(Modifier.padding(top = 18.dp).semantics(mergeDescendants = true) { heading() }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                             Text("All ${noun}s", color = WmmColors.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.alignByBaseline())
                                             val count = if (state.filtered) state.total else state.summary?.items ?: state.total

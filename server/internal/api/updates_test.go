@@ -84,7 +84,7 @@ func TestUpdatesOff(t *testing.T) {
 
 // A server installed from a package says so: to admins in the updates
 // reply, which has the command in place of a file, and in the server info
-// the web's folder check and transcoder notes read (PLAN-LINUX.md §4).
+// the web's folder check and transcoder notes read.
 func TestPackageInstallKinds(t *testing.T) {
 	t.Parallel()
 	for _, kind := range []string{updates.InstallDeb, updates.InstallRpm} {

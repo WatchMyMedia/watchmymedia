@@ -5,8 +5,8 @@ import { shouldAskToLeave } from '../../lib/drafts'
 import { Button, GuardedCaption, Message, fieldInput } from './Frame'
 
 /**
- * A deliberate remove or a choice whose cost should be seen first
- * (PLAN-ADMIN-SETTINGS.md §3.8): what Stays, what is Deleted and what Stops,
+ * A deliberate remove or a choice whose cost should be seen first:
+ * what Stays, what is Deleted and what Stops,
  * with real numbers where the server has them. `typeToConfirm` asks for a
  * name to be typed before the button works.
  */
@@ -73,7 +73,7 @@ function Kept({ tone, label, items }: { tone: 'ok' | 'warn' | 'err'; label: stri
 }
 
 /**
- * The leave check (§3.2, board m-leave): while `when` is true, leaving this
+ * The leave check: while `when` is true, leaving this
  * address by Exit, Back, a breadcrumb, the browser's back button or closing
  * the tab asks first. `what` says what isn't saved.
  */

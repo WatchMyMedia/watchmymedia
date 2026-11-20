@@ -13,7 +13,7 @@ import { liveViewers, refreshSummary, sourceChannels, tunerPill, tunerRefreshErr
 import { setFlash, tvHref, useLiveActivity, useLiveMutation, useLiveSettings } from './data'
 import { FlashBanner, LoadFailed, Loading } from './Parts'
 
-/** One tuner's page (PLAN-ADMIN-SETTINGS.md §5.4): its switch, Refresh channels, name and address, and Remove apart at the bottom. */
+/** One tuner's page: its switch, Refresh channels, name and address, and Remove apart at the bottom. */
 export function TunerPage({ id }: { id: string }) {
   const settings = useLiveSettings()
   const source = settings.data?.sources.find((s) => s.id === id)
@@ -108,7 +108,7 @@ function Tuner({ source }: { source: LiveSource }) {
   )
 }
 
-/** Remove a tuner (board tv-remove): a named dialog with the server's numbers; away from home it asks for the password. */
+/** Remove a tuner: a named dialog with the server's numbers; away from home it asks for the password. */
 function RemoveTuner({ source, onClose, onRemoved }: { source: LiveSource; onClose: () => void; onRemoved: () => void }) {
   const settings = useLiveSettings()
   const { sessions } = useLiveActivity()

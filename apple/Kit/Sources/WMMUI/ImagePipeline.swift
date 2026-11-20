@@ -20,7 +20,7 @@ enum ArtworkSize {
 
 /// Decoded artwork kept while the app runs, so scrolling back does not flash.
 ///
-/// Kept by address and decoded size (PLAN-APPLE-REVIEW.md §3.3.3): a request
+/// Kept by address and decoded size: a request
 /// is served by the smallest picture held that is at least its size step,
 /// so a 600-pixel card's decode is never stretched over a 1,600-pixel panel,
 /// and a larger decode serves a smaller card. A decode smaller than its step
@@ -131,8 +131,8 @@ final class ImageMemoryCache: Sendable {
     }
 }
 
-/// Fetches and decodes artwork off the main actor (PLAN-APPLE-REVIEW.md
-/// §4.3.2), as `SeekThumbnails` does its sheets, into ``ImageMemoryCache``.
+/// Fetches and decodes artwork off the main actor,
+/// as `SeekThumbnails` does its sheets, into ``ImageMemoryCache``.
 ///
 /// A load already under way for the same picture at the same size or larger
 /// is shared, so a hero and a card, or a prefetch and the view it was for,

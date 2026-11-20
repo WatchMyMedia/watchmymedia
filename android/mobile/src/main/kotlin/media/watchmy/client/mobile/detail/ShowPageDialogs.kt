@@ -53,7 +53,7 @@ import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.WmmColors
 
 /**
- * Delete episode (EpisodeMenu.dc.html, confirm and cantDelete): what Sonarr
+ * Delete episode: what Sonarr
  * will do, as previewDelete says, with Cancel and Delete episode; or, for a
  * file no Radarr or Sonarr manages, that WatchMyMedia can't, with one OK.
  */

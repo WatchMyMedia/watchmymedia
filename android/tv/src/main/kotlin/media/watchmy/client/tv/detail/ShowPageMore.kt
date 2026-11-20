@@ -141,7 +141,7 @@ private fun MenuRow(text: String, icon: ImageVector, onClick: () -> Unit, modifi
 }
 
 /**
- * Delete episode (EpisodeDelete.dc.html): what Sonarr will do, as
+ * Delete episode: what Sonarr will do, as
  * previewDelete says, with Cancel focused and Delete episode beside it; or,
  * for a file no Radarr or Sonarr manages, that WatchMyMedia can't, with OK.
  */

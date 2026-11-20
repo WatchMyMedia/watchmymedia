@@ -15,7 +15,7 @@ const seasonState: Record<string, string> = {
 }
 
 /**
- * Asks for a movie, or some seasons of a show (PLAN-ARR.md §7.1). preselect
+ * Asks for a movie, or some seasons of a show. preselect
  * ticks seasons, as the show page's Request season does; otherwise every
  * season that can be asked for starts ticked.
  */

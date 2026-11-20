@@ -3,7 +3,7 @@ import UIKit
 import WMMUI
 
 extension EnvironmentValues {
-    /// How the window sits on a folding device (PLAN-IPHONE-DUO.md §4.2). Set
+    /// How the window sits on a folding device. Set
     /// once, at the root, by ``SwiftUICore/View/readsFoldPosture()``. Anything
     /// but `.flat` means the fold runs through the middle of the window: across
     /// it (`.tabletop`) or down it (`.book`).

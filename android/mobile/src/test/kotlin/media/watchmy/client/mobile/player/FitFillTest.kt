@@ -22,8 +22,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Fit and fill and the immediate tap (the PlayerFitFill board,
- * PLAN-ANDROID-REVIEW §6.3), on a phone held sideways, 915 × 412.
+ * Fit and fill and the immediate tap,
+ * on a phone held sideways, 915 × 412.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])

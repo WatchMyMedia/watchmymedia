@@ -22,7 +22,7 @@ var errBlocked = errors.New("address not allowed")
 
 // publicAddr reports whether a dialled address ("ip:port") is on the
 // internet: not this machine, the home network, a tailnet or any other
-// range that is not routed globally (PLAN-POSTERS.md, decision 10).
+// range that is not routed globally.
 func publicAddr(address string) bool {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {

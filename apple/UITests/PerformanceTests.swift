@@ -1,7 +1,7 @@
 import XCTest
 
-/// Launch and scrolling on the fakes, five runs each (PLAN-APPLE-REVIEW.md
-/// §4.3.1): `make apple-perf`. Skipped unless `WMM_PERF=1` (the make target
+/// Launch and scrolling on the fakes, five runs each:
+/// `make apple-perf`. Skipped unless `WMM_PERF=1` (the make target
 /// sets it), so `make apple-e2e` doesn't run them. The fakes are debug-only,
 /// so these measure a Debug build: compare numbers with each other, before
 /// and after a change on the same Mac, not with a release on a device.

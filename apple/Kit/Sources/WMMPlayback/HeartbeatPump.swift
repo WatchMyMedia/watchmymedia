@@ -1,7 +1,7 @@
 import Foundation
 
-/// The reports a controller sends its server, one at a time (PLAN-APPLE-REVIEW.md
-/// §5.1): one is out at once; what comes meanwhile waits, and `coalesce`
+/// The reports a controller sends its server, one at a time:
+/// one is out at once; what comes meanwhile waits, and `coalesce`
 /// says what a newer message replaces among those waiting, so a server that
 /// can't be reached gets the newest position rather than a backlog, while
 /// a stop is never dropped. The file player queues its heartbeats, stops and

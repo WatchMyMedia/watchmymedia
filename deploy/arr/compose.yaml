@@ -1,5 +1,5 @@
-# A throwaway Radarr and Sonarr for testing the integrations (PLAN-ARR.md
-# §15). They see the scratch library at /movies and /tv, other paths than the
+# A throwaway Radarr and Sonarr for testing the integrations.
+# They see the scratch library at /movies and /tv, other paths than the
 # server sees, so path mappings are exercised. Nothing here downloads: there
 # is no indexer or download client, and imports are made with the apps' own
 # import of existing folders.

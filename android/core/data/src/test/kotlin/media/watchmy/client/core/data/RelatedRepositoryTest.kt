@@ -15,7 +15,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The rows at the end of movie and show pages (PLAN-RELATED.md §6) from a server at level 30, and none from one below it. */
+/** The rows at the end of movie and show pages from a server at level 30, and none from one below it. */
 class RelatedRepositoryTest {
     private val h = Harness()
 

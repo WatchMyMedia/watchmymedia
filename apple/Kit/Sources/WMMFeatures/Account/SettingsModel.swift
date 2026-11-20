@@ -3,7 +3,7 @@ import Observation
 import WMMModel
 
 /// Settings: a short root (the account, Watching, Devices, About, Sign out)
-/// and a page per row (Settings*.dc.html). One model serves the root and its
+/// and a page per row. One model serves the root and its
 /// pages, so a change on a page shows on the root at once
 /// (android/.../SettingsViewModel.kt).
 @MainActor
@@ -53,7 +53,7 @@ public final class SettingsModel {
     public let facts: DeviceFacts
     /// The language the device is set to, offered for an empty list ("Use English").
     public let deviceLanguage: String?
-    /// Each server-kept control's save (PLAN-APPLE-SETTINGS.md §3.1); read one with ``saveState(_:)``.
+    /// Each server-kept control's save; read one with ``saveState(_:)``.
     public let saves: SaveStates<SettingKey>
 
     /// - Parameters:
@@ -212,7 +212,7 @@ public final class SettingsModel {
     // MARK: Audio and subtitles
 
     /// The page's lists and choices shown before the server confirms them,
-    /// and taken back if it refuses (PLAN-LANGUAGES.md §5.6).
+    /// and taken back if it refuses.
     private var pendingLanguages: (audio: AudioPreferences, subtitles: SubtitlePreferences)?
     private var languageRevision = 0
     public private(set) var languageError: String?
@@ -499,7 +499,7 @@ public final class SettingsModel {
     }
 }
 
-/// How signing another device out ended (Settings2Account.dc.html's notes).
+/// How signing another device out ended.
 public struct DeviceSignOut: Hashable, Sendable {
     public enum Result: Hashable, Sendable {
         /// "Kitchen iPad was signed out. It needs a password or a code to sign in again."

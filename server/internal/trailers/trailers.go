@@ -1,5 +1,5 @@
-// Package trailers keeps movies' trailers from TMDB (PLAN-TRAILERS.md
-// §5.1): it chooses the best of a movie's TMDB videos, encodes them for
+// Package trailers keeps movies' trailers from TMDB:
+// it chooses the best of a movie's TMDB videos, encodes them for
 // movies.trailers, refreshes them in the background (Refresher), and holds
 // whether YouTube trailers are on.
 package trailers

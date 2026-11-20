@@ -2,7 +2,7 @@ import Foundation
 
 /// The account a download belongs to: the server and the person signed in
 /// there when it was made. Downloads stay with it; signing it out deletes
-/// them (PLAN-DOWNLOADS.md §5).
+/// them.
 public struct OfflineOwner: Hashable, Sendable, Codable {
     public var serverID: String
     public var userID: Int
@@ -134,7 +134,7 @@ public struct SyncReply: Sendable {
     }
 }
 
-/// The offline routes' calls (PLAN-DOWNLOADS.md §9) and the sign-in they are
+/// The offline routes' calls and the sign-in they are
 /// made with. WMMData implements it; WMMDownloads uses it. Calls for an
 /// ``OfflineOwner`` go to its server as it, whichever server is current, and
 /// throw ``SignedOutError`` once it is signed out there (a 401 signs it

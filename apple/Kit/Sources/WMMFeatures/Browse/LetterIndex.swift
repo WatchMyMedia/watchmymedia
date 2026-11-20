@@ -1,8 +1,8 @@
 import Foundation
 import WMMModel
 
-/// The Apple TV grid's letter index (TvLibraryAZ.dc.html, PLAN-APPLE-REVIEW.md
-/// §6.2): # and A to Z down the right edge, the letters with no title dimmed
+/// The Apple TV grid's letter index:
+/// # and A to Z down the right edge, the letters with no title dimmed
 /// and skipped.
 ///
 /// It is built from what the server already sends: sorted by title, a page of
@@ -98,7 +98,7 @@ public struct LetterIndex: Hashable, Sendable {
     }
 }
 
-/// Page Up and Page Down on a grid (TvLibraryAZ.dc.html): two rows on or
+/// Page Up and Page Down on a grid: two rows on or
 /// back, in the same column, in any sort.
 public enum GridPaging {
     /// The rows one press moves.

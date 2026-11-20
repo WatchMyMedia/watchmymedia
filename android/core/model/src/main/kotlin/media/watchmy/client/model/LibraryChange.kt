@@ -1,8 +1,8 @@
 package media.watchmy.client.model
 
 /**
- * What changed on the server, from its events (PLAN-ANDROID-REVIEW.md
- * §4.1.2), so a page reloads only for what it shows. A burst of events comes
+ * What changed on the server, from its events,
+ * so a page reloads only for what it shows. A burst of events comes
  * as one change ([plus]).
  *
  * - [movies] and [episodes]: the person's progress or watched marks on these

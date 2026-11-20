@@ -1,4 +1,4 @@
-// The rules of Settings › Integrations (PLAN-ADMIN-SETTINGS.md §5.2): which
+// The rules of Settings › Integrations: which
 // step an address opens, each connection's checklist, the hub's banners and
 // lede, the folder rows with their suggestions, and the words for every
 // refusal the server gives.
@@ -229,7 +229,7 @@ export function rootsLeftOut<L extends { name: string; path: string }>(rows: rea
 // ---- Requests ---------------------------------------------------------------
 
 /**
- * The one target that is used (loose end 4): the server sends every request
+ * The one target that is used: the server sends every request
  * of a kind to the first target of the first connection with one. Saving
  * replaces the first target and keeps the library it was for, or the
  * library the folder is in, or the first library of the kind.
@@ -397,7 +397,7 @@ export function linkProblem(message: string, person: string, users: readonly See
 
 // ---- Remove and finish ----------------------------------------------------------
 
-/** The Remove dialog's words, per app (§3.8). */
+/** The Remove dialog's words, per app. */
 export function removeWording(c: Pick<Integration, 'kind' | 'name'>) {
   const app = APP[c.kind]
   const title = c.name === app ? `Remove ${app}?` : `Remove ${c.name} (${app})?`
@@ -423,7 +423,7 @@ function host(url: string) {
   try { return new URL(url).host } catch { return url }
 }
 
-/** What changed and what happens next, on Add Radarr or Sonarr's finished screen (§3.7). */
+/** What changed and what happens next, on Add Radarr or Sonarr's finished screen. */
 export function arrOutcome(
   c: Integration,
   opts: { roots?: readonly RootFolder[]; rootsLeft?: readonly string[]; profileName?: string; approval?: 'admins' | 'everyone'; seerr?: boolean },

@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
 // Rows people arrange on Home and each library's Movies or TV screen, and rows
-// made from lists (PLAN-ROWS.md §6, §8.2). The server orders and fills the
+// made from lists. The server orders and fills the
 // rows; the apps draw them by style and skip a style they don't know.
 
 /** The server API level that brought arranged rows and rows made from lists; below it the screens keep their fixed rows. */
@@ -220,7 +220,7 @@ fun List<RowLayoutEntry>.movedFrom(from: Int, to: Int): List<RowLayoutEntry> {
 fun List<RowLayoutEntry>.withHidden(id: String, hidden: Boolean): List<RowLayoutEntry> =
     map { if (it.id == id) it.copy(hidden = hidden, shown = !hidden && it.shown) else it }
 
-/** Add a row: [id] shown again where it was ("A row comes back where it was", AddRow.dc.html). */
+/** Add a row: [id] shown again where it was. */
 fun List<RowLayoutEntry>.added(id: String): List<RowLayoutEntry> = withHidden(id, false)
 
 /** What Add a row offers: the hidden rows. */
@@ -229,7 +229,7 @@ val List<RowLayoutEntry>.addable: List<RowLayoutEntry> get() = filter { it.hidde
 /** The same rows in the same order, hidden alike: nothing to save. */
 fun List<RowLayoutEntry>.sameOrderAs(other: List<RowLayoutEntry>): Boolean = placements() == other.placements()
 
-/** A screen draws at most this many rows (PLAN-ROWS.md Decision 13); the editor says so past it. */
+/** A screen draws at most this many rows; the editor says so past it. */
 const val MAX_ROWS_ON_SCREEN = 30
 
 /** More rows are shown than the screen draws: the editor's notice. */
@@ -245,7 +245,7 @@ fun ListOwner.label(): String = when (this) {
 }
 
 /**
- * The line under a row in the editor (HomeEditRows.dc.html): "Built in",
+ * The line under a row in the editor: "Built in",
  * "For everyone · 18 of 50 · From TMDB", "Your list · 9 of 24 · Imported",
  * with "Hidden · " before it when hidden. [list] is the row's list, when the
  * lists could be read.
@@ -264,7 +264,7 @@ fun RowLayoutEntry.editorLine(list: MediaList? = null): String {
 val RowLayoutEntry.notShown: String? get() = note.takeIf { !hidden && !shown }
 
 /**
- * The line under a row Add a row offers (AddRow.dc.html): "Hidden · Built in",
+ * The line under a row Add a row offers: "Hidden · Built in",
  * "From TMDB · 12 of 20 in your library", "From your library · 16 movies".
  */
 fun RowLayoutEntry.addLine(list: MediaList? = null): String {
@@ -284,7 +284,7 @@ fun RowLayoutEntry.addLine(list: MediaList? = null): String {
 data class AddRowGroup(val name: String, val rows: List<RowLayoutEntry>, val empty: String? = null)
 
 /**
- * Add a row's groups (AddRow.dc.html): the hidden built-in rows, the
+ * Add a row's groups: the hidden built-in rows, the
  * household's lists and the person's own. A list group says it has none
  * only when there are no such lists at all; one whose lists are all on the
  * screen already is left out, as is a group of built-in rows with none hidden.
@@ -308,7 +308,7 @@ fun addRowGroups(entries: List<RowLayoutEntry>, lists: List<MediaList>): List<Ad
     )
 }
 
-/** Add a row's line about making lists, which phones, tablets and TVs don't do (PLAN-ROWS.md Decision 10). */
+/** Add a row's line about making lists, which phones, tablets and TVs don't do. */
 const val LISTS_ON_THE_WEB = "Lists are made in WatchMyMedia on the web."
 
 /** The TMDB notice its terms ask for, in About. */
@@ -361,7 +361,7 @@ fun MediaList.fromLine(): String? = when (sourceKind) {
     else -> (sourceName?.takeIf { it.isNotBlank() } ?: listSourceName(sourceKind))?.let { "From $it" }
 }
 
-/** The list page's kicker (ListPage.dc.html): "List · For everyone", "Your list". */
+/** The list page's kicker: "List · For everyone", "Your list". */
 fun MediaList.kicker(): String = when (owner) {
     ListOwner.Me -> "Your list"
     ListOwner.Everyone -> "List · For everyone"
@@ -452,8 +452,8 @@ sealed interface RowsChange {
 }
 
 /**
- * Arranging rows and reading lists on the server in use (PLAN-ROWS.md §6.2,
- * §6.3). Below [ROWS_API_LEVEL] [supported] is false and nothing else is
+ * Arranging rows and reading lists on the server in use.
+ * Below [ROWS_API_LEVEL] [supported] is false and nothing else is
  * called. Methods throw [ApiException].
  */
 interface RowsRepository {
@@ -483,7 +483,7 @@ interface RowsRepository {
     val changes: Flow<RowsChange>
 
     companion object {
-        /** The most entries a list keeps (PLAN-ROWS.md Decision 13). */
+        /** The most entries a list keeps. */
         const val MAX_LIST_ENTRIES = 250
     }
 

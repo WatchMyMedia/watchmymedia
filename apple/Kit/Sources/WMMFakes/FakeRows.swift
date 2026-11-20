@@ -1,7 +1,7 @@
 import Foundation
 import WMMModel
 
-/// Arranged rows and lists on the fakes (PLAN-ROWS.md; every title and name
+/// Arranged rows and lists on the fakes (every title and name
 /// is fictional): Home with two list rows and one list waiting in Add a row,
 /// the Movies screen with a list whose last fetch failed, and list pages
 /// with titles the library has, missing ones to request, and an imported
@@ -20,7 +20,7 @@ public final class FakeRowsRepository: RowsRepository {
     private var listeners: [UUID: AsyncStream<Void>.Continuation] = [:]
 
     /// Home's movie rows mix two movie libraries (`-fakesTwoMovieLibraries`), so,
-    /// as the server does, they carry no See all link (PLAN-SEE-ALL.md decision 6).
+    /// as the server does, they carry no See all link.
     public var twoMovieLibraries = false
     /// From API level 29, Home's New from shows you follow is filled from these follows.
     public var follows: FakeFollowsRepository?
@@ -167,7 +167,7 @@ public final class FakeRowsRepository: RowsRepository {
         }
     }
 
-    /// The saved order first, then rows never placed in their default place (PLAN-ROWS.md Decision 5).
+    /// The saved order first, then rows never placed in their default place.
     private func merged(_ screen: RowScreen) -> [RowLayoutEntry] {
         let all = defaults(screen)
         guard let saved = saved[screen] else { return all.map(\.entry) }

@@ -54,7 +54,7 @@ func contentSecurityPolicy(withTurnstile, withCast, withYouTube bool) string {
 const castSenderOrigin = "www.gstatic.com"
 
 // youTubeEmbedOrigin serves YouTube's player in its privacy-enhanced mode,
-// which the web app's trailer page frames (PLAN-TRAILERS.md §6.1).
+// which the web app's trailer page frames.
 const youTubeEmbedOrigin = "https://www.youtube-nocookie.com"
 
 // securityHeaders sets browser protections on every response. The policy

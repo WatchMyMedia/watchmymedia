@@ -27,7 +27,7 @@ import org.robolectric.annotation.Config
 import media.watchmy.client.tv.quietTvFakes
 
 /**
- * Focus on the TV Shows page (PLAN-ANDROID-REVIEW.md §3.2.2): choosing a
+ * Focus on the TV Shows page: choosing a
  * filter leaves focus on its chip, where it used to be thrown back to the
  * top of the page, and Back from a show puts it on the show's card.
  */

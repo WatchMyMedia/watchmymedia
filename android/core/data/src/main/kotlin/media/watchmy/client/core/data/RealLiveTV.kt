@@ -73,7 +73,7 @@ import java.time.Instant
  * fixed boundaries, kept for this sign-in only; asking for one also fetches the
  * next, so moving later through the guide doesn't wait. From
  * [LIVE_PERSONAL_API_LEVEL] it also keeps the person's favourites, search and
- * reminders (PLAN-LIVE-TV-GUIDE.md §5.7); a change to a favourite drops the
+ * reminders; a change to a favourite drops the
  * windows, which carry them.
  */
 internal class RealLiveRepository(
@@ -312,8 +312,8 @@ internal fun LiveTVCapabilities.toModel(features: ServerFeatures) = LiveCapabili
 )
 
 /**
- * The caster's channels and pictures on this TV (Cast Connect, PLAN-LIVE-TV.md
- * §4.1), with their cast token: what a cast token may read. Pictures carry the
+ * The caster's channels and pictures on this TV (Cast Connect),
+ * with their cast token: what a cast token may read. Pictures carry the
  * token in the URL, since the TV's image loader signs in only to its own server.
  */
 internal class CastLiveRepository(private val access: CastTokenAccess) : LiveRepository {

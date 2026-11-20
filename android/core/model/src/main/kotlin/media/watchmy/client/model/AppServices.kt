@@ -16,10 +16,10 @@ interface AppServices {
     val live: LiveRepository get() = LiveRepository.Unavailable
     val livePlayback: LivePlaybackControllerFactory get() = LivePlaybackControllerFactory.Unavailable
 
-    /** Arranging rows and reading lists (PLAN-ROWS.md); [RowsRepository.Unavailable] where there are none. */
+    /** Arranging rows and reading lists; [RowsRepository.Unavailable] where there are none. */
     val rows: RowsRepository get() = RowsRepository.Unavailable
 
-    /** Following shows and their new episodes (PLAN-NEW-EPISODES.md); [FollowsRepository.Unavailable] where there is none. */
+    /** Following shows and their new episodes; [FollowsRepository.Unavailable] where there is none. */
     val follows: FollowsRepository get() = FollowsRepository.Unavailable
 
     /** Requests and problem reports; [RequestRepository.Unavailable] where there are none. */
@@ -41,7 +41,7 @@ interface AppServices {
     val diagnostics: Diagnostics get() = Diagnostics.None
 
     /**
-     * A row's See all on its way to a library's grid (PLAN-SEE-ALL.md §4.4).
+     * A row's See all on its way to a library's grid.
      * The app has one set of services, so it shares one; the fakes keep
      * their own, so tests don't hand requests to each other.
      */

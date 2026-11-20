@@ -3,14 +3,14 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The TV Shows or Movies grid (Library.dc.html): a title search, the
+/// The TV Shows or Movies grid: a title search, the
 /// filter, genre and (for movies) decade chips, a Sort menu, and three
 /// posters a row, a page at a time. Long-press a poster to mark it. On iPad
-/// (Pad2Library.dc.html) a collapsible filter panel sits beside the adaptive
+/// a collapsible filter panel sits beside the adaptive
 /// grid, and the A–Z bar jumps using the server's whole-list offsets. From
 /// API level 22 the library's rows sit above the grid, with Edit rows after
-/// them and the grid as All movies or All shows (LibraryRows.dc.html,
-/// Pad2LibraryRows.dc.html); a title search hides them.
+/// them and the grid as All movies or All shows;
+/// a title search hides them.
 struct LibraryScreen: View {
     let type: LibraryType
     @Environment(AppServices.self) private var services
@@ -75,8 +75,8 @@ private struct LibraryView: View {
                     .onChange(of: model.scrollRequestID) {
                         if let target = model.scrollTargetID { proxy.scrollTo(target, anchor: .top) }
                     }
-                    // A Home row's See all opens the tab at its grid, below the tab's own rows
-                    // (PLAN-SEE-ALL.md §11.2), once the grid has loaded sorted the row's way.
+                    // A Home row's See all opens the tab at its grid, below the tab's own rows,
+                    // once the grid has loaded sorted the row's way.
                     .onChange(of: model.gridJump) {
                         Task { @MainActor in proxy.scrollTo(Self.gridAnchor, anchor: .top) }
                     }
@@ -116,7 +116,7 @@ private struct LibraryView: View {
         .sheet(isPresented: $editingRows) {
             if let screen = model.screen { RowEditorSheet(screen: screen, screenName: model.title) }
         }
-        // With rows above the grid, the iPad's filter panel starts folded away (Pad2LibraryRows.dc.html).
+        // With rows above the grid, the iPad's filter panel starts folded away.
         .onChange(of: arranged) { _, now in if now { filtersExpanded = false } }
     }
 

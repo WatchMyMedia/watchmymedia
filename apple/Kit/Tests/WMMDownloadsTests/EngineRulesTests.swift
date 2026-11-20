@@ -3,8 +3,7 @@ import Testing
 @testable import WMMDownloads
 import WMMModel
 
-/// The engine's rules that run without the system's sessions
-/// (PLAN-APPLE-REVIEW.md §3.1.5 and §3.1.8).
+/// The engine's rules that run without the system's sessions.
 @MainActor
 @Suite struct EngineRulesTests {
     @Test func wifiOnlyWaitsOnAHotspotAndInLowDataMode() {

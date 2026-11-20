@@ -3,12 +3,12 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Signing in to the chosen server. By pairing first (TvMain.dc.html): a
+/// Signing in to the chosen server. By pairing first: a
 /// code to enter on the server's link page from a phone or computer, the
 /// page's QR code, and a new code when one runs out; this Apple TV signs in
 /// by itself once the code is approved. "Sign in with a password instead"
-/// (hidden while the server's sign-in protection is on) opens the form
-/// (TvSignInPassword.dc.html), typed with the remote or an iPhone's keyboard.
+/// (hidden while the server's sign-in protection is on) opens the form,
+/// typed with the remote or an iPhone's keyboard.
 struct SignInScreen: View {
     @Environment(AppServices.self) private var services
 
@@ -245,8 +245,8 @@ func pairingQR(_ model: SignInModel, size: CGFloat = 392) -> some View {
     }
 }
 
-/// The pairing code as tiles, three and three with a dash between
-/// (TvMain.dc.html); empty and dim before there is one.
+/// The pairing code as tiles, three and three with a dash between;
+/// empty and dim before there is one.
 private struct CodeTiles: View {
     let code: String
     var dim = false

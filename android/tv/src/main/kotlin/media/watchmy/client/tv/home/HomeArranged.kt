@@ -76,15 +76,15 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.onBack
 
 /**
- * Home in the person's order (PLAN-ROWS.md §8.2) as screens (PLAN-HOME.md
- * §7.3, HomeStart.dc.html and HomeRow.dc.html): page 0 is the hero and the
+ * Home in the person's order as screens:
+ * page 0 is the hero and the
  * first row drawn, every later row fills a page with the focused card's
  * picture, kicker, title, facts and overview above it, and the last page is
  * Edit rows and the totals. ▼ at a row pages down and ▲ pages up (the D-pad
  * pages, never a fling); each row comes back to the card it had focus on;
  * Back from a row page goes to page 0 first. Live TV sits in its place.
  * A row with somewhere to go ends in See all: a list's page, or its
- * library's grid sorted the row's way ([onOpenLibrary], PLAN-SEE-ALL.md).
+ * library's grid sorted the row's way ([onOpenLibrary]).
  *
  * Focus moves first and the pager follows it: ▼ puts focus on the next
  * row's card at once and the screen slides after, so a key pressed during

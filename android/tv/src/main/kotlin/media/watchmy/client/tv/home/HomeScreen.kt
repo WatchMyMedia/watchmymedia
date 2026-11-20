@@ -101,8 +101,8 @@ import media.watchmy.client.ui.ShowsLiveChannels
 
 /**
  * Home. Arranged (servers that send `rows`): screens, one row each, paged
- * with ▲ ▼ (HomeStart.dc.html, HomeRow.dc.html; [ArrangedHomeContent]).
- * Fixed (older servers; Home.dc.html and HomeScrolled.dc.html): the hero,
+ * with ▲ ▼ ([ArrangedHomeContent]).
+ * Fixed (older servers): the hero,
  * then Continue watching, Recently added shows, Recently aired, Recently
  * added movies and Recently released in one scrolling page, with the
  * library totals at the bottom and the focused row scrolled to the top.
@@ -188,7 +188,7 @@ private fun HomeData.isEmpty() =
     hero == null && continueWatching.isEmpty() && recentlyAddedShows.isEmpty() && recentlyAired.isEmpty() && recentlyAddedMovies.isEmpty() && recentlyReleased.isEmpty() &&
         rows.orEmpty().none { it.style != RowStyle.Live && it.hasContent }
 
-/** Arranged Home's first focus: the hero, else the first card of the first row drawn (PLAN-ROWS.md §8.2). */
+/** Arranged Home's first focus: the hero, else the first card of the first row drawn. */
 internal fun HomeData.arrangedFirstFocusKey(liveChannels: List<LiveChannel>): String? {
     hero?.let { return if (it.fileId != null) "hero:play" else "hero:open" }
     val first = rows.orEmpty().drawn(live = liveChannels.any { it.available }).firstOrNull() ?: return null
@@ -423,7 +423,7 @@ private fun ContinueItem.open(onOpenShow: (Long) -> Unit, onOpenMovie: (Long) ->
     }
 }
 
-/** A 160×240 poster with the New badge, as in Recently added (no quality badge, PLAN-HOME.md §5). */
+/** A 160×240 poster with the New badge, as in Recently added (no quality badge). */
 @Composable
 private fun PosterCard(
     item: BrowseItem,

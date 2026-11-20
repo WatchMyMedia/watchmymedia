@@ -6,7 +6,7 @@ import type { Hero } from './guideModel'
 import { LiveIcon } from './LiveIcon'
 
 /**
- * The focused programme above the guide (LiveGuide's hero): the channel and
+ * The focused programme above the guide: the channel and
  * when, the title, the episode and tags, the times with progress, a few
  * lines of description, and what OK and Hold OK do. Its picture fills the
  * top right and fades into the page.

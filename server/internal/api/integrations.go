@@ -16,7 +16,7 @@ import (
 	"watchmymedia/server/internal/integrations/apiclient"
 )
 
-// Integrations are Radarr, Sonarr and Seerr (PLAN-ARR.md §3): admins connect
+// Integrations are Radarr, Sonarr and Seerr: admins connect
 // them on the settings page; Radarr's and Sonarr's webhooks call
 // /api/integrations/{id}/webhook.
 

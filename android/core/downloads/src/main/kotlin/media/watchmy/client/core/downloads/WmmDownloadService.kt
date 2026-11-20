@@ -10,7 +10,7 @@ import androidx.media3.exoplayer.scheduler.Scheduler
 import androidx.media3.exoplayer.workmanager.WorkManagerScheduler
 
 /**
- * The downloads' `dataSync` foreground service (PLAN-DOWNLOADS.md §10.3):
+ * The downloads' `dataSync` foreground service:
  * Media3's DownloadService with its progress notification, one download at a
  * time. Below Android 12 a [WorkManagerScheduler] starts it again when Wi-Fi
  * or space comes back and after a reboot. Media3 passes no scheduler from

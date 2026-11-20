@@ -1,8 +1,8 @@
 import { commonLanguages, MAX_LANGUAGES, moveLanguage, type LanguageDraft } from '../../../src/lib/languagePreferences'
 import { languageName } from '../../../src/lib/format'
 
-// Settings › Audio & subtitles on the TV (SettingsPlayback, Tweak `pane`:
-// `audio`): two ordered lists, each language a row whose Options are Move
+// Settings › Audio & subtitles on the TV:
+// two ordered lists, each language a row whose Options are Move
 // up, Move down and Remove, and Add language from a list by name. Each
 // change saves at once.
 

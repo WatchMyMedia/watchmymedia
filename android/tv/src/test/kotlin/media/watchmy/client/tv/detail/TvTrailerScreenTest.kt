@@ -44,10 +44,10 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * The TV's trailer screen (TvTrailerPlayer.dc.html, PLAN-TV-TRAILERS.md §4):
+ * The TV's trailer screen:
  * our screen while YouTube's player loads out of sight, then the player
  * alone, the remote through YouTube's IFrame API, our pause screen in the
- * player's place while it is paused (TV0's decision), the refused and
+ * player's place while it is paused, the refused and
  * unreachable screens, the end, and the hand-off when no WebView can be made.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -178,7 +178,7 @@ class TvTrailerScreenTest {
         assertTrue(shows(TrailerText.PLAYS_FROM_YOUTUBE))
         assertEquals(View.INVISIBLE, player.visibility)
         assertFalse("nothing of the player's takes focus", player.isFocusable)
-        // WRAP_CONTENT, which AndroidView gives a view without its own, lays the page out 0 px high: sound, no picture (TV0).
+        // WRAP_CONTENT, which AndroidView gives a view without its own, lays the page out 0 px high: sound, no picture.
         assertEquals("the page is laid out at the player's full width", ViewGroup.LayoutParams.MATCH_PARENT, player.layoutParams.width)
         assertEquals("and its full height", ViewGroup.LayoutParams.MATCH_PARENT, player.layoutParams.height)
         val page = shadowOf(player).lastLoadDataWithBaseURL

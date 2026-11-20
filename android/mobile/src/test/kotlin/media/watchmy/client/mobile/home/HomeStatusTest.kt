@@ -14,8 +14,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Home's loading, failed and empty states, shown by the shared LoadContent
- * (PLAN-ANDROID-REVIEW §5.4): an empty library with channels still shows
+ * Home's loading, failed and empty states, shown by the shared LoadContent:
+ * an empty library with channels still shows
  * them, and an admin's empty Home offers the web app.
  */
 class HomeStatusTest {

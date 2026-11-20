@@ -108,7 +108,7 @@ internal class SessionPlayer(player: Player, private val controls: SessionContro
     override fun getContentBufferedPosition(): Long = controls.fileBufferedPositionMs
 
     private companion object {
-        // The TV player's left/right nudge (PLAN-CLIENTS.md §5.3).
+        // The TV player's left/right nudge.
         const val SEEK_STEP_MS = 10_000L
 
         val NOT_OFFERED = intArrayOf(

@@ -32,7 +32,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Arranged rows, the layout and lists (PLAN-ROWS.md §6) against a server that speaks the contract, and one too old for it. */
+/** Arranged rows, the layout and lists against a server that speaks the contract, and one too old for it. */
 class RowsRepositoryTest {
     private val h = Harness()
 

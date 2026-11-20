@@ -3,8 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The player's own colours and type, from the player artboards
-/// (design/mockups/ios/Player*.dc.html).
+/// The player's own colours and type, from the player artboards.
 enum PlayerStyle {
     /// Light text over video.
     static let light = Color(hex: 0xE5E5E5)
@@ -19,7 +18,7 @@ enum PlayerStyle {
 }
 
 /// The player's sizes: the iPhone artboards', or the iPad's
-/// (PadPlayerControls.dc.html) on a screen that is regular both ways, an
+/// on a screen that is regular both ways, an
 /// iPad full screen or in a wide Split View. An iPhone in landscape, even a
 /// large one, keeps the iPhone's, since its height is compact.
 struct PlayerMetrics: Equatable {
@@ -47,7 +46,7 @@ struct PlayerMetrics: Equatable {
     var streamChip: Bool
     /// The tablet picker is a trailing panel; compact widths retain the bottom sheet.
     var sidePanelPicker: Bool
-    /// The seek thumbnail's width while scrubbing (PlayerScrub.dc.html), its corners, and the gap to its time.
+    /// The seek thumbnail's width while scrubbing, its corners, and the gap to its time.
     var tileWidth: CGFloat = 200
     var tileRadius: CGFloat = 8
     var tileGap: CGFloat = 6
@@ -154,7 +153,7 @@ struct PlainBadge: View {
 }
 
 /// A gold arc turning: loading and buffering. With Reduce Motion it stays
-/// still and breathes instead (PLAN-APPLE-REVIEW.md §6.3).
+/// still and breathes instead.
 struct SpinnerRing: View {
     var size: CGFloat = 56
     var lineWidth: CGFloat = 3

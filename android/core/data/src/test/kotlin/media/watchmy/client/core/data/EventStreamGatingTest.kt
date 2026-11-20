@@ -15,8 +15,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * When the event stream connects and reconnects (PLAN-ANDROID-REVIEW.md
- * §4.1.5): with backoff after a failure, never again after a 404, only in
+ * When the event stream connects and reconnects:
+ * with backoff after a failure, never again after a 404, only in
  * front and on a network, and at once on the return to either.
  */
 class EventStreamGatingTest {

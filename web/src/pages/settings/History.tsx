@@ -9,9 +9,9 @@ import { settingsCrumbs, settingsHref } from '../../lib/settingsRoutes'
 import { ServerOnly } from './SettingsLayout'
 
 /**
- * Settings › Server › Watch history (PLAN-ADMIN-SETTINGS.md §5.9): five
+ * Settings › Server › Watch history: five
  * choices that save at once and confirm in their row; shortening Keep
- * history for warns first with how many plays it removes (board history).
+ * history for warns first with how many plays it removes.
  */
 export function HistorySettings() {
   return (

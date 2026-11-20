@@ -4,7 +4,7 @@ import Testing
 @testable import WMMPlayback
 import WMMModel
 
-/// Subtitles drawn by the app (PLAN-IOS.md §5): the selected text track's
+/// Subtitles drawn by the app: the selected text track's
 /// WebVTT, its cues at the file position.
 @MainActor
 @Suite struct CueTests {

@@ -1,11 +1,10 @@
 import Foundation
 import WMMModel
 
-// The words of Settings on iPhone, iPad and Apple TV as PLAN-APPLE-SETTINGS.md
-// redraws it (§6): the web's words where the two say the same thing
+// The words of Settings on iPhone, iPad and Apple TV:
+// the web's words where the two say the same thing
 // (web/src/lib/youSettings.ts, web/src/pages/settings/), the boards'
-// (design/mockups/ios/Settings2*, ipad-revised/Pad2Settings2*,
-// apple-tv/TvSettings2*) for what only the apps have. Views draw these and
+// for what only the apps have. Views draw these and
 // tests pin them, so a page never words a setting on its own.
 
 /// A heading and what follows it: a banner, a failure above a sheet's button,
@@ -40,7 +39,7 @@ public struct ConfirmWords: Hashable, Sendable {
     public var message: String { lines.joined(separator: "\n\n") }
 }
 
-/// A page that isn't offered here, opened by a link (Settings2KeptOut.dc.html):
+/// A page that isn't offered here, opened by a link:
 /// why, and who can change that.
 public struct KeptOutWords: Hashable, Sendable {
     public var title: String
@@ -63,7 +62,7 @@ public func andList(_ items: [String]) -> String {
 
 /// The words of Settings, by page.
 public enum SettingsWords {
-    // MARK: Names (the web's groups and pages, §4)
+    // MARK: Names (the web's groups and pages)
 
     public static let settings = "Settings"
     public static let you = "You"
@@ -92,7 +91,7 @@ public enum SettingsWords {
     /// "This iPhone", "This iPad", "This Apple TV": the device's own group.
     public static func thisDevice(_ device: String) -> String { "This \(device)" }
 
-    // MARK: Playback (Settings2Playback.dc.html, TvSettings2.dc.html)
+    // MARK: Playback
 
     /// "Yours, on every device you sign in to. Quality is this iPhone’s alone."
     public static func playbackLede(device: String) -> String {
@@ -102,7 +101,7 @@ public enum SettingsWords {
     /// "Quality · this iPhone": the one section kept on the device.
     public static func qualityHeading(device: String) -> String { "Quality · this \(device)" }
     public static let quality = "Quality"
-    /// Apple TV's row (TvSettings2.dc.html).
+    /// Apple TV's row.
     public static let defaultQuality = "Default quality"
 
     /// Under Quality, now that its heading says it is this device's.
@@ -160,7 +159,7 @@ public enum SettingsWords {
     /// The Apple TV's panel: a setting every device follows.
     public static let keptOnTheServer = "Kept on the server, so every device you sign in to follows it."
 
-    // MARK: Saved lines (§3.1): what the change did
+    // MARK: Saved lines: what the change did
 
     /// "Saved. Credits now skip after 3 seconds, on every device."
     public static func skipSaved(_ kind: SegmentKind, mode: SkipMode) -> String {
@@ -193,7 +192,7 @@ public enum SettingsWords {
         "Saved. Reminders now come \(liveLeadChoice(minutes).lowercased()), on every device."
     }
 
-    // MARK: Audio & subtitles (Settings2Languages.dc.html)
+    // MARK: Audio & subtitles
 
     /// How things stand, under the title: "Yours, on every device. Videos
     /// start in English, then Urdu. Subtitles start when the audio isn’t in
@@ -292,7 +291,7 @@ public enum SettingsWords {
         tags.isEmpty ? nil : andList(tags.map { languageTagName($0, locale: locale) })
     }
 
-    // MARK: Account & devices (Settings2Account.dc.html)
+    // MARK: Account & devices
 
     /// "Sam, an admin on Living room server. 4 devices are signed in.", or
     /// "Only this iPhone is signed in." for one; the count is left out until
@@ -335,7 +334,7 @@ public enum SettingsWords {
     /// "Sign out Kitchen iPad", a row's button as VoiceOver names it.
     public static func signOutNamed(_ name: String) -> String { "Sign out \(name)" }
 
-    /// Signing another device out (Settings2SignOutOther.dc.html): the
+    /// Signing another device out: the
     /// device by name, and the person when it is someone else's.
     public static func signOutDevice(_ session: DeviceSession, me: String?) -> ConfirmWords {
         let theirs = me != nil && session.userName != me
@@ -345,7 +344,7 @@ public enum SettingsWords {
         return ConfirmWords(title: "Sign out \(session.name)?", lines: [line], confirm: "Sign out \(session.name)", keep: "Keep it signed in")
     }
 
-    /// Signing this iPhone or iPad out (Settings2SignOutThis.dc.html): what
+    /// Signing this iPhone or iPad out: what
     /// stays, what is deleted with its count and size, and what signing in
     /// again needs.
     public static func signOutThisDevice(serverName: String?, device: String, downloads: Int, bytes: Int64) -> ConfirmWords {
@@ -369,7 +368,7 @@ public enum SettingsWords {
         )
     }
 
-    /// Signing this Apple TV out (TvSettings2SignOut.dc.html), which keeps no downloads.
+    /// Signing this Apple TV out, which keeps no downloads.
     public static func signOutThisAppleTV(serverName: String?) -> ConfirmWords {
         ConfirmWords(
             title: signOutQuestion(serverName: serverName),
@@ -410,7 +409,7 @@ public enum SettingsWords {
         ]
     }
 
-    // MARK: Rename (Settings2Rename.dc.html, TvSettings2Rename.dc.html)
+    // MARK: Rename
 
     /// "Rename this iPhone".
     public static func renameTitle(device: String) -> String { "Rename this \(device)" }
@@ -431,7 +430,7 @@ public enum SettingsWords {
     /// The rooms Apple TV offers as names, before Type another name.
     public static let rooms = ["Living room", "Bedroom", "Kitchen", "Office", "Den", "Basement", "Kids’ room", "Guest room"]
 
-    /// Apple TV's names to choose from (TvSettings2Rename.dc.html): this one's
+    /// Apple TV's names to choose from: this one's
     /// name first, then each room's that isn't it.
     public static func roomNames(device: String, current: String) -> [String] {
         let names = rooms.map { "\($0) \(device)" }
@@ -443,7 +442,7 @@ public enum SettingsWords {
         "Select a name to save it · Menu goes back to Account & devices and keeps \(current)"
     }
 
-    // MARK: Server (Settings2Server.dc.html, TvSettings2Server.dc.html)
+    // MARK: Server
 
     /// "Living room server, v1.4.5. You’re signed in as Sam, an admin."
     public static func serverLede(_ server: Server, user: User?) -> String {
@@ -465,7 +464,7 @@ public enum SettingsWords {
     ]
     public static let inboxLine = "Requests to approve and problems people reported"
 
-    // MARK: Apple TV (TvSettings2*.dc.html)
+    // MARK: Apple TV
 
     /// The hints at the foot of the panel beside the focused row.
     public static let tvHintChange = "Select changes it · Menu goes back to the list"
@@ -475,7 +474,7 @@ public enum SettingsWords {
     /// "Right opens Playback · Menu goes to the top bar", for a group in the list.
     public static func tvHintGroup(_ title: String) -> String { "Right opens \(title) · Menu goes to the top bar" }
 
-    // MARK: Elsewhere (Settings2Confirm.dc.html)
+    // MARK: Elsewhere
 
     /// Remove all downloads asks first, with the count on its button and what stays.
     public static func removeAllDownloads(count: Int, bytes: Int64, device: String) -> ConfirmWords {
@@ -499,7 +498,7 @@ public enum SettingsWords {
         )
     }
 
-    // MARK: Kept out (Settings2KeptOut.dc.html, §5.8)
+    // MARK: Kept out
 
     public static let requestsOff = KeptOutWords(
         title: "Requests are off on this server",

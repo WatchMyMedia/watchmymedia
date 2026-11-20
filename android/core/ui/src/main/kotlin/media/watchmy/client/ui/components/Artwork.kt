@@ -28,7 +28,7 @@ import kotlin.math.absoluteValue
  * The image is decoded at the size the box has when it is first laid out.
  * Art drawn larger later passes [decodeSize], the largest it is drawn at:
  * a TV row that grows when it takes focus, which would otherwise stretch
- * the image it decoded at rest (PLAN-ANDROID-REVIEW §4.3.6).
+ * the image it decoded at rest.
  */
 @Composable
 fun Artwork(

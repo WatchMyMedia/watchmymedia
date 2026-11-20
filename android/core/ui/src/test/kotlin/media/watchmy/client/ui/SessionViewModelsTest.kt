@@ -26,8 +26,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * A signed-in session's ViewModels live and end with it
- * (PLAN-ANDROID-REVIEW.md §3.3.6), on the phone and the TV alike: kept
+ * A signed-in session's ViewModels live and end with it,
+ * on the phone and the TV alike: kept
  * while it shows, cleared when it signs out or another account or server
  * takes over, and never in the activity's own store, where they outlived
  * the session.

@@ -53,7 +53,7 @@ fun TvApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
                 }
                 return@Box
             }
-            // A channel cast to this TV plays in the TV's own live player, as whoever cast it (PLAN-LIVE-TV.md §4.1).
+            // A channel cast to this TV plays in the TV's own live player, as whoever cast it.
             castLive?.let { live ->
                 key(live.id) {
                     CastLivePlayer(live, onExit = { services.castReceiver.finished(live) })

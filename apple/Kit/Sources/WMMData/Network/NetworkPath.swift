@@ -2,7 +2,7 @@ import Foundation
 import Network
 
 /// Whether the device has a way to the network, as it changes, so the event
-/// stream reconnects the moment one returns (PLAN-APPLE-REVIEW.md §4.1.7)
+/// stream reconnects the moment one returns
 /// rather than at its next backoff, up to a minute later. Tests drive their own.
 protocol NetworkPath: Sendable {
     /// True while a path is satisfied; the current state first, then each change.

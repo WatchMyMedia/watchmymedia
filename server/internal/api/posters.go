@@ -17,7 +17,7 @@ import (
 	"watchmymedia/server/internal/tmdb"
 )
 
-// Posters an admin chooses in place of the match's (PLAN-POSTERS.md): one
+// Posters an admin chooses in place of the match's: one
 // of TMDB's others, an upload, or a link the server copies once. The choice
 // goes out as the item's posterPath, so no client changes to show it.
 

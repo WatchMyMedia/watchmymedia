@@ -17,7 +17,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Following shows and the feed of their new episodes (PLAN-NEW-EPISODES.md §5.3, §5.4) against a server that speaks the contract, and one too old for it. */
+/** Following shows and the feed of their new episodes against a server that speaks the contract, and one too old for it. */
 class FollowsRepositoryTest {
     private val h = Harness()
 

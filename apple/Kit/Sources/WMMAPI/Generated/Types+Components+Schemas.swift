@@ -619,7 +619,7 @@ extension Components {
         public struct AudioPlan: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/AudioPlan/channels`.
             public var channels: Swift.Int64?
-            /// The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3 (PLAN-AUDIO.md).
+            /// The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3.
             ///
             /// - Remark: Generated from `#/components/schemas/AudioPlan/codec`.
             public var codec: Swift.String?
@@ -631,7 +631,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - channels:
-            ///   - codec: The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3 (PLAN-AUDIO.md).
+            ///   - codec: The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3.
             ///   - copy:
             ///   - index:
             public init(
@@ -2103,7 +2103,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Decision/reasons`.
             public var reasons: [Swift.String]
-            /// Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread (PLAN-RESUME.md §3.8).
+            /// Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread.
             ///
             /// - Remark: Generated from `#/components/schemas/Decision/resumeMs`.
             public var resumeMs: Swift.Int64
@@ -2157,7 +2157,7 @@ extension Components {
             ///   - playlist: HLS only: vod (start at 0, file time = player time) or event (file time = startMs + player time).
             ///   - _protocol:
             ///   - reasons: Why a cheaper mode was not possible.
-            ///   - resumeMs: Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread (PLAN-RESUME.md §3.8).
+            ///   - resumeMs: Where to resume this item, if partway through: 5 s before the user's saved position, so they pick up the thread.
             ///   - segments:
             ///   - sessionId:
             ///   - startMs: Where the HLS session starts; add to the player's time to get the file position. An event session of copied video starts on the keyframe at or before the time asked for, so this can be up to 12 s earlier than the request.
@@ -9847,7 +9847,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Profile/hdr`.
             public var hdr: Swift.Bool?
-            /// The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means the profile follows PLAN-HDR-PROFILE: HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it.
+            /// The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it.
             ///
             /// - Remark: Generated from `#/components/schemas/Profile/hdrTypes`.
             public var hdrTypes: [Swift.String]?
@@ -9887,7 +9887,7 @@ extension Components {
             ///   - audioCodecs:
             ///   - containers:
             ///   - hdr: True when the client can display HDR. Without hdrTypes, HDR video is copied only when this is true; otherwise transcodes tone-map to SDR.
-            ///   - hdrTypes: The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means the profile follows PLAN-HDR-PROFILE: HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it.
+            ///   - hdrTypes: The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it.
             ///   - maxAudioChannels: 0 means any.
             ///   - maxBitrate: Bits per second; 0 means unlimited.
             ///   - maxHeight:

@@ -603,8 +603,8 @@ private fun LiveQualityOptions(state: LivePlayerState, onSelect: (StreamQuality)
 }
 
 /**
- * The warning before a recording takes this tuner (PLAN-LIVE-TV-DVR.md §3.1,
- * Taken over): OK hides it, and Don't record it is for whoever set the
+ * The warning before a recording takes this tuner:
+ * OK hides it, and Don't record it is for whoever set the
  * recording and admins. TalkBack reads it out as it appears.
  */
 @Composable

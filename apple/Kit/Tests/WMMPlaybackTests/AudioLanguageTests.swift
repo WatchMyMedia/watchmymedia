@@ -3,7 +3,7 @@ import Testing
 @testable import WMMPlayback
 import WMMModel
 
-/// Starting on the person's audio language (PLAN-LANGUAGES.md §5.2, §5.5).
+/// Starting on the person's audio language.
 @MainActor
 @Suite struct AudioLanguageTests {
     private nonisolated static let spanishPreferences = PlaybackPreferences(

@@ -6,6 +6,9 @@ backticks or in a Markdown link must exist (or be gitignored, for build
 outputs and secrets the files mention on purpose). A path is looked up from
 the folder of the file that names it, then from the repository root. Run it
 with `make agents-check` after moving files or renaming targets.
+
+It also checks the rule in AGENTS.md that nothing here names the maintainers'
+plans or design mockups: no tracked file may, in a comment or a document.
 """
 
 import glob
@@ -34,6 +37,24 @@ UNPUBLISHED = re.compile(
     r"|(^|/)\.github/workflows/downloads\.yml$"
 )
 UNPUBLISHED_TARGETS = {"release-tag", "download-stats", "site-dev", "site-check", "brand", "brand-sources"}
+
+
+# What a mention of a plan or a mockup looks like: a plan's file name, the
+# folders the mockups and proposals are in, and a board's file name.
+CITATION = r"PLAN(-[A-Z0-9]+)+(\.md)?|PLAN\.md|design/(mockups|proposals)|\.dc\.html"
+# This file has the pattern, and the names of what the public copy lacks.
+CITATION_EXEMPT = ("deploy/ci/check-agent-docs.py",)
+
+
+def citations():
+    """Lines of tracked files that name a plan or a mockup, as `path:line: text`."""
+    if not PUBLIC_COPY:
+        return []
+    out = subprocess.run(
+        ["git", "grep", "-n", "-I", "-E", CITATION, "--", ".", *(f":!{p}" for p in CITATION_EXEMPT)],
+        cwd=ROOT, capture_output=True, text=True,
+    ).stdout.splitlines()
+    return [f"{line[:160]}: names a plan or a mockup the repository does not have" for line in out]
 
 
 def guidance_files():
@@ -112,6 +133,7 @@ def main():
                     token = token.rstrip(".,;:)")
                     if looks_like_path(token) and not exists(token, base):
                         problems.append(f"{rel}:{n}: missing path {token}")
+    problems += citations()
     for p in problems:
         print(p)
     if problems:

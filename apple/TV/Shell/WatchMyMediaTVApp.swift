@@ -4,21 +4,21 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The Apple TV app (PLAN-IOS.md §11.2, design/mockups/apple-tv): the
+/// The Apple TV app: the
 /// server picker, sign-in by pairing, then the tvOS tab bar, all over the
 /// Kit's screen models. The player is the system's `AVPlayerViewController`.
 @main
 struct WatchMyMediaTVApp: App {
     @State private var services: AppServices
     @State private var navigator = Navigator()
-    /// Live TV favourites and reminders, shared by every screen (PLAN-LIVE-TV-GUIDE.md §6.5).
+    /// Live TV favourites and reminders, shared by every screen.
     @State private var extras: LiveExtrasStore
     @State private var recordings: LiveRecordingsStore
-    /// The shows the person follows: the bell, Settings' list (PLAN-NEW-EPISODES.md §7.4). The TV doesn't notify.
+    /// The shows the person follows: the bell, Settings' list. The TV doesn't notify.
     @State private var follows: FollowsStore
 
     init() {
-        // Launch to Home's first content (PLAN-APPLE-REVIEW.md §4.3.1). tvOS has no MetricKit, so start() does nothing here.
+        // Launch to Home's first content. tvOS has no MetricKit, so start() does nothing here.
         PerformanceSignposts.shared.launchBegan()
         Diagnostics.start()
         let services = ServicesFactory.make(arguments: ProcessInfo.processInfo.arguments)

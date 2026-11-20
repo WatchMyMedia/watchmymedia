@@ -4,7 +4,7 @@ import Testing
 @testable import WMMFeatures
 import WMMModel
 
-/// What ticks stays out of the screen's state (PLAN-APPLE-REVIEW.md §4.3.3):
+/// What ticks stays out of the screen's state:
 /// a position tick changes ``PlayerClock`` and not ``PlayerChromeModel/state``,
 /// so the iPhone's player screen is not rebuilt ten times a second. Android
 /// guards the same thing with recomposition tests.

@@ -18,7 +18,7 @@ import media.watchmy.client.presentation.library.LibraryViewModel
 
 /**
  * The library grid's scroll, one for the phone, the arranged and the
- * tablet layouts (PLAN-ANDROID-REVIEW.md §5.4). It is made above the
+ * tablet layouts. It is made above the
  * phone/tablet branch, so turning or resizing the screen keeps the place.
  */
 @Composable
@@ -49,8 +49,8 @@ internal fun LazyGridState.FollowLibrary(state: LibraryViewModel.State, top: Int
 }
 
 /**
- * A row's See all opened the grid ([LibraryViewModel.State.toGrid],
- * PLAN-SEE-ALL.md §4.4): once its first page is in, the grid's [heading]
+ * A row's See all opened the grid ([LibraryViewModel.State.toGrid]):
+ * once its first page is in, the grid's [heading]
  * comes to the top (the tab's own rows are above it, a scroll up away), also
  * when the rows were in view, which [FollowLibrary] leaves alone. Then
  * [onShown], so turning the screen doesn't do it again.

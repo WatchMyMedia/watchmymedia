@@ -1,7 +1,7 @@
 import type { LivePlaybackState } from '../../player'
 
-// Why a channel can't play, in LiveProblems' words and with its actions
-// (the Samsung TV canvas). The reason codes are the server's; the words
+// Why a channel can't play, in the design's words and with its actions.
+// The reason codes are the server's; the words
 // are ours or the shared ones (src/lib/liveTV.ts liveFailure, which the
 // engine already put in `failure`), never the server's own sentences.
 

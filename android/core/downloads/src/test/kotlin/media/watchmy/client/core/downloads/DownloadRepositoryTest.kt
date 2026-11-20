@@ -396,7 +396,7 @@ class DownloadRepositoryTest {
         r.mark(42, false)
         r.progress(r.offlinePlay(42)!!, report(600_000, PlayState.Paused))
         val d = r.offlinePlay(42)!!.decision
-        assertEquals("5 s before where this device was (PLAN-RESUME.md §3.8)", 595_000L, d.resumeMs)
+        assertEquals("5 s before where this device was", 595_000L, d.resumeMs)
         assertEquals(OfflinePlaybackGateway.OFFLINE_PLAY, d.playId)
         assertNull(d.sessionId)
         assertEquals(listOf("x0"), d.subtitles.map { it.option.id })

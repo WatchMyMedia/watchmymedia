@@ -63,7 +63,7 @@ internal interface DownloadEngine {
 }
 
 /**
- * A download's state for the screens (MovieDownload.dc.html): Media3's state,
+ * A download's state for the screens: Media3's state,
  * with why a queued one waits ([notMet]) and whether the server asked it to
  * wait ([preparing]).
  */

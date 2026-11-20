@@ -6,8 +6,8 @@ import { PlayerIcon, type PlayerIconName } from './PlayerIcons'
 import { ScrubberRow, WallClock } from './Ticking'
 import type { Heading } from './playerSession'
 
-// PlayerControls' chrome over the video (and RecordingPlayer's, and
-// TrailerPlayer's trailer file): the title and its line, the stream pill
+// The chrome over the video, for files, recordings and trailer
+// files: the title and its line, the stream pill
 // and the clock, the scrubber, the transport row and the hint line. The
 // scrubber reads the position itself; the rest redraws only on a change.
 

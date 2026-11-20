@@ -36,7 +36,7 @@ import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
 /**
- * Notify me (PLAN-NEW-EPISODES.md §7.1; the boards' `bell`): the first of
+ * Notify me: the first of
  * About the show's actions. Off, the outline bell and "Notify me"; on, the
  * filled bell and "Notifications on", both gold. A button whose name carries
  * its state, not a switch.

@@ -1,7 +1,7 @@
 import Foundation
 
 /// What a server at an API level offers, by name, so a check says what it
-/// gates rather than a number (PLAN-APPLE-REVIEW.md §5.6; Android's
+/// gates rather than a number (Android's
 /// `ServerFeatures`, named alike). The levels are the server's (`APILevel` in
 /// server/internal/api/system.go, whose comment says what each one brought):
 /// a feature is offered from its level and hidden below it. A feature that
@@ -24,15 +24,15 @@ public struct ServerFeatures: Hashable, Sendable {
         public static let requests = 5
         /// Deleting from the apps.
         public static let delete = 6
-        /// Profile.hdrTypes and the dovi keys; HDR copied only to a screen that shows it (PLAN-HDR-PROFILE.md).
+        /// Profile.hdrTypes and the dovi keys; HDR copied only to a screen that shows it.
         public static let hdrProfile = 8
-        /// Seek thumbnails (PLAN-TRICKPLAY.md).
+        /// Seek thumbnails.
         public static let trickplay = 9
-        /// Offline downloads (PLAN-DOWNLOADS.md).
+        /// Offline downloads.
         public static let offline = 10
         /// Live TV.
         public static let liveTV = 11
-        /// Live TV listings (PLAN-LIVE-TV-GUIDE.md).
+        /// Live TV listings.
         public static let liveGuide = 13
         /// Casting Live TV.
         public static let liveCast = 14
@@ -42,11 +42,11 @@ public struct ServerFeatures: Hashable, Sendable {
         public static let subtitlePreferences = 18
         /// Recordings (DVR) and growing playback.
         public static let liveRecordings = 19
-        /// Movie trailers (PLAN-TRAILERS.md).
+        /// Movie trailers.
         public static let trailers = 20
-        /// Audio languages, the foreign-audio subtitle choice and Profile.selectsAudioTrack (PLAN-LANGUAGES.md).
+        /// Audio languages, the foreign-audio subtitle choice and Profile.selectsAudioTrack.
         public static let audioLanguages = 21
-        /// Rows people arrange, and lists (PLAN-ROWS.md).
+        /// Rows people arrange, and lists.
         public static let rows = 22
         /// Opt-in Automatic recovery, the transfer's age and acknowledged quality switches.
         public static let autoRecovery = 24
@@ -55,11 +55,11 @@ public struct ServerFeatures: Hashable, Sendable {
         /// Opt-in Live TV Automatic.
         public static let liveAutomatic = 26
         /// A play's decision carries its media token (`Decision.mediaToken`), and the
-        /// Live TV status call waits while a channel tunes (PLAN-APPLE-REVIEW.md §4.2).
+        /// Live TV status call waits while a channel tunes.
         public static let tokenWithDecision = 28
-        /// Following shows and their new episodes (PLAN-NEW-EPISODES.md).
+        /// Following shows and their new episodes.
         public static let follows = 29
-        /// Related titles at the end of movie and show pages (PLAN-RELATED.md).
+        /// Related titles at the end of movie and show pages.
         public static let related = 30
     }
 

@@ -1,8 +1,8 @@
 import { SETTLE_MS } from './newEpisodes'
 
 /**
- * When the tab holding the new episodes' lock checks (PLAN-NEW-EPISODES.md
- * §6.1): at once when it starts holding it, and once SETTLE_MS have passed
+ * When the tab holding the new episodes' lock checks:
+ * at once when it starts holding it, and once SETTLE_MS have passed
  * since the last library.changed. The server holds an arrival back 2
  * minutes, so a check inside that window can miss it: any check that starts
  * before the window has passed is followed by one once it has. The time of

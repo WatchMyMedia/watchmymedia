@@ -19,7 +19,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The phone's remote for a channel on the TV (PLAN-LIVE-TV.md §4.1, L10d), against a recording link. */
+/** The phone's remote for a channel on the TV, against a recording link. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class LiveCastControllerTest {
     private val dispatcher = UnconfinedTestDispatcher()
@@ -177,7 +177,7 @@ class LiveCastControllerTest {
         link.state(live(phase = StateMessage.ERROR, reason = "tuners_busy").copy(error = "All tuners are in use."))
         assertEquals(LiveCastPhase.Failed, controller.state.value.phase)
         assertEquals("tuners_busy", controller.state.value.reason)
-        // A receiver from before L10b's refused state drops the channel when it refuses a LOAD; the channel cast is still the one shown.
+        // A receiver from before the refused state drops the channel when it refuses a LOAD; the channel cast is still the one shown.
         controller.cast(sleuth, StreamQuality.FullHd)
         link.state(StateMessage(features = listOf("live"), phase = StateMessage.ERROR, error = "No signal on 4.1. The tuner couldn’t pick up this channel."))
         val refused = controller.state.value

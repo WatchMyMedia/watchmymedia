@@ -58,7 +58,7 @@ private final class NoPlayback: PlaybackControllerFactory {
     func plans(fileIDs: [Int]) async -> [Int: PlaybackPlan] { [:] }
 }
 
-/// The API's own HTTP cache (PLAN-APPLE-REVIEW.md §4.1.6).
+/// The API's own HTTP cache.
 @MainActor
 @Suite struct APICacheTests {
     let h = Harness()
@@ -83,7 +83,7 @@ private final class NoPlayback: PlaybackControllerFactory {
     }
 }
 
-/// The offline routes' sign-in goes only to its own server (PLAN-APPLE-REVIEW.md §3.4.8).
+/// The offline routes' sign-in goes only to its own server.
 @MainActor
 @Suite struct OfflineGatewayOriginTests {
     let h = Harness()

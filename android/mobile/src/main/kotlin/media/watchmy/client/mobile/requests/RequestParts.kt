@@ -82,7 +82,7 @@ import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import media.watchmy.client.presentation.requests.RequestFormViewModel
 
-/** A missing episode's colour, as ShowMissing.dc.html gives each state. */
+/** A missing episode's colour, as the design gives each state. */
 internal fun MissingEpisode.Kind.tone(): Color = when (this) {
     MissingEpisode.Kind.Downloading, MissingEpisode.Kind.Importing -> WmmColors.Accent
     MissingEpisode.Kind.DownloadFailed -> WmmColors.Warn
@@ -102,7 +102,7 @@ internal fun MissingEpisode.Kind.icon(): ImageVector = when (this) {
     MissingEpisode.Kind.NotInLibrary -> WmmIcons.PlusCircle
 }
 
-/** A request's colour and icon in Your requests (MyRequests.dc.html). */
+/** A request's colour and icon in Your requests. */
 internal fun RequestLine.Tone.tone(): Color = when (this) {
     RequestLine.Tone.Waiting -> WmmColors.TextSoft
     RequestLine.Tone.Declined, RequestLine.Tone.Failed -> WmmColors.Warn
@@ -213,8 +213,8 @@ internal fun NoteLine(text: String, icon: ImageVector = WmmIcons.Info) {
 }
 
 /**
- * Asking for a movie or some of a show's seasons (the request sheet on
- * SearchRequest.dc.html and ShowMissing.dc.html): poster, kind, title and
+ * Asking for a movie or some of a show's seasons (the request sheet):
+ * poster, kind, title and
  * overview, a show's seasons to tick, the approval line for members, and
  * Request. [only] ticks just that season (Request season N); otherwise the
  * missing and partly-there seasons start ticked. [onSent] gets the message
@@ -330,7 +330,7 @@ private fun SeasonOption(name: String, detail: String, state: String?, checked: 
 }
 
 /**
- * Report a problem (ReportProblem.dc.html): the kind, a note, and what the
+ * Report a problem: the kind, a note, and what the
  * server adds. [kicker] names the movie or "Show · S03 E07".
  */
 @Composable

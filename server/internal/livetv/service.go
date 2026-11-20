@@ -41,11 +41,11 @@ type Channel struct {
 	Enabled   bool   `json:"enabled"`
 	Available bool   `json:"available"`
 	Reason    string `json:"reason,omitempty"`
-	// Filled from listings, only while they are on (PLAN-LIVE-TV-GUIDE.md).
+	// Filled from listings, only while they are on.
 	LogoURL string     `json:"logoUrl,omitempty" required:"false" doc:"The channel's logo from the listings provider: a path on this server."`
 	Now     *Programme `json:"now,omitempty" required:"false" doc:"What is on now, when the channel has listings."`
 	Next    *Programme `json:"next,omitempty" required:"false" doc:"What follows, when the channel has listings."`
-	// The viewer's own (PLAN-LIVE-TV-GUIDE.md §5.7).
+	// The viewer's own.
 	Favourite bool `json:"favourite,omitempty" required:"false" doc:"The viewer starred this channel (API level 15)."`
 }
 

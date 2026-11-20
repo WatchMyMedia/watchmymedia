@@ -4,7 +4,7 @@ import { SecurityHub } from './security/Hub'
 import { SignInProtectionFlow } from './security/SignInFlow'
 
 /**
- * Settings › Security (PLAN-ADMIN-SETTINGS.md §5.6): the hub says where this
+ * Settings › Security: the hub says where this
  * browser is and holds both protections; turning sign-in protection on is
  * a flow that ends by trying the check.
  */

@@ -9,13 +9,13 @@ const val AUTO_RECOVERY_API_LEVEL = 24
 /**
  * The level that brought the media token with the decision, a Live TV status
  * call that waits while the channel tunes, and ETags on Live TV's
- * capabilities and channels (PLAN-ANDROID-REVIEW.md §4.2.2–3a).
+ * capabilities and channels.
  */
 const val DECISION_TOKEN_API_LEVEL = 28
 
 /**
  * What a server at API [level] offers, by name, so a check says what it gates
- * rather than a number (PLAN-ANDROID-REVIEW.md §5.7). The levels are the
+ * rather than a number. The levels are the
  * server's (`APILevel` in server/internal/api/system.go, whose comment says
  * what each one brought); a feature is offered from its level and hidden
  * below it. The `*_API_LEVEL` constants stay for the code outside core:data
@@ -86,15 +86,15 @@ value class ServerFeatures(val level: Int) {
     /** 28: the Live TV status call waits (waitMs) while the channel tunes, so the player needn't poll. */
     val liveStatusWaits: Boolean get() = level >= DECISION_TOKEN_API_LEVEL
 
-    /** 29: following shows, the feed of their new episodes and Home's `followed` row (PLAN-NEW-EPISODES.md). */
+    /** 29: following shows, the feed of their new episodes and Home's `followed` row. */
     val follows: Boolean get() = level >= FOLLOWS_API_LEVEL
 
-    /** 30: related titles at the end of movie and show pages (PLAN-RELATED.md). */
+    /** 30: related titles at the end of movie and show pages. */
     val related: Boolean get() = level >= RELATED_API_LEVEL
 
     /**
      * 31: Profile.maxPcmChannels and pcm, copied only in direct play; a
-     * converted track may be FLAC, E-AC-3 or AC-3 (PLAN-AUDIO.md).
+     * converted track may be FLAC, E-AC-3 or AC-3.
      */
     val pcmProfile: Boolean get() = level >= PCM_PROFILE_API_LEVEL
 }

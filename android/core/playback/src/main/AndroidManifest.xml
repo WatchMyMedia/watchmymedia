@@ -21,7 +21,7 @@
             </intent-filter>
         </service>
 
-        <!-- The pictures on the launcher's Watch Next cards (PLAN-ANDROID-REVIEW.md §2.4).
+        <!-- The pictures on the launcher's Watch Next cards.
              Exported so the launcher can read them; read-only, and it answers only
              addresses this app signed with a key that never leaves it (WatchNextArt),
              for the account signed in now. -->

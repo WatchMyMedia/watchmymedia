@@ -150,7 +150,7 @@ enum class MobileTab(val label: String, val icon: ImageVector) {
 
     companion object {
         /**
-         * The tabs shown: with downloads (PLAN-DOWNLOADS.md §11) Downloads
+         * The tabs shown: with downloads Downloads
          * takes Search's place in the phone's bottom bar, where Search stays
          * in the top bar, and joins Search in the tablet's rail.
          */
@@ -171,7 +171,7 @@ enum class MobileTab(val label: String, val icon: ImageVector) {
 /**
  * The Material 3 navigation bar, in the mockups' colours: a gold pill on the
  * selected item. [settingsCount] is the admins' Inbox count, a gold badge on
- * Settings (SearchRequest.dc.html).
+ * Settings.
  */
 @Composable
 fun MobileBottomBar(selected: MobileTab?, onSelect: (MobileTab) -> Unit, settingsCount: Int = 0, tabs: List<MobileTab> = MobileTab.shown(downloads = false, rail = false)) {

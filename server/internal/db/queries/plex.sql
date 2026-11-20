@@ -1,4 +1,4 @@
--- Plex connections and their links (PLAN-PLEX-SYNC.md, P2), and the exact
+-- Plex connections and their links, and the exact
 -- lookups that match Plex items to local ones.
 
 -- name: ListPlexConnections :many

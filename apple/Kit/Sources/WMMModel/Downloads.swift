@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-// Offline downloads on iPhone and iPad (PLAN-DOWNLOADS.md, phase D3), worded
+// Offline downloads on iPhone and iPad, worded
 // and shaped as the Android app's (android/core/model/.../Downloads.kt).
 
 /// The qualities a download is made at (Settings › Downloads › Quality, and the download sheet), best first.
@@ -102,7 +102,7 @@ public enum DownloadStatus: Hashable, Sendable {
     }
 }
 
-/// What the server said of a held download at its last sync (PLAN-DOWNLOADS.md §5): the copy still plays.
+/// What the server said of a held download at its last sync: the copy still plays.
 public enum DownloadMark: String, Hashable, Sendable, Codable { case none, removedFromServer, newVersion }
 
 /// A download held on this device for the signed-in account.
@@ -236,7 +236,7 @@ public struct DownloadChoice: Hashable, Sendable {
 
 /// The space downloads take and what is left, on the volume that holds them.
 public struct DownloadStorage: Hashable, Sendable {
-    /// 1 GB stays free after any download (PLAN-DOWNLOADS.md §5).
+    /// 1 GB stays free after any download.
     public static let reserveBytes: Int64 = 1 << 30
 
     public var usedBytes: Int64
@@ -265,7 +265,7 @@ public struct DownloadSettings: Hashable, Sendable {
     }
 }
 
-/// Downloads to watch offline on an iPhone or iPad (PLAN-DOWNLOADS.md §10).
+/// Downloads to watch offline on an iPhone or iPad.
 /// Everything here is for the account signed in now. Methods that talk to
 /// the server throw ``APIError`` or ``SignedOutError``.
 /// ``UnavailableDownloads`` where there are none: the Apple TV app, and
@@ -397,7 +397,7 @@ public func neededSize(_ bytes: Int64) -> String {
 /// "96.4 GB": free space, to a tenth.
 public func freeSize(_ bytes: Int64) -> String { String(format: "%.1f GB", Double(bytes) / gigabyte) }
 
-/// The download button's words (MovieDownload.dc.html).
+/// The download button's words.
 public func downloadLabel(_ status: DownloadStatus) -> String {
     switch status {
     case .waiting(let reason): reason == .wifi ? "Waiting for Wi-Fi" : "Waiting"
@@ -418,7 +418,7 @@ public func downloadHelp(_ status: DownloadStatus) -> String? {
     }
 }
 
-/// The menu's title for a download (MovieDownload.dc.html, menu open).
+/// The menu's title for a download.
 public func downloadMenuTitle(_ status: DownloadStatus) -> String {
     if case .paused(let percent, _) = status { return "Paused at \(percent)%" }
     return downloadLabel(status)

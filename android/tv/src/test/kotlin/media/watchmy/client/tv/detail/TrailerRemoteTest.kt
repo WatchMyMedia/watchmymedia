@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** PLAN-TV-TRAILERS.md §4.3's table: what each remote key does on the trailer screen, through YouTube's IFrame API. */
+/** What each remote key does on the trailer screen, through YouTube's IFrame API. */
 class TrailerRemoteTest {
     @Test
     fun `each remote key does what the table says`() {

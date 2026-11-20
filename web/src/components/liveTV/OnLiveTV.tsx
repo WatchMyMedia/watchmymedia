@@ -9,8 +9,8 @@ import { RemindControls } from './LiveReminders'
 import { useGuideExtras, useReminders } from './useGuideExtras'
 
 /**
- * The Search page's On Live TV (PLAN-LIVE-TV-GUIDE.md §6.5; the LiveSearch
- * board): programmes on now and later whose titles have the words, between
+ * The Search page's On Live TV:
+ * programmes on now and later whose titles have the words, between
  * the library's results and Not in your library. Left out when nothing
  * matches, or without listings at API level 15.
  */

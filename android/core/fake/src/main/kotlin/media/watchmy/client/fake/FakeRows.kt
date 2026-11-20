@@ -27,7 +27,7 @@ import media.watchmy.client.model.HomeData
 import media.watchmy.client.model.ItemSort
 
 /**
- * The fakes' rows and lists (PLAN-ROWS.md): every person's layouts on the
+ * The fakes' rows and lists: every person's layouts on the
  * fake server, its lists and their entries, shared by [FakeLibraryRepository]
  * (which fills the rows) and [FakeRowsRepository] (the editor and the list
  * page). Every title is fictional; the missing ones are [FakeRequestRepository]'s,
@@ -117,7 +117,7 @@ class FakeRowsData(
     private fun order(screen: String): List<Pair<String, Boolean>> {
         val known = defaults(screen).filter { (id, _) -> id.startsWith("list:").not() || lists.any { RowIds.list(it.list.id) == id } }
         val mine = saved[screen] ?: return known
-        // As the server merges (PLAN-ROWS.md §7.1): the saved order, then rows never placed after the row before them.
+        // As the server merges: the saved order, then rows never placed after the row before them.
         val placed = mine.filter { p -> known.any { it.first == p.id } }.map { it.id to it.hidden }.toMutableList()
         known.forEachIndexed { i, (id, hidden) ->
             if (placed.none { it.first == id }) {

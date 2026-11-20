@@ -14,8 +14,8 @@ function appStorage(): Storage | undefined {
 }
 
 /**
- * A Live TV reminder over whatever is on screen while the app is open
- * (LiveReminders on the canvas). It never takes focus: Hold OK watches the
+ * A Live TV reminder over whatever is on screen while the app is
+ * open. It never takes focus: Hold OK watches the
  * channel, Return dismisses it, and it goes by itself after 15 s. Each one
  * shows once on this TV. The shell mounts it once; `player` lowers it under
  * the player's top bar.

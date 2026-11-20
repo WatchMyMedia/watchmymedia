@@ -11,7 +11,7 @@ import { setFlash, tvHref, useLiveActivity, useLiveMutation, useLiveSettings } f
 import { LoadFailed, Loading, StayCheck } from './Parts'
 
 /**
- * A tuner's name and address (board tv-move): one step with Cancel and Save.
+ * A tuner's name and address: one step with Cancel and Save.
  * Only an address change asks for the password, and the new address has to
  * answer as the same device; a different one is offered as another tuner.
  */

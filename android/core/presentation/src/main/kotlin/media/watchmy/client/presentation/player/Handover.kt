@@ -6,7 +6,7 @@ import media.watchmy.client.model.SubtitleRequestMode
 import media.watchmy.client.model.PlayerUiState
 
 /*
- * A play moving between this phone and a TV (PLAN-CAST.md §5.2): casting
+ * A play moving between this phone and a TV: casting
  * starts while it plays here, or ends while this screen is the TV's remote.
  */
 

@@ -1,7 +1,7 @@
 import UIKit
 import XCTest
 
-/// The iPad's Home one row a screen (PLAN-HOME.md §7.6) on the fakes with
+/// The iPad's Home one row a screen on the fakes with
 /// arranged rows: the hero beside Continue watching, a swipe up to a row's
 /// screen whose panel is the leading card's and follows the row's snap, the
 /// next-row line paging, portrait keeping the screens, the end screen and

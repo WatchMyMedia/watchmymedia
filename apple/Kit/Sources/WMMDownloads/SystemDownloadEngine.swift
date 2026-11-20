@@ -4,7 +4,7 @@ import Foundation
 import Network
 import WMMModel
 
-/// Downloads with the system's background sessions (PLAN-DOWNLOADS.md D3), so
+/// Downloads with the system's background sessions, so
 /// they go on while the app is away: an HLS download is an
 /// `AVAssetDownloadURLSession` task, an original file and the subtitles beside
 /// it `URLSession` download tasks. One download at a time, as on Android.

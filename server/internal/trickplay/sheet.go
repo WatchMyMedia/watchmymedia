@@ -11,8 +11,8 @@ import (
 	"watchmymedia/server/internal/playback"
 )
 
-// sheetArgs is the ffmpeg command line for one sheet (PLAN-TRICKPLAY.md
-// §3.2). Only keyframes are decoded. The input seek lands on the keyframe
+// sheetArgs is the ffmpeg command line for one sheet.
+// Only keyframes are decoded. The input seek lands on the keyframe
 // at or before the sheet's start (-noaccurate_seek keeps it), and fps with
 // round=up makes tile i the last keyframe at or before its time, repeating
 // one where a GOP is longer than the interval. HDR is mapped to SDR as the

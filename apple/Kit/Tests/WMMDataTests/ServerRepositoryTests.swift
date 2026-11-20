@@ -97,7 +97,7 @@ struct ServerRepositoryTests {
         #expect(ContinuousClock.now - start >= Self.probeTimeout)
     }
 
-    /// PLAN-APPLE-REVIEW.md §3.4.3: once discovery has heard that Local
+    /// Once discovery has heard that Local
     /// Network access is off, a server on this network that can't be reached
     /// says why; one elsewhere, or with access allowed again, doesn't.
     @Test func aServerOnThisNetworkSaysWhenLocalNetworkIsOff() async throws {

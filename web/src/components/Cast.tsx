@@ -18,11 +18,11 @@ export function CastIcon({ connected, size = 18 }: { connected?: boolean; size?:
 }
 
 /**
- * The header's Cast button (PLAN-CAST.md §5.1): shown while a Cast device is
+ * The header's Cast button: shown while a Cast device is
  * on the network. It opens Chrome's device picker, or while connected a menu
  * with the TV's name and Stop casting. In the live player (variant player)
  * notLive says the connected TV can't play a channel yet: the menu opens
- * once by itself to say so (the LiveCast board's notLive state).
+ * once by itself to say so.
  */
 export function CastButton({ variant = 'header', notLive = false }: { variant?: 'header' | 'player'; notLive?: boolean }) {
   const cast = useCast()
@@ -114,8 +114,8 @@ export function CastBar() {
 }
 
 /**
- * The casting bar while the TV plays a channel (the LiveCast board's bar
- * view): the channel and what is on, leading back to the live remote. The
+ * The casting bar while the TV plays a channel:
+ * the channel and what is on, leading back to the live remote. The
  * logo and episode line come from this page's channel list; the TV's state
  * carries text only.
  */

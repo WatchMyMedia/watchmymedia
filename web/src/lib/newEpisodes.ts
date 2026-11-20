@@ -3,8 +3,7 @@ import { relativeTime } from './format'
 import { episodePath } from './showPage'
 
 /**
- * New episodes of the shows a person follows (PLAN-NEW-EPISODES.md §6, §7.5;
- * the words are design/proposals/new-episodes/web's): when this browser
+ * New episodes of the shows a person follows: when this browser
  * checks, what a notification and the banner say and where they open, and
  * what the browser keeps for each person: the cursor, the switch and the
  * banner. The server keeps the follows and the arrivals; each browser keeps
@@ -23,18 +22,18 @@ export function canFollow(apiLevel: number | undefined): boolean {
   return (apiLevel ?? 0) >= FOLLOW_API_LEVEL
 }
 
-/** While a tab is open, the check runs this long after the last library.changed (§6.1). */
+/** While a tab is open, the check runs this long after the last library.changed. */
 export const SETTLE_MS = 3 * 60_000
 
-/** More shows than this at once become these and one notification for the rest (§6.2). */
+/** More shows than this at once become these and one notification for the rest. */
 export const MAX_SHOW_NOTICES = 5
 
 /**
- * The check runs only when it has something to do (§6.1): the person
+ * The check runs only when it has something to do: the person
  * follows a show, this browser's switch is on and the page is a secure
  * context (the Web Lock needs one). It doesn't need the browser's
  * permission: a tab in front shows the banner without it, and only a hidden
- * tab's system notifications need it (§7.5).
+ * tab's system notifications need it.
  */
 export function shouldCheck(o: { follows: number; on: boolean; secure: boolean }): boolean {
   return o.follows > 0 && o.on && o.secure
@@ -74,7 +73,7 @@ export type EpisodeNotice = {
 }
 
 /**
- * One show's notice, opening its page at the earliest new episode (§6.2).
+ * One show's notice, opening its page at the earliest new episode.
  * The line is the episode, the first to the last listed, or, when more
  * arrived than the feed lists (it sends the earliest five), "From" the
  * earliest.
@@ -147,7 +146,7 @@ export function followFailLine(failure: Exclude<FollowFailure, 'limit'>, show: s
 }
 
 /**
- * One check (§6.1). Without a cursor, the first call asks without after and
+ * One check. Without a cursor, the first call asks without after and
  * only keeps the cursor: a browser that has just turned notifications on
  * starts from now. Undefined when the server couldn't be reached, so the
  * cursor stays and the next check catches up.
@@ -283,7 +282,7 @@ export function stopFailLine(show: string): string {
 
 /**
  * What Settings › Notifications says about this browser's system
- * notifications (the settings-* boards): allowed; not asked yet; blocked;
+ * notifications: allowed; not asked yet; blocked;
  * a plain http:// address, where nothing shows at all; or a browser with no
  * notifications, which the boards don't draw. The switch is apart from it:
  * on by default, it also governs the banner, which needs no permission.

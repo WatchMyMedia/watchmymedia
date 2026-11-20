@@ -16,7 +16,7 @@ import { ChannelTile, OnNowRow } from './OnNowRow'
 import './live.css'
 
 /**
- * Live TV (LiveHome on the canvas): the On now row with each channel's
+ * Live TV: the On now row with each channel's
  * programme, Full guide, Recordings and Reminders. Without listings, every
  * channel as a tile. The number keys open Go to channel.
  */

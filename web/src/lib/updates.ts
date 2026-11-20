@@ -15,8 +15,8 @@ export function dockerUpdateSteps(host?: string): { text: string; command?: stri
 }
 
 /**
- * How a server installed from the .deb or the .rpm package updates
- * (PLAN-LINUX.md §4): apt or dnf fetches the package, so there is a command
+ * How a server installed from the .deb or the .rpm package updates:
+ * apt or dnf fetches the package, so there is a command
  * and no file, and the line after it says where the repository entry is in
  * case it was turned off. Undefined for every other install.
  */

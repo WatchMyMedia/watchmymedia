@@ -163,7 +163,7 @@ private struct TVLivePlayerContent: View {
                     .padding(.top, 60)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
-            // Page Up and Down's note and Go to channel (TvLiveChannelKeys.dc.html).
+            // Page Up and Down's note and Go to channel.
             if model.overlay == nil { LiveChannelKeysLayer(model: model) }
         }
         .animation(.easeOut(duration: 0.3), value: banner)

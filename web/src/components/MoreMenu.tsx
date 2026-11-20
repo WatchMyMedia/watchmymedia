@@ -57,7 +57,7 @@ const icons = {
 }
 
 /**
- * The ⋯ button and its menu, as on the movie page (design/mockups/web/ReportProblem). Renders nothing without items.
+ * The ⋯ button and its menu, as on the movie page. Renders nothing without items.
  * tall matches the episode page's 44px buttons.
  */
 export function MoreMenu({

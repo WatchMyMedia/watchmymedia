@@ -18,7 +18,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/** The notifications a check posts (PLAN-NEW-EPISODES.md §6.2, §7.3), on Robolectric's NotificationManager. */
+/** The notifications a check posts, on Robolectric's NotificationManager. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
 class NewEpisodeNotifierTest {

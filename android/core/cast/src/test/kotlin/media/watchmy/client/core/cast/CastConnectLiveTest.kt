@@ -41,7 +41,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Cast Connect playing a Live TV channel (PLAN-LIVE-TV.md §4.1, L10d): a
+ * Cast Connect playing a Live TV channel: a
  * synthetic LOAD as a phone sends it, a recording in place of the Cast SDK's
  * receiver, and a live player that records what it is told.
  */

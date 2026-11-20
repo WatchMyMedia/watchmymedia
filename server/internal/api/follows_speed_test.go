@@ -118,8 +118,8 @@ func (p *planner) QueryContext(ctx context.Context, query string, args ...any) (
 }
 
 // TestNewEpisodesSpeed times the feed devices check, the follows list and
-// Home's followed row over the large seeded library, alone and ten at once
-// (PLAN-NEW-EPISODES.md section 5.4), and checks the feed's and the row's
+// Home's followed row over the large seeded library, alone and ten at once,
+// and checks the feed's and the row's
 // plans without statistics: the person's follows, then each one's
 // arrivals from (tmdb_id, id), and an episode row by show TMDB id, season
 // and number, never a scan of all arrivals, shows or episodes.

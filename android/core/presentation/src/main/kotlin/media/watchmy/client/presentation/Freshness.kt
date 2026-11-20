@@ -16,7 +16,7 @@ interface ShownPage {
 }
 
 /**
- * When a page reloads for server changes (PLAN-ANDROID-REVIEW.md §4.1.2): a
+ * When a page reloads for server changes: a
  * change that touches the page reloads it at once while it is shown, and
  * marks it stale while it isn't, so it reloads once when it is next shown.
  * Pausing one episode used to reload every page in the back stack. A page

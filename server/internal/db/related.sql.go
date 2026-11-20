@@ -111,7 +111,7 @@ const deleteMovieTags = `-- name: DeleteMovieTags :exec
 DELETE FROM movie_tags WHERE movie_id = ?
 `
 
-// Related titles at the end of movie and show pages (PLAN-RELATED.md).
+// Related titles at the end of movie and show pages.
 // Tags are what a title is like; internal/related writes them and works
 // out the rows from them.
 func (q *Queries) DeleteMovieTags(ctx context.Context, movieID int64) error {

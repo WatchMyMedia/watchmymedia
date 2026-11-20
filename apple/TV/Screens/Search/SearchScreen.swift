@@ -3,14 +3,14 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Search (TvSearch.dc.html): the tvOS search field and keyboard (Siri
+/// Search: the tvOS search field and keyboard (Siri
 /// dictation works on the field), then TV Shows and Movies as posters and
 /// Episodes as 16:9 cards; "Search your libraries" before anything is typed
 /// and "No matches" after. An episode opens its show with its row expanded.
-/// From API level 5 (TvSearchRequest.dc.html), a Not in your library row
+/// From API level 5, a Not in your library row
 /// follows, each poster with Request, Requested or Downloading; Request
-/// opens the full-screen request dialog. From API level 15 with listings
-/// (TvLiveSearch.dc.html), On Live TV follows the library's rows.
+/// opens the full-screen request dialog. From API level 15 with listings,
+/// On Live TV follows the library's rows.
 struct SearchScreen: View {
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
@@ -174,7 +174,7 @@ private struct SearchView: View {
     }
 }
 
-/// A not-in-library poster (TvSearchRequest.dc.html's card): the poster, the
+/// A not-in-library poster: the poster, the
 /// title and line, and its pill.
 private struct RequestCard: View {
     let item: Requestable

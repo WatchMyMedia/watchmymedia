@@ -252,7 +252,7 @@ func serve() error {
 	relatedJob := related.New(queries, tmdbClient, log)
 	go relatedJob.Run(ctx)
 	// Lists that rows come from are fetched again in the background, from
-	// TMDB and, with the admin's key, MDBList (PLAN-ROWS.md 7.2).
+	// TMDB and, with the admin's key, MDBList.
 	mdbKey, _ := store.Get(ctx, settings.KeyListsMDBListKey, "")
 	listService := lists.New(lists.Options{Queries: queries, Conn: conn, TMDB: tmdbClient, MDBList: lists.NewMDBList(mdbKey, lists.MDBListOptions{}),
 		Bus: bus, Log: log, Disabled: !cfg.Lists.Enabled, Changed: api.ListsChangedPublisher(bus)})

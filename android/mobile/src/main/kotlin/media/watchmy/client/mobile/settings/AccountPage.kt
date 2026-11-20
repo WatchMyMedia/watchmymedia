@@ -60,8 +60,7 @@ import media.watchmy.client.ui.components.rememberSheen
 import media.watchmy.client.ui.components.skeletonLine
 
 /**
- * Settings › Account & devices (PLAN-ANDROID-SETTINGS.md §5.3, the
- * SettingsAccount and SettingsConfirm boards), in the web's order: who and
+ * Settings › Account & devices, in the web's order: who and
  * where, Change password, this device's name, the signed-in devices, Link a
  * TV, the server, and signing out apart at the bottom. Signing a device or
  * this one out asks first. What was just done shows as a card at the top
@@ -236,7 +235,7 @@ internal fun AccountPage(
     }
 }
 
-/** Sign out another device? (§4.6): working while it goes, closed once the list has dropped it, or failed with Try again. */
+/** "Sign out another device?": working while it goes, closed once the list has dropped it, or failed with Try again. */
 @Composable
 private fun RevokeDialog(state: SettingsViewModel.State, id: String, name: String, onRevoke: (DeviceSession) -> Unit, onKeep: () -> Unit, onClose: () -> Unit) {
     val session = (state.sessions as? Load.Ready)?.data?.firstOrNull { it.id == id }
@@ -277,7 +276,7 @@ private fun DeviceRow(d: DeviceSession, device: String, revoking: Boolean, onSig
     )
 }
 
-/** The devices list while it loads: its rows' shapes in their places (§5.3). */
+/** The devices list while it loads: its rows' shapes in their places. */
 @Composable
 private fun DevicePlaceholders() {
     val sheen = rememberSheen(1_600)

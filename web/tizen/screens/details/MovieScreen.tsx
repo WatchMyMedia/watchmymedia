@@ -28,8 +28,8 @@ let planProfile: ReturnType<typeof samsungProfile> | undefined
 const profile = () => (planProfile ??= samsungProfile({ hdr10: tvTakesHdr10() }))
 
 /**
- * A movie (Movie and MovieRelated on the Samsung TV canvas; the Android TV
- * app's MovieScreen): the header with Resume or Play, Play from start,
+ * A movie (the Android TV app's MovieScreen):
+ * the header with Resume or Play, Play from start,
  * Trailer, Mark watched and More › Report a problem; the versions, each with
  * Play this and how it would play here, beside the focused version's tracks
  * and the cast; then the movie's collection and More like this. Return

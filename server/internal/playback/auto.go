@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Automatic quality (PLAN-AUTO-QUALITY.md): a play asks for quality "auto",
+// Automatic quality: a play asks for quality "auto",
 // the server picks the step it starts at, and heartbeats feed NextStep,
 // which says when the connection cannot keep up and which step to drop to.
 // Existing clients only step down within a play. A separately negotiated
@@ -170,7 +170,7 @@ type StepChange struct {
 	Server bool
 }
 
-// The policy's timings and thresholds (PLAN-AUTO-QUALITY.md §4.2).
+// The policy's timings and thresholds.
 const (
 	autoSmoothing       = 20 * time.Second
 	autoSlowStart       = 8 * time.Second

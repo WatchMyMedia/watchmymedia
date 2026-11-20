@@ -15,7 +15,7 @@ const crumbs = settingsCrumbs('users', { label: 'Add a person' })
 const stepHref = (key: string) => settingsHref('users', 'add', key)
 
 /**
- * Add a person (§5.5): Name and role → Password → Added. Name and role are
+ * Add a person: Name and role → Password → Added. Name and role are
  * only collected; Password adds them. A role can't be changed later, so it
  * is a choice with what it means, and Admin makes Password ask for the
  * password away from home. There are no invites, so Added says what to tell them.

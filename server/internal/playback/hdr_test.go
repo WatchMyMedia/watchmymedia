@@ -14,9 +14,9 @@ import (
 	"watchmymedia/server/internal/probe/probetest"
 )
 
-// Sources for the HDR and Dolby Vision decisions (PLAN-HDR-PROFILE.md §8).
+// Sources for the HDR and Dolby Vision decisions.
 // dvNew streams were probed with the record's base layer and level;
-// dvOld ones before (decision 10).
+// dvOld ones before.
 func hdrSource(codec, hdr string) probe.VideoStream {
 	return probe.VideoStream{Codec: codec, Profile: "Main 10", Width: 1920, Height: 1080, FrameRate: 24, BitDepth: 10, HDR: hdr, Detailed: true}
 }
@@ -179,7 +179,7 @@ func TestDolbyVision7KeptOnlyInDirectPlay(t *testing.T) {
 }
 
 // A transcode keeps HDR only for a screen that shows its kind, and never
-// for profile 5, which goes to SDR (PLAN-HDR-PROFILE.md §9 has HDR10).
+// for profile 5, which goes to SDR.
 func TestTranscodeKeepsOnlyHDRTheScreenShows(t *testing.T) {
 	t.Parallel()
 	vt := Capabilities{Encoder: "h264_videotoolbox", HEVCEncoder: "hevc_videotoolbox", HWAccel: "videotoolbox", MaxHeight: 2160, DoviToneMap: true}

@@ -6,8 +6,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Link a TV (Settings2LinkTvCode, Settings2LinkTvCheck, Settings2LinkTvDone,
-/// Pad2Settings2LinkTv; PLAN-APPLE-SETTINGS.md §5.5): the web's three steps
+/// Link a TV: the web's three steps
 /// in a sheet: Enter the code, Check it's yours, Linked. The first button is
 /// off until six characters are in and says so; the second names the TV;
 /// the last screen has no way back, since the TV is signed in, and Done

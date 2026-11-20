@@ -13,7 +13,7 @@ import (
 	"watchmymedia/server/internal/playback"
 )
 
-// The I-frame track (PLAN-TRICKPLAY.md §7.3, T4): a version's tiles
+// The I-frame track: a version's tiles
 // encoded once as a small all-intra H.264 MP4, one frame per tile, which
 // VOD master playlists offer as an I-frame stream so that
 // AVPlayerViewController's transport bar (the Apple TV app's) draws them.

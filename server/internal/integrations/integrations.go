@@ -1,5 +1,5 @@
-// Package integrations connects the server to Radarr, Sonarr and Seerr
-// (PLAN-ARR.md): the connections and their path mappings, an index of what
+// Package integrations connects the server to Radarr, Sonarr and Seerr:
+// the connections and their path mappings, an index of what
 // each app has, and the apps' webhooks, which make the server scan what they
 // changed at once.
 package integrations
@@ -40,7 +40,7 @@ type Scanner interface {
 	RequestPaths(libraryID int64, paths []string)
 }
 
-// Target is where requests for a library go in an app (§7.2).
+// Target is where requests for a library go in an app.
 type Target struct {
 	LibraryID        int64  `json:"libraryId"`
 	RootFolder       string `json:"rootFolder" maxLength:"1024" doc:"One of the app's root folders, as the app sees it."`
@@ -601,7 +601,7 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-// supported refuses versions older than PLAN-ARR.md §1 supports.
+// supported refuses versions older than it supports.
 func supported(kind arr.Kind, version string) error {
 	major, minor, patch := versionParts(version)
 	switch kind {

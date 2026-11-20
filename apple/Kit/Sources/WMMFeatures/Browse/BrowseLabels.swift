@@ -114,7 +114,7 @@ extension HomeData {
     }
 
     /// On iPad, Continue watching sits beside the hero only while it is the
-    /// first row drawn (PLAN-ROWS.md Decision 3).
+    /// first row drawn.
     public func continueBesideHero(liveTV: Bool) -> [ContinueItem]? {
         guard hero != nil, let first = drawnRows(liveTV: liveTV).first, first.style == .continue else { return nil }
         return first.continueItems
@@ -200,7 +200,7 @@ extension BrowseItem {
 
 extension SeasonDetail {
     /// "On disk 4 of 7 · 16.8 GB", beside the season chips on iPad
-    /// (PadShow.dc.html) and the season strip on Apple TV: how many of the season's episodes have a file, and
+    /// and the season strip on Apple TV: how many of the season's episodes have a file, and
     /// the size of those files.
     public var diskLine: String {
         let bytes = episodes.reduce(Int64(0)) { sum, episode in sum + episode.versions.reduce(0) { $0 + $1.sizeBytes } }
@@ -416,7 +416,7 @@ public func unmatchedCount(_ n: Int) -> String? {
     n > 0 ? "\(formatCount(n)) not matched yet" : nil
 }
 
-// MARK: Home's rows and cards, as both apps word them (PLAN-APPLE-REVIEW.md §5.8)
+// MARK: Home's rows and cards, as both apps word them
 
 public let continueWatchingTitle = "Continue watching"
 public let recentlyAddedTitle = "Recently added"

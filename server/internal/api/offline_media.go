@@ -22,7 +22,7 @@ import (
 	"watchmymedia/server/internal/playback"
 )
 
-// The offline routes' media (PLAN-DOWNLOADS.md §3): the original file with
+// The offline routes' media: the original file with
 // Range for a direct download, a download session's HLS for the rest, and
 // the subtitles beside them. Each fetch is checked against its record and
 // counted as the download's transfer, never as a play.
@@ -271,7 +271,7 @@ func offlineHLSError(w http.ResponseWriter, r *http.Request, deps Deps, id strin
 // serveOfflineHLS serves a transcoding download's session: its playlists,
 // init segment and segments, made again from the record when the session
 // is gone. A remade session's init segment that differs from the first
-// one's means the device must start over (PLAN-DOWNLOADS.md §3.3).
+// one's means the device must start over.
 func serveOfflineHLS(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := chi.URLParam(r, "name")

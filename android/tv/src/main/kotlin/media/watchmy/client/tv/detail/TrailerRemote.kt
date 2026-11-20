@@ -4,9 +4,9 @@ import media.watchmy.client.ui.PlayerKey
 import media.watchmy.client.ui.playerKey
 
 /**
- * What a remote key does on the TV's trailer screen: PLAN-TV-TRAILERS.md
- * §4.3's table, through YouTube's IFrame API ([trailerScript]). TV0 found
- * that YouTube's keyboard controls do nothing in the embedded player, on a
+ * What a remote key does on the TV's trailer screen,
+ * through YouTube's IFrame API ([trailerScript]). YouTube's
+ * keyboard controls do nothing in the embedded player, on a
  * Google TV Streamer as on an emulator, so the API is the only way. While
  * a trailer is paused, the screen's own pause screen takes the player's
  * place, and Select and Play show the player again before it plays.

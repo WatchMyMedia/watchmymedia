@@ -1,7 +1,7 @@
 import XCTest
 
-/// A signed-in launch of the Apple TV app on the fakes, five runs
-/// (PLAN-APPLE-REVIEW.md §4.3.1): `make apple-perf`. Skipped unless
+/// A signed-in launch of the Apple TV app on the fakes, five runs:
+/// `make apple-perf`. Skipped unless
 /// `WMM_PERF=1` (the make target sets it), so `make apple-tv-test-sim` and CI
 /// don't run it. The fakes are debug-only, so this measures a Debug build:
 /// compare numbers with each other on the same Mac, not with a release.

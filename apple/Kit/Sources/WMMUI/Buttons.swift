@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The burgundy primary button: full width by default, 50 pt tall. Its text
 /// and height follow the system's text size, so it looks exactly so at the
-/// default size and grows with the text (PLAN-APPLE-REVIEW.md §2.8).
+/// default size and grows with the text.
 public struct PrimaryButtonStyle: ButtonStyle {
     var height: CGFloat
     var fullWidth: Bool

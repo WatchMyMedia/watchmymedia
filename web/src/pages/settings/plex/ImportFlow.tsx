@@ -43,7 +43,7 @@ import { importKey, NO_IMPORT, plexCrumbs, plexHref, setAsideCheck, useClock, us
 
 /**
  * Check and import: Check → What will change → Choose how → Import →
- * Imported (§5.1). Opening the task starts a check; once an import exists
+ * Imported. Opening the task starts a check; once an import exists
  * there is no Back, and a stopped one stays on Import with Retry.
  * `run` (the address after the step) names a stopped import to show.
  */
@@ -102,7 +102,7 @@ function Import({ connection, step, runParam }: { connection: PlexConnection; st
     check()
     go(plexHref('import', 'check'))
   }
-  // Starting the flow starts the check (board plex-import-1).
+  // Starting the flow starts the check.
   const started = useRef(false)
   useEffect(() => {
     if (waiting || started.current || current !== 'check' || kept.previewId || kept.runId) return

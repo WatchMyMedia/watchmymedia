@@ -99,7 +99,7 @@ class PlaybackGatewayTest {
         assertEquals("off", h.body(server.last("POST /api/files/4/playback"))["subtitleMode"]!!.jsonPrimitive.content)
     }
 
-    /** A box on a Dolby Vision TV (PLAN-HDR-PROFILE.md §2). */
+    /** A box on a Dolby Vision TV. */
     private val dolbyVisionTv = profile.copy(videoCodecs = listOf("h264", "hevc", "hevc10", "dovi5", "dovi8"), hdr = true, hdrTypes = listOf("hdr10", "hlg", "dovi"))
 
     private fun sentProfile(route: String) = h.body(server.last(route))["profile"]!!.jsonObject
@@ -139,7 +139,7 @@ class PlaybackGatewayTest {
         assertEquals(listOf("h264", "hevc", "hevc10"), planned.strings("videoCodecs"))
     }
 
-    /** A box on a soundbar over ARC: E-AC-3 with eight channels, PCM with two (PLAN-AUDIO.md §3.5). */
+    /** A box on a soundbar over ARC: E-AC-3 with eight channels, PCM with two. */
     private val soundbar = profile.copy(audioCodecs = listOf("aac", "pcm", "eac3"), maxAudioChannels = 8, maxPcmChannels = 2)
 
     @Test

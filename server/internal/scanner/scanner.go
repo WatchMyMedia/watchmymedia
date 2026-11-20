@@ -794,7 +794,7 @@ func (s *Scanner) keepMovedDates(ctx context.Context, libraryID int64, added []d
 
 // probeOutdated reports whether an unchanged file's stored probe lacks
 // something the prober now reads: Dolby Vision files probed before the
-// profile, or the record's base layer and level (PLAN-HDR-PROFILE.md), were
+// profile, or the record's base layer and level, were
 // kept are probed again once. Playback treats them safely meanwhile.
 func probeOutdated(k known) bool {
 	return k.Hdr == "dolbyvision" && (k.DvProfile == nil || k.DvOutdated == 1)

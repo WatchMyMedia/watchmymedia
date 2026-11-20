@@ -24,7 +24,7 @@ const (
 	listRowPrefix  = "list:"
 )
 
-// Built-in row IDs (PLAN-ROWS.md 6.1).
+// Built-in row IDs.
 const (
 	rowContinue            = "continue"
 	rowFollowed            = "followed"
@@ -239,7 +239,7 @@ func liveRowAvailable(ctx context.Context, deps Deps, user *auth.User) bool {
 	return deps.LiveTV.Allowed(ctx, user.IsAdmin)
 }
 
-// mergeRows places a screen's rows (PLAN-ROWS.md 7.1). It starts from base,
+// mergeRows places a screen's rows. It starts from base,
 // the saved order (nil for none: the built-in order), and drops IDs the
 // screen doesn't have. A built-in row base leaves out goes right after the
 // nearest row before it in defaults, the effective default order, or
@@ -420,8 +420,8 @@ func checkPlacements(c screenCat, rows []RowPlacement) error {
 // hidden, something to show (for lists; built-in rows are assumed to have
 // some, as filling them is the screen's work) and within the screen's 30
 // rows. New from shows you follow doesn't count toward the 30: it is empty
-// for everyone who follows nothing, and must not push their 30th row out
-// (PLAN-NEW-EPISODES.md section 5.5), so Home draws at most 31.
+// for everyone who follows nothing, and must not push their 30th row out,
+// so Home draws at most 31.
 func layoutEntries(rows []placedRow, counts map[int64]listCounts) []RowLayoutEntry {
 	out := make([]RowLayoutEntry, 0, len(rows))
 	drawn := 0

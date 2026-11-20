@@ -148,7 +148,7 @@ type CastMember struct {
 type Credits struct {
 	Cast []CastMember `json:"cast"`
 	// Crew is everyone behind the camera; related titles keep only the
-	// directors (PLAN-RELATED.md §4).
+	// directors.
 	Crew []CrewMember `json:"crew"`
 }
 
@@ -212,7 +212,7 @@ type Movie struct {
 	Credits       Credits      `json:"credits"`
 	ReleaseDates  ReleaseDates `json:"release_dates"`
 	// The collection, original language, keywords and recommendations are
-	// what related titles are worked out from (PLAN-RELATED.md §4).
+	// what related titles are worked out from.
 	Collection       *CollectionRef `json:"belongs_to_collection"`
 	OriginalLanguage string         `json:"original_language"`
 	Keywords         struct {
@@ -342,7 +342,7 @@ type TVShow struct {
 	Credits         Credits         `json:"credits"`
 	ContentRatings  ContentRatings  `json:"content_ratings"`
 	// The creators, original language, keywords and recommendations are
-	// what related titles are worked out from (PLAN-RELATED.md §4).
+	// what related titles are worked out from.
 	CreatedBy        []Person `json:"created_by"`
 	OriginalLanguage string   `json:"original_language"`
 	Keywords         struct {

@@ -24,8 +24,8 @@ export type GridProps<T> = {
 }
 
 /**
- * A grid card's size, the boards' 190 × 285 poster (LibraryAZ, ListPage,
- * Search): eight across with the gaps come to 105.5rem, inside the content
+ * A grid card's size, the boards' 190 × 285 poster:
+ * eight across with the gaps come to 105.5rem, inside the content
  * area's 106.75rem from the rail to the right gutter. A screen narrows them
  * with `--grid-poster-w` on a parent (beside the A–Z strip). Wide cards
  * keep the rows' size; five fit.

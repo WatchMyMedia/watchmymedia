@@ -1,8 +1,8 @@
 package media.watchmy.client.model
 
 /**
- * The server level that lists a movie's trailers on getMovie
- * (PLAN-TRAILERS.md §5.3). Older servers send none, so their movies show no
+ * The server level that lists a movie's trailers on getMovie.
+ * Older servers send none, so their movies show no
  * Trailer button.
  */
 const val TRAILERS_API_LEVEL = 20
@@ -56,7 +56,7 @@ fun MovieDetail.youTubeTrailers(first: Trailer.YouTube): List<Trailer.YouTube> {
 fun MovieDetail.trailerRequest(trailer: Trailer.File): PlayRequest =
     PlayRequest(trailer.fileId, startMs = 0, title = title, subtitle = trailer.name, backdropPath = backdropPath)
 
-/** Trailers' wording, the same in the Apple apps (PLAN-TRAILERS.md §6). */
+/** Trailers' wording, the same in the Apple apps. */
 object TrailerText {
     const val BUTTON = "Trailer"
 

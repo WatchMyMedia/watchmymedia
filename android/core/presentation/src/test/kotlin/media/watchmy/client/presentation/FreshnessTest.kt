@@ -14,7 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/** Pages reload for their own changes, at once while shown and once when next shown (PLAN-ANDROID-REVIEW.md §4.1.2). */
+/** Pages reload for their own changes, at once while shown and once when next shown. */
 class FreshnessTest {
     @get:Rule val main = MainDispatcherRule(UnconfinedTestDispatcher())
 

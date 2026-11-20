@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Name this Apple TV (TvSettings2Rename.dc.html): room names to choose
+/// Name this Apple TV: room names to choose
 /// from (`SettingsModel.roomNames`, this one's first), so most people never
 /// type with the remote, and Type another name for the rest. Select on a
 /// name saves it; Menu goes back and keeps the name it had.
@@ -120,7 +120,7 @@ struct TVScanCodeScreen: View {
     }
 }
 
-/// Add a language (TvSettings2AddLanguage.dc.html, `LanguagePicker`): every
+/// Add a language (`LanguagePicker`): every
 /// language by name in a grid, A to Z, the ones already in the list marked
 /// Added and the device's own first. Search languages above it takes the
 /// keyboard or the microphone. Select adds one to the end of the list, which

@@ -18,7 +18,7 @@ import media.watchmy.client.model.attempt
 import media.watchmy.client.model.errorMessage
 
 /**
- * The person's reminders (PLAN-LIVE-TV-GUIDE.md §6.5): the Reminders list
+ * The person's reminders: the Reminders list
  * on the phone, the tablet's panel and the TV, its Remove, and the lead time
  * Settings picks, which is the same on all their devices. Below
  * [LIVE_PERSONAL_API_LEVEL] it is unavailable and asks nothing.

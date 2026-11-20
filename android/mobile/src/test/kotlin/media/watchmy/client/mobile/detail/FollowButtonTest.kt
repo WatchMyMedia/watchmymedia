@@ -22,8 +22,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Notify me on the phone's show page (PLAN-NEW-EPISODES.md §7.1; the boards'
- * `bell` and `explainer`), on the fakes, where Sam follows Harbor Lights:
+ * Notify me on the phone's show page,
+ * on the fakes, where Sam follows Harbor Lights:
  * the bell's name carries its state, and the first Notify me on Android 13
  * and later explains before Android asks, keeping the follow on Not now.
  */

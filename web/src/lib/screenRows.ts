@@ -4,7 +4,7 @@ import { itemFilter, itemSort, sortOptions } from './browseOptions'
 import type { BrowseSearch } from './routeSearch'
 
 // Home and a library's Overview drawn from the server's rows, in the
-// person's order (PLAN-ROWS.md §6.1). Styles, link kinds and source kinds
+// person's order. Styles, link kinds and source kinds
 // are plain strings: what the web doesn't know, it skips.
 
 export type ScreenRow = components['schemas']['ScreenRow']
@@ -77,10 +77,10 @@ export function libraryRows(r: LibraryRows, type: 'movie' | 'tv'): ScreenRow[] {
 }
 
 /**
- * The rows a movie's or a show's page ends with (PLAN-RELATED.md §7): the
+ * The rows a movie's or a show's page ends with: the
  * collection, then More like this, as the server sends them, those the web
  * can draw. None before the reply arrives or when it failed, and never a
- * See all (§3.7), so the page ends as it did.
+ * See all, so the page ends as it did.
  */
 export function relatedRows(reply: RelatedRows | undefined): ScreenRow[] {
   return (reply?.rows ?? []).filter(drawable).map((row) => ({ ...row, seeAll: undefined }))
@@ -104,7 +104,7 @@ export function titleParts(row: Pick<ScreenRow, 'id' | 'title'>): [string, strin
 /**
  * The plain end of the line under a poster in a built-in row: when it was
  * added, or released. A Recently added show card's "S03E07" or "Season 1"
- * comes before it as links (`cardLinks.ts`, PLAN-HOME.md §6.1).
+ * comes before it as links (`cardLinks.ts`).
  */
 export function posterSubtitle(row: Pick<ScreenRow, 'id'>, item: BrowseItem): string | undefined {
   const added = row.id === 'recentlyAddedShows' || row.id === 'recentlyAddedMovies' || row.id === 'recentlyAdded'
@@ -177,7 +177,7 @@ export function seeAllTarget(row: Pick<ScreenRow, 'seeAll' | 'listId' | 'items'>
 export type SeeAllWords = { title: string; detail?: string; label: string }
 
 /**
- * What a row's See all says (PLAN-SEE-ALL.md §4.4), on its card and, as
+ * What a row's See all says, on its card and, as
  * `label`, to a screen reader from the card and the heading's link alike. A
  * library's grid is "See all TV shows" over "By last aired", the sort in the
  * grid's own words so the two can't drift, and no second line without a

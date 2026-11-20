@@ -11,7 +11,7 @@ export type Thumbnail = {
 }
 
 /**
- * The seek thumbnails of a decision's manifest (PLAN-TRICKPLAY.md): which
+ * The seek thumbnails of a decision's manifest: which
  * tile shows a time, and its sheet, fetched by the shared SheetLoader. The
  * sheets go through the TV's media URLs, signed when they are asked for.
  */

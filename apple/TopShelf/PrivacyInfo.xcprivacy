@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  The Top Shelf extension's privacy manifest (PLAN-APPLE-REVIEW.md §3.4.1, §6.2).
+  The Top Shelf extension's privacy manifest.
   No tracking and no data collected. It reads the snapshot and picture files the
   app wrote into the App Group (Kit/Sources/WMMTopShelf) and nothing else: no
   UserDefaults, no file dates, no disk space, no system uptime, so no

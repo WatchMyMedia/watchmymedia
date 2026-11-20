@@ -3,7 +3,7 @@ import Testing
 @testable import WMMFeatures
 import WMMModel
 
-/// The lifecycle both players' models share (PLAN-APPLE-REVIEW.md §5.2), on a spy.
+/// The lifecycle both players' models share, on a spy.
 @MainActor
 @Suite struct PlayerSessionTests {
     private let spy = SpyPlaybackController()

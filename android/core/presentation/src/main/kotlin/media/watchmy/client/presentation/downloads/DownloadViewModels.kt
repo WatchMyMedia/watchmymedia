@@ -23,8 +23,7 @@ import media.watchmy.client.model.forFile
 import media.watchmy.client.presentation.Load
 
 /**
- * One movie's or episode's download (MovieDownload.dc.html,
- * EpisodePageDownload.dc.html, DownloadSheet.dc.html, DownloadMenu.dc.html):
+ * One movie's or episode's download:
  * the button's state, the sheet's qualities with their sizes and the space
  * free, and what the menu does. [fileId] is the version the page plays
  * first, the one a new download is of; null when there is no file. A
@@ -117,7 +116,7 @@ class ItemDownloadViewModel(
 }
 
 /**
- * Everything downloaded here (Downloads.dc.html, TabDownloads.dc.html, the
+ * Everything downloaded here (Downloads, the
  * offline Home and Settings › Downloads): movies, and shows with their
  * episodes, the space they take, the download settings, and Download season.
  */
@@ -187,7 +186,7 @@ class DownloadsViewModel(private val downloads: DownloadRepository) : ViewModel(
     fun setWifiOnly(wifiOnly: Boolean) = downloads.setWifiOnly(wifiOnly)
 
     /**
-     * Download season (ShowDownloadSeason.dc.html): every one of [fileIds]
+     * Download season: every one of [fileIds]
      * not downloaded yet, at the Settings quality, in order. Says
      * [startedMessage] once they're made, or why one failed.
      */

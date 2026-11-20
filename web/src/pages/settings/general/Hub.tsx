@@ -17,7 +17,7 @@ import { clearNotice, peekNotice } from './notice'
 
 type Settings = components['schemas']['Settings']
 
-/** Settings › Server › General: Add a TMDB key is the Next step when there is none (board gen-hub). */
+/** Settings › Server › General: Add a TMDB key is the Next step when there is none. */
 export function GeneralHub() {
   const settings = useQuery(settingsQuery)
   const health = useQuery(healthQuery)

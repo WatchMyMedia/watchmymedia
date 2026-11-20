@@ -5,7 +5,7 @@ import WMMModel
 @testable import WMMFeatures
 
 /// Which channel Ch−, Ch+ and Page Up and Down go to, and Go to channel's
-/// keypad (TvLiveChannelKeys.dc.html).
+/// keypad.
 @MainActor
 @Suite struct LiveChannelKeysTests {
     private let channels: [LiveChannel] = [

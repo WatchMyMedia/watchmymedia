@@ -3,7 +3,7 @@ import Testing
 @testable import WMMData
 import WMMModel
 
-/// Change password goes to PUT /api/auth/password (PLAN-APPLE-SETTINGS.md §8).
+/// Change password goes to PUT /api/auth/password.
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct ChangePasswordRepositoryTests {

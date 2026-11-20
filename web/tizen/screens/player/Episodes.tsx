@@ -15,7 +15,7 @@ import { useSelect } from './select'
 
 type Episode = components['schemas']['Episode']
 
-// PlayerEpisodes: the season tabs (focusing one shows it at once) and the
+// Episodes: the season tabs (focusing one shows it at once) and the
 // season's episodes with their stills. OK plays one as a new play; OK on
 // the one playing goes back to the video where it is.
 

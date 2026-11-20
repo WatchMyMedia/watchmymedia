@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.sp
 import media.watchmy.client.model.RecordingGlyph
 import media.watchmy.client.model.RecordingMark
 
-/** The Live tag's red, for a programme that will record or is recording (PLAN-LIVE-TV-DVR.md §3.1, Colours). */
+/** The Live tag's red, for a programme that will record or is recording. */
 private val RecordRed = Color(0xFFF04438)
 private val RecTag = Color(0xFFB42318)
 

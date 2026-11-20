@@ -2,9 +2,9 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Search (Search.dc.html): the server's search by title, a moment after
+/// Search: the server's search by title, a moment after
 /// typing stops, with results grouped as TV Shows, Movies and Episodes.
-/// From API level 5, for someone who may request (SearchRequest.dc.html),
+/// From API level 5, for someone who may request,
 /// TMDB's matches that are not in the library follow as Not in your
 /// library, fetched beside the library's results and never holding them up;
 /// one opens the request sheet.
@@ -25,8 +25,8 @@ public final class SearchModel {
 
     public private(set) var query = ""
     /// Successful queries, newest first, kept between launches for this
-    /// account on this server when the model has a ``RecentSearches``
-    /// (PLAN-APPLE-REVIEW.md §6.3); without one, for this model only.
+    /// account on this server when the model has a ``RecentSearches``;
+    /// without one, for this model only.
     public private(set) var recentQueries: [String] = [] {
         didSet { if recentQueries != oldValue { recents?.save(recentQueries) } }
     }

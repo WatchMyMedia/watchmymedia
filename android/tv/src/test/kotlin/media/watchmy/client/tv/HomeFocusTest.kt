@@ -31,7 +31,7 @@ import org.robolectric.annotation.Config
 /**
  * Moving around the TV app with the D-pad, on the fakes at a 1080p TV's
  * size: the rail hands focus back to where it was, Home's screens page on
- * ▲ ▼ and restore each row's card (PLAN-HOME.md §7.3), a key pressed
+ * ▲ ▼ and restore each row's card, a key pressed
  * while a screen slides in acts on the row arriving, and Back from a page
  * puts focus back on the card that opened it.
  */

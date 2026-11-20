@@ -1,7 +1,7 @@
 import Foundation
 import WMMModel
 
-// A row's See all (PLAN-SEE-ALL.md §3, §4.4): the card at the end of a row
+// A row's See all: the card at the end of a row
 // and the link in its heading say the same, and are worded here so the
 // iPhone, iPad and Apple TV apps read alike, as Android's seeAllWords does.
 
@@ -54,7 +54,7 @@ public struct SeeAllWords: Hashable, Sendable {
     /// The words for `row`'s See all, where `libraryType` is the type of the
     /// library its link names (nil when the screen doesn't know it). Nil when
     /// the row has no link, when the link's library isn't known, and for
-    /// Continue watching and Live TV, which have no See all (decision 4).
+    /// Continue watching and Live TV, which have no See all.
     public init?(row: ScreenRow, libraryType: LibraryType?) {
         guard row.style != .continue, row.style != .live, let link = row.seeAll else { return nil }
         switch link {
@@ -66,8 +66,8 @@ public struct SeeAllWords: Hashable, Sendable {
         }
     }
 
-    /// The second line on Apple TV's See all card (PLAN-SEE-ALL.md S5), which
-    /// keeps the list card's look (TvLibraryRows.dc.html): a list's whole
+    /// The second line on Apple TV's See all card, which
+    /// keeps the list card's look: a list's whole
     /// count, "50", as that card has always said; a library's sort, "By last
     /// aired". Nil when there is neither. VoiceOver reads ``accessibilityLabel``.
     public func tvCardLine(listTotal: Int?) -> String? {
@@ -85,8 +85,8 @@ public struct SeeAllWords: Hashable, Sendable {
 
 extension RowPanel {
     /// The row's leading card once a swipe settles on `key`, where `current`
-    /// was the leading one. The See all card never leads (PLAN-SEE-ALL.md
-    /// §11.3): ``panel(for:card:)`` would take its key for the row's first
+    /// was the leading one. The See all card never leads:
+    /// ``panel(for:card:)`` would take its key for the row's first
     /// card, so the panel would jump back to the start of the row. The panel
     /// stays on the card it was on.
     public static func leadingCard(settledOn key: String?, was current: String?) -> String? {
@@ -105,7 +105,7 @@ extension ScreenRow {
 extension HomeData {
     /// The type of the library `id` names: Home's TV or movie library, or nil
     /// for one Home doesn't know (a Home that mixes two libraries of a type
-    /// gets no link for those rows from the server, decision 6).
+    /// gets no link for those rows from the server).
     public func libraryType(_ id: Int) -> LibraryType? {
         if id == tvLibraryID { return .tv }
         if id == movieLibraryID { return .movie }

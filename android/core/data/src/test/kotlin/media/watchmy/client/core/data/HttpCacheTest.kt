@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * The API client's HTTP cache (PLAN-ANDROID-REVIEW.md §4.1.1): a quiet reload
+ * The API client's HTTP cache: a quiet reload
  * gets a 304, and a reply kept for one account is never what another sees
  * unless the server says theirs is the same.
  */

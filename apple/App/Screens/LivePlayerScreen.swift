@@ -11,7 +11,7 @@ import WMMUI
 /// A dedicated live surface: no file scrubber, progress or next episode.
 /// It is drawn inside the players' shell (``PlayerShell``), so its controls
 /// hide by themselves as the film player's do and the status bar and home
-/// indicator stay off the picture (PLAN-APPLE-REVIEW.md §3.3.1, §5.3).
+/// indicator stay off the picture.
 struct LivePlayerScreen: View {
     let request: LivePlayRequest
     @Environment(AppServices.self) private var services
@@ -57,7 +57,7 @@ private struct LivePlayerContent: View {
     /// The takeover warning OK'd, by its recording.
     @State private var dismissedTakeover: String?
     @State private var takeoverError: String?
-    /// Half open on a table or like a book, until Use the whole screen (PLAN-IPHONE-DUO.md §5).
+    /// Half open on a table or like a book, until Use the whole screen.
     @State private var fold = PlayerFold(hasBook: true)
 
     private var state: LivePlayerState { model.state }

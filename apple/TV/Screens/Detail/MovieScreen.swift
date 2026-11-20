@@ -4,12 +4,12 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// A movie (TvMovie.dc.html): the poster, facts and tags; Resume (with how
-/// far it was watched) or Play, Play from start, Trailer (TvMovieTrailer.dc.html)
+/// A movie: the poster, facts and tags; Resume (with how
+/// far it was watched) or Play, Play from start, Trailer
 /// and Mark watched; each version with how it would play on this Apple TV
 /// and Play this; the tracks of the version in focus, and the cast. Below the
-/// first screen wait the movie's collection and More like this
-/// (TvMovieRelated.dc.html, PLAN-RELATED.md §7), named along its bottom
+/// first screen wait the movie's collection and More like this,
+/// named along its bottom
 /// edge until the page scrolls; Down from the versions reaches them.
 struct MovieScreen: View {
     let id: Int
@@ -44,7 +44,7 @@ private struct MovieView: View {
             .fullScreenCover(item: $report) { report in
                 ReportProblemDialog(model: report) { self.report = nil }
             }
-            // A YouTube trailer without the YouTube app: a code to scan (TvTrailerQR.dc.html).
+            // A YouTube trailer without the YouTube app: a code to scan.
             .fullScreenCover(item: $model.trailerCode) { trailer in
                 TrailerCodePanel(trailer: trailer) { model.trailerCode = nil }
             }
@@ -153,12 +153,12 @@ private struct MovieView: View {
                     Button(model.watchToggleLabel) { Task { await model.setWatched(!model.watched) } }
                         .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
                         .disabled(model.busy)
-                    // From API level 5 (PLAN-ARR.md §9).
+                    // From API level 5.
                     if services.requests.options.problems {
                         Button(reportProblemTitle) { report = ReportProblemModel(requests: services.requests, target: .movie(movie)) }
                             .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
                     }
-                    // 160 pt beside Trailer (TvMovieTrailer.dc.html), and the first to give way
+                    // 160 pt beside Trailer, and the first to give way
                     // when a long Resume label needs the room, so no button is cut short.
                     if model.resumable, let watch = movie.watch {
                         ProgressStrip(progress: watch.progress, height: 6)

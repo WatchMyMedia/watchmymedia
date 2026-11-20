@@ -51,7 +51,7 @@ import WMMModel
 
     /// The table matches the server's own history of its levels: each
     /// feature's level is the entry that names it. Level 28 is the server's
-    /// part of PLAN-APPLE-REVIEW.md, on its own branch: until the server here
+    /// work, on its own branch: until the server here
     /// is at 28 it is only checked to be beyond the server's level.
     @Test func theLevelsAreTheServersOwn() throws {
         let source = try String(contentsOf: Self.systemGo, encoding: .utf8)

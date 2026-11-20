@@ -66,7 +66,7 @@ extension View {
 }
 
 /// Cards dim and shrink a little while pressed, and lift under an iPad's
-/// pointer as the system draws it (PLAN-APPLE-REVIEW.md §6.3); at rest, and
+/// pointer as the system draws it; at rest, and
 /// without a pointer, nothing changes.
 struct CardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {

@@ -1,4 +1,4 @@
-// The rules of the You group of Settings (PLAN-ADMIN-SETTINGS.md §5.10):
+// The rules of the You group of Settings:
 // Playback, Audio & subtitles, Account & devices, Link a TV, Your requests
 // and About. What each page says about its state, and which message a
 // refusal gets, live here so they can be tested; the pages only draw them.
@@ -274,7 +274,7 @@ export function passwordChangeError(error: unknown, words: string): PasswordProb
   return { field: null, title: 'Your password wasn’t changed', body: words }
 }
 
-/** The banner on Account & devices after a change (loose end 6). */
+/** The banner on Account & devices after a change. */
 export function passwordChangedBanner(others: number | undefined): Notice {
   if (others === undefined) return { title: 'Password changed', body: 'Every other device was signed out and will ask for the new password. Link a TV signs a TV back in without typing.' }
   if (others === 0) return { title: 'Password changed', body: 'No other device was signed in. Use the new password next time you sign in.' }
@@ -368,7 +368,7 @@ export function requestsSummary(items: readonly Pick<MediaRequest, 'status' | 'd
 export type RequestsOff = { title: string; body: string; setUp: boolean }
 
 /**
- * Why Your requests is off when it's opened by its address (loose end 10),
+ * Why Your requests is off when it's opened by its address,
  * or null when requests are on. An admin is offered Set up requests.
  */
 export function requestsOff(options: Pick<RequestOptions, 'backend' | 'movies' | 'shows'>, admin: boolean): RequestsOff | null {

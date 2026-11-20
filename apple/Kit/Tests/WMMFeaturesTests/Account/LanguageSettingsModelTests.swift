@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// Settings › Audio & subtitles (PLAN-LANGUAGES.md §5.6).
+/// Settings › Audio & subtitles.
 @MainActor
 @Suite struct LanguageSettingsModelTests {
     init() { FakeLatency.duration = .zero }

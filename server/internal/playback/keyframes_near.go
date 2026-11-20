@@ -10,7 +10,7 @@ import (
 )
 
 // An event session of copied video starts on a keyframe and ends each run
-// just before one (PLAN-RESUME.md §3.1, §3.2). ffmpeg can only start copied
+// just before one. ffmpeg can only start copied
 // video on a keyframe: given -ss between two, it starts at the one before,
 // so a session that reported the asked-for time ran up to a keyframe
 // interval ahead of the picture, and each run's re-seek skipped or repeated

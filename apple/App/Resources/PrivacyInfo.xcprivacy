@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  The iPhone and iPad app's privacy manifest (PLAN-APPLE-REVIEW.md §3.4.1).
+  The iPhone and iPad app's privacy manifest.
   No tracking and no data collected: the app talks only to the person's own
   server. The required-reason APIs it calls, with Apple's reasons:
   - UserDefaults, CA92.1: the app's own settings (Kit/Sources/WMMData/Storage/DeviceStorage.swift).

@@ -11,8 +11,8 @@ import (
 	"watchmymedia/server/internal/related"
 )
 
-// RelatedRows are the rows at the end of a movie's or a show's page
-// (PLAN-RELATED.md §6): the movie's collection, then More like this.
+// RelatedRows are the rows at the end of a movie's or a show's page:
+// the movie's collection, then More like this.
 type RelatedRows struct {
 	Rows []ScreenRow `json:"rows" nullable:"false" doc:"In order: collection (movies only, when the library has another film of the movie's TMDB collection; titled with the collection's name, in release order) and similar (More like this, best first, when at least 3 titles qualify). Both style poster, with items. Empty when neither has anything."`
 }
@@ -30,7 +30,7 @@ type RelatedOutput struct {
 func registerRelated(h huma.API, deps Deps) {
 	op := func(id, path, summary string) huma.Operation {
 		return huma.Operation{OperationID: id, Method: http.MethodGet, Path: Prefix + path, Summary: summary,
-			Description: "Titles from this server's libraries of the same kind, for the end of the page (PLAN-RELATED.md). Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.",
+			Description: "Titles from this server's libraries of the same kind, for the end of the page. Ask once the page's details have arrived; the reply never waits on TMDB. Items are marked for the signed-in person as Home's are. From API level 30.",
 			Tags:        []string{"browse"}}
 	}
 	huma.Register(h, op("getMovieRelated", "/movies/{id}/related", "The rows at the end of a movie's page: its collection and More like this"),
@@ -51,7 +51,7 @@ func registerRelated(h huma.API, deps Deps) {
 		})
 }
 
-// similarTitle names More like this (PLAN-RELATED.md §3.1).
+// similarTitle names More like this.
 const similarTitle = "More like this"
 
 // relatedRows works out a title's related rows for the signed-in person,

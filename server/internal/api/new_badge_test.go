@@ -10,7 +10,7 @@ import (
 )
 
 // The New badge means "a file arrived in the last 7 days and this person
-// has not watched it" (PLAN-HOME.md section 4): watching clears it on the
+// has not watched it": watching clears it on the
 // Recently added card, the Recently aired card, the library grid, the
 // season's episodes and the movie, while an older unwatched episode keeps
 // the show out of New once its recent episodes are watched.

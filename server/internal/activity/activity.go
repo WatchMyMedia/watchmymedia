@@ -1,6 +1,6 @@
 // Package activity records who watches what: the plays running now, a
 // history of every play that searches as fast as you type, and statistics
-// over it (PLAN.md §10b). The server is the source, so nothing is guessed:
+// over it. The server is the source, so nothing is guessed:
 // players announce each play and report their state, bytes are counted where
 // they are written, and ffmpeg reports its own speed.
 package activity

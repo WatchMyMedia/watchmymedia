@@ -19,8 +19,8 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * A row's See all reaching the TV Shows or Movies grid (PLAN-SEE-ALL.md
- * §4.4): the grid takes its library's request once, as if the person had
+ * A row's See all reaching the TV Shows or Movies grid:
+ * the grid takes its library's request once, as if the person had
  * chosen it, over what its saved state brought back, and a later choice
  * sticks.
  */

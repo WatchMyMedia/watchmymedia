@@ -130,7 +130,7 @@ import WMMModel
 }
 
 /// Links that start playback or take a tuner only when the app published
-/// them for the server signed in (PLAN-APPLE-REVIEW.md §2.5, §3.4.7), as
+/// them for the server signed in, as
 /// android/core/model's DeepLinkTest checks the same rule.
 @MainActor @Suite struct PublishedLinkTests {
     init() { FakeLatency.duration = .zero }
@@ -213,7 +213,7 @@ struct FindInSearchTests {
 }
 
 /// The Home Screen quick actions and App Shortcuts open the app's own links,
-/// published for the server signed in (PLAN-APPLE-REVIEW.md §2.5, §6.3).
+/// published for the server signed in.
 @MainActor @Suite struct QuickActionLinkTests {
     @Test func searchAndHomeOpenTheirTabsOverAPlayer() async {
         FakeLatency.duration = .zero

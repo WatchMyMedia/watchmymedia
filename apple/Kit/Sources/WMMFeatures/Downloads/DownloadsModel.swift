@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Everything downloaded here (Downloads.dc.html, SettingsDownloads.dc.html,
-/// Pad2Downloads.dc.html, the offline Home; android DownloadsViewModel):
+/// Everything downloaded here (the Downloads screens and
+/// the offline Home; android DownloadsViewModel):
 /// movies, and shows with their episodes, the space they take, the download
 /// settings, and what a row's menu does.
 @MainActor

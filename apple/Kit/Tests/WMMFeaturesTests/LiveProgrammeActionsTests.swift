@@ -4,8 +4,8 @@ import WMMFakes
 import WMMModel
 @testable import WMMFeatures
 
-/// What a Live TV programme, a recording row and the options form offer
-/// (PLAN-APPLE-REVIEW.md §5.4): the whole table the six menus draw from.
+/// What a Live TV programme, a recording row and the options form offer:
+/// the whole table the six menus draw from.
 @Suite @MainActor
 struct LiveProgrammeActionsTests {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)

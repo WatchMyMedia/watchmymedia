@@ -11,7 +11,7 @@ struct TVRowActions {
     var resume: (ContinueItem) -> Void = { _ in }
     var openPage: (ContinueItem) -> Void = { _ in }
     var setWatched: (WatchTarget, Bool) async -> Void
-    /// The row's See all (PLAN-SEE-ALL.md): what its card says and what Select
+    /// The row's See all: what its card says and what Select
     /// on it does, or nil for a row without one.
     var seeAll: (ScreenRow) -> TVRowSeeAll? = { _ in nil }
 }
@@ -23,12 +23,12 @@ struct TVRowSeeAll {
     let open: () -> Void
 }
 
-/// One arranged row on Apple TV (PLAN-ROWS.md §6.1; TvLibraryRows.dc.html),
+/// One arranged row on Apple TV,
 /// drawn by its style with Home's cards, or the app's Live TV row in the
 /// `live` slot. A list row has its line beside its name ("18 of 50 · From
 /// TMDB"). A poster, 16:9 or episode row with a See all (a list, or a
-/// built-in row's library, PLAN-SEE-ALL.md §4.3) ends in a See all card. On
-/// Home's screens (PLAN-HOME.md §7.4) `counter` is "Row 2 of 7",
+/// built-in row's library) ends in a See all card. On
+/// Home's screens `counter` is "Row 2 of 7",
 /// `focusedCard` receives the focused card's key (``BrowseItem/cardID``,
 /// ``EpisodeCard/cardKey``, ``ContinueItem/cardKey``) and `focusedChannel`
 /// the Live TV row's focused channel.
@@ -174,9 +174,9 @@ enum ShelfCard: Identifiable {
     }
 }
 
-/// A row's last card, the size of its others (TvLibraryRows.dc.html's list
-/// card): "See all" over a list's count, or "See all TV shows" over "By
-/// last aired" for a built-in row's library (PLAN-SEE-ALL.md §3).
+/// A row's last card, the size of its others:
+/// "See all" over a list's count, or "See all TV shows" over "By
+/// last aired" for a built-in row's library.
 private struct SeeAllCard: View {
     let seeAll: TVRowSeeAll
     let line: String?
@@ -192,7 +192,7 @@ private struct SeeAllCard: View {
             .accessibilityIdentifier("row-see-all")
     }
 
-    /// A list's card as TvLibraryRows.dc.html draws it, "See all" over the
+    /// A list's card as the design draws it, "See all" over the
     /// count in one size; a library's with its name over the sort in a
     /// smaller line, "TV shows" under "See all" on a poster, where the whole
     /// name doesn't fit a line.

@@ -16,7 +16,7 @@ import (
 	"watchmymedia/server/internal/netguard"
 )
 
-// CastOptions turns on casting to Google Cast devices (PLAN-CAST.md). The
+// CastOptions turns on casting to Google Cast devices. The
 // receiver, a web page on the TV, runs the play itself with a cast token:
 // it asks for the decision, fetches the media and reports progress.
 type CastOptions struct {
@@ -103,8 +103,8 @@ func castRoute(method, p string) bool {
 }
 
 // castLiveRoute lists what a cast token opens under /live-tv/: what a
-// receiver needs to play a channel for the person who cast (PLAN-LIVE-TV.md
-// §4.1). The session belongs to the sender's sign-in, as the token does.
+// receiver needs to play a channel for the person who cast.
+// The session belongs to the sender's sign-in, as the token does.
 // Settings, sources, Activity and the admin stop stay closed.
 func castLiveRoute(method, p string) bool {
 	read := method == http.MethodGet || method == http.MethodHead

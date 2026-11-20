@@ -5,7 +5,7 @@ import { SKIP_LABELS } from '../src/lib/play/rules'
 import type { ReceiverFailure } from './live'
 
 /**
- * The receiver's own screens over the video (PLAN-CAST.md §4.4). The Cast
+ * The receiver's own screens over the video. The Cast
  * player element draws the paused and seeking overlay; these are the
  * idle screen, loading, the Skip prompt, Up Next, Still watching, and the
  * messages. A remote cannot press our buttons, so prompts say where to.
@@ -15,8 +15,8 @@ const root = () => document.getElementById('overlay') as HTMLDivElement
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string)
 
 /**
- * What the TV shows for a Live TV channel (the web canvas's LiveReceiver
- * board). Its pictures are this receiver's own, fetched with the cast
+ * What the TV shows for a Live TV channel.
+ * Its pictures are this receiver's own, fetched with the cast
  * token; senders get none of them.
  */
 export type LiveScreen =

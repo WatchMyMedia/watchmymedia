@@ -5,7 +5,7 @@ import WMMModel
 @MainActor
 enum CastServicesFactory {
     static func make(services: AppServices, arguments: [String]) -> CastService {
-        // The fakes are for debug builds only, as in ServicesFactory (PLAN-APPLE-REVIEW.md §2.9).
+        // The fakes are for debug builds only, as in ServicesFactory.
         #if DEBUG
         if arguments.contains(where: { $0.hasPrefix("-fakes") }) {
             let gateway = FakeCastGateway()

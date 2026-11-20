@@ -4,8 +4,7 @@ import WMMModel
 
 /// What covers the video on Apple TV besides the system's transport bar and
 /// info panel, most important first: the can't-play state, an admin's stop
-/// message, Still watching, the Next Episode card (TvPlayerStopped,
-/// TvPlayerStillWatching and TvPlayerNext.dc.html).
+/// message, Still watching, the Next Episode card.
 public enum TVPlayerOverlay: Hashable, Sendable {
     /// Can't play this, with Try again and Back. The video is gone.
     case failed(String)
@@ -19,7 +18,7 @@ public enum TVPlayerOverlay: Hashable, Sendable {
 
 /// A button the system shows: Skip Intro and the other skips over the video
 /// (`contextualActions`), and Next Episode in the transport bar
-/// (`transportBarCustomMenuItems`) (TvPlayerControls.dc.html).
+/// (`transportBarCustomMenuItems`).
 public struct TVPlayerAction: Hashable, Sendable, Identifiable {
     public enum Kind: String, Hashable, Sendable { case skip, nextEpisode, goToNow }
 
@@ -45,7 +44,7 @@ public struct TVPlayerAction: Hashable, Sendable, Identifiable {
 }
 
 /// The Apple TV player screen's state around a ``PlaybackController``. The
-/// screen is the system's `AVPlayerViewController` (PLAN-IOS.md §11.2): its
+/// screen is the system's `AVPlayerViewController`: its
 /// transport bar seeks and scrubs, its info panel holds the Audio, Subtitles
 /// and Quality tabs, Skip is its contextual action and Next Episode a button
 /// of its transport bar, and the prompts are overlays. This decides which of

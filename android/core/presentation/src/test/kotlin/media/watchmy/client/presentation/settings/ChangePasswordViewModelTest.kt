@@ -22,7 +22,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** Change password (SettingsPassword.dc.html): one test per message on the board, against the fakes. */
+/** Change password: one test per message on the board, against the fakes. */
 class ChangePasswordViewModelTest {
     @get:Rule val main = MainDispatcherRule()
 

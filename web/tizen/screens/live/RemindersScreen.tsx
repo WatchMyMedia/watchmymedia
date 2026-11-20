@@ -13,7 +13,7 @@ import { reminderRow, remindersHeading } from './remindersModel'
 import './live.css'
 
 /**
- * Reminders (LiveReminders' list): each with its picture, what and where,
+ * Reminders: each with its picture, what and where,
  * when or what changed, and Remove. OK on one opens it in the guide.
  */
 export function RemindersScreen() {

@@ -7,14 +7,13 @@ class SettingsLabelsTest {
     @Test fun `the skip rows are the mockups'`() {
         assertEquals(listOf("Intro", "Recap", "Credits", "Previews", "Ads"), SKIP_KINDS.map { it.settingsLabel })
         assertEquals(listOf("Never", "Ask", "Auto", "Auto after 3 s"), SkipMode.entries.map { it.label })
-        // The phone's segmented buttons are narrow (android/Settings.dc.html).
+        // The phone's segmented buttons are narrow.
         assertEquals(listOf("Never", "Ask", "Auto", "Auto 3 s"), SkipMode.entries.map { it.shortLabel })
     }
 
     @Test fun `the device's playback settings word their choices as the boards do`() {
-        // android/SettingsMobileData.dc.html: the row's value.
+        // The row's value.
         assertEquals(listOf("Automatic", "Original", "4K", "1080p", "720p", "480p", "360p"), StreamQuality.entries.map { it.shortLabel })
-        // android-tv/SettingsPlayback.dc.html.
         assertEquals(listOf("Auto", "Off"), AudioPassthrough.entries.map { it.label })
         assertEquals(listOf("Smaller", "Normal", "Larger", "Largest"), SubtitleSize.entries.map { it.label })
         assertEquals(listOf(22f, 28f, 34f, 42f), SubtitleSize.entries.map { Math.round(it.scale * 28).toFloat() })

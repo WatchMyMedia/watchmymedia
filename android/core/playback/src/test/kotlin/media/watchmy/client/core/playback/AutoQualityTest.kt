@@ -24,7 +24,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Automatic quality (PLAN-AUTO-QUALITY.md §2, §6): the request, the heartbeats, the server's step changes. */
+/** Automatic quality: the request, the heartbeats, the server's step changes. */
 class AutoQualityTest {
     private val h = Harness(quality = StreamQuality.Auto)
 

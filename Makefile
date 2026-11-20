@@ -34,10 +34,10 @@ gen-api: ## Dump OpenAPI (web types, and api/ for the native apps) and regenerat
 	cp api/openapi.json web/src/api/openapi.json
 	cd web && pnpm gen:api
 
-# The iPhone app (apple/, PLAN-IOS.md). SIM names the simulator xcodebuild uses;
+# The iPhone app (apple/). SIM names the simulator xcodebuild uses;
 # without one by that name, apple/scripts/simulator.sh picks the newest iPhone Pro.
 SIM ?= iPhone 17 Pro
-# The Apple TV app (apple/TV, PLAN-IOS.md §11.2), on TV_SIM or the newest Apple TV 4K.
+# The Apple TV app (apple/TV), on TV_SIM or the newest Apple TV 4K.
 TV_SIM ?= Apple TV 4K (4th generation)
 # Optional CI override for verbose Xcode diagnostics; empty keeps local defaults.
 APPLE_TV_TEST_DIAGNOSTICS ?=
@@ -88,7 +88,7 @@ apple-tv-test-sim: apple-gen ## Build the Apple TV app and run every test on the
 	  -derivedDataPath $(APPLE_DERIVED) -resultBundlePath apple/build/TVTests.xcresult $(APPLE_SIM_SIGNING) $(APPLE_TEST_FLAGS) \
 	  $(if $(APPLE_TV_TEST_DIAGNOSTICS),-collect-test-diagnostics $(APPLE_TV_TEST_DIAGNOSTICS)) test
 
-# CI's way to run the same tests (PLAN-CI-SPEED.md C5): build once, run the
+# CI's way to run the same tests: build once, run the
 # Kit's tests, then the remote UI tests on their own. Both runs go ahead, and
 # either failing fails the target. Results: TVTests.xcresult (Kit),
 # TVUITests.xcresult (UI). TV_UI_WORKERS above 1 runs the UI tests on that many
@@ -143,7 +143,7 @@ apple-tv-build-release: apple-gen ## Build the Apple TV app in Release for devic
 
 # apple-perf measures a signed-in launch and scrolling Home and Movies on
 # $(SIM), and a launch on $(TV_SIM), five runs each, on the fakes (so Debug
-# builds; PLAN-APPLE-REVIEW.md §4.3.1). Not in CI: the numbers need a quiet Mac.
+# builds). Not in CI: the numbers need a quiet Mac.
 apple-perf: apple-gen ## Measure launch and scrolling on $(SIM) and $(TV_SIM) (Debug, fakes) -> apple/build/Perf.xcresult, TVPerf.xcresult
 	id=$$(apple/scripts/simulator.sh "$(SIM)") && \
 	{ xcrun simctl boot "$$id" 2>/dev/null || true; } && \

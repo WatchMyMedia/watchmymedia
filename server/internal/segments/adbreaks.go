@@ -129,7 +129,7 @@ func adBreaks(e adEvidence) []playback.Segment {
 	// make a break of 30 seconds to 6 minutes. Nothing is inferred from a
 	// single black or quiet scene, and a longer run of regular cuts (a
 	// countdown, a music channel) is no break at all: it is dropped whole,
-	// never cut into breaks of the longest length (PLAN-LIVE-TV-DVR.md §4.8).
+	// never cut into breaks of the longest length.
 	for i := 0; i < len(boundaries)-2; {
 		end := i
 		for end+1 < len(boundaries) {

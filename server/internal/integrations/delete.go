@@ -17,7 +17,7 @@ import (
 	"watchmymedia/server/internal/parser"
 )
 
-// Deleting (PLAN-ARR.md §8.1): the app that owns the files deletes them. The
+// Deleting: the app that owns the files deletes them. The
 // server first says what will go, then asks each app, closes the item's open
 // requests and scans what changed. It never deletes a file itself.
 
@@ -29,7 +29,7 @@ const deleteWait = 2 * time.Minute
 const unlistedLimit = 10000
 
 // KeyDeleteAccess says who may delete episodes and movies: "admins" (the
-// default) or "everyone" (PLAN-EPISODE-PAGE.md §4). Shows, whole seasons and
+// default) or "everyone". Shows, whole seasons and
 // replacing a file stay with admins either way.
 const KeyDeleteAccess = "delete.access"
 
@@ -66,7 +66,7 @@ type DeleteTarget struct {
 	// episode, only its own.
 	Files []string
 	// Trailers are a movie's trailer files in the library, which go with
-	// it once none of its files stays (PLAN-TRAILERS.md §5.2).
+	// it once none of its files stays.
 	Trailers []string
 	Season   int
 	Episode  int
@@ -115,7 +115,7 @@ type DeleteApp struct {
 	Error         string `json:"error,omitempty" doc:"Why the app could not be asked. It can't delete until it answers."`
 }
 
-// DeleteChoices are the options a delete offers, at their defaults (§8.1).
+// DeleteChoices are the options a delete offers, at their defaults.
 type DeleteChoices struct {
 	Keep          bool `json:"keep" doc:"Movies and shows: keep it in the app unmonitored rather than remove it. Off."`
 	Exclude       bool `json:"exclude" doc:"Movies and shows: don't add it again from import lists. Off."`
@@ -434,7 +434,7 @@ func anyTakes(gone []func(string) bool, p string) bool {
 }
 
 // deleteTrailers deletes a movie's trailer files once none of its files
-// stays (decided 2026-11-05, PLAN-TRAILERS.md §11): those in a folder an app
+// stays: those in a folder an app
 // removed go with it; the server deletes the rest itself, as when the movie
 // stays in Radarr and only its files go. A file the server can't delete (a
 // library mounted read-only) is logged and stays. It returns how many went.
@@ -559,7 +559,7 @@ func (s *Service) DeleteMedia(ctx context.Context, by Person, t DeleteTarget, o 
 	return res, nil
 }
 
-// deleteIn carries out the delete in one app (§8.1's table).
+// deleteIn carries out the delete in one app.
 func (s *Service) deleteIn(ctx context.Context, cl *arr.Client, t DeleteTarget, o DeleteOptions, keepMonitored bool, p plan) error {
 	switch t.Type {
 	case "movie":
@@ -610,7 +610,7 @@ func (s *Service) deleteIn(ctx context.Context, cl *arr.Client, t DeleteTarget, 
 }
 
 // tellSeerr clears Seerr's record of what was deleted, so it stops calling it
-// available and it can be asked for again (§8.1): the movie's or show's, and
+// available and it can be asked for again: the movie's or show's, and
 // for a season or an episode, the show's, with Seerr's Sonarr sync rerun to
 // rebuild it. Seerr down or refusing is reported, not returned.
 func (s *Service) tellSeerr(ctx context.Context, by Person, t DeleteTarget) *SeerrDone {
@@ -755,7 +755,7 @@ func (s *Service) closeRequests(ctx context.Context, by Person, t DeleteTarget) 
 	return n
 }
 
-// ReplaceTarget is a library file to replace (§9).
+// ReplaceTarget is a library file to replace.
 type ReplaceTarget struct {
 	Type        string // movie or episode
 	Title       string // for the log

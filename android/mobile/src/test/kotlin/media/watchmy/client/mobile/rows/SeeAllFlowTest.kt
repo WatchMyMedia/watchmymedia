@@ -39,8 +39,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * A Home row's See all on the phone, on the fakes (PLAN-SEE-ALL.md §4.4,
- * §7): the card at the row's end and the heading's link open the library's
+ * A Home row's See all on the phone, on the fakes:
+ * the card at the row's end and the heading's link open the library's
  * tab at its grid, sorted the row's way, and the sort is the tab's from then
  * on, not put back on a later visit.
  */

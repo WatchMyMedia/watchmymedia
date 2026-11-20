@@ -65,7 +65,7 @@ struct TVLiveRecordChoice: View {
 }
 
 /// The clash after Record, or a Won't record row's choice, full screen (the
-/// web's `DvrTakeover` dialog; the Apple canvas has no board for it yet).
+/// web's dialog).
 /// Keep holds the focus, so a stray press changes nothing; Back is Keep.
 struct TVLiveRecordingClashView: View {
     @State private var clash: LiveRecordingClash
@@ -146,7 +146,7 @@ struct TVLiveRecordingsScreen: View {
             .padding(.horizontal, TVLayout.gutter).padding(.vertical, 40)
         }
         .task(id: services.liveTV.contextID) { for section in LiveRecordingSection.allCases { await recordings.load(section) } }
-        // On screen until this list goes: events then stop asking for its sections (PLAN-APPLE-REVIEW.md §4.1.8).
+        // On screen until this list goes: events then stop asking for its sections.
         .task { await recordings.show(LiveRecordingSection.allCases) }
         .messagePill(Binding(get: { recordings.message }, set: { recordings.message = $0 }))
         .fullScreenCover(item: $deleting) { item in TVLiveRecordingDelete(recording: item) }

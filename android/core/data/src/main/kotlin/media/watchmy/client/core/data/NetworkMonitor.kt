@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 /**
  * The device's default network, for the API client (no waiting without one)
  * and the event stream (connected only on one, and again at once on a new
- * one): PLAN-ANDROID-REVIEW.md §4.1.5–6.
+ * one).
  */
 internal interface NetworkMonitor {
     /** The default network, as a value that changes when the device moves to another; null with none. */

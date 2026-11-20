@@ -5,7 +5,7 @@ import { TranscodingHub } from './transcoding/Hub'
 import { UploadLimitPage } from './transcoding/UploadLimit'
 
 /**
- * Settings › Server › Transcoding (PLAN-ADMIN-SETTINGS.md §5.7): the page,
+ * Settings › Server › Transcoding: the page,
  * the Choose an encoder flow and the Remote upload limit page.
  */
 export function TranscodingSettings() {

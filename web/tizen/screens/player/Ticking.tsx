@@ -20,7 +20,7 @@ const progressOf = (s: FilePlaybackState) => ({
   scrub: s.scrub, recordingNow: !!s.recording?.now, segments: s.segments,
 })
 
-/** The time of day, as at the top right of PlayerControls, redrawn each minute. */
+/** The time of day, as at the top right of the controls, redrawn each minute. */
 export function WallClock({ className }: { className?: string }) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -83,7 +83,7 @@ function SeekPreview({ scrub, at }: { scrub: NonNullable<FilePlaybackState['scru
 
 const miniOf = (s: FilePlaybackState) => ({ positionMs: s.positionMs, durationMs: s.durationMs })
 
-/** PlayerNext's small progress line while the card is up. */
+/** The small progress line while the card is up. */
 export function MiniProgress({ playback }: Props) {
   const p = useSelect(playback, miniOf)
   return <div className="pl-mini" aria-hidden="true">

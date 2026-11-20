@@ -7,7 +7,7 @@ import { compatibleLiveProfile, liveFailure } from '../src/lib/liveTV'
 import { withRequestTimeout } from '../src/lib/requestTimeout'
 
 /**
- * Casting Live TV (PLAN-LIVE-TV.md §4.1): what the receiver needs beyond
+ * Casting Live TV: what the receiver needs beyond
  * main.ts's file plays, kept free of CAF so it can be tested.
  */
 
@@ -125,8 +125,8 @@ export function nowEnds(channel: LiveChannel | undefined): number | undefined {
 export type ReceiverFailure = { title: string; body: string; small: string }
 
 /**
- * The TV's words for why a channel can't play (the web canvas's
- * LiveReceiver board), the web player's (liveFailure) for the rest.
+ * The TV's words for why a channel can't play,
+ * the web player's (liveFailure) for the rest.
  */
 export function receiverFailure(reason: string, number: string): ReceiverFailure {
   const where = 'from your phone or browser'
@@ -140,7 +140,7 @@ export function receiverFailure(reason: string, number: string): ReceiverFailure
     case 'not_allowed': case 'access_changed': case 'access_revoked':
       return { title: 'Live TV isn’t available to you', body: 'An admin can let everyone watch Live TV on this server.', small: '' }
     default: {
-      // Casting a recording still being written is not supported (PLAN-LIVE-TV-DVR.md §10).
+      // Casting a recording still being written is not supported.
       const f = liveFailure(reason, { watchRecording: false })
       return { title: f.title, body: f.detail, small: `Try again ${where}.` }
     }

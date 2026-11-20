@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import WMMModel
 
-/// The shows the person follows, shared by every screen of one app
-/// (PLAN-NEW-EPISODES.md §7.1, §7.2): the bell on a show's page and Settings ›
+/// The shows the person follows, shared by every screen of one app:
+/// the bell on a show's page and Settings ›
 /// Notifications' list. A change shows at once and goes back when the server
 /// refuses it, as stars and reminders do. The server's follows.changed from
 /// the person's other devices brings the list up to date (``listen()``), and

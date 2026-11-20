@@ -73,7 +73,7 @@ final class RealPreferencesRepository: PreferencesRepository {
         try await change({ $0.autoplayNext = enabled }, body: .init(autoplayNext: enabled))
     }
 
-    /// Sends only what changed (PLAN-LANGUAGES.md §5.3), and the audio
+    /// Sends only what changed, and the audio
     /// languages and foreignAudio only to a server at
     /// ``ServerFeatures/audioLanguages``, since older ones reject them.
     func setLanguages(_ edit: LanguageChange) async throws {

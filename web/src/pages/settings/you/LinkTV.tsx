@@ -24,7 +24,7 @@ const STEPS: readonly FlowStep[] = [
 const approved = new Map<string, PairingInfo>()
 
 /**
- * Link a TV (PLAN-ADMIN-SETTINGS.md §5.10): Enter the code → Check it's
+ * Link a TV: Enter the code → Check it's
  * yours → Linked, inside Settings, with Exit back to Account & devices. The
  * code is the address's step (/settings/account/link/ABC234), so /link from a
  * TV's QR code starts on the second step.

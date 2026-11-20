@@ -3,7 +3,7 @@ import Observation
 import WMMModel
 
 /// One play on a ``PlaybackController`` from start to finish, as every player
-/// screen's model needs it (PLAN-APPLE-REVIEW.md §5.2): it starts the
+/// screen's model needs it: it starts the
 /// controller and listens to it, follows its state, swaps in the next episode
 /// when one starts in place, closes the play once when the app goes to the
 /// background, and leaves once. ``TVPlayerModel`` and the phone's

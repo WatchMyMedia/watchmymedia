@@ -70,7 +70,7 @@ internal fun AboutShow(show: ShowDetail, state: ShowPageViewModel.State, vm: Sho
             }
         }
         if (show.overview.isNotBlank()) Overview(show.overview, collapsedLines = if (compact) 3 else 4)
-        // Notify me, first of the show's actions (PLAN-NEW-EPISODES.md §7.1).
+        // Notify me, first of the show's actions.
         state.following?.let { following -> FollowButton(following, show.title, page.onFollow, Modifier.fillMaxWidth()) }
         if (state.canMarkShow) TonalButton(markShowLabel(state.showWatched), { vm.setShowWatched(!state.showWatched) }, Modifier.fillMaxWidth(), enabled = !state.acting)
         if (state.missingSeasons) TonalButton("Request missing seasons", { page.onAsk(ALL_SEASONS) }, Modifier.fillMaxWidth())

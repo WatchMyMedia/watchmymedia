@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import WMMModel
 
-/// Settings › About › Diagnostics (Diagnostics.dc.html): what the page shows
+/// Settings › About › Diagnostics: what the page shows
 /// is what Copy copies, and neither holds a name, an address or a secret.
 @Suite struct DiagnosticsPageTests {
     let at = Date(timeIntervalSince1970: 1_794_517_440) // 2026-11-12 21:04 UTC

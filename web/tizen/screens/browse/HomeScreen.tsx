@@ -160,7 +160,7 @@ function EndPage({ home, onTop }: { home: HomeData; onTop(): void }) {
 const PAGE_MS = 320
 
 /**
- * Home one row a screen (HomeStart, HomeRow): ▲ ▼ page, focus moving first
+ * Home one row a screen: ▲ ▼ page, focus moving first
  * and the screen sliding after, so a key pressed during the slide acts on
  * the row arriving. A held key's repeats are swallowed, so they can't skip
  * screens. Only the page showing and the ones either side are drawn, and

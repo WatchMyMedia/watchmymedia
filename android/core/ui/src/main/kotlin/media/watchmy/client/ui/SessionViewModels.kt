@@ -18,8 +18,8 @@ import java.util.UUID
 
 /**
  * The ViewModels of the signed-in sessions, one store each, kept by the
- * activity so they outlive the activity being recreated
- * (PLAN-ANDROID-REVIEW §3.3.6). Without them the signed-in screens'
+ * activity so they outlive the activity being recreated.
+ * Without them the signed-in screens'
  * ViewModels lived in the activity's own store, and so did Navigation's,
  * which keeps every screen's: after a sign-out the previous account's
  * stayed alive, still collecting, until the app closed.

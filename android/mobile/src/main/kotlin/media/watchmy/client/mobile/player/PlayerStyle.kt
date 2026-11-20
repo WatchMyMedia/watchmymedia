@@ -7,7 +7,7 @@ import androidx.compose.ui.unit.sp
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.WmmColors
 
-/** Text sizes and colours from the player artboards (design/mockups/android/Player*.dc.html). */
+/** Text sizes and colours from the player artboards. */
 internal object PlayerType {
     val Title = inter(18, FontWeight.Bold)
     val Subtitle = inter(13, FontWeight.Normal, WmmColors.TextSoft)

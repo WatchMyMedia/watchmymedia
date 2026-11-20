@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The tvOS tab bar at the top (TvHome.dc.html): Search as a magnifier,
+/// The tvOS tab bar at the top: Search as a magnifier,
 /// Home, TV Shows, Movies and Settings, each tab with its own stack. Menu
 /// pops a stack, and from a section's root goes to Home (from Settings'
 /// list, to the top bar); the player covers everything.
@@ -51,7 +51,7 @@ struct MainTabs: View {
             extras.reveal = .init(channelID: channelID, programmeID: reminder.programmeID, start: reminder.start)
         }
         // What the user may request, and the Inbox's count, follow the server's
-        // events; Live TV follows its own (PLAN-APPLE-REVIEW.md §4.1.8).
+        // events; Live TV follows its own.
         .task {
             for await _ in services.requests.changes() {
                 await services.requests.refreshOptions()
@@ -109,7 +109,7 @@ struct MainTabs: View {
 }
 
 /// The lockup at the left of the tab bar and the account's initial at its
-/// right (TvHome.dc.html). Each page puts them at the top of its scrolling
+/// right. Each page puts them at the top of its scrolling
 /// content (``SwiftUICore/View/tabBarAccessories()``), so they scroll away
 /// with the tab bar.
 struct TabBarAccessories: View {
@@ -169,7 +169,7 @@ struct TabPage<Content: View>: View {
 
 /// What a page's first screen shows below the tab bar, and whether the page
 /// has scrolled from its top: for a page that keeps something below the fold,
-/// as the movie page keeps its related shelves (TvMovieRelated.dc.html).
+/// as the movie page keeps its related shelves.
 struct PageFold: Equatable {
     /// The height of the first screen, under the tab bar.
     var height: CGFloat = 0

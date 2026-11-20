@@ -30,7 +30,7 @@ import media.watchmy.client.presentation.ShownPage
 
 /**
  * Home for phones, tablets and TV. With [rows] on a server that arranges them
- * ([RowsRepository.supported], PLAN-ROWS.md §8.2) Home comes in the person's
+ * ([RowsRepository.supported]) Home comes in the person's
  * order ([HomeData.rows]) and is read again when its layout or a list
  * changes; otherwise it keeps its fixed rows.
  */
@@ -43,7 +43,7 @@ class HomeViewModel(private val library: LibraryRepository, auth: AuthRepository
         val error: String? = null,
         /** A one-off note for a snackbar ("Marked as watched"). */
         val message: String? = null,
-        /** Home couldn't reach the server at all: the offline Home shows the downloads (PLAN-DOWNLOADS.md §11). */
+        /** Home couldn't reach the server at all: the offline Home shows the downloads. */
         val offline: Boolean = false,
         /** The offline Home's Try again is out. */
         val tryingAgain: Boolean = false,

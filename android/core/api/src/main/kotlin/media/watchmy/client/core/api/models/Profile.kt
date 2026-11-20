@@ -37,7 +37,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param audioCodecs
  * @param containers
  * @param hdr True when the client can display HDR. Without hdrTypes, HDR video is copied only when this is true; otherwise transcodes tone-map to SDR.
- * @param hdrTypes The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means the profile follows PLAN-HDR-PROFILE: HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it.
+ * @param hdrTypes The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it.
  * @param maxAudioChannels 0 means any.
  * @param maxBitrate Bits per second; 0 means unlimited.
  * @param maxHeight
@@ -63,7 +63,7 @@ data class Profile (
     @SerialName(value = "hdr")
     val hdr: kotlin.Boolean? = null,
 
-    /* The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means the profile follows PLAN-HDR-PROFILE: HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it. */
+    /* The HDR the screen shows: hdr10, hlg, dovi. Sending it, even empty, means HDR is copied only when its kind is listed, and Dolby Vision needs its dovi key. From apiLevel 8; older servers reject it. */
     @SerialName(value = "hdrTypes")
     val hdrTypes: kotlin.collections.List<kotlin.String>? = null,
 

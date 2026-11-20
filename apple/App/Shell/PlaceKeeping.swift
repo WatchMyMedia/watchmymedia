@@ -4,7 +4,7 @@ import WMMModel
 
 /// Keeps where the person was (the tab and each tab's pages, ``SavedPlace``)
 /// for the account and server signed in, so the app reopens there after the
-/// system evicts it (PLAN-APPLE-REVIEW.md §6.3): saved whenever it changes
+/// system evicts it: saved whenever it changes
 /// (a view's scene phase didn't report the background on the iOS 27.2
 /// simulator), restored once a launch when the tabs first show. Never
 /// the player or Settings (a sheet on a Live TV server), and never another

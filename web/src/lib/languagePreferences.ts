@@ -3,7 +3,7 @@ import type { components } from '../api/schema'
 type Saved = components['schemas']['Preferences']
 type Patch = components['schemas']['UpdatePreferencesInputBody']
 
-/** How subtitles start (PLAN-LANGUAGES.md §5.6). foreign is saved as mode
+/** How subtitles start. foreign is saved as mode
  * forced with foreignAudio, so older apps, which don't know the flag, read it
  * as Forced only and leave the flag alone when they save. */
 export type SubtitleChoice = 'off' | 'forced' | 'foreign' | 'on'

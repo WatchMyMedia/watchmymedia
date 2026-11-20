@@ -5,8 +5,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// A movie's YouTube trailer, full screen (TrailerPlayer.dc.html,
-/// Pad2TrailerPlayer.dc.html; PLAN-TRAILERS.md §6.3). Our bar holds ✕, the
+/// A movie's YouTube trailer, full screen.
+/// Our bar holds ✕, the
 /// trailer's and the movie's names and YouTube's terms; YouTube's own player
 /// fills the rest at 16:9 with its own controls, and nothing of ours is drawn
 /// over it. When no trailer's owner lets it play outside YouTube, the screen
@@ -19,7 +19,7 @@ struct TrailerPlayerScreen: View {
     @Environment(\.horizontalSizeClass) private var horizontal
     @Environment(\.verticalSizeClass) private var vertical
 
-    /// The iPad's larger bar (Pad2TrailerPlayer.dc.html), in a window regular
+    /// The iPad's larger bar, in a window regular
     /// both ways (an iPad's, the iPhone Duo's inner screen): the largest
     /// iPhones are regular width in landscape, but compact in height.
     private var wide: Bool { PlayerWindow(horizontal: horizontal, vertical: vertical) == .wide }

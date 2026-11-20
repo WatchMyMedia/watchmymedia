@@ -3,8 +3,8 @@ import Testing
 @testable import WMMFeatures
 import WMMModel
 
-/// The bell and Settings › Notifications' list (PLAN-NEW-EPISODES.md §7.1,
-/// §7.2): a change shows at once and goes back when the server refuses it,
+/// The bell and Settings › Notifications' list:
+/// a change shows at once and goes back when the server refuses it,
 /// saying why; the person's other devices' changes arrive by event; a new
 /// sign-in forgets everything.
 @MainActor

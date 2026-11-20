@@ -50,7 +50,7 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 /**
- * The guide boards' fictional lineup (design/mockups/android/LiveGuide): 4.3
+ * The guide boards' fictional lineup: 4.3
  * isn't in the feed (no listings, no logo), 4.4 is listed without a logo, and
  * 36.1 has gone from the tuner's list. Logos and pictures are paths no image
  * loader can fetch, so they draw as their wordmarks and placeholders.
@@ -136,7 +136,7 @@ class FakeLiveRepository(
     /**
      * Most programme pictures can't be fetched, so they draw their title
      * cards; every third title gets one of the fakes' fictional backdrops,
-     * so Home's Live row screen has a picture to fill (PLAN-HOME.md §12).
+     * so Home's Live row screen has a picture to fill.
      */
     override fun artUrl(path: String?): String? {
         if (path == null) return null

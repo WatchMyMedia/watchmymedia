@@ -25,7 +25,7 @@ import (
 	"watchmymedia/server/internal/watchstate"
 )
 
-// Offline downloads (PLAN-DOWNLOADS.md): an Android phone or tablet
+// Offline downloads: an Android phone or tablet
 // downloads a movie or an episode to watch with no connection. What it
 // downloads is the playback decision for the device at the chosen quality:
 // the original file, fetched with Range, when the device plays it directly;
@@ -52,7 +52,7 @@ const (
 var offlineQualities = []string{"original", "1080", "720", "480"}
 
 // offlineSlotWait is how long a download's request waits for a transcoder
-// slot before answering 503 (PLAN-DOWNLOADS.md §3.2).
+// slot before answering 503.
 const offlineSlotWait = 30 * time.Second
 
 type OfflineSettings struct {
@@ -412,7 +412,7 @@ func stepProfile(quality string, p playback.Profile) playback.Profile {
 }
 
 // downloadable refuses trailers: they play from the movie's page, not
-// offline (PLAN-TRAILERS.md §5.2).
+// offline.
 func downloadable(f db.MediaFile) error {
 	if f.ExtraKind != nil {
 		return huma.Error409Conflict("trailers aren't downloaded")
@@ -878,7 +878,7 @@ func applyOffline(ctx context.Context, deps Deps, u auth.User, p OfflineSyncProg
 	if err != nil {
 		return "", nil, err
 	}
-	// A download whose file is gone syncs no progress (PLAN-DOWNLOADS.md §5).
+	// A download whose file is gone syncs no progress.
 	if p.DownloadID != "" {
 		rec, ok := recs[p.DownloadID]
 		if !ok {

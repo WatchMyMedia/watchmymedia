@@ -7,7 +7,7 @@ struct OfflinePlay: Hashable, Sendable {
     var decision: PlaybackDecision
 }
 
-/// The player's server calls with downloads in (PLAN-DOWNLOADS.md §10.4): a
+/// The player's server calls with downloads in: a
 /// downloaded item always plays from the device, online or not, from the
 /// decision stored when it was made, and its heartbeats go to the offline
 /// queue rather than the server. Everything else goes to `online`
@@ -45,7 +45,7 @@ public final class OfflinePlaybackGateway: PlaybackGateway, @unchecked Sendable 
 
     /// A copy of the whole file plays the track the player asks for, as the
     /// server would, so a reload keeps the viewer's pick or the person's
-    /// language (PLAN-LANGUAGES.md §5.5); an HLS copy has only its own.
+    /// language; an HLS copy has only its own.
     static func asked(_ decision: PlaybackDecision, audioIndex: Int?) -> PlaybackDecision {
         guard decision.protocol == .file, let audioIndex, decision.audio.contains(where: { $0.index == audioIndex }) else { return decision }
         var d = decision

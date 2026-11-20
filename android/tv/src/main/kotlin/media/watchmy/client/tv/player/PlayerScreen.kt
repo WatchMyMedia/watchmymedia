@@ -62,14 +62,12 @@ import media.watchmy.client.ui.components.SubtitleCues
 import media.watchmy.client.ui.playerKey
 
 /**
- * The TV player. Mockups: design/mockups/android-tv/PlayerControls.dc.html
- * (controls with Skip Intro), PlayerNext.dc.html (Next Episode card) and
- * PlayerPicker.dc.html (audio, subtitles and quality). It renders a
- * [PlaybackController]; the controller does the rest of PLAN-CLIENTS.md
- * §2.3.
+ * The TV player: controls with Skip Intro, the Next Episode card and the
+ * picker for audio, subtitles and quality. It renders a
+ * [PlaybackController]; the controller does the rest.
  *
  * Opened from the app, the play is held on the player's nav entry by a
- * [PlayerViewModel] (PLAN-ANDROID-REVIEW §3.1.5): a recreated activity finds
+ * [PlayerViewModel]: a recreated activity finds
  * it still playing, and after process death it comes back at the same file
  * (a later episode, if the play had moved on), place and tracks. Leaving the
  * entry releases it, which reports the play stopped.

@@ -1,8 +1,8 @@
 import { pruneNotices } from './liveReminders'
 
 /**
- * The browser's part in Live TV reminders (PLAN-LIVE-TV-GUIDE.md §6.5) and
- * new-episode notices (PLAN-NEW-EPISODES.md §7.5): the notification
+ * The browser's part in Live TV reminders and
+ * new-episode notices: the notification
  * permission, the same-origin service worker that shows them
  * (public/reminders-sw.js; the CSP's worker-src 'self' allows it), the Web
  * Lock that lets one tab notify, and the record of what was shown. All of

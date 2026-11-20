@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// What the remote's channel keys put over Live TV (TvLiveChannelKeys.dc.html):
+/// What the remote's channel keys put over Live TV:
 /// the note at the top when Page Up or Page Down changed channel, or when
 /// the transport bar came up ("Select pauses · swipe up for the channel
 /// buttons"); and Go to channel's keypad, from the 123 key or its button.

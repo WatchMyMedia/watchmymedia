@@ -21,9 +21,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 
 /**
- * Android 17's local network access, for the server picker's row
- * (PLAN-ANDROID-REVIEW.md §3.4.2, LocalNetwork.dc.html and
- * TvLocalNetwork.dc.html). Without it the app can't find servers on this
+ * Android 17's local network access, for the server picker's row.
+ * Without it the app can't find servers on this
  * network or reach them at their local address; "Not now" at the app's
  * first question was the only chance to allow it before.
  */

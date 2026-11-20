@@ -17,7 +17,7 @@ import (
 const linkChunk = 64
 
 // LinkTrailers links each trailer in a movie library to the movie it
-// belongs to (PLAN-TRAILERS.md §5.2) and returns how many links changed.
+// belongs to and returns how many links changed.
 // A trailer belongs to the movie whose file is in its folder, or in the
 // folder above Trailers:
 //   - "<name>-trailer.ext" to the movie of the file named <name>;

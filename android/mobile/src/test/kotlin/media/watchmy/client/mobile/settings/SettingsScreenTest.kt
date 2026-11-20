@@ -33,7 +33,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Settings as groups on a phone (PLAN-ANDROID-SETTINGS.md §4.1, §4.5, §4.6; §12's unit checks). */
+/** Settings as groups on a phone. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xxhdpi")
 class SettingsScreenTest {

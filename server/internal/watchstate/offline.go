@@ -9,7 +9,7 @@ import (
 	"watchmymedia/server/internal/db"
 )
 
-// Offline changes (PLAN-DOWNLOADS.md §6): a phone playing a download with
+// Offline changes: a phone playing a download with
 // no connection keeps its progress and marks, each with when it happened,
 // and sends them when it is back online. The newest local change wins by
 // when it happened, so a later play on the TV is not overwritten by an

@@ -19,7 +19,7 @@ import {
 const PLAYER_ID = 1
 
 /**
- * A movie's YouTube trailer, full screen (PLAN-TRAILERS.md §6.1): our bar on
+ * A movie's YouTube trailer, full screen: our bar on
  * top, YouTube's own player in a plain iframe below it, and nothing of ours
  * drawn over the video. When the owner keeps a video on YouTube, the next
  * trailer is tried, then the page says it can't play here.

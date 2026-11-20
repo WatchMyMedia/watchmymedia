@@ -7,7 +7,7 @@ import { VScroll } from '../../ui/VScroll'
 import { qualityRows, subtitlePanel, type OnlineRow, type PickRow, type SubtitleChoices } from './labels'
 import { PlayerIcon } from './PlayerIcons'
 
-// PlayerPicker: Audio, Subtitles and Quality, each its own side panel (the
+// Audio, Subtitles and Quality, each its own side panel (the
 // Samsung boards' change from Android TV's one sheet). A choice applies at
 // once and the panel stays open; Return closes it, and focus goes back to
 // the button that opened it. The chosen row has focus when it opens.

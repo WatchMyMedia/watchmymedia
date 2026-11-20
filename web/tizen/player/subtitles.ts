@@ -2,7 +2,7 @@ import { CueSchedule } from './cues'
 import { parseVtt, type Cue } from './vtt'
 import type { SubtitleTrack } from './api'
 
-/** The TV's subtitle sizes, as Android TV's (SettingsPlayback: 22, 28, 34 and 42 px at 1080p). */
+/** The TV's subtitle sizes, as Android TV's (22, 28, 34 and 42 px at 1080p). */
 export type SubtitleSize = 'smaller' | 'normal' | 'larger' | 'largest'
 export const SUBTITLE_PX: Record<SubtitleSize, number> = { smaller: 22, normal: 28, larger: 34, largest: 42 }
 

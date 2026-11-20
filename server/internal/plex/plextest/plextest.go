@@ -42,7 +42,7 @@ type Fake struct {
 	SharesXML string
 	Inventory string
 	// rejectResource makes the server refuse the resource token with 401,
-	// as the P0 server did, so the owner's device token is used.
+	// as a real one did, so the owner's device token is used.
 	RejectResource bool
 	// identity is the machine identifier the server reports.
 	Identity string

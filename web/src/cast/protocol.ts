@@ -1,6 +1,6 @@
 /**
- * What senders and the Cast receiver say to each other (PLAN-CAST.md §2,
- * §4.5). Version 1. Changes are additive: both sides ignore message types
+ * What senders and the Cast receiver say to each other.
+ * Version 1. Changes are additive: both sides ignore message types
  * and fields they do not know. The Android app (core:cast) mirrors this
  * file; change both together.
  *
@@ -15,7 +15,7 @@ export const PROTOCOL_VERSION = 1
 /** LOAD's media.contentId. */
 export const contentId = (fileId: number) => `wmm:file:${fileId}`
 
-/** LOAD's media.contentId for a Live TV channel (PLAN-LIVE-TV.md §4.1). */
+/** LOAD's media.contentId for a Live TV channel. */
 export const liveContentId = (channelId: string) => `wmm:live:${channelId}`
 
 /**

@@ -33,7 +33,7 @@ import org.robolectric.annotation.Config
 /**
  * Moving along the TV show page's episode row puts each episode on top,
  * which redraws the top of the page and nothing else: the season tabs and
- * About the show stay as they are (PLAN-ANDROID-REVIEW.md §4.3.4). Counted
+ * About the show stay as they are. Counted
  * with the Compose runtime's tracer.
  */
 @OptIn(ExperimentalTestApi::class, InternalComposeTracingApi::class)

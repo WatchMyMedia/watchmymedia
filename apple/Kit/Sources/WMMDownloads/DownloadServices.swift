@@ -2,7 +2,7 @@ import Foundation
 import UserNotifications
 import WMMModel
 
-/// Offline downloads for the iPhone and iPad app (PLAN-DOWNLOADS.md D3),
+/// Offline downloads for the iPhone and iPad app,
 /// made once at launch so the background sessions reconnect:
 ///
 /// ```swift

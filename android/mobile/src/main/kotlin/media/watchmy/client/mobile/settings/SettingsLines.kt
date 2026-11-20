@@ -20,7 +20,7 @@ import media.watchmy.client.model.shortLabel
 import media.watchmy.client.presentation.Load
 import media.watchmy.client.presentation.settings.AccountLoad
 
-// What each group's row says is chosen (PLAN-ANDROID-SETTINGS.md §4.1–§4.2),
+// What each group's row says is chosen,
 // in the phone's line under the name and the tablet's shorter value beside it.
 
 /** A group's row: [long] under its name on a phone, [short] beside it on a tablet, [warn] with a warning mark. */
@@ -52,7 +52,7 @@ internal data class OverviewFacts(
     val serverVersion: String?,
     /** Live TV reminders are on here, and Android won't show them. */
     val remindersBlocked: Boolean,
-    /** The shows the person follows, or null where the server can't follow shows (PLAN-NEW-EPISODES.md §7.2). */
+    /** The shows the person follows, or null where the server can't follow shows. */
     val follows: Load<Int>? = null,
     /** This device's switch for new-episode notifications. */
     val notifyHere: Boolean = true,

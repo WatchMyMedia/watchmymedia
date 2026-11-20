@@ -31,7 +31,7 @@ func TestWriteAndSave(t *testing.T) {
 	}
 	_ = os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("port: 1\n"), 0o600)
 	// A picture an admin chose and a downloaded subtitle can't be fetched
-	// again, so both go in (PLAN-POSTERS.md).
+	// again, so both go in.
 	for _, name := range []string{ArtworkDir + "/c-0123456789abcdef01234567.jpg", DownloadedSubtitlesDir + "/1/en.srt"} {
 		path := filepath.Join(dir, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -107,7 +107,7 @@ func TestWriteAndSave(t *testing.T) {
 
 // The config file the server loaded is saved as config.yaml, wherever it is
 // and whatever it is called, in place of one left in the data directory: the
-// Linux packages keep theirs in /etc/watchmymedia (PLAN-LINUX.md §4).
+// Linux packages keep theirs in /etc/watchmymedia.
 func TestWriteSavesTheNamedConfigFile(t *testing.T) {
 	dir := t.TempDir()
 	conn, _ := dbtest.Open(t)

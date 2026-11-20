@@ -30,7 +30,7 @@ final class FirstRunAndSubtitleTests: XCTestCase {
         XCTAssertFalse(automatic.isEnabled)
     }
 
-    /// PLAN-LANGUAGES.md §5.6 on Apple TV: the audio languages, and the four
+    /// Audio & subtitles on Apple TV: the audio languages, and the four
     /// ways to start subtitles in a menu.
     @MainActor
     func testAudioLanguagesAndTheSubtitleChoiceMenu() {

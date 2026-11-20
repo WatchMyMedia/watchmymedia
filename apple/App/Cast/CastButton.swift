@@ -61,7 +61,7 @@ private struct NativeCastButton: UIViewRepresentable {
 /// which changes `CastService.media` and so anything that reads
 /// `CastService.state`; this follows the service and changes only when what
 /// it holds does, so the mini controllers in all five tabs don't redraw
-/// every second (PLAN-APPLE-REVIEW.md §4.3.6). One per service, shared.
+/// every second. One per service, shared.
 @MainActor @Observable
 final class CastMiniState {
     private(set) var active = false

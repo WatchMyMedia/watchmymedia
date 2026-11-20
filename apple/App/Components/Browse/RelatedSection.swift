@@ -3,8 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The rows at the end of a movie's or a show's page (PLAN-RELATED.md §7;
-/// MovieRelated, ShowRelated, Pad2MovieRelated and Pad2ShowRelated.dc.html):
+/// The rows at the end of a movie's or a show's page:
 /// the movie's collection and More like this, drawn with Home's poster rows
 /// and cards, without See all. A card opens its title's page over this one,
 /// so Back comes back here, to the row; a long press marks it. With no rows

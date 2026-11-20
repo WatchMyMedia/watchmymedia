@@ -4,7 +4,7 @@ import WMMModel
 import WMMUI
 
 /// Live TV: the guide with listings (LiveGuide.swift) when the server has
-/// them, otherwise the channel-only LiveGuide and the L8 iPad boards. On a
+/// them, otherwise the channel list. On a
 /// wide iPad with listings, Channels is that channel list with what is on.
 struct LiveTVScreen: View {
     @Environment(AppServices.self) private var services
@@ -13,7 +13,7 @@ struct LiveTVScreen: View {
     @State private var mode = LiveTVMode.guide
     /// The guide's model lives as long as the tab, not the guide's view, so
     /// Guide → Channels → Guide on iPad keeps the time shown, the selection
-    /// and the listings loaded (PLAN-APPLE-REVIEW.md §3.3.5).
+    /// and the listings loaded.
     @State private var guide = GuideModelHolder()
 
     var body: some View {
@@ -204,7 +204,7 @@ struct LiveHomeRow: View {
 /// Home's On now row with listings (`LiveHome`): each channel's programme
 /// with its picture, logo and number, minutes left and progress, then the guide.
 struct LiveOnNowRow: View {
-    /// On the iPad's Home screens (PLAN-HOME.md §7.6): "Row 7 of 7", and the leading channel's id.
+    /// On the iPad's Home screens: "Row 7 of 7", and the leading channel's id.
     var counter: String?
     var leading: Binding<String?>?
     @Environment(AppServices.self) private var services
@@ -240,7 +240,7 @@ struct LiveOnNowCard: View {
     let programme: LiveProgramme?
     let now: Date
     var width: CGFloat = 220
-    /// The gold ring of the iPad's leading card (PLAN-HOME.md §7.2).
+    /// The gold ring of the iPad's leading card.
     var leading = false
     @Environment(\.displayScale) private var displayScale
 

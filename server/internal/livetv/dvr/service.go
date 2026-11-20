@@ -657,7 +657,7 @@ func (s *Service) Reconcile(ctx context.Context) error {
 			r.Reason = "listing_gone"
 			if r.Series && r.RuleID != "" {
 				// A series simply drops an episode the listings no longer
-				// have (§4.3); it comes back if the listings bring it back.
+				// have; it comes back if the listings bring it back.
 				r.State = "skipped"
 			}
 		} else if e != nil {

@@ -64,7 +64,7 @@ func TestCheckPathStopsAtFolderLimit(t *testing.T) {
 // A folder the server is not allowed to look at is one it can't read, not
 // one that isn't there: a library in a home folder that is closed to the
 // packages' watchmymedia user was reported as not found, so the page never
-// said to give that user access (PLAN-LINUX.md §3.6).
+// said to give that user access.
 func TestCheckPathBehindAClosedFolder(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {

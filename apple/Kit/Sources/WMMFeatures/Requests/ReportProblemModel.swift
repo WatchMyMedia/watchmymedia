@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Report a problem (ReportProblem.dc.html), from a movie's or show's More
+/// Report a problem, from a movie's or show's More
 /// menu: the kind, a note, and what the server will attach.
 @MainActor
 @Observable

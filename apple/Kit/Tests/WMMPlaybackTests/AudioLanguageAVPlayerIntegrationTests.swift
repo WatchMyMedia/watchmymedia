@@ -8,8 +8,8 @@ import Testing
 /// throwaway loopback server: English (default), Spanish and an English
 /// commentary. A person with Spanish first gets direct play of track 2 when
 /// the profile says the player selects tracks, and AVPlayer's audible
-/// options line up with the server's tracks, so the player starts on it
-/// (PLAN-LANGUAGES.md §5.2, §8). Opt in with WMM_LANGUAGES_SERVER (the base
+/// options line up with the server's tracks, so the player starts on it.
+/// Opt in with WMM_LANGUAGES_SERVER (the base
 /// URL) and WMM_LANGUAGES_FILE (Copper Valley's file ID); it signs in as the
 /// fixture's viewer and saves their audio languages.
 @Suite @MainActor struct AudioLanguageAVPlayerIntegrationTests {

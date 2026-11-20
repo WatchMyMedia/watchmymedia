@@ -55,7 +55,7 @@ export function audioWords(track: AudioTrack): OptionWords {
   return { label: knownLanguage(track.language) ? languageName(track.language) : track.title || `Track ${track.index}`, detail: detail || undefined }
 }
 
-/** A subtitle track; an image one says picking it restarts the stream (PLAN-CLIENTS.md §2.3 item 7). */
+/** A subtitle track; an image one says picking it restarts the stream. */
 export function subtitleWords(track: SubtitleTrack): OptionWords {
   const label = knownLanguage(track.language) ? languageName(track.language) : track.title || 'Unknown language'
   const detail = [track.source === 'opensubtitles' ? 'OpenSubtitles' : track.external ? 'External' : undefined,

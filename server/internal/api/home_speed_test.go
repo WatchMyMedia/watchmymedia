@@ -20,7 +20,7 @@ import (
 // TMDB, 14,000 of them on disk), with 116 movie files and 1,300 episode
 // files waiting on a match, spread over a hundred folders. A third of those
 // folders belong to shows already in the library. Every other movie has a
-// trailer file (PLAN-TRAILERS.md §5.2), pending as trailers stay, which
+// trailer file, pending as trailers stay, which
 // every count and work list leaves out.
 func seedHomeLibrary(tb testing.TB, conn *sql.DB, now time.Time) (tvLibrary int64) {
 	tb.Helper()

@@ -5,7 +5,7 @@ import WMMFakes
 import WMMModel
 
 /// The browse screens as the Apple TV app uses them: the season tabs, the library's
-/// Decade menu and header (TvLibrary.dc.html), and Menu on the Siri Remote.
+/// Decade menu and header, and Menu on the Siri Remote.
 @MainActor
 @Suite struct AppleTVBrowseTests {
     let library = TestLibrary()

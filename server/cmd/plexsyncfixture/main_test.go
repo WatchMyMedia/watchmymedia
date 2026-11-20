@@ -163,8 +163,8 @@ func TestImportPreservesExistingClientStateAndIndependentHistory(t *testing.T) {
 			t.Fatalf("movie %d watched = %v; want %v", check.movie, watched, check.watched)
 		}
 	}
-	// Play next follows on from the episode finished last (PLAN-SHOW-PAGE.md,
-	// decision 10): the viewer finished E02 only, so E03, not the skipped E01.
+	// Play next follows on from the episode finished last:
+	// the viewer finished E02 only, so E03, not the skipped E01.
 	for _, check := range []struct {
 		browser browser
 		next    int64

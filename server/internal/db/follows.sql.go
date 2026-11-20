@@ -59,7 +59,7 @@ SELECT added_at FROM media_files WHERE id = ?
 `
 
 // When a file counts as added, as the New badge reads it, for the arrival
-// rule (PLAN-NEW-EPISODES.md section 5.2).
+// rule.
 func (q *Queries) GetMediaFileAddedAt(ctx context.Context, id int64) (string, error) {
 	row := q.db.QueryRowContext(ctx, getMediaFileAddedAt, id)
 	var added_at string
@@ -173,7 +173,7 @@ type ListFollowedArrivalsRow struct {
 	ShowPosterPath *string `json:"show_poster_path"`
 }
 
-// What a person hears about (section 5.4), in the order it arrived: the
+// What a person hears about, in the order it arrived: the
 // announced arrivals of shows they follow, after both the device's cursor
 // and the follow and up to upto, since a date (the week, or the wait),
 // that they haven't finished in any library, as the show page says.
@@ -277,7 +277,7 @@ type ListNewestFollowedArrivalsRow struct {
 	FileID           int64   `json:"file_id"`
 }
 
-// Home's row "New from shows you follow" (section 5.5): the same
+// Home's row "New from shows you follow": the same
 // arrivals as ListFollowedArrivals since a date, newest first, with what
 // an episode card shows and the episode row's tallest present file.
 func (q *Queries) ListNewestFollowedArrivals(ctx context.Context, arg ListNewestFollowedArrivalsParams) ([]ListNewestFollowedArrivalsRow, error) {

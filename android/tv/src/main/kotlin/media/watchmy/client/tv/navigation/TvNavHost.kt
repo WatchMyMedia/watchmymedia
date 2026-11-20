@@ -88,7 +88,7 @@ fun NavHostController.navigateSection(route: Any) = navigate(route) {
 private fun NavHostController.navigateFrom(route: Any) =
     if (route is TvRoutes.MediaList || route is TvRoutes.RowSettings) navigate(route) else navigateSection(route)
 
-/** The one page for a show, a season or an episode (PLAN-SHOW-PAGE.md §4.3): what goes on top first is [arrival]'s. */
+/** The one page for a show, a season or an episode: what goes on top first is [arrival]'s. */
 @Composable
 private fun ShowPage(nav: NavHostController, showId: Long, arrival: ShowArrival) {
     ShowPageScreen(
@@ -119,7 +119,7 @@ fun TvNavHost(
     val services = media.watchmy.client.ui.LocalAppServices.current
     val liveModel = viewModel { LiveChannelsViewModel(services.live, services.servers, services.auth) }
     val live by liveModel.state.collectAsStateWithLifecycle()
-    // The channel list is polled only while a screen showing channels is on screen (§4.1.3).
+    // The channel list is polled only while a screen showing channels is on screen.
     val showChannels = remember(liveModel) { liveModel::showing }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val watchLive = { channel: LiveChannel ->
@@ -132,7 +132,7 @@ fun TvNavHost(
         guideTarget = target
         nav.navigateSection(TvRoutes.LiveTV)
     }
-    // Reminders on the TV (PLAN-LIVE-TV-GUIDE.md §6.5): read while the app is open, and again on the server's event.
+    // Reminders on the TV: read while the app is open, and again on the server's event.
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             launch { attempt { services.live.refreshReminders() } }
@@ -142,7 +142,7 @@ fun TvNavHost(
     val format = rememberLiveClockFormat()
     val bannerModel = viewModel { ReminderBannerViewModel(services.live) }
     val due by bannerModel.banner.collectAsStateWithLifecycle()
-    // Nothing of ours is drawn over YouTube's player (PLAN-TV-TRAILERS.md §3.3): a reminder waits for the trailer to close.
+    // Nothing of ours is drawn over YouTube's player: a reminder waits for the trailer to close.
     val entry by nav.currentBackStackEntryAsState()
     val banner = due.takeUnless { entry?.destination?.hasRoute<TvRoutes.Trailer>() == true }
     val dismiss = bannerModel::dismiss

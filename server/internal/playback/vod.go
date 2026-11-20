@@ -1516,7 +1516,7 @@ func (v *vodState) Master() []byte {
 	}
 	b.WriteString("\n" + VODMedia + "\n")
 	if f := v.opts.IFrames; f != nil {
-		// Tiles are SDR whatever the video is (PLAN-TRICKPLAY.md decision 9).
+		// Tiles are SDR whatever the video is.
 		fmt.Fprintf(&b, "#EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=%d,CODECS=%q,RESOLUTION=%dx%d,VIDEO-RANGE=SDR,URI=%q\n",
 			max(f.Bandwidth, 1), f.Codecs, f.Width, f.Height, VODIFrames)
 	}

@@ -12,7 +12,7 @@ import { TurnOffProtectionDialog, TurnOffRemoteAdminDialog } from './TurnOffDial
 const flowHref = (step: string) => settingsHref('security', 'sign-in-protection', step)
 
 /**
- * Settings › Security (§5.6): where this browser is and what that means,
+ * Settings › Security: where this browser is and what that means,
  * then sign-in protection and admin settings away from home, with the
  * complete list of what asks for the password away from home.
  */
@@ -110,7 +110,7 @@ function SignInProtection() {
   )
 }
 
-/** Everything that asks for the password again away from home (the map's table and §8's additions). */
+/** Everything that asks for the password again away from home. */
 const GUARDED = [
   'Adding a library or changing its folder, and removing a library',
   'Testing, adding, moving or removing a tuner',

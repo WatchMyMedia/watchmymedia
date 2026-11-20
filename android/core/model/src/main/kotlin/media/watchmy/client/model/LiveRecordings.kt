@@ -161,7 +161,7 @@ data class RecordingOptions(val series: Boolean = false, val newOnly: Boolean = 
     val valid: Boolean get() = keep in 0..10 && padBefore in RECORDING_PADDING && padAfter in RECORDING_PADDING
 }
 
-/** The longest manual recording (PLAN-LIVE-TV-DVR.md §3.1, New recording). */
+/** The longest manual recording. */
 const val MANUAL_RECORDING_MAX_MS = 12 * 3_600_000L
 
 /** The form's repeat choices: "Once", "Every day", "Weekdays", "Every Tuesday" (the start's day). */
@@ -237,7 +237,7 @@ fun recordingClashLabel(reason: String?, holders: List<String> = emptyList()): S
 /** "Coastline Rescue", "Coastline Rescue and Harbor Evening News", "A, B and C" */
 private fun namesList(names: List<String>): String = if (names.size <= 1) names.joinToString() else names.dropLast(1).joinToString(", ") + " and " + names.last()
 
-// The clash a Record or a Won't record row shows, to choose which recording gives way (§3.1).
+// The clash a Record or a Won't record row shows, to choose which recording gives way.
 
 /** "The tuners are busy at 9:00 PM" */
 fun LiveRecording.clashTitle(format: LiveClockFormat): String =

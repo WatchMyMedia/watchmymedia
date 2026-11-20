@@ -126,9 +126,9 @@ data class ScrubberBand(val kind: SegmentKind, val start: Float, val end: Float)
 }
 
 /**
- * The faint bands the scrubber draws for intros, credits and the like
- * (PLAN-CLIENTS.md §2.3 item 4), one per segment that lies at least partly
- * inside the file. A segment with no end runs to the end of the file.
+ * The faint bands the scrubber draws for intros, credits and the like,
+ * one per segment that lies at least partly inside the file. A segment
+ * with no end runs to the end of the file.
  */
 fun scrubberBands(segments: List<Segment>, durationMs: Long): List<ScrubberBand> {
     if (durationMs <= 0) return emptyList()

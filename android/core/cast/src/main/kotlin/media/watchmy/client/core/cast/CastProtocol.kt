@@ -30,7 +30,7 @@ object CastProtocol {
     /** LOAD's media.contentId. */
     fun contentId(fileId: Long) = "$CONTENT_PREFIX$fileId"
 
-    /** LOAD's media.contentId for a Live TV channel (PLAN-LIVE-TV.md §4.1). */
+    /** LOAD's media.contentId for a Live TV channel. */
     fun liveContentId(channelId: String) = "wmm:live:$channelId"
 
     /**

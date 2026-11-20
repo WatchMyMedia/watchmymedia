@@ -2,7 +2,7 @@ import SwiftUI
 import WMMModel
 
 // The pieces every listings screen draws the same way on iPhone, iPad and
-// Apple TV (PLAN-LIVE-TV-GUIDE.md §6.1): a channel's logo or its number and
+// Apple TV: a channel's logo or its number and
 // name, a programme's picture with the logo standing in when it has none,
 // the New, Live and HD tags, and how far through a programme is.
 
@@ -38,7 +38,7 @@ public struct LiveLogo<Fallback: View>: View {
 }
 
 /// A programme's 16:9 picture. Without one, the channel's logo on a dark
-/// tile, or its number and name, carry it (§4.1's last steps). Pictures are
+/// tile, or its number and name, carry it. Pictures are
 /// decorative: the title beside them is the text.
 public struct LivePictureView: View {
     let programme: LiveProgramme?

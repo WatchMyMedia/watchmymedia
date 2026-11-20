@@ -1,7 +1,7 @@
 import XCTest
 
-/// Buttons and chips follow the system's text size (PLAN-APPLE-REVIEW.md
-/// §2.8): a movie's page and the Movies filters at the largest accessibility
+/// Buttons and chips follow the system's text size:
+/// a movie's page and the Movies filters at the largest accessibility
 /// size, on the fakes. The buttons grow with their text and stay on screen.
 final class TextSizeTests: XCTestCase {
     override func setUp() async throws { continueAfterFailure = false }

@@ -66,7 +66,7 @@ public struct Artwork: View {
 
     /// Loads `url` into the memory cache ahead of showing it, so a row screen's
     /// neighbouring cards do not flash their placeholder when focus reaches
-    /// them (PLAN-HOME.md §7.2). Nothing happens for nil or a cached picture;
+    /// them. Nothing happens for nil or a cached picture;
     /// a view that asks while it loads waits for this load.
     public static func prefetch(_ url: URL?, maxPixel: CGFloat, loader: any ImageLoader) async {
         guard let url else { return }

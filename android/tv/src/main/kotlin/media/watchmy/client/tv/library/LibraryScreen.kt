@@ -95,11 +95,11 @@ import androidx.compose.ui.focus.focusProperties
 private enum class Picker { Sort, Decade }
 
 /**
- * TV Shows or Movies (mockup: design/mockups/android-tv/Library.dc.html):
+ * TV Shows or Movies:
  * an 8-column poster grid under the sort control and the filter, genre and
  * decade chips, loading more as focus nears the end. A row's See all, on
  * Home or above the grid, opens it sorted the row's way with focus on its
- * first card (PLAN-SEE-ALL.md §4.4).
+ * first card.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -122,13 +122,13 @@ fun LibraryScreen(
     val gridState = rememberLazyGridState()
     // Whether focus is somewhere on this screen's content already, which first focus leaves alone.
     var contentFocused by remember { mutableStateOf(false) }
-    // The A–Z strip, when sorted by title, and two rows at a time with Page Up/Down or CH+/CH− (§6.2).
+    // The A–Z strip, when sorted by title, and two rows at a time with Page Up/Down or CH+/CH−.
     val jumps = rememberGridJumps(vm, memory, gridState)
     val byTitle = state.choices.sort == ItemSort.Title && !state.letters.isNullOrEmpty()
     var onStrip by remember { mutableStateOf(false) }
     LaunchedEffect(state.jump?.revision) { jumps.jumped(state) }
     val title = if (type == LibraryType.Tv) "TV Shows" else "Movies"
-    // The library's rows above the grid, from servers that arrange them (PLAN-ROWS.md Decision 11).
+    // The library's rows above the grid, from servers that arrange them.
     val rowsVm = viewModel(key = "tv-library-rows-$type") { LibraryRowsViewModel(services.library, services.rows) }
     ReportShown(rowsVm::setShown)
     val rows by rowsVm.state.collectAsStateWithLifecycle()
@@ -226,7 +226,7 @@ fun LibraryScreen(
                         }
                         JumpHints(onStrip, jumps.stripLetter, byTitle, Modifier.align(Alignment.BottomStart))
                         // Once, when the grid first shows (or comes back after Back): a filter
-                        // chosen on the chips leaves focus on its chip (§3.2.2).
+                        // chosen on the chips leaves focus on its chip.
                         LaunchedEffect(Unit) {
                             withFrameNanos { }
                             if (!contentFocused) memory.restore(fallback = state.items.firstOrNull()?.let { "item:${it.id}" })
@@ -274,7 +274,7 @@ fun LibraryScreen(
 }
 
 /**
- * Movies or TV Shows with their rows (android-tv/LibraryRows.dc.html): the
+ * Movies or TV Shows with their rows: the
  * title and its counts, the library's rows in the person's order (each with
  * somewhere to go ending with See all: a list's page, or the grid below
  * sorted the row's way, [onSeeAll]), Edit rows (Settings › Home rows on
@@ -395,10 +395,10 @@ private fun ArrangedLibrary(
     val first = drawn.firstOrNull()?.cardKey() ?: state.items.firstOrNull()?.let { "item:${it.id}" } ?: "edit"
     // Where first focus went. Rows that arrive after the grid move it up to them, but only while
     // it is still there: once the person has moved it (a chip, a filter), the page leaves it be,
-    // where it used to throw it back to the top after every filter (§3.2.2).
+    // where it used to throw it back to the top after every filter.
     var placed by remember { mutableStateOf<String?>(null) }
     // A row's See all, on Home or above the grid, lands on the grid's first card under All shows, the rows a
-    // scroll up away (PLAN-SEE-ALL.md §4.4). Rows that arrive afterwards leave focus there.
+    // scroll up away. Rows that arrive afterwards leave focus there.
     var atGrid by remember { mutableStateOf(false) }
     val gridAsked = state.toGrid && !state.loading && !state.refreshing
     LaunchedEffect(gridAsked) {
@@ -459,7 +459,7 @@ private fun ChipRow(vm: LibraryViewModel, state: LibraryViewModel.State, memory:
     }
 }
 
-/** A 190×285 poster (`.card`): the New badge, the watched check and progress (no quality badge, PLAN-HOME.md §5). */
+/** A 190×285 poster (`.card`): the New badge, the watched check and progress (no quality badge). */
 @Composable
 private fun GridCard(item: BrowseItem, imageUrl: String?, onClick: () -> Unit, onLongClick: (() -> Unit)?, modifier: Modifier = Modifier, narrow: Boolean = false) {
     MediaCard(

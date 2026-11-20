@@ -477,7 +477,7 @@ func TestMigrationPlexDurableImports(t *testing.T) {
 	}
 }
 
-// Migration 38 adds trailer files (PLAN-TRAILERS.md §5.2). It moves no data:
+// Migration 38 adds trailer files. It moves no data:
 // files keep their match until the next scan reads their names. A trailer
 // lets its movie go when the movie is deleted, and going down removes
 // trailer rows, which older servers skip.
@@ -562,7 +562,7 @@ func TestMigrationMovieTrailers(t *testing.T) {
 }
 
 // Going back below the chosen-poster columns puts TMDB's posters back, so
-// an older server never shows a path it cannot serve (PLAN-POSTERS.md).
+// an older server never shows a path it cannot serve.
 func TestMigrationCustomPosters(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -621,7 +621,7 @@ func TestMigrationCustomPosters(t *testing.T) {
 }
 
 // The library as it stands when following arrives has arrived already,
-// quietly: nobody is told about it (PLAN-NEW-EPISODES.md section 5.1).
+// quietly: nobody is told about it.
 // Each TMDB episode with a link in any library gets one quiet arrival, on
 // the episode row linked first and in the order the files came; an
 // unmatched file and a movie's give none. An arrival outlives its episode
@@ -720,7 +720,7 @@ func TestMigrationShowFollows(t *testing.T) {
 // clears those marks, and only those: a mark made here, on an episode no
 // library has had a file for, that hadn't aired by the mark's day. An
 // aired episode's mark, one with a file in either library, an import's
-// mark and progress stay (PLAN-NEW-EPISODES.md section 5.4).
+// mark and progress stay.
 func TestMigrationClearsUnairedMarks(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

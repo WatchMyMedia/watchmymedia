@@ -32,12 +32,12 @@ import { RemotePlayer } from './RemotePlayer'
 // back is a path on this site and may carry a query (an old season page's ?episode=),
 // so it is followed as an href: as a `to` the query would read as part of the path.
 // Links pass to="/" too, which the router uses only when there is no back.
-// trailer marks a movie's trailer file, which returns to back when it ends (PLAN-TRAILERS.md §6.1).
+// trailer marks a movie's trailer file, which returns to back when it ends.
 type Props = { fileId: number; recordingId?: string; start?: number; title?: string; back?: string; trailer?: boolean }
 
 /**
- * Plays one file here, or on the TV while this browser is casting
- * (PLAN-CAST.md §5.1). When casting ends, the remote stays up and offers to
+ * Plays one file here, or on the TV while this browser is casting.
+ * When casting ends, the remote stays up and offers to
  * carry on here.
  */
 export function Player(props: Props) {
@@ -114,10 +114,10 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
   const durationRef = useRef(0)
   const stateRef = useRef<PlayState>('buffering')
   const lastBeat = useRef(0)
-  // A seek has landed since the last report (PLAN-RESUME.md §3.6).
+  // A seek has landed since the last report.
   const seekLanded = useRef(false)
-  // What the heartbeats measure for Automatic quality (PLAN-AUTO-QUALITY.md
-  // §3.1): stalls and startup, and hls.js's estimate once it has sampled a
+  // What the heartbeats measure for Automatic quality:
+  // stalls and startup, and hls.js's estimate once it has sampled a
   // fragment (before that it gives its default).
   const [meter] = useState(() => new StallMeter())
   const measuredHls = useRef<Hls | null>(null)
@@ -260,7 +260,7 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
           const subTrack = prev?.subtitles.find((s) => s.id === sub)
           meter.asked(Date.now())
           // No explicit start: ask for none, so the server starts where this
-          // user resumes (PLAN-RESUME.md §3.7).
+          // user resumes.
           const resuming = o.resume !== false && start === undefined && from === 0
           const d = await startPlayback(fileId, {
             startMs: resuming ? undefined : Math.floor(from * 1000),

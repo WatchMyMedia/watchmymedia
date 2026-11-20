@@ -43,7 +43,7 @@ public struct QRMatrix: Hashable, Sendable {
 }
 
 /// A QR code on a white card with its quiet zone, as the Apple TV sign-in and
-/// privacy screens show it (TvMain.dc.html). Scanning it opens `text`.
+/// privacy screens show it. Scanning it opens `text`.
 public struct QRCodeView: View {
     let matrix: QRMatrix?
 

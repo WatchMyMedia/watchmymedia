@@ -1,6 +1,6 @@
 import type { components } from '../api/schema'
 
-// Edit rows (PLAN-ROWS.md §5): the order a person gives a screen's rows and
+// Edit rows: the order a person gives a screen's rows and
 // which are hidden, kept as a draft until Done saves it.
 
 export type RowLayoutEntry = components['schemas']['RowLayoutEntry']
@@ -123,7 +123,7 @@ export function ownerLabel(owner: string | undefined): string {
   return 'List'
 }
 
-/** The most rows a screen draws (PLAN-ROWS.md Decision 13). */
+/** The most rows a screen draws. */
 export const MAX_ROWS = 30
 
 export type RowView = { note?: string; over: boolean; divider: boolean }

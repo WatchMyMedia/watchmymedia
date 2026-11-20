@@ -3,8 +3,8 @@
 
 The server's document closes every object (`additionalProperties: false`),
 and swift-openapi-generator then refuses any field it does not know. Clients
-must ignore unknown fields so a newer server does not break an older app
-(PLAN-CLIENTS.md §2.1), so this drops those markers and changes nothing else.
+must ignore unknown fields so a newer server does not break an older app,
+so this drops those markers and changes nothing else.
 
     openapi-for-swift.py api/openapi.json apple/build/openapi-swift.json
 """

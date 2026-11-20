@@ -193,8 +193,8 @@ func TestLiveTVGuide(t *testing.T) {
 	}
 }
 
-// A guide window for 100 channels over 6 hours stays under the plan's
-// 300 KB gzipped (§5.6).
+// A guide window for 100 channels over 6 hours stays under
+// 300 KB gzipped.
 func TestLiveTVGuideReplyBudget(t *testing.T) {
 	t.Parallel()
 	e := newGuideEnv(t)

@@ -108,7 +108,7 @@ const adminRoute = createRoute({
     throw redirect({ to: '/settings', replace: true })
   },
 })
-// Pages and tasks under a tab (PLAN-ADMIN-SETTINGS.md §4) share the tab's
+// Pages and tasks under a tab share the tab's
 // component, which reads the rest of the address; one that names no page goes
 // to the tab's hub.
 function settingsSubpageGuard({ location }: { location: { pathname: string } }) {
@@ -167,7 +167,7 @@ const searchRoute = createRoute({
   },
 })
 
-// A list's See all page: every title in order, the missing ones dimmed (PLAN-ROWS.md §5).
+// A list's See all page: every title in order, the missing ones dimmed.
 const listRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/lists/$listId',
@@ -178,7 +178,7 @@ const listRoute = createRoute({
   }, ListPage),
 })
 
-// Make a list (PLAN-ROWS.md §5): from Add a row, or Settings › Lists for the household.
+// Make a list: from Add a row, or Settings › Lists for the household.
 const newListRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/lists/new',
@@ -217,7 +217,7 @@ const movieRoute = createRoute({
   },
 })
 
-// A movie's YouTube trailer, full screen like the player (PLAN-TRAILERS.md §6.1).
+// A movie's YouTube trailer, full screen like the player.
 // A trailer file plays in the player instead.
 const trailerRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -229,7 +229,7 @@ const trailerRoute = createRoute({
   }, TrailerPage),
 })
 
-// The one show page (PLAN-SHOW-PAGE.md): the show's, a season's and an
+// The one show page: the show's, a season's and an
 // episode's addresses draw the same page, and only the episode on top
 // differs. Keyed by show, so another show starts afresh; within a show the
 // page keeps its place as the address moves between episodes.

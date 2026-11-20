@@ -89,7 +89,7 @@ describe('deleteHint', () => {
   })
 })
 
-// The plan's example manifest: a 2-hour film, 724 tiles on 8 sheets.
+// An example manifest: a 2-hour film, 724 tiles on 8 sheets.
 const film: Trickplay = { intervalMs: 10000, width: 320, height: 180, columns: 10, rows: 10, count: 724, sheets: 8, url: '/api/files/42/trickplay/9c1e07a2/{sheet}.jpg' }
 
 describe('usableTrickplay', () => {

@@ -142,7 +142,7 @@ internal enum class Overlay {
 /** A followed show's side panel (the boards' `tv-settings`): its page, or stop notifying. */
 private enum class FollowAction(val label: String) { GoToShow(GO_TO_SHOW), Stop(STOP_NOTIFYING) }
 
-/** What a quality does, under it in Settings (SettingsQuality.dc.html). */
+/** What a quality does, under it in Settings. */
 internal fun qualityDescription(quality: StreamQuality): String = when (quality) {
     StreamQuality.Auto -> "Original first, lower when it can’t keep up"
     StreamQuality.Original -> "Direct play when the device can"
@@ -191,8 +191,8 @@ private val LastRowSaver = listSaver<SnapshotStateMap<SettingsGroup, String>, St
 )
 
 /**
- * Settings as groups (android-tv/SettingsGroups.dc.html,
- * PLAN-ANDROID-SETTINGS.md §4.3): the groups down the left in
+ * Settings as groups:
+ * the groups down the left in
  * [SettingsGroup] order, each with what is chosen in it, and the focused
  * group's rows on the right. Moving focus through the groups swaps the
  * pane, with no press; ▶ or OK goes into it, on its top row or the row left
@@ -207,7 +207,7 @@ private val LastRowSaver = listSaver<SnapshotStateMap<SettingsGroup, String>, St
  * server serves them; Your requests where requests are possible; Inbox and
  * Server settings for admins. [onOpenRequests] takes whether to open on the
  * Inbox. [rowsScreen] opens on Home rows for that screen (a library's Edit
- * rows, PLAN-ROWS.md §8.2).
+ * rows).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -237,7 +237,7 @@ fun SettingsScreen(
     val homeRowsState = homeRows?.state?.collectAsStateWithLifecycle()?.value
     val myRequests = if (badge.requests) viewModel(key = "tv-settings-requests") { MyRequestsViewModel(services.requests) } else null
     val myRequestsState = myRequests?.state?.collectAsStateWithLifecycle()?.value
-    // Following shows (PLAN-NEW-EPISODES.md §7.2): the list, for the group's line and its pane; this TV doesn't notify.
+    // Following shows: the list, for the group's line and its pane; this TV doesn't notify.
     val followsAvailable = ServerFeatures(apiLevel).follows
     val notifications = if (followsAvailable) viewModel(key = "tv-notifications") { NotificationsViewModel(services.follows) } else null
     val notificationsState = notifications?.state?.collectAsStateWithLifecycle()?.value
@@ -522,7 +522,7 @@ fun SettingsScreen(
                 BackClosesNote()
             },
         )
-        // A skip row's four modes, each with what it does (android-tv/SettingsGroupPlayback.dc.html, Tweak `overlay`: `choices`).
+        // A skip row's four modes, each with what it does.
         Overlay.Skip -> OptionsDialog(
             title = skipKind.skipRowLabel,
             context = "Playback · your account",

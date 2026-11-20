@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** A row's See all (PLAN-SEE-ALL.md §3, §4.4): its words, the grid choices it hands over, and which of Home's libraries it opens. */
+/** A row's See all: its words, the grid choices it hands over, and which of Home's libraries it opens. */
 class SeeAllTest {
     private val tv = 2L
     private val movies = 1L

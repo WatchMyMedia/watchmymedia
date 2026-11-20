@@ -3,8 +3,8 @@ import Testing
 @testable import WMMData
 import WMMModel
 
-/// Reference data asked for once by everyone who asks at the same time
-/// (PLAN-APPLE-REVIEW.md §4.1.3): launch, the sign-in and the foreground
+/// Reference data asked for once by everyone who asks at the same time:
+/// launch, the sign-in and the foreground
 /// refresh all want the request options, Live TV's access and the server's
 /// level at once.
 @MainActor

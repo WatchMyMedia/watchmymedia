@@ -57,7 +57,7 @@ internal fun TvRecordingChoice(programme: LiveProgramme, model: LiveRecordingsVi
 
 /**
  * The clash as a side panel, from the web's DvrTakeover clash dialog and the
- * TV guide board's Won't record panel (Android's canvas has no clash board):
+ * TV guide board's Won't record panel (Android has no clash board):
  * the recordings holding the tuners, a Record this instead of … for each
  * one that can still give way, and Keep them. It never takes a tuner by
  * itself; Back keeps the holders.
@@ -98,7 +98,7 @@ internal fun TvRecordingClash(clash: LiveRecording, model: LiveRecordingsViewMod
     }
 }
 
-/** A clash's orange (PLAN-LIVE-TV-DVR.md §3.1, Colours). */
+/** A clash's orange. */
 private val ClashTone = Color(0xFFFDBA74)
 
 @Composable

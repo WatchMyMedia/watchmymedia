@@ -23,7 +23,7 @@ import media.watchmy.client.core.api.models.ScreenRow as ApiScreenRow
 import media.watchmy.client.core.api.models.ScreenRowLink as ApiScreenRowLink
 
 /*
- * Rows, layouts and lists (PLAN-ROWS.md §6) as the app's model. Styles,
+ * Rows, layouts and lists as the app's model. Styles,
  * source kinds, link kinds and owners are plain strings in the API: a row of
  * a style this app doesn't know is left out, and a See all of a kind it
  * doesn't know is dropped, so later row types need no app change to be safe.

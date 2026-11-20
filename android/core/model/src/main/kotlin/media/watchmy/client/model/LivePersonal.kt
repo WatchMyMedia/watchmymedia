@@ -1,10 +1,8 @@
 package media.watchmy.client.model
 
 /*
- * Favourite channels, search across the listings and reminders
- * (PLAN-LIVE-TV-GUIDE.md §5.7 and §6.5, G8), from [LIVE_PERSONAL_API_LEVEL].
- * The wording here is the boards' (LiveGuideExtras, LiveSearch,
- * LiveReminders, TabLiveExtras and the TV's LiveReminder), shared by the
+ * Favourite channels, search across the listings and reminders, from
+ * [LIVE_PERSONAL_API_LEVEL]. The wording here is the boards', shared by the
  * phone, the tablet and the TV, and matches the Apple apps' WMMModel LiveWording.swift.
  */
 

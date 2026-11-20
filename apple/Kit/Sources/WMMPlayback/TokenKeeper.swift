@@ -2,7 +2,7 @@ import Foundation
 import WMMModel
 
 /// The media token a controller plays with, for the file player and Live TV
-/// alike (PLAN-APPLE-REVIEW.md §5.1). It is timed on this device's
+/// alike. It is timed on this device's
 /// monotonic clock from what was left of it when it came, with a floor
 /// (``tokenMinLifetimeMs``), so a device clock that disagrees with the
 /// server's cannot make a player renew it, and reload, over and over. It is

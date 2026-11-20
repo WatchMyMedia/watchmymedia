@@ -357,8 +357,8 @@ private fun LivePlayerContent(
 }
 
 /**
- * The warning before a recording takes this tuner (PLAN-LIVE-TV-DVR.md §3.1,
- * Taken over). It never takes focus: its keys are read first ([BannerKeys]),
+ * The warning before a recording takes this tuner.
+ * It never takes focus: its keys are read first ([BannerKeys]),
  * Hold OK for Don't record it (whoever set it and admins) and Back to
  * dismiss it. TalkBack reads it out as it appears.
  */

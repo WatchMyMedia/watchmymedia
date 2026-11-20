@@ -18,7 +18,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.ConscryptMode
 
 /**
- * Which Keystore failures sign an account out (PLAN-ANDROID-REVIEW.md §3.4.1):
+ * Which Keystore failures sign an account out:
  * only a token that can never be opened. The sealer runs here on a key of the
  * JVM's own, standing in for the Android Keystore's: Robolectric's Conscrypt
  * is off, since the JDK's AES-GCM refuses to load beside it.

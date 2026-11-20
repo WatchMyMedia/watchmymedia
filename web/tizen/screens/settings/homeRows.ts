@@ -2,7 +2,7 @@ import type { components } from '../../../src/api/schema'
 import { libraryScreen } from '../../../src/lib/screenRows'
 import { MAX_ROWS, moveRow, setHidden, type RowLayoutEntry } from '../../../src/lib/rowLayout'
 
-// Settings › Home rows (SettingsHomeRows on the canvas): the screens whose
+// Settings › Home rows: the screens whose
 // rows a person arranges, each row's line, and what its side panel offers.
 // Every change saves at once, as on Android TV.
 

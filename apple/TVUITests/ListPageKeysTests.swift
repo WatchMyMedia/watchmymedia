@@ -1,7 +1,7 @@
 import XCTest
 
-/// Page Up and Page Down on a list's page (TvListPage.dc.html), as on the
-/// library grids (TvLibraryAZ.dc.html): two rows in the same column. On the
+/// Page Up and Page Down on a list's page, as on the
+/// library grids: two rows in the same column. On the
 /// fakes' Top rated science fiction, twelve titles in two rows of seven.
 /// Runs in `make apple-tv-test-sim`.
 final class ListPageKeysTests: XCTestCase {

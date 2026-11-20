@@ -18,7 +18,7 @@ public final class FakeLiveTVRepository: LiveTVRepository {
     public var offered = LiveTVCapabilities(enabled: true, allowed: true, playback: true)
     public var availableChannels = sampleChannels
     public var failure: String?
-    /// The boards' listings; nil for channels without listings, as before G5.
+    /// The boards' listings; nil for channels without listings.
     public var listings: FakeLiveGuide? {
         didSet { listingsChanged() }
     }

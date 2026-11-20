@@ -285,7 +285,7 @@ class FakeRequestRepository(
 
     /** The catalogue entry with what has been asked for since. */
     /**
-     * What Request would do for a title on a list (PLAN-ROWS.md §6.3), as the
+     * What Request would do for a title on a list, as the
      * server says it: null below [REQUESTS_API_LEVEL], for someone who can't
      * request, and for a title TMDB's fake doesn't have.
      */

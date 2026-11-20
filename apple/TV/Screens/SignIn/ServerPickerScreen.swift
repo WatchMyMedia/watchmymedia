@@ -6,7 +6,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Choosing a server (TvServerPicker.dc.html): servers found on this
+/// Choosing a server: servers found on this
 /// network (live while the screen is up) and remembered ones, a long press
 /// on a remembered one to Forget it, and an address typed with the system
 /// keyboard, with the note that a host name needs https.

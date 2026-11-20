@@ -2,7 +2,7 @@ import Foundation
 import WMMModel
 
 /// What Play/Pause does on a focused card on Apple TV, where Select opens
-/// the card's page (PLAN-APPLE-REVIEW.md §6.2). Only what the card's own data
+/// the card's page. Only what the card's own data
 /// supports plays: a show's card knows no single episode to play, so it opens
 /// the show as Select does, and the page has Play ready.
 public enum CardPlayPause: Hashable, Sendable {

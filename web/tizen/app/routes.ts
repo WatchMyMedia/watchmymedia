@@ -24,7 +24,7 @@ export type PlayRequest =
   | { kind: 'recording'; id: string; startMs?: number; title?: string }
   | { kind: 'trailer'; movieId: number; title?: string; youtubeKey?: string; fileId?: number }
 
-/** Settings' groups (SettingsGroups on the canvas), in the order the left column lists them. */
+/** Settings' groups, in the order the left column lists them. */
 export type SettingsGroup = 'playback' | 'languages' | 'homeRows' | 'notifications' | 'account' | 'requests' | 'about' | 'inbox' | 'server'
 
 export type Route =
@@ -36,11 +36,11 @@ export type Route =
   /** Settings, opened at a group (Home's Edit rows opens `homeRows` at that screen). */
   | { name: 'settings'; group?: SettingsGroup; rowsScreen?: 'home' | 'movie' | 'tv' }
   // Pages: each opens on top of what opened it.
-  /** A row's See all: its library sorted the row's way (PLAN-SEE-ALL.md). */
+  /** A row's See all: its library sorted the row's way. */
   | { name: 'seeAll'; libraryId: number; title: string; sort?: string; filter?: string; genre?: string; decade?: number }
   | { name: 'list'; id: number }
   | { name: 'movie'; id: number }
-  /** The show page (PLAN-SHOW-PAGE.md): up next on top, or a season's start, or an episode. */
+  /** The show page: up next on top, or a season's start, or an episode. */
   | { name: 'show'; id: number; season?: number; episodeId?: number }
   | { name: 'requests'; inbox?: boolean }
   /** The guide, at a channel or a time (ms since the epoch). */

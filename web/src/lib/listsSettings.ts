@@ -1,6 +1,6 @@
 import type { RowLayoutEntry } from './rowLayout'
 
-// Settings › Server › Lists (PLAN-ADMIN-SETTINGS.md §5.9): default rows are
+// Settings › Server › Lists: default rows are
 // a draft with the save bar, and a save refused for a row that no longer
 // exists takes that row out of the draft.
 

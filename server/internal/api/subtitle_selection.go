@@ -12,7 +12,7 @@ import (
 )
 
 // trackPreferences are what a play's starting audio and subtitle tracks
-// follow (PLAN-LANGUAGES.md).
+// follow.
 type trackPreferences struct {
 	audio     []string
 	subtitles playback.SubtitlePreferences

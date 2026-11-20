@@ -27,7 +27,7 @@ function Keypad({ digits, text, matched, onKey, onWatch, onCancel, watchLabel, n
 }
 
 /**
- * Go to channel over the guide or Live TV (LiveGuide's dialog): the number
+ * Go to channel over the guide or Live TV: the number
  * typed with the remote's digit keys (the "-" key is the dot) or the
  * keypad; OK watches the one channel that number names, and nothing else
  * changes until then. Return closes it.

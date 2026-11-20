@@ -54,7 +54,7 @@ class WatchNextLibraryTest {
     fun eachHomeLoadBringsTheRowInLineWithContinueWatchingNewestFirst() = runBlocking {
         library.home()
         val (first, second) = row.synced.single()
-        // The card's picture is the episode's still, or the movie's backdrop (PLAN-ANDROID-REVIEW.md §6.2).
+        // The card's picture is the episode's still, or the movie's backdrop.
         assertEquals(WatchNextEntry(9101, "Harbor Lights", "S03 E07 · The Long Dark", true, 28 * 60_000L, 52 * 60_000L, 1_000_000L, itemId = 100037, showId = 100, season = 3, artPath = "/still.jpg"), first)
         assertEquals(WatchNextEntry(9002, "Dead Reckoning Bay", null, false, 31 * 60_000L, 103 * 60_000L, 999_999L, itemId = 500, artPath = "/b.jpg"), second)
         assertTrue(row.synced.single().none { it.next })

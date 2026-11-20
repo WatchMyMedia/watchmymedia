@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import WMMModel
 
-/// The recording words both apps' menus, Recordings and options forms share
-/// (PLAN-APPLE-REVIEW.md §5.8), as the Android app words them.
+/// The recording words both apps' menus, Recordings and options forms share,
+/// as the Android app words them.
 @Suite struct LiveRecordingWordingTests {
     @Test func stoppingAndRecordingAreWordedByState() {
         #expect(liveCancelRecordingTitle(.recording) == "Stop recording")

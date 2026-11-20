@@ -15,7 +15,7 @@ type Snapshot = components['schemas']['Snapshot']
 const crumbs = settingsCrumbs('transcoding', { label: 'Remote upload limit' })
 const LEDE = 'How much of your internet upload the server may use for people away from home.'
 
-/** Remote upload limit: a draft with the save bar; Save asks for the password away from home (board tx-upload). */
+/** Remote upload limit: a draft with the save bar; Save asks for the password away from home. */
 export function UploadLimitPage() {
   const settings = useQuery({ ...settingsQuery, refetchInterval: 15_000 })
   const upload = settings.data?.upload

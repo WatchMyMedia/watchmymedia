@@ -61,8 +61,7 @@ import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
 /*
- * Favourites and reminders on the phone and tablet (PLAN-LIVE-TV-GUIDE.md
- * §6.5, the LiveGuideExtras, LiveReminders and TabLiveExtras boards).
+ * Favourites and reminders on the phone and tablet.
  */
 
 /** What the guide's star column and details can do, from [media.watchmy.client.model.LIVE_PERSONAL_API_LEVEL]. */

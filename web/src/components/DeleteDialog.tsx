@@ -90,7 +90,7 @@ function Warning({ children }: { children: React.ReactNode }) {
 const bodyText = 'text-[15px] leading-relaxed text-neutral-200'
 
 /**
- * Delete a movie, show, season or episode (PLAN-ARR.md §8.1, design/mockups/web/DeleteDialog).
+ * Delete a movie, show, season or episode.
  * The server says what will go; the Radarr or Sonarr that manages it deletes it.
  */
 export function DeleteDialog({
@@ -296,7 +296,7 @@ export function DeleteDialog({
   )
 }
 
-/** Replace a file the app manages (PLAN-ARR.md §9, design/mockups/web/ReportProblem, replace). */
+/** Replace a file the app manages. */
 export function ReplaceFileDialog({
   file,
   app,

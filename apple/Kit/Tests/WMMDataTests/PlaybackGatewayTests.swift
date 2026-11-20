@@ -43,7 +43,7 @@ import WMMAPI
     }
 
     @Test func theMediaRequestsCarryTheAppsUserAgent() async {
-        // PLAN-APPLE-REVIEW.md §6.4: the one the API's requests carry, from ClientIdentity.
+        // The one the API's requests carry, from ClientIdentity.
         #expect(gateway.userAgent == ClientIdentity.userAgent())
         let bound = await gateway.bound()
         #expect(bound.userAgent == ClientIdentity.userAgent())
@@ -151,7 +151,7 @@ import WMMAPI
     }
 
     @Test func aStreamOutsideTheServerIsRefusedAndASubtitleOrThumbnailsThereLeftOut() async throws {
-        // PLAN-APPLE-REVIEW.md §3.4.8: the media token goes on these addresses.
+        // The media token goes on these addresses.
         let elsewhere = decisionDirect.replacingOccurrences(of: #""url":"/api/files/8/stream?play=e0b6acbb09202287""#, with: #""url":"https://elsewhere.example/api/files/8/stream""#)
         serve(["POST /api/files/8/playback": (200, elsewhere)])
         await #expect(throws: APIError.self) { try await gateway.decide(DecisionRequest(fileID: 8, profile: profile, client: client)) }
@@ -170,7 +170,7 @@ import WMMAPI
     }
 
     @Test func aCopiedVideoNamesItsProfileKey() async throws {
-        // PLAN-APPLE-REVIEW.md §3.1.2, as the server classifies (server/internal/playback/decide.go).
+        // As the server classifies (server/internal/playback/decide.go).
         typealias Plan = Components.Schemas.VideoPlan
         #expect(PlaybackMapping.copiedVideoCodec(Plan(codec: "h264", copy: true, toneMap: false)) == "h264")
         #expect(PlaybackMapping.copiedVideoCodec(Plan(bitDepth: 10, codec: "h264", copy: true, toneMap: false)) == "h264")
@@ -279,7 +279,7 @@ import WMMAPI
     }
 
     @Test func theHDRProfileGoesOnlyToServersThatReadIt() async throws {
-        // PLAN-HDR-PROFILE.md decision 9: an older server refuses hdrTypes, even null.
+        // An older server refuses hdrTypes, even null.
         let tv = PlaybackProfile(name: "tvos", containers: ["mp4", "mov"], videoCodecs: ["h264", "hevc", "hevc10", "dovi5", "dovi8"], audioCodecs: ["aac"], hdr: true, hdrTypes: ["hdr10", "hlg", "dovi"])
         var sdrPhone = tv
         sdrPhone.videoCodecs = ["h264", "hevc", "hevc10"]
@@ -313,7 +313,7 @@ import WMMAPI
     }
 
     @Test func selectsAudioTrackGoesOnlyToServersThatReadIt() async throws {
-        // PLAN-LANGUAGES.md §4: older servers reject request fields they don't know.
+        // Older servers reject request fields they don't know.
         var phone = profile
         phone.selectsAudioTrack = true
         serve(["POST /api/files/4/playback": (200, decisionHLS), "POST /api/playback/plans": (200, #"{"items":[]}"#)])
@@ -472,7 +472,7 @@ import WMMAPI
         #expect(token.expiresAt == Date(timeIntervalSince1970: 1_793_315_375))
         let stream = "\(server.baseURL.absoluteString)/api/files/1/stream?play=a1"
         #expect(token.apply(to: URL(string: stream)!).absoluteString == "\(stream)&access_token=\(token.token)")
-        // PLAN-APPLE-REVIEW.md §3.4.8: it goes to the server that issued it, and nowhere else.
+        // It goes to the server that issued it, and nowhere else.
         #expect(token.server == server.baseURL)
         #expect(token.apply(to: URL(string: "http://srv/api/files/1/stream?play=a1")!).absoluteString == "http://srv/api/files/1/stream?play=a1")
 

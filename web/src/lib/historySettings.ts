@@ -1,4 +1,4 @@
-// Settings › Server › Watch history (PLAN-ADMIN-SETTINGS.md §5.9): choices
+// Settings › Server › Watch history: choices
 // that save at once, and the warning before Keep history for is shortened.
 
 export type Option = { value: number; label: string }

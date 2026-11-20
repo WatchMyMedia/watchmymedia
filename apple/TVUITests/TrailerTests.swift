@@ -1,9 +1,9 @@
 import XCTest
 
-/// Trailer on the Apple TV movie page (TvMovieTrailer.dc.html, PLAN-TRAILERS.md
-/// §6.3), on the fakes: Dead Reckoning Bay has a YouTube trailer, The Paper
+/// Trailer on the Apple TV movie page,
+/// on the fakes: Dead Reckoning Bay has a YouTube trailer, The Paper
 /// Kite a trailer file. A simulator has no YouTube app, so a YouTube trailer
-/// shows the code to scan (TvTrailerQR.dc.html). Runs in `make apple-tv-test-sim`.
+/// shows the code to scan. Runs in `make apple-tv-test-sim`.
 final class TrailerTests: XCTestCase {
     @MainActor private var remote: XCUIRemote { XCUIRemote.shared }
 

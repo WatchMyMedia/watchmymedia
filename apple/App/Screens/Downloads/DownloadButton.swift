@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The movie and episode pages' Download button (MovieDownload.dc.html):
+/// The movie and episode pages' Download button:
 /// Download with the size at the Settings quality, or the download's state
 /// with its progress drawn inside; the server's marks under it. Download
 /// opens the sheet; a held download opens its menu, grown from the button.
@@ -115,7 +115,7 @@ struct DownloadButton: View {
     }
 }
 
-/// The download sheet (DownloadSheet.dc.html, Pad2DownloadSheet.dc.html):
+/// The download sheet:
 /// each quality with its size, the audio track and an image subtitle to burn
 /// in for an HLS download, Wi-Fi only and the space free; Download.
 struct DownloadSheet: View {

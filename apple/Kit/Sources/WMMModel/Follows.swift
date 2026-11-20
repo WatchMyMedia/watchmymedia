@@ -1,7 +1,7 @@
 import Foundation
 
-// Following a show and the episodes that arrive for it (PLAN-NEW-EPISODES.md
-// §5, API level 29). A person follows a show by its TMDB id, so one follow
+// Following a show and the episodes that arrive for it
+// (API level 29). A person follows a show by its TMDB id, so one follow
 // covers the show in every library and outlives the show's row. Each phone
 // and tablet keeps its own cursor into the feed of arrivals and notifies for
 // itself; the TVs show the Home row instead.

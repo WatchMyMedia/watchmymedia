@@ -3,19 +3,17 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// One page for a show, its seasons and episodes (PLAN-SHOW-PAGE.md §4.4;
-/// ShowPage.dc.html, ShowPageMissing.dc.html and, at regular widths,
-/// Pad2ShowPage.dc.html): the episode on top with Play, From the start, Mark
+/// One page for a show, its seasons and episodes:
+/// the episode on top with Play, From the start, Mark
 /// watched and its ⋯ (Report a problem, Replace file, Delete episode…), the
 /// season tabs (the specials last; one season is a plain heading) with the
 /// season's line, Mark season watched and Show missing, the season's
 /// episodes in a row with the one on top outlined in gold, then About the
 /// show (Notify me, Mark show watched, Request missing seasons, the cast and
-/// details). Notify me (PLAN-NEW-EPISODES.md §7.1, the boards' `show-bell`)
+/// details). Notify me
 /// follows at once; the first on this device, while iOS hasn't asked, then
-/// explains before iOS's question. The page ends with More like this
-/// (ShowRelated and Pad2ShowRelated.dc.html, PLAN-RELATED.md §7), with the
-/// tab bar.
+/// explains before iOS's question. The page ends with More like
+/// this, with the tab bar.
 ///
 /// The show's, a season's and an episode's routes all open it; only the
 /// episode on top differs (`ShowPageRule`). Picking a tab or a card changes

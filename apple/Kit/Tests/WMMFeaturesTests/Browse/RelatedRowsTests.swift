@@ -4,8 +4,8 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// Related titles at the end of movie and show pages (PLAN-RELATED.md §6,
-/// §7): asked once the page is in, only from API level 30, kept with the
+/// Related titles at the end of movie and show pages:
+/// asked once the page is in, only from API level 30, kept with the
 /// page, and never in the page's way.
 @MainActor
 @Suite struct RelatedRowsTests {

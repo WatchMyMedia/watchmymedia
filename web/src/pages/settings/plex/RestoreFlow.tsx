@@ -8,8 +8,8 @@ import { restoreMessage, restoreStep, RESTORE_STEPS } from '../../../lib/plexSet
 import { FlowWaiting, ListCard, PlexNote } from './parts'
 import { plexCrumbs, plexHref, setAsideCheck, usePlexConnection } from './state'
 
-/** Check a restored Plex server: What this does → Ready to check again
- * (§5.1), in place of the dialog inside today's fold. */
+/** Check a restored Plex server: What this does → Ready to check
+ * again, in place of the dialog inside today's fold. */
 export function RestoreFlow({ step }: { step?: string }) {
   const { query, connection } = usePlexConnection()
   const crumbs = plexCrumbs('restore')

@@ -12,7 +12,7 @@ import { tvHref, useGuideSettings, useLiveActivity, useLiveLevels, useLiveSettin
 import { FlashBanner, LoadFailed, Loading } from './Parts'
 
 /**
- * Settings › Live TV (PLAN-ADMIN-SETTINGS.md §5.4): the setup guide, the
+ * Settings › Live TV: the setup guide, the
  * tuners as a list with Add another tuner, and the pages for who can watch,
  * listings, recordings and channels. Problems are banners with their fix.
  */

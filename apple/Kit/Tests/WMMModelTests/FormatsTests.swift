@@ -140,7 +140,6 @@ import Testing
     }
 
     @Test func aScopedMediaTokenGoesOnlyToItsServer() {
-        // PLAN-APPLE-REVIEW.md §3.4.8.
         let t = MediaToken(token: "abc", expiresAt: .now, server: URL(string: "https://home.example.net/wmm")!)
         #expect(t.apply(to: URL(string: "https://home.example.net/wmm/api/files/1/stream")!).absoluteString == "https://home.example.net/wmm/api/files/1/stream?access_token=abc")
         #expect(t.apply(to: URL(string: "https://HOME.example.net/wmm")!).absoluteString == "https://HOME.example.net/wmm?access_token=abc")
@@ -180,7 +179,7 @@ import Testing
     }
 
     @Test func playRequestsCarryWhatTheAppleTVInfoPanelShows() {
-        // PLAN-APPLE-REVIEW.md §6.2: the page's own description, year, certification and genres.
+        // The page's own description, year, certification and genres.
         var movie = MovieDetail(
             id: 21, libraryID: 1, title: "Paper Moons", year: 2021, tagline: nil, overview: "Two letters a year.", releaseDate: nil, runtimeMin: nil, genres: ["Drama"],
             rating: nil, posterPath: nil, backdropPath: nil, quality: nil, hdr: false, versions: [MediaVersion(fileID: 5, label: "a", sizeBytes: 1)], cast: [], watch: nil

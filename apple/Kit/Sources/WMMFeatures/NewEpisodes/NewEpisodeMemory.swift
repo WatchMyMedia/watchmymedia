@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import WMMModel
 
-/// What this device keeps for new-episode notifications (PLAN-NEW-EPISODES.md
-/// §6.1, §7.2): this device's switch, and the cursor into the server's feed
+/// What this device keeps for new-episode notifications:
+/// this device's switch, and the cursor into the server's feed
 /// for one server and person, keyed by their ids.
 /// One record: another server or person, or nobody signed in, forgets it, so
 /// a new sign-in starts from now. In UserDefaults, as the place each tab was

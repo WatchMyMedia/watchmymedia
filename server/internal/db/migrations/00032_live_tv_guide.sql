@@ -1,4 +1,4 @@
--- Programme listings for live channels (PLAN-LIVE-TV-GUIDE.md §5.4). A
+-- Programme listings for live channels. A
 -- refresh replaces each listed channel's programmes in one transaction, so a
 -- reader sees the old listings or the new, never a mix. Pictures from the
 -- feed are fetched on first request and kept apart from TMDB's artwork.

@@ -3,7 +3,7 @@ import Observation
 import WMMModel
 
 /// Ch− and Ch+, Page Up and Page Down, and the arrows on a keyboard: which
-/// channel is next (PLAN-APPLE-REVIEW.md §6.2). The channel list's order,
+/// channel is next. The channel list's order,
 /// only channels that can be watched now, wrapping at either end.
 public enum LiveChannelStep {
     /// The channel `delta` steps from `currentID`. A current channel that
@@ -29,7 +29,7 @@ public enum LiveChannelStep {
     }
 }
 
-/// Go to channel (TvLiveChannelKeys.dc.html's `goTo`): a keypad and the
+/// Go to channel: a keypad and the
 /// channels whose number starts with what was typed. The first match tunes
 /// two seconds after the last key or move between keys, unless focus went to
 /// the matches to choose one, which tunes at once. Digit keys on the remote

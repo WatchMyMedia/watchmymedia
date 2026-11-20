@@ -11,8 +11,8 @@ const crumbs = settingsCrumbs('backups', { label: 'Restore from a backup' })
 
 /**
  * Restore from a backup: a numbered path to follow on the server itself,
- * with the commands for how this server is installed, and Print
- * (board bak-restore). It can't be a flow: the server is stopped for most of it.
+ * with the commands for how this server is installed, and
+ * Print. It can't be a flow: the server is stopped for most of it.
  */
 export function RestorePage() {
   const settings = useQuery(settingsQuery)

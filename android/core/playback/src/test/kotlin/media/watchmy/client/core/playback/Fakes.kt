@@ -148,7 +148,7 @@ private val offMain = ThreadLocal.withInitial { false }
  * every task it runs marked as off the main thread, so a [FakeMediaPlayer]
  * fails there as ExoPlayer does ("Player is accessed on the wrong thread").
  * With one dispatcher for both, a read of the player inside `withContext(io)`
- * went unnoticed (PLAN-ANDROID-REVIEW.md §3.1.2).
+ * went unnoticed.
  */
 @OptIn(ExperimentalCoroutinesApi::class, InternalCoroutinesApi::class)
 class OffMainDispatcher(private val delegate: TestDispatcher) : CoroutineDispatcher(), Delay {

@@ -2,7 +2,7 @@ import CoreGraphics
 import Testing
 @testable import WMMUI
 
-/// PLAN-IPHONE-DUO.md §4.2: how a window sits on a folding device.
+/// How a window sits on a folding device.
 @Suite struct FoldPostureTests {
     private let upright = CGSize(width: 669, height: 951)
     private let wide = CGSize(width: 951, height: 669)

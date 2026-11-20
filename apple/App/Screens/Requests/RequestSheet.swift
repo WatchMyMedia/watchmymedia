@@ -3,8 +3,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The request sheet (SearchRequest.dc.html; on iPad the form sheet of
-/// PadShowMissing.dc.html): poster, title, year and overview; a show's
+/// The request sheet (on iPad a form sheet):
+/// poster, title, year and overview; a show's
 /// seasons to tick, those in the library or asked for already greyed and
 /// ticked; the approval line when an admin approves first; the button; then
 /// the confirmation, with a link to Your requests.

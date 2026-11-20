@@ -1,18 +1,18 @@
 package media.watchmy.client.model
 
-/** The API level that reads [PlaybackProfile.hdrTypes] and the dovi keys (PLAN-HDR-PROFILE.md). */
+/** The API level that reads [PlaybackProfile.hdrTypes] and the dovi keys. */
 const val HDR_PROFILE_API_LEVEL = 8
 
 /**
  * The API level that reads [PlaybackProfile.maxPcmChannels] and copies pcm
- * only in direct play (PLAN-AUDIO.md §3.4, §3.5). An older server copies
+ * only in direct play. An older server copies
  * pcm into HLS as ipcm, which players don't read.
  */
 const val PCM_PROFILE_API_LEVEL = 31
 
 /**
  * What this device can play, sent with every playback request
- * (PLAN-CLIENTS.md §5.4; the server's `Profile`).
+ * (the server's `Profile`).
  */
 data class PlaybackProfile(
     val name: String,
@@ -220,7 +220,7 @@ enum class PlayState { Playing, Paused, Buffering, Stopped, Closed }
 
 /**
  * A heartbeat for PUT /api/files/{id}/progress, with what the player
- * measured of its stream (PLAN-AUTO-QUALITY.md §3.1): null where it has no
+ * measured of its stream: null where it has no
  * measurement.
  */
 data class ProgressReport(

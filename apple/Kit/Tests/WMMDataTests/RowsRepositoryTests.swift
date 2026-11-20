@@ -3,7 +3,7 @@ import Testing
 @testable import WMMData
 import WMMModel
 
-/// Arranged rows and lists (PLAN-ROWS.md §6, API level 22) from replies
+/// Arranged rows and lists (API level 22) from replies
 /// shaped as api/openapi.json has them.
 @MainActor
 @Suite(.timeLimit(.minutes(1)))

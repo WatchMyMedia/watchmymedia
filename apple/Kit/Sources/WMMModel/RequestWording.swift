@@ -1,7 +1,7 @@
 import Foundation
 
-// How requests, downloads and missing episodes are worded (PLAN-ARR.md §6,
-// §7), word for word as the web says them (web/src/lib/requests.ts) and the
+// How requests, downloads and missing episodes are worded,
+// word for word as the web says them (web/src/lib/requests.ts) and the
 // Android app does, so every client reads alike.
 
 /// A status line's colour: gold, light grey, orange or mid grey.

@@ -2,7 +2,7 @@ import type { components } from '../../../src/api/schema'
 import { itemFilter, itemSort, sortOptions, type ItemFilter, type ItemSort, type LibraryType } from '../../../src/lib/browseOptions'
 import { formatRuntime } from '../../../src/lib/format'
 
-// TV Shows and Movies on the TV (LibraryRows and LibraryAZ on the canvas):
+// TV Shows and Movies on the TV:
 // the grid's choices, how they show in a focus id, and the header's words.
 // The sorts and filters themselves are the web's (browseOptions.ts).
 

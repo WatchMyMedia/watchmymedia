@@ -3,8 +3,8 @@ import Testing
 @testable import WMMData
 import WMMModel
 
-/// Following shows and the new-episode feed (PLAN-NEW-EPISODES.md §5.3, §5.4;
-/// API level 29), from replies shaped as api/openapi.json has them.
+/// Following shows and the new-episode feed
+/// (API level 29), from replies shaped as api/openapi.json has them.
 @Suite(.timeLimit(.minutes(1))) @MainActor struct FollowsRepositoryTests {
     let h = Harness()
     var follows: any FollowsRepository { h.services.follows }

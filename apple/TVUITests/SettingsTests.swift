@@ -1,7 +1,7 @@
 import XCTest
 
-/// Settings on Apple TV (TvSettings2*.dc.html, PLAN-APPLE-SETTINGS.md §3.3
-/// and §5.9) on the fakes, driven with the Siri Remote: the groups beside
+/// Settings on Apple TV
+/// on the fakes, driven with the Siri Remote: the groups beside
 /// the page, Menu from a page back to its group and then the top bar, each
 /// group's remembered row, a question that opens on the button that keeps
 /// things, a row that keeps focus while it saves and says so, and Switch

@@ -2,7 +2,7 @@ import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query
 import { api, unwrap } from './client'
 import type { components } from './schema'
 
-// Change poster (PLAN-POSTERS.md): admins choose a movie's, show's or
+// Change poster: admins choose a movie's, show's or
 // season's poster. The same four routes exist per kind.
 
 export type PosterKind = 'movie' | 'show' | 'season'

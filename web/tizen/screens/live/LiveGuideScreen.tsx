@@ -56,7 +56,7 @@ function resolve(target: GuideTarget | undefined, rows: LiveGuideChannel[], star
 }
 
 /**
- * The guide (LiveGuide on the canvas): the focused programme's hero, then
+ * The guide: the focused programme's hero, then
  * Favourites, All channels and the categories, the days, Recordings,
  * Reminders and Go to channel, then two hours across seven channels.
  * ◀ ▶ go programme by programme and move the window at its edge; ▲ ▼ keep

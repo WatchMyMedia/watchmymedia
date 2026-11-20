@@ -12,8 +12,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 
 /**
- * The text of a field, held where it is typed (PLAN-ANDROID-REVIEW.md
- * §3.3.3): a field driven through a StateFlow gets its value back a frame
+ * The text of a field, held where it is typed:
+ * a field driven through a StateFlow gets its value back a frame
  * late, so fast typing, a paste or a password manager could lose characters.
  * What is typed goes to [onChange] (the ViewModel), which never writes back
  * while someone types. When the ViewModel sets the text itself (a recent

@@ -16,8 +16,8 @@ object TabletLayout {
     const val TABLET_MIN_HEIGHT_DP = 480
 
     /**
-     * The tablet layouts: at least 600 dp wide and 480 dp tall
-     * (PLAN-ANDROID-REVIEW §2.7). Width alone gave a phone held sideways
+     * The tablet layouts: at least 600 dp wide and 480 dp tall.
+     * Width alone gave a phone held sideways
      * (915 × 412) the tablet Home, whose 440 dp panel didn't fit its height.
      */
     fun isTablet(widthDp: Int, heightDp: Int) = widthDp >= 600 && heightDp >= TABLET_MIN_HEIGHT_DP

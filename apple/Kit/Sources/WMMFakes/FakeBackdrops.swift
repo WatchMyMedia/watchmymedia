@@ -3,8 +3,8 @@ import Foundation
 import ImageIO
 import WMMModel
 
-/// A handful of fictional 16:9 backdrops for the fake library (PLAN-HOME.md
-/// §12, question 6), drawn in code as the fake listings' pictures are: no
+/// A handful of fictional 16:9 backdrops for the fake library,
+/// drawn in code as the fake listings' pictures are: no
 /// real title or art, no words. Home's row screens are mostly picture, so
 /// the fakes carry one for every show, movie, episode and Continue watching
 /// item, chosen from these six scenes by title. Posters stay the seeded

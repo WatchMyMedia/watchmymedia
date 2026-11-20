@@ -6,7 +6,7 @@ import { markHoldsRecord, recordingMarkWords } from '../../../src/lib/liveRecord
 import { leadText, movedTo, onAt, remindState, type LiveReminder, type RemindState } from '../../../src/lib/liveReminders'
 import { channelLabel, leftWords } from './liveWords'
 
-// The Samsung guide (LiveGuide on the canvas): two hours across, seven
+// The Samsung guide: two hours across, seven
 // channels down, the focused programme in the hero. These rules decide
 // where the remote's arrows go and what the hero and Hold OK say; the
 // screen only draws them. The listings rules themselves are the web's

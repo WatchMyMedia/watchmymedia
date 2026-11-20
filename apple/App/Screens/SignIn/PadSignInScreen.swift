@@ -6,7 +6,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Choosing a server and signing in on one screen, on iPad (PadSignIn.dc.html):
+/// Choosing a server and signing in on one screen, on iPad:
 /// the servers on the left (found on this network, remembered, or typed),
 /// and on the right the sign-in form or the pairing card for the one chosen.
 /// The root moves on by itself once signed in.

@@ -4,7 +4,7 @@ import Testing
 import WMMModel
 
 /// AirPlay from an address an Apple TV is unlikely to reach: the play
-/// restarts on the server's LAN address at its position (PLAN-IOS.md §5).
+/// restarts on the server's LAN address at its position.
 @MainActor
 @Suite struct AirPlayTests {
     static let tailnet = url("https://studio.tail1234.ts.net")
@@ -33,7 +33,7 @@ import WMMModel
     }
 
     @Test func aTokenScopedToTheServerInUseStillReachesTheLANAddress() async {
-        // PLAN-APPLE-REVIEW.md §3.4.8: the token goes on the server's own address, which the LAN one then replaces.
+        // The token goes on the server's own address, which the LAN one then replaces.
         h.gateway.scope = Self.tailnet
         await startPlaying()
         #expect(loaded == url("https://studio.tail1234.ts.net/api/playback/s1/master.m3u8?access_token=tok1"))

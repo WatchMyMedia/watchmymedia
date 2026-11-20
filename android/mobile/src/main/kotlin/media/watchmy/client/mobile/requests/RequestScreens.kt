@@ -80,7 +80,7 @@ import media.watchmy.client.ui.rememberTabletLayout
 import media.watchmy.client.ui.components.Artwork
 
 /**
- * Your requests (MyRequests.dc.html), reached from Settings: what this
+ * Your requests, reached from Settings: what this
  * person asked for, newest first, each with where it stands; one still
  * waiting can be cancelled.
  */
@@ -146,7 +146,7 @@ private fun MyRequestRow(r: MediaRequest, cancelling: Boolean, onCancel: () -> U
 }
 
 /**
- * The admins' Inbox (Inbox.dc.html), reached from Settings: requests
+ * The admins' Inbox, reached from Settings: requests
  * waiting for approval (Decline asks why, optionally), failed ones to send
  * again, and problems people reported, to mark resolved.
  */

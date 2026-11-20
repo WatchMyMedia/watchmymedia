@@ -22,7 +22,7 @@ function FileLine({ file, size }: { file: MediaFile; size?: number }) {
 const CANT_DELETE = 'WatchMyMedia can’t delete this: no Radarr or Sonarr manages it. Delete it where it was downloaded, or on disk.'
 
 /**
- * Delete episode… (ShowPage's confirmDelete): what Sonarr will do, as the
+ * Delete episode…: what Sonarr will do, as the
  * preview says, with focus on Cancel, which Return also is; or, for a file
  * no Radarr or Sonarr manages, that WatchMyMedia can't, with OK.
  */

@@ -15,7 +15,7 @@ public final class AppServices {
     public let servers: any ServerRepository
     public let auth: any AuthRepository
     public let library: any LibraryRepository
-    /// Requests and problem reports (PLAN-ARR.md); does nothing below API level 5.
+    /// Requests and problem reports; does nothing below API level 5.
     public let requests: any RequestsRepository
     public let liveTV: any LiveTVRepository
     public let livePlayback: (any LivePlaybackControllerFactory)?
@@ -24,12 +24,12 @@ public final class AppServices {
     public let images: any ImageLoader
     /// This device as the server sees it; `name` is the name at launch, see ``AuthRepository/deviceName``.
     public let client: ClientInfo
-    /// Offline downloads on iPhone and iPad (PLAN-DOWNLOADS.md); ``UnavailableDownloads`` on Apple TV.
+    /// Offline downloads on iPhone and iPad; ``UnavailableDownloads`` on Apple TV.
     public let downloads: any DownloadRepository
     public let casting: any CastGateway
-    /// Arranged rows and lists (PLAN-ROWS.md); ``UnavailableRows`` below ``rowsAPILevel``.
+    /// Arranged rows and lists; ``UnavailableRows`` below ``rowsAPILevel``.
     public let rows: any RowsRepository
-    /// Following shows and their new episodes (PLAN-NEW-EPISODES.md); ``UnavailableFollows`` below ``followsAPILevel``.
+    /// Following shows and their new episodes; ``UnavailableFollows`` below ``followsAPILevel``.
     public let follows: any FollowsRepository
 
     public init(servers: any ServerRepository, auth: any AuthRepository, library: any LibraryRepository, requests: any RequestsRepository, preferences: any PreferencesRepository, playback: any PlaybackControllerFactory, images: any ImageLoader, client: ClientInfo, liveTV: (any LiveTVRepository)? = nil, livePlayback: (any LivePlaybackControllerFactory)? = nil, downloads: any DownloadRepository = UnavailableDownloads(), casting: any CastGateway = UnavailableCastGateway(), rows: (any RowsRepository)? = nil, follows: (any FollowsRepository)? = nil) {

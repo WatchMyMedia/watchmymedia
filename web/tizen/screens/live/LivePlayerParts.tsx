@@ -170,7 +170,7 @@ export function ProblemDialog({ problem, onAction }: { problem: LiveProblem; onA
   </div>
 }
 
-/** LiveProblems: why the channel can't play, what to do, and other channels on now where another may work. */
+/** Why the channel can't play, what to do, and other channels on now where another may work. */
 export function ProblemPage({ problem, channel, channels, current, admin, now, onAction, onWatch }: {
   problem: LiveProblem; channel?: LiveChannel; channels: readonly LiveChannel[]; current?: string; admin: boolean; now: number; onAction(a: ProblemAction): void; onWatch(c: LiveChannel): void
 }) {

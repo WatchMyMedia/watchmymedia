@@ -30,7 +30,7 @@ import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.WmmColors
 
 /**
- * A skip part and its four modes as segmented buttons (§5.1): "Intro" and
+ * A skip part and its four modes as segmented buttons: "Intro" and
  * Never · Ask · Auto · Auto 3 s on a phone, "Skip intro" and the full words
  * on a tablet. Where a phone's row is too narrow for the label beside the
  * buttons, the label sits above them. Saving… and a failure go under it.

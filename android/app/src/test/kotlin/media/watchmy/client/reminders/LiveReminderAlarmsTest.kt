@@ -18,7 +18,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/** The phone's reminder alarms (PLAN-LIVE-TV-GUIDE.md §6.5): inexact windows, following the server's list, and set again after a reboot. */
+/** The phone's reminder alarms: inexact windows, following the server's list, and set again after a reboot. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
 class LiveReminderAlarmsTest {

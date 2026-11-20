@@ -10,7 +10,7 @@ import (
 	"watchmymedia/server/internal/metadata"
 )
 
-// Season line-ups (PLAN-SEASON-MAPPING.md): where a season starts when TMDB
+// Season line-ups: where a season starts when TMDB
 // numbers it differently from the files in a show folder. Admins only; the
 // apps have no screens for it.
 

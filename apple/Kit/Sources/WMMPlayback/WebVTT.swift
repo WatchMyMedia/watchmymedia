@@ -1,8 +1,8 @@
 import Foundation
 import WMMModel
 
-/// Reads WebVTT into plain cues for the subtitles the app draws itself
-/// (PLAN-IOS.md §5): timings, and the text without tags or settings.
+/// Reads WebVTT into plain cues for the subtitles the app draws itself:
+/// timings, and the text without tags or settings.
 /// Lenient, as subtitle files often are: a missing header, SRT-style
 /// commas, `\r\n` line ends and a byte order mark are all fine.
 public enum WebVTT {

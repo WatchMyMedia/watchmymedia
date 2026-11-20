@@ -2,7 +2,7 @@ import Foundation
 
 /// The server's quality switches as a controller follows them, by
 /// generation, for Automatic on files (`Int64`) and on Live TV (`Int`)
-/// alike (PLAN-APPLE-REVIEW.md §5.1): a directive is acted on once, and a
+/// alike: a directive is acted on once, and a
 /// switch that showed a frame, or failed, is reported in every heartbeat
 /// until the server has heard it. What waits for the new stream's frame,
 /// and what is kept to go back to, differs between the two and stays with

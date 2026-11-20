@@ -70,7 +70,7 @@ internal class ControlsActions(
 )
 
 /**
- * The touch controls (PlayerControls.dc.html): back and the title, the
+ * The touch controls: back and the title, the
  * stream chip, picture in picture and rotation lock along the top; replay,
  * play/pause and forward in the middle; the scrubber; and Audio, Subtitles,
  * Quality and Next episode along the bottom. Only the scrubber reads

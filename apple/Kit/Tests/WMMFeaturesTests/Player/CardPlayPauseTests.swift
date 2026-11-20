@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// Play/Pause on a focused Apple TV card (PLAN-APPLE-REVIEW.md §6.2).
+/// Play/Pause on a focused Apple TV card.
 @MainActor
 @Suite struct CardPlayPauseTests {
     init() { FakeLatency.duration = .zero }

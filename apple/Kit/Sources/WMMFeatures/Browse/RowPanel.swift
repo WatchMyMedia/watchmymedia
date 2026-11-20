@@ -1,8 +1,7 @@
 import Foundation
 import WMMModel
 
-// Home one row a screen on Apple TV and iPad (PLAN-HOME.md §7; TvHomeStart,
-// TvHomeRow, Pad2HomeStart, Pad2HomeRow and the portrait boards): every row
+// Home one row a screen on Apple TV and iPad: every row
 // after the first fills a screen, and the row's current card (the focused
 // one on TV, the leading one on iPad) fills the top with its picture and a
 // panel. The panel's words are decided here, by row style, so both apps say
@@ -75,7 +74,7 @@ public struct RowPanel: Hashable, Sendable {
     /// The TV's hint after the Select key: "opens the episode · ◀ ▶ more in this row · ▼ next row".
     /// `moreInRow` is false for a row of one card. `atStart`: the panel is the
     /// row's first card's, which has nothing before it, so only ▶ moves along
-    /// the row (RowStartBest.dc.html; Android TV adds "◀ menu" for its rail,
+    /// the row (Android TV adds "◀ menu" for its rail,
     /// which Apple TV, with its tabs at the top, doesn't have).
     public func hint(moreInRow: Bool = true, atStart: Bool = false) -> String {
         let along = moreInRow ? (atStart ? "▶ more in this row" : "◀ ▶ more in this row") : nil
@@ -218,7 +217,7 @@ extension RowPanel {
 extension RowPanel {
     /// The panels of the cards either side of the one with `key`, whose
     /// pictures a screen fetches ahead so moving along the row does not flash
-    /// the placeholder (PLAN-HOME.md §7.2). Empty for a Live TV row.
+    /// the placeholder. Empty for a Live TV row.
     public static func neighbours(for row: ScreenRow, card key: String?, today: Date = .now) -> [RowPanel] {
         let keys: [String]
         switch row.style {

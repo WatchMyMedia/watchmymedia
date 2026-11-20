@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// "Are you still watching?" (PlayerStillWatching.dc.html): nothing plays
+/// "Are you still watching?": nothing plays
 /// until the viewer answers.
 struct StillWatchingDialog: View {
     let state: PlayerState
@@ -51,7 +51,7 @@ struct StillWatchingDialog: View {
     }
 }
 
-/// The stopped and can't-play states (PlayerStopped.dc.html): the admin's
+/// The stopped and can't-play states: the admin's
 /// message with Back, or why it failed with Try again and Back.
 struct PlayerEndState: View {
     enum Kind {
@@ -165,7 +165,7 @@ struct PlayerEndState: View {
     }
 }
 
-/// "Auto · 720p" (PlayerControls.dc.html): the step Automatic quality is at, in gold.
+/// "Auto · 720p": the step Automatic quality is at, in gold.
 struct AutoChip: View {
     let text: String
     let size: CGFloat
@@ -184,7 +184,7 @@ struct AutoChip: View {
 }
 
 /// "Lowered to 720p for your connection." under the top bar for a few
-/// seconds (PlayerControls.dc.html), with or without the controls.
+/// seconds, with or without the controls.
 struct QualityNote: View {
     let text: String
     let large: Bool

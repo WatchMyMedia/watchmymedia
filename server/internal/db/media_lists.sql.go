@@ -107,7 +107,7 @@ type CreateMediaListParams struct {
 	WantedAt    *string `json:"wanted_at"`
 }
 
-// A list a row is made from (PLAN-ROWS.md 7.2).
+// A list a row is made from.
 func (q *Queries) CreateMediaList(ctx context.Context, arg CreateMediaListParams) (MediaList, error) {
 	row := q.db.QueryRowContext(ctx, createMediaList,
 		arg.OwnerID,

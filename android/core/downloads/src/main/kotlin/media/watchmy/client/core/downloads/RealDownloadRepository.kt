@@ -56,7 +56,7 @@ internal interface DownloadNotices {
 }
 
 /**
- * Downloads on this device (PLAN-DOWNLOADS.md §5, §6, §10): records and
+ * Downloads on this device: records and
  * progress in [store], bytes in the [engine], the server through [gateway].
  *
  * - Downloads belong to the account that made them; one no longer signed
@@ -498,7 +498,7 @@ internal class RealDownloadRepository(
         val s = store.value
         val held = s.records.filter { it.ownerKey == o.key }
         val removals = s.removed.filter { it.ownerKey == o.key }
-        // A download whose file the server deleted syncs no progress (PLAN-DOWNLOADS.md §5).
+        // A download whose file the server deleted syncs no progress.
         val gone = held.filter { it.mark == StoredRecord.MARK_GONE }.map { it.id }.toSet()
         val entries = s.progress.filter { it.ownerKey == o.key }
         val sent = entries.filter { it.downloadId !in gone }

@@ -9,7 +9,7 @@ export type Problem = components['schemas']['Problem']
 export type QueueDownload = components['schemas']['QueueDownload']
 export type RequestOptions = components['schemas']['RequestOptions']
 
-/** What the signed-in user may request, report and manage (PLAN-ARR.md §10). */
+/** What the signed-in user may request, report and manage. */
 export const requestOptionsQuery = queryOptions({
   queryKey: ['requests', 'options'],
   queryFn: async () => unwrap(await api.GET('/api/requests/options')),

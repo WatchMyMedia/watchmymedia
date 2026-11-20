@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The launcher's shortcuts on a phone or tablet (PLAN-ANDROID-REVIEW §6.3): long-press the
+<!-- The launcher's shortcuts on a phone or tablet: long-press the
      icon for Search, Live TV and Downloads. Each opens a watchmymedia:// link, which waits
      through the server picker and sign-in as any link does. TV launchers don't show them.
      The intents name no package or activity: Android reads a shortcut's targetPackage as

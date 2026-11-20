@@ -41,7 +41,7 @@ struct DownloadRepositoryTests {
     }
 
     @Test func theListIsBuiltOncePerEngineTickNotAtEveryRead() async throws {
-        // PLAN-APPLE-REVIEW.md §5.1: the screens read `downloads` many times a tick.
+        // The screens read `downloads` many times a tick.
         let h = Harness()
         h.gateway.made = [record("aaaaaaaaaaaaaaaa", fileID: 42)]
         let repo = h.make()
@@ -553,7 +553,7 @@ struct DownloadRepositoryTests {
         #expect(play.url == media)
         #expect(play.mimeType == nil)
         #expect(play.playID == "offline")
-        // 5 s before where this device was (PLAN-RESUME.md §3.8).
+        // 5 s before where this device was.
         #expect(play.resumeMs == 115_000)
         #expect(play.next == nil && play.upNextMs == 0)
         #expect(play.audio.map(\.index) == [2])

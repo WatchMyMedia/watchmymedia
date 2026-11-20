@@ -77,8 +77,8 @@ function Chevron({ left = false }: { left?: boolean }) {
 const watchedPct = (e: Episode) => (e.watch && isPartlyWatched(e) ? Math.round((e.watch.positionMs / Math.max(e.watch.durationMs || e.files[0]?.durationMs || 0, 1)) * 100) : 0)
 
 /**
- * The one show page (PLAN-SHOW-PAGE.md, design/mockups/web/ShowPage): the show's, a season's and
- * an episode's addresses all draw it, and only the episode on top differs (§3). Under the episode,
+ * The one show page: the show's, a season's and
+ * an episode's addresses all draw it, and only the episode on top differs. Under the episode,
  * the season tabs and the season's episodes in a row; then About the show. Picking a tab or a card
  * replaces the address with the episode's, so Back leaves the show in one step.
  */
@@ -353,7 +353,7 @@ function EpisodeTop({ show: s, se, e, why, listed }: { show: ShowDetail; se: Sea
           episode={{ title, line, files: e.files }}
           onClose={() => setActing(null)}
           onDeleted={() => {
-            // Stay on the show: the next episode in the row moves on top, else the one before (§3).
+            // Stay on the show: the next episode in the row moves on top, else the one before.
             const to = afterEpisodeDelete(listed, e.id)
             const deleted = { title, season: se.number, which: to?.which }
             const params = { showId: String(s.id), number: String(se.number) }
@@ -610,7 +610,7 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
   const admin = (auth.user?.isAdmin ?? false) && auth.adminAllowed
   const navigate = useNavigate()
   const { pick } = usePickSeason(s)
-  // Notify me, on servers from API level 29 (PLAN-NEW-EPISODES.md §7.1).
+  // Notify me, on servers from API level 29.
   const notify = useNotifyMe(s)
   const [acting, setActing] = useState<'fix' | 'poster' | 'request' | 'deleteSeason' | 'deleteShow' | null>(null)
   const today = new Date().toISOString().slice(0, 10)
@@ -743,7 +743,7 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
           season={open.number}
           onClose={() => setActing(null)}
           onDeleted={() => {
-            // The next season's tab, as when arriving at it (§3); the show's address when none is left.
+            // The next season's tab, as when arriving at it; the show's address when none is left.
             setActing(null)
             const n = afterSeasonDelete(seasonTabs(s.seasons, showMissing, open.number), open.number)
             if (n !== undefined) void pick(n)

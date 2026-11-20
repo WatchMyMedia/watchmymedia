@@ -17,7 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** Cast Connect's Live TV calls (PLAN-LIVE-TV.md §4.1): the caster's cast token, never this TV's sign-in. */
+/** Cast Connect's Live TV calls: the caster's cast token, never this TV's sign-in. */
 class CastLiveDataTest {
     private val h = Harness()
     private val server get() = h.server

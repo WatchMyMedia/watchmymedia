@@ -17,7 +17,7 @@ import (
 	"watchmymedia/server/internal/metadata"
 )
 
-// Favourites, search and reminders (PLAN-LIVE-TV-GUIDE.md §5.7, G6).
+// Favourites, search and reminders.
 // Favourites and reminders name a channel by its number, which outlives a
 // tuner removed and added again; a renumbered channel loses them, as it
 // loses its listings.
@@ -225,7 +225,7 @@ func (s *Service) publish(kind string, userIDs ...int64) {
 }
 
 // reconcile follows every reminder that hasn't ended to its programme
-// after a refresh (§5.7). The same listing, still the same programme,
+// after a refresh. The same listing, still the same programme,
 // keeps it. Otherwise the same
 // series and episode, or the same title and episode title, on that channel
 // within three hours moves it; failing that it is gone. A number no longer

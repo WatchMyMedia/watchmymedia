@@ -89,8 +89,7 @@ import media.watchmy.client.ui.components.rememberLiveClockFormat
 import media.watchmy.client.ui.components.rememberLiveNow
 
 /*
- * Favourites, search and reminders on Android TV (PLAN-LIVE-TV-GUIDE.md §6.5;
- * android-tv/LiveGuideExtras, LiveSearch and LiveReminder): Hold OK menus,
+ * Favourites, search and reminders on Android TV: Hold OK menus,
  * the Reminders list, the On Live TV row and the in-app reminder banner.
  * Android TV posts no system notification for a reminder.
  */

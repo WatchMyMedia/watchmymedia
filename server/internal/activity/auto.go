@@ -8,7 +8,7 @@ import (
 	"watchmymedia/server/internal/playback"
 )
 
-// Automatic quality on the tracker (PLAN-AUTO-QUALITY.md §4). Every play
+// Automatic quality on the tracker. Every play
 // runs the policy at its heartbeats: for real when the viewer picked
 // Automatic, and otherwise in shadow, to show what Automatic would have
 // done. Each device's last measured link, per address, is kept for where its

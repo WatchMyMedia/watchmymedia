@@ -101,8 +101,8 @@ import media.watchmy.client.ui.components.rememberLiveClockFormat
 import media.watchmy.client.ui.components.rememberLiveNow
 
 /**
- * The tablet's arranged Home as screens (PLAN-HOME.md §7.5; TabHomeStart,
- * TabHomeRow and their portrait boards): page 0 is the hero beside (or, in
+ * The tablet's arranged Home as screens:
+ * page 0 is the hero beside (or, in
  * portrait and when the first row isn't Continue watching, over) the first
  * row; every later row fills a page with a panel of its leading card, the
  * one the row snapped to at its start, outlined in gold; the last page is
@@ -253,7 +253,7 @@ private fun RowPage(
     val fling = rememberSnapFlingBehavior(listState, SnapPosition.Start)
     var lead by rememberSaveable(row.id) { mutableIntStateOf(0) }
     // The leading card once the snap settles: the visible card nearest the row's start. Never the See all card after
-    // the last one, which has no panel of its own (PLAN-SEE-ALL.md §11.3): the panel stays on the last card. The Live
+    // the last one, which has no panel of its own: the panel stays on the last card. The Live
     // row's Full guide card has a panel.
     val lastCard = if (row.style == RowStyle.Live) Int.MAX_VALUE else (row.cardCount - 1).coerceAtLeast(0)
     LaunchedEffect(listState, lastCard) {
@@ -309,7 +309,7 @@ private fun CardPanel.primaryAction(row: ScreenRow, index: Int, channels: List<L
     CardTarget.Channel -> channels.getOrNull(index)?.let { ch -> PanelAction("Watch ${ch.number}") { onWatchLive(ch) } }
     CardTarget.Guide -> PanelAction("Full guide") { onNavigate(MobileRoutes.LiveTV) }
     CardTarget.List -> row.listId?.let { id -> PanelAction("See all") { onNavigate(MobileRoutes.MediaList(id)) } }
-    // The TV's: the tablet's panel stays on the row's last real card (PLAN-SEE-ALL.md §11).
+    // The TV's: the tablet's panel stays on the row's last real card.
     CardTarget.Library -> null
     CardTarget.File -> PanelAction("Open") { actions.onNotMatched() }
 }

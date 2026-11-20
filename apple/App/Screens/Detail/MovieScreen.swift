@@ -3,13 +3,13 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// A movie (Movie.dc.html): backdrop, poster, facts and tags; Resume or
-/// Play, From the start, Trailer (MovieTrailer.dc.html) and Mark watched;
+/// A movie: backdrop, poster, facts and tags; Resume or
+/// Play, From the start, Trailer and Mark watched;
 /// each version with how it would play here and Play this; the chosen
 /// version's tracks; cast and details; then the movie's collection and More
-/// like this (MovieRelated.dc.html, PLAN-RELATED.md §7), with the tab bar.
-/// On iPad (Pad2Movie.dc.html) the information column scrolls independently
-/// from versions, tracks, cast and the related rows (Pad2MovieRelated.dc.html).
+/// like this, with the tab bar.
+/// On iPad the information column scrolls independently
+/// from versions, tracks, cast and the related rows.
 /// Portrait stacks the same content.
 struct MovieScreen: View {
     let id: Int
@@ -51,7 +51,7 @@ private struct MovieView: View {
         .toolbarBackground(scrolled ? .automatic : .hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                // Report a problem (ReportProblem.dc.html), from API level 5.
+                // Report a problem, from API level 5.
                 if let movie = model.movie, services.requests.options.problems {
                     Menu {
                         Button {
@@ -69,7 +69,7 @@ private struct MovieView: View {
         .sheet(item: $report) { report in
             ReportProblemSheet(model: report, centred: wide) { self.report = nil }
         }
-        // A YouTube trailer, full screen in YouTube's player (PLAN-TRAILERS.md §6.3).
+        // A YouTube trailer, full screen in YouTube's player.
         .fullScreenCover(item: $model.trailerPlayer) { player in
             TrailerPlayerScreen(model: player) { model.trailerPlayer = nil }
         }
@@ -155,7 +155,7 @@ private struct MovieView: View {
                     FlowLayout(spacing: 4) { ForEach(movie.tags, id: \.self) { Tag($0) } }
                         .accessibilityElement(children: .combine)
                 }
-                // In Radarr's queue, such as an upgrade (PLAN-ARR.md §6).
+                // In Radarr's queue, such as an upgrade.
                 if let download = movie.download { StatusLineView(download.line(), fontSize: 12) }
             }
             VStack(alignment: .leading, spacing: 14) {
@@ -218,7 +218,7 @@ private struct MovieView: View {
     }
 
     /// Resume (or Play), then From the start and Trailer side by side, then
-    /// Mark watched (MovieTrailer.dc.html, Pad2MovieTrailer.dc.html). Without
+    /// Mark watched. Without
     /// From the start, Trailer and Mark watched share the row.
     @ViewBuilder private func playButtons(_ movie: MovieDetail) -> some View {
         let toggle = Button(model.watchToggleLabel) { Task { await model.setWatched(!model.watched) } }
@@ -253,7 +253,7 @@ private struct MovieView: View {
             } else {
                 toggle
             }
-            // Download (MovieDownload.dc.html): of the version Play plays first; a download of any version shows.
+            // Download: of the version Play plays first; a download of any version shows.
             if let first = movie.versions.first {
                 ItemDownloadButton(fileID: first.fileID, otherFiles: movie.versions.dropFirst().map(\.fileID)) { model.play() }
                     .id(first.fileID)

@@ -42,8 +42,8 @@ function Note({ note }: { note?: RowNote }) {
 }
 
 /**
- * Your requests and, for admins, the Inbox (Requests on the canvas, Tweak
- * `view`: `list`): each request with where it stands and Cancel request on
+ * Your requests and, for admins, the Inbox:
+ * each request with where it stands and Cancel request on
  * one still waiting; in the Inbox, requests to Approve or Decline (with a
  * note typed on the TV's keyboard), failed ones to Retry, problems to Mark
  * resolved, and Seerr's requests page as a QR code.

@@ -1,6 +1,5 @@
-/* The movie page, the show page and the YouTube trailer screen (Movie,
-   MovieRelated, ShowPage, ShowRelated and TrailerPlayer on the Samsung TV
-   canvas). Sizes are the boards' pixels / 16, colours the kit's tokens.
+/* The movie page, the show page and the YouTube trailer screen.
+   Sizes are the boards' pixels / 16, colours the kit's tokens.
    Class names are dt-<part>. */
 
 /* The page: over the whole content, the rail's gutter included, so the backdrop reaches the screen's edge. */

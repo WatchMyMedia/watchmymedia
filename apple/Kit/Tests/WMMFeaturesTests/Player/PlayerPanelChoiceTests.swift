@@ -1,7 +1,7 @@
 import Testing
 @testable import WMMFeatures
 
-/// PLAN-IPHONE-DUO.md §4.4: the panel beside the picture is the tab under the fold, and back.
+/// The panel beside the picture is the tab under the fold, and back.
 @Suite struct PlayerPanelChoiceTests {
     @Test func nothingChosenShowsUpNextUnderTheFold() {
         let choice = PlayerPanelChoice()

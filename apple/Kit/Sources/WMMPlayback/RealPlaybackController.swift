@@ -6,15 +6,15 @@ import WMMModel
 
 private let log = Logger(subsystem: "media.watchmy.client", category: "Playback")
 
-/// The player behaviour of PLAN-CLIENTS.md §2.3 around a ``MediaPlayer``, as
+/// The player behaviour around a ``MediaPlayer``, as
 /// android/core/playback/.../RealPlaybackController.kt does it: asks the
 /// server how to play, maps player time to file time, reports heartbeats,
 /// runs Skip, Next Episode and Still watching, draws the selected text
 /// subtitle's cues, keeps Now Playing current with the play's picture, and
 /// moves the stream to the server's LAN address when AirPlay needs one.
 /// At Automatic quality the server picks the step and may change it through a
-/// heartbeat's reply; the heartbeats carry what the player measures
-/// (PLAN-AUTO-QUALITY.md). ``PlaybackLookups`` names a file the request left
+/// heartbeat's reply; the heartbeats carry what the player measures.
+/// ``PlaybackLookups`` names a file the request left
 /// untitled, fills in the next episode's runtime and loads the picture.
 ///
 /// Everything runs on the main actor, so there is no locking. Heartbeats and
@@ -309,7 +309,7 @@ public final class RealPlaybackController: PlaybackController {
         var offlineAudioChosen = false
         /// Video codecs this device failed to decode when sent as they are:
         /// left out of the profile for the rest of the play, so the server
-        /// converts the video (PLAN-APPLE-REVIEW.md §3.1.2). Asked once a play.
+        /// converts the video. Asked once a play.
         var refusedVideoCodecs = Set<String>()
         /// The decoder failure that asked again; its message stands if that fails too.
         var codecFailure: PlayerFailure?
@@ -346,7 +346,7 @@ public final class RealPlaybackController: PlaybackController {
         /// A growing recording's length once its stream ended (an event playlist with its end tag).
         var grownMs: Int?
         var lastBeatAt = 0
-        /// A seek has landed since the last report: the next tick sends one (PLAN-RESUME.md §3.6).
+        /// A seek has landed since the last report: the next tick sends one.
         var seekLanded = false
         var recoveries = 0
         var recoveredAt = 0
@@ -401,7 +401,7 @@ public final class RealPlaybackController: PlaybackController {
                 refresh(0)
             }
         }
-        // Every play gets a fresh media token (PLAN-CLIENTS.md §2.2).
+        // Every play gets a fresh media token.
         tokens.clear()
         cueTracks = [:]
         cueFetches = []
@@ -423,7 +423,7 @@ public final class RealPlaybackController: PlaybackController {
         loadTask = launch { [weak self] in
             guard let self else { return }
             // A bare play link: name the file while the server decides, and
-            // start without waiting for the name (PLAN-APPLE-REVIEW.md §4.2.6).
+            // start without waiting for the name.
             async let named = request.title.isEmpty ? attempt("name the file") { try await self.lookups.name(request) } ?? nil : nil
             do {
                 var d = try await decide(v, startMs: request.startMs, playID: nil)
@@ -432,8 +432,8 @@ public final class RealPlaybackController: PlaybackController {
                 var start = request.startMs ?? 0
                 // No explicit start: pick up where the server resumes, 5 s
                 // before where the viewer left off. A VOD playlist (or the
-                // file) just starts there. An event session from a server of
-                // PLAN-RESUME.md §3.7 starts there already; one an older
+                // file) just starts there. An event session from a newer
+                // server starts there already; one an older
                 // server started at 0 is restarted there, as the web does.
                 if request.startMs == nil && d.resumeMs > resumeMinMs {
                     start = d.resumeMs
@@ -561,13 +561,13 @@ public final class RealPlaybackController: PlaybackController {
             switchGeneration: switchGeneration
         )
         // The token is asked for at the same time as the decision, not after
-        // it (PLAN-APPLE-REVIEW.md §4.2.1); a valid one is kept, and one the
+        // it; a valid one is kept, and one the
         // decision brings is taken instead.
         let beside = !tokens.valid && gateway.needsTokenBeside(request)
         let gateway = gateway
         async let fetched: MediaToken? = beside ? gateway.mediaToken() : nil
         let decision = try await gateway.decide(request)
-        // A download plays from the device and needs no media token (PLAN-DOWNLOADS.md §10.4).
+        // A download plays from the device and needs no media token.
         if decision.url.isFileURL {
             tokens.clear()
             return decision
@@ -590,7 +590,7 @@ public final class RealPlaybackController: PlaybackController {
     /// A decision that came back after its load was cancelled (a newer
     /// request, Close, the next episode) is not played: its server session
     /// ends, as Live TV's does, and the quality switch it was for is reported
-    /// failed (PLAN-APPLE-REVIEW.md §3.1.3).
+    /// failed.
     func overtaken(_ v: Viewing, _ d: PlaybackDecision, switchGeneration: Int64? = nil) -> Bool {
         guard Task.isCancelled else { return false }
         endUnused(d, of: v)
@@ -799,7 +799,7 @@ public final class RealPlaybackController: PlaybackController {
         if playingLocally && !external { localRoute = nil }
         if let codec = refusedCodec(v, failure) {
             // The video sent as it is didn't decode: once a play, ask again
-            // without its codec, so the server converts it (PLAN-APPLE-REVIEW.md §3.1.2).
+            // without its codec, so the server converts it.
             log.warning("Asking again without \(codec, privacy: .public)")
             v.refusedVideoCodecs.insert(codec)
             v.codecFailure = failure

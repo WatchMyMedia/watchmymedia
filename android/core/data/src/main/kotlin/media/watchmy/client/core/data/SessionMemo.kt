@@ -5,8 +5,8 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 
 /**
- * One answer per sign-in, shared while it is fresh (PLAN-ANDROID-REVIEW.md
- * §4.1.4): for reference data that changes only when an admin changes
+ * One answer per sign-in, shared while it is fresh:
+ * for reference data that changes only when an admin changes
  * settings, which every movie page, show page and grid asked for again.
  * Callers at the same time share one request (the [Deferred] in flight); the
  * answer is kept for [ttlMs], for this sign-in only (the store's revision)

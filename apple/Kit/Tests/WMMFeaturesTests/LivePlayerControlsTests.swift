@@ -5,7 +5,7 @@ import WMMModel
 @testable import WMMFeatures
 
 /// The iPhone and iPad Live TV player's controls hide as the film player's
-/// do (PLAN-APPLE-REVIEW.md §3.3.1, §5.3), on manual time.
+/// do, on manual time.
 @Suite @MainActor
 struct LivePlayerControlsTests {
     @MainActor private struct Harness {
@@ -125,7 +125,7 @@ struct LivePlayerControlsTests {
     }
 }
 
-/// Keys on a hardware keyboard in the Live TV player (PLAN-APPLE-REVIEW.md §6.3).
+/// Keys on a hardware keyboard in the Live TV player.
 @Suite @MainActor
 struct LivePlayerKeyTests {
     private func model(onExit: @escaping @MainActor () -> Void = {}) async throws -> (LivePlayerModel, FakeLivePlaybackController, FakeLiveTVRepository) {

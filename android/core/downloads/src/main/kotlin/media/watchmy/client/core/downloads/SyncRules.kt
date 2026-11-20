@@ -19,7 +19,7 @@ internal sealed interface SyncAction {
 }
 
 /**
- * PLAN-DOWNLOADS.md §5's one rule: anything about the person's access
+ * The one rule: anything about the person's access
  * removes downloads; anything about the file only marks them. [held] is each
  * download here and whether it has finished.
  */

@@ -19,8 +19,8 @@ const b1 = 'inline-flex min-h-[40px] items-center justify-center rounded-md btn-
 const b2 = 'inline-flex min-h-[40px] items-center justify-center gap-2 rounded-md border border-line-2 bg-surface px-4 text-sm font-medium hover:bg-surface-2 disabled:opacity-50'
 
 /**
- * A list's page, a list row's See all (PLAN-ROWS.md §5,
- * design/mockups/web/ListPage): every title in the list's order. Those in
+ * A list's page, a list row's See all:
+ * every title in the list's order. Those in
  * the library are the usual cards; missing ones are dimmed with TMDB's
  * poster and Request where the person may ask for them; imports TMDB
  * couldn't find are Not found.

@@ -26,7 +26,7 @@ import media.watchmy.client.model.watchTarget
 /**
  * Search by title as the viewer types, a moment after they stop, on the
  * phone, the tablet and the TV. Beside the library, what can be requested
- * (Not in your library, PLAN-ARR.md §7.1) is looked up on its own, so the
+ * (Not in your library) is looked up on its own, so the
  * library's results never wait for it. The query outlives the process
  * ([saved]) and is searched again when the page comes back; the recent
  * searches don't. A new account starts it over.

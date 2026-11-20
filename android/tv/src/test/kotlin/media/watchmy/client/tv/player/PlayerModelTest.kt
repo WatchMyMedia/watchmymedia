@@ -30,8 +30,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The TV player's play is held on its nav entry (PLAN-ANDROID-REVIEW
- * §3.1.5): the screen leaving composition while the entry stays, as in a
+ * The TV player's play is held on its nav entry:
+ * the screen leaving composition while the entry stays, as in a
  * recreated activity, keeps the play going; leaving the player reports the
  * stop once, and the entry going releases the player.
  */

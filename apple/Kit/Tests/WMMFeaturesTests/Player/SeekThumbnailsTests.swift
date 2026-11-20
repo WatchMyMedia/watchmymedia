@@ -81,7 +81,7 @@ func meanGrey(_ image: CGImage) -> Int {
     return Int(context.data!.load(as: UInt8.self))
 }
 
-/// Cutting tiles from sheets (PLAN-TRICKPLAY.md §7.3): the right tile, each
+/// Cutting tiles from sheets: the right tile, each
 /// sheet fetched once and decoded once, a failed sheet left alone until the
 /// next scrub.
 @MainActor
@@ -162,7 +162,7 @@ func meanGrey(_ image: CGImage) -> Int {
     }
 }
 
-/// The scrubber's seek thumbnail (PLAN-TRICKPLAY.md §7.1 for the phone):
+/// The scrubber's seek thumbnail on the phone:
 /// shown while dragging when the decision has thumbnails, the middle buttons
 /// and Skip making way; gone when the drag ends; the time alone without
 /// them or once a sheet fails.

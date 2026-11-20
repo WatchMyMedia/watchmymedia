@@ -93,10 +93,10 @@ internal fun audioRows(tracks: PlayerTracks): List<PickerRow> = tracks.audio.map
 
 /**
  * [subtitleEntries] as the panel's rows: a group's name goes over its first
- * row and its note and credit under its last (PlayerPicker.dc.html). A group
+ * row and its note and credit under its last. A group
  * with nothing in it (no results) gets one row that can't be chosen, with
  * the note as its text. Image subtitles stay listed: picking one burns it in
- * and restarts the stream, and the row says so (PLAN-CLIENTS.md §2.3 item 7).
+ * and restarts the stream, and the row says so.
  */
 internal fun subtitleRows(tracks: PlayerTracks): List<PickerRow> {
     val rows = mutableListOf<PickerRow>()

@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Settings › Your requests (MyRequests.dc.html): each request's state,
+/// Settings › Your requests: each request's state,
 /// newest first, with Cancel request while it waits.
 @MainActor
 @Observable
@@ -62,7 +62,7 @@ public final class MyRequestsModel {
     }
 }
 
-/// Settings › Inbox, for admins (Inbox.dc.html): requests to approve or
+/// Settings › Inbox, for admins: requests to approve or
 /// decline with a note, and reported problems to mark resolved. Each change
 /// refreshes the count on the Settings tab.
 @MainActor

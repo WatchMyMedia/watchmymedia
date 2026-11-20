@@ -3,8 +3,7 @@ import UIKit
 import WMMFeatures
 import WMMUI
 
-// The frame every Settings task shares (Settings2LinkTv*, Settings2Switch*,
-// Pad2Settings2LinkTv, PLAN-APPLE-SETTINGS.md §3): a sheet with Cancel, the
+// The frame every Settings task shares: a sheet with Cancel, the
 // task's name, the steps as a bar with "Step 2 of 3", one filled button
 // pinned at the bottom, and a last step that says what changed and what
 // happens next, closed with Done.

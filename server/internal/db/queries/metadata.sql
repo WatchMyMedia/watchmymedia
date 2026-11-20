@@ -15,8 +15,8 @@ ON CONFLICT (library_id, tmdb_id) DO UPDATE SET
 RETURNING *;
 
 -- name: ListMoviesForTrailers :many
--- Movies with a file on disk whose TMDB trailers are due a check
--- (PLAN-TRAILERS.md 5.1), never checked first, then the longest since.
+-- Movies with a file on disk whose TMDB trailers are due a
+-- check, never checked first, then the longest since.
 -- Movies released on or after recent_since, or not yet released, are due
 -- once last checked before recent_before; every movie is due once last
 -- checked before older_before, which is earlier. Never checked ('') is
@@ -340,7 +340,7 @@ WHERE id = ?;
 -- name: ListShowEpisodesByAirDate :many
 SELECT * FROM episodes WHERE show_id = ? AND air_date = ? ORDER BY number;
 
--- Chosen posters (PLAN-POSTERS.md). poster_tmdb is TMDB's own poster while
+-- Chosen posters. poster_tmdb is TMDB's own poster while
 -- a choice is set: taken from poster_path when the first choice is made,
 -- kept up to date by the upserts, and put back by an empty source. SQLite
 -- reads the row as it was for every expression of an UPDATE.

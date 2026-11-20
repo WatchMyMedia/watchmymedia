@@ -19,8 +19,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Where Home's rows and the library's rows send See all (PLAN-SEE-ALL.md
- * §4.4). Home's phone and tablet layouts both take [homeSeeAll], so the
+ * Where Home's rows and the library's rows send See all.
+ * Home's phone and tablet layouts both take [homeSeeAll], so the
  * phone has it on built-in rows now, as the tablet did, with the row's sort.
  */
 class SeeAllMappingTest {

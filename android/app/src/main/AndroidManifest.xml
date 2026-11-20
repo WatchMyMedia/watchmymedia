@@ -10,7 +10,7 @@
     <!-- Android 17 blocks the local network (mDNS, .local names, LAN addresses) for apps
          targeting it unless this is granted; LocalNetworkGate asks for it. -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
-    <!-- Live TV reminders on phones and tablets (PLAN-LIVE-TV-GUIDE.md §6.5): notifications, asked
+    <!-- Live TV reminders on phones and tablets: notifications, asked
          at the first Remind me; and setting the reminders' alarms again after a reboot. The alarms
          are inexact (setWindow), so no exact-alarm permission. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -23,7 +23,7 @@
     <uses-feature android:name="android.hardware.wifi" android:required="false" />
 
     <!-- The TV's Trailer button hands YouTube trailers to the YouTube app, and shows only when an
-         app can open a YouTube watch link (PLAN-TRAILERS.md §6.2): without this, Android 11 and
+         app can open a YouTube watch link: without this, Android 11 and
          later hide the YouTube app from resolveActivity. -->
     <queries>
         <intent>
@@ -72,14 +72,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="watchmymedia" />
             </intent-filter>
-            <!-- Cast Connect: a sender casting to this Android TV opens the app (PLAN-CAST.md §6). -->
+            <!-- Cast Connect: a sender casting to this Android TV opens the app. -->
             <intent-filter>
                 <action android:name="com.google.android.gms.cast.tv.action.LOAD" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 
-        <!-- Casting from the phone (PLAN-CAST.md §5.2). -->
+        <!-- Casting from the phone. -->
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
             android:value="media.watchmy.client.CastOptionsProvider" />

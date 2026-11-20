@@ -7,7 +7,7 @@ export type Progress = components['schemas']['Progress']
 export type PlayState = 'playing' | 'paused' | 'buffering' | 'stopped' | 'closed'
 export type QualityDirective = components['schemas']['ActivityDirective']
 
-/** A heartbeat: the play, its state, and what the player measured (PLAN-AUTO-QUALITY.md §3.1). */
+/** A heartbeat: the play, its state, and what the player measured. */
 export type Beat = {
   renditionHeight?: number
   renditionBitrate?: number

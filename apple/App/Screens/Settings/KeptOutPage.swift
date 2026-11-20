@@ -3,8 +3,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Why a page isn't offered (Settings2KeptOut.dc.html, PLAN-APPLE-SETTINGS.md
-/// §5.8): a link (watchmymedia://requests, …/downloads) or a launch argument
+/// Why a page isn't offered:
+/// a link (watchmymedia://requests, …/downloads) or a launch argument
 /// can open a page whose root row is hidden, and a missing row explains
 /// nothing, so the page says why and who can change it. The reasons and
 /// words are the Kit's (``keptOutReason(_:server:requests:downloadsEnabled:)``).

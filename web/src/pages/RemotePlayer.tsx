@@ -12,7 +12,7 @@ import { AUTO, qualitiesFor, qualityById, saveQuality, savedQuality, stepName } 
 type Props = { fileId: number; start?: number; title?: string; back?: string; onLocal: () => void }
 
 /**
- * The player as a remote while this browser casts (PLAN-CAST.md §5.1). The
+ * The player as a remote while this browser casts. The
  * TV runs the play; this page shows its state and sends commands. Opening
  * it for a file the TV is not playing casts that file; when the TV moves on
  * to the next episode by itself, the page follows.

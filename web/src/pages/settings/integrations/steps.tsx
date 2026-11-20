@@ -279,7 +279,7 @@ export function FoldersStep({ connection: c, frame, nextLabel, onSaved, leaveWha
 
 // ---- Requests -----------------------------------------------------------------
 
-/** Requests: the one target that is used, and it says so (loose end 4). */
+/** Requests: the one target that is used, and it says so. */
 export function RequestsStep({ connection: c, frame, nextLabel, onSaved, inFlow, leaveWhat }: StepProps<Integration> & { connection: Integration; inFlow: boolean }) {
   const app = APP[c.kind]
   const t = things(c.kind)

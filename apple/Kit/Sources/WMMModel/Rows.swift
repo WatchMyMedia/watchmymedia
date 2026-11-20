@@ -1,7 +1,7 @@
 import Foundation
 
 // Rows a person arranges on Home and on each library's Movies or TV screen,
-// and rows made from lists (PLAN-ROWS.md §6). The server orders and fills the
+// and rows made from lists. The server orders and fills the
 // rows; the apps draw them by style. Mirrors android/core/model's rows.
 
 /// A screen a person arranges: Home, or a library's Movies or TV screen.

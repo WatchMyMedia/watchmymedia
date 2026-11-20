@@ -123,7 +123,7 @@ fun SearchScreen(
     val services = LocalAppServices.current
     val vm = viewModel { SearchViewModel(services.library, auth = services.auth, requests = services.requests, saved = createSavedStateHandle()) }
     val state by vm.state.collectAsStateWithLifecycle()
-    // The field holds its text (§3.3.3), which the keyboard edits; the model searches a moment after it changes.
+    // The field holds its text, which the keyboard edits; the model searches a moment after it changes.
     val query = rememberModelTextField(state.query, state.revision, vm::setQuery)
     // On Live TV (android-tv/LiveSearch): the listings' titles too, from API level 15 with Live TV.
     val liveTv = LocalLiveTVAvailable.current
@@ -137,7 +137,7 @@ fun SearchScreen(
     var asking by remember { mutableStateOf<Requestable?>(null) }
     val firstKey = remember { FocusRequester() }
     val memory = rememberFocusMemory()
-    // Voice typing in the app (TvSearchKeyboard.dc.html): what is heard fills the box as it is said.
+    // Voice typing in the app: what is heard fills the box as it is said.
     val voice = rememberVoiceTyping { query.setTextAndPlaceCursorAtEnd(it) }
     val pressMic = rememberVoicePress(voice)
     val listening = voice.state == Voice.Listening
@@ -188,7 +188,7 @@ fun SearchScreen(
         }
         Notice(state.message, vm::messageShown)
     }
-    // Back from a result puts focus back on it (§3.2.3); a first visit starts on the keyboard.
+    // Back from a result puts focus back on it; a first visit starts on the keyboard.
     val returning = remember { memory.key != null }
     if (returning) {
         LaunchedEffect(Unit) {
@@ -302,7 +302,7 @@ private fun Results(
     }
 }
 
-/** A movie or show not in the library, with where it stands on the poster (SearchRequest.dc.html, Android TV). */
+/** A movie or show not in the library, with where it stands on the poster. */
 @Composable
 private fun NotInLibraryCard(item: Requestable, library: LibraryRepository, memory: FocusMemory, onClick: () -> Unit) {
     val (label, icon, gold) = when (item.state) {

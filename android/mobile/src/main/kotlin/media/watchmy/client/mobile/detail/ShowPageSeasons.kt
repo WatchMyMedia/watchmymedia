@@ -165,7 +165,7 @@ private fun EpisodeRow(show: ShowDetail, state: ShowPageViewModel.State, vm: Sho
     }
 }
 
-/** Show missing, a switch with its label (ShowPage.dc.html). */
+/** Show missing, a switch with its label. */
 @Composable
 private fun MissingSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
     Row(

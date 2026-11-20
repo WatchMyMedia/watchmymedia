@@ -8,7 +8,7 @@ import (
 	"watchmymedia/server/internal/probe"
 )
 
-// What a converted track is encoded at (PLAN-AUDIO.md §2.4, §2.5).
+// What a converted track is encoded at.
 const (
 	// dolbyBitrate is E-AC-3's and AC-3's: a common rate for 5.1 Dolby
 	// Digital Plus, and AC-3's ceiling (ffmpeg writes 640k when asked for more).
@@ -43,8 +43,8 @@ func lossless(a probe.AudioStream) bool {
 	return false
 }
 
-// audioTarget is what a track that can't be copied is converted to
-// (PLAN-AUDIO.md §3.1), in this order:
+// audioTarget is what a track that can't be copied is converted to,
+// in this order:
 //
 //  1. FLAC, for a lossless source, when the video is copied, the play has
 //     no rate cap and is not a download, and the result keeps every channel

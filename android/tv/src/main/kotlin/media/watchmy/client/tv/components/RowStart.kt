@@ -29,7 +29,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * Where a row of cards starts (RowStartBest.dc.html). Getting back to a
+ * Where a row of cards starts. Getting back to a
  * row's first card is a run of ◀: the key held, or pressed again within
  * [RUN_MS] of the last. A run stops at the first card instead of going on
  * into the rail: the row gives [offset] and springs back, and the rail's

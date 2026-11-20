@@ -46,7 +46,7 @@ private final class CountingLibrary: LibraryRepository {
     func libraryChanges() -> AsyncStream<LibraryChange> { AsyncStream { $0.finish() } }
 }
 
-/// The Episodes tab of the Apple TV player (TvPlayerEpisodes.dc.html): Harbor
+/// The Episodes tab of the Apple TV player: Harbor
 /// Lights season 3 on the fakes has episodes 1–8 on disk, and file 9101 is
 /// episode 7, The Long Dark.
 @MainActor

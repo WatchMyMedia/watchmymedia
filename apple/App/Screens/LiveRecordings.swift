@@ -99,8 +99,8 @@ struct LiveRecordControls: View {
 }
 
 /// The clash after Record, or a Won't record row's choice (the web's
-/// `DvrTakeover` dialog, here a sheet; a form sheet on iPad). The Apple
-/// canvas has no board of its own for it yet. Each holder not yet recording
+/// dialog, here a sheet; a form sheet on iPad).
+/// Each holder not yet recording
 /// offers Record … instead, which makes that one give way; Keep changes nothing.
 struct LiveRecordingClashSheet: View {
     @State private var clash: LiveRecordingClash
@@ -270,7 +270,7 @@ struct LiveRecordingsScreen: View {
         .task(id: services.liveTV.contextID) {
             for section in LiveRecordingSection.allCases { await recordings.load(section) }
         }
-        // On screen until this list goes: events then stop asking for its sections (PLAN-APPLE-REVIEW.md §4.1.8).
+        // On screen until this list goes: events then stop asking for its sections.
         .task { await recordings.show(LiveRecordingSection.allCases) }
         .sheet(isPresented: $manual) { LiveManualRecordingSheet() }
         .sheet(item: $deleting) { item in LiveRecordingDeleteSheet(recording: item) }

@@ -1,7 +1,6 @@
 import CoreGraphics
 
-/// How the show page lays out the episode on top and its season
-/// (PLAN-SHOW-PAGE.md §4.4, PLAN-IPHONE-DUO.md §3).
+/// How the show page lays out the episode on top and its season.
 public enum ShowPageLayout: Sendable, Equatable {
     /// A compact width (iPhone, the iPhone Duo's outer screen): the episode
     /// over the season's tabs and its row of episodes (ShowPage).

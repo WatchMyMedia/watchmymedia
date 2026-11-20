@@ -1,6 +1,6 @@
 import XCTest
 
-/// The remote's channel keys on Live TV (TvLiveChannelKeys.dc.html) on the
+/// The remote's channel keys on Live TV on the
 /// fakes' channels: 2.1 Cedar One, 5.1 Northline, 5.2 Northline Extra, 8.1
 /// Coast Public and 12.1 Valley News. The channel buttons on the transport
 /// bar are AVKit's, which the fakes' empty player doesn't show, so the Kit's

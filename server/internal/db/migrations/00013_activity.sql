@@ -1,6 +1,5 @@
 -- +goose Up
 -- Activity: every play of a file, who made it, on what, and how it streamed.
--- See PLAN.md §10b.
 
 -- Whether a user's plays are kept in history (Now playing shows them either way).
 ALTER TABLE users ADD COLUMN record_history INTEGER NOT NULL DEFAULT 1;

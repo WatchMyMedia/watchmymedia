@@ -85,7 +85,7 @@ public final class AVMediaPlayer: MediaPlayer {
     /// A file: nil. The log counts a slowed progressive download at a
     /// fraction of the time it takes (a direct play capped at 2 Mbps read
     /// 22–43 Mbps either way), so the server works the link out from the
-    /// buffer instead (PLAN-AUTO-QUALITY.md §3.2).
+    /// buffer instead.
     public var throughputBps: Int? {
         guard hls, logged, let last = core.readAccessLog()?.last else { return nil }
         return core.measuredBps ?? Self.bitsPerSecond(last.observedBitrate)

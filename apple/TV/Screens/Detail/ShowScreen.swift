@@ -3,14 +3,14 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// One page for a show on Apple TV (PLAN-SHOW-PAGE.md §4.5; TvShowPage and
-/// TvShowPageMissing.dc.html): the episode on top over its still, with Play
+/// One page for a show on Apple TV:
+/// the episode on top over its still, with Play
 /// (or Resume and From the start), Mark watched and ⋯ (Report a problem,
 /// Replace file, the file's versions, Delete episode…); the season tabs (the
 /// specials last) with the season's line and Mark season watched at the end;
 /// the season's episodes in a row; then About the show (Notify me, Mark show
 /// watched, Request missing seasons, Show missing, the cast); then More like
-/// this (TvShowRelated.dc.html, PLAN-RELATED.md §7), which Down from About
+/// this, which Down from About
 /// the show reaches and Up leaves.
 ///
 /// Focus starts on Play. Moving focus along the row changes the episode on
@@ -41,7 +41,7 @@ private enum PageFocus: Hashable {
     case card(Int)
     /// About the show's buttons, by place.
     case about(Int)
-    /// Notify me, first among them (PLAN-NEW-EPISODES.md §7.4).
+    /// Notify me, first among them.
     case bell
 }
 
@@ -658,7 +658,7 @@ private struct AboutShow: View, Equatable {
     }
 }
 
-/// The full-screen confirmation (TvEpisodeDelete.dc.html): an icon, the
+/// The full-screen confirmation: an icon, the
 /// title, the show and episode, the file, what happens, then Cancel (focused,
 /// so a stray press deletes nothing) and the destructive button. The
 /// can't-delete one has OK alone.

@@ -25,8 +25,8 @@ const (
 // once, on a server that has none: a new server set up from its config, or
 // the Docker image's /movies and /tv. After that the libraries are the
 // admin's, made and removed in setup and Settings, and the configuration is
-// not read again, so a library removed there stays removed
-// (PLAN-ONBOARDING.md §2.3). Only folders that exist and hold something are
+// not read again, so a library removed there stays removed.
+// Only folders that exist and hold something are
 // added, so an empty or missing mount becomes no library; while none has
 // been added, the next start tries again, as an external drive may simply
 // be unmounted.

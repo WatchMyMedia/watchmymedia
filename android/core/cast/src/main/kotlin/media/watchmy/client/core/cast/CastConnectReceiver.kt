@@ -56,13 +56,13 @@ import org.json.JSONObject
 class CastConnectPlay(val controller: PlaybackController, val imageUrl: (path: String?) -> String?)
 
 /**
- * What [CastConnectReceiver] plays a cast channel with (PLAN-LIVE-TV.md §4.1):
+ * What [CastConnectReceiver] plays a cast channel with:
  * a live player on the caster's token, and their channels and pictures.
  */
 class CastConnectLive(val controller: LivePlaybackController, val live: LiveRepository)
 
 /**
- * Plays cast to this Android TV app (Cast Connect, PLAN-CAST.md §6) instead
+ * Plays cast to this Android TV app (Cast Connect) instead
  * of the web receiver. A sender's LOAD carries [LoadData]; [open] finds the
  * caster's server from here and builds a player that plays as them, which
  * [incoming] hands to the TV's player screen. Senders get MEDIA_STATUS from
@@ -240,7 +240,7 @@ class CastConnectReceiver internal constructor(
         }
     }
 
-    // --- Live TV (PLAN-LIVE-TV.md §4.1) ---
+    // --- Live TV ---
 
     /** A channel's LOAD: the caster's server and channel list, then the TV's live player on their token. */
     private suspend fun loadLive(data: MediaLoadRequestData, load: LoadData, result: TaskCompletionSource<MediaLoadRequestData>) {

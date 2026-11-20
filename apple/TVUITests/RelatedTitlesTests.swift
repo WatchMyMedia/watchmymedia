@@ -1,7 +1,6 @@
 import XCTest
 
-/// Related titles at the end of movie and show pages on Apple TV
-/// (PLAN-RELATED.md §7; TvMovieRelated and TvShowRelated.dc.html), on the
+/// Related titles at the end of movie and show pages on Apple TV, on the
 /// fakes at API level 30 (`-fakesRelated`), driven with the remote: Down
 /// from the movie's versions reaches its collection, then More like this,
 /// each shelf on its first card; Up leaves them; Select opens a card's page

@@ -76,7 +76,7 @@ import media.watchmy.client.model.episodeCode
 import kotlin.math.abs
 
 /**
- * The player behaviour of PLAN-CLIENTS.md §2.3 around a [MediaPlayer]:
+ * The player behaviour around a [MediaPlayer]:
  * asks the server how to play, maps player time to file time, reports
  * heartbeats, runs Skip, Next Episode and Still watching, and keeps Watch
  * Next and the media session current. [lookups] names a file the request
@@ -185,7 +185,7 @@ class RealPlaybackController(
         /**
          * The player couldn't start a direct play on the decided track: this
          * viewing's decisions leave out selectsAudioTrack, so the server
-         * remuxes a track other than the file's default (PLAN-LANGUAGES.md §5.2).
+         * remuxes a track other than the file's default.
          */
         var playerSelectsAudio = true
 
@@ -237,7 +237,7 @@ class RealPlaybackController(
         var lastReported: PlayState? = null
         var lastBeatAt = 0L
 
-        /** A seek has landed since the last report: the next tick sends one (PLAN-RESUME.md §3.6). */
+        /** A seek has landed since the last report: the next tick sends one. */
         var seekLanded = false
         var recoveries = 0
         var recoveredAt = 0L
@@ -499,7 +499,7 @@ class RealPlaybackController(
             preferencesLoaded = true
             scope.launch { attempt("load preferences") { preferences.refresh() }; preferencesReady = true }
         }
-        // Every play gets a fresh media token (PLAN-CLIENTS.md §2.2).
+        // Every play gets a fresh media token.
         renewing?.cancel()
         tokens.forget()
         quality = choice.current()
@@ -524,8 +524,8 @@ class RealPlaybackController(
                 var start = request.startMs ?: 0
                 // No explicit start: pick up where the server resumes, 5 s
                 // before where the viewer left off. A VOD playlist (or the
-                // file) just starts there. An event session from a server of
-                // PLAN-RESUME.md §3.7 starts there already; one an older
+                // file) just starts there. An event session from a newer
+                // server starts there already; one an older
                 // server started at 0 is restarted there, as the web does.
                 if (request.startMs == null && d.resumeMs > RESUME_MIN_MS) {
                     start = d.resumeMs
@@ -634,7 +634,7 @@ class RealPlaybackController(
         )
         v.askedAt = clock.elapsedMs()
         // The token comes with the decision, from the server or asked for beside it. A downloaded
-        // item plays from the device and brings none: it needs none (PLAN-DOWNLOADS.md §10.4).
+        // item plays from the device and brings none: it needs none.
         var decision = withContext(io) { gateway.decide(request) }
         decision.mediaToken?.let(tokens::accept)
         // An automatic ASS default needs the same faithful server renderer as a manual choice.
@@ -687,7 +687,7 @@ class RealPlaybackController(
         v.selectedAudio = when {
             !d.isOffline -> d.selectedAudio ?: v.selectedAudio
             // From the device: a pick stays; otherwise an original file, which has every track,
-            // starts in the person's audio languages, as the server would choose (PLAN-LANGUAGES.md §5.5).
+            // starts in the person's audio languages, as the server would choose.
             v.audioChosen && d.audio.any { it.index == v.selectedAudio } -> v.selectedAudio
             d.protocol == StreamProtocol.File -> preferredAudioIndex(d.audio, v.profile, prefs.audio.languages) ?: d.selectedAudio
             else -> d.selectedAudio
@@ -1260,7 +1260,7 @@ class RealPlaybackController(
         val prefs = playback.subtitles
         val d = v.decision ?: return
         val playId = v.playId ?: return
-        // On, or subtitles for foreign audio that this audio is (PLAN-LANGUAGES.md §5.3).
+        // On, or subtitles for foreign audio that this audio is.
         val starts = startingSubtitles(audioLanguage(d, v), playback.audio.languages, prefs).first == SubtitleMode.On
         if (d.isOffline || !starts || !prefs.automaticDownload || v.subtitleManuallyChosen || v.selectedSubtitle != null) return
         val revision = v.subtitleRevision

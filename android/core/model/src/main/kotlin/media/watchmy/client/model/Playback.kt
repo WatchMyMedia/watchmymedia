@@ -172,7 +172,7 @@ const val UP_NEXT_COUNTDOWN_MS = 10_000L
 
 /**
  * How far before the saved position a resume starts, so people pick up the
- * thread (PLAN-RESUME.md §3.8). The server's resumeMs already starts there;
+ * thread. The server's resumeMs already starts there;
  * a device applies it to the positions it keeps itself, for offline plays.
  */
 const val RESUME_REWIND_MS = 5_000L
@@ -283,9 +283,9 @@ sealed interface PlayerEvent {
 
 /**
  * One viewing at a time: asks the server how to play, drives the player,
- * reports progress and runs Skip, Next Episode and Still watching, as
- * PLAN-CLIENTS.md §2.3 describes. The UI only renders [state] and
- * [progress], shows [player]'s video, and calls the methods below.
+ * reports progress and runs Skip, Next Episode and Still watching. The
+ * UI only renders [state] and [progress], shows [player]'s video, and
+ * calls the methods below.
  */
 interface PlaybackController {
     val state: StateFlow<PlayerUiState>

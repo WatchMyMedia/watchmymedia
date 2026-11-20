@@ -1,4 +1,4 @@
-// Search's on-screen keyboard (Search on the Samsung TV canvas): four rows
+// Search's on-screen keyboard: four rows
 // of ten keys, then Shift, the symbols, Space, Delete and Clear. The TV's
 // own keyboard (accents, other alphabets, the voice key) is one key below.
 

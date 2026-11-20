@@ -4,8 +4,8 @@ import WMMFeatures
 
 /// The Home Screen quick actions (a long press on the app's icon) and the
 /// App Shortcuts (Siri, Spotlight, the Shortcuts app) for Search, Live TV,
-/// Downloads and Continue watching (PLAN-APPLE-REVIEW.md §6.3). Each opens
-/// one of the app's links, published for the server signed in (§2.5), so
+/// Downloads and Continue watching. Each opens
+/// one of the app's links, published for the server signed in, so
 /// it opens nothing for another server; signed out, the app opens as it is.
 /// The quick actions show only what this sign-in has: Live TV when the
 /// server offers it, Downloads when they are on. Continue watching opens

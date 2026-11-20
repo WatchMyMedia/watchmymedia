@@ -36,7 +36,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** Home, the library rows, the row editor and the list page on the fakes (PLAN-ROWS.md §8.2). */
+/** Home, the library rows, the row editor and the list page on the fakes. */
 class RowsViewModelsTest {
     @get:Rule val main = MainDispatcherRule()
 

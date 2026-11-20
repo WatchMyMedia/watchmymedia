@@ -3,8 +3,8 @@ import UIKit
 import WMMFeatures
 import WMMUI
 
-// The pieces every Settings page shares (Settings2*.dc.html,
-// Pad2Settings2*.dc.html, PLAN-APPLE-SETTINGS.md §3): a page of groups under
+// The pieces every Settings page shares:
+// a page of groups under
 // a line that says how things stand, rows that grow with the text size and
 // say in their own line whether a change saved, menus from their row, and a
 // red row apart at the bottom for what signs out or deletes.
@@ -475,7 +475,7 @@ struct DangerRowLabel: View {
 
 extension View {
     /// A Saved or a failed line is said to VoiceOver as it appears, with the
-    /// system's success tap or error tap (PLAN-APPLE-SETTINGS.md §3.2).
+    /// system's success tap or error tap.
     func speaksSaving(_ line: RowLine?) -> some View {
         onChange(of: line) { _, line in
             switch line {

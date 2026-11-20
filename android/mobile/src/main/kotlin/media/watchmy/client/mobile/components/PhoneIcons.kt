@@ -18,7 +18,7 @@ object PhoneIcons {
     val External = stroke("M14 4h6v6M20 4l-9 9", "M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5")
     val Refresh = stroke("M20 11a8 8 0 1 0-2.3 5.7", "M20 4v7h-7")
 
-    // Downloads (PLAN-DOWNLOADS.md), as the download boards draw them.
+    // Downloads, as the download boards draw them.
     /** The Downloads tab and the empty list: an arrow into a tray. */
     val Downloads = stroke("M12 3v12M7 10l5 5 5-5M4 17v3h16v-3")
     val Wifi = stroke("M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01")
@@ -32,7 +32,7 @@ object PhoneIcons {
     /** You're offline: a cloud struck through. */
     val CloudOff = stroke("M3 3l18 18", "M8.5 6.3A6 6 0 0 1 17.7 10H18a4 4 0 0 1 2.4 7.2M17 18H7a5 5 0 0 1-1.6-9.7")
 
-    // Settings' groups and rows (android/SettingsOverview.dc.html, SettingsAccount.dc.html).
+    // Settings' groups and rows.
     /** Home rows: three lines, the last one short. */
     val Lines = stroke("M4 6h16M4 12h16M4 18h10")
     /** Change password: a padlock. */

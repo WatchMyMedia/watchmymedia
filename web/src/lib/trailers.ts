@@ -1,4 +1,4 @@
-// Movie trailers (PLAN-TRAILERS.md §6.1): which one the Trailer button
+// Movie trailers: which one the Trailer button
 // plays, YouTube's player in a plain iframe, and what its messages mean.
 
 import type { components } from '../api/schema'

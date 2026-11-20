@@ -1,5 +1,5 @@
 -- name: CreateMediaList :one
--- A list a row is made from (PLAN-ROWS.md 7.2).
+-- A list a row is made from.
 INSERT INTO media_lists (owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url,
     fetched_at, next_fetch_at, wanted_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

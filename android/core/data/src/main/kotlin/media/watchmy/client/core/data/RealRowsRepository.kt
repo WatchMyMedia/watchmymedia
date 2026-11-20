@@ -16,8 +16,8 @@ import media.watchmy.client.model.RowsRepository.Companion.MAX_LIST_ENTRIES
 import media.watchmy.client.core.api.models.RowPlacement as ApiRowPlacement
 
 /**
- * /api/me/rows and /api/lists on the server in use (PLAN-ROWS.md §6.2,
- * §6.3). Below [ROWS_API_LEVEL] [supported] is false and every call fails
+ * /api/me/rows and /api/lists on the server in use.
+ * Below [ROWS_API_LEVEL] [supported] is false and every call fails
  * without asking the server, so no screen offers what it can't do. The
  * household defaults and making lists are the web's: nothing here calls them.
  */

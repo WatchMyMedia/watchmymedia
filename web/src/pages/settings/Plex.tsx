@@ -11,7 +11,7 @@ import { UndoFlow } from './plex/UndoFlow'
 import { plexCrumbs, TASK_LABEL } from './plex/state'
 
 /**
- * Settings › Server › Plex (PLAN-ADMIN-SETTINGS.md §5.1): a hub that says
+ * Settings › Server › Plex: a hub that says
  * where things stand and what comes next, and a stepped flow per task, each
  * at its own address under /settings/plex. Personal imported history has its
  * own page under Activity.

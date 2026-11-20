@@ -31,7 +31,7 @@ export function liveTVChannelSetting(channel: Pick<LiveChannel, 'available' | 'e
   return { checked: channel.enabled && !protectedChannel, locked: protectedChannel, status }
 }
 
-/** The listings' status pill (PLAN-LIVE-TV-GUIDE.md §6.2); the server's message says what to do. */
+/** The listings' status pill; the server's message says what to do. */
 export function liveGuideStatus(state: string): { label: string; tone: 'ok' | 'warn' | 'off'; busy: boolean } {
   switch (state) {
     case 'ok': return { label: 'Up to date', tone: 'ok', busy: false }

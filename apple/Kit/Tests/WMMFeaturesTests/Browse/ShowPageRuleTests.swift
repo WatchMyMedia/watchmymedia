@@ -3,7 +3,7 @@ import Testing
 @testable import WMMFeatures
 import WMMModel
 
-/// Which episode goes on top of the show's page, and why (PLAN-SHOW-PAGE.md §3).
+/// Which episode goes on top of the show's page, and why.
 @Suite struct ShowPageRuleTests {
     /// An episode of show 1: `watched` finished, `partway` started, `file` on disk.
     private func episode(_ season: Int, _ number: Int, file: Bool = true, watched: Bool = false, partway: Bool = false, aired: Bool = true, airDate: String? = nil) -> EpisodeDetail {

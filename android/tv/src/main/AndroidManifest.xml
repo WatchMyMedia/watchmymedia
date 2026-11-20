@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- TV Search's voice typing (TvSearchKeyboard.dc.html) listens in the app, with the TV's
+    <!-- TV Search's voice typing listens in the app, with the TV's
          speech recognizer. The permission is asked for at the microphone key's first press, on a
          TV only: the phone has no microphone key and never asks. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Android TV's guide hero: what Hold OK offers (PLAN-LIVE-TV-DVR.md §3.1, On the TVs). */
+/** Android TV's guide hero: what Hold OK offers. */
 class TvHoldHintTest {
     private val now = 1_800_000_000_000L
     private val later = LiveProgramme("p1", now + 3_600_000, now + 7_200_000, "Inspector Vane")

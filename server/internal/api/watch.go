@@ -43,7 +43,7 @@ type ProgressInputBody struct {
 	PlayID     string `json:"playId,omitempty" pattern:"^[0-9a-f]{16}$" doc:"The playId the playback decision returned."`
 	State      string `json:"state,omitempty" enum:"playing,paused,buffering,stopped,closed" doc:"Defaults to playing."`
 	BufferedMs int64  `json:"bufferedMs,omitempty" minimum:"0" doc:"How far ahead of the position the player has buffered."`
-	// What the player measures, for Automatic quality (PLAN-AUTO-QUALITY.md §3.1).
+	// What the player measures, for Automatic quality.
 	ThroughputBps          int64  `json:"throughputBps,omitempty" minimum:"0" doc:"The player's own estimate of its link to the server, from its downloads, in bits per second; omit when it has none."`
 	ThroughputAgeMs        *int64 `json:"throughputAgeMs,omitempty" minimum:"0" required:"false" doc:"API level 24: age in milliseconds of the latest completed media transfer used for throughputBps. Missing or stale samples never justify recovery."`
 	SwitchGeneration       uint64 `json:"switchGeneration,omitempty" required:"false" doc:"API level 24: acknowledge this quality generation only after its first frame plays."`
@@ -108,7 +108,7 @@ func watchFromDB(w db.WatchState) WatchState {
 }
 
 // itemsForFile resolves the movie or episodes a file belongs to. A trailer
-// belongs to neither: it has no watch state of its own (PLAN-TRAILERS.md §4.6).
+// belongs to neither: it has no watch state of its own.
 func itemsForFile(ctx context.Context, deps Deps, f db.MediaFile) (itemType string, ids []int64, err error) {
 	if f.ExtraKind != nil {
 		return "", nil, nil
@@ -141,7 +141,7 @@ func watchForFile(ctx context.Context, deps Deps, user auth.User, f db.MediaFile
 }
 
 // resumeRewindMs is how far before the saved position a resume starts, so
-// people pick up the thread (PLAN-RESUME.md §3.8). Only resuming saved
+// people pick up the thread. Only resuming saved
 // progress rewinds: an explicit start, such as a seek or a reload, is
 // played as asked, and the saved position itself stays exact.
 const resumeRewindMs = 5_000
@@ -209,8 +209,7 @@ func registerWatch(h huma.API, deps Deps) {
 				playWatchedAt, playDuration, _ = deps.Activity.WatchedAt(out.Body.PlayID, user.ID, f.ID)
 			}
 		}
-		// The play's event session keeps its history behind this position
-		// (PLAN-RESUME.md §3.4).
+		// The play's event session keeps its history behind this position.
 		if deps.Playback != nil {
 			deps.Playback.NoteViewer(in.Body.PlayID, user.ID, in.Body.PositionMs)
 		}

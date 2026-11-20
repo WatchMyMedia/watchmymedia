@@ -120,7 +120,7 @@ import WMMModel
     }
 }
 
-/// The one way a sign-in goes on a request (PLAN-APPLE-REVIEW.md §5.6): the
+/// The one way a sign-in goes on a request: the
 /// token only on the issuing server's addresses, however the request is made.
 @Suite struct RequestSignerTests {
     let signer = RequestSigner(baseURL: URL(string: "http://192.168.1.20:27587/wmm")!, token: "tok", userAgent: "WatchMyMedia/1.0 (ios; iOS 27.0)")

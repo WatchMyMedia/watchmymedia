@@ -2,8 +2,8 @@ import type { components } from '../../../src/api/schema'
 import { formatBytes, plural, relativeTime } from '../../../src/lib/format'
 import { drawable, homeRows, titleParts, type ScreenRow } from '../../../src/lib/screenRows'
 
-// Home one row a screen (HomeStart and HomeRow on the Samsung TV canvas,
-// Android TV's HomePages.kt): which screens Home has, which one a focus id
+// Home one row a screen (Android TV's HomePages.kt):
+// which screens Home has, which one a focus id
 // is on, and the words along their bottom edge.
 
 export type HomeData = components['schemas']['HomeData']

@@ -230,7 +230,7 @@ func TestLinkTrailers(t *testing.T) {
 
 // A library scanned before the server read trailers has a bare trailer.mp4
 // matched as a second version of its movie. The first scan after the
-// upgrade turns it into a trailer of that movie (PLAN-TRAILERS.md §1, §5.2).
+// upgrade turns it into a trailer of that movie.
 func TestScanTurnsMatchedTrailerIntoTrailer(t *testing.T) {
 	s, q, _, root, lib := setup(t)
 	ctx := context.Background()

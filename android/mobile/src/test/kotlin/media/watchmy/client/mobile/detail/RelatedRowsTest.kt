@@ -36,8 +36,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The rows at the end of the phone's movie and show pages (PLAN-RELATED.md
- * §7; MovieRelated.dc.html, ShowRelated.dc.html), on the fakes: named as
+ * The rows at the end of the phone's movie and show pages,
+ * on the fakes: named as
  * headings, each card read as its title and year, a card opening its title,
  * and none from an older server.
  */
@@ -103,7 +103,7 @@ class RelatedRowsTest {
     }
 }
 
-/** The tablet's movie page puts the rows in its right pane, under the cast (TabMovieRelated.dc.html). */
+/** The tablet's movie page puts the rows in its right pane, under the cast. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w1280dp-h800dp-land-xhdpi")
 class TabletRelatedRowsTest {

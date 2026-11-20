@@ -1,5 +1,5 @@
 -- +goose Up
--- A poster an admin chose in place of the match's (PLAN-POSTERS.md).
+-- A poster an admin chose in place of the match's.
 -- poster_path stays the poster to show, so no query that reads it changes.
 -- poster_source says where poster_path came from: '' for TMDB's own, 'tmdb'
 -- for another of TMDB's posters, 'upload' or 'url' for a picture kept under

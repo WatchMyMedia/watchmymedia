@@ -1,6 +1,6 @@
 import type { components } from '../api/schema'
 
-// Settings › Server › General (PLAN-ADMIN-SETTINGS.md §5.9): the TMDB key as
+// Settings › Server › General: the TMDB key as
 // the Next step and a one-step task, the Remove key dialog, and the rest of
 // the page's wording.
 
@@ -32,7 +32,7 @@ export function tmdbSaveMessage(error: unknown, words: (e: unknown) => string): 
 }
 
 /**
- * The Remove the TMDB key? dialog (loose end 5): what stops and what stays,
+ * The Remove the TMDB key? dialog: what stops and what stays,
  * and, when config.yaml or the environment has a key too, that it comes
  * back at the next restart.
  */

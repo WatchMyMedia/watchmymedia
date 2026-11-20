@@ -82,7 +82,7 @@ final class LocalStore {
 
     /// Protected data is available again (the first unlock after a restart):
     /// the sign-ins that couldn't be read at launch are read now, so a run
-    /// that started locked doesn't stay signed out (PLAN-APPLE-REVIEW.md §3.4.3).
+    /// that started locked doesn't stay signed out.
     func readUnreadableAgain() {
         guard !unreadable.isEmpty else { return }
         for id in unreadable {
@@ -229,7 +229,7 @@ final class LocalStore {
 
     /// The API of a kept sign-in: `token` on `baseURL`'s addresses only, and a
     /// 401 that revokes it forgets that sign-in (unless it was replaced
-    /// since), wherever the request came from (PLAN-APPLE-REVIEW.md §5.6).
+    /// since), wherever the request came from.
     func api(serverID: String, baseURL: URL, token: String, session: URLSession? = nil) -> ServerAPI {
         ServerAPI(
             baseURL: baseURL, session: session ?? self.session, userAgent: userAgent, token: { token },

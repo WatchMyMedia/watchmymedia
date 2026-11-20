@@ -3,10 +3,10 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings › Downloads (Downloads.dc.html, SettingsDownloads.dc.html): the
+/// Settings › Downloads: the
 /// space downloads take, movies, shows with their episodes, and the download
 /// settings under them. Swipe a row to remove it, or use its ⋯ menu. On iPad
-/// (Pad2Downloads.dc.html, the Settings split view's page) movies and the
+/// (the Settings split view's page) movies and the
 /// settings stand beside the shows when the page is wide enough.
 struct DownloadsScreen: View {
     @Environment(AppServices.self) private var services
@@ -62,7 +62,7 @@ private struct DownloadsView: View {
         List { content() }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
-            // Pull to sync: what the server decided of the downloads, and progress made offline (PLAN-APPLE-REVIEW.md §6.3).
+            // Pull to sync: what the server decided of the downloads, and progress made offline.
             .refreshable {
                 await model.sync()
                 model.refreshStorage()
@@ -163,7 +163,7 @@ private struct DownloadsView: View {
             if !model.all.isEmpty {
                 Button("Remove all downloads", role: .destructive) { model.confirmingRemoveAll = true }
                     .frame(maxWidth: .infinity)
-                    // Asks from the button (Settings2Confirm.dc.html), with the count on the button and what stays.
+                    // Asks from the button, with the count on the button and what stays.
                     .confirmationDialog(removeAll.title, isPresented: $model.confirmingRemoveAll, titleVisibility: .visible) {
                         Button(removeAll.confirm, role: .destructive) { model.removeAll() }
                         Button(removeAll.keep, role: .cancel) {}
@@ -179,7 +179,7 @@ private struct DownloadsView: View {
         .listRowBackground(Palette.surfaceRaised)
     }
 
-    /// Remove all downloads' question, in the Kit's words (Settings2Confirm.dc.html).
+    /// Remove all downloads' question, in the Kit's words.
     private var removeAll: ConfirmWords {
         SettingsWords.removeAllDownloads(count: model.all.count, bytes: model.usedBytes, device: model.device)
     }

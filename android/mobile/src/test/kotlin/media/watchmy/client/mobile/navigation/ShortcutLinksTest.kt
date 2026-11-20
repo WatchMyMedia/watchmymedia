@@ -30,7 +30,7 @@ import org.robolectric.annotation.Config
 
 /**
  * The phone launcher's shortcuts' links open Search and Downloads, and a
- * keyboard's Ctrl+F, / or Search key opens Search (PLAN-ANDROID-REVIEW §6.3).
+ * keyboard's Ctrl+F, / or Search key opens Search.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xxhdpi")

@@ -18,7 +18,7 @@ import (
 	"watchmymedia/server/internal/tmdb"
 )
 
-// Requests and problem reports (PLAN-ARR.md §7, §9). Radarr and Sonarr carry
+// Requests and problem reports. Radarr and Sonarr carry
 // requests out; problems go to the admins' Inbox. With Seerr connected,
 // requests and problems go to Seerr as each person's linked Seerr user.
 

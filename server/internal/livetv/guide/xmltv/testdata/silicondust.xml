@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE tv SYSTEM "xmltv.dtd">
-<!-- The forms SiliconDust's feed carries (PLAN-LIVE-TV-GUIDE.md §7.1), with fictional channels and programmes. -->
+<!-- The forms SiliconDust's feed carries, with fictional channels and programmes. -->
 <tv source-info-name="Fictional listings">
   <channel id="US10001.hdhomerun.com">
     <display-name>QMDWDT</display-name>

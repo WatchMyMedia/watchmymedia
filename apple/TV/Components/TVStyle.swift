@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-// The 10-foot look of design/mockups/apple-tv: the artboards are 1920×1080
+// The 10-foot look of the Apple TV designs: the artboards are 1920×1080
 // and a tvOS point is one of their pixels, so sizes are the artboards' own.
 
 // Cards and rows (posters, wide cards, episode rows, servers) draw their own
@@ -27,7 +27,7 @@ extension Color {
 }
 
 /// The brand's focus on the native look: lifted, shadowed, and a 3 pt gold
-/// rim just outside the shape (PLAN-IOS.md §11.2).
+/// rim just outside the shape.
 struct FocusRim: ViewModifier {
     let focused: Bool
     var cornerRadius: CGFloat = 16
@@ -116,7 +116,7 @@ struct TVButtonStyle: ButtonStyle {
     }
 }
 
-/// A filter, genre or season chip (TvLibrary.dc.html's `.chip`): gold when
+/// A filter, genre or season chip: gold when
 /// chosen, white with the rim when focused.
 struct TVChipStyle: ButtonStyle {
     var selected: Bool
@@ -221,7 +221,7 @@ struct TVTag: View {
 }
 
 /// "RECENTLY ADDED" with a muted "TV Shows" after it: a row's heading. On
-/// Home's screens `counter` ("Row 2 of 7") sits at the right (TvHomeRow.dc.html).
+/// Home's screens `counter` ("Row 2 of 7") sits at the right.
 struct RowHeading: View {
     let title: String
     var detail: String?
@@ -388,7 +388,7 @@ struct TVErrorState: View {
     }
 }
 
-/// A quiet empty state: an icon in a circle, a title and a line (TvSearch.dc.html).
+/// A quiet empty state: an icon in a circle, a title and a line.
 struct TVEmptyState: View {
     let systemImage: String
     let title: String

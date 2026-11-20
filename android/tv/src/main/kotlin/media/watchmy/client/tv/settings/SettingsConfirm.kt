@@ -44,13 +44,13 @@ import media.watchmy.client.ui.components.WmmIcons
 internal data class ConfirmWords(val title: String, val keep: String, val go: String, val busy: String)
 
 /**
- * A confirmation (android-tv/SettingsConfirm.dc.html): a centred overlay
+ * A confirmation: a centred overlay
  * with the question, what stays and what goes ([content]), and two buttons.
  * Focus starts on the one that changes nothing, so a stray OK does no harm.
  * [working]: both buttons are off and [ConfirmWords.busy] says why; after a
  * [failure] its line shows and the button says Try again. Back, like
  * [ConfirmWords.keep], calls [onKeep] whatever the state: a TV's Back is
- * never held up (PLAN-ANDROID-SETTINGS.md §3).
+ * never held up.
  */
 @Composable
 internal fun ConfirmDialog(

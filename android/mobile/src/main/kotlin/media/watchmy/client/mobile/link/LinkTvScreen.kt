@@ -79,8 +79,8 @@ private val StepTitle = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Se
 private val FieldProblem = Color(0xFFFCA5A5)
 
 /**
- * Link a TV (PLAN-ANDROID-SETTINGS.md §5.3, the SettingsLinkTv board; the
- * web's path): a task in the phone's frame, with Close, a step bar and one
+ * Link a TV (the web's path):
+ * a task in the phone's frame, with Close, a step bar and one
  * named button pinned at the bottom. Enter the code → Check it's yours →
  * Linked, which says what changed and what happens next. A code no TV is
  * showing, or one that ran out, is said under the field; a server that

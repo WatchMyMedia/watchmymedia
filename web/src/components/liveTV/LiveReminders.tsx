@@ -26,7 +26,7 @@ const textAction = 'inline-flex min-h-11 items-center whitespace-nowrap px-2 tex
  * Remind me for a programme that starts later, and its states: set (with
  * the lead time), moved by a listings refresh, with Remove. The first
  * Remind me in a browser that could notify explains before the browser
- * asks (the LiveReminder board's permission state); either answer sets the
+ * asks; either answer sets the
  * reminder, which then shows at least as a banner.
  */
 export function RemindControls({ programme, reminder, lead, now, primary = true, compact }: { programme: LiveProgramme; reminder?: LiveReminder; lead: number; now: number; primary?: boolean; compact?: boolean }) {
@@ -47,7 +47,7 @@ export function RemindControls({ programme, reminder, lead, now, primary = true,
   </>
 }
 
-/** Before the browser's own question: what Allow will do (the LiveReminder board's permission dialog). */
+/** Before the browser's own question: what Allow will do. */
 function NotifyExplainer({ title, lead, onAnswer }: { title: string; lead: number; onAnswer: (allow: boolean) => void }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onAnswer(false) }
@@ -108,7 +108,7 @@ function episodeOf(r: LiveReminder): string {
 }
 
 /**
- * Delivers reminders while this page is open (§6.5): a banner with Watch
+ * Delivers reminders while this page is open: a banner with Watch
  * and Dismiss in a visible tab, and from the one tab holding the Web Lock a
  * system notification through the service worker once the person allowed
  * them. Mounted once in the layout, which places the banner; it shows off

@@ -41,7 +41,7 @@ type HealthOutput struct {
 // 8: Profile.hdrTypes and the dovi5, dovi7 and dovi8 video keys; HDR is
 // copied only to a screen that shows it (for every profile), and Dolby
 // Vision is kept only for its key, else sent as its base layer or
-// transcoded (PLAN-HDR-PROFILE.md). VideoPlan.dvProfile and
+// transcoded. VideoPlan.dvProfile and
 // Capabilities.doviToneMap. Apps send hdrTypes and the dovi keys, and offer
 // hevc10 without an HDR display, only from this level: older servers
 // reject hdrTypes and would copy HDR to a screen that was offered hevc10.
@@ -52,18 +52,18 @@ type HealthOutput struct {
 // /api/settings/offline); apps offer Download only from this level.
 // 11: Live TV source configuration and the separate live channel/session contract.
 // 12: Library.lastScanError and lastScanErrorAt, why a library's last scan
-// failed (PLAN-ONBOARDING.md §4); apps explain an empty library with it.
-// 13: Live TV listings (PLAN-LIVE-TV-GUIDE.md): GET /live-tv/guide,
+// failed; apps explain an empty library with it.
+// 13: Live TV listings: GET /live-tv/guide,
 // LiveTVChannel.logoUrl, now and next, pictures at /live-tv/art/{id},
 // /settings/live-tv/guide; capabilities.guide is true while any channel has
 // listings. Apps show listings only from this level and with that flag.
-// 14: casting Live TV (PLAN-LIVE-TV.md §4.1): a cast token may start, keep
+// 14: casting Live TV: a cast token may start, keep
 // and stop its sender's live sessions and fetch their HLS, and read
 // /live-tv/channels, capabilities, guide and art; capabilities.cast says the
 // account may. Senders offer a channel to a receiver only from this level,
 // with that flag, and when the receiver says it plays live.
-// 15: Live TV favourites, listings search and reminders
-// (PLAN-LIVE-TV-GUIDE.md §5.7): PUT and DELETE
+// 15: Live TV favourites, listings search and reminders:
+// PUT and DELETE
 // /live-tv/channels/{id}/favourite and LiveTVChannel.favourite, GET
 // /live-tv/guide/search, /live-tv/reminders and Programme.reminder,
 // Preferences.liveTVReminderMinutes, and the live.favourites.changed and
@@ -78,17 +78,17 @@ type HealthOutput struct {
 // Decision.subtitleId; POST /files/{id}/subtitles/automatic performs one
 // opt-in exact-file subtitle download after the stream starts.
 // 19: household DVR schedules, recording rules, tuner takeover warnings and growing playback.
-// 20: movie trailers (PLAN-TRAILERS.md §5.3): MovieDetail.trailers on
+// 20: movie trailers: MovieDetail.trailers on
 // getMovie, best first, and Settings.trailersYouTube. A trailer's source is
 // a plain string, "youtube" (key) or "file" (fileId); apps play the first
 // trailer whose source they know and skip the others.
-// 21: audio languages (PLAN-LANGUAGES.md): Preferences.audio.languages
+// 21: audio languages: Preferences.audio.languages
 // chooses the starting audio track of any play, cast, version list or hls
 // download that names no audioIndex; SubtitlePreferences.foreignAudio turns
 // subtitles on for audio the person doesn't follow; Profile.selectsAudioTrack
 // keeps direct play for a track other than the file's default. Apps send the
 // new request fields only from this level: older servers reject them.
-// 22: rows people arrange and rows made from lists (PLAN-ROWS.md §6):
+// 22: rows people arrange and rows made from lists:
 // getHome and getLibraryRows take arranged=true and send rows (ScreenRow:
 // id, style, items, episodes or continue) in the person's order; the
 // layout routes /me/rows/{screen} and /rows/defaults/{screen}; lists under
@@ -106,7 +106,7 @@ type HealthOutput struct {
 // generations. Fixed-quality clients keep the same session and heartbeat.
 // 27: opt-in adaptive HLS families and observed rendition measurements.
 // Servers keep experimental family creation disabled unless configured.
-// 28: playback starts sooner (PLAN-ANDROID-REVIEW.md §4.2): the decision
+// 28: playback starts sooner: the decision
 // from startPlayback and startLiveTVRecordingPlayback carries mediaToken,
 // what createMediaToken would give the same request, when it signed in
 // with a session; getLiveTVSession takes waitMs (at most 10000) and
@@ -114,7 +114,7 @@ type HealthOutput struct {
 // capabilities and channel list carry an ETag and answer 304. Clients read
 // mediaToken when present and else ask createMediaToken; they send waitMs
 // only from this level, as older servers reply at once.
-// 29: following shows (PLAN-NEW-EPISODES.md §5): PUT and DELETE
+// 29: following shows: PUT and DELETE
 // /shows/{id}/follow and ShowDetail.following; GET /me/follows and DELETE
 // /me/follows/{tmdbId}, by TMDB id, so a show that left the library can
 // still be removed; GET /me/new-episodes?after=<cursor>, the arrivals a
@@ -122,17 +122,17 @@ type HealthOutput struct {
 // the follows.changed event to the person's own devices; and Home's built-in
 // row followed ("New from shows you follow", style episode). Apps offer
 // Notify me only from this level.
-// 30: related titles (PLAN-RELATED.md §6): GET /movies/{id}/related and
+// 30: related titles: GET /movies/{id}/related and
 // GET /shows/{id}/related, the rows at the end of a movie's or a show's
 // page as ScreenRows (collection, movies only, then similar, More like
 // this). Apps ask for them, and draw the rows, only from this level.
-// 31: converted audio keeps lossless and surround (PLAN-AUDIO.md): a track
+// 31: converted audio keeps lossless and surround: a track
 // the device can't take is converted to FLAC, E-AC-3 or AC-3 where the
 // profile lists them, not only AAC, so decision.audio.codec may be flac,
 // eac3 or ac3 with copy false; Profile.maxPcmChannels, the channels the
 // output takes as PCM; and pcm is copied only in direct play. Apps send
 // maxPcmChannels and list pcm only from this level.
-// 32: packaged TV apps (Samsung, PLAN-SAMSUNG.md §3) can pair and send
+// 32: packaged TV apps (Samsung) can pair and send
 // bearer requests from another origin: starting and claiming a pairing,
 // and any request with Authorization: Bearer, pass the cross-origin check;
 // a bearer request is signed in by its token alone, never by the cookie;

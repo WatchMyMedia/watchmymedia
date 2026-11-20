@@ -14,11 +14,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** Start-up away from the server's network, and the player's client (PLAN-ANDROID-REVIEW.md §4.1.6, §4.2.1). */
+/** Start-up away from the server's network, and the player's client. */
 class ReachabilityTest {
     @Test
     fun `local addresses are told apart without a lookup`() {
-        for (host in listOf("127.0.0.1", "localhost", "::1", "10.0.0.5", "172.16.0.1", "172.31.255.255", "192.168.1.178", "169.254.1.1",
+        for (host in listOf("127.0.0.1", "localhost", "::1", "10.0.0.5", "172.16.0.1", "172.31.255.255", "192.168.1.20", "169.254.1.1",
             "fe80::1", "fd12:3456::1", "nas", "media-server.local", "box.lan", "tv.home.arpa")) {
             assertTrue(host, isPrivateHost(host))
         }

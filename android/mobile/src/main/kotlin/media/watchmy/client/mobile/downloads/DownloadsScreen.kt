@@ -82,7 +82,7 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.rememberTabletLayout
 
 /**
- * Downloads (Downloads.dc.html; TabDownloads.dc.html on a tablet): the space
+ * Downloads: the space
  * downloads take and what is free, then movies, and shows with their
  * episodes, each with its size, quality and state; ⋯ opens its menu, a swipe
  * removes it on the phone, and a tap opens its page.
@@ -387,7 +387,7 @@ private fun MoreButton(d: OfflineDownload, onMore: () -> Unit) {
     }
 }
 
-/** TabDownloads.dc.html: the header with the space bar, movies in a panel on the left, a panel per show on the right. */
+/** On a tablet: the header with the space bar, movies in a panel on the left, a panel per show on the right. */
 @Composable
 private fun TabletDownloads(
     state: DownloadsViewModel.State,

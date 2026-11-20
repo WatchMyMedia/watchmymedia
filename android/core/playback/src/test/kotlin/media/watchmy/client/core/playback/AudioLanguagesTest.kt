@@ -19,7 +19,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** PLAN-LANGUAGES.md §5.2 and §5.5: the decided track in direct play, and offline plays choosing on the device. */
+/** The decided track in direct play, and offline plays choosing on the device. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class AudioLanguagesTest {

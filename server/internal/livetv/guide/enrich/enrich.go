@@ -1,6 +1,6 @@
 // Package enrich matches listings to TMDB and adds its pictures and
-// descriptions where the feed's fall short (PLAN-LIVE-TV-GUIDE.md §4.2,
-// G3). A wrong picture is worse than none, so a programme is matched only
+// descriptions where the feed's fall short.
+// A wrong picture is worse than none, so a programme is matched only
 // when every check agrees; when unsure, it keeps what the feed gave.
 package enrich
 
@@ -39,8 +39,8 @@ const (
 	// recent episode's still, is asked for again: TMDB gains a daily
 	// show's episodes around their air dates.
 	recheckAfter = 24 * time.Hour
-	// maxOverview is the longest TMDB overview used, the feed's own cap
-	// (§5.2). A longer one is left out rather than cut mid-sentence.
+	// maxOverview is the longest TMDB overview used, the feed's own
+	// cap. A longer one is left out rather than cut mid-sentence.
 	maxOverview = 4000
 
 	SourceProvider = "provider"
@@ -187,7 +187,7 @@ func skipped(rows []db.ListEnrichProgrammesRow) map[string]bool {
 	return out
 }
 
-// Categories TMDB is never asked about (§4.2, §7.1 item 8): news, weather,
+// Categories TMDB is never asked about: news, weather,
 // shopping and sport, which TMDB can't match to an episode. Sport is any
 // category with one of sportWords in it.
 var (
@@ -302,7 +302,7 @@ func (r *run) series(ctx context.Context, s *series) error {
 	return nil
 }
 
-// lookup asks TMDB for the one show or movie the series is (§4.2). Its
+// lookup asks TMDB for the one show or movie the series is. Its
 // result has no TMDB kind when there isn't exactly one.
 func (r *run) lookup(ctx context.Context, s *series) (db.LiveTvGuideMatch, error) {
 	none := db.LiveTvGuideMatch{}
@@ -429,7 +429,7 @@ func complete(eps []episode, need []int, now time.Time) bool {
 }
 
 // episodeFor is the season's episode a programme is, if TMDB has it and
-// its name or air date agrees (§4.2). A date agrees within a day, as the
+// its name or air date agrees. A date agrees within a day, as the
 // feed and TMDB may date a late-night episode a day apart, but only when
 // no other episode is as close: a daily show has one every day, and an
 // episode numbered one off would be a day off too.

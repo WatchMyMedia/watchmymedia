@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// The Settings root as a hub (PLAN-APPLE-SETTINGS.md §5.1, §5.9): the web's
+/// The Settings root as a hub: the web's
 /// groups and order with each row's value, for an admin, a member, an older
 /// server and servers that don't offer a page; Apple TV's list of groups;
 /// the Next step; the banner when the server can't be reached.

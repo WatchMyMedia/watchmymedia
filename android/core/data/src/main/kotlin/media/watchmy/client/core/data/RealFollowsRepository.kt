@@ -22,7 +22,7 @@ import media.watchmy.client.core.api.models.NewEpisodeGroup as ApiNewEpisodeGrou
 
 /**
  * /api/shows/{id}/follow, /api/me/follows and /api/me/new-episodes on the
- * server in use (PLAN-NEW-EPISODES.md §5.3, §5.4). Below [FOLLOWS_API_LEVEL]
+ * server in use. Below [FOLLOWS_API_LEVEL]
  * [supported] is false and every call fails without asking the server. The
  * list read last is kept for the sign-in it was read for, and dropped when
  * another server or account is used. This device's switch for the

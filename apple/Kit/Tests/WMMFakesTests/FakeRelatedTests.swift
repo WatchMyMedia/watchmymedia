@@ -3,7 +3,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// The fakes' related titles keep the server's rules (PLAN-RELATED.md §3),
+/// The fakes' related titles keep the server's rules,
 /// so the pages drawn on them look as a real server's would.
 @MainActor
 @Suite struct FakeRelatedTests {

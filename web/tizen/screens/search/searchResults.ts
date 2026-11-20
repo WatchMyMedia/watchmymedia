@@ -5,7 +5,7 @@ import { searchWhen } from '../../../src/lib/liveReminders'
 import { suggestions } from '../../../src/lib/searchSuggestions'
 import type { IconName } from '../../ui/Icon'
 
-// Search's results on the TV (Search on the canvas): the suggestions under
+// Search's results on the TV: the suggestions under
 // the box, each section's cards and their lines, On Live TV's times and
 // what OK does there, and Not in your library.
 

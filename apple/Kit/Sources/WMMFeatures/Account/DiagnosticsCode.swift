@@ -1,8 +1,8 @@
 import Foundation
 import WMMModel
 
-/// Diagnostics on Apple TV (TvDiagnostics.dc.html, PLAN-APPLE-REVIEW.md
-/// §6.4), which has no clipboard a person can paste from: the redacted text
+/// Diagnostics on Apple TV,
+/// which has no clipboard a person can paste from: the redacted text
 /// as a QR code to scan with a phone, a summary of it beside the code, and
 /// Show as text, all of it in pages to read out or photograph. Nothing is
 /// sent from the Apple TV.

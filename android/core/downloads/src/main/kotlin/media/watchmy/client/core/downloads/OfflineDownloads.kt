@@ -54,7 +54,7 @@ import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 
 /**
- * Offline downloads for the phone app (PLAN-DOWNLOADS.md §10): made once by
+ * Offline downloads for the phone app: made once by
  * the app on the main thread, phones and tablets only. It holds Media3's
  * download cache and manager (in `noBackupFilesDir/offline/`, left out of
  * backups), the [repository] the screens use, the player's way to the
@@ -140,7 +140,7 @@ class OfflineDownloads(
             artwork = OfflineArtwork(File(dir, "artwork")),
         )
         repository = repo
-        // At start and on coming to the foreground (PLAN-DOWNLOADS.md §6).
+        // At start and on coming to the foreground.
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 scope.launch { repo.sync() }
@@ -206,7 +206,7 @@ class OfflineDownloads(
         private const val SYNC_WORK = "offline-sync"
         private const val TAG = "WmmDownloads"
 
-        /** Syncs when the device next has a network (PLAN-DOWNLOADS.md §6). */
+        /** Syncs when the device next has a network. */
         internal fun scheduleSync(context: Context) {
             try {
                 WorkManager.getInstance(context).enqueueUniqueWork(

@@ -2,8 +2,8 @@ import { formatDuration } from '../../../src/lib/format'
 import { afterPlayerError, PLAYER_ENDED, readPlayerMessage, YOUTUBE_EMBED_ORIGIN, type PlayerMessage } from '../../../src/lib/trailers'
 import type { Action } from '../../app/keys'
 
-// The YouTube trailer screen's rules (TrailerPlayer on the Samsung TV canvas;
-// the Android TV app's TvTrailerScreen, TrailerViewModel and TrailerRemote).
+// The YouTube trailer screen's rules (the Android TV app's
+// TvTrailerScreen, TrailerViewModel and TrailerRemote).
 // YouTube's own player plays in an iframe, driven by the IFrame Player API's
 // postMessage commands, never by its keys. While it loads, and while it is
 // paused, our own screen takes its place; nothing of ours is drawn over it
@@ -151,7 +151,7 @@ export function embedUrl(key: string, pageOrigin: string): string {
 /**
  * The player's word, from a message event: only from the player's origin.
  * The time comes in its `infoDelivery` messages (undocumented, as the rest
- * of the protocol is; PLAN-TRAILERS.md's As built says what they were).
+ * of the protocol is).
  */
 export function readTrailerMessage(expectedOrigin: string, origin: string, data: unknown): { message?: PlayerMessage; timeMs?: number; durationMs?: number } | null {
   if (origin !== expectedOrigin) return null

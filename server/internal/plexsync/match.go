@@ -29,7 +29,7 @@ type showIDs struct {
 }
 
 // matcher matches Plex items to local ones by exact external IDs within one
-// linked library (PLAN-PLEX-SYNC.md, "Identity and media matching"). Titles
+// linked library. Titles
 // are never compared. Anything that isn't one certain match is unmatched
 // or ambiguous, and an import leaves it alone.
 type matcher struct {

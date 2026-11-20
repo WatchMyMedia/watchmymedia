@@ -75,8 +75,8 @@ import media.watchmy.client.ui.components.WmmIcons
 internal enum class PickerTab(val title: String) { Audio("Audio"), Subtitles("Subtitles"), Quality("Quality") }
 
 /**
- * Audio, subtitles and quality in one M3 modal bottom sheet
- * (PlayerPicker.dc.html): three columns when the sheet is wide (the player
+ * Audio, subtitles and quality in one M3 modal bottom sheet:
+ * three columns when the sheet is wide (the player
  * is landscape), tabs when it is narrow. Picking an option applies it and
  * closes the sheet; an online subtitle keeps it open while it downloads,
  * then closes it once it is on. [tab] is the one the viewer opened it from.

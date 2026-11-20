@@ -9,8 +9,8 @@ import (
 	"watchmymedia/server/internal/db"
 )
 
-// TestShowNextEpisodeOrder checks the show's up-next pick (PLAN-SHOW-PAGE.md,
-// decision 10): the episode in progress played last, else the first unfinished
+// TestShowNextEpisodeOrder checks the show's up-next pick:
+// the episode in progress played last, else the first unfinished
 // one after the episode finished last, else the first unfinished one; never
 // Specials.
 func TestShowNextEpisodeOrder(t *testing.T) {

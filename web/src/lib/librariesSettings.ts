@@ -1,4 +1,4 @@
-// The Libraries tab's rules (PLAN-ADMIN-SETTINGS.md §5.3): which step of
+// The Libraries tab's rules: which step of
 // Add a library an address opens, each library's state in words, what each
 // refusal says, and the unmatched queue's order and outcome.
 
@@ -87,7 +87,7 @@ export type FolderResult =
   | { kind: 'looksTV' }
   | { kind: 'ok'; count: number; truncated: boolean }
 
-/** One result of a check at a time, the most useful first (board lib-add-2). */
+/** One result of a check at a time, the most useful first. */
 export function folderResult(type: LibraryType, check: PathCheck): FolderResult {
   if (!check.exists) return { kind: 'missing' }
   if (!check.readable) return { kind: 'unreadable' }
@@ -128,7 +128,7 @@ export function possessive(name: string) {
 const OVERLAP = /that folder (is inside|holds) the "(.+)" library \((.+)\)/
 
 /**
- * What a refused add or change says (board lib-add-3, lib-edit), from the
+ * What a refused add or change says, from the
  * server's status and detail. Null when there is nothing to say: the
  * password dialog was cancelled.
  */
@@ -163,7 +163,7 @@ export function libraryRefusal(error: unknown, path: string, action: 'add' | 'sa
   return { title: action === 'add' ? 'Couldn’t add the library' : 'Couldn’t save', body: `${nothing} Try again.` }
 }
 
-/** Why Scan or Match didn't start (loose end 7). */
+/** Why Scan or Match didn't start. */
 export function startRefusal(error: unknown, what: 'scan' | 'match', name: string): Refusal | null {
   if (error instanceof Error && error.name === 'ConfirmationCancelled') return null
   if (what === 'match' && error instanceof ApiError && error.status === 503) return { title: 'Match is off', body: 'There’s no TMDB key.' }
@@ -174,7 +174,7 @@ export function startRefusal(error: unknown, what: 'scan' | 'match', name: strin
     : { title: 'Couldn’t match: the server didn’t answer', body: 'Nothing was changed. Try again in a few minutes.' }
 }
 
-/** Why Remove failed (board lib-remove). */
+/** Why Remove failed. */
 export function removeRefusal(error: unknown, name: string): Refusal | null {
   if (error instanceof Error && error.name === 'ConfirmationCancelled') return null
   if (error instanceof ApiError && error.status === 404) return { title: `${name} is already gone`, body: 'Someone else removed it. Nothing more to do.', gone: true }
@@ -256,7 +256,7 @@ function n(count: number, one: string, many = `${one}s`) {
 }
 
 /**
- * What Remove says stays and goes (board lib-remove), with the server's
+ * What Remove says stays and goes, with the server's
  * numbers. Removing a library deletes no plays: Activity history keeps
  * them. What goes is the titles and everyone's watched marks and resume
  * points on them.
@@ -371,7 +371,7 @@ export function nextOpen(entries: readonly QueueEntry[], from: number): QueuePla
   return before >= 0 ? { at: before + 1 } : { done: true }
 }
 
-/** The list's word for an entry (board lib-review). */
+/** The list's word for an entry. */
 export function entryWord(e: Pick<QueueEntry, 'state' | 'kind'>, type: LibraryType) {
   if (e.state === 'matched') return 'matched'
   if (e.state === 'seasons') return 'seasons lined up'
@@ -382,7 +382,7 @@ export function entryWord(e: Pick<QueueEntry, 'state' | 'kind'>, type: LibraryTy
   return type === 'tv' ? 'show?' : 'movie?'
 }
 
-/** The end of the queue (board lib-review-done). */
+/** The end of the queue. */
 export function queueSummary(entries: readonly QueueEntry[], recorded: ReadonlyMap<string, Recorded> = new Map()) {
   const count = (s: EntryState) => entries.filter((e) => e.state === s).length
   const files = (s: EntryState) => entries.filter((e) => e.state === s).reduce((n, e) => n + e.files, 0)

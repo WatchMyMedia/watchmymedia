@@ -5,7 +5,7 @@ import media.watchmy.client.model.MediaToken
 import media.watchmy.client.model.OfflineOwner
 
 /**
- * Each download's current `o1.` token (PLAN-DOWNLOADS.md §4.2), fetched with
+ * Each download's current `o1.` token, fetched with
  * its account's session and kept until it is near its end. The downloader
  * asks on its own threads, one download at a time.
  */

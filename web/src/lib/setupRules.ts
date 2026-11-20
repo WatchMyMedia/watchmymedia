@@ -27,7 +27,7 @@ export function draftsToAdd(saved: LibraryType[], drafts: FolderDrafts): Library
 
 /**
  * What step one's Next does. A folder left in a card is added, never
- * dropped (PLAN-ONBOARDING.md §3.1), so the setup path is the one after
+ * dropped, so the setup path is the one after
  * adding: a typed folder on a tuner-only server brings Metadata back.
  */
 export function sourcesNext(saved: LibraryType[], drafts: FolderDrafts, tunerSaved: boolean) {

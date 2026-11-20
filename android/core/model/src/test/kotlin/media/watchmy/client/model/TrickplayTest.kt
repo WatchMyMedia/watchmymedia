@@ -5,7 +5,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The tile locator (PLAN-TRICKPLAY.md §2) and the manifest's checks. */
+/** The tile locator and the manifest's checks. */
 class TrickplayTest {
     /** The plan's example: a 2-hour film, 724 tiles of 320 × 180, 10 × 10 a sheet. */
     private val film = Trickplay(10_000, 320, 180, 10, 10, 724, 8, "http://nas:27587/api/files/42/trickplay/9c1e07a2/{sheet}.jpg")

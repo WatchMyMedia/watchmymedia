@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// An I-frame playlist for VOD sessions (PLAN-TRICKPLAY.md §7.3, T4): a
+// An I-frame playlist for VOD sessions: a
 // file's seek thumbnails as a small all-intra H.264 track, one frame per
 // tile, listed by byte range. AVPlayerViewController draws thumbnails on
 // its transport bar only from one, which is how the Apple TV app shows

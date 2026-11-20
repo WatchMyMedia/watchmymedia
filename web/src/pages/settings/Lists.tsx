@@ -16,9 +16,9 @@ import { settingsCrumbs, settingsHref } from '../../lib/settingsRoutes'
 import { ServerOnly } from './SettingsLayout'
 
 /**
- * Settings › Server › Lists (PLAN-ADMIN-SETTINGS.md §5.9, PLAN-ROWS.md §5):
+ * Settings › Server › Lists:
  * where list rows come from, the household's lists, and the default rows,
- * a draft with the save bar; Back to built-in asks first (boards lists, lists-reset).
+ * a draft with the save bar; Back to built-in asks first.
  */
 export function ListsSettings() {
   return (

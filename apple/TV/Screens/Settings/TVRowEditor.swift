@@ -3,8 +3,8 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Settings › Home rows on Apple TV (TvSettingsHomeRows.dc.html, PLAN-ROWS.md
-/// §8.3), and Edit rows on Movies and TV Shows for that screen: every row
+/// Settings › Home rows on Apple TV,
+/// and Edit rows on Movies and TV Shows for that screen: every row
 /// numbered, with Move up, Move down and Hide or Show, as the Audio &
 /// subtitles sheet orders languages; hidden rows stay in place, greyed.
 /// Beside the list: Add a row (the hidden rows by kind, in a menu) and Reset

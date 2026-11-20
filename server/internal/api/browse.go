@@ -58,11 +58,11 @@ type MovieDetail struct {
 	TotalSize int64             `json:"totalSize"`
 	AddedAt   *time.Time        `json:"addedAt,omitempty"`
 	Watch     *WatchState       `json:"watch,omitempty" doc:"The signed-in user's progress."`
-	// ManagedBy and Download come from Radarr (PLAN-ARR.md §6).
+	// ManagedBy and Download come from Radarr.
 	ManagedBy string                 `json:"managedBy,omitempty" required:"false" doc:"The Radarr connection that has the movie."`
 	Download  *integrations.Download `json:"download,omitempty" required:"false" doc:"A download of it in Radarr's queue, such as an upgrade."`
 	// Trailers are the movie's trailer files in the library, then its
-	// YouTube trailers from TMDB (PLAN-TRAILERS.md §5.3), APILevel 20.
+	// YouTube trailers from TMDB, APILevel 20.
 	Trailers []MovieTrailer `json:"trailers,omitempty" required:"false" nullable:"false" doc:"The movie's trailers, best first: trailer files in the library, then YouTube trailers while they are on. Apps play the first one whose source they know. Absent when it has none, and on older servers."`
 }
 
@@ -108,7 +108,7 @@ type Season struct {
 	EpisodeCount   int64  `json:"episodeCount" doc:"Episodes TMDB lists for the season, and those named after files because TMDB does not list them."`
 	AvailableCount int64  `json:"availableCount" doc:"Episodes with a present file."`
 	WatchedCount   int64  `json:"watchedCount" doc:"Episodes the signed-in user has watched."`
-	// Monitored and Request come from Sonarr and requests (PLAN-ARR.md §6).
+	// Monitored and Request come from Sonarr and requests.
 	Monitored *bool                      `json:"monitored,omitempty" required:"false" doc:"Sonarr monitors the season; absent when no Sonarr has the show."`
 	Request   *integrations.RequestState `json:"request,omitempty" required:"false" doc:"The newest request for the season."`
 }
@@ -125,7 +125,7 @@ type ShowDetail struct {
 	// NextEpisode is the first unwatched episode on disk, for "Play next".
 	NextEpisode *NextEpisode `json:"nextEpisode,omitempty"`
 	ManagedBy   string       `json:"managedBy,omitempty" required:"false" doc:"The Sonarr connection that has the show."`
-	// Following is PLAN-NEW-EPISODES.md §5.3, API level 29.
+	// Following is from API level 29.
 	Following bool `json:"following" required:"false" doc:"The signed-in person follows the show (followShow). Absent on servers below API level 29."`
 }
 
@@ -153,8 +153,7 @@ type Episode struct {
 	AddedAt    *time.Time  `json:"addedAt,omitempty" doc:"When its newest file was added: its date on disk when first found."`
 	IsNew      bool        `json:"isNew"`
 	Watch      *WatchState `json:"watch,omitempty"`
-	// Monitored, Download and Request say why a missing episode is missing
-	// (PLAN-ARR.md §6).
+	// Monitored, Download and Request say why a missing episode is missing.
 	Monitored *bool                      `json:"monitored,omitempty" required:"false" doc:"Sonarr monitors the episode; absent when no Sonarr has the show."`
 	Download  *integrations.Download     `json:"download,omitempty" required:"false" doc:"Its download in Sonarr's queue."`
 	Request   *integrations.RequestState `json:"request,omitempty" required:"false" doc:"The newest request for its season."`

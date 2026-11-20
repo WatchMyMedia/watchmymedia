@@ -15,9 +15,9 @@ func cardPixels(width: CGFloat, height: CGFloat, scale: CGFloat, lift: CGFloat =
 
 /// A 2:3 poster (Home's rows, the grids, Search): the New badge, the watched
 /// check or how far it was watched, then the title and a line. No quality
-/// badge (PLAN-HOME.md §5): quality is a fact on the hero, the row screens'
+/// badge: quality is a fact on the hero, the row screens'
 /// panel and the detail pages. Focused, the artwork lifts with the gold rim
-/// and the text moves down out of its way (TvLibrary.dc.html's `.card.focus`).
+/// and the text moves down out of its way.
 struct PosterCard: View {
     let item: BrowseItem
     let imageURL: URL?
@@ -122,13 +122,13 @@ struct FocusSheen: View {
     }
 }
 
-/// A titled row of cards that scrolls sideways (TvHome.dc.html). It is a
+/// A titled row of cards that scrolls sideways. It is a
 /// focus section that remembers the card focused last, so coming back to the
-/// row lands where the person left it (PLAN-IOS.md §11.2). It shows where it
+/// row lands where the person left it. It shows where it
 /// starts (``RowStartScrolling``): the card before the focused one stays in
 /// view, and Left on the first card bumps the row. `focusedItem`
-/// tells the screen which card has focus, for the row screens' panel
-/// (PLAN-HOME.md §7.4); `counter` is "Row 2 of 7" at the heading's right.
+/// tells the screen which card has focus, for the row screens' panel;
+/// `counter` is "Row 2 of 7" at the heading's right.
 struct ShelfRow<Item: Identifiable, Card: View>: View {
     let title: String
     var detail: String?
@@ -166,8 +166,8 @@ struct ShelfRow<Item: Identifiable, Card: View>: View {
             .defaultFocus($focused, remembered ?? items.first?.id, priority: .userInitiated)
             .onChange(of: focused) { old, id in
                 guard let id else { return }
-                // Coming in from another row lands on the card last focused, else the first
-                // (PLAN-HOME.md §7.2): the focus engine would pick the card nearest the way it came.
+                // Coming in from another row lands on the card last focused, else the first:
+                // the focus engine would pick the card nearest the way it came.
                 if old == nil, let wanted = remembered ?? items.first?.id, wanted != id, items.contains(where: { $0.id == wanted }) {
                     focused = wanted
                     return
@@ -193,7 +193,7 @@ struct WatchToggleButton: View {
     }
 }
 
-/// The page backdrop of Show and Movie (TvShow.dc.html): the artwork across
+/// The page backdrop of Show and Movie: the artwork across
 /// the top, fading to the ground at the bottom and on the left, with a warm light.
 struct DetailBackdrop: View {
     let url: URL?
@@ -229,7 +229,7 @@ struct DetailPoster: View {
     }
 }
 
-/// Cast as a row of faces, names and roles (TvMovie.dc.html).
+/// Cast as a row of faces, names and roles.
 struct CastRow: View {
     let cast: [Person]
     @Environment(AppServices.self) private var services

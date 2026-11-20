@@ -174,7 +174,7 @@ class KeepInViewSpec(private val leading: Float, private val trailing: Float) : 
  * edge one card and [gap] further in, so the card before the focused one
  * stays in view. At the row's start there is nothing left to scroll back to,
  * so focus itself moves into the first place: the first card is the one
- * with nothing before it (RowStartBest.dc.html). A row's cards are one
+ * with nothing before it. A row's cards are one
  * width, so the focused card's own size stands for its neighbour's. Where
  * two cards don't fit, the focused one is kept whole as before.
  */

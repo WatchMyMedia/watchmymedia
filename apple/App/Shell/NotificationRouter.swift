@@ -5,7 +5,7 @@ import UserNotifications
 import WMMFeatures
 import WMMModel
 
-/// The app's one notification delegate (PLAN-NEW-EPISODES.md §7.4): it
+/// The app's one notification delegate: it
 /// hands each notification to the feature that owns its category, Live TV
 /// reminders (``LiveReminderNotifier``) or new episodes
 /// (``NewEpisodeNotifier``), and keeps what both share: what iOS says of the

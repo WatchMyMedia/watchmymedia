@@ -28,7 +28,7 @@ import media.watchmy.client.tv.requests.tvIcon
 import media.watchmy.client.tv.requests.tvTone
 import media.watchmy.client.ui.WmmColors
 
-// The TV show page's parts shared with other screens (PLAN-SHOW-PAGE.md §4.3).
+// The TV show page's parts shared with other screens.
 
 /** Cast & details: the show's whole overview, its facts and cast, from the show page and the episode page's More. */
 @Composable

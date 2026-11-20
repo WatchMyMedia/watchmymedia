@@ -1,5 +1,5 @@
 // Package artwork keeps the pictures an admin gave the server in place of
-// TMDB's (PLAN-POSTERS.md): an upload or a link, copied once, re-encoded as
+// TMDB's: an upload or a link, copied once, re-encoded as
 // JPEG and named by its hash under <data_dir>/artwork. internal/images
 // serves them, scaled, on the route that serves TMDB's.
 package artwork

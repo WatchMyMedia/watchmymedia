@@ -1,6 +1,6 @@
 // Package arr is a client for Radarr's and Sonarr's v3 API, which share their
 // shape: an X-Api-Key header, /api/v3 resources, commands, a queue and history.
-// It covers what WatchMyMedia uses (PLAN-ARR.md §0), not the whole API.
+// It covers what WatchMyMedia uses, not the whole API.
 package arr
 
 import (

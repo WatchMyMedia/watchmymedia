@@ -1,7 +1,7 @@
 import Foundation
 
 /// What changed in the library or the person's watch state, as the server's
-/// events say it (PLAN-APPLE-REVIEW.md §4.1.1), so a screen patches or
+/// events say it, so a screen patches or
 /// ignores what isn't its own instead of reloading everything.
 public enum LibraryChange: Hashable, Sendable {
     /// The person's watch state of these movies or episodes changed: the
@@ -44,7 +44,7 @@ extension Array where Element == LibraryChange {
 }
 
 /// What changed in the person's Live TV, by the server's event, so each store
-/// asks again only for its own part (PLAN-APPLE-REVIEW.md §4.1.8).
+/// asks again only for its own part.
 public enum LiveTVChange: Hashable, Sendable {
     /// `live.favourites.changed`: the channels' stars.
     case favourites

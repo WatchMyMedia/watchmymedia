@@ -369,7 +369,7 @@ class FakePreferencesRepository(server: StateFlow<SavedServer?>? = null) : Prefe
         prefs.value = prefs.value.copy(autoplayNext = enabled)
     }
 
-    /** A subtitle mode was saved, which keeps the server from choosing one (PLAN-LANGUAGES.md §5.3). */
+    /** A subtitle mode was saved, which keeps the server from choosing one. */
     private var modeChosen = false
 
     override suspend fun setSubtitles(value: media.watchmy.client.model.SubtitlePreferences) {

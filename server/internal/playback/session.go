@@ -75,7 +75,7 @@ type Spec struct {
 	// a negotiated replacement prepares and waits for first-frame ack.
 	PreservePrevious bool
 	// SharedOutput opts a compatible VOD output into complete-segment reuse.
-	// It is internal until the A0 cold-rung contract and client opt-in land.
+	// It is internal until the cold-rung contract and client opt-in land.
 	SharedOutput bool
 	sharedKey    string
 	// ReserveSlot holds one future VOD producer slot while this session is
@@ -86,8 +86,8 @@ type Spec struct {
 	// caps pins device/filter choices across this session's VOD restarts.
 	caps *Capabilities
 	// Keyframes finds keyframes in Path, so an event session of copied
-	// video starts on one and ends each run just before one
-	// (PLAN-RESUME.md §3.1, §3.2); nil runs it from StartMs as asked.
+	// video starts on one and ends each run just before one;
+	// nil runs it from StartMs as asked.
 	Keyframes KeyframeFinder
 	// eventChunk caps one event ffmpeg run; zero is used by argument tests.
 	eventChunk time.Duration
@@ -174,7 +174,7 @@ func (s *Session) IsVOD() bool { return s.vod != nil }
 
 // InitHash is the SHA-256 of a VOD session's init segment, hex-encoded,
 // waiting for the first run to write it. An offline download compares it
-// with the one its device already has (PLAN-DOWNLOADS.md §3.3): copied
+// with the one its device already has: copied
 // video always gives the same, and a hardware encoder may not.
 func (s *Session) InitHash(ctx context.Context) (string, error) {
 	if s.vod == nil {

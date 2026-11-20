@@ -17,7 +17,7 @@ public enum PlayerOverlay: Hashable, Sendable {
 /// the subtitle cues on screen, Skip's auto-skip fill and the Next Episode
 /// countdown. Only the views that draw these read it (the scrubber, the
 /// times, the small progress line, the cues, Skip and the card's button), so
-/// a tick redraws them and not the whole player (PLAN-APPLE-REVIEW.md §4.3.3).
+/// a tick redraws them and not the whole player.
 /// Each value is set only when it changes.
 @MainActor
 @Observable
@@ -43,15 +43,15 @@ public final class PlayerClock {
     }
 }
 
-/// A key on a hardware keyboard, as the players read it (PLAN-APPLE-REVIEW.md
-/// §6.3). The apps have no volume or mute of their own (the device's
+/// A key on a hardware keyboard, as the players read it.
+/// The apps have no volume or mute of their own (the device's
 /// buttons do that), so there is no M.
 public enum PlayerKey: Hashable, Sendable {
     case space, left, right, up, down, escape
 }
 
 /// Whether a player's controls show, for the film player and the Live TV
-/// player alike (PLAN-APPLE-REVIEW.md §5.3): they hide by themselves
+/// player alike: they hide by themselves
 /// ``hideDelayMs`` after the last input while the owner's rule allows it,
 /// counting from the later of that input and the moment the rule began to
 /// allow it (a long load doesn't hide them the moment playback starts), and
@@ -155,7 +155,7 @@ public final class ControlsAutoHide {
 /// (the time, and the seek thumbnail where the server has made them), which
 /// overlay is up, and leaving. Every touch reaches the controller as
 /// ``PlaybackController/noteUserInput()``, which resets Still watching.
-/// The controller does the playing (PLAN-CLIENTS.md §2.3); this only decides
+/// The controller does the playing; this only decides
 /// what the screen shows and passes on what the viewer does, as
 /// android/mobile/.../PlayerScreen.kt does.
 @MainActor
@@ -388,7 +388,7 @@ public final class PlayerChromeModel {
 
     /// A drag on the scrubber shows the seek thumbnail over the thumb, and
     /// the middle buttons and Skip make way for it; without thumbnails, or
-    /// once a sheet fails, the time shows alone (PLAN-TRICKPLAY.md §7.1).
+    /// once a sheet fails, the time shows alone.
     public var showsScrubTile: Bool { scrubMs != nil && state.trickplay != nil && thumbnails != nil && !scrubTileFailed }
 
     /// The seek thumbnail's height for its width.

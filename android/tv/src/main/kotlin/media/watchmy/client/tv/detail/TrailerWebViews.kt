@@ -5,8 +5,8 @@ import android.webkit.WebView
 import androidx.annotation.VisibleForTesting
 
 /**
- * Whether this TV can show YouTube's player in a WebView
- * (PLAN-TV-TRAILERS.md §4.4). Some Android TVs have no WebView, or one that
+ * Whether this TV can show YouTube's player in a WebView.
+ * Some Android TVs have no WebView, or one that
  * fails to start; there a YouTube trailer goes to the YouTube app, as it
  * did before trailers played in the app.
  */

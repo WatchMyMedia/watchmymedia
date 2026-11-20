@@ -24,8 +24,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Cast Connect's Live TV path on a device against a real server
- * (PLAN-LIVE-TV.md §4.1, L10d): a phone's cast token, which this TV uses to
+ * Cast Connect's Live TV path on a device against a real server:
+ * a phone's cast token, which this TV uses to
  * reach the server, read the channels, start a channel, fetch its HLS with
  * the media tokens the cast token's renewal gives, heartbeat and stop.
  * Skipped when nothing answers.

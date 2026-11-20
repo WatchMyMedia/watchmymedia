@@ -187,8 +187,8 @@ class ExoMediaPlayer(
      * the window (0 or negative), for an event playlist of a file or a
      * recording. Media3 gives live positions within the window, which moves
      * on as the server trims the playlist's head, so a position read or a
-     * seek made in the window's terms would drift by what was trimmed
-     * (PLAN-RESUME.md §3.5). Positions here count from the stream's start
+     * seek made in the window's terms would drift by what was trimmed.
+     * Positions here count from the stream's start
      * instead. A Live TV channel keeps the window's terms: it is followed
      * from its edge.
      */

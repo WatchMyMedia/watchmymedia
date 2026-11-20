@@ -27,7 +27,7 @@ import org.junit.Test
 import java.time.Instant
 import java.time.ZoneId
 
-/** Favourites, search and reminders in the shared ViewModels (PLAN-LIVE-TV-GUIDE.md §6.5), on the fakes. */
+/** Favourites, search and reminders in the shared ViewModels, on the fakes. */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class LiveExtrasViewModelTest {
     @get:Rule val main = MainDispatcherRule()

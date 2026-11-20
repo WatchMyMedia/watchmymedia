@@ -2,7 +2,7 @@ import { queryOptions } from '@tanstack/react-query'
 import { api, unwrap } from './client'
 
 // Queries the Transcoding, Backups, General and Watch history pages add to
-// the ones in settings.ts (PLAN-ADMIN-SETTINGS.md §5.7–§5.9).
+// the ones in settings.ts.
 
 /** How many plays a shorter Keep history for would delete. Counting changes nothing. */
 export const playsOlderThanQuery = (days: number) =>

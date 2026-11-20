@@ -397,8 +397,8 @@ func startFilePlayback(ctx context.Context, deps Deps, in *PlaybackInput) (*Play
 		}
 		if d.Playlist == "event" {
 			// With no start asked for, an event play starts where it
-			// resumes, so the player needn't ask again (PLAN-RESUME.md
-			// §3.7). Copied video starts on the keyframe before.
+			// resumes, so the player needn't ask again.
+			// Copied video starts on the keyframe before.
 			if in.Body.StartMs == nil {
 				spec.StartMs = resumeStart(watch)
 			}
@@ -516,7 +516,7 @@ func uploadDemand(d playback.Decision, info *probe.MediaInfo) int64 {
 }
 
 // keyframeFinder reads the file's keyframes near a time for an event
-// session of its copied video (PLAN-RESUME.md §3.1); nil without a prober.
+// session of its copied video; nil without a prober.
 func keyframeFinder(deps Deps, row db.MediaFile, info *probe.MediaInfo, d playback.Decision) playback.KeyframeFinder {
 	if deps.Prober == nil || !d.Video.Copy {
 		return nil

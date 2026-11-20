@@ -45,7 +45,7 @@ export function exitApp(): boolean {
 
 /**
  * Whether the TV shows HDR10, as Samsung's avinfo says. The QN90D said so and
- * showed it (PLAN-SAMSUNG.md §10.6), so the player claims HDR10 where this
+ * showed it, so the player claims HDR10 where this
  * holds and the server tone-maps for the rest. False in the preview.
  */
 export function tvTakesHdr10(): boolean {

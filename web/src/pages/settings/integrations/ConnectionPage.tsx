@@ -13,7 +13,7 @@ import { settingsCrumbs } from '../../../lib/settingsRoutes'
 import { FlashBanner } from './parts'
 import { hubHref, pageHref, setFlash } from './shared'
 
-/** One connection's page (§5.2): its checklist as rows that each open their step by itself, and Remove apart at the bottom. */
+/** One connection's page: its checklist as rows that each open their step by itself, and Remove apart at the bottom. */
 export function ConnectionPage({ id }: { id: number }) {
   const list = useQuery(integrationsQuery)
   const c = list.data?.items.find((x) => x.id === id)
@@ -147,7 +147,7 @@ function Page({ c }: { c: Integration }) {
   )
 }
 
-/** Remove, worded per app (§3.8), in place of the browser's confirm. */
+/** Remove, worded per app, in place of the browser's confirm. */
 function RemoveDialog({ c, onClose }: { c: Integration; onClose: () => void }) {
   const go = useGo()
   const remove = useDeleteIntegration()

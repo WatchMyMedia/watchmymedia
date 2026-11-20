@@ -3,7 +3,7 @@ import WMMAPI
 import WMMModel
 
 /// Following shows and the feed of their new episodes, on the current server
-/// as the signed-in person (PLAN-NEW-EPISODES.md §5.3, §5.4; API level 29).
+/// as the signed-in person (API level 29).
 /// Below that level nothing here is called.
 @MainActor
 final class RealFollowsRepository: FollowsRepository {

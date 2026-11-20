@@ -36,7 +36,7 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 
 /*
- * Copy diagnostics (PLAN-ANDROID-REVIEW §6.4, the Diagnostics board): the
+ * Copy diagnostics: the
  * last times the app's process ended, as Android recorded them, for a bug
  * report. Nothing is sent anywhere; Copy puts the text on the clipboard.
  * The words are the TV's too (core:model DiagnosticsWords), but for a force

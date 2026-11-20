@@ -29,7 +29,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 
-/** The skeletons' fills (HomeLoading.dc.html): `.ln` lines and the hero's stronger ones, and its burgundy button. */
+/** The skeletons' fills: `.ln` lines and the hero's stronger ones, and its burgundy button. */
 object SkeletonColors {
     val Line = Color(0xFF222225)
     val Strong = Color(0xFF2E2E33)

@@ -13,7 +13,7 @@ import { thisTvLine } from './thisTv'
 const id = (row: string) => paneRowId('about', row)
 
 /**
- * Settings › About (SettingsAccount, Tweak `pane`: `about`): the versions,
+ * Settings › About: the versions,
  * the last five playback errors as codes someone helping can read off the
  * screen (there is no clipboard, so no Copy), the privacy policy as a QR
  * code and the licences.

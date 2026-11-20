@@ -2,7 +2,7 @@ import { useEffect, useState, type RefObject } from 'react'
 import { api, unwrap } from '../api/client'
 
 /**
- * AirPlay from Safari (PLAN-CAST.md §5.3). AirPlay hands the Apple TV a
+ * AirPlay from Safari. AirPlay hands the Apple TV a
  * URL, which it fetches itself, so it cannot carry an MSE stream (hls.js)
  * or the session cookie. Where AirPlay exists, the player plays native HLS
  * from a VOD playlist and puts a media token in every URL.

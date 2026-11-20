@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 
-// The Google Cast receiver (PLAN-CAST.md §4): a page of its own, hosted at
+// The Google Cast receiver: a page of its own, hosted at
 // cast.watchmy.media for every WatchMyMedia server. `pnpm build:receiver`
 // writes dist-receiver/; `pnpm dev:receiver` serves it on the LAN for an
 // unpublished development App ID.

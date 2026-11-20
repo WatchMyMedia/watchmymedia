@@ -9,7 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** What the overview's rows say is chosen (PLAN-ANDROID-SETTINGS.md §4.1, the SettingsOverview board's Tweak attention). */
+/** What the overview's rows say is chosen. */
 class SettingsLinesTest {
     private val facts = OverviewFacts(
         device = "phone",

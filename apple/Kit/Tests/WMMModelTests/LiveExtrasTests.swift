@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import WMMModel
 
-/// The extras boards' words (PLAN-LIVE-TV-GUIDE.md §6.5) and when reminders come.
+/// The extras boards' words and when reminders come.
 @Suite struct LiveExtrasTests {
     private static let zone = TimeZone(identifier: "America/New_York")!
     private static func calendar() -> Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = zone; return c }

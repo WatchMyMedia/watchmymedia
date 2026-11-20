@@ -1,5 +1,4 @@
-/* Home, the libraries, See all and list pages (HomeStart, HomeRow,
-   LibraryRows, LibraryAZ and ListPage on the Samsung TV canvas). Sizes are
+/* Home, the libraries, See all and list pages. Sizes are
    the boards' pixels over 16; colours are the kit's tokens. */
 
 /* Home: one row a screen, the pages on a track moved with a transform. */
@@ -106,7 +105,7 @@
 .browse-slot .tv-card__placeholder { background: var(--surface-2); }
 .browse-land .tv-card__art { outline: .1875rem dashed var(--accent); outline-offset: .25rem; }
 
-/* The A–Z strip at the grid's right edge (LibraryAZ). */
+/* The A–Z strip at the grid's right edge. */
 .library-strip { position: absolute; right: 3.25rem; top: 0; width: 4.25rem; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: .5rem 0; border-radius: 2.125rem; }
 .library-strip--on { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-2); }
 .library-az { display: grid; place-items: center; width: 3.25rem; height: 1.6875rem; border-radius: .5rem; font-size: 1.0625rem; font-weight: 700; color: var(--text-3); transition: transform var(--focus-time) ease-out; }
@@ -117,7 +116,7 @@
 .library-bubble b { font-size: 3.625rem; line-height: 1; font-weight: 800; color: var(--accent); }
 .library-bubble span { font-size: .9375rem; color: var(--text-3); }
 
-/* A list's page (ListPage). */
+/* A list's page. */
 .list-page { position: absolute; inset: 0; overflow: hidden; }
 .list-head { position: absolute; left: var(--content-left); right: var(--gutter); top: 3.5rem; display: flex; align-items: flex-end; justify-content: space-between; gap: 2.5rem; }
 .list-head__text { display: flex; flex-direction: column; gap: .625rem; min-width: 0; }

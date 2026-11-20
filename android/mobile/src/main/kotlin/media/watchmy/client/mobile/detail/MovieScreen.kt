@@ -88,12 +88,12 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.ReportShown
 
 /**
- * A movie (Movie.dc.html): backdrop, poster and facts, Resume or Play, Mark
- * watched, Download (MovieDownload.dc.html, where the server allows it), and
+ * A movie: backdrop, poster and facts, Resume or Play, Mark
+ * watched, Download (where the server allows it), and
  * each version with Play this. [onOpenSettings] is Settings › Downloads.
- * Trailer (MovieTrailer.dc.html) plays a trailer file through [onPlay], and
+ * Trailer plays a trailer file through [onPlay], and
  * opens YouTube's trailers in the trailer screen through [onOpenTrailer].
- * The page ends with its related titles (MovieRelated.dc.html), whose cards
+ * The page ends with its related titles, whose cards
  * open their page through [onOpenMovie].
  */
 @Composable
@@ -124,7 +124,7 @@ fun MovieScreen(
         }
     }
 
-    // The rows at the page's end, the collection then More like this (PLAN-RELATED.md §7).
+    // The rows at the page's end, the collection then More like this.
     val related: @Composable () -> Unit = { RelatedRows(state.related, onOpenMovie, onOpenShow, layout.isTablet, Modifier.padding(top = 24.dp)) }
 
     Box(Modifier.fillMaxSize().background(WmmColors.Ground)) {
@@ -188,7 +188,7 @@ private fun MovieContent(
         }
         Overview(movie.overview, Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp))
         movie.download?.let { d ->
-            // Radarr is fetching it, or an upgrade (PLAN-ARR.md §6).
+            // Radarr is fetching it, or an upgrade.
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     val failed = d.state == DownloadState.Failed
@@ -208,8 +208,8 @@ private fun MovieContent(
 
 /**
  * Resume or Play, Play from start, Trailer and Mark watched, as
- * MovieTrailer.dc.html lays them out: Trailer beside Play from start when
- * partway, else beside Mark watched. Without a trailer, as Movie.dc.html.
+ * the design lays them out: Trailer beside Play from start when
+ * partway, else beside Mark watched.
  */
 @Composable
 private fun MovieActions(movie: MovieDetail, state: MovieViewModel.State, vm: MovieViewModel, onPlay: (PlayRequest) -> Unit, onOpenSettings: () -> Unit, onTrailer: () -> Unit) {
@@ -324,7 +324,7 @@ private fun TabletMovieContent(
             Column(Modifier.width(TabletLayout.detailColumn).verticalScroll(scroll).padding(bottom = 24.dp)) { details() }
             LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 24.dp, bottom = 24.dp)) {
                 item { MovieExtras(movie, state, vm, onPlay, sideBySide = true) }
-                // In the right pane, under the cast (TabMovieRelated.dc.html).
+                // In the right pane, under the cast.
                 item { related() }
             }
         }

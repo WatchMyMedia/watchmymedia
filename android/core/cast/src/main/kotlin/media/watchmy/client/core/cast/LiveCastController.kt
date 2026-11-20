@@ -26,7 +26,7 @@ import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.forLiveTV
 
 /**
- * A Live TV channel on the TV as a remote (PLAN-LIVE-TV.md §4.1, L10d): the
+ * A Live TV channel on the TV as a remote: the
  * receiver holds the live session, heartbeats it and words its problems;
  * this turns the receiver's `state.live` and MEDIA_STATUS into
  * [LiveCastState] and the viewer's taps into LOADs and commands. One for the

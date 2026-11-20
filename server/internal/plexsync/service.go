@@ -350,7 +350,7 @@ func (s *Service) verifyAccount(ctx context.Context, opts plex.Options, cred ple
 
 // ownerServer finds the owner's credential for the server: the resource's
 // own token, or, only when the server refuses that with HTTP 401, the
-// owner's device token for it (PLAN-PLEX-SYNC.md, "Authentication result").
+// owner's device token for it.
 // The address must answer with the server's identity before either is sent.
 func (s *Service) ownerServer(ctx context.Context, cloudOpts plex.Options, cloud plex.Credential, account plex.Account, machine, origin string) (*owner, error) {
 	rc, err := plex.NewClient(s.clients, cloud.Token(), cloudOpts)
@@ -542,7 +542,7 @@ func (s *Service) personClient(ctx context.Context, o *owner, p PlexPerson) (*pl
 	case accessHome:
 		// A Home switch from the owner, verified to be the profile, then
 		// the profile's own credential for this server. Renewing the
-		// owner's grant does not renew a profile's (P0), so this happens
+		// owner's grant does not renew a profile's, so this happens
 		// again each time.
 		ac, err := plex.NewClient(s.account, o.cloud.Token(), o.cloudOpts)
 		if err != nil {

@@ -3,8 +3,7 @@ import { relatedRows } from '../../../src/lib/screenRows'
 import type { Route } from '../../app/routes'
 import type { CardBadge } from '../../ui/Card'
 
-// The rows a movie's and a show's page end with (PLAN-RELATED.md §7;
-// MovieRelated and ShowRelated on the Samsung TV canvas): the movie's
+// The rows a movie's and a show's page end with: the movie's
 // collection, then More like this, as poster rows.
 
 type BrowseItem = components['schemas']['BrowseItem']

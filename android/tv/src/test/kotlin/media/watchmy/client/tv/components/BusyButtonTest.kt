@@ -29,7 +29,7 @@ import org.robolectric.annotation.Config
 /**
  * A button that disables itself while it works (Sign in, Connect, Mark
  * season watched) keeps focus: OK does nothing until it is done, and
- * TalkBack hears it as disabled (PLAN-ANDROID-REVIEW.md §3.2.1).
+ * TalkBack hears it as disabled.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)

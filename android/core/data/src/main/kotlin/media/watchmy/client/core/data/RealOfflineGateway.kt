@@ -45,7 +45,7 @@ import media.watchmy.client.core.api.models.OfflineDownload as ApiOfflineDownloa
 import media.watchmy.client.core.api.models.OfflineItem as ApiOfflineItem
 
 /**
- * The offline routes (PLAN-DOWNLOADS.md §9) for core:downloads. Each call
+ * The offline routes for core:downloads. Each call
  * goes to its owner's server as that account ([Http.bindTo]), so a download
  * keeps its tokens and sync while another server is in use; once the
  * account is signed out there, calls throw [SignedOutException], and a 401

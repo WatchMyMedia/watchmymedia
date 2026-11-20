@@ -13,7 +13,7 @@ import { LinkTVFlow } from './you/LinkTV'
 import { useFlash, without } from './you/hooks'
 
 /**
- * Settings › You › Account & devices (PLAN-ADMIN-SETTINGS.md §5.10): who you
+ * Settings › You › Account & devices: who you
  * are, your password as a one-step task, and where you are signed in. Link a
  * TV is a flow at /settings/account/link; /link, which a TV's QR code opens,
  * goes to its second step.

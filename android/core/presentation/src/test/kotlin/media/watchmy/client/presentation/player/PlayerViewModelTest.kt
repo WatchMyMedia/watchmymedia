@@ -30,7 +30,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * The player's play kept on its nav entry (PLAN-ANDROID-REVIEW §3.1.5): a
+ * The player's play kept on its nav entry: a
  * recreated activity keeps the controller and doesn't restart it, and
  * process death picks the play up at the same file and place.
  */

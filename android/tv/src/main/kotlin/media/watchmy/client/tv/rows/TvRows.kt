@@ -77,7 +77,7 @@ internal class TvRowActions(
 )
 
 /**
- * A row's See all on the TV (PLAN-SEE-ALL.md): what its last card says, and
+ * A row's See all on the TV: what its last card says, and
  * what OK on it does. [list] draws the list glyph instead of the grid's.
  */
 internal class TvSeeAll(val words: SeeAllWords, val list: Boolean, val onClick: () -> Unit)
@@ -86,8 +86,8 @@ internal class TvSeeAll(val words: SeeAllWords, val list: Boolean, val onClick: 
  * A Home row's See all: a list's page, or its library's TV Shows or Movies
  * at the grid, sorted the row's way ([requests] carries the sort there,
  * [onOpenLibrary] goes). Null for a row without a link, and for a library
- * Home has no section for (one of several of its type, PLAN-SEE-ALL.md
- * decision 6). Continue watching and Live TV have no link.
+ * Home has no section for (one of several of its type).
+ * Continue watching and Live TV have no link.
  */
 internal fun tvHomeSeeAll(row: ScreenRow, home: HomeData, requests: BrowseRequests, actions: TvRowActions, onOpenLibrary: (LibraryType) -> Unit): TvSeeAll? {
     val link = row.seeAll ?: return null
@@ -132,7 +132,7 @@ internal fun ScreenRow.cardKey(index: Int = 0): String? = when (style) {
     RowStyle.Live -> null
 }
 
-/** Tells the screen which card of a row has focus: its index in the row and its focus key (Home's panel follows it, PLAN-HOME.md §7.3). */
+/** Tells the screen which card of a row has focus: its index in the row and its focus key (Home's panel follows it). */
 internal typealias OnFocusItem = (index: Int, key: String) -> Unit
 
 /** Registers the card with [memory] under [key] and reports its focus to [onFocusItem]. */
@@ -140,10 +140,10 @@ internal fun Modifier.rowCard(memory: FocusMemory, key: String, index: Int, onFo
     focusMemory(memory, key).then(if (onFocusItem == null) Modifier else Modifier.onFocusChanged { if (it.isFocused) onFocusItem(index, key) })
 
 /**
- * One arranged row on the TV (Home, and LibraryRows.dc.html): its heading
+ * One arranged row on the TV (Home's, or a library's): its heading
  * and the line beside it, then its cards by style, as Home's rows have
  * always looked; a row with somewhere to go ends with a See all card
- * ([seeAll]: a list's page, or its library's grid, PLAN-SEE-ALL.md). The
+ * ([seeAll]: a list's page, or its library's grid). The
  * Live TV row is the screen's to draw. Home's row screens pass [counter]
  * ("Row 2 of 7") and [onFocusItem], so the panel above the row follows the
  * focused card. [enter] is the card focus first comes to from outside the
@@ -250,11 +250,11 @@ private fun ContinueItem.openPage(actions: TvRowActions) {
 }
 
 /**
- * A row's last card (LibraryRows.dc.html `.more`), the size of the row's
+ * A row's last card, the size of the row's
  * artwork as it grows with the row ([RowArtCard]): on a list's row See all,
  * with the titles the library doesn't have;
  * on a built-in row "See all TV shows" over "By last aired" with the grid
- * glyph (PLAN-SEE-ALL.md §3), read aloud as one.
+ * glyph, read aloud as one.
  */
 @Composable
 private fun SeeAllCard(seeAll: TvSeeAll, wide: Boolean, modifier: Modifier = Modifier) {

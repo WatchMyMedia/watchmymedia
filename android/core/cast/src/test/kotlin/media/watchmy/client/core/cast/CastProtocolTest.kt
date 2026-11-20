@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The live parts of the protocol, as web/src/cast/protocol.ts writes them (PLAN-LIVE-TV.md §4.1). */
+/** The live parts of the protocol, as web/src/cast/protocol.ts writes them. */
 class CastProtocolTest {
     @Test fun `a channel's load has no file`() {
         val text = """{"v":1,"server":{"id":"s1","urls":["http://127.0.0.1:27587"]},"token":"c1.x","live":{"channelId":"c7","quality":"720"},"device":{"name":"Living Room TV"}}"""

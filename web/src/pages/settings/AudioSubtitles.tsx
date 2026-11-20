@@ -13,8 +13,8 @@ import { FallbackLanguagesFlow, OpenSubtitlesFlow, SubtitleService } from './you
 import { useFlash } from './you/hooks'
 
 /**
- * Settings › You › Audio & subtitles (PLAN-LANGUAGES.md §5.6,
- * PLAN-ADMIN-SETTINGS.md §5.10): the person's audio and subtitle languages,
+ * Settings › You › Audio & subtitles:
+ * the person's audio and subtitle languages,
  * how subtitles start and Automatic download, which depend on each other and
  * so are one draft with the save bar; then, for admins, the server subtitle
  * service, with its two one-step tasks at their own addresses. The route

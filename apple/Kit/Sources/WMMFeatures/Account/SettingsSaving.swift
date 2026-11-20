@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import WMMModel
 
-/// Where one control kept on the server stands (PLAN-APPLE-SETTINGS.md §3.1):
+/// Where one control kept on the server stands:
 /// at rest, being sent, saved with a sentence saying what the change did, or
 /// failed with the control back at the saved value and a sentence naming it.
 /// Only that control's row waits or speaks; Saved goes back to rest after a

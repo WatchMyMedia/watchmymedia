@@ -7,7 +7,7 @@ import { paneRowId } from './settingsGroups'
 import { PaneNote, SettingRow } from './SettingRow'
 import { requestsLine, webAppUrl } from './settingsWords'
 
-/** Your requests: where each one stands, on a page of its own (Requests on the canvas). */
+/** Your requests: where each one stands, on a page of its own. */
 export function RequestsPane({ first }: PaneProps) {
   const nav = useNav()
   const mine = useQuery(myRequestsQuery)
@@ -31,7 +31,7 @@ export function InboxPane({ first }: PaneProps) {
 }
 
 /**
- * Server settings, for admins (SettingsGroups, Tweak `group`: `server`):
+ * Server settings, for admins:
  * they are in the web app, so a QR code of its Settings and the address.
  */
 export function ServerPane() {

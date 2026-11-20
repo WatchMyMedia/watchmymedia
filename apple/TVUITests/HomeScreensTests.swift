@@ -1,6 +1,6 @@
 import XCTest
 
-/// Home one row a screen (PLAN-HOME.md §7.4) on the fakes with arranged
+/// Home one row a screen on the fakes with arranged
 /// rows: ▼ from the first row pages to the next row's screen, whose panel
 /// follows the focused card; the row that comes back restores its card;
 /// Menu returns to the first screen, and so does the last screen's Back to
@@ -95,7 +95,7 @@ final class HomeScreensTests: XCTestCase {
         XCTAssertTrue(visible(panel))
         XCTAssertTrue(panelSays(panel, "Season 1 · yesterday. The Quiet Meridian"), "the row that comes back restores the card it had focus on: \(panel.label)")
     }
-    /// Where a row starts (RowStartBest.dc.html): moving back along a row,
+    /// Where a row starts: moving back along a row,
     /// the card before the focused one stays whole on screen, so the 2nd card
     /// never sits where the 1st does; Left on the 1st card keeps focus there.
     @MainActor

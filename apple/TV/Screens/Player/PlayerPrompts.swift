@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The Next Episode card (TvPlayerNext.dc.html), in the corner while the
+/// The Next Episode card, in the corner while the
 /// transport bar is hidden: the still, the episode, and a button that fills
 /// as the countdown runs ("Next episode in 7", or "Play now" with autoplay
 /// off), with focus; Watch credits puts it away until the end, as Menu does.
@@ -96,7 +96,7 @@ private struct CountdownButtonStyle: ButtonStyle {
     }
 }
 
-/// "Are you still watching?" (TvPlayerStillWatching.dc.html): nothing plays
+/// "Are you still watching?": nothing plays
 /// until the viewer answers. Focus starts on Keep watching; Menu and
 /// Play/Pause answer it too.
 struct StillWatchingPrompt: View {
@@ -151,7 +151,7 @@ struct StillWatchingPrompt: View {
     }
 }
 
-/// The stopped and can't-play states (TvPlayerStopped.dc.html), on their
+/// The stopped and can't-play states, on their
 /// own with the video gone: the admin's message with Back, or why it failed
 /// with Try again and Back.
 struct PlayerEndState: View {

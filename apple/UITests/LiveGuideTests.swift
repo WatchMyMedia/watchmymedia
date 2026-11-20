@@ -1,6 +1,6 @@
 import XCTest
 
-/// The guide with listings (PLAN-LIVE-TV-GUIDE.md G5) on the fakes' fictional
+/// The guide with listings on the fakes' fictional
 /// listings, which put The Sleuth Files on 4.1 now, as the boards do.
 final class LiveGuideTests: XCTestCase {
     override func setUp() async throws { continueAfterFailure = false }

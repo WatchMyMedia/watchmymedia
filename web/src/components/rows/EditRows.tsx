@@ -28,8 +28,7 @@ type Props = {
 }
 
 /**
- * Edit rows (PLAN-ROWS.md §5, design/mockups/web/HomeEditRows and
- * HomeEditRowsPhone): a screen's rows folded into a list in place of the
+ * Edit rows: a screen's rows folded into a list in place of the
  * screen. Done saves the person's order; Cancel discards it; Reset to
  * default goes back to the household's order, which Cancel undoes. Add a
  * row and Make a list keep the draft for the visit.

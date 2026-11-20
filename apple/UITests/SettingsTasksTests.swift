@@ -1,7 +1,7 @@
 import XCTest
 import UIKit
 
-/// Settings' tasks on the fakes (PLAN-APPLE-SETTINGS.md §10): Link a TV and
+/// Settings' tasks on the fakes: Link a TV and
 /// Switch server from the first step to the last, Back and Cancel at each
 /// step, swiping a sheet down with something typed, Rename, and both
 /// sign-out questions. On an iPhone, and on an iPad, where the tasks are

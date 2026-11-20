@@ -4,7 +4,7 @@ import { SessionContext } from './hooks'
 
 /**
  * Return at Home (or on the first start screen) asks before leaving, as
- * Samsung TV apps do (HomeStart's leave state): both buttons grey, focus on
+ * Samsung TV apps do: both buttons grey, focus on
  * Stay, which Return also chooses. Signed in, it says the TV stays signed in
  * to the server. Android TV leaves without asking.
  */

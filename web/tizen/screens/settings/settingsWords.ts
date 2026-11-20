@@ -5,14 +5,13 @@ import { AUTO } from '../../../src/lib/quality'
 import { SKIP_KINDS } from '../../../src/lib/youSettings'
 import type { SubtitleSize } from '../../player'
 
-// Settings' words on the TV (SettingsGroups, SettingsPlayback and
-// SettingsAccount on the Samsung TV canvas), as the Android TV app says them:
+// Settings' words on the TV, as the Android TV app says them:
 // each group's state line, the choices' labels and what each one does.
 
 type MediaRequest = components['schemas']['MediaRequest']
 type Session = components['schemas']['Session']
 
-/** What a Default quality does, under it (SettingsPlayback, Tweak `picker`: `quality`). */
+/** What a Default quality does, under it. */
 export function qualityDescription(id: string): string {
   if (id === AUTO) return 'Original first, lower when it can’t keep up'
   if (id === 'original') return 'Direct play when the TV can'

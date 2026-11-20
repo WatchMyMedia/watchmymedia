@@ -1,4 +1,4 @@
-// The rules of the Plex settings tab (PLAN-ADMIN-SETTINGS.md §5.1): which
+// The rules of the Plex settings tab: which
 // state the hub is in, what its setup guide and Next step say, which step of
 // each flow an address and the server's state open, and the words for every
 // refusal the Plex routes give.
@@ -296,7 +296,7 @@ export function originHost(origin: string) {
 
 // ---------------------------------------------------------------------------
 // Refusals. Each says what happened, whether anything was saved, and what to
-// do, with the fix as a button where there is one (§3.5). Null means say
+// do, with the fix as a button where there is one. Null means say
 // nothing: the password dialog was cancelled.
 
 export type PlexFix =

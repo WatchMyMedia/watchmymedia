@@ -1,8 +1,8 @@
 import SwiftUI
 import WMMModel
 
-// How a missing episode's or a request's state looks (ShowMissing,
-// MyRequests.dc.html): an icon and a line in its colour, with a gold bar
+// How a missing episode's or a request's state looks:
+// an icon and a line in its colour, with a gold bar
 // under it while downloading. Shared by the iPhone and Apple TV apps.
 
 extension StatusTone {

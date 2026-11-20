@@ -38,7 +38,7 @@ type Preferences struct {
 	Skip         map[string]string `json:"skip" doc:"Per segment kind: none (no button), ask (a Skip button), auto (skip at once) or auto-delay (skip after 3 s)."`
 	AutoplayNext bool              `json:"autoplayNext" doc:"Play the next episode by itself after the credits."`
 	// LiveTVReminderMinutes is how long before a programme starts a Live TV
-	// reminder comes (PLAN-LIVE-TV-GUIDE.md §5.7).
+	// reminder comes.
 	LiveTVReminderMinutes int                          `json:"liveTVReminderMinutes" required:"false" doc:"Minutes before a programme starts that a Live TV reminder comes: 0, 1, 5, 10 or 15 (API level 15)."`
 	Subtitles             playback.SubtitlePreferences `json:"subtitles" required:"false" doc:"The person's subtitle languages, starting mode and opt-in automatic download (API level 18)."`
 	Audio                 playback.AudioPreferences    `json:"audio" required:"false" doc:"The person's audio languages: a play that names no audioIndex starts on the best track in the first of them the file has (API level 21)."`
@@ -289,7 +289,7 @@ func savePreferencePatch(ctx context.Context, deps Deps, userID int64, in *Updat
 	defer func() { _ = tx.Rollback() }()
 	q := deps.Queries.WithTx(tx)
 	// Someone who sets audio languages and never chose how subtitles start
-	// gets subtitles for audio they don't follow (PLAN-LANGUAGES.md §3). It
+	// gets subtitles for audio they don't follow. It
 	// is saved now rather than worked out on each read, so a later save from
 	// an older app, which always sends the mode it shows, leaves it alone.
 	_, setsMode := changes["subtitles.mode"]

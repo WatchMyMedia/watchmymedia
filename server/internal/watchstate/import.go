@@ -8,8 +8,8 @@ import (
 	"watchmymedia/server/internal/db"
 )
 
-// Imports apply another server's watched marks under the rules in
-// PLAN-PLEX-SYNC.md ("Additive merge rules"): they fill items the user has
+// Imports apply another server's watched marks under these rules:
+// they fill items the user has
 // never decided here and change nothing else. Plex runs use ImportChecked so
 // their checkpoint and authorization checks commit with the marks. Previews use
 // Evaluate, which applies the same merge rules without writing.

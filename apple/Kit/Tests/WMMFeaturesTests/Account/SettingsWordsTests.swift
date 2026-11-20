@@ -3,7 +3,7 @@ import Testing
 @testable import WMMFeatures
 import WMMModel
 
-/// The words of the redesigned Settings (PLAN-APPLE-SETTINGS.md §6), as the
+/// The words of the redesigned Settings, as the
 /// boards and the web word them.
 @Suite struct SettingsWordsTests {
     private let en = Locale(identifier: "en")

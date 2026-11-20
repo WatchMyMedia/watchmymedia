@@ -137,7 +137,7 @@ private fun Scrubber(
     val currentSeek by rememberUpdatedState(onSeek)
     val currentSegments by rememberUpdatedState(segments)
     var lastDragMs by remember { mutableLongStateOf(0L) }
-    // A tick as the drag takes hold, and a lighter one at each edge of an intro or credits band (§6.3).
+    // A tick as the drag takes hold, and a lighter one at each edge of an intro or credits band.
     val haptics = LocalHapticFeedback.current
     Canvas(
         modifier

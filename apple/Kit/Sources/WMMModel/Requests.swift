@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-// Requests, downloads and problem reports (PLAN-ARR.md §6–§9): the server
+// Requests, downloads and problem reports: the server
 // asks Radarr and Sonarr (or Seerr) for what is missing; the apps ask the
 // server. Mirrors android/core/model's requests.
 

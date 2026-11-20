@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import WMMModel
 
-/// A list's page, from a list row's See all (PLAN-ROWS.md §5, Decision 8):
+/// A list's page, from a list row's See all:
 /// its name, where it is from and how much of it the library has, then
 /// every title in rank order. What the library has opens as usual; a missing
 /// title is dimmed, with Request where the person may ask for it (the

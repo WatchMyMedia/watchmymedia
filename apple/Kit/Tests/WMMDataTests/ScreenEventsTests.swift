@@ -4,8 +4,8 @@ import Testing
 import WMMFeatures
 import WMMModel
 
-/// The screen models fed by the real ``ServerEvents`` and repositories
-/// (PLAN-APPLE-REVIEW.md §4.1.1): what a mark, its echo and a scan cost
+/// The screen models fed by the real ``ServerEvents`` and repositories:
+/// what a mark, its echo and a scan cost
 /// in requests.
 @MainActor
 @Suite(.timeLimit(.minutes(1)))

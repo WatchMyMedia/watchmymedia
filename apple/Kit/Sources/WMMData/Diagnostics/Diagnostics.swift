@@ -5,7 +5,7 @@ import WMMModel
 import MetricKit
 #endif
 
-/// Diagnostics a person can copy (PLAN-APPLE-REVIEW.md §6.4): MetricKit's
+/// Diagnostics a person can copy: MetricKit's
 /// launch, hang and crash reports and its daily count of background exits on
 /// iPhone and iPad, kept as summaries in
 /// `DiagnosticsStore`, and the text a "Copy diagnostics" row copies. Nothing

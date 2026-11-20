@@ -1,7 +1,7 @@
 import XCTest
 
-/// Play/Pause on a focused card plays it where Select opens its page
-/// (PLAN-APPLE-REVIEW.md §6.2): a Continue watching item resumes, a movie
+/// Play/Pause on a focused card plays it where Select opens its page:
+/// a Continue watching item resumes, a movie
 /// plays, a channel tunes, and a show, with no single thing to play, opens
 /// as Select does. Home on the fakes, below API level 22 (its fixed rows,
 /// drawn by the arranged rows' cards); then an episode in a show page's row,

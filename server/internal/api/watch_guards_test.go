@@ -13,8 +13,8 @@ import (
 	"watchmymedia/server/internal/watchstate"
 )
 
-// Every local route leaves a guard an import respects (PLAN-PLEX-SYNC.md
-// P1): starting playback before any progress report, progress reports from
+// Every local route leaves a guard an import respects:
+// starting playback before any progress report, progress reports from
 // outside a play, unwatching an item, and clearing a season or a show.
 func TestWatchRoutesGuardLocalChoices(t *testing.T) {
 	t.Parallel()

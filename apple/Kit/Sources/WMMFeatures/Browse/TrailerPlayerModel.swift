@@ -3,7 +3,7 @@ import Observation
 import WMMModel
 
 /// A movie's YouTube trailers in YouTube's own player, full screen on iPhone
-/// and iPad (TrailerPlayer.dc.html, PLAN-TRAILERS.md §6.3): our bar above
+/// and iPad: our bar above
 /// the player and nothing of ours over it. It follows the web app's rules:
 /// - 101 and 150 (the owner keeps the video on YouTube): the next trailer,
 ///   and after the last, "This trailer can't play here" with Open in YouTube

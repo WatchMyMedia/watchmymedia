@@ -7,8 +7,7 @@ import type { PlayRequest, Route } from '../../app/routes'
 import { codecWords } from '../../player'
 import { channelsText } from './movieLabels'
 
-// The one show page on the TV (ShowPage and ShowRelated on the Samsung TV
-// canvas; PLAN-SHOW-PAGE.md; the Android TV app's ShowPage*.kt and
+// The one show page on the TV (the Android TV app's ShowPage*.kt and
 // ShowPageViewModel): which episode is on top, what its parts say, and what
 // the season and the show offer. The web's showPage.ts, episode.ts and
 // requests.ts decide the rules both apps share.
@@ -42,7 +41,7 @@ export type Selection = { season: number; episodeId?: number; why?: OnTopReason;
 
 export type OnTop = { episode?: Episode; why?: OnTopReason; gone?: boolean }
 
-/** The episode on top of [season] for a selection (showPage.ts's episodeOnTop, §3). */
+/** The episode on top of [season] for a selection (showPage.ts's episodeOnTop). */
 export function onTopFor(sel: Selection, season: Pick<SeasonDetail, 'episodes'>, show: ShowDetail, arrival: Arrival): OnTop {
   if (sel.episodeId !== undefined) {
     const picked = season.episodes.find((e) => e.id === sel.episodeId)
@@ -230,7 +229,7 @@ export function showStatus(show: Pick<ShowDetail, 'status' | 'nextAirDate'>, tod
   return { text: show.nextAirDate ? `Continuing${SEP}next episode ${dayWords(show.nextAirDate, today)}` : 'Continuing', active: true }
 }
 
-/** "Notify me", or "Notifications on" while the person follows the show (PLAN-NEW-EPISODES.md §7.1). */
+/** "Notify me", or "Notifications on" while the person follows the show. */
 export const followLabel = (following: boolean) => (following ? 'Notifications on' : 'Notify me')
 
 /** The bell's name for screen readers, which carries its state. */
@@ -253,7 +252,7 @@ export type Zone = 'top' | 'seasons' | 'episodes' | 'about' | 'related'
  * How far the page is moved up for the part with focus: the top, the tabs
  * and the row are seen with the episode on top; About the show brings the
  * tabs to [topPad] (the top scrolled away), and More like this the page's
- * end (ShowRelated). About isn't held back by the page's end, so a page
+ * end. About isn't held back by the page's end, so a page
  * without More like this still shows the tabs at the top.
  */
 export function zoneOffset(zone: Zone, m: { seasonsTop: number; trackHeight: number; viewHeight: number; topPad: number }): number {

@@ -37,7 +37,7 @@ extension RealPlaybackController {
     }
 
     /// A direct-play file starts on the decided track, which the player
-    /// selects itself (PLAN-LANGUAGES.md §5.2). A stream carries only the
+    /// selects itself. A stream carries only the
     /// track the server chose; a file with one track has nothing to choose.
     func audioStart(_ d: PlaybackDecision, _ selected: Int?) -> AudioStart? {
         guard d.protocol == .file, d.audio.count > 1, let selected,
@@ -46,7 +46,7 @@ extension RealPlaybackController {
     }
 
     /// An offline play chooses its audio here, as the server would for a
-    /// stream, from the preferences loaded (PLAN-LANGUAGES.md §5.5); once,
+    /// stream, from the preferences loaded; once,
     /// and never over the viewer's pick.
     func chooseOfflineAudio(_ v: Viewing, _ d: PlaybackDecision) {
         guard !v.offlineAudioChosen, !v.audioManuallyChosen, d.protocol == .file else { return }

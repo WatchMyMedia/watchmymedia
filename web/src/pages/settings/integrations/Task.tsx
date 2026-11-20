@@ -12,7 +12,7 @@ import { ConnectStep, FoldersStep, PeopleStep, RequestsStep, WebhookStep, type P
 const leaveWhat = 'What you changed here isn’t saved.'
 
 /**
- * One connection's step by itself (§5.2): the same screen as in the Add
+ * One connection's step by itself: the same screen as in the Add
  * flow, with Cancel and Save, and a banner on the connection's page after.
  */
 export function ConnectionTaskPage({ task, id }: { task: string; id: number }) {

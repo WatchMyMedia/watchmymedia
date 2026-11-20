@@ -90,17 +90,17 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.ReportShown
 
 /**
- * A movie (mockup: design/mockups/android-tv/Movie.dc.html): the header
- * with Resume or Play, Play from start, Trailer (MovieTrailer.dc.html),
+ * A movie: the header
+ * with Resume or Play, Play from start, Trailer,
  * Mark watched and, where the server takes reports, More (Report a problem,
  * as on the episode page), then its versions, each with Play this, beside
  * the default version's audio and the cast. [onNavigate] goes to a rail
  * section. A trailer file plays in the player; a YouTube trailer plays in
- * the app's trailer screen through [onOpenTrailer] (MovieTrailerInApp.dc.html,
- * PLAN-TV-TRAILERS.md §4.5). Where this TV has no usable WebView, the
+ * the app's trailer screen through [onOpenTrailer].
+ * Where this TV has no usable WebView, the
  * YouTube app takes it instead, with "Opens the YouTube app" under the
  * button, and with neither there is no Trailer for it.
- * The page ends with its related titles (MovieRelated.dc.html): ▼ from the
+ * The page ends with its related titles: ▼ from the
  * cast or the versions reaches them, and a card opens its page through
  * [onOpenMovie].
  */
@@ -116,7 +116,7 @@ fun MovieScreen(
 ) {
     val services = LocalAppServices.current
     val context = LocalContext.current
-    // YouTube's player in a WebView here, else the YouTube app (PLAN-TV-TRAILERS.md §4.4).
+    // YouTube's player in a WebView here, else the YouTube app.
     var inApp by remember { mutableStateOf(TrailerWebViews.installed()) }
     val youTubeApp = remember(context) { context.canOpenYouTube() }
     val vm = viewModel(key = "movie-$movieId") { MovieViewModel(services.library, movieId, services.requests, youTube = inApp || youTubeApp, plans = services.playback::plans) }
@@ -293,7 +293,7 @@ private fun MovieContent(
                     }
                     if (movie.cast.isNotEmpty()) {
                         Text("Cast", style = inter(24.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.padding(top = 14.dp))
-                        // Focus stops on each member, so ▼ from the cast reaches the related rows (MovieRelated.dc.html).
+                        // Focus stops on each member, so ▼ from the cast reaches the related rows.
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp), maxLines = 2) {
                             movie.cast.take(10).forEachIndexed { i, p ->
                                 CastMember(p, library.imageUrl(p.profilePath, ImageSize.W185), Modifier.focusMemory(memory, "cast:$i"), focusable = true)

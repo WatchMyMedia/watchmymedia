@@ -27,7 +27,7 @@ import (
 const DefaultMDBListURL = "https://api.mdblist.com"
 
 // MDBList is a client for MDBList's API with the admin's own key, one for
-// the server (PLAN-ROWS.md 3). The key goes in the apikey parameter, so
+// the server. The key goes in the apikey parameter, so
 // errors are redacted, and redirects to another host are refused. Free
 // accounts get about a thousand requests a day; lists are fetched once a
 // day each.

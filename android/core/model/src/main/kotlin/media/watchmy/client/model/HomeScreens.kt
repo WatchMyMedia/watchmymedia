@@ -1,7 +1,7 @@
 package media.watchmy.client.model
 
 /**
- * Home one row a screen (PLAN-HOME.md §7): what the panel over a row says
+ * Home one row a screen: what the panel over a row says
  * about its current card (the focused one on TV, the leading one on a
  * tablet) and what OK or the panel's button does with it. The wording is
  * the Apple apps' too.
@@ -49,7 +49,7 @@ enum class CardTarget {
     /** A list's page (a list row's See all card). */
     List,
 
-    /** A library's grid, sorted the row's way (a built-in row's See all card, PLAN-SEE-ALL.md). */
+    /** A library's grid, sorted the row's way (a built-in row's See all card). */
     Library,
 
     /** A file that isn't matched to anything. */
@@ -97,7 +97,7 @@ fun ScreenRow.cardPanelAt(index: Int, channels: List<LiveChannel>, now: Long, fo
 
 /**
  * The See all card's panel: a list's, or a library's in the card's own words
- * ("See all TV shows", "By last aired", PLAN-SEE-ALL.md §3), over no picture
+ * ("See all TV shows", "By last aired"), over no picture
  * of its own, as the list's has none.
  */
 private fun ScreenRow.seeAllPanel(headingTitle: String, libraryType: LibraryType?): CardPanel? {

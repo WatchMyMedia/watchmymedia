@@ -49,7 +49,7 @@ import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.WmmColors
 
 /**
- * Settings › About › Copy diagnostics (android-tv/TvDiagnostics, PLAN-ANDROID-REVIEW.md §6.4):
+ * Settings › About › Copy diagnostics:
  * the last times the app closed and why, as Android recorded them, and
  * Copy, which puts them on the TV's clipboard as plain text. Nothing is
  * sent anywhere. [app] is the app, its version, Android and the device.

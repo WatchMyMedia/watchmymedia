@@ -3,7 +3,7 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The full-screen request dialog (TvSearchRequest.dc.html): the poster at
+/// The full-screen request dialog: the poster at
 /// the left; at the right "Not in your library" (from search), the title,
 /// facts and overview, a show's seasons to tick, the approval line, then
 /// Request and Cancel, with focus on Request. Sent, it says where the

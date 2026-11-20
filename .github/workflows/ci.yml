@@ -751,7 +751,7 @@ jobs:
             android/**/build/test-results/testDebugUnitTest/*.xml
             android/build/reports/jacoco/coverageReport/
 
-  # The iPhone app (apple/, PLAN-IOS.md), in two parts that run apart. When
+  # The iPhone app (apple/), in two parts that run apart. When
   # api/, the generator or the committed Swift API client changed: that
   # client against api/openapi.json. When the iPhone app or what it shares
   # with the TV app changed: the app built and every test run on an iOS
@@ -838,7 +838,7 @@ jobs:
           name: apple-test-results
           path: apple/build/Tests.xcresult
 
-  # The Apple TV app (apple/TV, PLAN-IOS.md §11.2), when the TV app or what it
+  # The Apple TV app (apple/TV), when the TV app or what it
   # shares with the iPhone app changed, and on main after a pull request only
   # for new package pins or a change to this job, as the apple job:
   # built, and the Kit's tests and the remote UI tests (apple/TVUITests) run,
@@ -906,8 +906,8 @@ jobs:
             apple/build/TVTests.xcresult
             apple/build/TVUITests.xcresult
 
-  # The Go tests on Windows, with the ffmpeg build the Windows app will ship
-  # (PLAN.md §7c). This, windows-live-tv and windows-app run on GitHub's
+  # The Go tests on Windows, with the ffmpeg build the Windows app will ship.
+  # This, windows-live-tv and windows-app run on GitHub's
   # Windows runners, side by side; they run only when the server, the
   # Windows app, the ffmpeg pin or
   # one of the three jobs changed. No GPU: they cover the software path, Windows file

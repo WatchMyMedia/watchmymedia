@@ -3,7 +3,7 @@ import Testing
 import WMMModel
 @testable import WMMFeatures
 
-/// Coming back to where the person was after the system evicts the app (PLAN-APPLE-REVIEW.md §6.3).
+/// Coming back to where the person was after the system evicts the app.
 @Suite @MainActor
 struct PlaceTests {
     private func defaults() -> UserDefaults {

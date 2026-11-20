@@ -25,7 +25,7 @@ import media.watchmy.client.model.TrickplayTile
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Seek thumbnails through the app's image loader (PLAN-TRICKPLAY.md §7.1).
+ * Seek thumbnails through the app's image loader.
  * A sheet is fetched once into the loader's disk cache, by its
  * [Trickplay.sheetKey], over the image client, which signs in to the current
  * server and nowhere else. A tile is cut from it with [BitmapRegionDecoder]:

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Checks a Release build of an app (make apple-build-release, apple-tv-build-release):
 # its bundle has the privacy manifest, and its binary holds none of the fakes
-# (PLAN-APPLE-REVIEW.md §2.9: they are debug-only, and project.yml links
+# (they are debug-only, and project.yml links
 # WMMFakes only in Debug) and doesn't honour `-fakes…`. Each app extension in
 # its PlugIns (the Apple TV app's Top Shelf) has its own privacy manifest, no
 # fakes, and none of the Kit's data or playback code: the Top Shelf links only
-# WMMTopShelf, so it can't reach a sign-in or a server (PLAN-APPLE-REVIEW.md §6.2).
+# WMMTopShelf, so it can't reach a sign-in or a server.
 # An extension with an arm64 binary lists arm64 in UIRequiredDeviceCapabilities,
 # or App Store Connect refuses the upload ("Invalid Bundle").
 #

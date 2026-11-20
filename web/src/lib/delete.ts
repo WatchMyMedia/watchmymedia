@@ -8,7 +8,7 @@ type Result = components['schemas']['DeleteResult']
 
 export type DeleteType = 'movie' | 'show' | 'season' | 'episode'
 
-/** The admin's choices in the Delete dialog (PLAN-ARR.md §8.1). */
+/** The admin's choices in the Delete dialog. */
 export type Choices = {
   /** Movies and shows: keep it in the app, unmonitored, rather than remove it. */
   keep: boolean
@@ -88,7 +88,7 @@ export function whatGoes(type: DeleteType, apps: App[], keep: boolean): Piece[] 
   return out
 }
 
-/** An episode is unmonitored as its file goes, so Sonarr doesn't fetch it again (PLAN-EPISODE-PAGE.md §3). */
+/** An episode is unmonitored as its file goes, so Sonarr doesn't fetch it again. */
 function episodeGoes(apps: App[]): string {
   const deleting = apps.filter((a) => a.files > 0)
   const unmonitored = apps.filter((a) => a.files === 0)
@@ -173,7 +173,7 @@ export function failures(r: Result): string[] {
   return out
 }
 
-/** What Seerr is told, when it is connected (PLAN-ARR.md §8.1). */
+/** What Seerr is told, when it is connected. */
 export function seerrLine(type: DeleteType, seerr?: string): string | null {
   if (!seerr) return null
   if (whole(type)) return `${seerr} is told too, so it stops showing the ${type} as available and it can be requested again.`

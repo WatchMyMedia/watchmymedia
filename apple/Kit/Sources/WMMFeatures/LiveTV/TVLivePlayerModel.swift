@@ -10,8 +10,8 @@ public enum TVLivePlayerOverlay: Hashable, Sendable {
 
 /// Live-only AVKit actions: no seek, file progress, subtitles or next episode.
 /// Last channel, Ch−, Ch+ and Go to channel are transport bar buttons, to the
-/// left of the system's (TvLiveChannelKeys.dc.html): as contextual actions
-/// they took Select from the transport bar (PLAN-APPLE-REVIEW.md §3.2.2).
+/// left of the system's: as contextual actions
+/// they took Select from the transport bar.
 public struct TVLivePlayerAction: Hashable, Sendable, Identifiable {
     public enum Kind: String, Hashable, Sendable { case lastChannel, previousChannel, nextChannel, goToChannel, goLive, stop }
     public let kind: Kind
@@ -115,7 +115,7 @@ public final class TVLivePlayerModel {
         guard videoTakesInput, let takeover = state.takeover, takeover.canCancel else { return nil }
         return takeover
     }
-    /// The transport bar's buttons (TvLiveChannelKeys.dc.html): Last channel
+    /// The transport bar's buttons: Last channel
     /// once there is one that can be watched, Ch− and Ch+ naming where they
     /// go, Go to channel, then Stop.
     public var transportBarActions: [TVLivePlayerAction] {

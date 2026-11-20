@@ -26,10 +26,10 @@ import media.watchmy.client.ui.LocalAppServices
 const val PRIVACY_POLICY_URL = "https://watchmy.media/privacy"
 
 /**
- * Settings › About (PLAN-ANDROID-SETTINGS.md §5.6, SettingsAbout): the app's
+ * Settings › About: the app's
  * and the server's versions, the privacy policy, Copy diagnostics and the
  * licences. A server too old for some of the app's settings says which, and
- * who can update it (§4.7), where those settings are otherwise just missing.
+ * who can update it, where those settings are otherwise just missing.
  */
 @Composable
 internal fun AboutPage(tablet: Boolean, onOpenWeb: (String) -> Unit, modifier: Modifier = Modifier) {
@@ -59,7 +59,7 @@ internal fun AboutPage(tablet: Boolean, onOpenWeb: (String) -> Unit, modifier: M
                 modifier = Modifier.clickable { onOpenWeb(PRIVACY_POLICY_URL) },
                 trailing = { RowValue("watchmy.media", icon = PhoneIcons.External) },
             )
-            // The app's last exits and why, for a bug report (PLAN-ANDROID-REVIEW §6.4, the Diagnostics board).
+            // The app's last exits and why, for a bug report.
             ListRow(
                 "Copy diagnostics",
                 subtitle = "The app’s last exits and why, for a bug report",
@@ -68,7 +68,7 @@ internal fun AboutPage(tablet: Boolean, onOpenWeb: (String) -> Unit, modifier: M
             )
             ListRow("Open-source licences", modifier = Modifier.clickable { dialog = DIALOG_LICENCES }, trailing = { RowValue("") })
         }
-        // TMDB's terms ask apps that use its API to say so (PLAN-ROWS.md §3).
+        // TMDB's terms ask apps that use its API to say so.
         FootNote(TMDB_NOTICE, Modifier.padding(top = 6.dp), tablet = tablet)
     }
 

@@ -26,7 +26,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 
-/** What Search's microphone is doing (TvSearchKeyboard.dc.html). */
+/** What Search's microphone is doing. */
 @Immutable
 internal sealed interface Voice {
     /** Not listening: the microphone key reads "Voice typing". */

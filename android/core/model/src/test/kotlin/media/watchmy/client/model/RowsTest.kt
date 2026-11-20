@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The layout editor's moves and the rows' helpers (PLAN-ROWS.md §5, §8.2), the same on the phone, tablet and TV. */
+/** The layout editor's moves and the rows' helpers, the same on the phone, tablet and TV. */
 class RowsTest {
     private fun entry(id: String, hidden: Boolean = false, kind: RowLayoutEntry.Kind = RowLayoutEntry.Kind.Builtin, style: String = "poster") =
         RowLayoutEntry(id, id, style, kind, hidden = hidden, shown = !hidden)

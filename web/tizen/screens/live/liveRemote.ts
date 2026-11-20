@@ -1,7 +1,7 @@
 import type { Action } from '../../app/keys'
 
-// What the remote does in the Live TV player (LivePlayer on the canvas;
-// Android TV's LiveRemote.kt): with the controls hidden ▲ ▼ and CH ± change
+// What the remote does in the Live TV player (Android TV's
+// LiveRemote.kt): with the controls hidden ▲ ▼ and CH ± change
 // channel, ◀ opens On now and OK or ▶ show the controls; the number keys
 // open Go to channel. Return closes the newest thing first.
 

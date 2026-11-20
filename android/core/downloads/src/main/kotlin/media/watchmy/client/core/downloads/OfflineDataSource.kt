@@ -40,7 +40,7 @@ internal interface FetchEvents {
 internal class OfflineRefusedException(val status: Int) : RuntimeException("the server refused the download ($status)")
 
 /**
- * The download's media fetches (PLAN-DOWNLOADS.md §10.2): each request to an
+ * The download's media fetches: each request to an
  * offline route carries the download's current `o1.` token as
  * `access_token`, in place of any its playlist gave it. A 401 gets a fresh
  * token once; a 503 is waited out for as long as its Retry-After says, up to
@@ -157,7 +157,7 @@ internal class OfflineDataSource(
             return b.build()
         }
 
-        /** Cache keys without the token (PLAN-DOWNLOADS.md §10.2), so tokenized playlists and segments find their bytes. */
+        /** Cache keys without the token, so tokenized playlists and segments find their bytes. */
         val cacheKeys = CacheKeyFactory { spec -> spec.key ?: withoutToken(spec.uri).toString() }
 
         /** The wait a 503 asks for, in seconds; 10 s when it names none. */

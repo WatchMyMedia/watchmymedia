@@ -6,7 +6,7 @@ import type { components } from './schema'
 
 export type OfflineSettings = components['schemas']['OfflineSettings']
 
-/** Who may download to watch offline, for Settings › Users (admins; PLAN-DOWNLOADS.md §4.3). */
+/** Who may download to watch offline, for Settings › Users (admins). */
 export const offlineSettingsQuery = queryOptions({
   queryKey: ['offline-settings'],
   queryFn: async () => unwrap(await api.GET('/api/settings/offline')),

@@ -40,8 +40,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The movie and show pages' last rows on the TV (PLAN-RELATED.md §7;
- * android-tv/MovieRelated.dc.html and ShowRelated.dc.html), on the fakes: ▼
+ * The movie and show pages' last rows on the TV,
+ * on the fakes: ▼
  * from the cast or About the show reaches the rows at their first card, ▲
  * goes back, OK opens the title, and TalkBack hears each row's name.
  */

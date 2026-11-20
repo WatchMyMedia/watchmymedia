@@ -1,6 +1,6 @@
 import type { components } from '../api/schema'
 
-// Settings › Server › Inbox (PLAN-ADMIN-SETTINGS.md §5.9, loose end 7):
+// Settings › Server › Inbox:
 // Approve, Retry and Mark resolved report in their row, failures included.
 
 type MediaRequest = components['schemas']['MediaRequest']

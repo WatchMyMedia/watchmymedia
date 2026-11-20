@@ -39,7 +39,7 @@ export function Movie({ movieId }: { movieId: number }) {
   const versions = m.files.filter((f) => f.status === 'present')
   const selected = versions.find((f) => f.id === picked) ?? versions[0]
   const label = `${m.title}${m.year ? ` (${m.year})` : ''}`
-  // Trailer plays the first trailer the server lists that this app can play (PLAN-TRAILERS.md §4.4).
+  // Trailer plays the first trailer the server lists that this app can play.
   const trailer = firstTrailer(m.trailers)
   return (
     <div className="space-y-8">
@@ -92,7 +92,7 @@ export function Movie({ movieId }: { movieId: number }) {
             {admin && <SecondaryButton onClick={() => setFixing(true)}>Fix match</SecondaryButton>}
             {admin && <SecondaryButton onClick={() => setPoster(true)}>Change poster</SecondaryButton>}
             {selected && <SecondaryButton onClick={() => setReporting(true)}>Report a problem</SecondaryButton>}
-            {/* Members delete a movie with a file when admins allow it; admins can also remove one without (PLAN-EPISODE-PAGE.md §4). */}
+            {/* Members delete a movie with a file when admins allow it; admins can also remove one without. */}
             <MoreMenu
               items={[
                 ...(manage && m.managedBy && selected ? [{ label: 'Replace file', icon: 'replace' as const, onSelect: () => setManaging({ kind: 'replace', file: selected, app: m.managedBy ?? '' }) }] : []),

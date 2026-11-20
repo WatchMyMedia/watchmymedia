@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Downloads run in a data sync foreground service with a progress notification
-         (PLAN-DOWNLOADS.md §10.3). Android 13+ asks for the notification permission when
+    <!-- Downloads run in a data sync foreground service with a progress notification.
+         Android 13+ asks for the notification permission when
          the first download starts; downloads run without it. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />

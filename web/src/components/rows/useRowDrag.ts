@@ -4,7 +4,7 @@ import { dragShift, dragStride, dropIndex, type Span } from '../../lib/rowLayout
 type Drag = { from: number; to: number; dy: number; stride: number }
 
 /**
- * Dragging a row by its handle (PLAN-ROWS.md Decision 12): pointer events
+ * Dragging a row by its handle: pointer events
  * on the handle, no library. The dragged row follows the pointer, the rows
  * it passes move aside, and letting go calls onDrop(from, to) with to
  * counted in the list without the row, as moveRowTo takes it. Escape or a

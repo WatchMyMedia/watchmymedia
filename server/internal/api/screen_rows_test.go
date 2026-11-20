@@ -75,7 +75,7 @@ func seedRowsLibrary(t testing.TB, conn *sql.DB) (tvLib int64) {
 var unarrangedGolden embed.FS
 
 // Without arranged=true, Home and the library rows are exactly what they
-// were before rows could be arranged (PLAN-ROWS.md §6.1), byte for byte, so
+// were before rows could be arranged, byte for byte, so
 // apps that don't know rows see no change. The golden files were written
 // by the code before arranged rows existed (WMM_UPDATE_GOLDEN=1, which
 // writes them to testdata/ for the next build to embed).
@@ -117,7 +117,7 @@ func TestUnarrangedRepliesUnchanged(t *testing.T) {
 	}
 }
 
-// The merge rules of PLAN-ROWS.md 7.1, as a table.
+// The merge rules, as a table.
 func TestMergeRows(t *testing.T) {
 	t.Parallel()
 	home := []string{"continue", "live", "shows", "aired", "movies", "released"}

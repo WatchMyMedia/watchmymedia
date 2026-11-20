@@ -10,7 +10,7 @@ import { selectInput, useRowSave, type RowSave } from './you/hooks'
 import { RowNote } from './you/RowNote'
 
 /**
- * Settings › You › Playback (PLAN-ADMIN-SETTINGS.md §5.10): how this
+ * Settings › You › Playback: how this
  * person's episodes skip and carry on, on every device. Every control is a
  * choice, so each saves at once and confirms in its own row; only that row
  * waits while it saves.

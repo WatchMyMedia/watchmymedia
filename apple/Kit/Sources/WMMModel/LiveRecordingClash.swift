@@ -1,9 +1,8 @@
 import Foundation
 
-/// Record's answer when the tuners are booked while the programme would run
-/// (PLAN-LIVE-TV-DVR.md §3.1, "Clashes between recordings show when they are
-/// set"): what holds the tuners, and a choice of which one gives way. The
-/// web's `DvrTakeover` board draws it as a dialog; the iPhone and iPad show
+/// Record's answer when the tuners are booked while the programme would run:
+/// what holds the tuners, and a choice of which one gives way. The
+/// web draws it as a dialog; the iPhone and iPad show
 /// it as a sheet and Apple TV full screen. Keep leaves the new one under
 /// Won't record in Recordings.
 public struct LiveRecordingClash: Hashable, Sendable, Identifiable {

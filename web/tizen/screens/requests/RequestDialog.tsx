@@ -22,7 +22,7 @@ export type RequestTarget = {
 }
 
 /**
- * The request dialog (Requests on the canvas, Tweak `view`: `dialog`), over
+ * The request dialog, over
  * the screen that opens it: search's Not in your library, a show's missing
  * seasons and episodes, a list's missing titles. The poster, title and
  * overview with Request and Cancel on the left, and a show's seasons to

@@ -74,7 +74,7 @@ internal fun RecordControls(programme: LiveProgramme, modifier: Modifier = Modif
 
 /**
  * The clash when a recording can't get a tuner, adapted from the web's
- * DvrTakeover clash dialog as a bottom sheet (Android's canvas has no clash
+ * DvrTakeover clash dialog as a bottom sheet (Android has no clash
  * board): the recordings holding the tuners, a Record … instead on each one
  * that can still give way, and Keep them, which leaves this one under Won't
  * record.

@@ -100,7 +100,7 @@ internal enum class ExtrasPanel { Programme, Search, Reminders, Recordings }
 
 /**
  * The LiveGuide board: with listings (API level 13 and `capabilities.guide`) the
- * guide; without them, as L6 and L7 built it, channels watchable with no
+ * guide; without them, channels watchable with no
  * programme data. With the extras ([LiveChannelsViewModel.State.extras], API
  * level 15) the top bar has Search listings and More (Reminders, Reminder
  * time), [onSearchListings], [onReminders] and [onReminderTime]; from
@@ -137,7 +137,7 @@ fun LiveChannelsScreen(
     val now = rememberLiveNow()
     val upcoming = reminders?.items.orEmpty().count { it.endMs > now }
     Column(modifier.fillMaxSize().background(WmmColors.Ground)) {
-        // Cast shows only where the server lets this account cast a channel (PLAN-LIVE-TV.md §4.1).
+        // Cast shows only where the server lets this account cast a channel.
         MainTopBar(
             "Live TV", userName,
             onSearch = onSearchListings.takeIf { state.extras && !layout.twoPane },
@@ -159,7 +159,7 @@ fun LiveChannelsScreen(
             }
         }
         if (!state.listings && state.capabilities.canRecord) GoldTextButton("Recordings", onRecordings, Modifier.padding(horizontal = 16.dp))
-        // Pulling the guide or the channel list down asks the server again (§6.3).
+        // Pulling the guide or the channel list down asks the server again.
         PullToRefreshBox(isRefreshing = state.loading && state.channels.isNotEmpty(), onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
                 when {
@@ -250,7 +250,7 @@ fun LiveHomeRow(
     onSeeAll: () -> Unit,
     modifier: Modifier = Modifier,
     listings: Boolean = false,
-    /** The tablet Home's row screen (PLAN-HOME.md §7.5): the row's list state, a snapping fling, the leading card to outline and "Row 2 of 7". */
+    /** The tablet Home's row screen: the row's list state, a snapping fling, the leading card to outline and "Row 2 of 7". */
     state: LazyListState = rememberLazyListState(),
     flingBehavior: FlingBehavior = ScrollableDefaults.flingBehavior(),
     lead: Int = -1,

@@ -3,14 +3,14 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Search (Search.dc.html): the server's search a moment after typing
+/// Search: the server's search a moment after typing
 /// stops, with TV Shows, Movies and Episodes in groups. A show or movie
 /// opens its page; an episode opens its own page.
-/// On iPad (Pad2Search.dc.html), shows and movies are posters beside the
+/// On iPad, shows and movies are posters beside the
 /// episode list in landscape; portrait stacks those two sections.
 /// Requestable titles follow the library results, retaining the server permissions and Seerr guidance.
-/// From API level 15 with listings, On Live TV follows the library's groups
-/// (LiveSearch.dc.html's `tab` Tweak, PLAN-LIVE-TV-GUIDE.md §6.5).
+/// From API level 15 with listings, On Live TV follows the library's
+/// groups.
 struct SearchScreen: View {
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator

@@ -19,7 +19,7 @@ import media.watchmy.client.presentation.Latest
 import media.watchmy.client.presentation.Load
 
 /**
- * Your requests (MyRequests.dc.html, on the phone and the TV; the Apple
+ * Your requests (on the phone and the TV; the Apple
  * apps' MyRequestsModel): each request's state, newest first, with Cancel
  * request while it waits. Refetches when requests change on the server.
  */
@@ -76,7 +76,7 @@ class MyRequestsViewModel(private val requests: RequestRepository) : ViewModel()
 }
 
 /**
- * The admins' Inbox (Inbox.dc.html, on the phone and the TV; the Apple
+ * The admins' Inbox (on the phone and the TV; the Apple
  * apps' InboxModel): requests to approve or decline (with a note), failed
  * ones to send again, and problems to mark resolved.
  */

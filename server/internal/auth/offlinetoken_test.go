@@ -55,7 +55,7 @@ func TestOfflineTokens(t *testing.T) {
 	}
 }
 
-// PLAN-DOWNLOADS.md §4.2: an offline token opens its own record's media
+// An offline token opens its own record's media
 // routes and nothing else; media and cast tokens never open offline routes.
 func TestMiddlewareOfflineTokens(t *testing.T) {
 	s, _ := setup(t)

@@ -16,7 +16,7 @@ func (f *fixture) reportAt(t *testing.T, user int64, ids []int64, itemType strin
 	return got
 }
 
-// PLAN-DOWNLOADS.md §6's table: an offline change applies to an item no
+// An offline change applies to an item no
 // one decided, or an import decided, or a local change made before it; a
 // local change made after it stays; a gone item is unavailable.
 func TestOfflineChangeNewestLocalWins(t *testing.T) {

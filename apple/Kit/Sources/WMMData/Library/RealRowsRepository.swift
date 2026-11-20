@@ -3,7 +3,7 @@ import WMMAPI
 import WMMModel
 
 /// Arranged rows and lists on the current server as the signed-in person
-/// (PLAN-ROWS.md §6, android/core/data/.../RealRowsRepository.kt). Below
+/// (android/core/data/.../RealRowsRepository.kt). Below
 /// ``rowsAPILevel`` the library screens get no rows and nothing else is called.
 @MainActor
 final class RealRowsRepository: RowsRepository {

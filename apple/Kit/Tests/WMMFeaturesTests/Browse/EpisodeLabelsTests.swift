@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// The episode page's wording (PLAN-EPISODE-PAGE.md §2, §3), on Harbor
+/// The episode page's wording, on Harbor
 /// Lights' season 3 in the fakes: E04 watched, E05 partway, E07 new, E09 yet to air.
 @MainActor
 @Suite struct EpisodeLabelsTests {

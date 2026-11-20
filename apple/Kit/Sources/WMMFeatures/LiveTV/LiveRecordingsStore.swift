@@ -7,8 +7,7 @@ import WMMModel
 /// An event asks again only for what is on screen (``show(_:)``, the guide's
 /// span while ``showGuide(from:to:)`` holds it); a section that has left the
 /// screen is forgotten and loads again when it returns. The echo of a change
-/// made here asks for nothing more, as the change already did
-/// (PLAN-APPLE-REVIEW.md §4.1.8).
+/// made here asks for nothing more, as the change already did.
 ///
 /// A programme's mark is the newest this device has learnt: from Record and
 /// Don't record, the lists, or the guide's span on screen, asked again after

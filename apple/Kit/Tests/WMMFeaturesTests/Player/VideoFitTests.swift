@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import WMMFeatures
 
-/// Fit and fill (PLAN-APPLE-REVIEW.md §6.3, PlayerFitFill.dc.html).
+/// Fit and fill.
 @MainActor
 @Suite struct VideoFitTests {
     let phone = CGSize(width: 852, height: 393)

@@ -74,8 +74,8 @@ internal class Http(
     val signedClient: OkHttpClient by lazy { publicClient.newBuilder().addInterceptor(::authorize).build() }
 
     /**
-     * Media for the player and the downloader (PLAN-ANDROID-REVIEW.md
-     * §4.2.1): the shared pool and dispatcher, so the first playlist request
+     * Media for the player and the downloader:
+     * the shared pool and dispatcher, so the first playlist request
      * reuses the API's connection. No token (media URLs carry theirs), no
      * reply limit (files are gigabytes), no cache, and the player's timeouts:
      * 15 s to connect, 45 s between reads, none on the whole call.
@@ -95,8 +95,8 @@ internal class Http(
     }
 
     /**
-     * API calls, signed as [signedClient] is, with [cache] (PLAN-ANDROID-REVIEW.md
-     * §4.1.1): the server gives library reads a weak ETag and answers 304
+     * API calls, signed as [signedClient] is, with [cache]:
+     * the server gives library reads a weak ETag and answers 304
      * while it still matches, so a quiet reload costs a few hundred bytes.
      * Only replies with an ETag are kept, and each is asked again before
      * it is used ([revalidated]).
@@ -237,8 +237,8 @@ internal class Http(
 
     /**
      * Away from the server's network, a call to it waited out the 10 s
-     * connect timeout before the offline Home could show
-     * (PLAN-ANDROID-REVIEW.md §4.1.6). With no network at all a call fails at
+     * connect timeout before the offline Home could show.
+     * With no network at all a call fails at
      * once (this device itself still answers); an address on the local
      * network, which answers within milliseconds when it is there, gets
      * [PRIVATE_CONNECT_MS] to connect.
@@ -314,7 +314,7 @@ internal class Http(
          * ClassCastException and IllegalStateException on replies and
          * addresses it can't use, so those are caught here, and a mistake in
          * the app's own mapping inside [block] would have read as "That server
-         * address is not valid" (PLAN-ANDROID-REVIEW.md §3.4.3). A reply it
+         * address is not valid". A reply it
          * doesn't understand is logged with its cause.
          */
         suspend fun <T> call(signedIn: Boolean, block: suspend () -> T): T = try {
