@@ -3,6 +3,7 @@ package media.watchmy.client.tv.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,8 +27,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.lifecycle.viewmodel.compose.viewModel
+import media.watchmy.client.model.SERVERS
+import media.watchmy.client.presentation.servers.ServersViewModel
+import media.watchmy.client.tv.servers.LocalServersHost
+import media.watchmy.client.tv.servers.ServersPanel
+import media.watchmy.client.ui.TestTags
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -87,6 +99,7 @@ enum class RailSection(val label: String, val icon: ImageVector, val route: Any)
  * A signed-in screen: [content] full screen with the icon rail over its
  * left edge. The rail marks [section] in gold, opens with labels while it
  * has focus, and takes focus back to the active section when entered;
+ * the account button at its foot opens Servers, a panel over the screen;
  * leaving it to the right puts focus back where it was in [content].
  * Only moving left opens the rail: focus that comes back from nowhere (the
  * focused item went away, as when the player closes) goes to [content].
@@ -113,7 +126,15 @@ fun TvScaffold(
 
 @Composable
 private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -> Unit, content: FocusRequester, hint: RailHint) {
-    val user by LocalAppServices.current.auth.user.collectAsStateWithLifecycle()
+    val services = LocalAppServices.current
+    val user by services.auth.user.collectAsStateWithLifecycle()
+    // Servers, the switcher: OK on the account button opens it over this screen.
+    val serversModel = viewModel(key = "servers") { ServersViewModel(services.servers, cast = services.cast) }
+    val servers by serversModel.state.collectAsStateWithLifecycle()
+    var serversOpen by rememberSaveable { mutableStateOf(false) }
+    // A switch that happened, or one that went to a sign-in, closes it; the app then rebuilds its screens.
+    LaunchedEffect(serversModel) { serversModel.events.collect { serversOpen = false } }
+    val host = LocalServersHost.current
     val inbox = LocalRequestBadge.current.inbox ?: 0
     val sections = RailSection.shown(LocalLiveTVAvailable.current)
     var expanded by remember { mutableStateOf(false) }
@@ -166,23 +187,53 @@ private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -
         }
         Spacer(Modifier.weight(1f))
         val name = user?.name.orEmpty()
+        // The rail has no room for the server's name: it is the button's label while it has focus, and the first row of Servers.
+        val serverName = servers.current?.name
         FocusableBox(
-            onClick = { if (active != RailSection.Settings) onNavigate(TvRoutes.Settings) else content.requestFocus() },
-            modifier = toContent.focusRequester(avatarFocus),
+            onClick = { serversOpen = true },
+            modifier = toContent.focusRequester(avatarFocus).testTag(TestTags.ACCOUNT).semantics {
+                contentDescription = listOfNotNull(name.ifEmpty { null }, serverName).joinToString(", on ").let { who -> if (who.isEmpty()) SERVERS else "$SERVERS. $who" }
+            },
             cornerRadius = 30.dp,
             focusedScale = 1.04f,
+            role = Role.Button,
         ) {
-            Row(Modifier.height(60.dp), verticalAlignment = Alignment.CenterVertically) {
+            // The button's own words say who and where: the initial and the names under it aren't read again.
+            Row(Modifier.height(60.dp).clearAndSetSemantics {}, verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(60.dp), contentAlignment = Alignment.Center) {
+                    // Ringed in gold while its panel is open, as the control that opened it; focus is in the panel.
+                    if (serversOpen) Box(Modifier.size(60.dp).border(3.dp, WmmColors.Accent, CircleShape))
                     Box(Modifier.size(48.dp).background(WmmColors.Brand, CircleShape), contentAlignment = Alignment.Center) {
                         Text(name.take(1).uppercase(), style = inter(20.sp, FontWeight.Bold), color = WmmColors.Text)
                     }
                 }
                 if (expanded) {
-                    Text(name, style = inter(21.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.padding(start = 8.dp, end = 20.dp))
+                    Column(Modifier.padding(start = 8.dp, end = 20.dp).widthIn(max = 220.dp)) {
+                        Text(name, style = inter(21.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (serverName != null && servers.several) Text(serverName, style = inter(16.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         }
+    }
+    if (serversOpen) {
+        val close = {
+            serversOpen = false
+            serversModel.dismissFailure()
+        }
+        ServersPanel(
+            servers, serversModel,
+            onAdd = {
+                close()
+                host?.onAdd?.invoke()
+            },
+            onManage = {
+                close()
+                host?.manage = true
+                onNavigate(TvRoutes.Settings)
+            },
+            onDismiss = close,
+        )
     }
 }
 

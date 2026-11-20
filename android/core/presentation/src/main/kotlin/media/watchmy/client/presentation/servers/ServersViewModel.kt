@@ -29,6 +29,23 @@ import media.watchmy.client.model.serverLine
 import media.watchmy.client.model.serverLineWithVersion
 import media.watchmy.client.model.serversSummary
 
+/** What Servers' rows and buttons do: [ServersViewModel], which the screens' parts take as this. */
+interface ServersActions {
+    /** Switches to [serverId], asking it first. */
+    fun choose(serverId: String)
+
+    /** Asks the server that didn't answer again. */
+    fun retry()
+
+    /** Switches to the server that didn't answer all the same, for what was downloaded from it. */
+    fun watchDownloads()
+
+    fun dismissFailure()
+
+    /** Removes [serverId] from this device. */
+    fun remove(serverId: String)
+}
+
 /**
  * Servers, on the phone, the tablet and the TV: the servers this device is
  * signed in to, the one in use first, and switching between them. It draws
@@ -46,7 +63,7 @@ class ServersViewModel(
     private val servers: ServerRepository,
     downloads: DownloadRepository = DownloadRepository.Unavailable,
     cast: CastService = CastService.None,
-) : ViewModel() {
+) : ViewModel(), ServersActions {
     enum class RowState { Idle, Switching, SignedOut, TooOld }
 
     /** One registered server. */
@@ -147,20 +164,18 @@ class ServersViewModel(
         downloads = held?.takeIf { it.count > 0 },
     )
 
-    /** Switches to [serverId], asking it first. */
-    fun choose(serverId: String) = switch(serverId, ask = true)
+    override fun choose(serverId: String) = switch(serverId, ask = true)
 
-    /** Asks the server that didn't answer again. */
-    fun retry() {
+    override fun retry() {
         local.value.failure?.let { switch(it.serverId, ask = true) }
     }
 
-    /** Switches to the server that didn't answer all the same: the app opens as it does offline, on what was downloaded from it. */
-    fun watchDownloads() {
+    /** The app opens as it does offline, on what was downloaded from that server. */
+    override fun watchDownloads() {
         local.value.failure?.let { switch(it.serverId, ask = false) }
     }
 
-    fun dismissFailure() = local.update { it.copy(failure = null) }
+    override fun dismissFailure() = local.update { it.copy(failure = null) }
 
     private fun switch(serverId: String, ask: Boolean) {
         if (local.value.switching != null) return
@@ -193,7 +208,7 @@ class ServersViewModel(
      * here deleted, and nothing changed on the server. When it was the one
      * in use, the app moves to the server used last that is still signed in.
      */
-    fun remove(serverId: String) {
+    override fun remove(serverId: String) {
         if (local.value.removing != null) return
         val name = state.value.row(serverId)?.name ?: return
         local.update { it.copy(removing = serverId, failure = it.failure?.takeIf { f -> f.serverId != serverId }) }

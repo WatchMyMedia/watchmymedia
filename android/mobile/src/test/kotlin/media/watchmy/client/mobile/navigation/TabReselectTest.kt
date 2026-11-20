@@ -45,7 +45,7 @@ class TabReselectTest {
     @Test fun `tapping Home again scrolls Home to the top`() {
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides FakeAppServices()) {
-                MobileNavHost(onSwitchServer = {}, onSignedOut = {}, nav = rememberNavController())
+                MobileNavHost(onAddServer = {}, onSignedOut = {}, nav = rememberNavController())
             }
         }
         compose.waitForIdle()
@@ -61,7 +61,7 @@ class TabReselectTest {
     @Test fun `tapping TV Shows again scrolls the library grid to the top`() {
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides FakeAppServices()) {
-                MobileNavHost(onSwitchServer = {}, onSignedOut = {}, nav = rememberNavController())
+                MobileNavHost(onAddServer = {}, onSignedOut = {}, nav = rememberNavController())
             }
         }
         compose.waitForIdle()

@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
+import media.watchmy.client.model.SERVERS
 import media.watchmy.client.model.DeviceSession
 import media.watchmy.client.model.ON_EVERY_DEVICE
 import media.watchmy.client.model.SKIP_KINDS
@@ -44,7 +45,6 @@ internal interface SettingsCalls {
     fun addLanguage(list: LanguageList, tag: String)
     fun editLanguage(list: LanguageList, tag: String)
     fun addTo(list: LanguageList)
-    fun switchServer()
     fun openRequests(inbox: Boolean)
 }
 
@@ -151,12 +151,13 @@ internal fun ColumnScope.PlaybackPane(
 /**
  * Account & devices: this TV's
  * name, the signed-in devices (each other one a row whose OK asks before it
- * is signed out), Change password and Switch server, and Sign out of this
- * TV apart at the foot. When a device that had focus is signed out, focus
- * goes to the next one, else the one before, else Change password.
+ * is signed out), Change password and Servers (the servers this TV is signed
+ * in to, [serversLine]: "Living room and 2 more"), and Sign out of this TV
+ * apart at the foot. When a device that had focus is signed out, focus goes
+ * to the next one, else the one before, else Change password.
  */
 @Composable
-internal fun ColumnScope.AccountPane(state: SettingsViewModel.State, serverLine: String?, first: FocusRequester, calls: SettingsCalls) {
+internal fun ColumnScope.AccountPane(state: SettingsViewModel.State, serversLine: String?, first: FocusRequester, calls: SettingsCalls) {
     PaneHeading("This TV")
     SettingRow(
         "Device name",
@@ -191,12 +192,15 @@ internal fun ColumnScope.AccountPane(state: SettingsViewModel.State, serverLine:
 
     PaneHeading("Account")
     SettingRow("Change password", onClick = { calls.show(Overlay.ChangePassword) }, description = "On your phone or computer", focusKey = CHANGE_PASSWORD) { Value("", chevron = true) }
-    SettingRow("Switch server", onClick = calls::switchServer, description = serverLine) { Value("", chevron = true) }
+    SettingRow(SERVERS, onClick = { calls.show(Overlay.Servers) }, description = serversLine, focusKey = SERVERS_ROW) { Value("", chevron = true) }
     PaneDivider()
     SignOutRow("Sign out of this TV…", onClick = { calls.show(Overlay.SignOut) })
 }
 
 private const val CHANGE_PASSWORD = "Change password"
+
+/** The Servers row's key in Settings' focus memory: where focus goes back to when its panel closes. */
+internal const val SERVERS_ROW = "Servers"
 
 /** A signed-in device's key in Settings' focus memory. */
 internal fun deviceKey(id: String) = "device:$id"

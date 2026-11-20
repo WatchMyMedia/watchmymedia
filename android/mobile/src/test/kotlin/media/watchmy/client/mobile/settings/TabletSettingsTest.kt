@@ -46,7 +46,7 @@ class TabletSettingsTest {
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides FakeAppServices()) {
                 WatchMyMediaPhoneTheme {
-                    SettingsScreen(onSwitchServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {}, onOpenPage = { group, beside -> opened = group to beside })
+                    SettingsScreen(onAddServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {}, onOpenPage = { group, beside -> opened = group to beside })
                 }
             }
         }
@@ -63,7 +63,7 @@ class TabletSettingsTest {
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides FakeAppServices()) {
                 WatchMyMediaPhoneTheme {
-                    SettingsScreen(onSwitchServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {}, open = SettingsGroup.Account)
+                    SettingsScreen(onAddServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {}, open = SettingsGroup.Account)
                 }
             }
         }

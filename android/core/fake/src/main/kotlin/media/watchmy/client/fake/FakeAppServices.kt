@@ -21,10 +21,18 @@ import media.watchmy.client.model.TRICKPLAY_API_LEVEL
  * All fakes together. [signedIn] false starts at sign-in. [offline] makes the
  * server unreachable from Home, which then shows the downloads (phones only).
  * [cast] has a TV called Living Room TV connected from the start, which plays
- * Live TV ([FakeLiveCastRemote]) and files (phones only).
+ * Live TV ([FakeLiveCastRemote]) and files (phones only). [several] false is
+ * a device signed in to the Living room server alone ([FakeServerRepository]).
  */
-class FakeAppServices(signedIn: Boolean = true, tv: Boolean = false, seerr: Boolean = false, offline: Boolean = false, cast: Boolean = false) : AppServices {
-    override val servers = FakeServerRepository(signedIn)
+class FakeAppServices(
+    signedIn: Boolean = true,
+    tv: Boolean = false,
+    seerr: Boolean = false,
+    offline: Boolean = false,
+    cast: Boolean = false,
+    several: Boolean = true,
+) : AppServices {
+    override val servers = FakeServerRepository(signedIn, several)
     override val auth = FakeAuthRepository(signedIn, servers)
     private val arr = FakeArr()
     private val level = { servers.current.value?.server?.apiLevel ?: 0 }

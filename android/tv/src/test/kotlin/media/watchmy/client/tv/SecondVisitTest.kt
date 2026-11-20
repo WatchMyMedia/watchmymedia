@@ -91,7 +91,7 @@ class SecondVisitTest {
     }
 
     @Test fun `after signing out, sign-in shows a new code rather than the accepted one`() {
-        val services = FakeAppServices(signedIn = false, tv = true)
+        val services = FakeAppServices(signedIn = false, tv = true, several = false)
         var shown by mutableStateOf(true)
         compose.setContent { ProvideAppServices(services) { TvTheme { if (shown) SignInScreen(onSwitchServer = {}) } } }
         compose.waitForIdle()

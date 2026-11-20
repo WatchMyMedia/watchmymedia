@@ -27,6 +27,12 @@ object TestTags {
     const val SERVER_ADDRESS = "server-address"
     const val SERVER_CONNECT = "server-connect"
 
+    /** Servers, the switcher the account button opens: the phone's sheet, the tablet's popover and the TV's panel. */
+    const val SERVERS = "servers"
+
+    /** The account button that opens Servers: the initial in the phone's top bar, at the foot of the tablet's and the TV's rail. */
+    const val ACCOUNT = "account"
+
     /** The phone sign-in's fields and its button. */
     const val SIGN_IN_NAME = "sign-in-name"
     const val SIGN_IN_PASSWORD = "sign-in-password"

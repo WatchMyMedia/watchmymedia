@@ -104,7 +104,7 @@ class AccessibilityTest {
     fun `Settings' switch rows say on or off, and the passthrough panel's choices are radio buttons`() {
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides FakeAppServices(tv = true)) {
-                TvTheme { SettingsScreen(onSwitchServer = {}, onSignedOut = {}, onNavigate = {}) }
+                TvTheme { SettingsScreen(onAddServer = {}, onSignedOut = {}, onNavigate = {}) }
             }
         }
         compose.onNode(hasText("Autoplay next episode"))

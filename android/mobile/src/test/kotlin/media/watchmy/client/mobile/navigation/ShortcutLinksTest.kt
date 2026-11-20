@@ -54,7 +54,7 @@ class ShortcutLinksTest {
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides FakeAppServices(), LocalKeyboardShortcuts provides shortcuts) {
                 nav = rememberNavController()
-                MobileNavHost(onSwitchServer = {}, onSignedOut = {}, nav = nav, deepLink = link)
+                MobileNavHost(onAddServer = {}, onSignedOut = {}, nav = nav, deepLink = link)
             }
         }
         compose.waitForIdle()
@@ -90,7 +90,7 @@ class ShortcutLinksTest {
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides FakeAppServices(), LocalKeyboardShortcuts provides shortcuts) {
                 nav = rememberNavController()
-                MobileNavHost(onSwitchServer = {}, onSignedOut = {}, nav = nav, deepLink = link.value)
+                MobileNavHost(onAddServer = {}, onSignedOut = {}, nav = nav, deepLink = link.value)
             }
         }
         compose.waitForIdle()

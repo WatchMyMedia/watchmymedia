@@ -19,6 +19,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.media3.common.Player
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
+import media.watchmy.client.fake.Cabin
 import media.watchmy.client.fake.FakeAppServices
 import media.watchmy.client.fake.FakeLiveChannels
 import media.watchmy.client.fake.OfficeMini
@@ -247,7 +248,8 @@ class LiveTVScreenTest {
             compose.onNodeWithContentDescription("Live TV").performClick()
             compose.onNodeWithContentDescription("2.1 HRBR-HD, Watch live").performClick()
             compose.onNode(hasText("Pause") and hasClickAction()).assertExists()
-            compose.runOnIdle { runBlocking { base.servers.select(OfficeMini) } }
+            // Another server this TV is signed in to.
+            compose.runOnIdle { runBlocking { base.servers.switchTo(Cabin.id) } }
             compose.onNode(hasText("Play") and hasClickAction()).assertIsFocused()
             assertEquals(2, controllers.size)
             assertEquals(1, controllers.last().releases)

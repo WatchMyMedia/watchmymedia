@@ -95,8 +95,11 @@ val Den = Server("srv-den", "Den server", "http://192.168.4.52:27587", "0.9.1", 
  * fourth registered and signed out, and the Office Mac mini on the network
  * and not added yet. Each keeps its own sign-in, as the real store does:
  * [signIn] and [signOut] are the fake sign-in's, for the server in use.
+ * Not [several], only the Living room server and the signed-out one are
+ * registered: a device signed in to one server, where signing out goes to
+ * its sign-in.
  */
-class FakeServerRepository(signedIn: Boolean = true) : ServerRepository {
+class FakeServerRepository(signedIn: Boolean = true, several: Boolean = true) : ServerRepository {
     private data class Entry(val server: Server, val lastUserName: String?, val account: User?, val lastUsedAtMs: Long) {
         fun toSaved() = SavedServer(server, account?.name ?: lastUserName, account != null, lastUsedAtMs, account?.id)
     }
@@ -112,10 +115,10 @@ class FakeServerRepository(signedIn: Boolean = true) : ServerRepository {
     )
     private val entries = MutableStateFlow(
         System.currentTimeMillis().let { now ->
-            listOf(
+            listOfNotNull(
                 Entry(LivingRoom, "Sam", User(1, "Sam", true).takeIf { signedIn }, now),
-                Entry(Cabin, "Sam", User(4, "Sam", false), now - 86_400_000L),
-                Entry(Den, "Sam", User(2, "Sam", true), now - 2 * 86_400_000L),
+                Entry(Cabin, "Sam", User(4, "Sam", false), now - 86_400_000L).takeIf { several },
+                Entry(Den, "Sam", User(2, "Sam", true), now - 2 * 86_400_000L).takeIf { several },
                 Entry(RemoteHome, "Sam", null, now - 3 * 86_400_000L),
             )
         },

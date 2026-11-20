@@ -17,7 +17,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.AuthRepository
 import media.watchmy.client.model.BrowseItem
+import media.watchmy.client.model.DeepLink
 import media.watchmy.client.model.EpisodeCard
+import media.watchmy.client.model.ItemKind
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.RequestOptions
 import media.watchmy.client.model.RequestRepository
@@ -387,3 +389,17 @@ class SearchViewModel(
 
 /** Nothing matched in any group of the library's. */
 fun SearchResults.isEmpty(): Boolean = movies.isEmpty() && shows.isEmpty() && episodes.isEmpty()
+
+/**
+ * The page a result on another server opens once the app is on that server:
+ * a movie's or a show's, or an unmatched file to play. Null for a folder of
+ * files nobody has matched, which has no page anywhere.
+ */
+fun BrowseItem.pageElsewhere(): DeepLink? = when (kind) {
+    ItemKind.Movie -> DeepLink.Movie(id)
+    ItemKind.Show -> DeepLink.Show(id)
+    ItemKind.Unmatched -> if ((fileCount ?: 1) <= 1) DeepLink.Play(id, title = title) else null
+}
+
+/** An episode found on another server: its show's page with the episode on top. */
+fun EpisodeCard.pageElsewhere(): DeepLink = DeepLink.Show(showId, season, episodeId)
