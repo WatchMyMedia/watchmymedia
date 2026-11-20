@@ -295,12 +295,3 @@ export function replaceBody(app: string, what = 'episode'): string {
 export function replacedMessage(r: Pick<ReplaceResult, 'connection' | 'blocklisted'>): string {
   return r.blocklisted ? `${r.connection} blocked this release and is searching for another.` : `${r.connection} is searching for another copy.`
 }
-
-/**
- * Whether a Search now that "failed" was in fact accepted: the server answers
- * 202 with no body, which the web's shared `unwrap` treats as a failure (it
- * lets only 204 come without one), so the mutation rejects with status 202.
- */
-export function searchAccepted(error: unknown): boolean {
-  return (error as { status?: unknown } | null)?.status === 202
-}
