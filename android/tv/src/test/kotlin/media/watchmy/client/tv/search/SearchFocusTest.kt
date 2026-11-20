@@ -152,17 +152,20 @@ class SearchFocusTest {
      */
     @Test
     fun `the focused Live TV card's key hints are on screen`() {
-        typeHar()
-        repeat(7) { press(Key.DirectionRight) }
-        assertEquals("Harbor Lights", focused())
-        // Down the results to On Live TV; its cards read as one thing, so the line under them shows that one has focus.
-        val hint = hasText("Open it in the guide") or hasText("Watch ", substring = true)
-        repeat(4) { if (compose.onAllNodes(hint).fetchSemanticsNodes().isEmpty()) press(Key.DirectionDown) }
-        val line = compose.onAllNodes(hint).onFirst().fetchSemanticsNode()
+        focusLiveTvResult()
+        val line = liveHints().first()
         val screen = compose.onRoot().fetchSemanticsNode().boundsInRoot
         val top = line.positionInRoot.y
         assertTrue("the line runs from $top to ${top + line.size.height}, off a screen ${screen.bottom} tall", top >= 0f && top + line.size.height <= screen.bottom)
         assertEquals("how much of the line's height shows", line.size.height.toFloat(), line.boundsInRoot.height, 1f)
+    }
+
+    /** The card clears its parts' semantics to read as one thing, and its focus went with them: TalkBack had a card that never said it was in focus. */
+    @Test
+    fun `a Live TV result in focus reads as focused`() {
+        focusLiveTvResult()
+        val spoken = focused()
+        assertTrue("\"$spoken\" has focus, not an On Live TV card", spoken.startsWith("Watch ") || spoken.contains("Opens it in the guide"))
     }
 
     @Test
@@ -209,6 +212,18 @@ class SearchFocusTest {
         compose.waitForIdle()
     }
 
+    /** Types "har", then goes onto the results and down them to an On Live TV card: the line of key hints under that row shows one has focus. */
+    private fun focusLiveTvResult() {
+        typeHar()
+        repeat(7) { press(Key.DirectionRight) }
+        assertEquals("Harbor Lights", focused())
+        repeat(4) { if (liveHints().isEmpty()) press(Key.DirectionDown) }
+        assertTrue("no On Live TV card took focus", liveHints().isNotEmpty())
+    }
+
+    /** What OK does for the On Live TV card in focus, in the line under its row. */
+    private fun liveHints() = compose.onAllNodes(LIVE_HINT).fetchSemanticsNodes()
+
     private fun focused(): String {
         val node = compose.onNode(isFocused()).fetchSemanticsNode()
         return node.config.getOrNull(SemanticsProperties.Text)?.firstOrNull { it.text.isNotBlank() && !BADGES.matches(it.text) }?.text
@@ -225,6 +240,9 @@ class SearchFocusTest {
     private companion object {
         /** What the fakes have for "har": the show (and its episodes) and the movie. */
         val RESULTS = setOf("Harbor Lights", "Cold Harbour Road")
+
+        /** An On Live TV card's OK: watch what is on now, or open what is on later in the guide. */
+        val LIVE_HINT = hasText("Open it in the guide") or hasText("Watch ", substring = true)
 
         /** Quality and New badges come before a poster's title. */
         val BADGES = Regex("4K|1080p|720p|SD|HDR|HDR10|New|Dolby Vision", RegexOption.IGNORE_CASE)

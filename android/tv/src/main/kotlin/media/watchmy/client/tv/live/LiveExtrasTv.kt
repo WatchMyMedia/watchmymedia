@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.focused
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -342,11 +343,20 @@ fun TvLiveSearchRow(
 private fun TvLiveSearchCard(hit: LiveSearchHit, now: Long, format: LiveClockFormat, reminded: Boolean, onClick: () -> Unit, onLongClick: () -> Unit, onFocus: () -> Unit, modifier: Modifier = Modifier) {
     val p = hit.programme
     val airing = p.airingAt(now)
+    // The card reads as one thing; its focus state stays in the semantics it clears, so TalkBack (and the focus tests) see it.
+    var isFocused by remember { mutableStateOf(false) }
     Column(modifier.width(340.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FocusableBox(
             onClick = onClick, onLongClick = onLongClick,
-            modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onFocus() }
-                .clearAndSetSemantics { contentDescription = if (airing) "Watch ${hit.channel.number} ${hit.channel.name}, ${p.title}, ${liveMinutesLeft(now, p.endMs)}" else hit.spokenName(now, format, "Opens it in the guide") + if (reminded) ", reminder set" else "" },
+            modifier = Modifier.fillMaxWidth()
+                .onFocusChanged {
+                    isFocused = it.isFocused
+                    if (it.isFocused) onFocus()
+                }
+                .clearAndSetSemantics {
+                    contentDescription = if (airing) "Watch ${hit.channel.number} ${hit.channel.name}, ${p.title}, ${liveMinutesLeft(now, p.endMs)}" else hit.spokenName(now, format, "Opens it in the guide") + if (reminded) ", reminder set" else ""
+                    focused = isFocused
+                },
             cornerRadius = 12.dp,
         ) {
             Box(Modifier.fillMaxWidth().background(WmmColors.Surface2, RoundedCornerShape(12.dp))) {
