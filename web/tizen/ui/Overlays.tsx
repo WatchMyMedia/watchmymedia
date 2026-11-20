@@ -84,3 +84,6 @@ export function Banner({ icon = 'bell', title, children, hints, onDismiss, onHol
     </span>
   </div>
 }
+
+/** The frame Dialog and SidePanel share (focus held inside, Return closes), for a feature's own modal such as a Hold OK menu. */
+export { Modal }

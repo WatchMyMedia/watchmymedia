@@ -12,6 +12,7 @@ import { Rail } from '../ui/Rail'
 import { Banner } from '../ui/Overlays'
 import { railBadge } from '../ui/railBadge'
 import { LeaveDialog } from './LeaveDialog'
+import { ReminderBanner } from '../screens/live/ReminderBanner'
 
 /** Shown after the stream has been down this long: brief drops pass unnoticed. */
 const OFFLINE_AFTER_MS = 5000
@@ -90,6 +91,7 @@ function Frame({ nav, entries, exit }: { nav: NavStack<Route>; entries: readonly
         <EntryContext.Provider value={top}><Screen route={top.route}/></EntryContext.Provider>
       </main>
       {chrome === 'rail' && <OfflineBanner/>}
+      <ReminderBanner player={chrome === 'full'}/>
       {leaving && <LeaveDialog onStay={() => setLeaving(false)} onLeave={exit}/>}
     </div>
   </NavContext.Provider>
