@@ -54,8 +54,6 @@ export class FakePlayer implements Player {
   liveWindow() { return this.window }
   tracks() { return this.trackList }
   async selectTrack(kind: 'audio' | 'text', index: number) { this.calls.push(`track:${kind}:${index}`); return this.selects }
-  async suspend() { this.calls.push('suspend'); this.emit({ state: 'paused' }) }
-  async restore() { this.calls.push('restore'); this.emit({ state: 'paused' }) }
 
   /** Plays on for ms: the position moves while playing. */
   advance(ms: number) {

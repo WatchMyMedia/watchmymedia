@@ -233,7 +233,17 @@ What the first session on the QN90D found:
 - A second session found that Tizen loads YouTube's player in an iframe only
   where `<tizen:allow-navigation>` names YouTube; without it the frame stayed
   on `about:blank` and the trailer screen said it couldn't reach YouTube.
-- Not yet tried there: image subtitles, suspend and wake.
+- The second session also tried Home and back. Samsung's `restore()` brought a
+  direct play back unprepared at 0:00, so a play sent to the background is
+  let go and opened again where it was, paused, as an HLS play always was.
+  AVPlay lands a seek in a file on the keyframe *after* the frame asked for
+  (9 s late in a test clip with 10.4 s between keyframes, and ⏪ from just
+  past a keyframe landed on it again), so the engine seeks once more, one
+  usual keyframe gap back, whenever it lands past (PLAN-RESUME.md §3.1). Home
+  and back then came back paused 3 s before where it left, and a resume
+  landed before the saved position with one seek, playing 3 s after the
+  server's answer. Each seek before the first frame took about 3 s there.
+- Not yet tried there: image subtitles.
 
 Do not broadly trust `Origin: null` on the server. HDR, certification and
 more model groups remain in [PLAN-SAMSUNG.md](../../PLAN-SAMSUNG.md).
