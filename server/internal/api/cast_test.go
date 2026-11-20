@@ -153,13 +153,25 @@ func TestCastCORS(t *testing.T) {
 	if res := send(http.MethodGet, "/api/server", "https://cast.example", nil); res.Header.Get("Access-Control-Allow-Origin") != "https://cast.example" {
 		t.Errorf("server probe CORS: %v", res.Header)
 	}
-	// Cross-site writes: the receiver origin passes the CSRF check, others do not.
-	cross := map[string]string{"Sec-Fetch-Site": "cross-site", "Authorization": "Bearer c1.x.y"}
-	if res := send(http.MethodPost, "/api/files/1/playback", "https://cast.example", cross); res.StatusCode == http.StatusForbidden {
-		t.Errorf("receiver POST refused as cross-site")
-	}
-	if res := send(http.MethodPost, "/api/files/1/playback", "https://evil.example", cross); res.StatusCode != http.StatusForbidden {
-		t.Errorf("other site POST -> %d", res.StatusCode)
+	// Cross-site writes: the receiver origin passes the CSRF check, others
+	// do not, unless they carry a bearer token, which signs them in alone:
+	// a made-up one is then refused as a sign-in.
+	for _, c := range []struct {
+		origin, authorization string
+		want                  int
+	}{
+		{"https://cast.example", "Bearer c1.x.y", http.StatusUnauthorized},
+		{"https://cast.example", "", http.StatusUnauthorized},
+		{"https://evil.example", "", refused},
+		{"https://evil.example", "Bearer c1.x.y", http.StatusUnauthorized},
+	} {
+		h := map[string]string{"Origin": c.origin, "Sec-Fetch-Site": "cross-site"}
+		if c.authorization != "" {
+			h["Authorization"] = c.authorization
+		}
+		if got, res := sendWith(t, nil, http.MethodPost, srv.URL+"/api/files/1/playback", `{"profile":{}}`, h); got != c.want {
+			t.Errorf("POST from %s with %q -> %d %s", c.origin, c.authorization, res.StatusCode, res.Body)
+		}
 	}
 }
 

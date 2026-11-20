@@ -4,7 +4,8 @@ import type { components } from '../../src/api/schema'
 import { changeAuthScope } from '../../src/lib/authScope'
 import { eventInvalidations, invalidateAfterReconnect } from '../../src/api/eventInvalidation'
 import { bearerClient } from './client'
-import { MediaTokens, MediaUrls } from './media'
+import { MediaTokens, MediaUrls, tokenedUrl } from './media'
+import { PlayerError } from '../player'
 import { EventStream } from './events'
 import type { Account } from './servers'
 import type { ClientInfo } from './device'
@@ -61,6 +62,18 @@ export class ActiveSession {
   }
 
   get isAdmin() { return this.account.isAdmin }
+
+  /**
+   * The player engine's `mediaUrl` (player/README.md): a media path on this
+   * server with the play's own token, which the engine holds and renews.
+   * Streams, playlists, subtitle files, seek-thumbnail sheets and Live TV
+   * playlists pass; any other path is refused.
+   */
+  readonly playerMediaUrl = (path: string, token: string): string => {
+    const url = tokenedUrl(this.baseUrl, path, token)
+    if (!url) throw new PlayerError('The server sent an address this TV won’t open.')
+    return url
+  }
 
   /** Whether the event stream reaches the server: false from a drop until it is open again (the offline banner). */
   readonly connection = {

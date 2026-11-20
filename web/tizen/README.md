@@ -28,6 +28,15 @@ against an isolated synthetic server, and the app builds for Chromium 108.
 - Three 60-second synthetic clips and an opt-in live contract test for direct
   MP4, HLS remux, audio/video conversion delivery, resume and token revocation.
 
+The player engine for the full TV client is in [`player/`](player/README.md),
+2026-11-19: the AVPlay adapter with tracks, live streams and backgrounding; one
+conservative QN90D-class profile; the file, recording and trailer player
+(heartbeats, directives, Automatic, skip, the next episode, Still watching,
+held seeking with thumbnails, WebVTT cues, OpenSubtitles, recovery and token
+renewal); and the Live TV player on the shared tuner controller. It has unit
+tests with fake players and servers only; no screen uses most of it yet, and
+nothing of it has run on a TV.
+
 The development preview labels itself **Browser preview · not AVPlay**. Its
 HTML video/Hls.js adapter is excluded from the production TV bundle. The TV app
 fails clearly when Samsung APIs are unavailable; it never silently substitutes
@@ -83,6 +92,7 @@ pnpm typecheck
 pnpm lint
 pnpm test
 pnpm build:tizen
+pnpm check:tizen
 pnpm build:tizen-core
 pnpm build
 pnpm build:receiver
@@ -93,7 +103,12 @@ WMM_TIZEN_TEST_SERVER=http://127.0.0.1:27686 pnpm vitest run tizen/live.test.ts
 to ignored `web/dist-tizen/`, as one classic deferred script with no
 `crossorigin` attributes. The package loads from `file://`, where module scripts
 can be refused: in desktop Chrome the earlier module build ran nothing from
-`file://`, while this one starts. `pnpm dev:tizen` still serves modules. The optional core build writes to ignored
+`file://`, while this one starts. `pnpm dev:tizen` still serves modules. `pnpm check:tizen`
+then fails a build that Chromium 108 can't load: a missing file, a module script,
+or JS or CSS newer than Chrome 108 that the build leaves as written
+([deploy/samsung/bundle.py](../../deploy/samsung/bundle.py)). CI's `samsung` job lints,
+tests, builds and checks the app, and keeps the unsigned build as an artifact; the
+core build and the live test stay local. The optional core build writes to ignored
 `build/samsung/core/`; it cannot be installed as an app. The live test requires
 loopback port 27686 and the dedicated server name before any sign-in or writes.
 It revokes its test device and approver sessions afterwards.

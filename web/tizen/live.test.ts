@@ -1,7 +1,23 @@
 import { expect, it } from 'vitest'
+import { unwrap as result } from '../src/api/client'
+import type { components } from '../src/api/schema'
+import { bearerClient } from './session/client'
+import { tokenedUrl } from './session/media'
 import { pairOnce } from './session/pairing'
-import { mediaUrl, result, tvClient } from './server'
-import { prototypeProfile, type ProfileId } from './profile'
+
+type ProfileId = 'safe' | 'hevc'
+
+/** The prototype's two compatibility experiments this contract was written against: H.264 + AAC, and HEVC copied with AAC. */
+function prototypeProfile(id: ProfileId): components['schemas']['Profile'] {
+  return { name: `tizen-prototype-${id}`, containers: ['mp4'], videoCodecs: id === 'safe' ? ['h264'] : ['h264', 'hevc'], audioCodecs: ['aac'],
+    maxWidth: 3840, maxHeight: 2160, maxBitrate: 0, maxAudioChannels: 2, hdr: false, subtitleFormats: ['webvtt'] }
+}
+const tvClient = (base: string, token?: string) => bearerClient(base, { token, timeoutMs: 60_000 })
+const mediaUrl = (base: string, path: string, token: string) => {
+  const url = tokenedUrl(base, path, token)
+  if (!url) throw new Error('not a media path on this server')
+  return url
+}
 
 // Opt-in: this must never find/sign into a real server. The dedicated synthetic
 // fixture identity is checked before any credentials or writes are sent.

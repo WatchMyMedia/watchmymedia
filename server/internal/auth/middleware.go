@@ -48,9 +48,11 @@ func WithUser(ctx context.Context, u User) context.Context {
 }
 
 // Middleware authenticates every request except those exempt returns true
-// for. GET and HEAD requests to media paths (mediaPath true) may instead
-// carry a media token in the access_token query parameter; session tokens
-// are never read from URLs.
+// for. A request's token is its Authorization: Bearer header's or, without
+// that header, its cookie's (TokenFrom): a bad bearer token is refused,
+// never made good by a cookie. GET and HEAD requests to media paths
+// (mediaPath true) may instead carry a media token in the access_token
+// query parameter; session tokens are never read from URLs.
 // A cast token works on the routes castRoute allows (nil allows none), as a
 // bearer token or, on media paths, in access_token. An offline token works
 // only on the routes of its own download record: offlineRoute names the
@@ -101,7 +103,8 @@ func (s *Service) Middleware(exempt, mediaPath func(path string) bool, castRoute
 				// The cookie's Max-Age dates from when it was last sent: send
 				// it again when the session's expiry slides, or a browser in
 				// daily use is signed out when the first cookie runs out.
-				if slid && token == cookieToken(r) {
+				// A bearer request never touches the cookie.
+				if _, bearer := BearerToken(r); slid && !bearer {
 					s.SetCookie(ctx, w, token)
 				}
 			} else if mt := MediaTokenFrom(r); mt != "" && IsOfflineToken(mt) {

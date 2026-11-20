@@ -7,6 +7,7 @@ import type { Entry } from './nav'
 import type { PlayRequest, Route } from './routes'
 import type { ActiveSession } from '../session/active'
 import type { AppSession } from '../session/session'
+import type { Player } from '../player'
 
 // The contexts the app provides and the hooks screens use. Screens never
 // reach for the DOM's keys or the stack themselves.
@@ -14,6 +15,8 @@ import type { AppSession } from '../session/session'
 export const InputContext = createContext<Input | null>(null)
 export const AppContext = createContext<AppSession | null>(null)
 export const SessionContext = createContext<ActiveSession | null>(null)
+/** The app's one player (player/README.md); none where the TV's AVPlay is missing, as in a desktop browser opening the TV build. */
+export const PlayerContext = createContext<Player | undefined>(undefined)
 export const NavContext = createContext<Nav | null>(null)
 export const EntryContext = createContext<Entry<Route> | null>(null)
 /** Which layer a component's keys belong to: Dialog and SidePanel set 'modal' for what they hold. */
@@ -42,6 +45,9 @@ export function useInput(): Input { return need(useContext(InputContext), 'useIn
 export function useFocus() { return useInput().focus }
 export function useApp(): AppSession { return need(useContext(AppContext), 'useApp') }
 export function useNav(): Nav { return need(useContext(NavContext), 'useNav') }
+
+/** The app's one Player, which FilePlayback and LivePlayback share; undefined where nothing can play. */
+export function usePlayer(): Player | undefined { return useContext(PlayerContext) }
 
 /** The signed-in session: its server, account, query client and media addresses. */
 export function useSession(): ActiveSession { return need(useContext(SessionContext), 'useSession') }

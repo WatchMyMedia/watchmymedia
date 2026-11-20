@@ -1,23 +1,15 @@
+import type { SamsungWindow } from '../player'
+
 // The Samsung TV's own APIs that the app uses outside playback: keys,
 // leaving the app, the screensaver and the model name. Each call is a no-op
-// in the browser preview. Playback (AVPlay) is the player engine's.
+// in the browser preview. Playback (AVPlay) is the player engine's, whose
+// SamsungWindow this extends.
 
-export type TizenGlobal = {
-  tvinputdevice: { registerKey(name: string): void }
-  application: { getCurrentApplication(): { exit(): void; hide?(): void } }
+type TvWindow = SamsungWindow & {
+  webapis?: { productinfo?: { getRealModel?(): string; getModel?(): string } }
 }
 
-export type WebApis = {
-  appcommon?: {
-    AppCommonScreenSaverState: { SCREEN_SAVER_ON: number; SCREEN_SAVER_OFF: number }
-    setScreenSaver(value: number, success?: () => void, failure?: () => void): void
-  }
-  productinfo?: { getRealModel?(): string; getModel?(): string }
-}
-
-export type SamsungWindow = Window & { tizen?: TizenGlobal; webapis?: WebApis }
-
-const tv = () => window as SamsungWindow
+const tv = () => window as TvWindow
 
 /** Whether this is the packaged TV app rather than the browser preview. */
 export function onTV() { return !!tv().tizen }

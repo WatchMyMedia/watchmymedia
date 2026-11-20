@@ -4,6 +4,7 @@ import { Input } from './app/input'
 import { REGISTERED_KEYS } from './app/keys'
 import { exitApp, loadWebApis, onTV, refreshScreenSaver, registerKeys, tvModel } from './app/platform'
 import { AppSession } from './session/session'
+import { AVPlayPlayer, type Player, type SamsungWindow } from './player'
 import './ui/tokens.css'
 import './ui/kit.css'
 import './screens/start/start.css'
@@ -39,9 +40,27 @@ function closed(title: string, message: string) {
   root.append(section)
 }
 
+/**
+ * The app's one player, made once: AVPlay on the TV; in the development
+ * preview only, the browser's video (imported so the TV build leaves it
+ * out); none where neither is there, as when the TV build opens in a
+ * desktop browser, which can sign in and browse but not play.
+ */
+async function makePlayer(): Promise<Player | undefined> {
+  const avplay = (window as SamsungWindow).webapis?.avplay
+  if (avplay) {
+    document.querySelector('#browser-player')?.remove()
+    return new AVPlayPlayer(avplay)
+  }
+  if (!import.meta.env.DEV) return undefined
+  const { BrowserPlayer } = await import('./player/browser-player')
+  document.querySelector('#av-player')?.remove()
+  return new BrowserPlayer(document.querySelector<HTMLVideoElement>('#browser-player')!)
+}
+
 async function start() {
   // Samsung's webapis.js (AVPlay, the screensaver, the model) comes with the packaged app only.
-  if (onTV()) await loadWebApis().catch(() => undefined)
+  if (!import.meta.env.DEV || onTV()) await loadWebApis().catch(() => undefined)
   registerKeys(REGISTERED_KEYS)
   const fakes = fakesMode()
   let initialAddress = ''
@@ -53,6 +72,7 @@ async function start() {
     initialAddress = location.origin
   }
   const app = new AppSession(appStorage(), { model: tvModel(), initialAddress })
+  const player = await makePlayer()
   const input = new Input(document.body)
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) app.suspend()
@@ -69,7 +89,7 @@ async function start() {
     input.dispose()
     closed('Preview closed', 'Reload this page to open WatchMyMedia again.')
   }
-  root.render(<App app={app} input={input} exit={exit}/>)
+  root.render(<App app={app} input={input} player={player} exit={exit}/>)
   app.start()
   refreshScreenSaver()
 }
