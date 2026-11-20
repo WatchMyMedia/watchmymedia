@@ -1,5 +1,5 @@
 import type { components } from '../api/schema'
-import { formatDate, formatDuration, languageName, seCode } from './format'
+import { formatDate, formatDuration, knownLanguage, languageName, seCode } from './format'
 
 type Episode = components['schemas']['Episode']
 type MediaInfo = components['schemas']['MediaInfo']
@@ -42,7 +42,7 @@ export function trackSummary(probe: Pick<MediaInfo, 'audio' | 'subtitles'> | und
   const audio = probe?.audio.find((a) => a.default) ?? probe?.audio[0]
   const layout = audio?.channelLayout?.replace(/\(.*\)$/, '') ?? ''
   const channels = /^\d\.\d$/.test(layout) ? layout : layout === 'stereo' ? '2.0' : layout === 'mono' ? '1.0' : ''
-  const langs = [...new Set((probe?.subtitles ?? []).filter((s) => s.language && s.language !== 'und').map((s) => languageName(s.language)))]
+  const langs = [...new Set((probe?.subtitles ?? []).filter((s) => knownLanguage(s.language)).map((s) => languageName(s.language)))]
   return { channels, subtitles: langs.length ? `Subtitles: ${langs.join(', ')}` : '' }
 }
 

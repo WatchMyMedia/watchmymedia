@@ -1,4 +1,4 @@
-import { languageName, resolutionLabel } from '../../src/lib/format'
+import { knownLanguage, languageName, resolutionLabel } from '../../src/lib/format'
 import { AUTO, QUALITIES, stepName } from '../../src/lib/quality'
 import type { AudioTrack, Decision, OnlineSubtitle, SubtitleTrack } from './api'
 
@@ -52,16 +52,16 @@ export type OptionWords = { label: string; detail?: string }
 /** An audio track: its language, with the format as the detail ("English", "EAC3 5.1 · Commentary"). */
 export function audioWords(track: AudioTrack): OptionWords {
   const detail = [[codecWords(track.codec), channelsWords(track.channels)].filter(Boolean).join(' '), track.title].filter(Boolean).join(SEP)
-  return { label: track.language ? languageName(track.language) : track.title || `Track ${track.index}`, detail: detail || undefined }
+  return { label: knownLanguage(track.language) ? languageName(track.language) : track.title || `Track ${track.index}`, detail: detail || undefined }
 }
 
 /** A subtitle track; an image one says picking it restarts the stream (PLAN-CLIENTS.md §2.3 item 7). */
 export function subtitleWords(track: SubtitleTrack): OptionWords {
-  const label = track.language ? languageName(track.language) : track.title || 'Unknown language'
+  const label = knownLanguage(track.language) ? languageName(track.language) : track.title || 'Unknown language'
   const detail = [track.source === 'opensubtitles' ? 'OpenSubtitles' : track.external ? 'External' : undefined,
     track.forced ? 'Forced' : undefined, track.hearingImpaired ? 'HI' : undefined, track.release,
     track.format === 'image' || track.burnInOnly ? 'burned in, restarts playback' : undefined,
-    track.source !== 'opensubtitles' && track.title && track.language ? track.title : undefined].filter(Boolean).join(SEP)
+    track.source !== 'opensubtitles' && track.title && knownLanguage(track.language) ? track.title : undefined].filter(Boolean).join(SEP)
   return { label, detail: detail || undefined }
 }
 
