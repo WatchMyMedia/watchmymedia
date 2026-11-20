@@ -21,8 +21,8 @@ export function OnNowCardButton({ card, focusId, onPress }: { card: OnNowCard; f
 }
 
 /** A channel without listings: its number and name, LIVE, and "No listings". */
-export function ChannelTile({ channel, focusId, onPress }: { channel: LiveChannel; focusId: string; onPress(): void }) {
-  return <button type="button" data-focus={focusId} className={`live-tile${channel.available ? '' : ' live-tile--off'}`} aria-label={`Watch ${channelLabel(channel)}`} onClick={onPress}>
+export function ChannelTile({ channel, focusId, onPress, autoFocus }: { channel: LiveChannel; focusId: string; onPress(): void; autoFocus?: boolean }) {
+  return <button type="button" data-focus={focusId} data-autofocus={autoFocus || undefined} className={`live-tile${channel.available ? '' : ' live-tile--off'}`} aria-label={`Watch ${channelLabel(channel)}`} onClick={onPress}>
     <span className="live-tile__top"><b>{channel.number}</b><span>{channel.name}</span>{channel.available && <span className="live-badge"><span className="live-dot"/>LIVE</span>}</span>
     <span className="live-tile__sub">{channel.available ? 'No listings' : 'Unavailable'}</span>
   </button>

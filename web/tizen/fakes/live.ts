@@ -145,7 +145,7 @@ class LiveStore {
     return {
       id: this.id('rec'), userId: FAKE_USER.id, userName: 'Robin', sourceId: channel.sourceId, channelId: channel.id, number: channel.number, channelName: channel.name,
       programmeId: p.id, title: p.title, episodeTitle: p.episodeTitle, season: p.season, episode: p.episode, start: p.start, end: p.end, state,
-      series: !!p.seriesKey, padBefore: 1, padAfter: 2, bytes: 0, gaps: [], canCancel: true, canDelete: false, ...extra,
+      series: !!extra.ruleId, padBefore: 1, padAfter: 2, bytes: 0, gaps: [], canCancel: true, canDelete: false, ...extra,
     }
   }
 

@@ -156,13 +156,13 @@ export function RecordPanel({ channel, programme, onClose, onNote, onWatchRecord
         onSave={() => page.rule ? saveRule.mutate(page.rule, { onSuccess: () => { onNote('Series options saved.'); onClose() } }) : record(series ? 'series' : 'once', options.newOnly)}/>
         : <>
           {view.lines && view.lines.length > 0 && <div className="live-panel__lines">{view.lines.map((l) => <span key={l}><span className="live-mark live-mark--dot" aria-hidden="true"/>{l}</span>)}</div>}
-          {mark && recording.isPending && <p className="tv-note">Loading the recording…</p>}
-          <div className="live-panel__choices" role="group" aria-label={view.title}>
+          {/* What is set decides the choices: none until it has loaded, so focus starts on the first real one. */}
+          {mark && !clash && recording.isPending ? <p className="tv-note">Loading the recording…</p> : <div className="live-panel__choices" role="group" aria-label={view.title}>
             {view.choices.map((c, i) => <button key={c.id} type="button" className="live-opt" data-focus={`record/${c.id}`} data-autofocus={i === 0 || undefined} aria-disabled={busy || undefined} onClick={() => pick(c)}>
               <span className="live-opt__text"><span className="live-opt__label">{c.label}</span>{c.detail && <span className="live-opt__detail">{c.detail}</span>}</span>
               {c.more && <LiveIcon name="chevron" className="live-opt__more"/>}
             </button>)}
-          </div>
+          </div>}
         </>}
       {error && <p className="tv-error" role="alert">{problemWords(error).body}</p>}
       <p className="live-panel__foot">{optionsPage ? '◀ ▶ change the focused setting. Return goes back to the choice.' : view.foot}</p>

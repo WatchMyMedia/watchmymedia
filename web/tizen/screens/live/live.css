@@ -38,7 +38,8 @@
 .live-art--banner { width: 16rem; height: 9rem; border-radius: .625rem; }
 .live-art--panel { width: 12rem; height: 6.75rem; border-radius: .625rem; }
 .live-art--hero { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; background: var(--ground); }
-.live-art--dim { filter: saturate(.25) brightness(.6); }
+/* Faded, but not its focus ring. */
+.live-art--dim > .live-art__img, .live-art--dim > .live-art__plain, .live-art--dim > .live-art__over { filter: saturate(.25) brightness(.6); }
 .live-art__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .live-art__plain { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .live-art__logo { max-width: 40%; max-height: 50%; object-fit: contain; }

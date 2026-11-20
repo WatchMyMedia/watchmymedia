@@ -61,7 +61,7 @@ export function LiveScreen() {
         <Button id="live/goto" onPress={() => setGoto('')}>Go to channel</Button>
       </div>
       <Grid id="channels" variant="wide" items={channels} itemKey={(c) => c.id} visibleRows={3}
-        renderItem={(c, focusId) => <ChannelTile channel={c} focusId={focusId} onPress={() => watch(c)}/>}/>
+        renderItem={(c, focusId, i) => <ChannelTile channel={c} focusId={focusId} autoFocus={i === 0} onPress={() => watch(c)}/>}/>
     </div>}
     <KeyHints hints={[{ key: 'OK', label: 'Watch' }, { key: '0–9', label: 'Go to channel' }, ...(tv.listings ? [{ key: 'Guide', label: 'Full guide' }] : [])]}/>
     {goto !== undefined && <GoToChannelDialog channels={channels} initial={goto} now={now} onWatch={watch} onClose={() => setGoto(undefined)}/>}
