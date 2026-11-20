@@ -116,8 +116,8 @@ fun serverAdded(serverName: String): String = "$serverName is added"
 fun serverAddedLine(userName: String?): String = if (userName != null) "You’re on it now, signed in as $userName." else "You’re on it now."
 
 /** What changed: "This phone is signed in to 3 servers. Search looks in all of them." */
-fun serverAddedChanged(device: String, registered: Int): String =
-    if (registered > 1) "This $device is signed in to ${plural(registered, "server")}. Search looks in all of them." else "This $device is signed in to 1 server."
+fun serverAddedChanged(device: String, signedIn: Int): String =
+    if (signedIn > 1) "This $device is signed in to ${plural(signedIn, "server")}. Search looks in all of them." else "This $device is signed in to 1 server."
 
 /** What happens next. */
 const val SERVER_ADDED_NEXT = "Tap your initial on Home to switch. It doesn’t ask for a password again."

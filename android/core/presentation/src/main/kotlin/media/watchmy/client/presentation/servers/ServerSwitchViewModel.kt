@@ -50,8 +50,8 @@ class ServerSwitchViewModel(
     /** Search with [query], then [page] on top, once the app is on the server that has it. */
     data class Landing(val query: String, val page: DeepLink)
 
-    /** Add a server's last step: which server, who signed in, and how many are registered now. */
-    data class Added(val serverName: String, val userName: String?, val registered: Int)
+    /** Add a server's last step: which server, who signed in, and how many servers the device is signed in to now. */
+    data class Added(val serverName: String, val userName: String?, val signedIn: Int)
 
     data class State(
         val note: String? = null,
@@ -108,8 +108,8 @@ class ServerSwitchViewModel(
             was?.signedIn == false && now.signedIn && (_state.value.returnTo != null || _state.value.adding == AddServerStep.SignIn) -> {
                 val adding = _state.value.adding == AddServerStep.SignIn
                 if (adding && addedStep) {
-                    val registered = servers.saved.first().count { it.registered }
-                    _state.update { it.copy(returnTo = null, adding = AddServerStep.Added, added = Added(now.server.name, now.userName, registered)) }
+                    val signedIn = servers.saved.first().count { it.registered && it.signedIn }
+                    _state.update { it.copy(returnTo = null, adding = AddServerStep.Added, added = Added(now.server.name, now.userName, signedIn)) }
                 } else {
                     _state.update { it.copy(returnTo = null, adding = null) }
                     say(nowOn(now.server.name))

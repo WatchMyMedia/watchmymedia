@@ -147,7 +147,7 @@ class ServerSwitchViewModelTest {
         runCurrent()
         assertEquals(AddServerStep.Added, vm.state.value.adding)
         assertEquals("Step 3 of 3 · Added", vm.state.value.adding!!.line)
-        assertEquals(ServerSwitchViewModel.Added("Office Mac mini", "Sam", registered = 5), vm.state.value.added)
+        assertEquals(ServerSwitchViewModel.Added("Office Mac mini", "Sam", signedIn = 4), vm.state.value.added)
         assertNull("the last step says it, not a note", vm.state.value.note)
         assertEquals(OfficeMini.id, current)
 

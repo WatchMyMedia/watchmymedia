@@ -128,7 +128,7 @@ internal fun ServerAddedScreen(added: ServerSwitchViewModel.Added, onDone: () ->
                     )
                     Text(serverAddedLine(added.userName), style = TextStyle(fontFamily = Inter, fontSize = 14.sp, lineHeight = 21.sp, color = WmmColors.TextMuted, textAlign = TextAlign.Center))
                 }
-                AddedBox("What changed", serverAddedChanged(device, added.registered))
+                AddedBox("What changed", serverAddedChanged(device, added.signedIn))
                 AddedBox("What happens next", SERVER_ADDED_NEXT, Modifier.padding(top = 10.dp))
             }
             Column(Modifier.fillMaxWidth().background(WmmColors.Ground).navigationBarsPadding()) {

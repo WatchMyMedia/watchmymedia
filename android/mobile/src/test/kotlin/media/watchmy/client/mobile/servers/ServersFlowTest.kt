@@ -148,7 +148,7 @@ class ServersFlowTest {
         compose.onNodeWithContentDescription("Step 3 of 3 · Added").assertIsDisplayed()
         compose.onNodeWithText("Office Mac mini is added").assertIsDisplayed()
         compose.onNodeWithText("You’re on it now, signed in as Sam.").assertIsDisplayed()
-        compose.onNodeWithText("This phone is signed in to 5 servers. Search looks in all of them.").assertIsDisplayed()
+        compose.onNodeWithText("This phone is signed in to 4 servers. Search looks in all of them.").assertIsDisplayed()
         compose.onNodeWithText("Done").performClick()
         compose.waitForIdle()
         compose.onNodeWithContentDescription("On Office Mac mini. Open Servers").assertIsDisplayed()
