@@ -15,8 +15,7 @@ tile. Pass `--style aperture` or `--style play-dot` to `tools/make_sources.py`
 redraw `BrandMark` in the web app (`web/src/components/BrandMark.tsx`), the
 Apple apps (`apple/Kit/Sources/WMMUI/Marks.swift`), the Android app
 (`android/core/ui/…/components/Brand.kt`) and the Samsung prototype
-(`web/tizen/App.tsx`), which draw the mark in code. Design canvas:
-https://claude.ai/artifact/88tQqNarhhnbEJijimnMNG (private until shared).
+(`web/tizen/App.tsx`), which draw the mark in code.
 
 Everything here is generated from one definition of the geometry in
 `tools/make_sources.py`. Edit that, not the exported files.

@@ -3,7 +3,8 @@
 The Unraid Docker template, how people install it (from Community
 Applications, or by hand), how to test it on an Unraid server, and the
 submission checklist. The design and decisions are in
-[PLAN-UNRAID.md](../../PLAN-UNRAID.md); the guide for people is
+PLAN-UNRAID.md (the maintainers' plan,
+[not in this repository](../../CONTRIBUTING.md#files-this-repository-does-not-have)); the guide for people is
 [watchmy.media/guide/unraid](https://watchmy.media/guide/unraid).
 
 ## Files

@@ -2,11 +2,13 @@
 
 One app, one APK: the TV UI on Android TV and Google TV (including the Google
 TV Streamer), the phone UI on phones and tablets. The plan is
-[PLAN-CLIENTS.md](../PLAN-CLIENTS.md) §5 and §2.3; the screens follow the
-mockups in [design/mockups](../design/mockups) (`android-tv/` and `android/`).
+PLAN-CLIENTS.md §5 and §2.3; the screens follow the
+mockups in `design/mockups` (`android-tv/` and `android/`). The plans and
+mockups this file names are the maintainers' and are
+[not in this repository](../CONTRIBUTING.md#files-this-repository-does-not-have).
 
-Tablet layouts follow [PLAN-TABLETS.md](../PLAN-TABLETS.md) and the
-[tablet boards](../design/mockups/android-tablet). At 600 dp the bottom bar
+Tablet layouts follow PLAN-TABLETS.md and the
+tablet boards (`design/mockups/android-tablet`). At 600 dp the bottom bar
 becomes a navigation rail, grids fit the available width, and dialogs and
 single-column pages keep readable widths. At 1000 dp Home, Library, Search,
 details and the Inbox use two panes. Settings puts its list of groups beside the
@@ -65,7 +67,7 @@ no server): the TV shows a pairing code and signs itself
 in after a few seconds, and the phone takes any name with the password
 `password`. Any name but Alex signs in as an admin; Alex is a member, whose
 requests wait for approval. On the fakes the server takes requests
-([PLAN-ARR.md](../PLAN-ARR.md)): search for "harbor" for the Not in your
+(PLAN-ARR.md): search for "harbor" for the Not in your
 library row, and Copperline lists its missing episodes in every state the
 boards draw. Add `-PfakesSeerr=true` to exercise a Seerr-only server: requests
 go to a separate fake Seerr list, while admins can still approve earlier
@@ -85,7 +87,7 @@ account and the server’s admin-network permission; Search now and Monitor
 still require Radarr/Sonarr management. Settings has Your requests, and admins' Inbox with its count
 on the Settings tab (phone) and the rail's Settings (tablet and TV).
 
-Settings on a phone or tablet ([PLAN-ANDROID-SETTINGS.md](../PLAN-ANDROID-SETTINGS.md))
+Settings on a phone or tablet (PLAN-ANDROID-SETTINGS.md)
 opens on a list of groups named and ordered as the
 web app's tabs, each saying what is chosen: Playback, Audio & subtitles,
 Downloads, Home rows, then Account & devices, Your requests and About, and for
@@ -96,7 +98,7 @@ doesn't save stays on its row with Try again; the account's rows wait until its
 settings have loaded. Signing out, signing another device out and Remove all
 downloads ask first.
 
-A show, a season and an episode all open one page ([PLAN-SHOW-PAGE.md](../PLAN-SHOW-PAGE.md),
+A show, a season and an episode all open one page (PLAN-SHOW-PAGE.md,
 `ShowPageViewModel`): the chosen episode on top with Play, Mark watched and
 its own ⋮ (the TV's More), the season chips or tabs (Specials last) over the
 season's row of episodes, and About the show with Mark show watched and
@@ -136,7 +138,7 @@ fakes, which draw the Cast glyph instead of the real button:
 adb shell am start -n media.watchmy.client/media.watchmy.client.mobile.player.harness.PlayerHarnessActivity -e scenario casting
 ```
 
-Automatic quality ([PLAN-AUTO-QUALITY.md](../PLAN-AUTO-QUALITY.md)) needs a
+Automatic quality (PLAN-AUTO-QUALITY.md) needs a
 server at API level 3; older ones don't offer it. The harnesses show a step
 down on the fakes (`-e scenario auto` on the phone, `--es scene auto` on the
 TV) and a return to Direct play (`-e scenario autorecovery` or `--es scene
@@ -154,7 +156,7 @@ to the proxy's port. The fixture's `S01E01` (720p, 2.7 Mbps) steps down at
 1.5 Mbps; its other episodes are too small to stall. On an emulator, use 720p
 or smaller: its software decoders fall behind at 1080p.
 
-Seek thumbnails ([PLAN-TRICKPLAY.md](../PLAN-TRICKPLAY.md)) show the picture
+Seek thumbnails (PLAN-TRICKPLAY.md) show the picture
 at the target while a finger drags the scrubber on a phone or tablet, or the
 remote seeks on a TV (with the step beside the time). They need a server at
 API level 9 that has made them for the file, which it does in the background
@@ -163,7 +165,7 @@ alone. Sheets come through the image loader (`CoilSeekThumbnails`), which
 signs in only to the current server, and each tile is cut out of its sheet
 with `BitmapRegionDecoder`. On the fakes every play has them, drawn in code.
 
-Movie trailers ([PLAN-TRAILERS.md](../PLAN-TRAILERS.md) §6.2) need a server at
+Movie trailers (PLAN-TRAILERS.md §6.2) need a server at
 API level 20, which lists them on the movie (`trailers`, best first); older
 servers list none, so there is no Trailer button. The button (after Play or
 Resume and Play from start) plays the first trailer the server lists that
@@ -265,7 +267,7 @@ lists `pcm`, which the server copies only in direct play of MKV: Media3
 also reads `ipcm`, `fpcm`, `lpcm`, `sowt` and `twos` in MP4 and MOV, but
 not QuickTime's `in24`, `in32`, `fl32` or `fl64`, which ffmpeg writes for
 24-bit, so the server converts PCM in any other file. Both go only to
-servers at API level 31 or later ([PLAN-AUDIO.md](../PLAN-AUDIO.md) §3.4,
+servers at API level 31 or later (PLAN-AUDIO.md §3.4,
 §3.5). The profile's size limit is the largest picture the offered
 codecs' decoders take at 24 fps, whatever the screen, so a phone whose
 hardware decodes 4K direct-plays a 4K file: read from
@@ -282,7 +284,7 @@ neither do low-RAM devices.
 
 ### Rows people arrange, and rows made from lists
 
-From API level 22 ([PLAN-ROWS.md](../PLAN-ROWS.md) §8.2) Home and each
+From API level 22 (PLAN-ROWS.md §8.2) Home and each
 library's Movies or TV screen come in the person's order
 (`LibraryRepository.arrangedHome` and `libraryRows`, `getHome` and
 `getLibraryRows` with `arranged=true`); older servers keep the fixed rows.
@@ -331,7 +333,7 @@ list; the missing titles are the fake request flow's, in each request state.
 
 ### Following shows: new-episode notifications
 
-From API level 29 ([PLAN-NEW-EPISODES.md](../PLAN-NEW-EPISODES.md) §7.1–§7.3)
+From API level 29 (PLAN-NEW-EPISODES.md §7.1–§7.3)
 a show's About has **Notify me** first, on the phone, the tablet and the TV:
 it follows the show on the server at once, for the person on every device,
 and goes back with the page's message if the server refuses
@@ -386,7 +388,7 @@ lists the id).
 
 ### Related titles at the end of movie and show pages
 
-From API level 30 ([PLAN-RELATED.md](../PLAN-RELATED.md) §6–§7) a movie's page
+From API level 30 (PLAN-RELATED.md §6–§7) a movie's page
 ends with its collection (the collection's other films in the library, in
 release order, named as TMDB names it) and More like this, and a show's page
 with More like this (`LibraryRepository.movieRelated` and `showRelated`,
@@ -443,7 +445,7 @@ copies stored beside the file.
 ### Downloads
 
 Phones and tablets download movies and episodes to watch with no connection
-([PLAN-DOWNLOADS.md](../PLAN-DOWNLOADS.md)); the TV app never shows them.
+(PLAN-DOWNLOADS.md); the TV app never shows them.
 Download is offered from API level 10 to whoever the server's Who can
 download allows (admins by default, `RequestOptions.offline`); with downloads
 offered, Downloads takes Search's place in the phone's bottom bar (Search
@@ -577,7 +579,7 @@ the same API-level gates (`FAKE_SERVER_API_LEVEL`).
 ### Listings
 
 With a server at API level 13 whose `capabilities.guide` is true
-([PLAN-LIVE-TV-GUIDE.md](../PLAN-LIVE-TV-GUIDE.md) §6.3), Live TV shows
+(PLAN-LIVE-TV-GUIDE.md §6.3), Live TV shows
 programme listings; otherwise every screen above stays as it was. The phone's
 guide shows an hour across, with the selected programme above it and its
 details in a bottom sheet; from 1000 dp the tablet shows two hours beside the
@@ -607,7 +609,7 @@ Use an isolated Android 35 AVD and an app-id suffix, as described above.
 
 ### Favourites, search and reminders
 
-From API level 15 with listings ([PLAN-LIVE-TV-GUIDE.md](../PLAN-LIVE-TV-GUIDE.md)
+From API level 15 with listings (PLAN-LIVE-TV-GUIDE.md
 §6.5), the guide has a star column left of the channels and a Favourites
 filter first among the chips once there is a favourite. Every client keeps
 one rule (`LiveGuideFilter.keeps`): a favourite shows with or without
@@ -675,7 +677,7 @@ ANDROID_SERIAL=emulator-5690 ./gradlew :core:data:connectedDebugAndroidTest \
 ### Casting Live TV
 
 With a server at API level 14 whose `capabilities.cast` is true
-([PLAN-LIVE-TV.md](../PLAN-LIVE-TV.md) §4.1), Live TV's top bar and the live
+(PLAN-LIVE-TV.md §4.1), Live TV's top bar and the live
 player have the Cast button (the LiveCast and TabLiveCast boards). A channel is
 offered to a TV only when its receiver's `state` lists the `live` feature, so
 an older receiver or TV app is never sent one; file casting is unchanged.
@@ -774,8 +776,8 @@ against `cmd/livetvfixture`.
 | `core:api` | Client generated from `../api/openapi-3.0.json` |
 | `core:data` | Real repositories: servers (DataStore, mDNS), sign-in and pairing, library, preferences, the server's event stream, playback API calls (`DataServices`) |
 | `core:playback` | `PlaybackEngine`, file `RealPlaybackController` and separate `RealLivePlaybackController` on Media3, device profile, media session, Watch Next |
-| `core:downloads` | Offline downloads on phones and tablets ([PLAN-DOWNLOADS.md](../PLAN-DOWNLOADS.md)): Media3's `DownloadManager` and `WmmDownloadService`, the download cache, `o1.` tokens, the records and offline progress queue, sync, and the player's way to downloaded items (`OfflineDownloads`) |
-| `core:cast` | Casting ([PLAN-CAST.md](../PLAN-CAST.md)): the phone's `RealCastService` and its remote `CastPlaybackController` on the Cast SDK, Cast Connect's `CastConnectReceiver` for the TV app, and `CastProtocol`, the Kotlin side of `web/src/cast/protocol.ts` |
+| `core:downloads` | Offline downloads on phones and tablets (PLAN-DOWNLOADS.md): Media3's `DownloadManager` and `WmmDownloadService`, the download cache, `o1.` tokens, the records and offline progress queue, sync, and the player's way to downloaded items (`OfflineDownloads`) |
+| `core:cast` | Casting (PLAN-CAST.md): the phone's `RealCastService` and its remote `CastPlaybackController` on the Cast SDK, Cast Connect's `CastConnectReceiver` for the TV app, and `CastProtocol`, the Kotlin side of `web/src/cast/protocol.ts` |
 | `tv` | Compose for TV screens; `tv/player/` is the TV player, with a debug harness in `tv/src/debug` |
 | `mobile` | Material 3 phone screens; `mobile/player/` is the phone player, with a debug harness in `mobile/src/debug` |
 | `baselineprofile` | Tests that drive `app` on a device: the journeys that write its baseline and startup profiles, the startup and frame-timing benchmarks (Macrobenchmark), and `fixture_server.py`, the seeded fixture server the real-build journey uses ("Baseline profile" below) |

@@ -246,7 +246,7 @@ What the first session on the QN90D found:
 - Not yet tried there: image subtitles.
 
 Do not broadly trust `Origin: null` on the server. HDR, certification and
-more model groups remain in [PLAN-SAMSUNG.md](../../PLAN-SAMSUNG.md).
+more model groups remain in PLAN-SAMSUNG.md.
 
 Samsung references: [certificate setup](https://developer.samsung.com/smarttv/develop/getting-started/setting-up-sdk/creating-certificates.html),
 [TV testing](https://developer.samsung.com/smarttv/develop/getting-started/using-sdk/tv-device.html),

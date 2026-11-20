@@ -1,6 +1,7 @@
 # Plex compatibility spike (P0)
 
-Part of [PLAN-PLEX-SYNC.md](../../../PLAN-PLEX-SYNC.md#p0-resolve-protocol-uncertainty-before-building-the-feature).
+Part of PLAN-PLEX-SYNC.md's P0, which resolves protocol uncertainty before the
+feature is built (the maintainers' plan, [not in this repository](../../../CONTRIBUTING.md#files-this-repository-does-not-have)).
 Updated 2026-10-31. The adapter and executable probe have synthetic contract tests
 and authorized live evidence from PMS **1.43.5.11079-b3b13e506**. Fresh owner JWT
 sign-in and renewal, an owner-device credential bridge, invited-user reads and

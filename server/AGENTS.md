@@ -2,7 +2,7 @@
 
 The Go server. Read the root [AGENTS.md](../AGENTS.md) first: the API contract
 rules, generated files and authority limits there apply here. Architecture
-and decisions are in [PLAN.md](../PLAN.md) and the feature plans.
+and decisions are in PLAN.md and the feature plans.
 
 ## Commands
 
@@ -38,11 +38,11 @@ Under `internal/`:
 |---|---|
 | `api` | Every HTTP route: huma operations registered per area (`registerActivity`, …), their input and output types, and the OpenAPI document |
 | `db` | Connection, embedded goose migrations, sqlc queries (`internal/db/queries/*.sql` → `*.sql.go`) |
-| `library`, `scanner`, `parser`, `probe`, `metadata`, `tmdb`, `images` | Finding files, naming them, matching them on TMDB, artwork. Season line-ups, for seasons TMDB numbers differently from the files, are in `internal/metadata/seasonmap.go` ([PLAN-SEASON-MAPPING.md](../PLAN-SEASON-MAPPING.md)); episodes named after files, for a known show's episodes TMDB does not list, in `internal/metadata/filenamed.go` |
-| `artwork` | The pictures admins chose in place of TMDB's posters ([PLAN-POSTERS.md](../PLAN-POSTERS.md)): uploads and links copied once, re-encoded as JPEG and named `c-<hash>.jpg` under `<data_dir>/artwork`, the address check on links, and the sweep. `images` serves them scaled on the TMDB image route; the routes are `internal/api/posters.go`. `poster_path` stays the poster to show: change it only through `SetMoviePoster`, `SetShowPoster` and `SetSeasonPoster`, and keep the upserts' `poster_source` guard, or a refresh overwrites an admin's choice |
-| `trailers` | Movies' YouTube trailers from TMDB: choosing the best three, `movies.trailers`, the background refresh (`Refresher`) and whether the Trailers from YouTube setting is on ([PLAN-TRAILERS.md](../PLAN-TRAILERS.md)) |
-| `related` | Related titles at the end of movie and show pages ([PLAN-RELATED.md](../PLAN-RELATED.md)): each title's tags from TMDB (`movie_tags`, `show_tags`: recommendations, keywords, genres, billed cast, director or creator, language) and a movie's collection, written when the matcher stores a title (`StoreMovie`, `StoreShow`, in its transaction); the scoring (`Similar`, weights in `score.go`); and the background job (`Refresher`) that fills in titles matched before and refetches a title whose page was opened with data older than 30 or 90 days. Pages never wait on TMDB. The routes are `internal/api/related.go` |
-| `lists` | The lists rows are made from ([PLAN-ROWS.md](../PLAN-ROWS.md)): a `Source` per kind (TMDB's trending, charts, discover, lists and collections; MDBList with the admin's key; a saved library filter; an import of an IMDb or Letterboxd export or pasted lines), what they fetched in `media_lists` and `media_list_entries`, and the refresh job (`Service.Run`), with a fake MDBList in `internal/lists/mdblisttest`. Each person's row layouts (`user_preferences` `rows.*`, the household's in `settings` `rows.default.*`), their merge, the arranged screens and matching entries to the library are in `api` (`screen_layout.go`, `media_list_rows.go`) |
+| `library`, `scanner`, `parser`, `probe`, `metadata`, `tmdb`, `images` | Finding files, naming them, matching them on TMDB, artwork. Season line-ups, for seasons TMDB numbers differently from the files, are in `internal/metadata/seasonmap.go` (PLAN-SEASON-MAPPING.md); episodes named after files, for a known show's episodes TMDB does not list, in `internal/metadata/filenamed.go` |
+| `artwork` | The pictures admins chose in place of TMDB's posters (PLAN-POSTERS.md): uploads and links copied once, re-encoded as JPEG and named `c-<hash>.jpg` under `<data_dir>/artwork`, the address check on links, and the sweep. `images` serves them scaled on the TMDB image route; the routes are `internal/api/posters.go`. `poster_path` stays the poster to show: change it only through `SetMoviePoster`, `SetShowPoster` and `SetSeasonPoster`, and keep the upserts' `poster_source` guard, or a refresh overwrites an admin's choice |
+| `trailers` | Movies' YouTube trailers from TMDB: choosing the best three, `movies.trailers`, the background refresh (`Refresher`) and whether the Trailers from YouTube setting is on (PLAN-TRAILERS.md) |
+| `related` | Related titles at the end of movie and show pages (PLAN-RELATED.md): each title's tags from TMDB (`movie_tags`, `show_tags`: recommendations, keywords, genres, billed cast, director or creator, language) and a movie's collection, written when the matcher stores a title (`StoreMovie`, `StoreShow`, in its transaction); the scoring (`Similar`, weights in `score.go`); and the background job (`Refresher`) that fills in titles matched before and refetches a title whose page was opened with data older than 30 or 90 days. Pages never wait on TMDB. The routes are `internal/api/related.go` |
+| `lists` | The lists rows are made from (PLAN-ROWS.md): a `Source` per kind (TMDB's trending, charts, discover, lists and collections; MDBList with the admin's key; a saved library filter; an import of an IMDb or Letterboxd export or pasted lines), what they fetched in `media_lists` and `media_list_entries`, and the refresh job (`Service.Run`), with a fake MDBList in `internal/lists/mdblisttest`. Each person's row layouts (`user_preferences` `rows.*`, the household's in `settings` `rows.default.*`), their merge, the arranged screens and matching entries to the library are in `api` (`screen_layout.go`, `media_list_rows.go`) |
 | `playback` | Direct play, remux and transcode decisions, bounded event and VOD HLS sessions, owned temporary-storage accounting, hardware encoders, Automatic quality's policy (`auto.go`) |
 | `streamtest` | Test-only aggregate/per-viewer HTTP media shaper for `cmd/livetvfixture`; never wire it into the production server. `make streaming-check` runs the isolated F0/F1 harness. |
 | `upload` | Production remote media upload accounting, start reservations, bounded response pacing and download priority. The API middleware covers old/anonymous media routes too; `streamtest` remains fixture-only. |
@@ -50,14 +50,14 @@ Under `internal/`:
 | `activity` | Plays now, history and statistics, with hand-written SQL tuned by `make bench` |
 | `auth`, `turnstile`, `netguard` | Accounts, device sessions and pairing, the sign-in bot check, the real client address behind trusted proxies, and where admin and setup work |
 | `segments`, `subtitles`, `opensubtitles` | Intro and credits detection; subtitles from files and OpenSubtitles |
-| `trickplay` | Seek thumbnails: the background job that makes the JPEG sheets under `<data_dir>/trickplay`, their versions and the sweep, and the I-frame track VOD master playlists offer Apple TV, made from the sheets on first request ([PLAN-TRICKPLAY.md](../PLAN-TRICKPLAY.md)) |
+| `trickplay` | Seek thumbnails: the background job that makes the JPEG sheets under `<data_dir>/trickplay`, their versions and the sweep, and the I-frame track VOD master playlists offer Apple TV, made from the sheets on first request (PLAN-TRICKPLAY.md) |
 | `settings`, `config` | Settings kept in the database; `config.yaml` and `WATCHMYMEDIA_*` variables |
 | `discovery`, `events`, `backup`, `updates`, `webui` | mDNS, the in-process event bus behind `/api/events`, backups, update checks, the embedded web app |
-| `watchstate` | Every change to watch state, with the guards that keep local choices safe from imports ([PLAN-PLEX-SYNC.md](../PLAN-PLEX-SYNC.md)), and offline progress applied by when it happened (`ReportAt`, `MarkAt`) |
-| `offline` | Offline downloads outside the database: who may download (`offline.access`) and the transfers running now; the records, routes and sync are in `api` (`offline.go`, `offline_media.go`) ([PLAN-DOWNLOADS.md](../PLAN-DOWNLOADS.md)) |
-| `livetv` | Live TV: HDHomeRun tuners, channels and live HLS sessions; listings in `internal/livetv/guide`: SiliconDust's XMLTV feed (`internal/livetv/guide/xmltv`), its pictures (`internal/livetv/guide/art`), the refresh schedule and TMDB pictures and descriptions matched to listings (`internal/livetv/guide/enrich`), and each person's favourites, reminders and listings search (`internal/livetv/guide/personal.go`), with fakes in `internal/livetv/guide/guidetest` and `internal/livetv/hdhomerun/hdhrtest` ([PLAN-LIVE-TV-GUIDE.md](../PLAN-LIVE-TV-GUIDE.md)). The tuner's `DeviceAuth` is a `hdhomerun.Secret`, which never prints. `internal/livetv/dvr` owns schedules, capture, shared tuners, finalization, deletion and progress handoff ([PLAN-LIVE-TV-DVR.md](../PLAN-LIVE-TV-DVR.md)); `internal/growing` follows owned recording files, and `internal/bgwork` gates optional background analysis |
+| `watchstate` | Every change to watch state, with the guards that keep local choices safe from imports (PLAN-PLEX-SYNC.md), and offline progress applied by when it happened (`ReportAt`, `MarkAt`) |
+| `offline` | Offline downloads outside the database: who may download (`offline.access`) and the transfers running now; the records, routes and sync are in `api` (`offline.go`, `offline_media.go`) (PLAN-DOWNLOADS.md) |
+| `livetv` | Live TV: HDHomeRun tuners, channels and live HLS sessions; listings in `internal/livetv/guide`: SiliconDust's XMLTV feed (`internal/livetv/guide/xmltv`), its pictures (`internal/livetv/guide/art`), the refresh schedule and TMDB pictures and descriptions matched to listings (`internal/livetv/guide/enrich`), and each person's favourites, reminders and listings search (`internal/livetv/guide/personal.go`), with fakes in `internal/livetv/guide/guidetest` and `internal/livetv/hdhomerun/hdhrtest` (PLAN-LIVE-TV-GUIDE.md). The tuner's `DeviceAuth` is a `hdhomerun.Secret`, which never prints. `internal/livetv/dvr` owns schedules, capture, shared tuners, finalization, deletion and progress handoff (PLAN-LIVE-TV-DVR.md); `internal/growing` follows owned recording files, and `internal/bgwork` gates optional background analysis |
 | `plex` | The Plex adapter; `cmd/plexprobe` is its read-only probe, `internal/plex/plextest` a fictional plex.tv and server for tests. `cmd/plexsyncfixture` runs a disposable loopback provider/server for browser and client acceptance ([usage](cmd/plexsyncfixture/README.md)) |
-| `plexsync` | Plex sign-in, private grants, mappings, previews, durable opt-in watched imports, guarded undo and separate history ([PLAN-PLEX-SYNC.md](../PLAN-PLEX-SYNC.md), “P3 as built”). Watch mutations and checkpoints commit through `watchstate.ImportChecked`; worker and preview shutdown are awaited. A scheduled sync (`planScheduled`) writes only items an import would mark or whose source identity is not recorded yet, and adds the rest to the run's counts in one fenced update; a manual import writes every item. One item whose identity changed in Plex is skipped as unavailable (`sourceChanges`); only most of them changing stops the run as `source_identity_changed`. `TestScheduledSyncNoChangeCost` measures a 10,000-item no-change run. |
+| `plexsync` | Plex sign-in, private grants, mappings, previews, durable opt-in watched imports, guarded undo and separate history (PLAN-PLEX-SYNC.md, “P3 as built”). Watch mutations and checkpoints commit through `watchstate.ImportChecked`; worker and preview shutdown are awaited. A scheduled sync (`planScheduled`) writes only items an import would mark or whose source identity is not recorded yet, and adds the rest to the run's counts in one fenced update; a manual import writes every item. One item whose identity changed in Plex is skipped as unavailable (`sourceChanges`); only most of them changing stops the run as `source_identity_changed`. `TestScheduledSyncNoChangeCost` measures a 10,000-item no-change run. |
 | `httpx`, `memo`, `internal/integrations/apiclient`, `internal/tmdb/tmdbtest`, `internal/lists/mdblisttest` | What the clients for outside services share: URL redaction, size-limited reads and `Retry-After` (`httpx`); bounded TTL caches and shared calls detached from the first caller (`memo`); the Radarr, Sonarr and Seerr request and error code (`apiclient`); one fake TMDB for tests (`tmdbtest`) and one MDBList (`internal/lists/mdblisttest`) |
 
 ## Rules
@@ -104,7 +104,7 @@ SQLite plans joins without statistics, and a plan that looks fine after
 - Adding `ANALYZE` or `PRAGMA optimize` would change many plans at once; it is
   a change of its own, not part of another.
 - Trailer files are `media_files` rows too (`extra_kind = 'trailer'`,
-  [PLAN-TRAILERS.md](../PLAN-TRAILERS.md) §5.2). A query that reads
+  PLAN-TRAILERS.md §5.2). A query that reads
   `media_files` other than through `movie_id` or `episode_files` leaves them
   out with `extra_kind IS NULL`. `media_files_library_status_idx`,
   `media_files_match_idx` and `media_files_trickplay_idx` hold `extra_kind`
@@ -120,7 +120,7 @@ SQLite plans joins without statistics, and a plan that looks fine after
   argument with index 19"); `?` with a numbered `?13` is refused at
   generation ("can not mix $1 format with ? format"). So a long `?` insert
   cannot use one value twice: `UpsertMovie` sets `poster_tmdb` only on its
-  conflict side for that reason ([PLAN-POSTERS.md](../PLAN-POSTERS.md) §4.1).
+  conflict side for that reason (PLAN-POSTERS.md §4.1).
 - Put a `sqlc.slice` after every other parameter in its query. sqlc numbers
   the parameters that follow a slice (`?2`, `?3`) as if the slice were one
   value, so once the slice holds several, those numbers point into it and
@@ -161,7 +161,7 @@ SQLite plans joins without statistics, and a plan that looks fine after
 `Matcher.record` (`internal/metadata/matcher.go`): in the same transaction it
 records each episode's arrival in `episode_arrivals`, which people
 following the show are told about
-([PLAN-NEW-EPISODES.md](../PLAN-NEW-EPISODES.md) §5.2). An arrival belongs
+(PLAN-NEW-EPISODES.md §5.2). An arrival belongs
 to the TMDB episode (show TMDB id, season, number), not the episode row, so
 it is made once across libraries, the first time any file is linked to
 it, and outlives a library removed. It is announced only when that file's
@@ -324,13 +324,13 @@ On Linux a device index is a DRM render node (`renderNode`: N is
 for decoder, filters and encoder alike; VAAPI always names one, since its
 encoder takes only uploaded frames. The probe records a `device` diagnostic
 when no node is visible and explains ffmpeg's "Permission denied" on one
-([PLAN-UNRAID.md](../PLAN-UNRAID.md)); tests stand in for another platform
+(PLAN-UNRAID.md); tests stand in for another platform
 with `detectHardwareOn` and `pipelineOnOS`.
 Add an encoder to the table in `internal/playback/encoders.go`. Store and
 read probes with `probe.Encode` and `probe.Parse`: chapters, the start
 time, each video stream's codec tag and Dolby Vision base layer and level,
 and each audio stream's commentary and audio-description flags
-([PLAN-LANGUAGES.md](../PLAN-LANGUAGES.md)) are kept there for playback but
+(PLAN-LANGUAGES.md) are kept there for playback but
 are `json:"-"`, so the API does not show them.
 
 **Text.** Folder and file names on real servers are often NFD (decomposed
@@ -358,7 +358,7 @@ only when the release list has that file for its architecture
 `ServerInfo.install` is a plain string because the apps do decode that reply.
 The packages keep `config.yaml` outside the data folder
 (`WATCHMYMEDIA_CONFIG`): `config.Config.File` is the file `Load` read, and
-backups save that one ([PLAN-LINUX.md](../PLAN-LINUX.md) §4).
+backups save that one (PLAN-LINUX.md §4).
 
 **Tests.** Standard `testing` only (no assertion libraries), `t.TempDir()`
 and `t.Setenv` for isolation, tests beside the code. Tests that call outside
@@ -433,7 +433,7 @@ client reconnects and refetches; the server's own loops use `Bus.Subscribe`.
 - Cast and HLS problems: test with HEVC and E-AC-3 sources, not just the
   fixture's H.264. The `CODECS` written on the master playlist and what the
   TV's Media Source Extensions accept decide whether a cast plays.
-- Dolby Vision ([PLAN-HDR-PROFILE.md](../PLAN-HDR-PROFILE.md)): ffmpeg writes
+- Dolby Vision (PLAN-HDR-PROFILE.md): ffmpeg writes
   the `dvcC`/`dvvC` record into MP4 and HLS only with `-strict unofficial`,
   so a copy without it loses the Dolby Vision. `probetest.DolbyVisionClip`
   makes a clip with a record (no RPU) for tests; check what a session

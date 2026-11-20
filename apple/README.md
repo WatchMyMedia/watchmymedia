@@ -1,10 +1,11 @@
 # WatchMyMedia for iPhone, iPad and Apple TV
 
 The iOS app, the Apple TV app, and the Swift package both build on. The
-plan is [PLAN-IOS.md](../PLAN-IOS.md); the iPhone screens follow the mockups
-in [design/mockups/ios](../design/mockups/ios) (the canvas is linked from
-PLAN-IOS.md §9), the Apple TV screens those in
-[design/mockups/apple-tv](../design/mockups/apple-tv) (§11.2).
+plan is PLAN-IOS.md; the iPhone screens follow the mockups
+in `design/mockups/ios`, the Apple TV screens those in
+`design/mockups/apple-tv` (§11.2). The plans and mockups this file names are
+the maintainers' and are
+[not in this repository](../CONTRIBUTING.md#files-this-repository-does-not-have).
 
 ## Build and run
 
@@ -120,7 +121,7 @@ Admins only.
 At wide iPad widths, Inbox shows its request or problem list beside the selected
 item, keeping approval, decline and resolve actions available.
 
-A show is one page on every Apple device ([PLAN-SHOW-PAGE.md](../PLAN-SHOW-PAGE.md);
+A show is one page on every Apple device (PLAN-SHOW-PAGE.md;
 `ShowPage`, `Pad2ShowPage` and `TvShowPage`): the episode on top, the season
 tabs over the season's episodes in a row, then About the show. `ShowPageModel`
 holds it and `ShowPageRule` says which episode goes on top. Picking a tab or a
@@ -143,7 +144,7 @@ as the fixture admin and read the Inbox without changing shared requests.
 a disposable iPad simulator with windowed apps enabled.
 
 On an iPad the app has layouts of its own wherever the width is regular
-([PLAN-TABLETS.md](../PLAN-TABLETS.md), `design/mockups/ipad-revised/`): full screen in either
+(PLAN-TABLETS.md, `design/mockups/ipad-revised/`): full screen in either
 orientation, or a window wider than half the screen. A compact width (every
 iPhone, Slide Over, a 50/50 split) shows the iPhone screens, so check both:
 run on the iPad Pro 11-inch simulator, where `-fakes` signs in as Sam’s iPad,
@@ -311,7 +312,7 @@ xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMediaE2E -destin
 ## Rows
 
 From API level 22 the server arranges Home and each library's Movies or TV
-screen ([PLAN-ROWS.md](../PLAN-ROWS.md) §8.3, HR6 as built; the boards are
+screen (PLAN-ROWS.md §8.3, HR6 as built; the boards are
 `HomeEditRows`, `AddRow`, `ListPage` and `LibraryRows` in `ios/`,
 `Pad2HomeEditRows` and `Pad2LibraryRows` in `ipad-revised/`, and
 `TvSettingsHomeRows`, `TvListPage` and `TvLibraryRows` in `apple-tv/`). Home
@@ -674,8 +675,8 @@ preserves explicit Off across reloads. That behavior requires a separate deploym
 of the receiver; opening or merging this PR does not deploy it. Older receivers and
 Cast Connect retain their existing subtitle behavior.
 
-The new screens follow [approved repository boards](../design/proposals/ios-completion/README.md),
-not yet synced to the Apple canvas. Simulator/fake transport checks do not prove
+The new screens follow approved boards (`design/proposals/ios-completion`).
+Simulator/fake transport checks do not prove
 the real chooser, Chromecast/Cast Connect, network permissions or hardware.
 
 Against a real server: `make fixture` once, then `make fixture-serve` from the
@@ -695,7 +696,7 @@ and the server’s recording capability and permission; iPhone/iPad casting is
 described above under Google Cast.
 
 On servers at API level 13 or later whose capabilities say `guide`, Live TV
-shows programme listings ([PLAN-LIVE-TV-GUIDE.md](../PLAN-LIVE-TV-GUIDE.md)
+shows programme listings (PLAN-LIVE-TV-GUIDE.md
 §6.4). The guide is a grid of channels against an hour (iPhone) or two (iPad,
 Apple TV) from the half hour, with the days listed, Now, earlier and later,
 category chips and Go to channel. On iPhone the selected programme's card sits

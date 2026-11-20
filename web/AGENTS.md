@@ -3,7 +3,7 @@
 The web app (`src/`) and the Google Cast receiver (`receiver/`). Read the root
 [AGENTS.md](../AGENTS.md) first. The web app is embedded in the server binary;
 the receiver is deployed on its own to cast.watchmy.media
-([PLAN-CAST.md](../PLAN-CAST.md) §4).
+(PLAN-CAST.md §4).
 
 ## Commands
 

@@ -5,8 +5,8 @@ the root [AGENTS.md](../AGENTS.md) first. [README.md](README.md) has the build
 commands, the modules and the code conventions (screens take callbacks, state
 from `LocalAppServices`, TV focus and sizes, libraries in
 `gradle/libs.versions.toml`); follow it. The plan is
-[PLAN-CLIENTS.md](../PLAN-CLIENTS.md) §5; the screens follow
-`design/mockups/android/`, `design/mockups/android-tablet/` ([PLAN-TABLETS.md](../PLAN-TABLETS.md))
+PLAN-CLIENTS.md §5; the screens follow
+`design/mockups/android/`, `design/mockups/android-tablet/` (PLAN-TABLETS.md)
 and `design/mockups/android-tv/`.
 
 ## Before handing work back

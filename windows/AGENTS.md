@@ -1,6 +1,7 @@
 # Windows desktop app
 
-Read the root [AGENTS.md](../AGENTS.md) and [PLAN-WINDOWS.md](../PLAN-WINDOWS.md).
+Read the root [AGENTS.md](../AGENTS.md), and PLAN-WINDOWS.md where you have the
+maintainers' plans.
 This is a separate, pure-Go module. The server remains in `server/`.
 
 - `cmd/tray/`: Windows GUI entry point; `internal/winui/`: native message loop,
@@ -41,7 +42,7 @@ Use the desktop user's token and environment for post-elevation launch/configura
 never fall back to the installing administrator. Only explicit interactive opt-in
 may delete the desktop user's data; silent uninstall keeps it.
 
-Signing ([SIGNING.md](SIGNING.md), README "Signing") runs only in jobs with the
+Signing ([README, Signing](README.md#signing)) runs only in jobs with the
 `windows-signing` environment, from `v*` tags: release.yml's `windows` job and
 CI's `windows-signing` job on a manual run that asks for it. Both sign as Eldwick
 Software LLC, so a manual signing run needs the user's go-ahead like a release.

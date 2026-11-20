@@ -5,8 +5,8 @@ Read the root [AGENTS.md](../AGENTS.md) first. [README.md](README.md) has the
 commands, the layout, the launch arguments and the code conventions (thin
 views over `@Observable` models in `WMMFeatures`, services from the
 environment, shared wording, Swift 6, Swift Testing); follow it. The plan and
-its Status section are [PLAN-IOS.md](../PLAN-IOS.md); the screens follow
-`design/mockups/ios/`, `ipad-revised/` ([PLAN-TABLETS.md](../PLAN-TABLETS.md))
+its Status section are PLAN-IOS.md; the screens follow
+`design/mockups/ios/`, `ipad-revised/` (PLAN-TABLETS.md)
 and `apple-tv/`; `ipad/` keeps the earlier iPad designs for reference.
 
 ## Before handing work back
