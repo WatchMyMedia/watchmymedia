@@ -61,7 +61,9 @@ Open <http://127.0.0.1:5186/?fakes>. Its server, Lakeside, is at the
 prefilled address; its code signs in by itself after a few seconds, and the
 password form takes Sam and `watching`. `?fakes=away` adds a remembered
 server away from home over http; `?fakes=old`, `?fakes=setup` and
-`?fakes=expire` show the start problems. Nothing on the network is asked:
+`?fakes=expire` show the start problems. `?fakes=savefail` refuses every
+change to the account's settings, `?fakes=nosettings` doesn't answer for them,
+and `?fakes=seerr` carries requests out through Seerr. Nothing on the network is asked:
 every other address fails as an unreachable server would.
 
 Against the synthetic fixture server, from the repository or worktree root,

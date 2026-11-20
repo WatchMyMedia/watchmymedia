@@ -1,4 +1,5 @@
 import { useApp } from '../../app/hooks'
+import { displayAddress } from '../../session/address'
 import type { StartState } from '../../session/session'
 import { KeyHints } from '../../ui/Button'
 import { Brand } from '../../ui/Icon'
@@ -19,9 +20,13 @@ export function StartProblemScreen({ state }: { state: Problem }) {
     <div className="start-brand"><Brand/></div>
     <ProblemScreen icon={words.icon} title={words.title} actions={[
       { id: 'retry', label: words.retry, onPress: () => app.retry() },
-      { id: 'servers', label: 'Choose another server', onPress: () => app.showServers() },
-    ]}>{words.body}</ProblemScreen>
-    <KeyHints hints={[{ key: '◀ ▶', label: 'Move' }, { key: 'OK', label: 'Choose' }, { key: 'Return', label: 'Servers' }]}/>
+      { id: 'servers', label: 'Change server', onPress: () => app.showServers() },
+    ]} extra={<>
+      {words.address && <div className="start-problem__address"><span>{words.address.label}</span><b>{words.address.value}</b></div>}
+      {words.note && <p className="tv-note">{words.note}</p>}
+    </>}>{words.body}</ProblemScreen>
+    <KeyHints hints={[{ key: '◀ ▶', label: 'Move' }, { key: 'OK', label: 'Choose' }, { key: 'Return', label: 'Change server' }]}
+      right={`${state.server.name} · ${displayAddress(state.server.baseUrl)} · This device: Samsung TV`}/>
   </div>
 }
 
