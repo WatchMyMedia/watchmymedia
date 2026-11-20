@@ -83,6 +83,8 @@ function Guide({ route, canRecord }: { route: ScreenProps<'liveGuide'>['route'];
   const [initial, setInitial] = useState<GuideTarget>()
   const pending = useRef<string>(undefined)
   const grid = useRef<HTMLDivElement>(null)
+  // The page is there from the first draw (the grid only once listings are in), so Hold OK is listened for on it.
+  const page = useRef<HTMLDivElement>(null)
 
   const earliest = halfHourStart(now)
   // Until a reply says where the listings end, the window may go where it was asked.
@@ -171,10 +173,10 @@ function Guide({ route, canRecord }: { route: ScreenProps<'liveGuide'>['route'];
     const t = parseTarget((e.target as HTMLElement).closest<HTMLElement>('[data-focus]')?.dataset.focus)
     if (t) watch(t.channelId)
   }
-  useHold(grid, () => {
+  useHold(page, () => {
     const el = document.activeElement as HTMLElement | null
     const t = parseTarget(el?.dataset?.focus)
-    if (!t || !el) return
+    if (!t || !el || !grid.current?.contains(el)) return
     if (t.kind === 'none') return
     const r = el.getBoundingClientRect(), px = remPx()
     const items = t.kind === 'channel' ? 2 : 3
@@ -217,16 +219,16 @@ function Guide({ route, canRecord }: { route: ScreenProps<'liveGuide'>['route'];
   const recordProgramme = recordChannel?.programmes.find((p) => p.id === record?.programmeId)
   const failed = favourite.error ?? remind.error
 
-  if (guide.isPending) return <div className="tv-page live-guide" aria-busy="true">
+  if (guide.isPending) return <div ref={page} className="tv-page live-guide" aria-busy="true">
     <div className="live-hero"><SkeletonText width="16rem"/><Skeleton width="40rem" height="3.5rem"/><SkeletonText width="30rem"/></div>
     <div className="live-guide__grid"><Skeleton width="100%" height="34rem"/></div>
   </div>
-  if (guide.error && !guide.data) return <div className="tv-page live-guide">
+  if (guide.error && !guide.data) return <div ref={page} className="tv-page live-guide">
     <ProblemScreen icon="offline" title="Couldn’t load listings" actions={[{ id: 'guide/retry', label: 'Try again', onPress: () => void guide.refetch() }]}>{problemWords(guide.error).body}</ProblemScreen>
   </div>
   const frac = nowFraction(start, now)
   const autofocus = initial ? targetId(initial) : undefined
-  return <div className="tv-page live-guide">
+  return <div ref={page} className="tv-page live-guide">
     <GuideHero hero={hero}/>
     <div className="live-guide__clock">
       {guide.data?.state.stale && <span className="live-guide__stale"><LiveIcon name="clock"/>Listings may be out of date</span>}

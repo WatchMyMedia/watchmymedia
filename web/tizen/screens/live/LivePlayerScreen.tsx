@@ -83,13 +83,14 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
   const banner = !!channel && channel.id !== bannerDone
 
   // The banner shows for a while on each channel; the controls hide after a quiet spell while it plays.
+  useEffect(() => { if (channel?.id) rememberChannel(channel.id) }, [channel?.id])
+  // The banner stays while the channel tunes, and goes a few seconds after it plays.
   useEffect(() => {
     const id = channel?.id
-    if (!id) return
-    rememberChannel(id)
+    if (!id || !playing) return
     const timer = setTimeout(() => setBannerDone(id), BANNER_MS)
     return () => clearTimeout(timer)
-  }, [channel?.id])
+  }, [channel?.id, playing])
   useEffect(() => {
     if (!controls || panel || !playing || state.paused || prompt) return
     const timer = setTimeout(() => { setControls(false); (document.activeElement as HTMLElement | null)?.blur() }, Math.max(0, lastKey + CONTROLS_MS - Date.now()))
@@ -117,6 +118,9 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
   const toGuide = () => nav.replace({ name: 'liveGuide', channelId: channel?.id })
   const leave = () => nav.back()
 
+  // A problem or Still watching takes focus on its first button.
+  const asking = problem ? `problem/${problem.actions[0]?.id}` : prompt ? 'prompt/keep' : undefined
+  useLayoutEffect(() => { if (asking) focus.focusId(asking) }, [focus, asking])
   // Focus goes where the last change asked, once it is drawn.
   useLayoutEffect(() => {
     const id = want.current
@@ -155,13 +159,14 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
         openPanel('number')
         return true
       }
-      case 'channelUp': if (!i.repeat) { setPanel(undefined); live.channelUp() } return true
-      case 'channelDown': if (!i.repeat) { setPanel(undefined); live.channelDown() } return true
-      case 'previousChannel': live.previousChannel(); return true
+      // A new channel shows its banner over the picture, without the controls.
+      case 'channelUp': if (!i.repeat) { setPanel(undefined); hideControls(); live.channelUp() } return true
+      case 'channelDown': if (!i.repeat) { setPanel(undefined); hideControls(); live.channelDown() } return true
+      case 'previousChannel': setPanel(undefined); hideControls(); live.previousChannel(); return true
       // Pausing brings the controls up, with Go live.
-      case 'togglePause': if (!state.paused) setControls(true); live.togglePause(); return true
+      case 'togglePause': if (!state.paused && !controls) showControls(); live.togglePause(); return true
       case 'play': live.resume(); return true
-      case 'pause': setControls(true); live.pause(); return true
+      case 'pause': if (!controls) showControls(); live.pause(); return true
       case 'leave': leave(); return true
       case 'guide': toGuide(); return true
       case 'keepWatching': live.keepWatching(); showControls(); return true
