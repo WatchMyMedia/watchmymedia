@@ -40,7 +40,7 @@ WatchMyMedia are the audience for `CHANGELOG.md` and the README.
 | Path | What |
 |---|---|
 | `server/` | Go module: chi + huma API, SQLite (modernc) through sqlc and goose, ffmpeg orchestration, embedded web UI |
-| `web/` | React + Vite web app (`src/`), Cast receiver (`receiver/`) and the Samsung TV app (`tizen/`, being built; signing and TV tests still to do) |
+| `web/` | React + Vite web app (`src/`), Cast receiver (`receiver/`) and the Samsung TV app (`tizen/`; signed and run on a QN90D, not yet submitted) |
 | `api/` | The OpenAPI documents the native apps generate their clients from. Generated |
 | `android/` | Android app; modules and conventions in [android/README.md](android/README.md) |
 | `apple/` | iPhone, iPad and Apple TV apps and the `Kit` package; layout and conventions in [apple/README.md](apple/README.md) |
