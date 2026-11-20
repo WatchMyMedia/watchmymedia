@@ -198,6 +198,13 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   `tv/src/main/kotlin/media/watchmy/client/tv/search/SearchScreen.kt`), or
   name the way across, as the rail does with `focusProperties { right = … }`.
   `SearchFocusTest` presses ▶ from the last key of every row.
+- **Text widths under Robolectric.** The tests measure text far narrower
+  than a device does: a 65-character line at 19 sp came out 65 px wide. A
+  test there can't see text overflow or run into something beside it, so a
+  width check passes on a layout that collides on a TV. Assert on structure
+  instead (which line a thing is on, what it lines up with), as
+  `SearchFocusTest` does for Search's key hints, and check the widths on an
+  emulator.
 - **Passwords in fields.** `rememberModelTextField` keeps its text across
   process death, so password fields use a plain `remember`ed state
   (`ChangePasswordScreen`): a password never outlives the process.
