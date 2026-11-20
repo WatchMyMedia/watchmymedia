@@ -62,22 +62,10 @@ class SearchFocusTest {
     @Test
     fun `Back from a result goes back to it`() {
         assertEquals("the keyboard's first letter", "q", focused())
-        // "har" on the keyboard: h (down a row, five along), a, then r (up a row, three along).
-        press(Key.DirectionDown)
-        repeat(5) { press(Key.DirectionRight) }
-        press(Key.DirectionCenter)
-        repeat(5) { press(Key.DirectionLeft) }
-        press(Key.DirectionCenter)
-        press(Key.DirectionUp)
-        repeat(3) { press(Key.DirectionRight) }
-        press(Key.DirectionCenter)
-        // The search waits a moment after the last key.
-        ShadowLooper.idleMainLooper(1, TimeUnit.SECONDS)
-        compose.waitForIdle()
+        typeHar()
 
-        // Onto the result (the keys and the results sit side by side; where ▶ lands depends on the row).
-        compose.onAllNodesWithText("Harbor Lights").onFirst().performSemanticsAction(SemanticsActions.RequestFocus)
-        compose.waitForIdle()
+        // Onto the result: along the row from r to its last key, p, and once more.
+        repeat(7) { press(Key.DirectionRight) }
         val result = focused()
         assertEquals("Harbor Lights", result)
         press(Key.DirectionCenter)
@@ -86,6 +74,41 @@ class SearchFocusTest {
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
         assertEquals(result, focused())
+    }
+
+    /**
+     * The results' list used to start under the keyboard's last column, so a
+     * search to the right from 0, p, ' or - found nothing: only the bottom
+     * row's wider keys reached the results.
+     */
+    @Test
+    fun `right from the end of every keyboard row reaches the results, and left comes back`() {
+        typeHar()
+        val rows = listOf("1" to "0", "q" to "p", "a" to "'", "z" to "-", "⇧ abc" to "Clear", "Use the TV’s keyboard" to "Use the TV’s keyboard")
+        val lastKeys = rows.map { it.second }
+        for ((first, last) in rows) {
+            compose.onAllNodesWithText(first).onFirst().performSemanticsAction(SemanticsActions.RequestFocus)
+            compose.waitForIdle()
+            repeat(10) { if (focused() != last) press(Key.DirectionRight) }
+            assertEquals("the end of the row that starts at $first", last, focused())
+
+            press(Key.DirectionRight)
+            assertTrue("right from $last reached ${focused()}, not a result", focused() in RESULTS)
+
+            press(Key.DirectionLeft)
+            assertTrue("left from the results reached ${focused()}, not the keyboard's edge", focused() in lastKeys)
+        }
+    }
+
+    @Test
+    fun `right from the search box reaches the results`() {
+        typeHar()
+        compose.onAllNodesWithText("1").onFirst().performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.waitForIdle()
+        press(Key.DirectionUp)
+        assertEquals("the search box, with what was typed", "har", focused())
+        press(Key.DirectionRight)
+        assertTrue("right from the search box reached ${focused()}, not a result", focused() in RESULTS)
     }
 
     @Test
@@ -116,6 +139,22 @@ class SearchFocusTest {
         if (focused() == "Search") press(Key.DirectionRight)
     }
 
+    /** Types "har" on the keyboard from q and waits for its results; focus is left on r. */
+    private fun typeHar() {
+        // h (down a row, five along), a, then r (up a row, three along).
+        press(Key.DirectionDown)
+        repeat(5) { press(Key.DirectionRight) }
+        press(Key.DirectionCenter)
+        repeat(5) { press(Key.DirectionLeft) }
+        press(Key.DirectionCenter)
+        press(Key.DirectionUp)
+        repeat(3) { press(Key.DirectionRight) }
+        press(Key.DirectionCenter)
+        // The search waits a moment after the last key.
+        ShadowLooper.idleMainLooper(1, TimeUnit.SECONDS)
+        compose.waitForIdle()
+    }
+
     private fun focused(): String {
         val node = compose.onNode(isFocused()).fetchSemanticsNode()
         return node.config.getOrNull(SemanticsProperties.Text)?.firstOrNull { it.text.isNotBlank() && !BADGES.matches(it.text) }?.text
@@ -130,6 +169,9 @@ class SearchFocusTest {
     }
 
     private companion object {
+        /** What the fakes have for "har": the show (and its episodes) and the movie. */
+        val RESULTS = setOf("Harbor Lights", "Cold Harbour Road")
+
         /** Quality and New badges come before a poster's title. */
         val BADGES = Regex("4K|1080p|720p|SD|HDR|HDR10|New|Dolby Vision", RegexOption.IGNORE_CASE)
     }

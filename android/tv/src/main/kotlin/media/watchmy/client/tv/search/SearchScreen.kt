@@ -105,6 +105,16 @@ import media.watchmy.client.ui.onBack
 private val ResultsStart = 926.dp
 
 /**
+ * How far inside their list the results start. The list's own left edge has
+ * to be right of the keyboard (which ends at 866): a focus search to the
+ * right skips anything that starts left of the focused key, so with the
+ * list starting under the keyboard's last column, ▶ from the end of the
+ * number and letter rows found nothing and only the bottom row's wider keys
+ * reached the results.
+ */
+private val ResultsInset = 40.dp
+
+/**
  * Search (no mockup; it follows the Library's cards): the on-screen keyboard
  * on the left, and shows, movies and episodes matching the title on the
  * right as the viewer types. An episode opens its page; holding centre on
@@ -132,7 +142,7 @@ fun SearchScreen(
     val withLive = liveTv && live.available
     LaunchedEffect(state.query, withLive) { if (withLive) liveSearch.search(state.query) }
     val liveRow: (@Composable () -> Unit)? = if (withLive && live.searched != null && live.error == null) {
-        { TvLiveSearchRow(live, onWatchLive, onOpenLive, liveSearch::toggleReminder, Modifier.padding(start = ContentStart)) }
+        { TvLiveSearchRow(live, onWatchLive, onOpenLive, liveSearch::toggleReminder, Modifier.padding(start = ResultsInset)) }
     } else null
     var asking by remember { mutableStateOf<Requestable?>(null) }
     val firstKey = remember { FocusRequester() }
@@ -241,7 +251,8 @@ private fun Results(
     val density = LocalDensity.current
     val spec = remember(density) { with(density) { KeepInViewSpec(leading = 90.dp.toPx(), trailing = 40.dp.toPx()) } }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
-        LazyColumn(Modifier.fillMaxSize(), state = rememberLazyListState(), contentPadding = PaddingValues(top = 60.dp, bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        // The list starts right of the keyboard, so ▶ from the last key of any of its rows comes here (ResultsInset).
+        LazyColumn(Modifier.fillMaxSize().padding(start = ContentStart - ResultsInset), state = rememberLazyListState(), contentPadding = PaddingValues(top = 60.dp, bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             if (results.shows.isNotEmpty()) {
                 item("shows") {
                     PosterSection("TV Shows", results.shows, library, memory) { it.open(onOpenShow, onOpenMovie, onPlay, notMatched) }
@@ -257,8 +268,8 @@ private fun Results(
             if (notInLibrary.isNotEmpty()) {
                 item("requestable") {
                     Column {
-                        SectionHeader("Not in your library", small = if (viaSeerr) "From Seerr" else "${notInLibrary.size}", start = ContentStart)
-                        CardRow(start = ContentStart) {
+                        SectionHeader("Not in your library", small = if (viaSeerr) "From Seerr" else "${notInLibrary.size}", start = ResultsInset)
+                        CardRow(start = ResultsInset) {
                             items(notInLibrary, key = { "${it.mediaType}${it.tmdbId}" }) { item ->
                                 NotInLibraryCard(item, library, memory) {
                                     when {
@@ -275,8 +286,8 @@ private fun Results(
             if (results.episodes.isNotEmpty()) {
                 item("episodes") {
                     Column {
-                        SectionHeader("Episodes", small = "${results.episodes.size}", start = ContentStart)
-                        CardRow(start = ContentStart) {
+                        SectionHeader("Episodes", small = "${results.episodes.size}", start = ResultsInset)
+                        CardRow(start = ResultsInset) {
                             items(results.episodes, key = { it.episodeId }) { e ->
                                 MediaCard(
                                     title = e.showTitle,
@@ -335,8 +346,8 @@ private fun NotInLibraryCard(item: Requestable, library: LibraryRepository, memo
 @Composable
 private fun PosterSection(title: String, items: List<BrowseItem>, library: LibraryRepository, memory: FocusMemory, onOpen: (BrowseItem) -> Unit) {
     Column {
-        SectionHeader(title, small = "${items.size}", start = ContentStart)
-        CardRow(start = ContentStart) {
+        SectionHeader(title, small = "${items.size}", start = ResultsInset)
+        CardRow(start = ResultsInset) {
             items(items, key = { it.id }) { item ->
                 MediaCard(
                     title = item.title,
