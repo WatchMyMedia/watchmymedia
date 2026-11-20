@@ -8,9 +8,14 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -72,8 +77,9 @@ class ServersFlowTest {
         compose.waitUntil(5_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
     }
 
+    /** The account button: the one in the top bar on a phone; on a tablet the last is the one at the rail's foot. */
     private fun openServers() {
-        compose.onNodeWithTag(TestTags.ACCOUNT).performClick()
+        compose.onAllNodesWithTag(TestTags.ACCOUNT).onLast().performClick()
         compose.waitForIdle()
         compose.onNodeWithTag(TestTags.SERVERS).assertIsDisplayed()
     }
@@ -188,6 +194,10 @@ class ServersFlowTest {
         // Back on the list, without it.
         compose.onNodeWithText("This phone is signed in to each of these. Search looks in all of them.").assertIsDisplayed()
         assertTrue(compose.onAllNodesWithText("Cabin server").fetchSemanticsNodes().isEmpty())
+        // Back from the list is Account & devices, where its row is.
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+        compose.onNode(hasText("Servers") and hasText("Living room and 2 more")).assertExists()
     }
 
     @Test fun `search looks in every server, and a result on another opens there and comes back to the words`() {
@@ -226,5 +236,45 @@ class ServersFlowTest {
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
         compose.onNodeWithContentDescription("On Cabin server. Open Servers").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h800dp-land-mdpi")
+    fun `on a tablet the rail's account button opens Servers as a popover beside it, and a switch says where it went`() {
+        start()
+        // The rail has no room for the server's name: it is the label of the button at its foot.
+        compose.onAllNodesWithContentDescription("Sam on Living room server. Open Servers").onLast().assertIsDisplayed()
+        openServers()
+        val popover = compose.onNodeWithTag(TestTags.SERVERS).fetchSemanticsNode().boundsInRoot
+        assertEquals("384 wide", 384f, popover.width / compose.density.density, 1f)
+        compose.onNodeWithText("Cabin server").performClick()
+        compose.waitForIdle()
+        assertEquals(Cabin.id, current)
+        compose.onNodeWithText("Now on Cabin server").assertIsDisplayed()
+        compose.onAllNodesWithContentDescription("Sam on Cabin server. Open Servers").onLast().assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h800dp-land-mdpi")
+    fun `on a tablet the Servers pages open beside Settings' list, each with its way back`() {
+        start()
+        openServers()
+        compose.onNodeWithText("Manage servers").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("This tablet is signed in to each of these. Search looks in all of them.").assertIsDisplayed()
+        // Settings' list stays beside it, on the group the page belongs to.
+        compose.onNode(hasText("Account & devices") and isSelectable()).assertIsSelected()
+        compose.onNodeWithText("Sam · 192.168.4.31:27587 · v0.9.3").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Switch to this server").assertIsDisplayed()
+        compose.onNodeWithText("Remove this server…").assertIsDisplayed()
+        // Up from a server's page is the list; up from the list is Account & devices.
+        compose.onNode(hasText("Servers") and hasClickAction()).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("This tablet is signed in to each of these. Search looks in all of them.").assertIsDisplayed()
+        compose.onNode(hasText("Account & devices") and hasClickAction() and !isSelectable()).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Sign out of this tablet…").assertExists()
+        compose.onNodeWithText("Living room and 3 more", substring = true).assertExists()
     }
 }

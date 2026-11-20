@@ -620,6 +620,8 @@ fun MobileNavHost(
                 val manage = {
                     close()
                     nav.openTab(MobileTab.Settings)
+                    // On a phone the page sits over Account & devices, where its row is, so Back is Up.
+                    if (!layout.isTablet) nav.openSettingsPage(SettingsGroup.Account, beside = false)
                     nav.openServersPage(null, beside = layout.isTablet)
                 }
                 val device = if (layout.isTablet) "tablet" else "phone"

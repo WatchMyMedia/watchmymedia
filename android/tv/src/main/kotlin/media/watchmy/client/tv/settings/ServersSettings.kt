@@ -148,7 +148,7 @@ internal fun ServerPagePanel(
             Fact("Signed in as", row.userName?.takeIf { row.state != RowState.SignedOut } ?: "No one")
         }
         PanelRule()
-        if (failure != null) FailureNote(failure, onRetry, Modifier.focusRequester(retry))
+        if (failure != null) FailureNote(failure, onRetry, retry)
         if (canSwitch) {
             ActionRow(
                 SWITCH_TO_THIS_SERVER, WmmIcons.Replace, onSwitch,

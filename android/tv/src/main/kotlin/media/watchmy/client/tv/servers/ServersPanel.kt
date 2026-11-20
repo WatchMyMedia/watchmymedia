@@ -101,7 +101,7 @@ private val Rail = 96.dp
  * answer. Back closes it, and focus goes back to the account button.
  */
 @Composable
-fun ServersPanel(state: ServersViewModel.State, actions: ServersActions, onAdd: () -> Unit, onManage: () -> Unit, onDismiss: () -> Unit) {
+internal fun ServersPanel(state: ServersViewModel.State, actions: ServersActions, onAdd: () -> Unit, onManage: () -> Unit, onDismiss: () -> Unit) {
     val first = remember { FocusRequester() }
     val retry = remember { FocusRequester() }
     // Where focus opens: the first server that can be switched to; with none, Add a server.
@@ -122,7 +122,7 @@ fun ServersPanel(state: ServersViewModel.State, actions: ServersActions, onAdd: 
             ) {
                 Text(SERVERS, style = inter(34.sp, FontWeight.ExtraBold, tracking = -0.015f), color = WmmColors.Text, modifier = Modifier.semantics { heading() })
                 state.casting?.let { Text(switchingStopsCasting(it), style = inter(19.sp, lineHeight = 28.sp), color = WmmColors.TextMuted) }
-                state.failure?.let { FailureNote(it, actions::retry, Modifier.focusRequester(retry)) }
+                state.failure?.let { FailureNote(it, actions::retry, retry) }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     state.rows.forEach { row ->
                         ServerOption(row, row.line, onClick = { actions.choose(row.serverId) }, modifier = if (row.serverId == entry) Modifier.focusRequester(first) else Modifier)
@@ -151,19 +151,19 @@ fun ServersPanel(state: ServersViewModel.State, actions: ServersActions, onAdd: 
     }
 }
 
-/** A server that didn't answer, over the list (`.tvnote`): which, where the TV still is, and Try again. */
+/** A server that didn't answer, over the list (`.tvnote`): which, where the TV still is, and Try again, which [retry] gives focus to. */
 @Composable
-internal fun FailureNote(failure: ServersViewModel.Failure, onRetry: () -> Unit, retry: Modifier = Modifier) {
+internal fun FailureNote(failure: ServersViewModel.Failure, onRetry: () -> Unit, retry: FocusRequester, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(12.dp)
     Column(
-        Modifier.fillMaxWidth().background(Color(0xFF1D160C), shape).border(1.dp, Color(0xFF7A4A12), shape).padding(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 24.dp),
+        modifier.fillMaxWidth().background(Color(0xFF1D160C), shape).border(1.dp, Color(0xFF7A4A12), shape).padding(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column(Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Assertive }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(failure.title, style = inter(22.sp, FontWeight.Bold), color = WmmColors.Text)
             Text(failure.body, style = inter(19.sp, lineHeight = 28.sp), color = WmmColors.TextSoft)
         }
-        TvButton("Try again", onRetry, retry.padding(start = 6.dp, top = 10.dp), size = TvButtonSize.Settings)
+        TvButton("Try again", onRetry, Modifier.focusRequester(retry).padding(start = 6.dp, top = 10.dp), size = TvButtonSize.Settings)
     }
 }
 

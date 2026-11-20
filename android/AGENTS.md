@@ -48,6 +48,17 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   ViewModel in `core:presentation`, tested there against the fakes; the TV
   and phone screens only draw it. Where the two UIs used to differ, the
   Apple apps' `WMMFeatures` models decide.
+- **Several servers.** A device is signed in to several servers, one in
+  use (README, "Several servers"). The signed-in screens are rebuilt on
+  every switch (`key(server.id, user)` in `MobileApp` and `TvApp`), so
+  anything that must outlive one (a note, a flow's step, where to land)
+  belongs to `ServerSwitchViewModel`, above them. A call to a server that
+  isn't in use goes through `Http.bindTo(serverId, userId)`, which builds
+  it for that server's address and sign-in; never send the current
+  sign-in to an address taken from another server's reply. The fakes are
+  signed in to several too, so signing out there moves to the next server:
+  a test of what a device with one server does makes them with
+  `several = false` (`quietTvFakes(several = false)` on the TV).
 - **Server changes.** A page's ViewModel reloads for `libraryChanges`
   (core:model's `LibraryChange`, with the items and libraries an event
   names) through `Freshness` in core:presentation, which ignores changes
@@ -188,6 +199,11 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   it; a `LaunchedEffect` a frame later finds focus already elsewhere. A
   `FocusRequester` whose element has left the composition throws on
   `requestFocus()`; use `tryFocus()` (`tv/src/main/kotlin/media/watchmy/client/tv/components/Focus.kt`).
+- **Focus in a panel.** A `TvDialog`'s content is a composition of its
+  own. Ask for focus from inside it (a `LaunchedEffect` in its content): one
+  outside runs before the panel's rows exist, the request finds nothing,
+  and focus opens on the panel's first row instead. Settings' Servers page
+  opened on the server in use that way.
 - **Passwords in fields.** `rememberModelTextField` keeps its text across
   process death, so password fields use a plain `remember`ed state
   (`ChangePasswordScreen`): a password never outlives the process.

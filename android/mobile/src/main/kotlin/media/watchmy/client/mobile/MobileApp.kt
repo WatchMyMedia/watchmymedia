@@ -160,7 +160,7 @@ fun MobileApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
     }
 }
 
-/** The note after a switch, as the boards' snackbar: light on the dark app, read out when it comes, and put away by a tap. */
+/** The note after a switch: light on the dark app, read out when it comes, and put away by a tap. */
 @Composable
 private fun SwitchNote(text: String, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(8.dp)

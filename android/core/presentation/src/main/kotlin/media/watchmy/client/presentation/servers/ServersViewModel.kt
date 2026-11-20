@@ -132,6 +132,7 @@ class ServersViewModel(
     private data class Local(val switching: String? = null, val failure: Failure? = null, val removing: String? = null)
 
     private val local = MutableStateFlow(Local())
+    // Sent without waiting: a screen that draws the rows and takes no events (Settings' list) leaves them unread.
     private val eventChannel = Channel<Event>(Channel.BUFFERED)
     val events: Flow<Event> = eventChannel.receiveAsFlow()
 
@@ -196,8 +197,8 @@ class ServersViewModel(
             }
             local.update { it.copy(switching = null, failure = failure) }
             when (outcome) {
-                ServerSwitch.Switched -> eventChannel.send(Event.Switched)
-                ServerSwitch.NeedsSignIn -> eventChannel.send(Event.SignIn)
+                ServerSwitch.Switched -> eventChannel.trySend(Event.Switched)
+                ServerSwitch.NeedsSignIn -> eventChannel.trySend(Event.SignIn)
                 else -> Unit
             }
         }
@@ -215,7 +216,7 @@ class ServersViewModel(
         viewModelScope.launch {
             attempt { servers.forget(serverId) }
             local.update { it.copy(removing = null) }
-            eventChannel.send(Event.Removed(name))
+            eventChannel.trySend(Event.Removed(name))
         }
     }
 }

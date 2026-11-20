@@ -251,7 +251,8 @@ fun SettingsScreen(
                     ServersPage.List -> SettingsGroup.Account.title
                     is ServersPage.Server -> SERVERS
                 },
-                onUp = onBack,
+                // Up from the list is its group's page, whichever way the list was opened; up from a server is the list.
+                onUp = { if (servers == ServersPage.List) onOpenPage(SettingsGroup.Account, true) else onBack() },
                 userName = user?.name,
                 role = listOfNotNull(if (user?.isAdmin == true) "Admin" else "Member", server?.name).joinToString(" · "),
                 onChoose = choose,

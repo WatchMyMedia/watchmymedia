@@ -56,7 +56,7 @@ internal interface FakeShelf {
     }
 }
 
-/** The Living room server's library: [FakeData], the mockups' sample library. */
+/** The Living room server's library: [FakeData], the fakes' main sample library. */
 internal object LivingRoomShelf : FakeShelf {
     override val shows get() = FakeData.shows
     override val movies get() = FakeData.movies

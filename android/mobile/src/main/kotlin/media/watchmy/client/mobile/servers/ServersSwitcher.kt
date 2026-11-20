@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -173,7 +174,7 @@ internal fun ServersPopover(
  * TV in the bar, the account button was the way to it.
  */
 @Composable
-private fun ServersList(state: ServersViewModel.State, actions: ServersActions, device: String, onAdd: () -> Unit, onManage: () -> Unit, onSettings: (() -> Unit)?) {
+private fun ColumnScope.ServersList(state: ServersViewModel.State, actions: ServersActions, device: String, onAdd: () -> Unit, onManage: () -> Unit, onSettings: (() -> Unit)?) {
     state.casting?.let { tv ->
         Text(
             switchingStopsCasting(tv),
