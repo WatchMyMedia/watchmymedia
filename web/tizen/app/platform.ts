@@ -1,4 +1,4 @@
-import type { SamsungWindow } from '../player'
+import { samsungDisplay, type SamsungWindow } from '../player'
 
 // The Samsung TV's own APIs that the app uses outside playback: keys,
 // leaving the app, the screensaver and the model name. Each call is a no-op
@@ -41,6 +41,15 @@ export function exitApp(): boolean {
   const app = tv().tizen?.application
   if (!app) return false
   try { app.getCurrentApplication().exit(); return true } catch { return false }
+}
+
+/**
+ * Whether the TV shows HDR10, as Samsung's avinfo says. The QN90D said so and
+ * showed it (PLAN-SAMSUNG.md §10.6), so the player claims HDR10 where this
+ * holds and the server tone-maps for the rest. False in the preview.
+ */
+export function tvTakesHdr10(): boolean {
+  return samsungDisplay(tv()).hdr
 }
 
 /** The TV's model ("QN65QN90D"), for the signed-in devices list; undefined in the preview. */

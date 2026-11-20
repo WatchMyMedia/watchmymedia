@@ -88,4 +88,6 @@ class PackageName(unittest.TestCase):
         # Tizen loads YouTube's player in an iframe only where allow-navigation names it.
         navigation = ' '.join(e.text or '' for e in root.iter('{http://tizen.org/ns/widgets}allow-navigation')).split()
         self.assertTrue({'www.youtube-nocookie.com', 'www.youtube.com'} <= set(navigation))
+        # Settings › About reads the model and firmware through productinfo.
+        self.assertIn('http://developer.samsung.com/privilege/productinfo', [p.get('name') for p in root.iter('{http://tizen.org/ns/widgets}privilege')])
 

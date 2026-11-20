@@ -14,8 +14,10 @@ import type { Decision, Profile } from './api'
  * - AAC, AC-3 and E-AC-3, up to 5.1. A track the TV can't take is converted
  *   by the server to E-AC-3 or AC-3 where these are listed, else AAC.
  * - HLS fMP4, which every remux and transcode is.
- * - HDR10 only when the caller says it was proven (hdr10); otherwise
- *   hdrTypes stays empty and the server tone-maps HDR to SDR.
+ * - HDR10 when the caller says the TV shows it (hdr10: the screens ask
+ *   avinfo, app/platform.ts tvTakesHdr10). The QN90D played an HDR10 HEVC
+ *   file directly in HDR on 2026-11-20. Otherwise hdrTypes stays empty and
+ *   the server tone-maps HDR to SDR.
  * - Text subtitles as WebVTT, drawn by the engine; image ones burned in.
  * - selectsAudioTrack is not claimed: another audio track of a direct-play
  *   file comes as a remux until AVPlay's track switching is proven.

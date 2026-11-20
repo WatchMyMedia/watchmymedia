@@ -1,6 +1,7 @@
 import { qualityById, saveQuality, savedQuality } from '../../../src/lib/quality'
 import type { PlayRequest } from '../../app/routes'
 import { localSettings } from '../../app/localSettings'
+import { tvTakesHdr10 } from '../../app/platform'
 import { FilePlayback, playbackSettings, StillWatchingSession, type FilePlaybackState, type FileRequest, type PlaybackSettings, type Player, type Preferences, type UpNext } from '../../player'
 import type { ActiveSession } from '../../session/active'
 import type { PlaybackMedia } from '../../app/playbackErrors'
@@ -100,7 +101,7 @@ export class PlayerSession {
     const size = localSettings().subtitleSize
     const m = this.settingsMemo
     if (m && m.preferences === this.preferences && m.size === size && m.quality === this.quality) return m.value
-    const value = playbackSettings(this.preferences, { quality: this.quality, subtitleSize: size })
+    const value = playbackSettings(this.preferences, { quality: this.quality, subtitleSize: size, hdr10: tvTakesHdr10() })
     this.settingsMemo = { preferences: this.preferences, size, quality: this.quality, value }
     return value
   }
