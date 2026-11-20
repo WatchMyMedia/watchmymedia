@@ -48,18 +48,3 @@ export const AIRED: EpisodeCard[] = SHOWS.slice(0, 6).map((showTitle, i) => ({
   episodeId: 5000 + i, showId: 201 + i, showTitle, seasonNumber: 1 + (i % 3), episodeNumber: 3 + i, title: ['The Long Dark', 'Brass Tacks', 'Night Shift', 'Undertow', 'Old Roads', 'Second Harbour'][i],
   overview: 'A made-up episode.', hasFile: true, isNew: i < 2, airDate: at(i), fileId: 6000 + i,
 }))
-
-export function fakeHome(): components['schemas']['HomeData'] {
-  const rows: components['schemas']['ScreenRow'][] = [
-    { id: 'continue', style: 'continue', title: 'Continue watching', continue: CONTINUE },
-    { id: 'recentlyAddedShows', style: 'poster', title: 'Recently added · TV Shows', items: SHOW_ITEMS, seeAll: { kind: 'library', libraryId: 2, sort: 'added' } },
-    { id: 'recentlyAired', style: 'episode', title: 'Recently aired · Episodes', episodes: AIRED, seeAll: { kind: 'library', libraryId: 2, sort: 'aired' } },
-    { id: 'recentlyAddedMovies', style: 'poster', title: 'Recently added · Movies', items: MOVIE_ITEMS, seeAll: { kind: 'library', libraryId: 1, sort: 'added' } },
-    { id: 'recentlyReleased', style: 'wide', title: 'Recently released · Movies', items: [...MOVIE_ITEMS].reverse(), seeAll: { kind: 'library', libraryId: 1, sort: 'released' } },
-  ]
-  return {
-    continueWatching: [], recentlyAddedShows: [], recentlyAired: [], recentlyAddedMovies: [], recentlyReleased: [], rows,
-    totals: { movies: MOVIE_ITEMS.length, shows: SHOW_ITEMS.length, episodes: 96, files: 110, totalSize: 300_000_000_000 },
-    movieLibraryId: 1, tvLibraryId: 2,
-  }
-}

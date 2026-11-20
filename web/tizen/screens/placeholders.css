@@ -1,5 +1,0 @@
-/* The placeholder screens' layout; each feature's own screens bring their own CSS. */
-.home-placeholder { display: flex; flex-direction: column; gap: 2.5rem; padding: 4rem 0 6rem; }
-.home-row { display: block; }
-.library-placeholder { position: absolute; inset: 4rem 0 0 var(--content-left); display: flex; flex-direction: column; gap: 1.75rem; }
-.library-placeholder__grid { flex: 1; min-height: 0; }

@@ -53,7 +53,7 @@ context, and imports nothing from the shell's folders.
 | `app/` | The shell: `main.tsx` makes the session, the input and the one Player, then `app/App.tsx` shows the start screens or the signed-in `app/Shell.tsx`. Routes, the screens stack, focus, keys and the platform calls |
 | `session/` | Everything about servers and accounts: typed addresses, remembered servers, pairing and password sign-in, the signed-in session (client, cache, media token, events) |
 | `ui/` | The kit: components, `tokens.css` and `kit.css`, and their pure helpers (`problemWords`, `qr`, `railBadge`, `tones`) |
-| `screens/` | One folder per feature. `screens/start/` (server, sign-in, problems) is done; `screens/browse/`, `screens/details/`, `screens/player/`, `screens/live/`, `screens/search/` and `screens/settings/` hold placeholders their features replace |
+| `screens/` | One folder per feature: `start/` (server, sign-in, problems), `browse/` (Home, libraries, See all, lists), `details/` (movie and show pages, YouTube trailers), `player/`, `live/`, `search/`, `requests/` and `settings/` |
 | `player/` | The player engine (above) |
 | `fakes/` | The fictional server for the browser preview and tests |
 
@@ -192,10 +192,11 @@ opens it.
 `pnpm dev:tizen`, then open `/?fakes`: `fakes/index.ts` puts a fictional
 server (`lakeside.local`) in front of `fetch`, and refuses every other
 address, so the preview reaches nothing on the network. It pairs by itself
-after 8 s, signs in Sam with the password `watching`, and serves Home, the
-libraries, Live TV's capabilities and request options. `?fakes=away` adds a
-remembered server away from home over http; `old`, `setup` and `expire` give
-the start problems. The TV build leaves the fakes out (`main.tsx` imports
+after 8 s, signs in Sam with the password `watching`, and serves every
+screen. `?fakes=away` adds a remembered server away from home over http;
+`old`, `setup` and `expire` give the start problems; the README lists the
+other modes. The first registration of a route answers, so the order in
+`createFakeServer` matters where two areas serve the same route. The TV build leaves the fakes out (`main.tsx` imports
 them behind `import.meta.env.DEV`). A feature adds its routes in its own
 `fakes/<area>.ts` (`server.route('GET', '/api/movies/:id', handler)`) with
 its data, and registers it in `createFakeServer`. Every title and name in

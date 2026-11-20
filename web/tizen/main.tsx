@@ -8,7 +8,6 @@ import { AVPlayPlayer, type Player, type SamsungWindow } from './player'
 import './ui/tokens.css'
 import './ui/kit.css'
 import './screens/start/start.css'
-import './screens/placeholders.css'
 
 function appStorage(): Storage | undefined {
   try { return window.localStorage } catch { return undefined }

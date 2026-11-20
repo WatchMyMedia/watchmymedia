@@ -36,10 +36,24 @@ Built, 2026-11-19, and checked in the browser preview only:
   the Live TV player on the shared tuner controller. It has unit tests with
   fake players and servers only.
 
-Home and the libraries show placeholder screens drawn with the kit; the
-movie and show pages, the player's screens, Live TV, Search and Settings are
-placeholders that their features replace. Settings already has Switch server
-and Sign out.
+The screens, each to its board on the canvas:
+
+- Home, one row a screen with the hero and Continue watching, Edit rows and
+  the totals; Movies and TV Shows with their rows, sort, filters, chips, the
+  eight-poster grid and the A–Z strip; See all and list pages.
+- The movie page (versions, tracks, cast, the collection and More like this,
+  Report a problem) and the one show page (the episode on top, season tabs,
+  missing episodes with requests, Notify me, Delete episode for admins); YouTube
+  trailers inside the app.
+- The player for files, recordings and trailer files: the controls, held
+  seeking with thumbnails, Skip, the Next episode card, Still watching, the
+  Audio, Subtitles and Quality panels, Episodes, the administrator's stop.
+- Live TV: home, the guide with favourites, reminders and recording, the Live
+  TV player with CH ▲▼ and Go to channel, Recordings, Reminders and the
+  reminder banner.
+- Search with the on-screen keyboard and the TV's own, On Live TV and requests;
+  Your requests and the Inbox; Settings in groups, About listing the last
+  playback errors.
 
 The development preview labels nothing as AVPlay: its HTML video and Hls.js
 adapter and its fictional server are left out of the TV build. All app assets
@@ -61,10 +75,16 @@ Open <http://127.0.0.1:5186/?fakes>. Its server, Lakeside, is at the
 prefilled address; its code signs in by itself after a few seconds, and the
 password form takes Sam and `watching`. `?fakes=away` adds a remembered
 server away from home over http; `?fakes=old`, `?fakes=setup` and
-`?fakes=expire` show the start problems. `?fakes=savefail` refuses every
-change to the account's settings, `?fakes=nosettings` doesn't answer for them,
-and `?fakes=seerr` carries requests out through Seerr. Nothing on the network is asked:
-every other address fails as an unreachable server would.
+`?fakes=expire` show the start problems. `?fakes=member` signs in a member
+instead of an admin; `?fakes=empty`, `scanning` and `unreadable` give Home's
+empty states; `?fakes=player` makes the player step down in Automatic, stop
+one play for the administrator, fail another and ask Still watching early;
+`?fakes=nolistings` and `?fakes=notv` give Live TV without listings and
+without access; `?fakes=savefail` refuses every change to the account's
+settings, `?fakes=nosettings` doesn't answer for them, and `?fakes=seerr`
+carries requests out through Seerr. Nothing on the network is asked: every
+other address fails as an unreachable server would. There is no media to play,
+so the player shows its screens over a simulated stream.
 
 Against the synthetic fixture server, from the repository or worktree root,
 with ffmpeg, Go, Node 24 and pnpm 9 available:

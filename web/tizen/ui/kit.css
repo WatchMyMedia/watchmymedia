@@ -182,10 +182,6 @@ button { border: 0; background: none; padding: 0; text-align: inherit; cursor: p
 .tv-problem__body { max-width: 60rem; font-size: 1.5rem; line-height: 1.5; color: #bdbdbd; }
 .tv-problem .tv-actions { margin-top: .875rem; justify-content: center; }
 
-/* Placeholder screens, until the feature that owns each replaces it. */
-.tv-placeholder { position: absolute; left: var(--content-left); top: 4rem; right: var(--gutter); display: flex; flex-direction: column; gap: 1.25rem; }
-.tv-placeholder--full { left: var(--gutter); }
-
 .tv-boot { position: absolute; inset: 0; display: grid; place-items: center; }
 .tv-boot__inner { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; font-size: 1.375rem; color: var(--muted); }
 
