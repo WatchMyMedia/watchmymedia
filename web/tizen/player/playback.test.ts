@@ -2,10 +2,10 @@ import createClient from 'openapi-fetch'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { paths } from '../../src/api/schema'
 import { StillWatchingSession } from '../../src/lib/stillWatching'
-import type { Decision, Progress, SubtitleSearch, SubtitleTrack } from './api'
+import { PlayerError, type Decision, type Progress, type SubtitleSearch, type SubtitleTrack } from './api'
 import type { Clock } from './clock'
 import { FakePlayer } from './fake-player'
-import { DEFAULT_SETTINGS, FilePlayback, playbackSettings, type FileRequest, type PlaybackSettings } from './playback'
+import { DEFAULT_SETTINGS, failureOf, FilePlayback, playbackSettings, type FileRequest, type PlaybackSettings } from './playback'
 
 const HOUR = 3_600_000
 type Sent = { method: string; path: string; body?: Record<string, unknown> }
@@ -524,9 +524,20 @@ describe('tokens, recovery and the app’s lifecycle', () => {
     expect(h.decisions().slice(1).map((r) => r.body?.playId)).toEqual(['aaaaaaaaaaaaaaaa', 'aaaaaaaaaaaaaaaa'])
     h.player.emit({ state: 'error', failure: { code: 'PLAYER_ERROR_CONNECTION_FAILED', kind: 'network' } }); await h.settle()
     expect(h.decisions()).toHaveLength(3)
-    expect(h.c.snapshot()).toMatchObject({ phase: 'error', error: 'The TV couldn’t play this (PLAYER_ERROR_CONNECTION_FAILED). Try again, or choose a lower quality.' })
+    expect(h.c.snapshot()).toMatchObject({ phase: 'error', error: 'The TV couldn’t play this (PLAYER_ERROR_CONNECTION_FAILED). Try again, or choose a lower quality.', failure: { kind: 'network' } })
     h.c.resume(); await h.settle()
     expect(h.decisions()).toHaveLength(4)
+    expect(h.c.snapshot().failure).toBeUndefined()
+  })
+
+  it('says what kind of failure stopped a play that couldn’t start, with the server’s status', async () => {
+    const h = harness({ decide: () => new Response(null, { status: 503 }) })
+    await started(h)
+    expect(h.c.snapshot()).toMatchObject({ phase: 'error', failure: { kind: 'network', status: 503 } })
+    expect(failureOf(new PlayerError('no', 403))).toEqual({ kind: 'auth', status: 403 })
+    expect(failureOf(new PlayerError('no', 404))).toEqual({ kind: 'other', status: 404 })
+    expect(failureOf(new TypeError('Failed to fetch'))).toEqual({ kind: 'network' })
+    expect(failureOf(new Error('?'))).toEqual({ kind: 'other' })
   })
 
   it('asks for a new token after a refused stream, and for the plain profile once after a format the TV turned down', async () => {

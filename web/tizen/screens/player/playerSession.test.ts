@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { episodeHeading, fileRequest, playKey, routeHeading } from './playerSession'
+import { episodeHeading, fileRequest, playbackMedia, playKey, routeHeading } from './playerSession'
 
 describe('what the player route plays', () => {
   it('asks the engine for files, recordings and trailer files', () => {
@@ -17,5 +17,9 @@ describe('what the player route plays', () => {
     expect(playKey({ kind: 'file', fileId: 7 })).toBe('file:7')
     expect(playKey({ kind: 'recording', recordingId: 'r' })).toBe('recording:r')
     expect(playKey(undefined)).toBe('')
+  })
+
+  it('names what failed for the TV’s playback errors', () => {
+    expect(['file', 'episode', 'trailer', 'recording'].map((k) => playbackMedia(k as never))).toEqual(['movie', 'episode', 'trailer', 'recording'])
   })
 })

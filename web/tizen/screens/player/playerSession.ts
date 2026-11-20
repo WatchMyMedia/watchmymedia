@@ -3,7 +3,8 @@ import type { PlayRequest } from '../../app/routes'
 import { localSettings } from '../../app/localSettings'
 import { FilePlayback, playbackSettings, StillWatchingSession, type FilePlaybackState, type FileRequest, type PlaybackSettings, type Player, type Preferences, type UpNext } from '../../player'
 import type { ActiveSession } from '../../session/active'
-import { episodeLine } from './labels'
+import type { PlaybackMedia } from '../../app/playbackErrors'
+import { episodeLine, type PlayerKind } from './labels'
 
 /** What the player route asks for, as the engine's request; undefined for what this player can't play (a trailer with no file). */
 export function fileRequest(play: PlayRequest): FileRequest | undefined {
@@ -14,6 +15,9 @@ export function fileRequest(play: PlayRequest): FileRequest | undefined {
     default: return undefined
   }
 }
+
+/** What a play was, for the TV's list of playback errors: a file that is no episode counts as a movie. */
+export const playbackMedia = (kind: PlayerKind): PlaybackMedia => kind === 'file' ? 'movie' : kind
 
 /** What heads the player: the title, and the line under it. */
 export type Heading = { title: string; line?: string }

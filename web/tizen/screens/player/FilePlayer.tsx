@@ -5,6 +5,7 @@ import type { components } from '../../../src/api/schema'
 import { useFocus, useKeys, useNav, useSession } from '../../app/hooks'
 import type { KeyInput } from '../../app/keys'
 import { useKeyUp } from '../../app/keyUp'
+import { recordPlaybackError } from '../../app/playbackErrors'
 import { holdScreenSaver } from '../../app/platform'
 import type { PlayRequest } from '../../app/routes'
 import { useVideoSurface } from '../../app/surface'
@@ -16,7 +17,7 @@ import { areaOf, backAction, HIDE_CONTROLS_MS, overlayOf, PLAY_PAUSE_ID, RELEASE
 import { adBreaksWords, audioDetail, episodeCode, episodeLine, qualityDetail, recordingLine, subtitleDetail, type PlayerKind } from './labels'
 import { PickerPanel, type Picker } from './Pickers'
 import { AdminStop, NextCard, Note, PlayError, PROMPT_FOCUS, Spinner, StillWatching } from './PlayerOverlays'
-import { PlayerSession, type Heading } from './playerSession'
+import { playbackMedia, PlayerSession, type Heading } from './playerSession'
 import { atRecordingEdge } from './scrubber'
 import { useSelect } from './select'
 import { Cues, SkipButton } from './Ticking'
@@ -32,7 +33,7 @@ function modelOf(s: FilePlaybackState) {
     subtitles: { options: s.subtitles.options, selected: s.subtitles.selected, online: s.subtitles.online },
     skipId: s.skip?.segmentId,
     next: s.next && { episode: s.next.episode, heading: s.next.heading },
-    askStillWatching: s.askStillWatching, adminStop: s.adminStop, error: s.error, exited: s.exited,
+    askStillWatching: s.askStillWatching, adminStop: s.adminStop, error: s.error, failure: s.failure, exited: s.exited,
     segments: s.segments, upNext: s.upNext,
     scrubbing: !!s.scrub, holding: !!s.scrub?.holding,
     writtenMinutes: s.recording?.now ? Math.floor(s.durationMs / 60_000) : undefined,
@@ -115,6 +116,10 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
   })
 
   const panelOpen = panel === 'episodes' ? !!context && fileId !== undefined : !!panel
+  // Each failure the player gives up on goes in the TV's list (Settings › About), as facts only.
+  const recordFailure = useEffectEvent((failure: NonNullable<FilePlaybackState['failure']>) => recordPlaybackError({ media: playbackMedia(kind), ...failure }))
+  useEffect(() => { if (m.failure) recordFailure(m.failure) }, [m.failure])
+
   const overlay: Overlay = overlayOf(m, panelOpen)
   const chromeVisible = controls && overlay === 'none'
   const skipShown = !!m.skipId && overlay === 'none' && !(m.scrubbing && m.trickplay)

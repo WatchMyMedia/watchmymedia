@@ -113,6 +113,8 @@ export type FilePlaybackState = {
   upNext?: UpNext
   adminStop?: { message: string }
   error?: string
+  /** With error: what kind of failure it was and the server's status, for the TV's list of playback errors. Never words. */
+  failure?: { kind: PlayerFailure['kind']; status?: number }
   /** The play ended by itself (the end, a skip to the end, Still watching's No): leave the player. */
   exited: boolean
 }
@@ -174,6 +176,7 @@ class Viewing {
   adminStopped = false
   stopMessage?: string
   error?: string
+  failure?: FilePlaybackState['failure']
   lastReported?: BeatState
   lastBeatAt = 0
   seekLanded = false
@@ -693,6 +696,7 @@ export class FilePlayback {
     v.loading = false
     v.starting = false
     v.error = safeMessage(error, 'Playback couldn’t start. Try again.')
+    v.failure = failureOf(error)
     this.refresh(0)
   }
 
@@ -850,6 +854,7 @@ export class FilePlayback {
       return
     }
     v.error = cause instanceof PlayerError ? cause.message : `The TV couldn’t play this (${failure.code}). Try again, or choose a lower quality.`
+    v.failure = { kind: failure.kind, status: failure.httpStatus ?? (cause instanceof PlayerError ? cause.status : undefined) }
     this.refresh(0)
   }
 
@@ -997,7 +1002,7 @@ export class FilePlayback {
       askStillWatching: v.askStill, adminStop: undefined, exited: false, note: this.note && now < this.note.until ? this.note.text : undefined,
     }
     if (!d) {
-      this.publish({ ...IDLE, ...base, phase: v.error ? 'error' : 'loading', error: v.error, positionMs: v.pendingMs ?? (v.request.kind === 'trailer' ? 0 : v.request.startMs ?? 0),
+      this.publish({ ...IDLE, ...base, phase: v.error ? 'error' : 'loading', error: v.error, failure: v.error ? v.failure : undefined, positionMs: v.pendingMs ?? (v.request.kind === 'trailer' ? 0 : v.request.startMs ?? 0),
         subtitles: { ...IDLE.subtitles, size: settings.subtitleSize }, recording: v.request.kind === 'recording' ? { now: false, goToNow: false, starting: v.starting } : undefined })
       return
     }
@@ -1056,6 +1061,7 @@ export class FilePlayback {
       segments: d.segments,
       upNext: next,
       error: v.error,
+      failure: v.error ? v.failure : undefined,
     })
 
     this.heartbeat(v, phase, pos, force)
@@ -1125,6 +1131,17 @@ export class FilePlayback {
 
 /** Why opening failed: the player's own failure, or a stream that didn't open. */
 const openFailure = (error: unknown): PlayerFailure => error instanceof PlaybackFailure ? error.failure : { code: 'OPEN_FAILED', kind: 'network' }
+
+/** A play that couldn't start, as a kind and the server's status: refused (auth), unavailable or unreachable (network), else other. */
+export function failureOf(error: unknown): NonNullable<FilePlaybackState['failure']> {
+  if (error instanceof PlaybackFailure) return { kind: error.failure.kind, status: error.failure.httpStatus }
+  if (error instanceof PlayerError && error.status) {
+    const status = error.status
+    return { kind: status === 401 || status === 403 ? 'auth' : status >= 500 ? 'network' : 'other', status }
+  }
+  if (error instanceof TypeError || (error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError'))) return { kind: 'network' }
+  return { kind: 'other' }
+}
 
 /** Equal to two levels, so a tick that changed nothing doesn't redraw the player. */
 function sameState(a: FilePlaybackState, b: FilePlaybackState): boolean {
