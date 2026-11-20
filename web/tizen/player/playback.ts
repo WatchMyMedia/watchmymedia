@@ -130,6 +130,8 @@ const END_SLACK_MS = 1_000
 const EVENT_SEEK_SLACK_MS = 500
 const DECIDE_TIMEOUT_MS = 45_000
 const EVENT_START_TOLERANCE_MS = 15_000
+/** The server resumes this much before where the viewer was (PLAN-RESUME.md §3.8), so a start may land up to there. */
+const RESUME_REWIND_MS = 5_000
 const STEP_GAP_MS = 10_000
 
 const IDLE: FilePlaybackState = {
@@ -188,7 +190,6 @@ class Viewing {
   steppedAt = -Infinity
   floorNoted = false
   parkedAtMs?: number
-  suspended = false
   thumbnails?: Thumbnails
   cueTimer?: unknown
   readonly meter = new StallMeter()
@@ -435,28 +436,28 @@ export class FilePlayback {
   /** Any key: the viewer is there. */
   noteInput() { this.ctx.stillWatching.noteInput() }
 
-  /** The app went to the background: report closed, and let go of the decoder and the server's session. */
+  /**
+   * The app went to the background: report closed, end the server's session,
+   * and let the decoder go. The TV keeps nothing running while it's away
+   * (Android TV's stopInBackground); the return asks again where it was.
+   * Direct play parks the same way: Samsung's AVPlay restore() came back on the
+   * QN90D unprepared at 0:00 (web/tizen/README.md), and opening again doesn't.
+   */
   suspend() {
     const v = this.active()
     this.backgrounded = true
     const d = v?.decision
-    if (!v || !d || v.parkedAtMs !== undefined || v.suspended) return
+    if (!v || !d || v.parkedAtMs !== undefined) return
     const pos = this.position(v)
     v.paused = true
     this.report(v, 'closed', pos)
     if (d.sessionId) {
-      // A TV keeps no transcode running while it's away (Android TV's
-      // stopInBackground): the session ends, and the return asks again there.
       this.endSession(d.sessionId)
       v.decision = { ...d, sessionId: undefined }
-      v.parkedAtMs = pos
-      v.pendingMs = pos
-      void this.ctx.player.stop().catch(() => undefined)
-    } else {
-      // Direct play holds nothing on the server: the player keeps its place.
-      v.suspended = true
-      void this.ctx.player.suspend().catch(() => undefined)
     }
+    v.parkedAtMs = pos
+    v.pendingMs = pos
+    void this.ctx.player.stop().catch(() => undefined)
     this.refresh(0)
   }
 
@@ -464,14 +465,8 @@ export class FilePlayback {
   restore() {
     this.backgrounded = false
     const v = this.active()
-    if (!v) return
-    if (v.parkedAtMs !== undefined) { this.unpark(v); return }
-    if (v.suspended) {
-      v.suspended = false
-      if (this.tokens.due) this.reopen(v)
-      else void this.ctx.player.restore().catch(() => undefined)
-    }
-    this.refresh(0)
+    if (v?.parkedAtMs !== undefined) this.unpark(v)
+    else this.refresh(0)
   }
 
   /** Ends the play: the last report, and the server's session, go out; resolves once they have. */
@@ -519,11 +514,13 @@ export class FilePlayback {
       let d = await this.decide(v, explicit, undefined)
       if (!this.current(v, load)) { this.endReplaced(d, undefined); return }
       let start = explicit ?? 0
+      let latest: number | undefined
       // No explicit start: pick up where the server resumes, 5 s before where
       // the viewer left off. An event session that didn't start there is asked for again.
       const resume = explicit === undefined ? resumePlan(d) : undefined
       if (resume) {
         start = resume.fromMs
+        latest = start + RESUME_REWIND_MS
         if (resume.again) {
           const first = d
           d = await this.decide(v, start, first.playId)
@@ -531,7 +528,7 @@ export class FilePlayback {
           if (!this.current(v, load)) { this.endReplaced(d, undefined); return }
         }
       }
-      await this.apply(v, d, start, false)
+      await this.apply(v, d, start, false, latest)
     } catch (error) {
       if (this.current(v, load)) this.fail(v, error)
     }
@@ -630,7 +627,8 @@ export class FilePlayback {
     }
   }
 
-  private async apply(v: Viewing, d: Decision, requestedMs: number, paused: boolean) {
+  /** `latestMs`: the latest the start may land, when it is later than just past requestedMs. */
+  private async apply(v: Viewing, d: Decision, requestedMs: number, paused: boolean, latestMs?: number) {
     const previous = v.decision
     const offset = timelineOffset(d) * 1000
     // A reload's old stream played on meanwhile: the new one starts where it got to.
@@ -664,7 +662,8 @@ export class FilePlayback {
     v.playerDurationMs = 0
     this.refresh(0)
     try {
-      await this.ctx.player.open(this.sign(d.url), { startMs: Math.max(0, start - offset), uhd: uhd(d), paused })
+      const latest = latestMs !== undefined && start === requestedMs ? { latestMs: latestMs - offset } : {}
+      await this.ctx.player.open(this.sign(d.url), { startMs: Math.max(0, start - offset), ...latest, uhd: uhd(d), paused })
     } catch (error) {
       if (this.viewing === v && v.decision === d && !v.stopped) this.onFailure(v, openFailure(error), error)
     }

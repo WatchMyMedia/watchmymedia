@@ -53,6 +53,12 @@ export type OpenOptions = {
   live?: boolean
   /** Prepare and stay paused at startMs. */
   paused?: boolean
+  /**
+   * The latest a file's start may land, in the player's time: by default a
+   * second past startMs. A resume the server started 5 s back passes where
+   * the viewer was, so a keyframe between the two needs no second seek.
+   */
+  latestMs?: number
 }
 
 export interface Player {
@@ -72,10 +78,6 @@ export interface Player {
   tracks(): PlayerTrack[]
   /** Switches the stream's own audio or text track; false when it can't, and the server must send it. */
   selectTrack(kind: 'audio' | 'text', index: number): Promise<boolean>
-  /** The app went to the background: let go of the decoder, keeping the place. */
-  suspend(): Promise<void>
-  /** Back from suspend: the same media where it was, paused. */
-  restore(): Promise<void>
 }
 
 type AVState = 'NONE' | 'IDLE' | 'READY' | 'PLAYING' | 'PAUSED'
@@ -103,8 +105,6 @@ export interface AVPlayAPI {
   setDisplayRect(x: number, y: number, width: number, height: number): void
   setDisplayMethod(mode: 'PLAYER_DISPLAY_MODE_LETTER_BOX'): void
   setStreamingProperty(type: 'SET_MODE_4K', value: 'TRUE'): void
-  suspend(): void
-  restore(url: string, resumeTimeMs: number, prepare: boolean): void
   setListener(listener: {
     onbufferingstart: () => void
     onbufferingprogress?: (percent: number) => void
@@ -160,6 +160,22 @@ export function failureOf(code: string, httpStatus?: number): PlayerFailure {
 function json(text: string): Record<string, unknown> {
   try { const value: unknown = JSON.parse(text); return value && typeof value === 'object' ? value as Record<string, unknown> : {} } catch { return {} }
 }
+
+/**
+ * AVPlay lands a seek in a file on the keyframe after the frame asked for:
+ * on the QN90D a return at 10:37 started at 10:46, the test clip's next
+ * keyframe, and ⏪ from just past a keyframe landed on it again. A landing
+ * past the latest it may (LANDING_SLACK_MS by default) seeks once more, one
+ * usual keyframe gap before where it landed, then FAR_BACK_MS before the
+ * frame, so a start never lands past the viewer (PLAN-RESUME.md §3.1). Each
+ * seek before the first frame took about 3 s there, so it seeks as few times
+ * as it can.
+ */
+const LANDING_SLACK_MS = 1_000
+/** x264's default keyframe interval at 24 fps (250 frames), the longest gap most files have. */
+const KEYFRAME_GAP_MS = 10_500
+const FAR_BACK_MS = 30_000
+
 const num = (value: unknown) => { const n = Number(value); return Number.isFinite(n) && n > 0 ? n : undefined }
 const str = (value: unknown) => typeof value === 'string' && value && value !== 'und' ? value : undefined
 
@@ -192,8 +208,6 @@ export class AVPlayPlayer implements Player {
   private live = false
   private lastPosition = 0
   private httpStatus?: number
-  private source?: { url: string; options: OpenOptions }
-  private suspendedAt?: number
   private listeners = new Set<PlayerListener>()
 
   constructor(private api: AVPlayAPI, private options: { timeoutMs?: number; width?: number; height?: number } = {}) {}
@@ -258,8 +272,6 @@ export class AVPlayPlayer implements Player {
       this.durationMs = 0
       this.live = !!options.live
       this.httpStatus = undefined
-      this.suspendedAt = undefined
-      this.source = { url, options }
       try {
         this.api.open(url)
         // AVPlay decodes UHD only in 4K mode, which must be set between open and prepare.
@@ -275,10 +287,10 @@ export class AVPlayPlayer implements Player {
         // Subtitles are drawn by the engine from the server's WebVTT, never by AVPlay.
         try { this.api.setSilentSubtitle(true) } catch { /* Not every firmware has it; the engine draws over it. */ }
         this.emit(generation, { durationMs: this.durationMs, video: this.videoInfo() })
-        if (startMs > 0) await this.callback((ok, fail) => this.api.seekTo(this.target(startMs), ok, fail))
+        const landedMs = startMs > 0 ? await this.land(generation, startMs, options.latestMs) : 0
         if (generation !== this.generation) return
         this.started = true
-        if (this.paused) { this.emit(generation, { state: 'paused', positionMs: startMs }); return }
+        if (this.paused) { this.emit(generation, { state: 'paused', positionMs: landedMs }); return }
         this.api.play()
         this.emit(generation, { state: 'playing' })
       } catch (error) {
@@ -304,10 +316,34 @@ export class AVPlayPlayer implements Player {
     const generation = this.generation
     return this.serial(async () => {
       if (generation !== this.generation || !this.started) return
-      const target = this.live ? Math.round(Math.max(0, ms)) : this.target(ms)
-      await this.callback((ok, fail) => this.api.seekTo(target, ok, fail))
-      this.emit(generation, { positionMs: target, state: this.paused ? 'paused' : 'playing' })
+      let landedMs = Math.round(Math.max(0, ms))
+      if (this.live) await this.callback((ok, fail) => this.api.seekTo(landedMs, ok, fail))
+      else landedMs = await this.land(generation, ms)
+      this.emit(generation, { positionMs: landedMs, state: this.paused ? 'paused' : 'playing' })
     })
+  }
+
+  /** Seeks a file to `ms`, or a keyframe before it, landing no later than `latestMs`; resolves with where it landed. */
+  private async land(generation: number, ms: number, latestMs = ms + LANDING_SLACK_MS): Promise<number> {
+    let target = this.target(ms)
+    let landed = await this.seekOnce(target)
+    for (const earlier of [() => landed - KEYFRAME_GAP_MS, () => ms - FAR_BACK_MS]) {
+      if (generation !== this.generation || landed <= latestMs || target <= 1) break
+      const next = this.target(earlier())
+      if (next >= target) continue
+      target = next
+      landed = await this.seekOnce(target)
+    }
+    return landed
+  }
+
+  private async seekOnce(target: number): Promise<number> {
+    await this.callback((ok, fail) => this.api.seekTo(target, ok, fail))
+    return this.currentTime() ?? target
+  }
+
+  private currentTime(): number | undefined {
+    try { return this.api.getCurrentTime() } catch { return undefined }
   }
 
   liveWindow() {
@@ -359,37 +395,11 @@ export class AVPlayPlayer implements Player {
     }).then(() => done)
   }
 
-  suspend(): Promise<void> {
-    const generation = this.generation
-    return this.serial(() => {
-      if (generation !== this.generation || !this.started || this.suspendedAt !== undefined) return
-      this.suspendedAt = this.position()
-      if (this.api.getState() === 'PLAYING') this.api.pause()
-      this.paused = true
-      try { this.api.suspend() } catch { /* The native player let go already. */ }
-      this.emit(generation, { state: 'paused' })
-    })
-  }
-
-  restore(): Promise<void> {
-    const generation = this.generation
-    return this.serial(() => {
-      const source = this.source, at = this.suspendedAt
-      if (generation !== this.generation || !source || at === undefined) return
-      this.suspendedAt = undefined
-      try { this.api.restore(source.url, Math.round(at), true) }
-      catch (error) { this.emit(generation, { state: 'error', failure: failureOf(errorCode(error), this.httpStatus) }); return }
-      this.emit(generation, { state: 'paused', positionMs: at })
-    })
-  }
-
   stop(): Promise<void> {
     const generation = ++this.generation
     return this.serial(() => {
       this.close()
       this.started = false
-      this.source = undefined
-      this.suspendedAt = undefined
       for (const listener of this.listeners) if (generation === this.generation) listener({ state: 'idle' })
     })
   }

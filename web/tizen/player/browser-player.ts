@@ -83,7 +83,5 @@ export class BrowserPlayer implements Player {
   // The preview leaves track changes to the server, as a TV without them would.
   tracks() { return [] }
   async selectTrack() { return false }
-  async suspend() { this.video.pause() }
-  async restore() {}
   async stop() { ++this.generation; this.reset(); for (const listener of this.listeners) listener({ state: 'idle' }) }
 }

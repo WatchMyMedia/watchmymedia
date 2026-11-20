@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AVPlayPlayer, PlaybackFailure, failureOf, readTracks, samsungDisplay, type AVPlayAPI, type PlayerUpdate, type SamsungWindow } from './avplay'
 
-function fixture() {
+/** `keyframeMs`: a seek lands on the next keyframe, as AVPlay's do in a file. */
+function fixture({ keyframeMs }: { keyframeMs?: number } = {}) {
   let state: ReturnType<AVPlayAPI['getState']> = 'NONE'
   let prepared = () => {}
   let refused: (error: unknown) => void = () => {}
@@ -18,17 +19,17 @@ function fixture() {
   const api: AVPlayAPI = {
     open: vi.fn(() => { state = 'IDLE' }), close: vi.fn(() => { state = 'NONE' }), stop: vi.fn(() => { state = 'IDLE' }),
     prepareAsync: vi.fn((ok, fail) => { prepared = () => { state = 'READY'; ok() }; refused = fail }),
-    seekTo: vi.fn((ms, ok) => { sought = () => { time = ms; ok() } }), play: vi.fn(() => { state = 'PLAYING' }), pause: vi.fn(() => { state = 'PAUSED' }),
+    seekTo: vi.fn((ms, ok) => { sought = () => { time = keyframeMs ? Math.ceil(ms / keyframeMs) * keyframeMs : ms; ok() } }), play: vi.fn(() => { state = 'PLAYING' }), pause: vi.fn(() => { state = 'PAUSED' }),
     getState: () => state, getDuration: () => 120_000, getCurrentTime: () => time, getVersion: () => 'test',
     getTotalTrackInfo: () => tracks, getCurrentStreamInfo: () => [tracks[0], tracks[1]], setSelectTrack: vi.fn(), setSilentSubtitle: vi.fn(),
     getStreamingProperty: vi.fn(() => liveDuration), setDisplayRect: vi.fn(), setDisplayMethod: vi.fn(), setStreamingProperty: vi.fn(),
-    suspend: vi.fn(), restore: vi.fn(), setListener: (next) => { listener = next },
+    setListener: (next) => { listener = next },
   }
   const updates: PlayerUpdate[] = []
   const player = new AVPlayPlayer(api, { timeoutMs: 1000 })
   player.listen((update) => updates.push(update))
   return { api, updates, player, prepared: () => prepared(), refuse: (e: unknown) => refused(e), sought: () => sought(), listener: () => listener,
-    live: (value: string) => { liveDuration = value } }
+    live: (value: string) => { liveDuration = value }, at: (ms: number) => { time = ms } }
 }
 const flush = async () => { for (let i = 0; i < 5; i++) await Promise.resolve() }
 async function opened(f: ReturnType<typeof fixture>, options: Parameters<AVPlayPlayer['open']>[1] = {}) {
@@ -175,17 +176,48 @@ describe('AVPlay tracks, live streams and backgrounding', () => {
     expect(f.player.liveWindow()).toBeUndefined()
   })
 
-  it('suspends the decoder and restores the same media where it was', async () => {
-    const f = fixture()
-    await opened(f, { startMs: 42_000 })
-    await f.player.suspend()
-    expect(f.api.suspend).toHaveBeenCalledOnce()
-    expect(f.updates.at(-1)).toEqual({ state: 'paused' })
-    await f.player.restore()
-    expect(f.api.restore).toHaveBeenCalledWith('https://fixture.example/media', 42_000, true)
-    expect(f.updates.at(-1)).toEqual({ state: 'paused', positionMs: 42_000 })
-    await f.player.restore()
-    expect(f.api.restore).toHaveBeenCalledOnce()
+  it('starts a file at or before the frame asked for, one keyframe gap back from a later landing', async () => {
+    const f = fixture({ keyframeMs: 10_400 })
+    const opening = f.player.open('https://fixture.example/media', { startMs: 40_000, paused: true })
+    await flush(); f.prepared()
+    for (let i = 0; i < 3; i++) { await flush(); f.sought() }
+    await opening
+    expect(vi.mocked(f.api.seekTo).mock.calls.map(([ms]) => ms)).toEqual([40_000, 31_100])
+    expect(f.updates.at(-1)).toEqual({ state: 'paused', positionMs: 31_200 })
+    expect(f.api.play).not.toHaveBeenCalled()
+  })
+
+  it('takes a resume’s keyframe up to where the viewer was with one seek', async () => {
+    const f = fixture({ keyframeMs: 10_400 })
+    await opened(f, { startMs: 40_000, latestMs: 45_000 })
+    expect(f.api.seekTo).toHaveBeenCalledOnce()
+    expect(f.updates).toContainEqual({ state: 'playing' })
+    expect(f.player.position()).toBe(41_600)
+  })
+
+  it('goes further back when the keyframes are further apart than usual', async () => {
+    const f = fixture({ keyframeMs: 25_000 })
+    const opening = f.player.open('https://fixture.example/media', { startMs: 40_000, paused: true })
+    await flush(); f.prepared()
+    for (let i = 0; i < 4; i++) { await flush(); f.sought() }
+    await opening
+    expect(vi.mocked(f.api.seekTo).mock.calls.map(([ms]) => ms)).toEqual([40_000, 39_500, 10_000])
+    expect(f.updates.at(-1)).toEqual({ state: 'paused', positionMs: 25_000 })
+  })
+
+  it('seeks back past the keyframe it is on, and takes a landing just after the frame', async () => {
+    const f = fixture({ keyframeMs: 10_400 })
+    await opened(f)
+    f.at(21_000)
+    const back = f.player.seek(11_000)
+    for (let i = 0; i < 3; i++) { await flush(); f.sought() }
+    await back
+    expect(vi.mocked(f.api.seekTo).mock.calls.map(([ms]) => ms)).toEqual([11_000, 10_300])
+    expect(f.updates.at(-1)).toEqual({ positionMs: 10_400, state: 'playing' })
+    const near = f.player.seek(20_000)
+    await flush(); f.sought(); await near
+    expect(f.api.seekTo).toHaveBeenLastCalledWith(20_000, expect.any(Function), expect.any(Function))
+    expect(f.updates.at(-1)).toEqual({ positionMs: 20_800, state: 'playing' })
   })
 
   it('classifies failures by code and status', () => {

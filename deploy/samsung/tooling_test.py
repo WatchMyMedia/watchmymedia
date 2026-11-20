@@ -81,3 +81,13 @@ class PackageName(unittest.TestCase):
         self.assertEqual((root.get('id'), application.get('package'), application.get('id')),
                          ('https://watchmy.media/tizen', 'cPFf0iV3Li', 'cPFf0iV3Li.WatchMyMedia'))
 
+    def test_the_app_declares_what_the_tv_and_the_store_check(self):
+        root = ET.parse(Path(__file__).resolve().parents[2] / 'web/tizen/public/config.xml').getroot()
+        # Samsung's pre-test reads the declared screen size.
+        self.assertIn('http://tizen.org/feature/screen.size.normal.1080.1920', [f.get('name') for f in root.iter('{http://www.w3.org/ns/widgets}feature')])
+        # Tizen loads YouTube's player in an iframe only where allow-navigation names it.
+        navigation = ' '.join(e.text or '' for e in root.iter('{http://tizen.org/ns/widgets}allow-navigation')).split()
+        self.assertTrue({'www.youtube-nocookie.com', 'www.youtube.com'} <= set(navigation))
+        # Settings › About reads the model and firmware through productinfo.
+        self.assertIn('http://developer.samsung.com/privilege/productinfo', [p.get('name') for p in root.iter('{http://tizen.org/ns/widgets}privilege')])
+

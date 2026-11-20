@@ -5,6 +5,7 @@ import { requestOptionsQuery, useReportProblem } from '../../../src/api/requests
 import { useMarkWatched } from '../../../src/api/watch'
 import type { components } from '../../../src/api/schema'
 import { useEntry, useFocus, useKeys, useNav } from '../../app/hooks'
+import { tvTakesHdr10 } from '../../app/platform'
 import type { ScreenProps } from '../../app/routes'
 import { samsungProfile } from '../../player'
 import { Button } from '../../ui/Button'
@@ -22,7 +23,9 @@ type MovieDetail = components['schemas']['MovieDetail']
 type MediaFileDetail = components['schemas']['MediaFileDetail']
 
 // The TV's profile asks the plans; one per page, as it never changes while the app runs.
-const PROFILE = samsungProfile()
+// The profile the versions' plans ask with, once the TV's APIs have loaded: HDR10 where the TV shows it.
+let planProfile: ReturnType<typeof samsungProfile> | undefined
+const profile = () => (planProfile ??= samsungProfile({ hdr10: tvTakesHdr10() }))
 
 /**
  * A movie (Movie and MovieRelated on the Samsung TV canvas; the Android TV
@@ -64,7 +67,7 @@ function MoviePage({ m }: { m: MovieDetail }) {
   const page = useRef<HTMLDivElement>(null)
   const options = useQuery(requestOptionsQuery)
   const versions = movieVersions(m)
-  const plans = useQuery(playbackPlansQuery(versions.map((v) => v.id), PROFILE))
+  const plans = useQuery(playbackPlansQuery(versions.map((v) => v.id), profile()))
   const related = useQuery(movieRelatedQuery(m.id))
   const rows = relatedPosterRows(related.data)
   const mark = useMarkWatched()
