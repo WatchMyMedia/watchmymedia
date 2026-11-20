@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { components } from '../../../src/api/schema'
 import { formatDate } from '../../../src/lib/format'
 import {
-  abilities, arrivalOf, searchAccepted, cardLine, dayWords, deleteWhere, replaceBody, replacedMessage, unansweredLines, episodeFacts, episodeKicker, episodeMore, episodePlay, episodeProgress, episodeTech, missingOf, onTopFor,
+  abilities, arrivalOf, cardLine, dayWords, deleteWhere, replaceBody, replacedMessage, unansweredLines, episodeFacts, episodeKicker, episodeMore, episodePlay, episodeProgress, episodeTech, missingOf, onTopFor,
   playLabel, seasonActions, seasonLine, seasonMark, showFacts, showMark, showStatus, tabCount, topActions, zoneOffset, type Selection,
 } from './showLabels'
 
@@ -217,13 +217,5 @@ describe('deleting and replacing', () => {
     expect(replaceBody('Sonarr')).toBe('Sonarr blocks this release and searches for another. The episode is gone until the new copy arrives.')
     expect(replacedMessage({ connection: 'Sonarr', blocklisted: true })).toBe('Sonarr blocked this release and is searching for another.')
     expect(replacedMessage({ connection: 'Sonarr', blocklisted: false })).toBe('Sonarr is searching for another copy.')
-  })
-})
-
-describe('Search now', () => {
-  it('counts the server’s bodiless 202 as accepted, and nothing else', () => {
-    expect(searchAccepted({ status: 202 })).toBe(true)
-    expect(searchAccepted({ status: 503 })).toBe(false)
-    expect(searchAccepted(new TypeError('Failed to fetch'))).toBe(false)
   })
 })

@@ -24,7 +24,7 @@ import { DeleteEpisodeDialog, ReplaceDialog } from './ShowDialogs'
 import { ShowTop } from './ShowTop'
 import { relatedPosterRows } from './relatedCards'
 import {
-  FOLLOW_LIMIT, abilities, arrivalOf, searchAccepted, episodeKicker, episodeMore, episodePlay, followRefused, missingOf, onTopFor, replacedMessage, seasonActions, seasonLine, seasonMark,
+  FOLLOW_LIMIT, abilities, arrivalOf, episodeKicker, episodeMore, episodePlay, followRefused, missingOf, onTopFor, replacedMessage, seasonActions, seasonLine, seasonMark,
   showMark, topActions, zoneOffset, type Zone,
 } from './showLabels'
 import './details.css'
@@ -207,7 +207,7 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
     const searching = () => { setSearched(searchKey(episode)); say({ title: `${show.managedBy ?? 'Sonarr'} is searching for ${episode === undefined ? season.name.toLowerCase() || `season ${season.number}` : `episode ${episode}`}` }) }
     search.mutate({ season: season.number, episodes: episode === undefined ? undefined : [episode] }, {
       onSuccess: searching,
-      onError: (err) => (searchAccepted(err) ? searching() : fail('Couldn’t start a search', err)),
+      onError: (err) => fail('Couldn’t start a search', err),
     })
   }
   const doMonitor = () => monitor.mutate({ season: season.number, monitored: true }, {
