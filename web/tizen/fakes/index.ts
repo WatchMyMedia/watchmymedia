@@ -2,6 +2,7 @@ import { ServerStore } from '../session/servers'
 import { FakeServer } from './server'
 import { registerStart } from './start'
 import { registerBrowse } from './browse'
+import { registerPlayer } from './player'
 
 // The browser preview's fictional server (`pnpm dev:tizen`, then open
 // /?fakes). Development only: main.tsx imports this behind
@@ -17,6 +18,7 @@ export function createFakeServer(mode = ''): FakeServer {
   const server = new FakeServer(FAKE_ORIGIN)
   registerStart(server, mode)
   registerBrowse(server)
+  registerPlayer(server, mode)
   return server
 }
 
