@@ -5,6 +5,7 @@ import { registerBrowse } from './browse'
 import { registerRequests } from './requests'
 import { registerSearch } from './search'
 import { registerSettings } from './settings'
+import { registerDetails } from './details'
 
 // The browser preview's fictional server (`pnpm dev:tizen`, then open
 // /?fakes). Development only: main.tsx imports this behind
@@ -19,7 +20,11 @@ export const AWAY_ORIGIN = 'http://203.0.113.20:27587'
 export function createFakeServer(mode = ''): FakeServer {
   const server = new FakeServer(FAKE_ORIGIN)
   registerStart(server, mode)
-  // Before Browse: its request options are static, these follow the Inbox.
+  // The first registration of a route answers. Details first: in
+  // ?fakes=member it makes the account a member and answers request options
+  // as one. Then Requests, whose options follow the Inbox, before Browse's
+  // static ones.
+  registerDetails(server, mode)
   registerRequests(server, mode)
   registerBrowse(server, mode)
   registerSearch(server)
