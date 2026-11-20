@@ -79,3 +79,15 @@ export function refreshScreenSaver() {
   saverOff = undefined
   applyScreenSaver()
 }
+
+type InfoWindow = { tizen?: { systeminfo?: { getCapability?(key: string): unknown } } }
+
+/** The TV's Tizen version ("8.0"), for Settings › About; undefined in the preview. */
+export function tizenVersion(): string | undefined {
+  try {
+    const v = (window as unknown as InfoWindow).tizen?.systeminfo?.getCapability?.('http://tizen.org/feature/platform.version')
+    return typeof v === 'string' && /^\d+(\.\d+){0,3}$/.test(v) ? v : undefined
+  } catch {
+    return undefined
+  }
+}

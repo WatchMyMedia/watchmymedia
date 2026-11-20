@@ -3,6 +3,9 @@ import { FakeServer } from './server'
 import { registerStart } from './start'
 import { registerBrowse } from './browse'
 import { registerLive } from './live'
+import { registerRequests } from './requests'
+import { registerSearch } from './search'
+import { registerSettings } from './settings'
 
 // The browser preview's fictional server (`pnpm dev:tizen`, then open
 // /?fakes). Development only: main.tsx imports this behind
@@ -17,8 +20,13 @@ export const AWAY_ORIGIN = 'http://203.0.113.20:27587'
 export function createFakeServer(mode = ''): FakeServer {
   const server = new FakeServer(FAKE_ORIGIN)
   registerStart(server, mode)
+  // Live TV first, so its capabilities, channels, reminders and listings search answer before the others' copies.
   registerLive(server, mode)
-  registerBrowse(server)
+  // Before Browse: its request options are static, these follow the Inbox.
+  registerRequests(server, mode)
+  registerBrowse(server, mode)
+  registerSearch(server)
+  registerSettings(server, mode)
   return server
 }
 
