@@ -24,7 +24,8 @@ class WorkflowIsolationTest(unittest.TestCase):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         jobs = dict(re.findall(r'(?ms)^  ([\w-]+):\n(.*?)(?=^  [\w-]+:|\Z)',
                                workflow.split('jobs:\n', 1)[1]))
-        hosted = dict.fromkeys(('changes', 'web', 'contract', 'docker', 'scripts', 'android', 'server', 'server-race'), 'ubuntu-latest')
+        hosted = dict.fromkeys(('changes', 'web', 'samsung', 'contract', 'docker', 'scripts', 'android', 'server', 'server-race'),
+                               'ubuntu-latest')
         # macOS runners are the scarce ones: only what needs a Mac runs there.
         hosted['server-macos'] = 'macos-26'
         # The Apple apps build on the image with the Xcode the App Store takes.
@@ -463,7 +464,7 @@ class WorkflowIsolationTest(unittest.TestCase):
     def test_tools_and_android_sdk_use_runner_owned_directories(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         pnpm = re.findall(r'(?ms)- uses: pnpm/action-setup@[^\n]+\n(.*?)(?=      -)', workflow)
-        self.assertEqual(3, len(pnpm))
+        self.assertEqual(4, len(pnpm))
         for setup in pnpm:
             self.assertIn('dest: ${{ runner.temp }}/setup-pnpm', setup)
         android = re.search(r'(?ms)^  android:\n(.*?)(?=^  apple:)', workflow).group(1)

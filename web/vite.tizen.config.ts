@@ -16,7 +16,10 @@ export default defineConfig({
   }],
   build: {
     outDir: '../dist-tizen', emptyOutDir: true, target: 'chrome108', cssTarget: 'chrome108', sourcemap: false,
-    modulePreload: false, cssCodeSplit: false, rolldownOptions: { output: { format: 'iife', inlineDynamicImports: true } },
+    // One deliberate script (about 650 kB, 200 kB gzipped, read from the TV's own
+    // storage): warn only if it grows well past that. Launch time is measured on the TV.
+    chunkSizeWarningLimit: 900,
+    modulePreload: false, cssCodeSplit: false, rolldownOptions: { output: { format: 'iife', codeSplitting: false } },
   },
   server: {
     host: '127.0.0.1', port: 5186, strictPort: true,

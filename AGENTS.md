@@ -40,7 +40,7 @@ WatchMyMedia are the audience for `CHANGELOG.md` and the README.
 | Path | What |
 |---|---|
 | `server/` | Go module: chi + huma API, SQLite (modernc) through sqlc and goose, ffmpeg orchestration, embedded web UI |
-| `web/` | React + Vite web app (`src/`), Cast receiver (`receiver/`) and Samsung prototype (`tizen/`, signing and TV tests deferred) |
+| `web/` | React + Vite web app (`src/`), Cast receiver (`receiver/`) and the Samsung TV app (`tizen/`, being built; signing and TV tests still to do) |
 | `api/` | The OpenAPI documents the native apps generate their clients from. Generated |
 | `android/` | Android app; modules and conventions in [android/README.md](android/README.md) |
 | `apple/` | iPhone, iPad and Apple TV apps and the `Kit` package; layout and conventions in [apple/README.md](apple/README.md) |
@@ -179,7 +179,10 @@ here, and no workflow may name a self-hosted runner or pick one at run time
 (`deploy/ci/security_test.py` checks).
 Each job runs only when what it builds or tests changed.
 `deploy/ci/changes.py` holds the rules, and the `changes` job runs it: the
-server jobs for `server/`, the web's for `web/`, Android's for `android/` and
+server jobs for `server/`, the web's for `web/` except the Samsung TV app,
+the `samsung` job's for that app (`web/tizen/`, its Vite configs and
+`deploy/samsung/`) and what it shares with the web app (`web/src/lib/`,
+`web/src/api/`, the dependencies and configs), Android's for `android/` and
 `api/`, each Apple app's for its own folders and the Kit, the Linux package
 jobs for `deploy/linux/` and the server's start-up and configuration. Four
 rules keep long jobs from running for nothing (45% of the job time in the
@@ -239,7 +242,8 @@ is encrypted with `GRADLE_ENCRYPTION_KEY`, the only secret `ci.yml` may read
 | SQL queries or migrations | `make gen-sqlc`, the tests, and the query plan without statistics ([server/AGENTS.md](server/AGENTS.md)) |
 | History, statistics, home, browse or recording-list queries | `make bench` |
 | API types | `make gen-api`, `make apple-api`, `make apple-test`, `cd web && pnpm typecheck`; Android's client if used |
-| Web app | `cd web && pnpm lint && pnpm typecheck && pnpm test && pnpm build` |
+| Web app | `cd web && pnpm lint && pnpm typecheck && pnpm test && pnpm build` (these cover the Samsung TV app too; CI's `web` job runs the `:web` scripts, which leave it out) |
+| Samsung TV app (`web/tizen/`, `deploy/samsung/`), or the `web/src/lib/` and `web/src/api/` code it imports | `cd web && pnpm lint:tizen && pnpm test:tizen && pnpm build:tizen && pnpm check:tizen` (`build:tizen` checks the types first), and `python3 -I -m unittest discover -s deploy/samsung -p '*_test.py'` |
 | Cast receiver | the web checks plus `cd web && pnpm build:receiver` |
 | Android | `cd android && ./gradlew testDebugUnitTest lintDebug` (CI adds `coverageReport`, `assembleDebug` and an unsigned `:app:assembleRelease` without `lintVitalRelease`) |
 | Apple Kit | `make apple-test` |

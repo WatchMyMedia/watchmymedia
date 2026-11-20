@@ -132,7 +132,13 @@ type HealthOutput struct {
 // eac3 or ac3 with copy false; Profile.maxPcmChannels, the channels the
 // output takes as PCM; and pcm is copied only in direct play. Apps send
 // maxPcmChannels and list pcm only from this level.
-const APILevel = 31
+// 32: packaged TV apps (Samsung, PLAN-SAMSUNG.md §3) can pair and send
+// bearer requests from another origin: starting and claiming a pairing,
+// and any request with Authorization: Bearer, pass the cross-origin check;
+// a bearer request is signed in by its token alone, never by the cookie;
+// and the API answers CORS for the origin file://, without credentials.
+// The TV apps ask people to update their server below this level.
+const APILevel = 32
 
 // ServerInfo identifies the server to apps before anyone signs in.
 type ServerInfo struct {

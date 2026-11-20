@@ -14,7 +14,9 @@ From `web/`. Node 24 and pnpm 9, as CI uses.
 | Install | `pnpm install --frozen-lockfile` |
 | Dev server on :5173 (proxies `/api` to the Go server on :27587) | `pnpm dev`, or `make web-dev` from the root; start the server with `make dev` or a `server-*` launch config |
 | Receiver dev server on :5174 | `pnpm dev:receiver` (launch config `receiver`) |
-| Lint, types, tests, builds, as CI does | `pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm build:receiver` |
+| Lint, types, tests and builds of everything here | `pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm build:receiver && pnpm build:tizen` |
+| As CI's `web` job does: the web app and the receiver, not the Samsung app | `pnpm lint:web && pnpm typecheck:web && pnpm test:web && pnpm build && pnpm build:receiver` |
+| As CI's `samsung` job does: the Samsung app alone, and the check that its build loads on the TV | `pnpm lint:tizen && pnpm test:tizen && pnpm build:tizen && pnpm check:tizen` ([tizen/AGENTS.md](tizen/AGENTS.md)) |
 | One test file | `pnpm vitest run src/lib/quality.test.ts` |
 | Regenerate the API types | `make gen-api` from the root (never `pnpm gen:api` alone: it reads a copy of the document the server writes) |
 | Embed in the server | `make web` from the root |
@@ -33,13 +35,18 @@ the user asks in this conversation; see Authority in the root file.
 | `src/lib/` | Logic without React, each file with a `*.test.ts` beside it where it has rules: formats, quality, pairing, episode routes, the play rules in `play/` |
 | `src/cast/` | The Cast sender and `protocol.ts`, the messages both sides speak |
 | `receiver/` | The receiver: CAF and Shaka, its own `tsconfig.json`, `vite.receiver.config.ts`, `wrangler.receiver.jsonc`, CSP in `receiver/public/_headers` |
-| `tizen/` | Samsung QN90D prototype; its own [guidance](tizen/AGENTS.md) and [checkpoint](tizen/README.md), with `pnpm dev:tizen` and `pnpm build:tizen`; signing and TV tests deferred |
+| `tizen/` | The Samsung TV app (Tizen, Chromium 108, AVPlay); its own [guidance](tizen/AGENTS.md), with its architecture, and [README](tizen/README.md), with `pnpm dev:tizen` (`/?fakes` for its fictional server) and `pnpm build:tizen`; it reuses `src/api/` and `src/lib/`, so a change there runs its checks too; CI's `samsung` job, not `web`, lints, tests and builds it; signing and TV tests are still to do |
 
 ## Rules
 
 - **API calls** go through `api` from `src/api/client.ts` with the generated
   path types, and through query options in `src/api/queries.ts` so the cache
   keys stay in one place. Don't write `fetch` calls with hand-typed replies.
+  The Samsung TV app uses the same options with its own bearer client
+  (`setApiClient`; the web app never calls it), so they import nothing
+  browser-only (no router, Tailwind, `EventSource` or `window` at load).
+  What each server event refetches is one table both apps dispatch through,
+  `src/api/eventInvalidation.ts`: a new event that changes cached data goes there.
 - **Logic in `src/lib`**, tested with Vitest; components render. A rule that
   decides something (which quality, which episode, whether a sign-in may
   continue) belongs in a tested function, not inline in JSX.

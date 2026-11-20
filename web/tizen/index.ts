@@ -1,6 +1,9 @@
-// Optional library build for testing the core separately from the app entry.
-export { AVPlayPlayer } from './avplay'
-export { PlaybackController } from './playback'
-export { deviceInfo, inspectServer, pair, readSession, restoreSession, saveSession, clearSession } from './session'
-export { tvClient, serverUrl, mediaUrl, safeError } from './server'
-export { PROFILES, prototypeProfile } from './profile'
+// Optional library build (pnpm build:tizen-core) for testing the core apart from the app entry.
+export { AVPlayPlayer, FilePlayback, LivePlayback, samsungProfile } from './player'
+export { AppSession, REQUIRED_API_LEVEL } from './session/session'
+export { ActiveSession } from './session/active'
+export { bearerClient } from './session/client'
+export { addressCandidates, isNotEncrypted } from './session/address'
+export { MediaTokens, MediaUrls, tokenedUrl } from './session/media'
+export { EventStream, EventStreamParser } from './session/events'
+export { pairOnce, passwordSignIn } from './session/pairing'
