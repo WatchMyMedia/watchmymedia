@@ -140,9 +140,10 @@ Mac app there.
 Host networking, read-only Movies and TV shares, appdata on your cache pool, an optional
 `/dev/dri` device and the NVIDIA variables; the guide is at
 [watchmy.media/guide/unraid](https://watchmy.media/guide/unraid). Install it from Unraid's
-**Apps** tab (Community Applications): search for WatchMyMedia and click Install. Where Apps can't
-be used, copy the template to `/boot/config/plugins/dockerMan/templates-user/` and pick it in
-Docker › Add Container. Settings › General then says to update from Unraid's Docker page.
+**Apps** tab (Community Applications): search for WatchMyMedia and click Install. Its listing is
+on the web at [ca.unraid.net](https://ca.unraid.net/apps/watchmymedia-1q0vytr13s083f).
+Where Apps can't be used, copy the template to `/boot/config/plugins/dockerMan/templates-user/`
+and pick it in Docker › Add Container. Settings › General then says to update from Unraid's Docker page.
 
 Both `MOVIES_DIR` and `TV_DIR` must point to existing folders. If you have only
 movies, point `TV_DIR` at an existing empty folder (or the reverse for TV only);

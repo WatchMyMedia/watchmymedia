@@ -56,9 +56,11 @@ recording from an HDHomeRun tuner.
 - `images/`: the icon.
 
 Install it from Unraid's Apps tab (Community Applications): search for
-WatchMyMedia and click Install. The guide for installing on Unraid, giving
-the container your GPU and keeping it updated is at
-<https://watchmy.media/guide/unraid>.
+WatchMyMedia and click Install. Its listing is on the web at
+<https://ca.unraid.net/apps/watchmymedia-1q0vytr13s083f>.
+
+The guide for installing on Unraid, giving the container your GPU and
+keeping it updated is at <https://watchmy.media/guide/unraid>.
 
 Where Apps can't be used, install it by hand: in the Unraid terminal,
 

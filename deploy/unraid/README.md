@@ -39,10 +39,12 @@ page shows the update.
 
 ## Installing from Community Applications
 
-WatchMyMedia is listed in Community Applications, Unraid's **Apps** tab:
-search for WatchMyMedia, click **Install** on its tile, and Unraid opens the
-Add Container form filled in from the templates repository's copy of
-`watchmymedia.xml`; **Apply** starts it. If the Apps tab offers to install
+WatchMyMedia has been
+[listed in Community Applications](https://ca.unraid.net/apps/watchmymedia-1q0vytr13s083f)
+since 2026-11-20. In Unraid's **Apps** tab, people search for WatchMyMedia
+and click **Install** on its tile. Unraid opens the Add Container form
+filled in from the templates repository's copy of `watchmymedia.xml`;
+**Apply** starts it. If the Apps tab offers to install
 Community Applications first, that comes first. The guide for people, with
 the GPU steps, is [watchmy.media/guide/unraid](https://watchmy.media/guide/unraid).
 
