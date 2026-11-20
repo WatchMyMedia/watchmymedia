@@ -58,10 +58,10 @@ The screens, each to its board on the canvas:
 
 The development preview labels nothing as AVPlay: its HTML video and Hls.js
 adapter and its fictional server are left out of the TV build. All app assets
-are bundled locally. The package ids in `public/config.xml` are still the
-development ones (`WMMProto01`): the store's package id, application id and
-author certificate are the maintainers' decision, made before the first
-store submission.
+are bundled locally. `public/config.xml` carries the store identity, chosen
+on 2026-11-20 and never to change: package id `cPFf0iV3Li`, application id
+`cPFf0iV3Li.WatchMyMedia`, signed with the maintainers' Samsung author
+certificate.
 
 ## Run the browser preview
 
@@ -206,11 +206,10 @@ Done on 2026-11-20 with a 2024 QN90D. In order:
    ```
 
    It refuses incomplete apps, symlinks and signing material, and writes
-   `build/samsung/watchmymedia-qn90d-prototype.wgt` (the name follows the
-   development package id).
+   `build/samsung/watchmymedia-samsung-tv-<version>.wgt`.
 4. **Install and launch** with that SDK's tools: `sdb connect <TV address>`,
    `tizen install -n <the .wgt> -s <TV address>:26101`, then
-   `sdb -s <TV address>:26101 shell 0 debug WMMProto01.Prototype`, which
+   `sdb -s <TV address>:26101 shell 0 debug cPFf0iV3Li.WatchMyMedia`, which
    prints a port for Chrome's inspector (`sdb forward tcp:<local> tcp:<port>`,
    then `http://127.0.0.1:<local>/json`). If `sdb connect` keeps failing while
    port 26101 answers, `sdb kill-server` and connect again.
