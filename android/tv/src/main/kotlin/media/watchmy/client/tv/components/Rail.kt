@@ -137,7 +137,9 @@ private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -
     val host = LocalServersHost.current
     val inbox = LocalRequestBadge.current.inbox ?: 0
     val sections = RailSection.shown(LocalLiveTVAvailable.current)
-    var expanded by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
+    // Servers opens beside the closed rail: the rail keeps this window's focus under the panel, and its labels would show at the panel's edge.
+    val expanded = focused && !serversOpen
     // A row stopped a run of ◀ at its first card: the active section pulses, since the next ◀ comes here.
     val pulse = remember { Animatable(0f) }
     LaunchedEffect(hint.stops) {
@@ -158,7 +160,7 @@ private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -
             .fillMaxHeight()
             .width(if (expanded) 340.dp else 96.dp)
             .background(scrim)
-            .onFocusChanged { expanded = it.hasFocus }
+            .onFocusChanged { focused = it.hasFocus }
             .focusProperties {
                 onEnter = {
                     if (requestedFocusDirection == FocusDirection.Left || !content.requestFocus()) {
