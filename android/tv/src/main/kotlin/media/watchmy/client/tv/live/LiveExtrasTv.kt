@@ -266,6 +266,9 @@ internal class BannerKeys(private val onWatch: () -> Unit, private val holdsOk: 
  * A card in focus brings the whole row into view, down to the line under the
  * cards that says what OK and Hold OK do. Left to the card's picture, the
  * page stopped scrolling with that line cut off at the foot of the screen.
+ * The line is there only while one of the row's cards has focus (or its
+ * menu is open): left in place, it went on naming a card and its keys after
+ * focus had gone to another row or the keyboard.
  */
 @Composable
 fun TvLiveSearchRow(
@@ -280,7 +283,7 @@ fun TvLiveSearchRow(
     if (!state.available || state.searched == null || state.error != null) return
     var focused by remember { mutableStateOf<LiveSearchHit?>(null) }
     var menu by remember { mutableStateOf<LiveSearchHit?>(null) }
-    // The line under the cards comes with the first card in focus, after the page has scrolled for it: ask again once the row has grown.
+    // The line under the cards comes with a card in focus, after the page has scrolled for it: ask again once the row has grown.
     val whole = remember { BringIntoViewRequester() }
     var hasFocus by remember { mutableStateOf(false) }
     var height by remember { mutableIntStateOf(0) }
@@ -312,7 +315,7 @@ fun TvLiveSearchRow(
                 )
             }
         }
-        focused?.let { hit ->
+        focused?.takeIf { hasFocus || menu != null }?.let { hit ->
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(hit.programme.title, style = inter(20.sp, FontWeight.SemiBold), color = WmmColors.TextSoft, maxLines = 1)
                 Text("·", style = inter(20.sp), color = WmmColors.TextMuted)

@@ -168,6 +168,17 @@ class SearchFocusTest {
         assertTrue("\"$spoken\" has focus, not an On Live TV card", spoken.startsWith("Watch ") || spoken.contains("Opens it in the guide"))
     }
 
+    /** The line stayed under the row once a card had had focus, naming that card and its keys while OK did something else. */
+    @Test
+    fun `the Live TV row's key hints go when focus leaves the row and come back with it`() {
+        focusLiveTvResult()
+        press(Key.DirectionUp)
+        assertEquals("the row above On Live TV", "Cold Harbour Road", focused())
+        assertTrue("the key hints are still under On Live TV", liveHints().isEmpty())
+        press(Key.DirectionDown)
+        assertTrue("the key hints did not come back with focus", liveHints().isNotEmpty())
+    }
+
     @Test
     fun `up from the keyboard's top row reaches the search box, and right from there the microphone`() {
         installRecognizer()
