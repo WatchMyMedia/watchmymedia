@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- The package ids below are the development ones. The store identity (package id, application id and author certificate) is the maintainers' decision: see README.md. -->
-<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://watchmy.media/prototype/tizen" version="0.1.0" viewmodes="maximized">
-  <tizen:application id="WMMProto01.Prototype" package="WMMProto01" required_version="8.0"/>
+<!-- The store identity, chosen 2026-11-20: never change the widget id, the package id or the application id. Every store update must keep them and be signed with the same Samsung author certificate. Raise the version for each update, together with TV_APP_VERSION in session/device.ts. -->
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://watchmy.media/tizen" version="1.0.0" viewmodes="maximized">
+  <tizen:application id="cPFf0iV3Li.WatchMyMedia" package="cPFf0iV3Li" required_version="8.0"/>
   <name>WatchMyMedia</name>
   <content src="index.html"/>
   <icon src="icon.png"/>

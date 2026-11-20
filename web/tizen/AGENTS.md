@@ -38,8 +38,10 @@ and QN90D steps still to do.
   32 is what lets a `file://` page pair and send bearer requests; this app
   needs it (`REQUIRED_API_LEVEL` in `session/session.ts`) and keeps no
   branches for older servers.
-- **Package ids** in `public/config.xml` are still the development ones. The
-  store identity and author certificate are the maintainers' decision.
+- **The store identity** in `public/config.xml` is permanent: the widget id,
+  package id `cPFf0iV3Li` and application id `cPFf0iV3Li.WatchMyMedia` never
+  change, and every update is signed with the same Samsung author certificate.
+  Raise `version` there and `TV_APP_VERSION` together for each store update.
 
 The player engine is `player/` ([README](player/README.md)): screens import
 `player/index.ts` and nothing else from it. It reuses the web's rules in

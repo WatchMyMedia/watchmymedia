@@ -3,6 +3,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from unittest.mock import patch
 
 
@@ -62,3 +63,21 @@ class PrototypeGuards(unittest.TestCase):
             (app / 'external').symlink_to('/nonexistent-fixture-path')
             with self.assertRaisesRegex(RuntimeError, 'symlinks'):
                 package.validate_app(app)
+
+
+class PackageName(unittest.TestCase):
+    def test_signed_package_is_named_for_the_config_version(self):
+        with tempfile.TemporaryDirectory() as folder:
+            app = Path(folder)
+            (app / 'config.xml').write_text('<widget xmlns="http://www.w3.org/ns/widgets" version="1.0.0"/>')
+            self.assertEqual(package.app_version(app), '1.0.0')
+            (app / 'config.xml').write_text('<widget xmlns="http://www.w3.org/ns/widgets" version="1.0"/>')
+            with self.assertRaises(RuntimeError):
+                package.app_version(app)
+
+    def test_the_app_carries_the_store_identity(self):
+        root = ET.parse(Path(__file__).resolve().parents[2] / 'web/tizen/public/config.xml').getroot()
+        application = root.find('{http://tizen.org/ns/widgets}application')
+        self.assertEqual((root.get('id'), application.get('package'), application.get('id')),
+                         ('https://watchmy.media/tizen', 'cPFf0iV3Li', 'cPFf0iV3Li.WatchMyMedia'))
+

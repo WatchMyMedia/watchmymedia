@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Sign a built prototype app. Credentials stay inside the SDK profile."""
+"""Sign the built Samsung TV app. Credentials stay inside the SDK profile."""
 import argparse
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -17,6 +18,14 @@ def validate_app(app):
         raise RuntimeError('The app is incomplete: index.html and config.xml are required. The core-only bundle cannot be installed.')
     if any(path.is_symlink() or path.suffix.lower() in SIGNING_SUFFIXES for path in app.rglob('*')):
         raise RuntimeError('The built app must not contain symlinks or signing material.')
+
+
+def app_version(app):
+    """The version in the app's config.xml, which names the signed package."""
+    version = ET.parse(app / 'config.xml').getroot().get('version', '')
+    if not version or any(part and not part.isdigit() for part in version.split('.')) or version.count('.') != 2:
+        raise RuntimeError('config.xml needs a version like 1.0.0.')
+    return version
 
 
 def main():
@@ -49,9 +58,9 @@ def main():
                 raise RuntimeError('Package is missing its signatures or entry files; refusing to label it signed.')
             if any(Path(name).suffix.lower() in SIGNING_SUFFIXES for name in names):
                 raise RuntimeError('Signing material must never be included in the app.')
-        final = output / 'watchmymedia-qn90d-prototype.wgt'
+        final = output / f'watchmymedia-samsung-tv-{app_version(args.app)}.wgt'
         shutil.copyfile(packages[0], final)
-        print(f'Signed prototype: {final}')
+        print(f'Signed: {final}')
         print('TV install acceptance still requires the matching Samsung distributor certificate/DUID.')
 
 
