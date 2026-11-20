@@ -91,7 +91,7 @@ class RulesTest(unittest.TestCase):
                 self.assertEqual(set(), running(changes.plan([path], None, '')))
         # A Markdown file a build packs or a test reads is not guidance.
         self.assertEqual({'linux-packages'}, running(changes.plan(['deploy/macos/FFMPEG-LICENSE.md'], None, '')))
-        self.assertIn('server', running(changes.plan(['server/internal/plex/COMPATIBILITY.md'], None, '')))
+        self.assertIn('server', running(changes.plan(['server/internal/playback/NOTES.md'], None, '')))
 
     def test_a_job_that_uses_anothers_build_runs_it(self):
         why = changes.plan(['windows/tray/main.go'], None, '')
