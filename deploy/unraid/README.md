@@ -91,10 +91,13 @@ titles or screenshots of their media.
 
 ## Submitting to Community Applications
 
-This waited for the repository to be open-sourced and the GHCR package to
-be public (PLAN-UNRAID.md Decision 1): the portal's scan refuses an image it
-cannot pull, and the policy wants a maintainer's own app to be open source.
-The steps, kept for a resubmission:
+WatchMyMedia was submitted on 2026-11-19 and approved automatically, as a
+Docker-only submission can be; it appears in Community Applications after
+the next catalog build, listed as "WatchMyMedia's Repository". It had waited
+for the repository to be open-sourced and the GHCR package to be public
+(PLAN-UNRAID.md Decision 1): the portal's scan refuses an image it cannot
+pull, and the policy wants a maintainer's own app to be open source. The
+steps, kept for a resubmission or another templates repository:
 
 1. The owner makes `ghcr.io/watchmymedia/watchmymedia` public in the package's
    settings and checks that `docker pull` works signed out.
@@ -106,8 +109,14 @@ The steps, kept for a resubmission:
    and mirror again).
 4. The site's guide at `/guide/unraid` is live, since the template's `ReadMe`
    points at it.
-5. Sign in at <https://ca.unraid.net/submit/new> with an Unraid account, add
-   the repository's GitHub URL, run Validate and Scan, fix what they flag,
-   submit. Approved apps appear at the next catalog build.
-6. Afterwards: link the listing from the site's download page, and change
+5. The [Unraid Community Apps](https://github.com/apps/unraid-community-apps)
+   GitHub App is installed on the templates repository, with read access to
+   contents and write access to issues; the portal can't run Validate
+   without it. Ours is installed on `unraid-templates` only.
+6. Sign in at <https://ca.unraid.net/submit/new> with an Unraid account, add
+   the repository's GitHub URL and a repository name (Community Applications
+   shows it with "'s Repository" after it; ours is "WatchMyMedia"), run
+   Validate and Scan, fix what they flag, submit. Approved apps appear at the
+   next catalog build.
+7. Afterwards: link the listing from the site's download page, and change
    the guide's "install by hand" step to "search Community Applications".
