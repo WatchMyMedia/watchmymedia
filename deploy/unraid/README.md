@@ -13,13 +13,23 @@ submission checklist. The design and decisions are in
 | `watchmymedia.xml` | The template, the working copy. Host networking, `/config` on appdata, read-only `/movies` and `/tv`, `/recordings`, `/transcode` on appdata, `PUID`/`PGID` 99/100, `UMASK`, an optional `/dev/dri` device, the NVIDIA variables |
 | `ca_profile.xml` | The templates repository's profile for Community Applications |
 | `template_test.py` | Checks both: structure, the elements Unraid reads, and that paths, port and variables match the image (`python3 -I -m unittest discover -s deploy/unraid -p '*_test.py'`; CI runs it) |
+| `templates-README.md` | The templates repository's README, which is also the listing's page for Unraid users: what to install, each setting in the form, the GPU, everyday use and fixes |
 | `mirror.sh` | Assembles the public templates repository from these files |
 
 The public repository is `WatchMyMedia/unraid-templates`: `templates/watchmymedia.xml`,
 `ca_profile.xml`, `images/watchmymedia.png` (from `brand/export/web/icon-512.png`),
-`LICENSE` (MIT, the templates only) and a README. Community Applications reads
-templates from a public repository separate from the one the image is built
-from, with an OSI licence and a profile.
+`LICENSE` (MIT, the templates only) and `README.md` (from
+`templates-README.md`). Community Applications reads templates from a public
+repository separate from the one the image is built from, with an OSI
+licence and a profile.
+
+The listing's **Readme** panel shows the template's `ReadMe` when it is a
+Markdown file on GitHub, so `ReadMe` points at the templates repository's
+`README.md`. With any other link (it was the site's guide until 2026-11-20)
+the panel shows the README of the image's source repository instead, which
+is written for developers. Keep `templates-README.md` in step with the
+template's settings (the test checks every setting is named in it) and with
+[the guide](https://watchmy.media/guide/unraid).
 
 ## Changing the template
 
@@ -31,7 +41,11 @@ from, with an OSI licence and a profile.
 3. Run the test.
 4. `deploy/unraid/mirror.sh <checkout of WatchMyMedia/unraid-templates>`, review
    its `git status`, commit and push there. Community Applications picks the
-   change up at its next catalog build (every two hours or so).
+   change up at its next catalog build (every four hours, at about a quarter
+   past 00:00, 04:00, 08:00, 12:00, 16:00 and 20:00 UTC).
+
+A change to `templates-README.md` alone needs steps 3 and 4, not a new `Date`.
+Changing where `ReadMe` points is a template change, so it gets one.
 
 A release does not need a template change unless the image's paths or
 variables changed; the `latest` tag moves on its own, and Unraid's Docker
@@ -109,8 +123,8 @@ steps, kept for a resubmission or another templates repository:
    assembles; its `Support` link works (the repository's Issues, or a thread
    in the forum's Docker Containers section, in which case change `Support`
    and mirror again).
-4. The site's guide at `/guide/unraid` is live, since the template's `ReadMe`
-   points at it.
+4. The templates repository's `README.md` is the one `mirror.sh` copies,
+   since the template's `ReadMe` points at it.
 5. The [Unraid Community Apps](https://github.com/apps/unraid-community-apps)
    GitHub App is installed on the templates repository, with read access to
    contents and write access to issues; the portal can't run Validate

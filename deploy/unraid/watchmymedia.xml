@@ -15,7 +15,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/WatchMyMedia/unraid-templates/issues</Support>
   <Project>https://watchmy.media</Project>
-  <ReadMe>https://watchmy.media/guide/unraid</ReadMe>
+  <ReadMe>https://github.com/WatchMyMedia/unraid-templates/blob/main/README.md</ReadMe>
   <Overview>Your movies and TV shows, with live TV and recording from an HDHomeRun tuner, on every screen in the house. One container holds the server and the web app; there are apps for Android, Android TV, iPhone, iPad and Apple TV, and you can cast to Chromecast and Google TV. Converts video on your Intel, AMD or NVIDIA GPU.</Overview>
   <Category>MediaServer:Video</Category>
   <WebUI>http://[IP]:[PORT:27587]</WebUI>
@@ -24,8 +24,10 @@
   <ExtraSearchTerms>media server live tv dvr hdhomerun chromecast</ExtraSearchTerms>
   <Requires>Intel or AMD GPU: keep the /dev/dri device below (remove it if this server has no /dev/dri). NVIDIA: install the Nvidia Driver plugin, add --runtime=nvidia to Extra Parameters (Advanced View) and put your GPU's UUID in NVIDIA_VISIBLE_DEVICES. Open the WebUI once the container is running to finish setup.</Requires>
   <MinVer>6.12.0</MinVer>
-  <Date>2026-11-07</Date>
+  <Date>2026-11-20</Date>
   <Changes>
+### 2026-11-20
+- The Readme explains installing on Unraid, each setting, the GPU and everyday use.
 ### 2026-11-07
 - First template.
   </Changes>
