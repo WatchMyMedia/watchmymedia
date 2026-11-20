@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { pair } from './session'
 import { mediaUrl, result, tvClient } from './server'
-import { prototypeProfile, type ProfileId } from './profile'
+import { prototypeProfile, type ProfileId } from './experiments'
 
 // Opt-in: this must never find/sign into a real server. The dedicated synthetic
 // fixture identity is checked before any credentials or writes are sent.

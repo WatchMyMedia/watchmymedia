@@ -7,7 +7,14 @@ receiver. `README.md` here records the signing and hardware gate.
 - Use the generated `../src/api/schema.d.ts` through the typed client in `server.ts`.
   API requests use the selected server, bearer auth and no cookies.
 - Keep testable session/player logic outside React. Samsung APIs belong behind
-  the adapter in `avplay.ts`; browser preview is explicitly a different backend.
+  the adapter in `player/avplay.ts`; browser preview is explicitly a different backend.
+- The player engine is `player/` ([README](player/README.md)): screens import
+  `player/index.ts` and nothing else from it. It reuses the web's rules in
+  `../src/lib/` (split a browser-bound module's pure part out rather than
+  copying it), takes its API client, media URLs, clock and Player as a
+  context, and imports nothing from the shell's folders.
+- Chromium 108 is the floor: no `crypto.randomUUID` (use `player/clock.ts`'s
+  `randomId`), `toSorted`, `Promise.withResolvers` or other later APIs.
 - Use plain CSS with the web brand's tokens for Chromium 108. Tailwind v4's
   runtime CSS is outside this target's support floor.
 - Never print session tokens, pairing secrets, full media URLs or certificates.

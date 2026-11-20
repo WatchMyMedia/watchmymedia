@@ -1,4 +1,7 @@
-import type { Decision, Profile } from './types'
+import type { Profile } from './player/api'
+
+// The S0 prototype's compatibility experiments, for its options screen and
+// the opt-in contract test. The app itself sends player/profile.ts.
 
 export const PROFILES = [
   { id: 'safe', label: 'H.264 + AAC', description: 'Conservative · unsupported formats convert on the server' },
@@ -22,17 +25,4 @@ export function prototypeProfile(id: ProfileId): Profile {
     hdr: false,
     subtitleFormats: ['webvtt'],
   }
-}
-
-/** Whether the stream the server sends is larger than 1080p. */
-export function uhd(decision: Pick<Decision, 'video'>): boolean {
-  return (decision.video.width ?? 0) > 1920 || (decision.video.height ?? 0) > 1080
-}
-
-export function filePosition(decision: Pick<Decision, 'protocol' | 'playlist' | 'startMs'>, playerMs: number): number {
-  return Math.max(0, Math.round(playerMs + (decision.protocol === 'hls' && decision.playlist !== 'vod' ? decision.startMs : 0)))
-}
-
-export function playerPosition(decision: Pick<Decision, 'protocol' | 'playlist' | 'startMs'>, fileMs: number): number {
-  return Math.max(0, Math.round(fileMs - (decision.protocol === 'hls' && decision.playlist !== 'vod' ? decision.startMs : 0)))
 }
