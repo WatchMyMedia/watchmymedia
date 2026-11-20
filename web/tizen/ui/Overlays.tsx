@@ -95,3 +95,6 @@ export function Sheet({ label, children, onClose }: { label: string; children: R
     <section role="dialog" aria-modal="true" aria-label={label} className="tv-sheet__page">{children}</section>
   </Modal>
 }
+
+/** The frame Dialog and SidePanel share (focus held inside, Return closes), for a feature's own modal such as a Hold OK menu. */
+export { Modal }

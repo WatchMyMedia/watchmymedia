@@ -2,6 +2,7 @@ import { ServerStore } from '../session/servers'
 import { FakeServer } from './server'
 import { registerStart } from './start'
 import { registerBrowse } from './browse'
+import { registerLive } from './live'
 import { registerRequests } from './requests'
 import { registerSearch } from './search'
 import { registerSettings } from './settings'
@@ -23,6 +24,8 @@ export function createFakeServer(mode = ''): FakeServer {
   registerStart(server, mode)
   // ?fakes=player plays from its own shows and files, so they answer first there.
   if (mode === 'player') registerPlayer(server, mode)
+  // Live TV next, so its capabilities, channels, reminders and listings search answer before the others' copies.
+  registerLive(server, mode)
   // The first registration of a route answers. Details first: in
   // ?fakes=member it makes the account a member and answers request options
   // as one. Then Requests, whose options follow the Inbox, before Browse's
