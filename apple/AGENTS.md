@@ -4,10 +4,8 @@ The iPhone, iPad and Apple TV apps and the `Kit` Swift package they share.
 Read the root [AGENTS.md](../AGENTS.md) first. [README.md](README.md) has the
 commands, the layout, the launch arguments and the code conventions (thin
 views over `@Observable` models in `WMMFeatures`, services from the
-environment, shared wording, Swift 6, Swift Testing); follow it. The plan and
-its Status section are PLAN-IOS.md; the screens follow
-`design/mockups/ios/`, `ipad-revised/` (PLAN-TABLETS.md)
-and `apple-tv/`; `ipad/` keeps the earlier iPad designs for reference.
+environment, shared wording, Swift 6, Swift Testing); follow it. The
+screens follow the maintainers' designs.
 
 ## Before handing work back
 
@@ -97,7 +95,7 @@ server, and on iPad in both a regular and a compact width.
   publishes goes through `DeepLink.url(publishedFor:source:)`. Code the
   extension runs must not use a required-reason API (file dates,
   UserDefaults) unless `TopShelf/PrivacyInfo.xcprivacy` declares it.
-- **The iPhone Duo** (PLAN-IPHONE-DUO.md). Its inner screen reports a
+- **The iPhone Duo**. Its inner screen reports a
   regular width held either way (951 × 669, 669 × 951) and its outer screen
   a compact one (466 × 678), so `isWide` already picks the right screens;
   decide a layout by the size class or the view's own width, never by
@@ -172,7 +170,7 @@ server, and on iPad in both a regular and a compact width.
   its light reaches (`ArtworkPlaceholder`). The show and movie pages'
   `DetailBackdrop`, the request dialog and the sign-in screens still draw
   theirs at full size.
-- **Home's screens** (PLAN-HOME.md §7; `HomeScreen.swift` on both apps): a
+- **Home's screens** (`HomeScreen.swift` on both apps): a
   vertical `ScrollView` with `.scrollTargetBehavior(.paging)`, each screen
   `.containerRelativeFrame(.vertical)`. A horizontal card row inside a screen
   takes all the height the panel leaves unless it has
@@ -289,7 +287,7 @@ server, and on iPad in both a regular and a compact width.
   - On iPad the toolbar beside the tab bar holds little: a third trailing
     item sends the rest into a ⋯ menu. Put a page's own buttons in its title
     row (the Live TV guide's search, Reminders and Guide/Channels switch).
-- **Settings** (README, Settings; PLAN-APPLE-SETTINGS.md). A task with steps
+- **Settings** (README, Settings). A task with steps
   is a sheet in `TaskFrame`, presented from `SettingsTasks` in
   `SettingsScreen.swift` so both widths share it, with its model kept in
   `AppFlow` so a resized iPad window keeps the step. `.linkTV` in the

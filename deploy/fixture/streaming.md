@@ -1,10 +1,8 @@
 # Simultaneous-stream and bandwidth-change harness
 
-F0, F1 and L0 of PLAN-STREAMING.md (the maintainers' plan,
-[not in this repository](../../CONTRIBUTING.md#files-this-repository-does-not-have)). This characterizes
-playback through the real HTTP routes and ffmpeg, including bounded event
-preparation and temporary storage. It never contacts the user's servers, media
-or physical tuners.
+This characterizes playback through the real HTTP routes and ffmpeg, including
+bounded event preparation and temporary storage. It never contacts the user's
+servers, media or physical tuners.
 
 ## Run it
 

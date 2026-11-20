@@ -2,7 +2,7 @@
 
 What each release changes, newest first, written for the people who run WatchMyMedia.
 `make release-tag VERSION=vX.Y.Z` only tags a version that has a section here, and the release
-workflow puts the section on the GitHub release (PLAN-RELEASES.md §2). A pre-release such as
+workflow puts the section on the GitHub release. A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
 ## 1.8.0

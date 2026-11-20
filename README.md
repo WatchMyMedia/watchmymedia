@@ -1043,7 +1043,7 @@ QSV, VAAPI); `GET /api/playback/capabilities` shows what was found. Segments are
 to a `watchmymedia-sessions` folder under `transcode.dir` and removed when a session goes
 idle; at startup the server clears that folder and leaves the rest of `transcode.dir` alone.
 
-Audio the device can't play is converted to what keeps the most of it (PLAN-AUDIO.md):
+Audio the device can't play is converted to what keeps the most of it:
 FLAC for a lossless track (TrueHD, DTS-HD MA, PCM, ALAC) when the video is copied, the
 play has no quality cap and isn't a download; E-AC-3 at 640 kbps, 5.1 at most, for
 surround where the device lists it; otherwise AAC, 192 kbps for stereo and 64 kbps a
@@ -1213,7 +1213,7 @@ stream available through an upward replacement until the new first frame is ackn
 failed upgrades back off and stale switch generations are rejected. The web player and Cast
 receiver opt in when they can measure completed HLS segment transfers and the server supports
 API level 24. They keep Automatic selected while quality changes and show whether the server
-lowered or raised it. Android and Apple adopt this in the U2–U3 phases of the streaming plan.
+lowered or raised it. The Android and Apple apps have not adopted this yet.
 When the transcoder is what falls behind, it
 drops a step too, and Activity says so. Plays at a fixed quality are measured the same way, so
 Activity shows what Automatic would have done before anyone picks it. The web player, the
@@ -1341,8 +1341,8 @@ frame. The viewer's session ID and physical tuner stay the same. If the
 server is out of spare output capacity, an upgrade waits while the current
 picture keeps playing. Fixed-quality clients continue with their previous
 session and heartbeat behavior. The web player and Cast receiver offer
-Automatic when the server advertises it; native apps follow in their later
-phases of the streaming plan. The Cast receiver also requires its transfer
+Automatic when the server advertises it; the native apps do not yet. The Cast
+receiver also requires its transfer
 measurement capability before it opts in.
 
 Live TV appears separately in **Activity → Now playing**. It does not create

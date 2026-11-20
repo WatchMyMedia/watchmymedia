@@ -1,11 +1,7 @@
 # WatchMyMedia for iPhone, iPad and Apple TV
 
 The iOS app, the Apple TV app, and the Swift package both build on. The
-plan is PLAN-IOS.md; the iPhone screens follow the mockups
-in `design/mockups/ios`, the Apple TV screens those in
-`design/mockups/apple-tv` (§11.2). The plans and mockups this file names are
-the maintainers' and are
-[not in this repository](../CONTRIBUTING.md#files-this-repository-does-not-have).
+screens follow the maintainers' designs.
 
 ## Build and run
 
@@ -79,7 +75,7 @@ so `play/` and `live-tv/<channel>` act as they read; the same links from
 outside the app (Safari, a QR code, another app) open the title's page or
 the guide instead, and only a link the app published for the server signed
 in (a reminder's notification) starts playback or takes a tuner
-(`DeepLink.opening`, PLAN-APPLE-REVIEW.md §2.5):
+(`DeepLink.opening`):
 
 ```bash
 xcrun simctl launch <udid> media.watchmy.client -fakes -tab movies
@@ -92,19 +88,18 @@ mockups' fictional library, no server): any name signs in with the password
 `-fakes…` argument and doesn't link `WMMFakes` (see Release builds below). The fakes' posters are seeded gradients, but every show, movie,
 episode and Continue watching item carries one of six fictional backdrops
 drawn in code (`FakeBackdrops`), so Home's row screens on iPad and Apple TV
-(PLAN-HOME.md §7) can be judged on a simulator. `-fakesSignedOut` starts at sign-in, `-fakesNoServer` at the
+can be judged on a simulator. `-fakesSignedOut` starts at sign-in, `-fakesNoServer` at the
 server picker. The scheme's Run action lists `-fakes`, off by default.
 `-fakesLargeLibrary` gives the fakes' Movies library about 1,200 titles (the
 sample's, then made-up ones), for measuring the grid.
 `-search harbor` searches at launch. The fake player has seek thumbnails drawn in
 code, so `-open watchmymedia://play/9101 -playerKeepControls -playerScrub 0.44`
-holds the scrubber at 44 % with its tile up (PLAN-TRICKPLAY.md T4).
+holds the scrubber at 44 % with its tile up.
 `-playerPanel episodes|audio|subtitles|quality` opens that panel beside the
-picture, or its tab under the fold, on the iPhone Duo's inner screen
-(PLAN-IPHONE-DUO.md).
+picture, or its tab under the fold, on the iPhone Duo's inner screen.
 
 The fakes' server is at API level 6, so requests, missing episodes
-(PLAN-ARR.md) and deleting (PLAN-EPISODE-PAGE.md) show: Harbor Lights' season 2
+and deleting show: Harbor Lights' season 2
 (`-open 'watchmymedia://shows/100?season=2'`) misses three episodes, each for
 another reason; searching "harbo" finds Not in your library; and the Inbox
 holds two requests and two problems. `-fakes` signs in as Sam, an admin;
@@ -121,8 +116,7 @@ Admins only.
 At wide iPad widths, Inbox shows its request or problem list beside the selected
 item, keeping approval, decline and resolve actions available.
 
-A show is one page on every Apple device (PLAN-SHOW-PAGE.md;
-`ShowPage`, `Pad2ShowPage` and `TvShowPage`): the episode on top, the season
+A show is one page on every Apple device: the episode on top, the season
 tabs over the season's episodes in a row, then About the show. `ShowPageModel`
 holds it and `ShowPageRule` says which episode goes on top. Picking a tab or a
 card changes the page in place, so Back leaves the show. On Apple TV, focus
@@ -143,8 +137,8 @@ as the fixture admin and read the Inbox without changing shared requests.
 `TEST_RUNNER_WMM_ARR_PAD_RESIZE=1` runs the regular-to-compact Inbox check on
 a disposable iPad simulator with windowed apps enabled.
 
-On an iPad the app has layouts of its own wherever the width is regular
-(PLAN-TABLETS.md, `design/mockups/ipad-revised/`): full screen in either
+On an iPad the app has layouts of its own wherever the width is regular:
+full screen in either
 orientation, or a window wider than half the screen. A compact width (every
 iPhone, Slide Over, a 50/50 split) shows the iPhone screens, so check both:
 run on the iPad Pro 11-inch simulator, where `-fakes` signs in as Sam’s iPad,
@@ -175,8 +169,8 @@ Skip, the card and the prompts show, but not the transport bar or its
 Episodes, Audio, Subtitles and Quality tabs, which need a server;
 `-playerPanel episodes` shows the Episodes tab over the video instead.
 
-The info panel's Episodes tab (TvPlayerEpisodes.dc.html, PLAN-APPLE-REVIEW.md
-§6.2) comes after Info for an episode, never a film or a recording: the
+The info panel's Episodes tab
+comes after Info for an episode, never a film or a recording: the
 show's seasons as buttons (focus on one chooses it) above the chosen
 season's episodes on disk, focus starting on the one playing, which is
 marked Now playing; the one after it is Next. Select or Play/Pause on
@@ -198,8 +192,8 @@ and runs with the rest in `make apple-tv-test-sim`. Its waits are in
 over a test of many presses. XCUI does not see AVKit's contextual actions,
 so Skip is checked by hand.
 
-Settings on Apple TV (TvSettings2*.dc.html, PLAN-APPLE-SETTINGS.md §3.3 and
-§5.9; `TV/Screens/Settings/`) shows one group at a time: the web's groups in
+Settings on Apple TV (`TV/Screens/Settings/`)
+shows one group at a time: the web's groups in
 its order at the left (Playback, Audio & subtitles, Home rows, Account &
 devices, Your requests, Server, About), each with how things stand under its
 name; the chosen group's page beside them, which scrolls in its own column;
@@ -231,8 +225,8 @@ shows a group with focus on it at launch; `-renameDevice`, `-changePassword`,
 `-homeRowsSettings` open the rest, in debug builds.
 `TVUITests/SettingsTests.swift` drives them with the remote.
 
-Sorted by title, the Apple TV grid has a letter index down its right edge
-(TvLibraryAZ.dc.html, PLAN-APPLE-REVIEW.md §6.2): right from the last column
+Sorted by title, the Apple TV grid has a letter index down its right edge:
+right from the last column
 enters it at the poster's letter, the grid follows the letters up and down,
 Select or left lands on the letter's first title, and Menu goes back to the
 poster. It is built from the `letters` the server already sends with a
@@ -249,7 +243,7 @@ Page Up and Page Down the same way (`TVUITests/ListPageKeysTests.swift`).
 ### Downloads
 
 From API level 10 an iPhone or iPad downloads movies and episodes to watch
-offline (PLAN-DOWNLOADS.md, D3 as built): Download on a movie's or an
+offline: Download on a movie's or an
 episode's page, Settings › Downloads for the list and the settings, and Home
 shows what is downloaded when the server can't be reached. The server's Who
 can download (Settings › Users on the web) is Admins only by default.
@@ -285,8 +279,8 @@ previews the offline page.
 
 ## Trailers
 
-A movie page's Trailer plays the first trailer the server lists (PLAN-TRAILERS.md
-§6.3; servers from API level 20 list them). A trailer file plays in our player.
+A movie page's Trailer plays the first trailer the server lists
+(servers from API level 20 list them). A trailer file plays in our player.
 A YouTube trailer opens YouTube's own player full screen on iPhone and iPad: a
 `WKWebView` (`App/Screens/Detail/TrailerPlayerScreen.swift`) loading a small page
 with the base URL `https://media.watchmy.client`, the bundle ID, which YouTube
@@ -312,10 +306,7 @@ xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMediaE2E -destin
 ## Rows
 
 From API level 22 the server arranges Home and each library's Movies or TV
-screen (PLAN-ROWS.md §8.3, HR6 as built; the boards are
-`HomeEditRows`, `AddRow`, `ListPage` and `LibraryRows` in `ios/`,
-`Pad2HomeEditRows` and `Pad2LibraryRows` in `ipad-revised/`, and
-`TvSettingsHomeRows`, `TvListPage` and `TvLibraryRows` in `apple-tv/`). Home
+screen. Home
 asks for `arranged=true` and draws `HomeData.rows` in the person's order by
 style (`ArrangedRow`, `TVArrangedRow`), the app's own Live TV row in the
 `live` slot, and skips a style it doesn't know. On iPad Continue watching sits
@@ -324,14 +315,14 @@ the library's rows above the grid (`getLibraryRows`), then Edit rows and the
 grid as All movies or All shows; a title search hides them, and a library
 row's See all sorts and filters the grid below. On iPhone and iPad every row
 with a link ends in a See all card the size of its cards ("See all TV shows",
-"By last aired"; PLAN-SEE-ALL.md §4.4), and has See all in its heading too.
+"By last aired"), and has See all in its heading too.
 From Home it opens the TV Shows or Movies tab at its grid, sorted the row's
 way with no filter: `Navigator.open(_:home:)` keeps the row's link for that
 tab and the tab's `LibraryModel` takes it once (`takeBrowseLink(for:)`), so
 selecting the tab again later leaves the grid as the person has it. Continue
 watching and Live TV have no See all, nor do Home's rows that mix two
 libraries of one type, which the server sends without a link. On iPad's Home
-screens the card never leads its row. On Apple TV (S5) the card is the list
+screens the card never leads its row. On Apple TV the card is the list
 card's size and look, with the library over the sort; with it focused the
 panel stays on the row's last card, Select opens the tab with focus on the
 grid's first poster, and Menu from there brings Home back to the row with
@@ -350,12 +341,12 @@ Move up, Move down and Hide, an Add a row menu and Reset, saving each change.
 missing ones dimmed with Request through the request sheet, Requested or
 Downloading, and Not found for an imported title TMDB couldn't find. `rows.changed` and `lists.changed` refetch
 Home, the library screens and the list page. There is no list builder: lists
-are made on the web (Decision 10).
+are made on the web.
 
 `-fakes -fakesRows` puts the fakes' server at level 22: Home has two list rows
 and Trending this week waits in Add a row; Movies has Best of 2026, whose last
 MDBList fetch failed. On iPad and Apple TV an arranged Home is drawn one row a
-screen (PLAN-HOME.md §7; `-fakesRows` is needed to see it). `-editRows` opens Home rows at launch and `-addRow` its
+screen (`-fakesRows` is needed to see it). `-editRows` opens Home rows at launch and `-addRow` its
 Add a row; `-open watchmymedia://lists/9001` opens Top rated science fiction
 (with titles to request) and `lists/9002` Rainy Sunday films (an import with a
 title not found). On Apple TV, `-tab settings -homeRowsSettings` opens Home
@@ -365,7 +356,7 @@ libraries, whose Home movie rows have no See all.
 
 ## Settings
 
-Settings follows the web's (PLAN-APPLE-SETTINGS.md): the same groups, names
+Settings follows the web's: the same groups, names
 and words, a root that is a hub, and one rule for saving. What the views draw
 comes from the Kit (`WMMFeatures/Account/`), so the iPhone, iPad and Apple TV
 apps word and decide alike:
@@ -407,7 +398,7 @@ apps word and decide alike:
   (or `401`, `offline`) the next Change password. `AppServices.fake` reads them
   (`applyFakeRefusals`), so both apps take them.
 
-On iPhone and iPad (`App/Screens/Settings/`; `Settings2*` and `Pad2Settings2*` boards):
+On iPhone and iPad (`App/Screens/Settings/`):
 
 - **The root is the hub** (`App/Screens/Settings/SettingsScreen.swift`): the
   account opens Account & devices, then the Kit's `settingsHub` groups, each
@@ -465,8 +456,8 @@ across a window resize and the pages' two columns in landscape.
 ## New episodes
 
 From API level 29 a person follows a show and hears when a new episode of it
-reaches the library (PLAN-NEW-EPISODES.md §7.1, §7.2, §7.4; the new-episodes
-Apple boards). The words are the Kit's (`NewEpisodeWords`), the rules too:
+reaches the library.
+The words are the Kit's (`NewEpisodeWords`), the rules too:
 
 - **Notify me** is first in About the show on every Apple device
   (`FollowsStore`, shared by every screen): it follows at once and goes back
@@ -538,10 +529,7 @@ not to have asked for notifications).
 
 From API level 30 a movie's page ends with the films of its TMDB collection
 that the library has, in release order, then More like this, and a show's
-page with More like this (PLAN-RELATED.md §7; the boards are
-`MovieRelated` and `ShowRelated` in `ios/`, `Pad2MovieRelated` and
-`Pad2ShowRelated` in `ipad-revised/`, and `TvMovieRelated` and
-`TvShowRelated` in `apple-tv/`). The server works the rows out and sends
+page with More like this. The server works the rows out and sends
 them as `ScreenRow`s (`getMovieRelated`, `getShowRelated`), so they are
 drawn with Home's poster rows and cards, without See all.
 
@@ -578,7 +566,7 @@ to ask the server owner. Scan transitions refresh it, and Check again remains
 available. `-fakes -fakesFirstRun noLibraries` (or `scanning`, `failed`, `empty`)
 previews the states; add `-fakesMember` for the member wording.
 
-Settings › Audio & subtitles (PLAN-LANGUAGES.md §5.6, L4 as built) is one page
+Settings › Audio & subtitles is one page
 on iPhone, iPad (two columns where the page is wide) and Apple TV (a sheet in
 three columns): Audio languages, Starting subtitles, Subtitle languages and
 Online subtitles. Its rules are in `SettingsModel` (`WMMFeatures`). From API
@@ -637,11 +625,7 @@ decodes a frame. A failed replacement restores the previous live URL. Mobile-dat
 or display-profile changes retune only after the old session releases its tuner.
 
 The existing iPhone, iPad and Apple TV Auto chip, quality picker and short note
-display these transitions. Repository boards in `design/mockups/ios/`,
-`ipad-revised/` and `apple-tv/` show recovery and rollback states; they are
-pending sync to the source canvases. The L5 Live TV boards in those same folders
-show the selected Automatic mode, the observed Original or converted output and
-the short preparation note. The Cast remote offers Live TV Automatic only when
+display these transitions. The Cast remote offers Live TV Automatic only when
 the receiver advertises `live-auto` and its server is capable; a handoff to an
 older receiver uses fixed 1080p. On debug fakes,
 `-open watchmymedia://play/9101 -playerAutomatic slowed|recovered|failed`
@@ -675,7 +659,7 @@ preserves explicit Off across reloads. That behavior requires a separate deploym
 of the receiver; opening or merging this PR does not deploy it. Older receivers and
 Cast Connect retain their existing subtitle behavior.
 
-The new screens follow approved boards (`design/proposals/ios-completion`).
+The new screens follow approved boards.
 Simulator/fake transport checks do not prove
 the real chooser, Chromecast/Cast Connect, network permissions or hardware.
 
@@ -696,8 +680,8 @@ and the server’s recording capability and permission; iPhone/iPad casting is
 described above under Google Cast.
 
 On servers at API level 13 or later whose capabilities say `guide`, Live TV
-shows programme listings (PLAN-LIVE-TV-GUIDE.md
-§6.4). The guide is a grid of channels against an hour (iPhone) or two (iPad,
+shows programme listings.
+The guide is a grid of channels against an hour (iPhone) or two (iPad,
 Apple TV) from the half hour, with the days listed, Now, earlier and later,
 category chips and Go to channel. On iPhone the selected programme's card sits
 above the grid and its details open in a sheet; a wide iPad shows them in a
@@ -714,9 +698,9 @@ selection until something they read changes (observation says when), and each
 guide cell is a view of its own compared by what it shows, so a focus move on
 Apple TV redraws the cells it moves between; on iPad the Live TV tab holds the
 guide's model, so Guide → Channels → Guide keeps the time, the selection and
-the listings. Without listings every screen stays as L8 and L9 built it.
+the listings. Without listings every screen stays as it was.
 
-On servers at API level 15 with listings (§6.5, G9), each channel in the guide
+On servers at API level 15 with listings, each channel in the guide
 has a star (its own 44 pt button on iPhone and iPad; on Apple TV the channel
 column takes focus and a long press stars it), and Favourites leads the chips
 once there is one: it shows the favourite channels, with or without listings,
@@ -758,7 +742,7 @@ and unplugged headphones pause it. A stream that refuses the media token gets
 a new one on the same tuner, as films do, before it reports a lost signal.
 
 On iPhone and iPad the film and Live TV players share one shell
-(`App/Screens/Player/PlayerShell.swift`, PLAN-APPLE-REVIEW.md §5.3): the status
+(`App/Screens/Player/PlayerShell.swift`): the status
 bar and home indicator hidden, the scene phase and Picture in Picture (2 s for
 it to start by itself in the background, `PlayerChromeModel.pictureInPictureGraceMs`),
 the safe area for the camera housing, and controls that hide 3 s after the last
@@ -766,7 +750,7 @@ touch while playing (`ControlsAutoHide`, tested in the Kit; up for VoiceOver,
 and for Channels and the Quality menu on Live TV). `-playerKeepControls` keeps
 either player's controls up for screenshots and UI tests.
 
-**Fit and fill** (PLAN-APPLE-REVIEW.md §6.3, `design/mockups/ios/PlayerFitFill.dc.html`)
+**Fit and fill**
 is the shell's too, for both players on iPhone and iPad: a button beside Close
 (arrows out while fitted; gold, with arrows in, while filled), and a pinch on
 the picture (out fills, in fits; taps and double-tap seeks keep working). Fit
@@ -791,11 +775,11 @@ The AirPlay receiver must be able to reach the selected server address; live
 playback does not perform the file player's LAN-address handoff. Simulator playback
 does not certify physical AirPlay, PiP, cellular networks or Apple TV remotes.
 
-Apple TV uses AVKit's native Play/Pause and a linear live transport
-(TvLiveChannelKeys.dc.html). Last channel (once there is one), Channel down,
+Apple TV uses AVKit's native Play/Pause and a linear live transport.
+Last channel (once there is one), Channel down,
 Channel up and Go to channel are transport bar buttons, before Stop and the
 system's own, each naming where it goes; as contextual actions they took
-Select from the bar (PLAN-APPLE-REVIEW.md §3.2.2). Go live stays a
+Select from the bar. Go live stays a
 contextual action. The first time the bar comes up a note says Select
 pauses and the buttons are a swipe up. Page Up and Page Down change channel
 with a note naming it; the 123 key (tvOS 18.1) or the button opens Go to
@@ -949,7 +933,7 @@ Picture in Picture or real-broadcast ad detection.
 ## Keyboard, pointer, quick actions and coming back
 
 What the iPhone and iPad apps take from the platform without a screen of
-their own (PLAN-APPLE-REVIEW.md §6.3):
+their own:
 
 - **A hardware keyboard.** In either player, space plays or pauses (or
   answers Still watching) and Escape closes the picker or Channels, then
@@ -982,7 +966,7 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
   which notifies once more five minutes later.
 - **Text size.** `PrimaryButtonStyle`, `GhostButtonStyle` and `Chip` scale
   their text and height with Dynamic Type and look as before at the default
-  size (§2.8); `UITests/TextSizeTests.swift` runs a movie's page and the
+  size; `UITests/TextSizeTests.swift` runs a movie's page and the
   Movies filters at the largest accessibility size. The guide and the
   player keep fixed sizes (Later).
 - **Tapping the selected tab** goes back to its first page
@@ -1002,7 +986,7 @@ their own (PLAN-APPLE-REVIEW.md §6.3):
 With the app in the top row of the Apple TV's Home Screen, the Top Shelf
 shows Continue watching (16:9 cards with the system's progress bar) and
 Recently added (posters, movies and shows in turn) as two sections the
-system draws (PLAN-APPLE-REVIEW.md §2.2, §6.2; `TvTopShelfSections`). Select
+system draws. Select
 opens the page; Play/Pause plays, as on the card in the app: a Continue
 watching item resumes, a movie plays its first version, and a show, which has
 no single episode to play, opens. Signed out, or with nothing to show, the
@@ -1025,7 +1009,7 @@ system shows the static Top Shelf image from `TV/Resources`.
   so does a launch that finds someone else's snapshot.
 - **What it may hold** (`Kit/Sources/WMMTopShelf`, `TopShelfRules`): titles,
   the app's own `watchmymedia:` links published for the server signed in
-  (`source=top-shelf&server=`, PLAN-APPLE-REVIEW.md §2.5) and bare picture file
+  (`source=top-shelf&server=`) and bare picture file
   names. Never a server address, an image's web address, a token or the
   person's ID (the owner is a hash). Links with other query items and
   pictures that aren't bare names are dropped on both sides.
@@ -1057,7 +1041,7 @@ app has no privacy manifest, holds any `WMMFakes` symbol or still reads
 privacy manifest of its own or holds code from `WMMModel`, `WMMData`,
 `WMMAPI`, `WMMPlayback`, `WMMFeatures` or `WMMFakes`.
 
-**The fakes are debug-only** (PLAN-APPLE-REVIEW.md §2.9): every
+**The fakes are debug-only**: every
 `import WMMFakes` in `App/` and `TV/`, the fakes' branch of each
 `ServicesFactory` and the `#Preview`s that use them sit under `#if DEBUG`.
 `project.yml` keeps `WMMFakes` as a dependency (so it builds and the import
@@ -1078,7 +1062,7 @@ fit). The Apple TV app has no downloads, so it doesn't declare disk space. When
 code starts calling another API on [Apple's list](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api),
 add it to the manifest of each app that links that code.
 
-**Signposts** (PLAN-APPLE-REVIEW.md §4.3.1): `PerformanceSignposts.shared`
+**Signposts**: `PerformanceSignposts.shared`
 (WMMModel) marks the intervals Instruments and `XCTOSSignpostMetric` measure,
 under subsystem `media.watchmy.client` and category `Performance`: Launch to
 Home, Play to first frame, and its two halves Play to decision and Decision to
@@ -1096,7 +1080,7 @@ simulator the scrolling measure reports only the fling's duration (hitches
 need a device), and on the tvOS simulator the launch metric reports nothing,
 so the Apple TV test also times `launch()` with a clock.
 
-**Diagnostics** (PLAN-APPLE-REVIEW.md §6.4, `design/mockups/ios/Diagnostics.dc.html`).
+**Diagnostics**.
 `Diagnostics.start()` (WMMData) subscribes to MetricKit on iPhone
 and iPad and keeps the last launch, hang and crash summaries, and the last
 day's count of exits in the background other than normal ones ("1 for
@@ -1139,7 +1123,7 @@ WatchMyMediaE2E scheme and `-only-testing`). Log lines carry the device's own
 time, as the reports do.
 
 On Apple TV, which has no clipboard to paste from, Settings › About's Help
-group has a Diagnostics row (TvDiagnostics.dc.html): it shows the redacted
+group has a Diagnostics row: it shows the redacted
 text as a QR code made on the Apple TV, beside a summary of what it holds,
 and Show as text pages through all of it (Down and Up turn the pages).
 `DiagnosticsCode` (WMMFeatures) decides what the code holds: at most
@@ -1158,8 +1142,8 @@ lines, enough to fill the code and turn pages (`TVUITests/DiagnosticsTests.swift
 | `Kit/Sources/WMMModel` | Domain types and the protocols every screen builds against (`ServerRepository`, `AuthRepository`, `LibraryRepository`, `RowsRepository`, `PreferencesRepository`, `PlaybackController`, `PlaybackGateway`, `AppServices`), errors, what a server offers at its API level (`ServerFeatures.swift`, the one table of levels), and the shared wording (`Formats.swift`, `TrackLabels.swift`, `Watching.swift`). Mirrors `android/core/model` |
 | `Kit/Sources/WMMAPI` | The client generated from `../api/openapi.json` (only the operations an app makes, see the config); committed. Generation opens response enums while keeping request-only enums strict |
 | `Kit/Sources/WMMData` | The real repositories. `Network/ServerAPI.swift` wraps the generated client: bearer token, user agent, and every failure as `APIError` or `SignedOutError`. Every request that carries a sign-in is built by its `RequestSigner` (the token only on the issuing server's addresses), and every 401 is read by `ServerAPI.revokes`, which signs out through the `ServerAPI` that `LocalStore.api(serverID:…)` made |
-| `Kit/Sources/WMMPlayback` | The `PlaybackController` on `AVPlayer` (PLAN-CLIENTS.md §2.3; `RealPlaybackController` split by part into `RealPlaybackController+*.swift`) and the Live TV controller (`LivePlaybackEngine`), with what both share: `PlayerCore` (an item, its first frame, the access log, the metadata, the audio session, the failure classifier), `TokenKeeper`, `SwitchGenerations`, `HeartbeatPump`, `Ticker` (PLAN-APPLE-REVIEW.md §5.1); the device profile, WebVTT cues, Now Playing |
-| `Kit/Sources/WMMDownloads` | Offline downloads on iPhone and iPad (PLAN-DOWNLOADS.md D3): the system's background sessions (`SystemDownloadEngine`), the offline store, sync, and `OfflinePlaybackGateway`, which plays a download from the device. Mirrors `android/core/downloads`; the Apple TV app doesn't link it |
+| `Kit/Sources/WMMPlayback` | The `PlaybackController` on `AVPlayer` (`RealPlaybackController` split by part into `RealPlaybackController+*.swift`) and the Live TV controller (`LivePlaybackEngine`), with what both share: `PlayerCore` (an item, its first frame, the access log, the metadata, the audio session, the failure classifier), `TokenKeeper`, `SwitchGenerations`, `HeartbeatPump`, `Ticker`; the device profile, WebVTT cues, Now Playing |
+| `Kit/Sources/WMMDownloads` | Offline downloads on iPhone and iPad: the system's background sessions (`SystemDownloadEngine`), the offline store, sync, and `OfflinePlaybackGateway`, which plays a download from the device. Mirrors `android/core/downloads`; the Apple TV app doesn't link it |
 | `Kit/Sources/WMMCast` | SDK-independent Cast protocol, session state, transfers and fakes; the Google SDK adapter lives only in `App/Cast/` |
 | `Kit/Sources/WMMFakes` | In-memory fakes of every protocol, with the mockups' library and a pretend player (`AppServices.fake()`) |
 | `Kit/Sources/WMMUI` | Brand tokens (`Palette`), `Artwork`, `Badge`, `Tag`, `ProgressStrip`, `WatchedCheck`, `BrandMark`, button styles, `Chip`, `LoadableView` and the empty and error states |
@@ -1213,7 +1197,7 @@ brand views and the QR code in `WMMUI`. The two targets share no files.
   and badges; burgundy for primary fills; orange for warnings), the system
   font with Dynamic Type, 44 pt touch targets, real `Button`s with
   accessibility labels on icon-only ones.
-- **Changes come from the server's events** (PLAN-APPLE-REVIEW.md §4.1.1):
+- **Changes come from the server's events**:
   `LibraryRepository.libraryChanges()` says what changed (`LibraryChange`:
   which movies or episodes were marked, which library changed, a scan). A
   screen model follows them through `ScreenChanges`, which keeps listening

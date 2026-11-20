@@ -4,10 +4,8 @@ The Android app: one APK for phones, tablets and Android TV / Google TV. Read
 the root [AGENTS.md](../AGENTS.md) first. [README.md](README.md) has the build
 commands, the modules and the code conventions (screens take callbacks, state
 from `LocalAppServices`, TV focus and sizes, libraries in
-`gradle/libs.versions.toml`); follow it. The plan is
-PLAN-CLIENTS.md §5; the screens follow
-`design/mockups/android/`, `design/mockups/android-tablet/` (PLAN-TABLETS.md)
-and `design/mockups/android-tv/`.
+`gradle/libs.versions.toml`); follow it. The screens follow
+the maintainers' designs.
 
 ## Before handing work back
 
@@ -156,7 +154,7 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   TV's Automatic heartbeat read the player inside `withContext(io)` unseen.
   Read the player on the main thread, then call the server.
 - **Event playlists' positions.** The server's event playlists of a file or
-  a recording are live to Media3 (PLAN-RESUME.md §3.5). Media3 gives a live
+  a recording are live to Media3. Media3 gives a live
   position within the live window, which moves on each time the server trims
   the playlist's head, so `ExoMediaPlayer` reads and seeks those positions
   from the stream's start (`windowShiftMs`); Live TV channels (`atLiveEdge`)

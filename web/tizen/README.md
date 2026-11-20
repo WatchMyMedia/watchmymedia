@@ -4,8 +4,8 @@ The Samsung TV app: a packaged Tizen web app for 2024 and later Samsung TVs,
 playing with Samsung's AVPlay. It is built for Chromium 108, the engine those
 TVs shipped with; the first test TV, a 2024 QN90D, has since been updated to
 Tizen 9.0 with Chrome 120. It matches the Android TV app's features, Live TV
-included (PLAN-SAMSUNG.md), as the screens on the "WatchMyMedia — Samsung TV"
-canvas. It needs a server at API level 32 or newer (WatchMyMedia 1.8). It has
+included.
+It needs a server at API level 32 or newer (WatchMyMedia 1.8). It has
 been signed with a Samsung certificate and run on that TV (below); the store
 package id and the submission are still to come.
 
@@ -37,7 +37,7 @@ Built on 2026-11-19 and checked in the browser preview; the first TV session (be
   the Live TV player on the shared tuner controller. It has unit tests with
   fake players and servers only.
 
-The screens, each to its board on the canvas:
+The screens:
 
 - Home, one row a screen with the hero and Continue watching, Edit rows and
   the totals; Movies and TV Shows with their rows, sort, filters, chips, the
@@ -239,14 +239,14 @@ What the first session on the QN90D found:
   AVPlay lands a seek in a file on the keyframe *after* the frame asked for
   (9 s late in a test clip with 10.4 s between keyframes, and ⏪ from just
   past a keyframe landed on it again), so the engine seeks once more, one
-  usual keyframe gap back, whenever it lands past (PLAN-RESUME.md §3.1). Home
+  usual keyframe gap back, whenever it lands past. Home
   and back then came back paused 3 s before where it left, and a resume
   landed before the saved position with one seek, playing 3 s after the
   server's answer. Each seek before the first frame took about 3 s there.
 - Not yet tried there: image subtitles.
 
 Do not broadly trust `Origin: null` on the server. HDR, certification and
-more model groups remain in PLAN-SAMSUNG.md.
+more model groups are still to do.
 
 Samsung references: [certificate setup](https://developer.samsung.com/smarttv/develop/getting-started/setting-up-sdk/creating-certificates.html),
 [TV testing](https://developer.samsung.com/smarttv/develop/getting-started/using-sdk/tv-device.html),

@@ -1,7 +1,6 @@
 # Windows desktop app
 
-Read the root [AGENTS.md](../AGENTS.md), and PLAN-WINDOWS.md where you have the
-maintainers' plans.
+Read the root [AGENTS.md](../AGENTS.md).
 This is a separate, pure-Go module. The server remains in `server/`.
 
 - `cmd/tray/`: Windows GUI entry point; `internal/winui/`: native message loop,
@@ -33,8 +32,7 @@ server before assigning its job; fail closed if job setup fails. Closing stdin
 is graceful shutdown; after five seconds terminate the job. Never poll an occupied
 port belonging to another user's server. Keep Windows CI GitHub-hosted.
 
-The approved repository boards are in `design/mockups/windows/`; they are not on
-a design canvas. Use fictional data in screenshots and fixture tests.
+Use fictional data in screenshots and fixture tests.
 
 `installer.nsi` and `installer.sh` build the development NSIS installer under
 `build/windows-installer/`. `installer-smoke.ps1` is for disposable hosted Windows.

@@ -53,7 +53,7 @@ Windows launched without a real PC to test on, so these are still to be checked 
 real Windows 11 PC: menu, keyboard, DPI, theme and sign-in behaviour, installing,
 updating between two signed releases and uninstalling, different-account UAC, network
 shares, and NVIDIA, Intel, AMD and hybrid GPUs. Until a GPU vendor passes, nothing
-claims hardware acceleration on Windows. The maintainers' `PLAN-WINDOWS.md` tracks them.
+claims hardware acceleration on Windows.
 
 ## Collect hardware test evidence
 

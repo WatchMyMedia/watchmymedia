@@ -1,7 +1,7 @@
 # Samsung TV app
 
-Read the root and `web/AGENTS.md` first. This is the Samsung TV client
-(PLAN-SAMSUNG.md): a packaged Tizen web app for Chromium 108 that plays with
+Read the root and `web/AGENTS.md` first. This is the Samsung TV client:
+a packaged Tizen web app for Chromium 108 that plays with
 Samsung's AVPlay, built to match the Android TV app's features, Live TV
 included. It is its own entry, not the browser app or the Cast receiver.
 [README.md](README.md) is for people: running it, building it, and the signing
@@ -9,9 +9,9 @@ and QN90D steps still to do.
 
 ## Rules
 
-- **Screens follow the boards** on the claude.ai canvas "WatchMyMedia —
-  Samsung TV". Where a Samsung board isn't drawn yet, follow the Android TV
-  board it adapts. Take colours, sizes and shapes from the kit's tokens
+- **Screens follow the maintainers' designs.** Where a Samsung design
+  isn't drawn yet, follow the Android TV one it adapts. Take colours,
+  sizes and shapes from the kit's tokens
   (`ui/tokens.css`), never new hex values in a screen.
 - **The API** goes through the web's own client and query options
   (`../src/api/client.ts`, `../src/api/queries.ts`), which the session points
