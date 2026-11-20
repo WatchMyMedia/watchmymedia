@@ -16,7 +16,7 @@ export default defineConfig({
   }],
   build: {
     outDir: '../dist-tizen', emptyOutDir: true, target: 'chrome108', cssTarget: 'chrome108', sourcemap: false,
-    modulePreload: false, cssCodeSplit: false, rolldownOptions: { output: { format: 'iife', inlineDynamicImports: true } },
+    modulePreload: false, cssCodeSplit: false, rolldownOptions: { output: { format: 'iife', codeSplitting: false } },
   },
   server: {
     host: '127.0.0.1', port: 5186, strictPort: true,

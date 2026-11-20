@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://watchmy.media/prototype/tizen" version="0.0.1" viewmodes="maximized">
+<!-- The package ids below are the development ones. The store identity (package id, application id and author certificate) is the maintainers' decision: see README.md. -->
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://watchmy.media/prototype/tizen" version="0.1.0" viewmodes="maximized">
   <tizen:application id="WMMProto01.Prototype" package="WMMProto01" required_version="8.0"/>
-  <name>WMM TV Prototype</name>
+  <name>WatchMyMedia</name>
   <content src="index.html"/>
   <icon src="icon.png"/>
   <tizen:profile name="tv-samsung"/>
@@ -10,5 +11,5 @@
   <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
   <tizen:metadata key="http://samsung.com/tv/metadata/use.network" value="true"/>
   <access origin="*" subdomains="true"/>
-  <tizen:content-security-policy>default-src 'self'; script-src 'self' $WEBAPIS; style-src 'self' 'unsafe-inline'; connect-src http: https:; media-src http: https: blob:; img-src 'self' data: blob:; object-src 'self'; base-uri 'self'</tizen:content-security-policy>
+  <tizen:content-security-policy>default-src 'self'; script-src 'self' $WEBAPIS; style-src 'self' 'unsafe-inline'; connect-src http: https:; media-src http: https: blob:; img-src 'self' data: blob: http: https:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; object-src 'self'; base-uri 'self'</tizen:content-security-policy>
 </widget>
