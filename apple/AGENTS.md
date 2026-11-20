@@ -346,6 +346,17 @@ didn't start.
   iPhone Pro or Apple TV 4K, which other sessions use.
   `scripts/simulator.sh` resolves names to a UDID and falls back to the newest
   iPhone Pro or Apple TV when the named one is missing (as on CI's runners).
+- On CI's runners (three cores, 7 GB) a simulator's first boot takes
+  minutes, and what compiles beside it takes two to three times as long: the
+  iPhone app's Debug build took 215 s with nothing booted and 409 to 690 s
+  beside the boot (runs of 2026-11-20). So CI's jobs build first
+  (`make apple-build-for-testing`, then the Release build), and only then
+  test (`make apple-test-without-building`), which is when `xcodebuild` boots
+  the simulator; the Apple TV job does the same with its `apple-tv-` targets.
+  Keep every build ahead of the first boot when changing those jobs, and
+  don't boot a simulator in a step before them. The tests then run on a
+  simulator that has only just booted, and take longer for it (the Kit's:
+  two to five minutes, one when the simulator had been up for ten).
 - `make apple-test-sim` runs the Kit's tests on the simulator: the
   `WatchMyMedia` scheme has no UI test target, so `UITests/` runs only
   through the `WatchMyMediaE2E` scheme, one class or test at a time with
