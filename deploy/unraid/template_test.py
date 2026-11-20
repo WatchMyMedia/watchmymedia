@@ -135,6 +135,18 @@ class TemplateTest(unittest.TestCase):
         self.assertEqual(self.config("NVIDIA_DRIVER_CAPABILITIES").get("Default"), "all")
         self.assertNotIn("TZ", [c.get("Target") for c in self.configs], "Unraid sets TZ itself")
 
+    def test_readme_is_the_templates_readme(self):
+        # Community Applications shows the ReadMe on the listing when it is a
+        # Markdown file on GitHub; any other link and it shows the image's
+        # source repository's README instead, which is for developers.
+        self.assertEqual(self.text("ReadMe"),
+                         "https://github.com/WatchMyMedia/unraid-templates/blob/main/README.md")
+        readme = (HERE / "templates-README.md").read_text()
+        self.assertTrue(readme.startswith("# WatchMyMedia for Unraid\n"))
+        self.assertIn('"$here/templates-README.md" "$dest/README.md"', (HERE / "mirror.sh").read_text())
+        for config in ("Network Type", *(c.get("Name") for c in self.configs)):
+            self.assertIn(f"**{config}**", readme, f"the README doesn't explain {config}")
+
     def test_requires_names_every_manual_step(self):
         requires = self.text("Requires")
         for phrase in ("/dev/dri", "Nvidia Driver plugin", "--runtime=nvidia", "NVIDIA_VISIBLE_DEVICES", "WebUI"):
