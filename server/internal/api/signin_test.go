@@ -470,7 +470,8 @@ func TestCrossOriginCORS(t *testing.T) {
 			{"a file URL with a host", http.MethodOptions, "/api/libraries", preflight("file://evil.example", "GET", "authorization"), "", ""},
 			{"the receiver's preflight", http.MethodOptions, "/api/files/1/playback", preflight("https://cast.example", "POST", "authorization,content-type"), "", "https://cast.example"},
 			{"the receiver's read", http.MethodGet, "/api/server", map[string]string{"Origin": "https://cast.example"}, "", "https://cast.example"},
-			{"the TV app's media preflight", http.MethodOptions, "/api/playback/abc/master.m3u8", preflight("file://", "GET", "range"), "", "*"},
+			{"the TV app's media preflight", http.MethodOptions, "/api/playback/abc/master.m3u8", preflight("file://", "GET", "range"), "file://", "file://"},
+			{"the TV app's subtitle read", http.MethodGet, "/api/files/1/subtitles/1.vtt", map[string]string{"Origin": "file://"}, "file://", "file://"},
 			{"another site's media preflight", http.MethodOptions, "/api/playback/abc/master.m3u8", preflight("https://evil.example", "GET", "range"), "", "*"},
 		} {
 			want := c.off
@@ -483,11 +484,16 @@ func TestCrossOriginCORS(t *testing.T) {
 				t.Errorf("cast %t: %s -> %d, allows %q (want %q), credentials %q", cast, c.name, res.StatusCode, got, want, h.Get("Access-Control-Allow-Credentials"))
 				continue
 			}
+			// The TV app gets the API's methods, and media only as anyone does.
+			methods, headers := "GET, POST, PUT, PATCH, DELETE", "Authorization, Content-Type"
+			if mediaPath(c.path) {
+				methods, headers = "GET, HEAD", "Range"
+			}
 			if want == "file://" && c.method == http.MethodOptions && (res.StatusCode != http.StatusNoContent ||
-				h.Get("Access-Control-Allow-Methods") != "GET, POST, PUT, PATCH, DELETE" || h.Get("Access-Control-Allow-Headers") != "Authorization, Content-Type") {
+				h.Get("Access-Control-Allow-Methods") != methods || h.Get("Access-Control-Allow-Headers") != headers) {
 				t.Errorf("cast %t: %s -> %d %v", cast, c.name, res.StatusCode, h)
 			}
-			if !mediaPath(c.path) && !slices.Contains(h.Values("Vary"), "Origin") {
+			if !slices.Contains(h.Values("Vary"), "Origin") {
 				t.Errorf("cast %t: %s -> Vary %v", cast, c.name, h.Values("Vary"))
 			}
 		}

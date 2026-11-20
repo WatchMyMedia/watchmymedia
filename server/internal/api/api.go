@@ -416,8 +416,9 @@ var (
 // reply allows credentials, so a page acts only with a token it holds.
 //   - Cast receiver pages, when casting is on, get the playback routes with
 //     an Authorization header.
-//   - The packaged TV apps (packagedAppOrigin) get every route but media,
-//     whether casting is on or not.
+//   - The packaged TV apps (packagedAppOrigin) get every route, whether
+//     casting is on or not: the API with their device's token, and media
+//     (subtitles they fetch to draw themselves) as anyone does.
 //   - Anyone gets media routes when casting is on. Cast devices fetch HLS
 //     and subtitles with XHR, which needs this even for Google's own
 //     receivers.
@@ -437,16 +438,15 @@ func apiCORS(c CastOptions) func(http.Handler) http.Handler {
 				// PerformanceResourceTiming. Media still requires its normal token.
 				h.Set("Timing-Allow-Origin", "*")
 			}
-			// Media replies depend on the origin only when casting is on.
-			if c.Enabled || !media {
-				h.Add("Vary", "Origin")
-			}
+			h.Add("Vary", "Origin")
 			var allow string
 			var policy corsPolicy
 			switch {
 			case c.Enabled && origin != "" && slices.Contains(c.ReceiverOrigins, origin):
 				allow, policy = origin, receiverCORS
-			case origin == packagedAppOrigin && !media:
+			case origin == packagedAppOrigin && media:
+				allow, policy = origin, mediaCORS
+			case origin == packagedAppOrigin:
 				allow, policy = origin, packagedAppCORS
 			case c.Enabled && media:
 				allow, policy = "*", mediaCORS

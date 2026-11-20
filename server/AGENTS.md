@@ -88,7 +88,7 @@ a request is signed in by its token alone (`auth.TokenFrom`): a bad bearer
 is a 401, never the cookie's user. Keep it so, and keep other schemes
 (a proxy's Basic sign-in, which browsers repeat on their own) under the
 check. `apiCORS` answers CORS for the receiver origins and for media while
-casting is on, and for `file://` either way; never for `null` or another
+casting is on, and for `file://` either way (the API and media); never for `null` or another
 site, and never with credentials.
 
 **SQL.** Queries go in `internal/db/queries/*.sql` and run through sqlc;
