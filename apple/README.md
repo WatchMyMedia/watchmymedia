@@ -354,6 +354,71 @@ rows. Add `-fakesMember` for a member, who can't delete or refresh the
 household's lists, and `-fakesTwoMovieLibraries` for a server with two movie
 libraries, whose Home movie rows have no See all.
 
+## Several servers
+
+A device stays signed in to up to 12 servers, one person on each, and one of
+them is in use: Home, the libraries, Live TV, requests, the Inbox and
+Settings' account pages are that server's. The list lives on the device (the
+servers and when each was last used in UserDefaults, a sign-in each in the
+Keychain); nothing about it is sent anywhere, so a server is added once on
+each device.
+
+- **Servers** is what the account button opens: the registered servers (the
+  ones signed in to and not removed, the one in use first, then by last
+  use), Add a server and Manage servers. Choosing a server asks it which
+  server it is (GET /api/server at its kept address, 5 s at most) and makes
+  it the one in use when it answers as itself: no password, no steps. The
+  app closes the player, rebuilds on Home and says "Now on Cabin server" for
+  4 s. One that doesn't answer leaves the app where it was, with Try again
+  and, on a device holding downloads from it, Watch its downloads, which
+  switches anyway to the offline Home. A server whose sign-in ended says so
+  and opens its sign-in. `ServersModel` (`WMMFeatures/Account`) is the one
+  model for all of it, shared through the environment, since Settings,
+  Search, Downloads and links switch too; nothing else calls
+  `ServerRepository.select` to change server.
+- **Add a server** is a task of three steps, Choose a server, Sign in, Added
+  (`AddServerModel`). Servers already registered aren't offered, and an
+  address that reaches one is refused. Cancel, or a failure at any step,
+  leaves the app on the server it was on.
+- **Settings › Server** lists Your servers; each opens its page (address,
+  version, who is signed in, what is downloaded from it) with Switch to this
+  server and Remove this server. Removing signs this device out of it,
+  deletes its downloads here and takes it off the list, after asking, and
+  changes nothing on the server. When it was the one in use, or after Sign
+  out, the app moves to the server used most recently that is still signed
+  in.
+- **Search looks in every server signed in to.** Each is asked at once, to
+  its own address with its own sign-in (`LibraryRepository.search(_:serverID:)`,
+  through an API built for that server alone). The server in use's results
+  come first in each group and the others' follow in the Servers list's
+  order, each naming its server; the same title on two servers is listed
+  twice. A server gets 4 s; one still out after 1 s is named at the end of
+  the list, and one that doesn't answer gets a line with Try again and is
+  left alone for 30 s on that visit, so typing doesn't queue timeouts. A
+  keystroke cancels the calls still out. Pictures come from the result's own
+  server, signed for it (`CachedImageLoader`). Opening a result on another
+  server switches to it and shows Search with the same words and the title
+  there. Not in your library, On Live TV and marking watched stay the server
+  in use's. What is typed goes to each server signed in to and nowhere else.
+- **A link or a notification names its server.** One for another registered
+  server that is signed in switches to it first, then opens
+  (`DeepLink.opening(_:signedInServer:others:)`, `ServersModel.open`); one
+  for a server that isn't registered opens nothing.
+- **Kept for each server:** the sign-in, where the person was, recent
+  searches, the new-episode place and the downloads with their sync. The
+  Downloads list shows the server in use's, with a line for each other
+  server's ("3 more from Cabin server") that switches to it. Live TV
+  reminders and the Top Shelf follow the server in use.
+
+On the fakes, `-fakesServers` signs Sam in to three servers: Living room
+server (in use, the sample library), Cabin server, with a small library of
+its own (`FakeCabin`: its ids are its own, and Harbor Lights is on both, so
+searching "harbor" lists it twice), and Den server, which doesn't answer and
+holds three downloads. Add a server finds the Office Mac mini.
+`-fakesSlowServer` makes Cabin server take 2.5 s to answer a search, to see
+Search say it is still asking. Without `-fakesServers` the fakes are signed in
+to one server, signed out of a second and remember a third that is too old.
+
 ## Settings
 
 Settings follows the web's: the same groups, names
@@ -383,7 +448,7 @@ apps word and decide alike:
   system has locale data for, with the ISO 639-1 ones and pt-BR, pt-PT,
   zh-Hans, zh-Hant and es-419; `LanguagePicker` searches it, marks what a list
   holds and says why Add is off at 16. No code is typed.
-- **Tasks with steps.** `LinkTVModel` and `ServerSwitchModel` give each step
+- **Tasks with steps.** `LinkTVModel` and `AddServerModel` give each step
   (`flowStep`: number, name, next), each button's title and why it is off,
   failures that end in what was or wasn't done (`problem`, `chooseProblem`,
   `signInProblem`), and the finished screen (`finished`).
@@ -477,10 +542,13 @@ The words are the Kit's (`NewEpisodeWords`), the rules too:
   the server's feed whenever this device could notify (signed in at level
   29, the switch on, iOS allowing), whatever this device last saw of the
   follows, since a show followed on another device notifies here too. It
-  keeps the server's cursor for one server and person (`NewEpisodeMemory`,
-  in UserDefaults, keyed by their ids), and forgets it when the switch goes
-  off, on a sign-out, or after signing in elsewhere (not a Switch server
-  that was cancelled). A first check only keeps the cursor; an unreachable
+  keeps the server's cursor for each server this device is signed in to and
+  the person signed in there (`NewEpisodeMemory`, in UserDefaults, keyed by
+  their ids), so coming back to a server announces what arrived there
+  meanwhile. A server's cursor goes when it is removed or signed out of, or
+  when someone else signs in there, and every cursor goes when the switch
+  goes off (not on an Add a server that was cancelled). Only the server in
+  use is checked. A first check only keeps the cursor; an unreachable
   server, or a 404 from a proxy in front of a restarting one, keeps it too.
   A check asked for while one runs runs once more after it, and the
   background refresh's expiry cancels it at once. Each check posts

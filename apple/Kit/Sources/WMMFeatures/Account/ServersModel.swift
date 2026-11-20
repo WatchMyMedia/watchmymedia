@@ -417,7 +417,7 @@ public final class ServersModel {
         }
         failure = Failure(serverID: saved.server.id, title: words.title, body: words.body, downloads: held)
         failedArrival = arriving
-        // A failure from Settings, Search, Downloads or a link is said where it can be answered.
+        // A failure from Settings or Downloads is said where it can be answered, as one from Servers is.
         presented = true
     }
 

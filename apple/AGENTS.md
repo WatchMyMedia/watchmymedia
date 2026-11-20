@@ -67,6 +67,39 @@ server, and on iPad in both a regular and a compact width.
   timing. `swift test --maximum-repetitions` repeats one test at a
   time, which doesn't load the main actor; to check a fix, run several copies
   of the whole test bundle at once.
+- **Several servers** (README, Several servers). One server is in use and
+  the device stays signed in to the others.
+  - A sign-in only ever goes to its own server's address. A call to a server
+    that isn't in use is made through an API built for that server alone
+    (`LocalStore.other(serverID:)`, as search across servers and downloads
+    do), never by handing another server's address to the API in use;
+    `RequestSigner` refuses to sign a request for any other address, and
+    `SeveralServersTests` checks that neither server sees the other's token.
+    A picture is signed for the server its address is on
+    (`LocalStore.signedIn(for:)`).
+  - Screens switch through `ServersModel` (`switchTo`, `remove`,
+    `signingOut`, `open`), one for the app in the environment, not by
+    calling `ServerRepository.select` or `forget` themselves: it asks the
+    server which it is first, says where the app is now, and moves on when
+    the server in use is removed or signed out of. Only sign-in and Add a
+    server (`AddServerModel`) select a server directly.
+  - A switch rebuilds the screens. What should show afterwards goes in
+    `Navigator.arrival` before the switch, and the root calls
+    `navigator.land(on:)` once it has reset the tabs; anything pushed before
+    that is thrown away by the reset.
+  - `ServerRepository.registered` (signed in to at some time and not
+    removed) is what Servers, Settings and search list. `saved` also holds
+    servers that were chosen and never signed in to, which only Add a
+    server's picker offers.
+  - Every id belongs to its server. Anything kept on the device for a title,
+    a search or a place is keyed by the server's id as well (and the
+    person's), and a search result from another server carries its server
+    (`FoundTitle.server`), so its id is never used against the server in use.
+  - Removing a server, or signing out of one, runs
+    `LocalStore.runSignOutHooks(serverID:)` while its session stands (the
+    downloads report every copy removed), then clears the sign-in, which
+    `onSignInRemoved` reports for a server that isn't in use, since
+    `onSessionChange` only fires for the one that is.
 - **iPhone and Apple TV share no files.** What both need goes in the Kit
   (README explains why `TV/` is separate from `App/`).
 - **Settings' words and saving are the Kit's** (README, Settings). A page
