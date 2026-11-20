@@ -10,6 +10,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
@@ -122,6 +123,25 @@ class SearchFocusTest {
         assertEquals("Voice typing", focused())
         press(Key.DirectionRight)
         assertTrue("right from the microphone reached ${focused()}, not a result", focused() in RESULTS)
+    }
+
+    /**
+     * With a microphone there are two hints, and on one line they ran from
+     * under the keyboard out across the results, where a third row of
+     * results (On Live TV) drew over them. Text here is measured far
+     * narrower than on a TV, so the test looks at the lines, not the widths.
+     */
+    @Test
+    fun `each key hint has a line of its own under the keyboard`() {
+        installRecognizer()
+        val keyboard = compose.onNodeWithText("Use the TV’s keyboard").fetchSemanticsNode().boundsInRoot
+        val top = compose.onNodeWithText("From the top row: the search box, and ▶ from there the microphone").fetchSemanticsNode().boundsInRoot
+        val bottom = compose.onNodeWithText("From the bottom row: the TV’s keyboard").fetchSemanticsNode().boundsInRoot
+        assertTrue("the ▼ hint, from ${bottom.top}, is not under the ▲ hint, which ends at ${top.bottom}", bottom.top >= top.bottom)
+        assertEquals("the hints' texts start in one column", top.left, bottom.left)
+        for (hint in listOf(top, bottom)) {
+            assertTrue("a hint runs from ${hint.left} to ${hint.right}, outside the keyboard's ${keyboard.left} to ${keyboard.right}", hint.left >= keyboard.left && hint.right <= keyboard.right)
+        }
     }
 
     @Test
