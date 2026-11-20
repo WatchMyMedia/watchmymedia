@@ -127,8 +127,11 @@ export class MediaUrls {
 
   constructor(readonly baseUrl: string, private tokens: MediaTokens, private now: () => number = () => Date.now(), private max = 1500) {}
 
+  // Arrow properties, so a screen can take them out of the object
+  // (`const { imageUrl } = useMediaUrls()`) and keep `this`.
+
   /** A media route on this server (`/api/images/…`, a logo, a trickplay sheet) with the token; undefined without one. */
-  mediaUrl(path: string | null | undefined): string | undefined {
+  mediaUrl = (path: string | null | undefined): string | undefined => {
     if (!path) return undefined
     const t = this.now()
     const hit = this.cache.get(path)
@@ -144,7 +147,5 @@ export class MediaUrls {
   }
 
   /** A TMDB image path ("/abc.jpg") at a size (`src/lib/images.ts`), with the token. */
-  imageUrl(path: string | null | undefined, size: ImageSize): string | undefined {
-    return this.mediaUrl(img(path ?? undefined, size))
-  }
+  imageUrl = (path: string | null | undefined, size: ImageSize): string | undefined => this.mediaUrl(img(path ?? undefined, size))
 }

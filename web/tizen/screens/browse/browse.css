@@ -1,0 +1,151 @@
+/* Home, the libraries, See all and list pages (HomeStart, HomeRow,
+   LibraryRows, LibraryAZ and ListPage on the Samsung TV canvas). Sizes are
+   the boards' pixels over 16; colours are the kit's tokens. */
+
+/* Home: one row a screen, the pages on a track moved with a transform. */
+.home { position: absolute; inset: 0; overflow: hidden; }
+.home__track { position: absolute; inset: 0; transition: transform 320ms cubic-bezier(.2, .8, .2, 1); will-change: transform; }
+.home__track--jump { transition: none; }
+.home__page { position: absolute; left: 0; width: 100%; height: 67.5rem; overflow: hidden; }
+
+.home-backdrop { position: absolute; left: 35rem; top: 0; width: 85rem; height: 41.25rem; pointer-events: none;
+  background: radial-gradient(56.25rem 26.25rem at 70% 30%, var(--accent-soft), transparent 60%), linear-gradient(180deg, var(--ph-a, var(--surface-3)) 0%, var(--ph-b, var(--surface)) 55%, var(--ground) 100%); }
+.home-backdrop--short { height: 26.25rem; }
+.home-backdrop__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: home-fade 200ms ease-out; }
+/* A pixel past the left edge, so no seam of the tone shows where the picture starts. */
+.home-backdrop__fade { position: absolute; inset: 0 0 0 -2px; background: linear-gradient(90deg, var(--ground) 0%, rgba(15, 15, 16, .85) 22%, rgba(15, 15, 16, 0) 60%), linear-gradient(180deg, rgba(15, 15, 16, 0) 50%, var(--ground) 100%); }
+@keyframes home-fade { from { opacity: 0; } }
+
+.home-kicker { font-size: 1.1875rem; }
+.home-hero { position: absolute; left: var(--content-left); top: 7rem; width: 56.25rem; display: flex; flex-direction: column; gap: 1.125rem; }
+.home-hero__title { font-size: var(--text-hero); font-weight: 800; letter-spacing: -.025em; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-hero__overview { max-width: 47.5rem; font-size: 1.375rem; line-height: 1.5; color: var(--text-3); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.home-hero__actions { margin-top: .625rem; gap: 1.25rem; }
+.home-facts { display: flex; align-items: center; gap: .75rem; min-width: 0; font-size: 1.375rem; color: var(--text-2); white-space: nowrap; }
+.home-facts--big { font-size: 1.4375rem; }
+.home-facts__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.home-facts__sep { color: var(--faint); }
+.home-facts__tags { display: flex; gap: .5rem; }
+.home-tag { font-size: .9375rem; font-weight: 700; padding: .1875rem .5rem; border-radius: var(--radius-s); border: 1px solid var(--line-3); }
+
+.home-start-row { position: absolute; left: var(--content-left); top: 35rem; }
+.home-page-row { position: absolute; left: var(--content-left); top: 36.25rem; }
+.home-panel { position: absolute; left: var(--content-left); top: 6rem; width: 58.75rem; display: flex; flex-direction: column; gap: 1rem; }
+.home-panel__title { font-size: 4rem; font-weight: 800; letter-spacing: -.025em; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-panel__overview { max-width: 50rem; font-size: 1.3125rem; line-height: 1.5; color: var(--text-3); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.home-panel__hint { margin-top: .375rem; display: flex; align-items: center; gap: .625rem; font-size: 1.0625rem; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.home-okkey { display: inline-flex; align-items: center; justify-content: center; min-width: 2.125rem; height: 1.75rem; padding: 0 .5rem; border-radius: var(--radius-s); border: 1px solid var(--line-3); font-size: .875rem; font-weight: 700; color: var(--text-3); flex: none; }
+
+.home-peek { position: absolute; left: var(--content-left); right: var(--gutter); bottom: 0; height: 3.75rem; display: flex; align-items: center; gap: .75rem; font-size: 1.1875rem; color: var(--muted); border-top: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
+.home-peek svg { width: 1.375rem; height: 1.375rem; flex: none; }
+.home-peek--up svg { transform: rotate(180deg); }
+
+.home-end { position: absolute; left: var(--content-left); top: 18.75rem; width: 62.5rem; display: flex; flex-direction: column; gap: 1.375rem; }
+.home-end__title { font-size: 2.75rem; font-weight: 700; letter-spacing: -.02em; }
+.home-end__body { max-width: 47.5rem; font-size: 1.375rem; line-height: 1.5; color: var(--text-3); }
+.home-end .tv-actions { margin-top: .375rem; gap: 1.25rem; }
+.home-end__totals { margin-top: 1.125rem; font-size: 1.0625rem; color: var(--faint); }
+
+.home-skeleton .home-hero { gap: 1.125rem; }
+.home-skeleton__rows { position: absolute; left: var(--content-left); top: 30.625rem; display: flex; flex-direction: column; gap: 1.25rem; }
+.home-address { font-size: 1.5rem; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* A row's last card: See all, or Live TV's Full guide. */
+.browse-more .browse-more__art { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .625rem; padding: 0 .875rem; text-align: center; background: var(--surface-2); border: 1px solid var(--line-2); }
+.browse-more:focus .browse-more__art { background: var(--surface-3); }
+.browse-more__glyph { width: 2.25rem; height: 2.25rem; color: var(--accent); }
+.browse-more__glyph svg { width: 100%; height: 100%; }
+.browse-more__title { font-size: 1.3125rem; font-weight: 700; line-height: 1.25; color: var(--text); }
+.browse-more__detail { font-size: 1.0625rem; line-height: 1.35; color: var(--muted); }
+
+/* A notice at the foot of the screen (Marked as watched, Requested). */
+.browse-toast { position: fixed; left: 50%; bottom: 3rem; transform: translateX(-50%); z-index: 16; padding: 1.125rem 1.625rem; border-radius: var(--radius-m); background: var(--text-2); color: var(--ground); font-size: 1.3125rem; font-weight: 600; box-shadow: 0 .75rem 2rem rgba(0, 0, 0, .5); white-space: nowrap; pointer-events: none; }
+.browse-toast[hidden] { display: none; }
+
+/* The remote's keys at the foot of a screen, over a fade. */
+.browse-hints { position: absolute; left: 0; right: 0; bottom: 0; height: 7.5rem; z-index: 3; display: flex; align-items: flex-end; gap: .875rem; padding: 0 var(--gutter) 1.875rem var(--content-left); background: linear-gradient(180deg, rgba(15, 15, 16, 0) 0%, rgba(15, 15, 16, .94) 45%); font-size: 1.1875rem; color: var(--text-3); white-space: nowrap; pointer-events: none; }
+.browse-hints__gap { width: 1.375rem; flex: none; }
+.browse-hints__note { color: var(--muted); }
+.browse-pill { position: absolute; right: var(--gutter); bottom: 2.25rem; z-index: 4; display: flex; align-items: center; gap: .75rem; padding: .625rem 1.125rem; border-radius: var(--radius); background: rgba(15, 15, 16, .88); font-size: 1.125rem; color: var(--text-3); white-space: nowrap; pointer-events: none; }
+.browse-pill[hidden] { display: none; }
+.browse-pill__gap { width: .5rem; }
+
+/* Libraries: the rows, Edit rows, then the grid with its sort and chips, in one vertical scroll. */
+.library { position: absolute; inset: 0 0 0 var(--content-left); }
+.library > .tv-vscroll { padding-right: 0; }
+.library-head { padding-top: 3.5rem; display: flex; align-items: flex-end; justify-content: space-between; gap: 2.5rem; padding-right: var(--gutter); }
+.library-head__text { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
+.library-title { font-size: 2.875rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+.library-counts { font-size: 1.25rem; color: var(--muted); }
+.library-rows { display: flex; flex-direction: column; gap: 1.5rem; padding-top: 1.5rem; }
+.library-edit { padding: 1.25rem 0 3.5rem; }
+/* A screen tall less the scroll's 48px margin, so focus coming into it fills the screen with it;
+   Edit rows leaves that margin empty above it. Alone (no rows) it is the whole screen. */
+.library-grid { position: relative; height: 64.5rem; display: flex; flex-direction: column; }
+.library-grid--alone { height: 67.5rem; }
+.library-grid__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 2rem; padding: 3rem var(--gutter) 0 0; }
+.library-grid__title { font-size: var(--text-h2); font-weight: 600; display: flex; align-items: baseline; gap: .875rem; }
+.library-grid__title small { font-size: 1.1875rem; font-weight: 500; color: var(--muted); }
+.library-sort { display: flex; align-items: center; gap: 1rem; flex: none; }
+.library-sort__label { font-size: 1.1875rem; color: var(--muted); }
+.library-sort .tv-chip svg { width: 1.25rem; height: 1.25rem; }
+.library-chips { position: relative; margin: 1.125rem -1rem 0; padding: .875rem 1rem; overflow: hidden; }
+.library-chips__track { display: flex; align-items: center; gap: .875rem; width: max-content; transition: transform 180ms ease-out; }
+.library-chips__divider { width: 1px; height: 2rem; margin: 0 .5rem; background: var(--line-2); flex: none; }
+.library-chip-more svg { width: 1.25rem; height: 1.25rem; }
+.library-grid__body { position: relative; flex: 1; min-height: 0; margin-top: .75rem; }
+.library-grid__body > .tv-grid { height: calc(100% + 1.25rem); }
+.library-grid--az { --grid-poster-w: 11.125rem; }
+.library-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 1.25rem; padding-top: 2.5rem; max-width: 60rem; }
+.library-empty__title { font-size: 2rem; font-weight: 700; }
+.library-empty__body { font-size: 1.375rem; line-height: 1.5; color: var(--text-3); }
+.library-more { padding: .5rem 0 0; font-size: 1.1875rem; color: var(--muted); }
+
+/* A grid title not loaded yet: its place, pulsing like a skeleton. */
+.browse-slot .tv-card__art { animation: tv-skel 1.4s ease-in-out infinite; }
+.browse-slot .tv-card__placeholder { background: var(--surface-2); }
+.browse-land .tv-card__art { outline: .1875rem dashed var(--accent); outline-offset: .25rem; }
+
+/* The A–Z strip at the grid's right edge (LibraryAZ). */
+.library-strip { position: absolute; right: 3.25rem; top: 0; width: 4.25rem; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: .5rem 0; border-radius: 2.125rem; }
+.library-strip--on { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-2); }
+.library-az { display: grid; place-items: center; width: 3.25rem; height: 1.6875rem; border-radius: .5rem; font-size: 1.0625rem; font-weight: 700; color: var(--text-3); transition: transform var(--focus-time) ease-out; }
+.library-az[aria-disabled="true"] { color: var(--dim); cursor: default; }
+.library-az--current { color: var(--accent); }
+.library-az:focus { background: var(--accent); color: var(--on-accent); outline: var(--focus-width) solid var(--accent); outline-offset: .1875rem; transform: scale(1.15); }
+.library-bubble { position: absolute; right: 8.75rem; width: 6.5rem; height: 7rem; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .125rem; border-radius: 1.25rem; background: var(--surface-2); border: 2px solid var(--accent); box-shadow: 0 1.125rem 2.75rem rgba(0, 0, 0, .6); pointer-events: none; }
+.library-bubble b { font-size: 3.625rem; line-height: 1; font-weight: 800; color: var(--accent); }
+.library-bubble span { font-size: .9375rem; color: var(--text-3); }
+
+/* A list's page (ListPage). */
+.list-page { position: absolute; inset: 0; overflow: hidden; }
+.list-head { position: absolute; left: var(--content-left); right: var(--gutter); top: 3.5rem; display: flex; align-items: flex-end; justify-content: space-between; gap: 2.5rem; }
+.list-head__text { display: flex; flex-direction: column; gap: .625rem; min-width: 0; }
+.list-title { font-size: 3.5rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-line { font-size: 1.3125rem; color: var(--text-3); }
+.list-count { font-size: 1.25rem; color: var(--muted); }
+.list-failed { display: flex; align-items: flex-start; gap: .875rem; width: 38.75rem; flex: none; padding: 1.125rem 1.25rem; border-radius: var(--radius-m); background: var(--surface-2); border: 1px solid var(--warn); font-size: 1.1875rem; line-height: 1.7rem; color: var(--text); }
+.list-failed svg { width: 1.625rem; height: 1.625rem; flex: none; color: var(--warn); }
+.list-hint { display: flex; align-items: center; gap: .75rem; font-size: 1.1875rem; color: var(--text-3); white-space: nowrap; flex: none; }
+.list-hint[hidden] { display: none; }
+.list-grid { position: absolute; left: var(--content-left); right: 0; top: 17.5rem; bottom: 0; }
+.list-grid__body { height: 100%; }
+.list-grid__body > .tv-grid { height: calc(100% + 1.25rem); }
+.list-empty { font-size: 1.375rem; color: var(--muted); }
+.list-rank { position: absolute; left: .5rem; top: .5rem; z-index: 1; display: grid; place-items: center; min-width: 2rem; height: 2rem; padding: 0 .5rem; border-radius: 1rem; background: rgba(15, 15, 16, .85); font-size: 1rem; font-weight: 800; color: var(--text); }
+.list-missing .tv-card__img, .list-missing .tv-card__placeholder { opacity: .32; filter: grayscale(.85); }
+.list-missing .tv-card__title { color: var(--muted); }
+.list-pill { position: absolute; left: .625rem; right: .625rem; bottom: .625rem; min-height: 3rem; display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .375rem .625rem; border-radius: var(--radius); background: rgba(26, 26, 29, .92); color: var(--text-3); font-size: 1.0625rem; font-weight: 600; text-align: center; }
+.list-pill svg { width: 1.25rem; height: 1.25rem; }
+.list-pill--request { background: var(--brand); box-shadow: inset 0 0 0 1px var(--brand-line); color: var(--text); }
+.list-pill--downloading { color: var(--accent); }
+.list-pill--muted { color: var(--muted); }
+.list-notfound .tv-card__art { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .625rem; padding: 0 .875rem; text-align: center; background: var(--surface); border: 2px dashed var(--line-3); color: var(--muted); }
+.list-notfound__glyph { width: 2.25rem; height: 2.25rem; }
+.list-notfound__glyph svg { width: 100%; height: 100%; }
+.list-notfound__title { font-size: 1.1875rem; font-weight: 700; color: var(--text-3); }
+.list-notfound__raw { font-size: 1rem; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.list-notfound .tv-card__title { color: var(--muted); }
+.browse-card { display: contents; }
+.library-hints { display: none; left: calc(-1 * var(--content-left)); padding-left: var(--content-left); }
+.library-grid--in .library-hints { display: flex; }

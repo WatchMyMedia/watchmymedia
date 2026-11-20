@@ -49,3 +49,6 @@
 .signin-aside__icon { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 1rem; background: var(--brand); }
 .signin-aside__icon svg { width: 2rem; height: 2rem; }
 .signin-aside__title { font-size: 1.75rem; font-weight: 700; letter-spacing: -.01em; }
+.start-problem__address { display: flex; flex-direction: column; align-items: center; gap: .5rem; margin: .375rem 0; padding: 1.375rem 2.5rem; border-radius: var(--radius-l); background: var(--surface-2); }
+.start-problem__address span { font-size: 1.125rem; color: var(--muted); }
+.start-problem__address b { font-size: 2.25rem; font-weight: 700; letter-spacing: -.01em; }
