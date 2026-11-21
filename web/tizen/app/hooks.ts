@@ -6,7 +6,7 @@ import type { KeyInput } from './keys'
 import type { Entry } from './nav'
 import type { PlayRequest, Route } from './routes'
 import type { ActiveSession } from '../session/active'
-import type { AppSession } from '../session/session'
+import type { AppSession, StartState } from '../session/session'
 import type { Player } from '../player'
 
 // The contexts the app provides and the hooks screens use. Screens never
@@ -45,6 +45,12 @@ export function useInput(): Input { return need(useContext(InputContext), 'useIn
 export function useFocus() { return useInput().focus }
 export function useApp(): AppSession { return need(useContext(AppContext), 'useApp') }
 export function useNav(): Nav { return need(useContext(NavContext), 'useNav') }
+
+/** The app session as it changes: the screen it is on, a switch under way. Screens that list `app.store`'s servers read it to redraw with them. */
+export function useAppState(): StartState {
+  const app = useApp()
+  return useSyncExternalStore(app.subscribe, app.snapshot)
+}
 
 /** The app's one Player, which FilePlayback and LivePlayback share; undefined where nothing can play. */
 export function usePlayer(): Player | undefined { return useContext(PlayerContext) }

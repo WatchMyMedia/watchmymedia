@@ -234,7 +234,9 @@ function episodeById(id: number): { showId: number; season: FakeSeason; index: n
   return season && season.episodes[index] ? { showId, season, index } : undefined
 }
 
-export function registerDetails(server: FakeServer, mode = '') {
+/** `titles` renames pages by id, for a server whose library borrows them under its own names. */
+export function registerDetails(server: FakeServer, mode = '', titles?: ReadonlyMap<number, string>) {
+  const named = <T extends { id: number; title: string }>(d: T): T => ({ ...d, title: titles?.get(d.id) ?? d.title })
   if (mode === 'member') {
     // A member: no Sonarr actions, requests that wait for an admin. Registered before Home's, so its options answer first.
     FAKE_USER.isAdmin = false
@@ -244,7 +246,7 @@ export function registerDetails(server: FakeServer, mode = '') {
 
   server.route('GET', '/api/movies/:id', ({ params }) => {
     const found = findMovie(Number(params.id))
-    return found ? movieDetail(found.item, found.index) : problem(404, 'no such movie')
+    return found ? named(movieDetail(found.item, found.index)) : problem(404, 'no such movie')
   })
   server.route('GET', '/api/movies/:id/related', ({ params }) => {
     const id = Number(params.id)
@@ -283,13 +285,13 @@ export function registerDetails(server: FakeServer, mode = '') {
 
   server.route('GET', '/api/shows/:id', ({ params }) => {
     const show = findShow(Number(params.id))
-    return show ? showDetail(show) : problem(404, 'no such show')
+    return show ? named(showDetail(show)) : problem(404, 'no such show')
   })
   server.route('GET', '/api/shows/:id/seasons/:number', ({ params }) => {
     const show = findShow(Number(params.id))
     const s = show && seasonsOf(show.id).find((x) => x.number === Number(params.number))
     if (!show || !s) return problem(404, 'no such season')
-    return { ...seasonSummary(show.id, s), show: { id: show.id, title: show.title }, episodes: s.episodes.map((e, i) => episodeOf(show.id, s, e, i)) }
+    return { ...seasonSummary(show.id, s), show: named({ id: show.id, title: show.title }), episodes: s.episodes.map((e, i) => episodeOf(show.id, s, e, i)) }
   })
   server.route('GET', '/api/shows/:id/related', ({ params }) => ({ rows: [
     { id: 'similar', style: 'poster', title: 'More like this', items: SHOW_ITEMS.filter((s) => s.id !== Number(params.id) % 1000).map(withWatch) },

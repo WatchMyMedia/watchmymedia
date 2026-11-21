@@ -188,6 +188,23 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   it; a `LaunchedEffect` a frame later finds focus already elsewhere. A
   `FocusRequester` whose element has left the composition throws on
   `requestFocus()`; use `tryFocus()` (`tv/src/main/kotlin/media/watchmy/client/tv/components/Focus.kt`).
+- **A list beside other controls.** A focus search in a direction takes
+  only what starts further that way than the focused item, and it judges a
+  scrolling list by the list's own bounds, not its cards'. Search's results
+  on the TV started under the keyboard's last column with their cards inset,
+  so ▶ from 0, p, ' and - found nothing, and only the bottom row's wider
+  keys reached a result. Start the list itself past the controls beside it
+  and inset its content less (`ResultsInset` in
+  `tv/src/main/kotlin/media/watchmy/client/tv/search/SearchScreen.kt`), or
+  name the way across, as the rail does with `focusProperties { right = … }`.
+  `SearchFocusTest` presses ▶ from the last key of every row.
+- **Text widths under Robolectric.** The tests measure text far narrower
+  than a device does: a 65-character line at 19 sp came out 65 px wide. A
+  test there can't see text overflow or run into something beside it, so a
+  width check passes on a layout that collides on a TV. Assert on structure
+  instead (which line a thing is on, what it lines up with), as
+  `SearchFocusTest` does for Search's key hints, and check the widths on an
+  emulator.
 - **Passwords in fields.** `rememberModelTextField` keeps its text across
   process death, so password fields use a plain `remember`ed state
   (`ChangePasswordScreen`): a password never outlives the process.
@@ -198,10 +215,15 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   row with an `enter` card (`CardRow`) takes the remembered card as its way
   in when it is composed again
   (`tv/src/main/kotlin/media/watchmy/client/tv/detail/RelatedRows.kt`).
-- **Focus tests and cleared semantics.** `HomeFocusTest` finds the focused
-  element by its `Focused` semantics. A card that `clearAndSetSemantics` to
-  read as one thing must set `focused` itself (as `TvOnNowCard` does), or the
-  test sees nothing focused after a move onto it.
+- **Cleared semantics and focus.** A card or cell that `clearAndSetSemantics`
+  to read as one thing clears its own focus state with its parts', so it
+  must set `focused` itself (as `TvOnNowCard` does). Without it TalkBack is
+  never told the element is in focus, and a test that finds the focused
+  element by its `Focused` semantics (`HomeFocusTest`) sees nothing after a
+  move onto it. Search's Live TV results and every cell of the Live TV
+  guide were like that until 20 November 2026; `adb shell uiautomator dump`
+  showed no focused node while one plainly had focus. Read the state only
+  in the semantics, so a move of focus composes nothing again.
 
 ## Emulators
 

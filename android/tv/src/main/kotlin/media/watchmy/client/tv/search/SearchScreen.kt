@@ -101,8 +101,21 @@ import androidx.compose.foundation.layout.height
 import media.watchmy.client.tv.components.TvKeyboardOpener
 import media.watchmy.client.ui.onBack
 
+/** How wide the keyboard is: ten keys and the gaps between them. Its box, its note and the key hints keep to it. */
+private val KeyboardWidth = 712.dp
+
 /** Where the results start: right of the keyboard (154 + 712 + 60). */
 private val ResultsStart = 926.dp
+
+/**
+ * How far inside their list the results start. The list's own left edge has
+ * to be right of the keyboard (which ends at 866): a focus search to the
+ * right skips anything that starts left of the focused key, so with the
+ * list starting under the keyboard's last column, ▶ from the end of the
+ * number and letter rows found nothing and only the bottom row's wider keys
+ * reached the results.
+ */
+private val ResultsInset = 40.dp
 
 /**
  * Search (no mockup; it follows the Library's cards): the on-screen keyboard
@@ -132,7 +145,7 @@ fun SearchScreen(
     val withLive = liveTv && live.available
     LaunchedEffect(state.query, withLive) { if (withLive) liveSearch.search(state.query) }
     val liveRow: (@Composable () -> Unit)? = if (withLive && live.searched != null && live.error == null) {
-        { TvLiveSearchRow(live, onWatchLive, onOpenLive, liveSearch::toggleReminder, Modifier.padding(start = ContentStart)) }
+        { TvLiveSearchRow(live, onWatchLive, onOpenLive, liveSearch::toggleReminder, Modifier.padding(start = ResultsInset)) }
     } else null
     var asking by remember { mutableStateOf<Requestable?>(null) }
     val firstKey = remember { FocusRequester() }
@@ -146,7 +159,7 @@ fun SearchScreen(
     TvScaffold(RailSection.Search, onNavigate) {
         // Back while listening stops it now, before anything else takes Back.
         Column(
-            Modifier.padding(start = ContentStart, top = 56.dp).width(712.dp).onBack(enabled = listening, onBack = voice::stop),
+            Modifier.padding(start = ContentStart, top = 56.dp).width(KeyboardWidth).onBack(enabled = listening, onBack = voice::stop),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Text("Search", style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
@@ -241,7 +254,8 @@ private fun Results(
     val density = LocalDensity.current
     val spec = remember(density) { with(density) { KeepInViewSpec(leading = 90.dp.toPx(), trailing = 40.dp.toPx()) } }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
-        LazyColumn(Modifier.fillMaxSize(), state = rememberLazyListState(), contentPadding = PaddingValues(top = 60.dp, bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        // The list starts right of the keyboard, so ▶ from the last key of any of its rows comes here (ResultsInset).
+        LazyColumn(Modifier.fillMaxSize().padding(start = ContentStart - ResultsInset), state = rememberLazyListState(), contentPadding = PaddingValues(top = 60.dp, bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             if (results.shows.isNotEmpty()) {
                 item("shows") {
                     PosterSection("TV Shows", results.shows, library, memory) { it.open(onOpenShow, onOpenMovie, onPlay, notMatched) }
@@ -257,8 +271,8 @@ private fun Results(
             if (notInLibrary.isNotEmpty()) {
                 item("requestable") {
                     Column {
-                        SectionHeader("Not in your library", small = if (viaSeerr) "From Seerr" else "${notInLibrary.size}", start = ContentStart)
-                        CardRow(start = ContentStart) {
+                        SectionHeader("Not in your library", small = if (viaSeerr) "From Seerr" else "${notInLibrary.size}", start = ResultsInset)
+                        CardRow(start = ResultsInset) {
                             items(notInLibrary, key = { "${it.mediaType}${it.tmdbId}" }) { item ->
                                 NotInLibraryCard(item, library, memory) {
                                     when {
@@ -275,8 +289,8 @@ private fun Results(
             if (results.episodes.isNotEmpty()) {
                 item("episodes") {
                     Column {
-                        SectionHeader("Episodes", small = "${results.episodes.size}", start = ContentStart)
-                        CardRow(start = ContentStart) {
+                        SectionHeader("Episodes", small = "${results.episodes.size}", start = ResultsInset)
+                        CardRow(start = ResultsInset) {
                             items(results.episodes, key = { it.episodeId }) { e ->
                                 MediaCard(
                                     title = e.showTitle,
@@ -335,8 +349,8 @@ private fun NotInLibraryCard(item: Requestable, library: LibraryRepository, memo
 @Composable
 private fun PosterSection(title: String, items: List<BrowseItem>, library: LibraryRepository, memory: FocusMemory, onOpen: (BrowseItem) -> Unit) {
     Column {
-        SectionHeader(title, small = "${items.size}", start = ContentStart)
-        CardRow(start = ContentStart) {
+        SectionHeader(title, small = "${items.size}", start = ResultsInset)
+        CardRow(start = ResultsInset) {
             items(items, key = { it.id }) { item ->
                 MediaCard(
                     title = item.title,
@@ -404,17 +418,25 @@ private fun VoiceLine(text: String, listening: Boolean) {
     }
 }
 
-/** The board's key hints at the foot of the keyboard, while typing. */
+/**
+ * The key hints at the foot of the keyboard, while typing: one a line, and
+ * no wider than the keyboard. On one line, the two a TV with a microphone
+ * gets ran out across the results, and a third row of results (On Live TV)
+ * drew over them.
+ */
 @Composable
 private fun KeyHints(mic: Boolean, modifier: Modifier = Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (mic) {
-            KeyCap("▲")
-            Text("From the top row: the search box, and ▶ from there the microphone", style = inter(19.sp), color = WmmColors.TextSoft)
-            Box(Modifier.width(18.dp))
-        }
-        KeyCap("▼")
-        Text("From the bottom row: the TV’s keyboard", style = inter(19.sp), color = WmmColors.TextSoft)
+    Column(modifier.width(KeyboardWidth), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (mic) KeyHint("▲", "From the top row: the search box, and ▶ from there the microphone")
+        KeyHint("▼", "From the bottom row: the TV’s keyboard")
+    }
+}
+
+@Composable
+private fun KeyHint(key: String, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        KeyCap(key)
+        Text(text, style = inter(19.sp), color = WmmColors.TextSoft)
     }
 }
 
