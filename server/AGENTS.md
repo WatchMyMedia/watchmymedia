@@ -157,9 +157,15 @@ SQLite plans joins without statistics, and a plan that looks fine after
   error. Work nobody waits for tries again with `db.RetryBusy`, as the
   matcher's writes do; what it runs has to be safe to run twice, so a
   transaction that counts or collects as it goes resets that at its start.
+  Its wait counts from the first refusal, so a refused write is always
+  tried once more, however long the first try took.
   To test it, open a second connection with `db.OpenBusy` and a wait of
   milliseconds, hold the lock on the first with `BeginTx`, and let go from
   a hook rather than after a sleep (`internal/metadata/busy_test.go`).
+  Don't assert how many tries fit in a wait, or that a try is shorter than
+  one: a 10 ms busy timeout took 61 ms on CI's Windows runner, longer than
+  the 40 ms a test was retrying for (`TestRetryBusy` now has that case on
+  every machine, with a connection that waits three times the retry).
 - `TestHomeSpeed` (`internal/api/home_speed_test.go`) seeds a library the size
   of the largest real one (about 2,850 movies, 1,100 shows, 18,700 files),
   with ten 250-entry lists and three library lists on Home, and times each

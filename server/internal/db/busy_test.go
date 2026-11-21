@@ -10,9 +10,10 @@ import (
 	"time"
 )
 
-// busyPair is a database with two connections to it: one to hold the write
-// lock with, and one that waits 10 ms for it where the server's waits 5 s.
-func busyPair(t *testing.T) (holder, quick *sql.DB) {
+// busyDB is a database, a connection to hold its write lock with, and a
+// way to open others that wait as long as a test says for that lock, where
+// the server's wait 5 s.
+func busyDB(t *testing.T) (holder *sql.DB, open func(busy time.Duration) *sql.DB) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "t.db")
 	holder, err := Open(path)
@@ -23,17 +24,21 @@ func busyPair(t *testing.T) (holder, quick *sql.DB) {
 	if _, err := holder.ExecContext(t.Context(), `CREATE TABLE notes (text TEXT)`); err != nil {
 		t.Fatal(err)
 	}
-	quick, err = OpenBusy(path, 10*time.Millisecond)
-	if err != nil {
-		t.Fatal(err)
+	return holder, func(busy time.Duration) *sql.DB {
+		t.Helper()
+		conn, err := OpenBusy(path, busy)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = conn.Close() })
+		return conn
 	}
-	t.Cleanup(func() { _ = quick.Close() })
-	return holder, quick
 }
 
 func TestIsBusy(t *testing.T) {
 	t.Parallel()
-	holder, quick := busyPair(t)
+	holder, open := busyDB(t)
+	quick := open(10 * time.Millisecond)
 	ctx := t.Context()
 	tx, err := holder.BeginTx(ctx, nil)
 	if err != nil {
@@ -64,7 +69,8 @@ func TestIsBusy(t *testing.T) {
 
 func TestRetryBusy(t *testing.T) {
 	t.Parallel()
-	holder, quick := busyPair(t)
+	holder, open := busyDB(t)
+	quick := open(10 * time.Millisecond)
 	ctx := t.Context()
 	hold := func() *sql.Tx {
 		t.Helper()
@@ -94,17 +100,49 @@ func TestRetryBusy(t *testing.T) {
 		t.Errorf("a lock that clears: %v after %d tries, want it written at the second", err, tries)
 	}
 
-	// It never finishes: the write is given up once the wait has passed,
-	// with the database's own error.
+	// It never finishes. The wait counts from the first refusal, so
+	// nothing here depends on how long a try takes, which is the
+	// connection's own wait and the machine's doing: the write is tried
+	// once more at least, and is not given up before the wait has passed
+	// since it was first refused.
 	hold()
-	tries = 0
-	begin := time.Now()
-	err = RetryBusy(ctx, 40*time.Millisecond, func() error {
-		tries++
-		return write()
-	})
-	if !IsBusy(err) || tries < 2 || time.Since(begin) < 40*time.Millisecond {
-		t.Errorf("a lock that stays: %v after %d tries in %v, want busy after more than one try and the whole wait", err, tries, time.Since(begin))
+	stays := func(conn *sql.DB, wait time.Duration) (tries int, first, after time.Duration, err error) {
+		var refused time.Time
+		begin := time.Now()
+		err = RetryBusy(ctx, wait, func() error {
+			_, err := conn.ExecContext(ctx, `INSERT INTO notes VALUES ('a')`)
+			if tries++; tries == 1 {
+				refused = time.Now()
+			}
+			return err
+		})
+		return tries, refused.Sub(begin), time.Since(refused), err
+	}
+	const wait = 40 * time.Millisecond
+	tries, first, after, err := stays(quick, wait)
+	if !IsBusy(err) || tries < 2 || after < wait {
+		t.Errorf("a lock that stays: %v after %d tries, the first of %v, and %v more; want busy after a second try at least and %v more", err, tries, first, after, wait)
+	}
+	// A try that outlasts the whole wait, as one did on CI's Windows runner
+	// (61 ms against a wait of 40 ms), when the wait still counted from the
+	// start and the write was given up after that one try. Here the
+	// connection itself waits three times as long for the lock as the
+	// write is to be retried for, so the first try is the longer on any
+	// machine.
+	const (
+		slowTry  = 60 * time.Millisecond
+		slowWait = slowTry / 3
+	)
+	tries, first, after, err = stays(open(slowTry), slowWait)
+	if first <= slowWait {
+		t.Errorf("the first try took %v, no longer than the wait of %v: this is not the case it means to be", first, slowWait)
+	}
+	if !IsBusy(err) || tries < 2 || after < slowWait {
+		t.Errorf("a lock that stays past a slow try: %v after %d tries, the first of %v, and %v more; want busy after a second try at least and %v more", err, tries, first, after, slowWait)
+	}
+	// No wait at all is one try.
+	if tries, _, _, err = stays(quick, 0); !IsBusy(err) || tries != 1 {
+		t.Errorf("no wait: %v after %d tries, want busy after one", err, tries)
 	}
 
 	// What it was waiting for ends: its error, at once.
