@@ -56,12 +56,12 @@ func TestSQLiteToolWritesTitles(t *testing.T) {
 		INSERT INTO episodes (id, season_id, show_id, number, title) VALUES (11, 4, 3, 1, 'Pilot'), (12, 4, 3, 2, 'Graveyard Special');
 		UPDATE movies SET title = 'Harbour Lights' WHERE id = 7;
 		DELETE FROM movies WHERE id = 9;
-		SELECT 'scratch ' || COUNT(*) FROM search_scratch;
+		SELECT 'indexed ' || COUNT(*) FROM movies_search;
 	`
 	cmd := exec.CommandContext(ctx, tool, "-bail", path) //nolint:gosec // G204: the sqlite3 found on the PATH
 	cmd.Stdin = strings.NewReader(script)
 	out, err := cmd.CombinedOutput()
-	if err != nil || strings.TrimSpace(string(out)) != "scratch 0" {
+	if err != nil || strings.TrimSpace(string(out)) != "indexed 2" {
 		t.Fatalf("sqlite3 %s: %v\n%s", strings.TrimSpace(string(version)), err, out)
 	}
 

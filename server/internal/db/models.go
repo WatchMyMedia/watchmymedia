@@ -703,11 +703,6 @@ type Request struct {
 	UpdatedAt     string  `json:"updated_at"`
 }
 
-type SearchScratch struct {
-	ID    int64  `json:"id"`
-	Words string `json:"words"`
-}
-
 type Season struct {
 	ID           int64   `json:"id"`
 	ShowID       int64   `json:"show_id"`

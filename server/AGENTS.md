@@ -220,17 +220,33 @@ missing or a rematch needs no index write. Don't put file state in it.
   fewer. A word goes to it only with three letters or digits
   (`searchLetters`; an accent typed apart from its letter does not count,
   since the index drops it). Shorter words ask for the titles where they
-  start a word, which the index can look up because its `words` column has
-  two unit separators before every word; only when those don't fill the
-  list is every title read (`searchQuery.hits`).
+  start a word (`searchQuery.startsMatch`): the index's `words` column has
+  two unit separators at the start of a title and after every space, so
+  one letter there is three characters; two letters are also asked for
+  after each mark a word can follow (`searchBreaks`), which is three
+  characters with the mark and needs nothing kept. Only when those don't
+  fill the list is every title read (`searchQuery.hits`). So with one
+  letter typed and a full list, a title whose word follows a hyphen or a
+  bracket is not in it until the second letter.
+- The triggers are compiled into every statement that writes a title, each
+  time it is prepared, whether or not they fire, and the queries here are
+  prepared on every call. Keep them to one statement and a few function
+  calls. A first version worked the words out in a helper table's trigger
+  with some fifty `replace()` calls: a title write, changed or not, went
+  from 42 to 245 microseconds, and under the race detector from 1.1 to
+  8.8 ms, where the matcher's two writers then waited for each other up to
+  1.65 s on a Mac and past the 5 s busy timeout on CI
+  (`TestMatchByOtherNames` left a file pending). As they are, a new title
+  costs 101 microseconds and one written again unchanged 64 (2.9 and
+  2.1 ms under the detector); measure a change to them the same way,
+  with and without `-race`.
 - The marks the index leaves out of a title's second form (`searchJoiners`)
-  and takes a word to start after are written out once in the migration,
-  in the trigger on `search_scratch`, since SQLite has no function for
-  them: each title's trigger puts the title in that table, its trigger
-  turns it into the words, and the title's trigger moves them to the index
-  and empties the table. A change to either list is a new migration that
-  replaces that trigger and rebuilds the three indexes, with the Go
-  constants changed to match; `TestSearchIndexWords` compares them.
+  and its two separators are written out in the migration nine times (the
+  first fill, the insert trigger and the update trigger of each table),
+  since SQLite has no function for them and a shared helper costs every
+  write. A change to them is a new migration that replaces the triggers
+  and rebuilds the three indexes, with the Go constants changed to match;
+  `TestSearchIndexWords` and `TestMigrationSearchIndex` compare every copy.
 - The triggers belong to `movies`, `shows` and `episodes`. A migration that
   rebuilds one of those tables (a new table, the rows copied, the old one
   dropped) drops its triggers with it and has to make them again;
@@ -266,7 +282,9 @@ database. A draft of the search index had fifty `replace()` calls inside
 one another in a trigger, which the server read and sqlite3 3.45 refused
 ("parser stack overflow"); keep an expression to a dozen.
 `TestSQLiteToolWritesTitles` (`internal/db`) writes titles with the
-`sqlite3` on the `PATH`, when it is 3.45 or later. Test data-moving migrations in `migrations_test.go` by
+`sqlite3` on the `PATH`, when it is 3.45 or later. A trigger also costs
+every write to its table, fired or not (see Search): time a write to the
+table before and after adding one. Test data-moving migrations in `migrations_test.go` by
 migrating up to the version before, inserting rows, then migrating on.
 Use raw SQL until the database is at the latest version: the generated
 queries list every column of today's schema, so one run at an older version

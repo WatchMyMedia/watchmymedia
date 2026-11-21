@@ -2,6 +2,7 @@ package api
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -48,8 +49,16 @@ func TestParseSearch(t *testing.T) {
 	if got := new(parseSearch(`one "two" three`)).indexMatch(); got != `"one" AND "two" AND "three"` {
 		t.Errorf("indexMatch = %s", got)
 	}
-	if got := new(parseSearch("dr io")).startsMatch(); got != `"`+searchMark+`dr" AND "`+searchMark+`io"` {
-		t.Errorf("startsMatch = %q", got)
+	// One letter can only be looked up after the index's mark; two also
+	// after each mark a word can follow, a double quote among them.
+	if got := new(parseSearch("e")).startsMatch(); got != `("`+searchMark+`e")` {
+		t.Errorf("startsMatch of one letter = %q", got)
+	}
+	got := new(parseSearch("dr io")).startsMatch()
+	dr, io, ok := strings.Cut(got, " AND ")
+	if !ok || !strings.HasPrefix(dr, `("`+searchMark+`dr" OR "!dr" OR """dr" OR "#dr" OR `) || !strings.HasSuffix(dr, " OR \"\u00bbdr\")") ||
+		strings.Count(dr, " OR ") != len([]rune(searchBreaks)) || io != strings.ReplaceAll(dr, `dr"`, `io"`) {
+		t.Errorf("startsMatch of two words of two letters = %q", got)
 	}
 	for typed, want := range map[string][4]string{
 		"ox":      {"%ox%", "%", "%", ""},

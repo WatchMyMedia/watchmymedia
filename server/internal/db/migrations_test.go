@@ -889,15 +889,26 @@ func TestMigrationSearchIndex(t *testing.T) {
 	if n := count("episodes_search"); int64(n) != episodes {
 		t.Errorf("%d episodes in the index", n)
 	}
-	// The words the index keeps: two unit separators before each word, and
-	// a title with a hyphen a second time without it.
+	// The words the index keeps: two unit separators at the start and after
+	// each space and line break, and a title with a hyphen a second time
+	// without it.
 	for id, want := range map[int64]string{
 		7: "\x1f\x1fHarbor \x1f\x1fLights\n\x1f\x1f",
-		8: "\x1f\x1fLantern-\x1f\x1fMan\n\x1f\x1fDer \x1f\x1fLaternen-\x1f\x1fMann\n\x1f\x1fLanternMan\n\x1f\x1fDer \x1f\x1fLaternenMann",
+		8: "\x1f\x1fLantern-Man\n\x1f\x1fDer \x1f\x1fLaternen-Mann\n\x1f\x1fLanternMan\n\x1f\x1fDer \x1f\x1fLaternenMann",
 	} {
 		var words string
 		if err := conn.QueryRowContext(ctx, `SELECT words FROM movies_search WHERE rowid = ?`, id).Scan(&words); err != nil || words != want {
 			t.Errorf("words of movie %d = %q, %v; want %q", id, words, err, want)
+		}
+	}
+	for table, want := range map[string]string{
+		"shows WHERE rowid = 3":     "\x1f\x1fInspector \x1f\x1fVane's \x1f\x1fRoad\n\x1f\x1f\n\x1f\x1fInspector \x1f\x1fVanes \x1f\x1fRoad\n\x1f\x1f",
+		"episodes WHERE rowid = 10": "\x1f\x1fCo-Pilot \x1f\x1f10\n\x1f\x1fCoPilot \x1f\x1f10",
+		"episodes WHERE rowid = 11": "\x1f\x1fNight \x1f\x1fFerry \x1f\x1f11",
+	} {
+		var words string
+		if err := conn.QueryRowContext(ctx, `SELECT words FROM `+strings.Replace(table, " WHERE", "_search WHERE", 1)).Scan(&words); err != nil || words != want {
+			t.Errorf("words of %s = %q, %v; want %q", table, words, err, want)
 		}
 	}
 

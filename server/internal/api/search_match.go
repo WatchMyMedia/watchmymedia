@@ -10,9 +10,8 @@ import (
 )
 
 // The search index (migration 00045_search_index.sql) keeps each title as
-// words to look up, and writes these marks out for each of its three
-// tables: keep the two alike (TestSearchIndexWords checks, with the marks
-// the index takes a word to start after).
+// words to look up. Its triggers write searchJoiners and searchMark out for
+// each of its three tables: keep them alike (TestSearchIndexWords checks).
 const (
 	// searchJoiners are the marks people leave out when they type and put
 	// no gap for: "spiderman" for "Spider-Man", "oceans" for "Ocean's
@@ -20,10 +19,19 @@ const (
 	// them a second time, without them. They are - ' . * / and the curled
 	// apostrophe and middle dot.
 	searchJoiners = "-'\u2019.\u00b7*/"
-	// searchMark is what the index puts before every word, so that the
-	// first letter of one is three characters, the least it can look up:
-	// two unit separators, which no title has.
+	// searchMark is what the index puts at the start of a title and after
+	// every space and line break, so that the first letter of a word there
+	// is three characters, the least it can look up: two unit separators,
+	// which no title has.
 	searchMark = "\x1f\x1f"
+	// searchBreaks are the other marks a word can start after: ASCII's
+	// punctuation, and the curled quotes, middle dot, dashes, ellipsis,
+	// inverted marks and guillemets. The index keeps nothing for them: a
+	// mark and two letters are three characters already, so a search of two
+	// letters asks for the letters after each. One letter after one of
+	// them is two characters, which the index cannot look up.
+	searchBreaks = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~" +
+		"\u2019\u2018\u201c\u201d\u00b7\u2013\u2014\u2026\u00a1\u00bf\u00ab\u00bb"
 )
 
 // How well a title matches the words typed, best first. Results are in
@@ -135,14 +143,21 @@ func (s *searchQuery) indexMatch() string {
 }
 
 // startsMatch is the index's query for a search of short words: every
-// title where each of them starts a word. The index can look up one letter
-// that way, after the two marks it puts before every word.
+// title where each of them starts a word. A word starts at the index's
+// mark (the start of a title, or after a space) and, for a word of two
+// letters, after any of searchBreaks.
 func (s *searchQuery) startsMatch() string {
-	quoted := make([]string, len(s.scan))
+	words := make([]string, len(s.scan))
 	for i, w := range s.scan {
-		quoted[i] = `"` + searchMark + w + `"`
+		starts := []string{`"` + searchMark + w + `"`}
+		if searchLetters(w) >= searchIndexMin-1 {
+			for _, r := range searchBreaks {
+				starts = append(starts, `"`+strings.ReplaceAll(string(r), `"`, `""`)+w+`"`)
+			}
+		}
+		words[i] = "(" + strings.Join(starts, " OR ") + ")"
 	}
-	return strings.Join(quoted, " AND ")
+	return strings.Join(words, " AND ")
 }
 
 // scanPatterns are the LIKE patterns of a search too short for the index,

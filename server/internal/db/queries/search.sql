@@ -7,8 +7,9 @@
 -- This one asks the trigram index (migration 00045) for the titles holding
 -- every one of the words given, each a quoted string of three characters
 -- or more: a word of the search as typed, or the first letters of a word
--- after the index's two marks. The index looks in the title, the original
--- title and both without their hyphens and apostrophes.
+-- after the index's two marks or after a mark a word can follow. The index
+-- looks in the title, the original title and both without their hyphens
+-- and apostrophes.
 --
 -- legacy is what search matched before the index: the words as typed,
 -- anywhere in the title or the original title. Those titles are always

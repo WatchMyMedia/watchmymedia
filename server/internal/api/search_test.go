@@ -434,15 +434,22 @@ func TestSearchKeepsWhatItFound(t *testing.T) {
 		}
 		// A list of twenty is the first twenty of everything found: a
 		// short search that stops at the titles whose words start with
-		// its letters leaves out nothing that belongs before them.
+		// its letters leaves out nothing that belongs before them. With a
+		// word of one letter that is true of words after a space only
+		// (the index cannot look up one letter after another mark), so
+		// then the list is some of everything found, in the same order.
 		first, err := searchLibrary(ctx, deps, q, 20)
 		if err != nil {
 			t.Fatalf("%q: %v", q, err)
 		}
-		if got, want := searchIDs(first), searchIDs(firstOf(res, 20)); !slices.Equal(got, want) {
+		s := parseSearch(q)
+		oneLetter := slices.ContainsFunc(s.scan, func(w string) bool { return searchLetters(w) < 2 })
+		if got, want := searchIDs(first), searchIDs(firstOf(res, 20)); !oneLetter && !slices.Equal(got, want) {
 			t.Errorf("%q: a list of twenty is %v, the first twenty of all is %v", q, got, want)
 		}
-		s := parseSearch(q)
+		if got, all := searchIDs(first), searchIDs(res); oneLetter && !inSameOrder(got, all) {
+			t.Errorf("%q: a list of twenty is %v, which is not part of all in its order: %v", q, got, all)
+		}
 		if hits, err := searchMovieHits(ctx, deps.Queries, &s, 20); err == nil && len(hits) < len(res.Movies) {
 			stopped++
 		}
@@ -454,6 +461,20 @@ func TestSearchKeepsWhatItFound(t *testing.T) {
 	if searches < enough || before < 5*enough || after <= before || stopped < enough/100 {
 		t.Errorf("the comparison is too small to mean anything, or nothing new is found")
 	}
+}
+
+// inSameOrder reports whether every id of part is in all, in the order it
+// has there.
+func inSameOrder(part, all []int64) bool {
+	at := 0
+	for _, id := range part {
+		i := slices.Index(all[at:], id)
+		if i < 0 {
+			return false
+		}
+		at += i + 1
+	}
+	return true
 }
 
 // firstOf is the first n of each group.
@@ -669,16 +690,9 @@ func TestSearchIndexFollowsTheLibrary(t *testing.T) {
 	}
 }
 
-// searchBreaks are what the index takes a word to start after, besides the
-// start of the text: a space, a line break, ASCII's punctuation, and the
-// curled quotes, middle dot, dashes, ellipsis, inverted marks and
-// guillemets. Migration 00045 writes them out for each table.
-const searchBreaks = " \n!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~" +
-	"\u2019\u2018\u201c\u201d\u00b7\u2013\u2014\u2026\u00a1\u00bf\u00ab\u00bb"
-
 // indexWords is what the index's words column holds for a title's text:
 // the text, then the text without searchJoiners if it has any, with
-// searchMark before every word.
+// searchMark at the start and after every space and line break.
 func indexWords(text string) string {
 	joined := strings.Map(func(r rune) rune {
 		if strings.ContainsRune(searchJoiners, r) {
@@ -689,28 +703,21 @@ func indexWords(text string) string {
 	if joined != text {
 		text += "\n" + joined
 	}
-	var b strings.Builder
-	b.WriteString(searchMark)
-	for _, r := range text {
-		b.WriteRune(r)
-		if strings.ContainsRune(searchBreaks, r) {
-			b.WriteString(searchMark)
-		}
-	}
-	return b.String()
+	return searchMark + strings.NewReplacer(" ", " "+searchMark, "\n", "\n"+searchMark).Replace(text)
 }
 
-// TestSearchIndexWords checks the words the index keeps for a title, in
-// all three tables, against the marks this package matches by: the
-// migration spells them out for each table, and a mark missing from one
-// would leave titles that search cannot find by their first letters.
+// TestSearchIndexWords checks the words the index keeps for a title
+// against the marks this package matches by. The migration spells them
+// out nine times, where a title is first indexed, written and changed in
+// each of the three tables, and a copy that differs would leave titles
+// that search cannot find by their first letters or run together.
 func TestSearchIndexWords(t *testing.T) {
 	t.Parallel()
 	srv := newTestServer(t)
 	lib := newSearchLib(t, srv.conn)
 	ctx := t.Context()
-	titles := []string{"Plain Title", "\u00c9t\u00e9 Indien", "Tab\tAnd Symbols \u2605 \u30fb here"}
-	// A word after each mark, and each mark at either end.
+	titles := []string{"Plain Title", "\u00c9t\u00e9 Indien", "Tab\tAnd Symbols \u2605 \u30fb here", "Two  Spaces", " Edge "}
+	// Each mark a word can follow, inside a title and at either end.
 	for _, r := range searchBreaks + "~" {
 		titles = append(titles, "Lantern"+string(r)+"Man", string(r)+"Edge"+string(r))
 	}
@@ -722,50 +729,89 @@ func TestSearchIndexWords(t *testing.T) {
 		lib.exec(`INSERT INTO shows (library_id, tmdb_id, title, original_title) VALUES (?, ?, ?, ?)`, lib.tv, 5000+i, "Show "+title, title)
 		lib.episode(show, 1, 1+i, title)
 	}
-	for _, c := range []struct{ table, text string }{
-		{"movies", `t.title || char(10) || COALESCE(t.original_title, '')`},
-		{"shows", `t.title || char(10) || COALESCE(t.original_title, '')`},
-		{"episodes", `t.title`},
-	} {
-		n := 0
-		func() {
-			rows, err := srv.conn.QueryContext(ctx, fmt.Sprintf(`SELECT %s, x.words FROM %s t JOIN %s_search x ON x.rowid = t.id`, c.text, c.table, c.table))
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer func() { _ = rows.Close() }()
-			for rows.Next() {
-				var text, words string
-				if err := rows.Scan(&text, &words); err != nil {
+	compare := func(when string) {
+		t.Helper()
+		for _, c := range []struct{ table, text string }{
+			{"movies", `t.title || char(10) || COALESCE(t.original_title, '')`},
+			{"shows", `t.title || char(10) || COALESCE(t.original_title, '')`},
+			{"episodes", `t.title`},
+		} {
+			n := 0
+			func() {
+				rows, err := srv.conn.QueryContext(ctx, fmt.Sprintf(`SELECT %s, x.words FROM %s t JOIN %s_search x ON x.rowid = t.id`, c.text, c.table, c.table))
+				if err != nil {
 					t.Fatal(err)
 				}
-				n++
-				if want := indexWords(text); words != want {
-					t.Errorf("%s %q: the index keeps %q, want %q", c.table, text, words, want)
+				defer func() { _ = rows.Close() }()
+				for rows.Next() {
+					var text, words string
+					if err := rows.Scan(&text, &words); err != nil {
+						t.Fatal(err)
+					}
+					n++
+					if want := indexWords(text); words != want {
+						t.Errorf("%s %q, %s: the index keeps %q, want %q", c.table, text, when, words, want)
+					}
 				}
+				if err := rows.Err(); err != nil {
+					t.Fatal(err)
+				}
+			}()
+			if n < len(titles) {
+				t.Errorf("%s: %d rows read", c.table, n)
 			}
-			if err := rows.Err(); err != nil {
-				t.Fatal(err)
+			// The migration writes the mark and the line break as blobs;
+			// what it makes of them has to be text, which is what the
+			// index reads.
+			var blobs int
+			if err := srv.conn.QueryRowContext(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM %s_search WHERE typeof(words) <> 'text'`, c.table)).Scan(&blobs); err != nil || blobs != 0 {
+				t.Errorf("%s, %s: %d rows whose words are not text (%v)", c.table, when, blobs, err)
 			}
-		}()
-		if n < len(titles) {
-			t.Errorf("%s: %d rows read", c.table, n)
 		}
+		checkSearchIndex(t, srv.conn)
 	}
-	checkSearchIndex(t, srv.conn)
+	compare("written")
+	// Changed: the title of each row becomes the next one's, so a title
+	// with marks follows one without and the other way round.
+	for _, table := range []string{"movies", "shows", "episodes"} {
+		lib.exec(fmt.Sprintf(`UPDATE %[1]s SET title = 'Next ' || (SELECT n.title FROM %[1]s n WHERE n.id > %[1]s.id ORDER BY n.id LIMIT 1) WHERE id < (SELECT MAX(id) FROM %[1]s)`, table))
+	}
+	lib.exec(`UPDATE movies SET original_title = title WHERE id % 3 = 0`)
+	compare("changed")
 
-	// And through search: a word after any of the marks is found by its
-	// first letter, and a title with a joiner by its letters run together.
-	lib2 := newTestServer(t)
-	l := newSearchLib(t, lib2.conn)
-	for i, r := range searchBreaks {
+	// And asked as a search of short words asks: a word after any of the
+	// marks is found by its first two letters, a word after a space by its
+	// first, and a title with a joiner by its letters run together.
+	other := newTestServer(t)
+	l := newSearchLib(t, other.conn)
+	marks := []rune(" " + searchBreaks)
+	for i, r := range marks {
 		l.movie(fmt.Sprintf("Quiet%sZebra %02d", string(r), i), 2000)
 	}
-	if got := search(t, lib2, "z", 50); len(got.Movies) != len([]rune(searchBreaks)) {
-		t.Errorf("z found %d of %d titles with a word starting with it", len(got.Movies), len([]rune(searchBreaks)))
+	found := func(words string) int {
+		t.Helper()
+		rows, err := other.q.SearchMovieTitles(ctx, db.SearchMovieTitlesParams{Legacy: "%", Words: words})
+		if err != nil {
+			t.Fatalf("%s: %v", words, err)
+		}
+		return len(rows)
 	}
-	if got := search(t, lib2, "quietzebra", 50); len(got.Movies) != len([]rune(searchJoiners)) {
+	if n := found(new(parseSearch("ze")).startsMatch()); n != len(marks) {
+		t.Errorf("the index has ze starting a word in %d of %d titles", n, len(marks))
+	}
+	if n := found(new(parseSearch("z")).startsMatch()); n != 1 {
+		t.Errorf("the index has z starting a word in %d titles, want the one where it follows a space", n)
+	}
+	if n := found(new(parseSearch("q")).startsMatch()); n != len(marks) {
+		t.Errorf("the index has q starting %d of %d titles", n, len(marks))
+	}
+	if got := search(t, other, "quietzebra", 50); len(got.Movies) != len([]rune(searchJoiners)) {
 		t.Errorf("quietzebra found %d titles, want one for each of %d joiners", len(got.Movies), len([]rune(searchJoiners)))
+	}
+	// Every one of them is found by one letter all the same, when the
+	// list has room for titles with the letter anywhere.
+	if got := search(t, other, "z", 50); len(got.Movies) != len(marks) {
+		t.Errorf("z found %d of %d titles", len(got.Movies), len(marks))
 	}
 }
 

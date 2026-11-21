@@ -203,7 +203,10 @@ func (s *searchQuery) titleHits(rows []searchTitleRow) []searchHit {
 // a title with the letters elsewhere comes after every one of them. The
 // first letter someone types is in most of a library, and reading every
 // title for it, then every match's files, took longer than search did
-// before it had an index.
+// before it had an index. One letter is only looked up at the start of a
+// title and after a space, so while the list is full a title where it
+// follows a hyphen or a bracket waits for the second letter
+// (startsMatch).
 //
 // Otherwise it also reads every title for the words anywhere, as search
 // always did, and adds what that finds.
