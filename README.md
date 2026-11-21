@@ -483,13 +483,12 @@ The `ios` job in `.github/workflows/release.yml` archives the app on every `v*`
 tag and uploads it to TestFlight. `apple/scripts/version.sh` turns the tag into
 the version, and the build number follows the Android version code, so
 pre-releases sort before their release (`v1.2.3-rc.1` is build 10200361, `v1.2.3`
-is build 10200399). The App Store's first release was 1.0, and App Store Connect
-takes only a higher version than the last approved one, so
-`CFBundleShortVersionString` stays on 1.x: `v0.5.2` was 1.5.2, `v1.0.0` was
-1.6.0, and since 1.1 and 1.2 shipped no App Store build, from `v1.3.0` the minor
-version is four ahead of the tag's (`v1.3.0` is 1.7.0, `v1.4.0` is 1.8.0) on
-iPhone, iPad and Apple TV, while the server, the Mac app and Android say
-the tag's own version.
+is build 10200399). From `v2.0.0` the iPhone, iPad and Apple TV apps say the
+tag's own version, as the server, the Mac app and Android always have. Before
+that they ran ahead of it: the App Store's first release was 1.0, and App Store
+Connect takes only a higher version than the last approved one, so
+`CFBundleShortVersionString` stayed on 1.x (`v0.5.2` was 1.5.2, `v1.0.0` was
+1.6.0, `v1.3.0` was 1.7.0 and `v1.8.0`, the last, was 1.11.0).
 
 The job builds with the Xcode `apple/scripts/select-xcode.sh` names (27.2), on
 GitHub's `xcode-27` image, the same Xcode CI's `apple` and `apple-tv` jobs test

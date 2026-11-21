@@ -80,8 +80,9 @@ nothing, and only a change to `project.yml` needs `make apple-gen` again.
 
 The project's version is a placeholder, 1.0 (1). Before archiving in Xcode
 (Product → Archive), generate it for the release, `make apple-gen
-VERSION=v1.2.3`, which writes that tag's App Store version (`v0.5.2` was 1.5.2,
-`v1.0.0` was 1.6.0, `v1.3.0` is 1.7.0: it stays on 1.x, since the App Store's first release was 1.0)
+VERSION=v1.2.3`, which writes that tag's App Store version (the tag's own from
+`v2.0.0`; before that it stayed on 1.x, since the App Store's first release was 1.0:
+`v1.0.0` was 1.6.0 and `v1.8.0` was 1.11.0)
 and its build number (`scripts/version.sh`) into the project; a plain `make apple-gen` puts the
 placeholder back. `make apple-archive VERSION=v1.2.3` sets them itself.
 The Apple TV app (the WatchMyMedia TV scheme) can't be archived in Xcode until
