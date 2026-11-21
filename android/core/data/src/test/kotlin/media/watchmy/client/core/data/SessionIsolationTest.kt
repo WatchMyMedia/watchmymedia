@@ -57,7 +57,7 @@ class SessionIsolationTest {
     }
 
     @Test
-    fun `a retained playback gateway sends the old report to its original server`() = runBlocking {
+    fun `a retained playback gateway sends the old report to its original server, once that has said which server it is`() = runBlocking {
         Harness().use { h ->
             TestServer().use { other ->
                 h.signIn()
@@ -66,13 +66,44 @@ class SessionIsolationTest {
                 h.services.servers.select(Server("server-b", "Server B", other.baseUrl, "1.0.0", 3))
                 other.on("POST /api/auth/login", TestServer.json(TestServer.SIGN_IN.replace("tok-viewer", "token-b")))
                 h.services.auth.signIn("viewer", "fixture-viewer-1")
+                h.services.awaitIdle()
                 h.server.always("PUT /api/files/4/progress", TestServer.json(
                     """{"completed":false,"durationMs":60000,"positionMs":12000,"updatedAt":"2026-10-31T12:00:00Z"}""",
                 ))
+                h.server.always("GET /api/server", TestServer.json(TEST_INFO))
+                h.server.requests.clear()
                 oldPlaybackGateway.reportProgress(queuedOldReport)
+                // Its server is no longer the one in use: asked which server it is, with no sign-in, then sent the report.
+                assertEquals(listOf("GET /api/server", "PUT /api/files/4/progress"), h.server.requests.map { "${it.method} ${it.requestUrl!!.encodedPath}" })
+                assertEquals(null, h.server.requests[0].getHeader("Authorization"))
                 val sent = h.server.last("PUT /api/files/4/progress")
                 assertEquals("Bearer tok-viewer", sent.getHeader("Authorization"))
                 assertTrue(sent.body.readUtf8().contains("1111111111111111"))
+                assertTrue(other.requests("PUT /api/files/4/progress").isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun `a retained playback gateway sends nothing to another server at its original server's address`() = runBlocking {
+        Harness().use { h ->
+            TestServer().use { other ->
+                h.signIn()
+                val oldPlaybackGateway = h.services.playbackGateway.bind()
+                h.services.servers.select(Server("server-b", "Server B", other.baseUrl, "1.0.0", 3))
+                other.on("POST /api/auth/login", TestServer.json(TestServer.SIGN_IN.replace("tok-viewer", "token-b")))
+                h.services.auth.signIn("viewer", "fixture-viewer-1")
+                h.services.awaitIdle()
+                h.server.always("PUT /api/files/4/progress", TestServer.json(
+                    """{"completed":false,"durationMs":60000,"positionMs":12000,"updatedAt":"2026-10-31T12:00:00Z"}""",
+                ))
+                // The app moved to another server, and the device to a network where the first one's address is someone else's.
+                h.server.always("GET /api/server", TestServer.json(TEST_INFO.replace("srv-test", "someone-else")))
+                h.server.requests.clear()
+                val report = runCatching { oldPlaybackGateway.reportProgress(ProgressReport(4, 12_000, 60_000, "1111111111111111", PlayState.Stopped, 0)) }
+                assertTrue("the report fails, as one that can't reach its server does", report.exceptionOrNull() is media.watchmy.client.model.ApiException)
+                assertTrue(h.server.requests("PUT /api/files/4/progress").isEmpty())
+                assertTrue("no request to it carried a sign-in", h.server.requests.none { it.getHeader("Authorization") != null })
                 assertTrue(other.requests("PUT /api/files/4/progress").isEmpty())
             }
         }
@@ -136,5 +167,10 @@ class SessionIsolationTest {
                 assertTrue(h.server.requests.none { it.getHeader("Authorization") == "Bearer c1.cast" })
             }
         }
+    }
+
+    private companion object {
+        /** What the harness's test server says of itself. */
+        const val TEST_INFO = """{"id":"srv-test","name":"Test server","version":"1.0.0","apiLevel":5,"setupRequired":false,"turnstile":false}"""
     }
 }

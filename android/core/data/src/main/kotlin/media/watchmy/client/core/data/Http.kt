@@ -5,9 +5,15 @@ import android.util.Log
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.SerializationException
+import media.watchmy.client.core.api.apis.SystemApi
 import media.watchmy.client.core.api.infrastructure.ClientError
 import media.watchmy.client.core.api.infrastructure.ClientException
 import media.watchmy.client.core.api.infrastructure.Serializer
@@ -15,8 +21,11 @@ import media.watchmy.client.core.api.infrastructure.ServerError
 import media.watchmy.client.core.api.infrastructure.ServerException
 import media.watchmy.client.core.api.models.ErrorModel
 import media.watchmy.client.model.ApiException
+import media.watchmy.client.model.REQUIRED_API_LEVEL
 import media.watchmy.client.model.SignedOutException
+import media.watchmy.client.model.couldntReach
 import media.watchmy.client.model.isOnServer
+import media.watchmy.client.model.tooOldNotListed
 import okhttp3.Cache
 import okhttp3.Call
 import okhttp3.HttpUrl
@@ -51,6 +60,8 @@ internal class Http(
     private val userAgent: String,
     cache: Cache? = null,
     private val network: NetworkMonitor = NetworkMonitor.Always,
+    /** Where a question to a server runs ([askFirst]): whoever asked can be cancelled without it. */
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
     constructor(base: OkHttpClient, store: LocalStore, userAgent: String) : this({ base }, store, userAgent)
 
@@ -144,8 +155,18 @@ internal class Http(
         on.newCall(request.newBuilder().tag(Credential::class.java, credential).build())
     }
 
-    /** [token] as the account it signs in on [server]: a 401 clears that sign-in, unless it has been replaced. */
-    fun accountCredential(server: StoredServer, token: String) = Credential(server.baseUrl, token) { store.tokenRejected(server.id, token) }
+    /** [token] as the account it signs in on [server]: a 401 clears that sign-in, unless it has been replaced. Made only here, for a server in use or one that has said which server it is. */
+    private fun accountCredential(server: StoredServer, token: String) = Credential(server.baseUrl, token) { store.tokenRejected(server.id, token) }
+
+    /**
+     * Calls on [on] as [token]'s account on [server], for what can't go
+     * through a [ServerAccess] (the event stream, on its own client). Like
+     * one, it asks first when [server] isn't the one in use ([askFirst]).
+     */
+    suspend fun accountCalls(server: StoredServer, token: String, on: OkHttpClient = client): Call.Factory {
+        askFirst(server)
+        return calls(accountCredential(server, token), on)
+    }
 
     /** Runs [block] with the current server's base URL as the signed-in user. */
     suspend fun <T> signedIn(block: suspend (baseUrl: String, client: Call.Factory) -> T): T {
@@ -165,6 +186,7 @@ internal class Http(
     suspend fun <T> signedInRefusing401(isRefusal: (ApiException) -> Boolean, block: suspend (baseUrl: String, client: Call.Factory) -> T): T {
         val (session, revision) = store.requestSnapshot()
         val account = session?.account ?: throw SignedOutException()
+        askFirst(session.server)
         val token = call(signedIn = true) { withContext(Dispatchers.IO) { store.tokenForRequest(session.server.id, account) } }
             ?: throw SignedOutException()
         val calls = calls(Credential(session.server.baseUrl, token))
@@ -192,38 +214,45 @@ internal class Http(
 
     /**
      * Access to the saved server [serverId] as [userId], whether or not it is
-     * the current one (an offline download's account); null once that
-     * account is no longer signed in there.
+     * the current one (an offline download's account, a search of every
+     * server); null once that account is no longer signed in there. Used
+     * for a server that isn't the one in use, it asks first ([askFirst]);
+     * [keepAnswer] keeps what the server says, for a search's visit.
      */
-    fun bindTo(serverId: String, userId: Long): ServerAccess? {
+    fun bindTo(serverId: String, userId: Long, keepAnswer: Boolean = false): ServerAccess? {
         val server = store.value.servers.firstOrNull { it.id == serverId } ?: return null
         val account = server.account?.takeIf { it.userId == userId } ?: return null
-        return bind(Session(server, account))
+        return bind(Session(server, account), keepAnswer)
     }
 
     /**
-     * The kept servers, other than the one in use, that have just said who
-     * they are: each one's id, the address that answered, and the network
-     * the device was on. A kept address is only an address: `192.168.1.20`
-     * on another network is someone else's machine. So a search of every
-     * server sends a server's sign-in (the search, and the pictures of what
-     * it found) only while the server is here, which
-     * [RealServerRepository.askFirst] decides, and an answer stands only on
-     * the network it was given on.
+     * What kept servers, other than the one in use, said when asked which
+     * server they are: each one's id, the address that was asked, the
+     * network the device was on, and whether it was the server remembered.
+     * A kept address is only an address: `192.168.1.20` on another network
+     * is someone else's machine. An answer stands only on the network it
+     * was given on, and only for one piece of work: a visit to Search, or
+     * the removal of a server.
      */
     private val answers = java.util.concurrent.ConcurrentHashMap<String, Answer>()
 
-    private data class Answer(val baseUrl: String, val network: Long?)
+    private data class Answer(val baseUrl: String, val network: Long?, val itself: Boolean)
 
-    /** The network the device is on now, as [NetworkMonitor] names it: taken before a server is asked, for [noteAnswer]. */
+    /** The questions out now, one a server and address: everyone who asks waits for the same answer, and learns the network it was asked on. */
+    private val asking = HashMap<String, Deferred<Result<Long?>>>()
+
+    /** The network the device is on now, as [NetworkMonitor] names it. */
     fun networkNow(): Long? = network.network.value
 
-    /** [server], which isn't the one in use, has said at the address kept, on the network the device is still on, that it is the server remembered. */
-    fun answered(server: StoredServer): Boolean = answers[server.id] == Answer(server.baseUrl, networkNow())
+    /** What [server] said at the address kept, when it stands: on the network the device is still on. */
+    private fun answer(server: StoredServer): Answer? = answers[server.id]?.takeIf { it.baseUrl == server.baseUrl && it.network == networkNow() }
 
-    /** [server] has just said so, asked while the device was on [network]. */
-    fun noteAnswer(server: StoredServer, network: Long?) {
-        answers[server.id] = Answer(server.baseUrl, network)
+    /** [server], which isn't the one in use, has said at the address kept, on the network the device is still on, that it is the server remembered. */
+    fun answered(server: StoredServer): Boolean = answer(server)?.itself == true
+
+    /** Keeps that [server], asked now, didn't say it is the server remembered: until [forgetAnswers], nothing asks it again and nothing is sent. */
+    fun noteNoAnswer(server: StoredServer) {
+        answers[server.id] = Answer(server.baseUrl, networkNow(), itself = false)
     }
 
     /** Forgets what [serverId] said, or with none what every server said: each is asked again before its sign-in next goes to it. */
@@ -232,22 +261,87 @@ internal class Http(
     }
 
     /**
-     * [bindTo] for a search of every server: access to [serverId] as
-     * [userId] when it is the server in use, or one that has [answered];
-     * null otherwise, and no call is made.
+     * Before a sign-in goes to a kept server that isn't the one in use: asks
+     * its address, with no sign-in, which server it is (`GET /api/server`),
+     * and returns only when it is the one remembered. Before there were
+     * several servers the app sent only the sign-in of the server in use;
+     * now a search, a report on a download, the end of a session and
+     * anything still running after a switch send another server's, on
+     * whatever network the device is on.
+     *
+     * Every [ServerAccess] this class makes calls it ([bind]), and so does
+     * the end of a session ([RealServerRepository.signOutQuietly]), so no
+     * caller has to remember to. The server in use is not asked: its
+     * sign-in goes to it as it always has.
+     *
+     * Nothing at the address, or another server there, throws as a server
+     * that can't be reached, and no sign-in is sent. One that is the same
+     * server but too old for this app throws too, after its level is kept.
+     * What the server says of itself (name, version, level) is kept as a
+     * switch keeps it.
+     *
+     * [keep] keeps the answer ([answered]) for the work that asked: a visit
+     * to Search, so typing asks once, or a removal, so its reports and its
+     * sign-out ask once between them. Anything else asks each time: it runs
+     * in the background, hours apart and on any network, with nothing to
+     * say when an answer has grown old.
+     *
+     * The question runs in [scope]: a keystroke cancels the search that
+     * asked, not the question, and whoever asks next waits for the same one.
      */
-    fun bindToAnswered(serverId: String, userId: Long): ServerAccess? {
-        val stored = store.value
-        val server = stored.servers.firstOrNull { it.id == serverId } ?: return null
-        if (server.id != stored.currentId && !answered(server)) return null
-        return bindTo(serverId, userId)
+    suspend fun askFirst(server: StoredServer, keep: Boolean = false) {
+        if (server.id == store.value.currentId) return
+        answer(server)?.let { kept ->
+            if (kept.itself) return
+            throw ApiException(null, "${couldntReach(server.name)}.")
+        }
+        val key = "${server.id} ${server.baseUrl}"
+        val question = synchronized(asking) {
+            asking[key] ?: scope.async { runCatching { ask(server) } }.also { out ->
+                asking[key] = out
+                out.invokeOnCompletion { synchronized(asking) { if (asking[key] === out) asking.remove(key) } }
+            }
+        }
+        val askedOn = question.await().getOrThrow()
+        // The answer is for the network it was asked on: a device that moved while it waited sends nothing.
+        if (askedOn != networkNow()) throw ApiException(null, "${couldntReach(server.name)}.")
+        if (keep) answers[server.id] = Answer(server.baseUrl, askedOn, itself = true)
     }
 
-    /** Bind an already captured atomic identity/revision snapshot (Live TV). */
-    internal fun bind(session: Session?): ServerAccess {
+    /** Asks [server] which server it is; returns the network it was asked on when it is the one remembered and new enough. */
+    private suspend fun ask(server: StoredServer): Long? {
+        val askedOn = networkNow()
+        val info = withTimeoutOrNull(ASK_MS) {
+            try {
+                call(signedIn = false) { SystemApi(server.baseUrl, probeClient).getServer() }
+            } catch (_: ApiException) {
+                null
+            }
+        }
+        // Nothing there, or another server at the address it had: its sign-in is not sent.
+        if (info == null || info.id != server.id) throw ApiException(null, "${couldntReach(server.name)}.")
+        val level = info.apiLevel.toInt()
+        store.update { s ->
+            s.withServer(server.id) {
+                val same = it.name == info.name && it.version == info.version && it.apiLevel == level
+                if (same || it.baseUrl != server.baseUrl) it else it.copy(name = info.name, version = info.version, apiLevel = level)
+            }
+        }
+        if (level < REQUIRED_API_LEVEL) throw ApiException(null, tooOldNotListed(info.name))
+        return askedOn
+    }
+
+    /**
+     * Bind an already captured atomic identity/revision snapshot (Live TV).
+     * Whoever holds the access, and however long, each call asks first when
+     * its server is not, or is no longer, the one in use ([askFirst]): a
+     * player's last report after a switch, a setting still being saved.
+     */
+    internal fun bind(session: Session?, keepAnswer: Boolean = false): ServerAccess {
         return object : ServerAccess {
             override suspend fun <T> call(block: suspend (baseUrl: String, client: Call.Factory) -> T): T {
                 val account = session?.account ?: throw SignedOutException()
+                askFirst(session.server, keepAnswer)
                 val token = Http.call(signedIn = true) { withContext(Dispatchers.IO) { store.tokenForRequest(session.server.id, account) } }
                     ?: throw SignedOutException()
                 val calls = calls(accountCredential(session.server, token))
@@ -345,6 +439,9 @@ internal class Http(
     companion object {
         const val AUTHORIZATION = "Authorization"
         private const val TAG = "WatchMyMedia"
+
+        /** How long a server gets to say which server it is ([askFirst]). */
+        const val ASK_MS = 5_000L
 
         /** How long an address on the local network gets to connect ([reachable]). */
         const val PRIVATE_CONNECT_MS = 3_000
