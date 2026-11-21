@@ -35,7 +35,7 @@ type scopeCandidate struct {
 func itemFingerprint(i plex.Item) string {
 	// A provider rating key reused for another canonical item is a source-epoch
 	// conflict. Text, watch counts and last-view times are deliberately excluded.
-	b, _ := json.Marshal([]any{i.Type, i.ExternalIDs, i.GUID, i.GrandparentRatingKey, i.SeasonNumber, i.EpisodeNumber, i.EditionTitle, i.EpisodeOrdering})
+	b, _ := json.Marshal([]any{i.Type, i.ExternalIDs, i.GUID, i.GrandparentRatingKey, i.SeasonNumber, i.EpisodeNumber, i.EditionTitle, i.ShowOrdering})
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
 }

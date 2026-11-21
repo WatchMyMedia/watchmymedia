@@ -97,6 +97,44 @@ func (c *Client) Libraries(ctx context.Context) ([]LibrarySection, error) {
 	return container.Directory, nil
 }
 
+// SectionOrdering is a TV library's default episode numbering, from its
+// showOrdering setting: tmdbAiring, aired (TheTVDB's) or another order. A
+// show with no showOrdering of its own is numbered this way. Empty means
+// the library doesn't say, as with agents that have no such setting.
+func (c *Client) SectionOrdering(ctx context.Context, sectionID string) (string, error) {
+	if !positiveID(sectionID) {
+		return "", &Error{Kind: "invalid_input"}
+	}
+	var response struct {
+		Container *struct {
+			Setting []struct {
+				ID      string          `json:"id"`
+				Value   json.RawMessage `json:"value"`
+				Default json.RawMessage `json:"default"`
+			} `json:"Setting"`
+		} `json:"MediaContainer"`
+	}
+	if err := c.get(ctx, "/library/sections/"+sectionID+"/prefs", nil, &response); err != nil {
+		return "", err
+	}
+	if response.Container == nil {
+		return "", &Error{Kind: "invalid_response"}
+	}
+	for _, s := range response.Container.Setting {
+		if s.ID != "showOrdering" {
+			continue
+		}
+		for _, raw := range []json.RawMessage{s.Value, s.Default} {
+			var v string
+			if json.Unmarshal(raw, &v) == nil && v != "" {
+				return v, nil
+			}
+		}
+		return "", nil
+	}
+	return "", nil
+}
+
 // Paging places hard bounds on a probe. Exhausting a bound is an error, not a
 // successful truncated import. Zero fields use bounded defaults.
 type Paging struct {
@@ -139,7 +177,14 @@ type Item struct {
 	SeasonNumber         *int64
 	EpisodeNumber        *int64
 	EditionTitle         string
-	EpisodeOrdering      string
+	// ShowOrdering is how Plex numbers a show's episodes, as the show's own
+	// setting says (showOrdering): tmdbAiring for TMDB's aired order, aired
+	// for TheTVDB's, dvd or absolute. Empty means the library's default
+	// applies (SectionOrdering).
+	ShowOrdering string
+	// AiredOn is the date Plex gives for the item (originallyAvailableAt),
+	// as YYYY-MM-DD, or empty.
+	AiredOn string
 }
 
 // Watched reports positive evidence from the current item response. Missing
@@ -191,7 +236,7 @@ func (c *Client) Snapshot(ctx context.Context, section LibrarySection, paging Pa
 
 // Metadata fetches one exact PMS item. For episode matching, callers can fetch
 // GrandparentRatingKey once per show and inspect the show IDs separately. The
-// returned episodeOrdering is merely evidence, never a verified mapping rule.
+// returned ShowOrdering is merely evidence, never a verified mapping rule.
 func (c *Client) Metadata(ctx context.Context, ratingKey string) (Item, error) {
 	if !positiveID(ratingKey) {
 		return Item{}, &Error{Kind: "invalid_input"}
@@ -296,7 +341,8 @@ type rawMetadata struct {
 	ParentIndex          *int64 `json:"parentIndex"`
 	Index                *int64 `json:"index"`
 	EditionTitle         string `json:"editionTitle"`
-	EpisodeOrdering      string `json:"episodeOrdering"`
+	ShowOrdering         string `json:"showOrdering"`
+	AiredOn              string `json:"originallyAvailableAt"`
 	HistoryKey           string `json:"historyKey"`
 	AccountID            *int64 `json:"accountID"`
 	ViewedAt             *int64 `json:"viewedAt"`
@@ -326,8 +372,17 @@ func (r rawMetadata) toItem(requireRatingKey bool) (Item, error) {
 		ViewCount: r.ViewCount, ViewOffsetMS: r.ViewOffset, DurationMS: r.Duration,
 		LastViewedAt: r.LastViewedAt, ParentRatingKey: r.ParentRatingKey,
 		GrandparentRatingKey: r.GrandparentRatingKey, SeasonNumber: r.ParentIndex,
-		EpisodeNumber: r.Index, EditionTitle: r.EditionTitle, EpisodeOrdering: r.EpisodeOrdering,
+		EpisodeNumber: r.Index, EditionTitle: r.EditionTitle, ShowOrdering: r.ShowOrdering,
+		AiredOn: airDate(r.AiredOn),
 	}, nil
+}
+
+// airDate keeps a calendar date Plex gives and drops anything else.
+func airDate(v string) string {
+	if _, err := time.Parse(time.DateOnly, v); err != nil {
+		return ""
+	}
+	return v
 }
 
 type metadataResponse struct {

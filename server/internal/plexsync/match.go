@@ -25,8 +25,16 @@ type showIDs struct {
 	tmdb   int64
 	title  string
 	reason string
-	order  string
+	// order is how Plex numbers the show's episodes: the show's own
+	// setting, else its library's default; empty when neither says.
+	order string
 }
+
+// The episode numberings Plex names (showOrdering).
+const (
+	tmdbAired = "tmdbAiring"
+	tvdbAired = "aired"
+)
 
 // matcher matches Plex items to local ones by exact external IDs within one
 // linked library. Titles
@@ -36,6 +44,8 @@ type matcher struct {
 	q     *db.Queries
 	owner *plex.Client
 	shows map[string]*showIDs
+	// orders is each Plex library's default numbering, by section ID.
+	orders map[string]string
 }
 
 func (m *matcher) match(ctx context.Context, libraryID int64, item plex.Item) (found, error) {
@@ -99,9 +109,12 @@ func (m *matcher) movie(ctx context.Context, libraryID int64, item plex.Item) (f
 // episode matches the library's episode with the show's TMDB ID and the
 // same season and episode numbers. The episode's own IDs say nothing about
 // the show (a TVDB ID is not a TMDB ID); the show's come from its own
-// metadata. DVD and absolute orders number episodes differently from TMDB,
-// and specials are numbered differently from one source to another, so
-// those are ambiguous.
+// metadata. Episodes here are numbered as TMDB numbers them, so numbers
+// match when Plex numbers the show in TMDB's aired order. TheTVDB's aired
+// order mostly agrees with it but not always, so its episode must also have
+// aired on the same date in both. DVD and absolute orders, a numbering
+// nothing states, and specials (numbered differently from one source to
+// another) are ambiguous.
 func (m *matcher) episode(ctx context.Context, libraryID int64, item plex.Item) (found, error) {
 	f := found{example: PlexExample{ItemType: watchstate.Episode, Title: item.Title}}
 	if item.SeasonNumber == nil || item.EpisodeNumber == nil {
@@ -115,14 +128,18 @@ func (m *matcher) episode(ctx context.Context, libraryID int64, item plex.Item) 
 	}
 	f.example.Show = show.title
 	f.sourceIdentity = fmt.Sprintf("%d:%s:%s", show.tmdb, show.order, show.reason)
+	order := show.order
+	if item.ShowOrdering != "" {
+		order = item.ShowOrdering
+	}
 	switch {
 	case item.ExternalIDs.Conflict:
 		return f.ambiguous("conflicting_ids"), nil
-	case show.reason == "conflicting_ids" || show.reason == "alternate_order":
+	case show.reason == "conflicting_ids":
 		return f.ambiguous(show.reason), nil
 	case show.reason != "":
 		return f.unmatched(show.reason), nil
-	case !tmdbCompatibleOrder(item.EpisodeOrdering) && (item.EpisodeOrdering != "" || !tmdbCompatibleOrder(show.order)):
+	case order != tmdbAired && order != tvdbAired:
 		return f.ambiguous("alternate_order"), nil
 	case season == 0:
 		return f.ambiguous("special"), nil
@@ -135,7 +152,10 @@ func (m *matcher) episode(ctx context.Context, libraryID int64, item plex.Item) 
 	case 0:
 		return f.unmatched("not_in_library"), nil
 	case 1:
-		return f.matched(watchstate.Target{ItemType: watchstate.Episode, ItemID: rows[0],
+		if order == tvdbAired && (item.AiredOn == "" || rows[0].AirDate == nil || *rows[0].AirDate != item.AiredOn) {
+			return f.ambiguous("air_date_differs"), nil
+		}
+		return f.matched(watchstate.Target{ItemType: watchstate.Episode, ItemID: rows[0].ID,
 			Identity: watchstate.Identity{LibraryID: libraryID, TMDBID: show.tmdb, Season: season, Episode: number}}), nil
 	}
 	return f.ambiguous("several_matches"), nil
@@ -157,13 +177,16 @@ func (m *matcher) show(ctx context.Context, ratingKey string) (*showIDs, error) 
 	switch kind := plex.ErrorKind(err); {
 	case err == nil && item.Type == "show":
 		s.title = item.Title
-		s.order = item.EpisodeOrdering
+		s.order = item.ShowOrdering
+		if s.order == "" {
+			if s.order, err = m.libraryOrder(ctx, item.LibrarySectionID); err != nil {
+				return nil, err
+			}
+		}
 		ids := item.ExternalIDs
 		switch {
 		case ids.Conflict:
 			s.reason = "conflicting_ids"
-		case item.EpisodeOrdering != "" && !tmdbCompatibleOrder(item.EpisodeOrdering):
-			s.reason = "alternate_order"
 		case ids.TMDB == "":
 			s.reason = "no_show_tmdb_id"
 		default:
@@ -180,14 +203,26 @@ func (m *matcher) show(ctx context.Context, ratingKey string) (*showIDs, error) 
 	return s, nil
 }
 
-// tmdbCompatibleOrder requires explicit TMDB aired-order evidence before
-// applying episode marks. Unstated and TVDB/DVD numbering stay unresolved.
-func tmdbCompatibleOrder(order string) bool {
-	switch order {
-	case "tmdbAiring":
-		return true
+// libraryOrder is how a Plex library numbers shows that don't say, read
+// once per preview with the owner's credential. Settings that can't be read
+// say no numbering, which leaves those shows' episodes ambiguous.
+func (m *matcher) libraryOrder(ctx context.Context, sectionID string) (string, error) {
+	if order, ok := m.orders[sectionID]; ok {
+		return order, nil
 	}
-	return false
+	order, err := m.owner.SectionOrdering(ctx, sectionID)
+	if err != nil {
+		// A server that stops answering stops the preview, as for shows.
+		if ctx.Err() != nil || retryablePlexError(err) {
+			return "", err
+		}
+		order = ""
+	}
+	if m.orders == nil {
+		m.orders = map[string]string{}
+	}
+	m.orders[sectionID] = order
+	return order, nil
 }
 
 func (f found) matched(t watchstate.Target) found {

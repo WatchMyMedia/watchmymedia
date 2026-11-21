@@ -46,8 +46,8 @@ func previewEnv(t *testing.T) (*env, PlexConnection, int64) {
 		plextest.EpisodeJSON("206", "Gone show", "304", 1, 1, 1),
 	)
 	f.Set(func(f *plextest.Fake) {
-		f.Shows["301"] = `{"ratingKey":"301","type":"show","title":"Signal Keepers","episodeOrdering":"tmdbAiring","Guid":[{"id":"tmdb://820001"},{"id":"tvdb://920001"}]}`
-		f.Shows["302"] = `{"ratingKey":"302","type":"show","title":"Signal Keepers DVD","Guid":[{"id":"tmdb://820001"}],"episodeOrdering":"dvd"}`
+		f.Shows["301"] = `{"ratingKey":"301","type":"show","title":"Signal Keepers","showOrdering":"tmdbAiring","Guid":[{"id":"tmdb://820001"},{"id":"tvdb://920001"}]}`
+		f.Shows["302"] = `{"ratingKey":"302","type":"show","title":"Signal Keepers DVD","Guid":[{"id":"tmdb://820001"}],"showOrdering":"dvd"}`
 		f.Shows["303"] = `{"ratingKey":"303","type":"show","title":"TVDB only","Guid":[{"id":"tvdb://920003"}]}`
 		f.Visible = map[string][]string{"synthetic-server-702": {"1"}}
 	})
@@ -185,6 +185,80 @@ func TestPreviewMatchesByExactIDs(t *testing.T) {
 	}
 	if n != maxExamples {
 		t.Errorf("%d unmatched examples; want %d", n, maxExamples)
+	}
+}
+
+// Episodes here are numbered as TMDB numbers them. A show with no
+// numbering of its own is numbered as its Plex library says; TMDB's aired
+// order matches by number, TheTVDB's only when the episode aired on the
+// same date in both; any other, or none at all, leaves it alone. Each
+// library's setting is read once.
+func TestPreviewMatchesEpisodesByPlexNumbering(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		library string // the TV library's showOrdering; "-" when it has none
+		want    map[string]string
+	}{
+		{"TMDB library", "tmdbAiring", map[string]string{
+			"Library order": "willMark ", "Dated wrong": "willMark ", "Undated": "willMark ",
+			"Own TMDB order": "willMark ", "Own DVD order": "ambiguous alternate_order",
+		}},
+		{"TheTVDB library", "aired", map[string]string{
+			"Library order": "willMark ", "Dated wrong": "ambiguous air_date_differs", "Undated": "ambiguous air_date_differs",
+			"Own TMDB order": "willMark ", "Own DVD order": "ambiguous alternate_order",
+		}},
+		{"library without the setting", "-", map[string]string{
+			"Library order": "ambiguous alternate_order", "Dated wrong": "ambiguous alternate_order", "Undated": "ambiguous alternate_order",
+			"Own TMDB order": "willMark ", "Own DVD order": "ambiguous alternate_order",
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEnv(t)
+			f := e.f
+			f.SetItems("owner", "2",
+				plextest.AiredEpisodeJSON("211", "Library order", "311", 1, 1, 1, "2024-01-07"),
+				plextest.AiredEpisodeJSON("212", "Dated wrong", "311", 1, 2, 1, "2024-01-15"),
+				plextest.EpisodeJSON("213", "Undated", "312", 1, 2, 1),
+				plextest.EpisodeJSON("214", "Own TMDB order", "313", 1, 2, 1),
+				plextest.AiredEpisodeJSON("215", "Own DVD order", "314", 1, 1, 1, "2024-01-07"),
+			)
+			f.Set(func(f *plextest.Fake) {
+				if tc.library != "-" {
+					f.Orders["2"] = tc.library
+				}
+				f.Shows["311"] = `{"ratingKey":"311","type":"show","title":"Signal Keepers","Guid":[{"id":"tmdb://820001"}]}`
+				f.Shows["312"] = `{"ratingKey":"312","type":"show","title":"Signal Keepers","Guid":[{"id":"tmdb://820001"}]}`
+				f.Shows["313"] = `{"ratingKey":"313","type":"show","title":"Signal Keepers","showOrdering":"tmdbAiring","Guid":[{"id":"tmdb://820001"}]}`
+				f.Shows["314"] = `{"ratingKey":"314","type":"show","title":"Signal Keepers","showOrdering":"dvd","Guid":[{"id":"tmdb://820001"}]}`
+			})
+			c := e.link(e.connect(), []PlexUserLink{{PlexUserID: 701, UserID: e.admin}}, []PlexLibraryLink{{SectionID: 2, LibraryID: e.tv}})
+			p, err := e.svc.StartPreview(t.Context(), c.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			p = e.waitPreview(c, p.ID)
+			if p.Status != "complete" || len(p.Users) != 1 {
+				t.Fatalf("preview = %+v", p)
+			}
+			got := map[string]string{}
+			for _, ex := range p.Users[0].Examples {
+				got[ex.Title] = ex.Category + " " + ex.Reason
+			}
+			for title, want := range tc.want {
+				if got[title] != want {
+					t.Errorf("%s = %q; want %q", title, got[title], want)
+				}
+			}
+			prefs := 0
+			for _, r := range f.ReadsBy(plextest.OwnerDeviceToken) {
+				if r == "/library/sections/2/prefs" {
+					prefs++
+				}
+			}
+			if wantPrefs := 1; prefs != wantPrefs {
+				t.Errorf("the library's settings were read %d times; want %d", prefs, wantPrefs)
+			}
+		})
 	}
 }
 

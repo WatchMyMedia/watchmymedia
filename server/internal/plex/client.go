@@ -110,7 +110,7 @@ func NewClient(baseURL, token string, opts Options) (*Client, error) {
 
 // Even Plex's GET endpoints can mutate state (scrobble/unscrobble). Keep the
 // probe's request surface explicit. Never add those endpoints to this list.
-var getPath = regexp.MustCompile(`^(?:/|/identity|/accounts|/system/accounts|/media/providers|/library/sections|/library/sections/[0-9]+/all|/library/metadata/[0-9]+|/status/sessions/history/all|/api/v2/user|/api/v2/resources|/api/v2/devices|/api/users/?|/api/home/users|/api/servers/[A-Za-z0-9_-]+/shared_servers|/api/v2/pins/[0-9]+|/api/v2/auth/nonce)$`)
+var getPath = regexp.MustCompile(`^(?:/|/identity|/accounts|/system/accounts|/media/providers|/library/sections|/library/sections/[0-9]+/all|/library/sections/[0-9]+/prefs|/library/metadata/[0-9]+|/status/sessions/history/all|/api/v2/user|/api/v2/resources|/api/v2/devices|/api/users/?|/api/home/users|/api/servers/[A-Za-z0-9_-]+/shared_servers|/api/v2/pins/[0-9]+|/api/v2/auth/nonce)$`)
 var postPath = regexp.MustCompile(`^(?:/api/v2/pins|/api/v2/auth/token|/api/home/users/[0-9]+/switch)$`)
 
 func (c *Client) do(ctx context.Context, method, path string, query url.Values, body any) ([]byte, error) {

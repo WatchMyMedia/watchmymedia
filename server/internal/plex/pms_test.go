@@ -190,7 +190,7 @@ func TestPMSEpisodeAndShowIdentifiersStaySeparate(t *testing.T) {
 		t.Fatalf("episode facts lost: %+v", episode)
 	}
 	show, err := client.Metadata(t.Context(), episode.GrandparentRatingKey)
-	if err != nil || show.Type != "show" || show.ExternalIDs.TMDB != "820001" || show.EpisodeOrdering != "tvdbAiring" {
+	if err != nil || show.Type != "show" || show.ExternalIDs.TMDB != "820001" || show.ShowOrdering != "aired" {
 		t.Fatalf("show facts lost: %+v %v", show, err)
 	}
 	legacy := snapshot.Items[1]
@@ -391,5 +391,46 @@ func TestPMSIdentifiersRejectLossyNumbers(t *testing.T) {
 				t.Fatal("invalid identifier accepted")
 			}
 		})
+	}
+}
+
+// A library's default numbering is its showOrdering setting: the value
+// chosen, else the setting's default; a library without the setting, as
+// with older agents, says none.
+func TestPMSSectionOrdering(t *testing.T) {
+	prefs := map[string]string{
+		"2": `{"MediaContainer":{"size":2,"Setting":[{"id":"enableCinemaTrailers","type":"bool","default":true,"value":false},{"id":"showOrdering","label":"Episode ordering","type":"text","default":"tmdbAiring","value":"aired","enumValues":"tmdbAiring:The Movie Database|aired:TheTVDB"}]}}`,
+		"3": `{"MediaContainer":{"size":1,"Setting":[{"id":"showOrdering","type":"text","default":"tmdbAiring","value":""}]}}`,
+		"4": `{"MediaContainer":{"size":1,"Setting":[{"id":"collectionMode","type":"int","default":-1,"value":-1}]}}`,
+		"5": `{"MediaContainer":{}}`,
+	}
+	client := pmsClient(t, "synthetic-owner-token", func(w http.ResponseWriter, r *http.Request) {
+		section, ok := strings.CutSuffix(strings.TrimPrefix(r.URL.Path, "/library/sections/"), "/prefs")
+		body, known := prefs[section]
+		if !ok || !known {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		pmsJSON(w, body)
+	})
+	for section, want := range map[string]string{"2": "aired", "3": "tmdbAiring", "4": "", "5": ""} {
+		got, err := client.SectionOrdering(t.Context(), section)
+		if err != nil || got != want {
+			t.Errorf("section %s = %q %v; want %q", section, got, err, want)
+		}
+	}
+	_, err := client.SectionOrdering(t.Context(), "9")
+	pmsErrorKind(t, err, "unavailable")
+	_, err = client.SectionOrdering(t.Context(), "../1")
+	pmsErrorKind(t, err, "invalid_input")
+}
+
+// An item's air date is kept only when it is a calendar date.
+func TestPMSAirDate(t *testing.T) {
+	for raw, want := range map[string]string{"2024-01-07": "2024-01-07", "": "", "2024-01-07T00:00:00Z": "", "January 7": ""} {
+		item, err := rawMetadata{RatingKey: "1", Type: "episode", AiredOn: raw}.item()
+		if err != nil || item.AiredOn != want {
+			t.Errorf("%q gave %q %v; want %q", raw, item.AiredOn, err, want)
+		}
 	}
 }
