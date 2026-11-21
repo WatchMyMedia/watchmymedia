@@ -84,6 +84,7 @@ import media.watchmy.client.tv.components.rememberFocusMemory
 import media.watchmy.client.presentation.library.gridSubtitle
 import media.watchmy.client.tv.requests.RequestDialog
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.ReportShown
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.WmmIcons
@@ -157,6 +158,8 @@ fun SearchScreen(
     val services = LocalAppServices.current
     val vm = viewModel { SearchViewModel(services.library, auth = services.auth, requests = services.requests, saved = createSavedStateHandle(), servers = services.servers) }
     val state by vm.state.collectAsStateWithLifecycle()
+    // Each time Search comes on screen is a new visit: the other servers are asked which they are again before a sign-in goes to them.
+    ReportShown(vm::setShown)
     // The field holds its text, which the keyboard edits; the model searches a moment after it changes.
     val query = rememberModelTextField(state.query, state.revision, vm::setQuery)
     // The words a result on another server was found with, searched again on the server the TV switched to.

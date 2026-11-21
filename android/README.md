@@ -341,6 +341,26 @@ nothing ties two servers together, and the server has no part in this.
   title's page. What can be requested, and marking watched, stay the
   server in use's. A picture from another server is asked for with that
   server's sign-in, which goes to no other address.
+- **Asked first.** A kept address is only an address: at home it is the
+  Cabin server, and on another network it is someone else's machine. So
+  before a search sends a server that isn't in use its sign-in, the app
+  asks that address which server it is, with no sign-in (`GET /api/server`),
+  and sends the sign-in only when the id is the one remembered
+  (`RealServerRepository.askFirst`, which `searchOn` calls; the answer is
+  kept in `Http`, and the pictures of what a server found are signed only
+  while it stands). It asks once a visit to Search, not once a letter, and
+  the question shares the server's four seconds. A visit begins each time
+  Search comes on screen (`SearchViewModel.setShown`), since a device
+  changes network while the app is away; servers whose results are showing
+  are asked then, so their pictures go on loading. An answer stands only on
+  the network it was given on, so a device that moves with Search open asks
+  again. A call to a server that fails forgets its answer, so Try again
+  asks again. Nothing at the
+  address, or another server there: no sign-in is sent, and the server gets
+  the line and the rest any failure gets. What it says of itself (name,
+  version, level) is kept; one that says it is too old is left out and
+  said to be too old. The server in use is not asked for each search: its
+  sign-in goes to it as it always has.
 - **Above the signed-in screens.** Those screens are rebuilt on every
   switch (`key(server.id, user)`), so the note, Add a server's steps, the
   way back from a sign-in and a search result's landing are kept by

@@ -3,6 +3,7 @@ package media.watchmy.client.core.data
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +22,9 @@ import media.watchmy.client.model.SavedServer
 import media.watchmy.client.model.Server
 import media.watchmy.client.model.ServerRepository
 import media.watchmy.client.model.ServerTooOldException
+import media.watchmy.client.model.SignedOutException
+import media.watchmy.client.model.couldntReach
+import media.watchmy.client.model.tooOldNotListed
 
 internal class RealServerRepository(
     private val store: LocalStore,
@@ -154,11 +158,72 @@ internal class RealServerRepository(
             val entry = kept.copy(name = name, version = version, apiLevel = apiLevel, lastUsedAtMs = now)
             s.copy(servers = listOf(entry) + s.servers.filter { it.id != serverId }, currentId = serverId)
         }
+        // Another server is in use: what the others said was for the search this one left.
+        http.forgetAnswers()
         return when {
             gone -> ServerSwitch.Gone
             signedIn -> ServerSwitch.Switched
             else -> ServerSwitch.NeedsSignIn
         }
+    }
+
+    /** The questions out now, one a server: everyone who asks waits for the same answer. */
+    private val asking = HashMap<String, Deferred<Result<Unit>>>()
+
+    /**
+     * Before a sign-in goes to a kept server that isn't the one in use (a
+     * search of every server): asks its address, with no sign-in, which
+     * server it is, and lets the sign-in go there only when it is the one
+     * remembered. Until this the app sent only the sign-in of the server in
+     * use; a search sends every signed-in server's, on whatever network the
+     * device is on.
+     *
+     * The answer is kept ([Http.answered]) until a call to that server fails,
+     * Search is left or the device changes network, so typing asks once,
+     * and what the server says of
+     * itself (name, version, level) is kept as a switch keeps it. Nothing at
+     * the address, or another server there, throws as a server that can't
+     * be reached and no sign-in is sent. One that is the same server but too
+     * old for this app throws too, after its level is kept, which leaves it
+     * out of the searches that follow.
+     *
+     * The question runs in [scope]: a keystroke cancels the search that
+     * asked, not the question, and the next search waits for the same one.
+     */
+    suspend fun askFirst(serverId: String) {
+        val stored = store.value
+        val server = stored.servers.firstOrNull { it.id == serverId } ?: throw SignedOutException()
+        if (server.id == stored.currentId || http.answered(server)) return
+        val question = synchronized(asking) {
+            asking[serverId] ?: scope.async { runCatching { ask(server) } }.also { out ->
+                asking[serverId] = out
+                out.invokeOnCompletion { synchronized(asking) { if (asking[serverId] === out) asking.remove(serverId) } }
+            }
+        }
+        question.await().getOrThrow()
+    }
+
+    private suspend fun ask(server: StoredServer) {
+        // The answer is for the network it is asked on: a device that moves while it waits asks again.
+        val network = http.networkNow()
+        val info = withTimeoutOrNull(SWITCH_ASK_MS) {
+            try {
+                Http.call(signedIn = false) { SystemApi(server.baseUrl, http.probeClient).getServer() }
+            } catch (_: ApiException) {
+                null
+            }
+        }
+        // Nothing there, or another server at the address it had: its sign-in is not sent.
+        if (info == null || info.id != server.id) throw ApiException(null, "${couldntReach(server.name)}.")
+        val level = info.apiLevel.toInt()
+        store.update { s ->
+            s.withServer(server.id) {
+                val same = it.name == info.name && it.version == info.version && it.apiLevel == level
+                if (same || it.baseUrl != server.baseUrl) it else it.copy(name = info.name, version = info.version, apiLevel = level)
+            }
+        }
+        if (level < REQUIRED_API_LEVEL) throw ApiException(null, tooOldNotListed(info.name))
+        http.noteAnswer(server, network)
     }
 
     /** What runs before a sign-in ends on this device, while its server still takes it ([beforeSignInEnds]). */
@@ -201,6 +266,7 @@ internal class RealServerRepository(
             // Removing the one in use moves to the server used last that is still signed in; with none, the picker.
             if (s.currentId == serverId) without.movedToSignedIn(now) ?: without.copy(currentId = null) else without
         }
+        http.forgetAnswers(serverId)
         // Ends the session on the server too, when it can be reached; removing works offline either way.
         if (token != null) signOutLater(gone.baseUrl, token)
     }

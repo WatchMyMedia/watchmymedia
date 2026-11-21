@@ -51,6 +51,16 @@ class SearchServersTest {
         /** The servers whose call was cancelled while it was out. */
         val cancelled = mutableListOf<String>()
 
+        /** What a server's call does before it answers or fails: what the real one learns from the server on the way. */
+        val before = HashMap<String, () -> Unit>()
+
+        /** Each visit to Search begun, with the servers whose results were showing. */
+        val visits = mutableListOf<List<String>>()
+
+        override suspend fun searchVisit(showing: Collection<String>) {
+            visits += showing.toList()
+        }
+
         fun asked(serverId: String) = calls.count { it.first == serverId }
 
         override suspend fun search(text: String): SearchResults = ask(servers.current.value!!.server.id, text) { fake.search(text) }
@@ -65,6 +75,7 @@ class SearchServersTest {
                 cancelled += serverId
                 throw e
             }
+            before[serverId]?.invoke()
             failures[serverId]?.let { throw it }
             return answer()
         }
@@ -286,4 +297,54 @@ class SearchServersTest {
         assertTrue(s.unlisted.isEmpty())
         assertTrue(s.shows.isEmpty())
     }
+    @Test fun `each time Search comes on screen is a new visit, and the servers whose results are showing are asked again at once`() = runTest {
+        vm.state
+        vm.setShown(true)
+        runCurrent()
+        assertEquals("the first visit, with nothing showing", listOf(emptyList<String>()), library.visits)
+        vm.setShown(true)
+        runCurrent()
+        assertEquals("still the same visit", 1, library.visits.size)
+
+        vm.setQuery("harbor")
+        advanceUntilIdle()
+        assertEquals(listOf(Cabin.id), vm.state.value.elsewhere.map { it.serverId })
+        // A title's page over Search, or the app in the background; then Search again.
+        vm.setShown(false)
+        runCurrent()
+        assertEquals("leaving asks nothing", 1, library.visits.size)
+        vm.setShown(true)
+        runCurrent()
+        assertEquals(listOf(emptyList(), listOf(Cabin.id)), library.visits)
+        assertEquals("the results stay as they were, and nothing is searched again", 3, library.calls.size)
+    }
+
+    @Test fun `a server that says it is too old when asked is said to be too old, with no Try again`() = runTest {
+        // Asked which server it is before its sign-in goes to it, the Cabin server answers with a level this app can't use.
+        library.before[Cabin.id] = { servers.says(Cabin.copy(apiLevel = 0)) }
+        library.failures[Cabin.id] = ApiException(null, "Cabin server is too old for this app, so its titles aren’t listed.")
+        vm.setQuery("harbor")
+        advanceUntilIdle()
+        val cabin = vm.state.value.unlisted.first { it.serverId == Cabin.id }
+        assertEquals("Cabin server is too old for this app, so its titles aren’t listed.", cabin.line)
+        assertFalse("asking again won't help", cabin.retry)
+        assertEquals("the server in use's results are there", listOf("Harbor Lights" to null), vm.state.value.shows.named { it.title })
+
+        // It is left out from then on, without waiting out a failure's rest.
+        typed("harbor l")
+        advanceUntilIdle()
+        assertEquals("not asked again", 1, library.asked(Cabin.id))
+        assertEquals("Cabin server is too old for this app, so its titles aren’t listed.", vm.state.value.unlisted.first { it.serverId == Cabin.id }.line)
+    }
+
+    @Test fun `a server that ends the sign-in during a search is said to be signed out, with no Try again`() = runTest {
+        library.before[Cabin.id] = { servers.signInEnded(Cabin.id) }
+        library.failures[Cabin.id] = media.watchmy.client.model.SignedOutException()
+        vm.setQuery("harbor")
+        advanceUntilIdle()
+        val cabin = vm.state.value.unlisted.first { it.serverId == Cabin.id }
+        assertEquals("You’re signed out of Cabin server here, so its titles aren’t listed.", cabin.line)
+        assertFalse(cabin.retry)
+    }
+
 }

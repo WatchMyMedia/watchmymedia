@@ -95,6 +95,7 @@ import media.watchmy.client.model.episodeCode
 import media.watchmy.client.model.formatDay
 import media.watchmy.client.model.playRequest
 import media.watchmy.client.ui.Inter
+import media.watchmy.client.ui.ReportShown
 import media.watchmy.client.ui.TabletLayout
 import media.watchmy.client.ui.rememberTabletLayout
 import media.watchmy.client.mobile.navigation.MobileRoutes
@@ -139,6 +140,8 @@ fun SearchScreen(
     var asking by remember { mutableStateOf<Requestable?>(null) }
     val notMatched = rememberNotMatchedNotice()
     val state by vm.state.collectAsStateWithLifecycle()
+    // Each time Search comes on screen is a new visit: the other servers are asked which they are again before a sign-in goes to them.
+    ReportShown(vm::setShown)
     // The field holds its text; the model searches a moment after it changes.
     val query = rememberModelTextField(state.query, state.revision, vm::setQuery)
     // The Search tab (the tablet's rail) tapped again takes the results back to the top.

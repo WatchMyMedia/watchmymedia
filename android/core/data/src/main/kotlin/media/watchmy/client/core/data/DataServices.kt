@@ -137,7 +137,7 @@ class DataServices internal constructor(
 
     val servers: ServerRepository = serverRepository
     val auth: AuthRepository = authRepository
-    val library: LibraryRepository = RealLibraryRepository(store, http, events, scope, clock)
+    val library: LibraryRepository = RealLibraryRepository(store, http, events, scope, clock, serverRepository::askFirst)
     private val liveRepository = RealLiveRepository(http, store, scope, clock, events)
     val live: LiveRepository = liveRepository
     val livePlaybackGateway: LivePlaybackGateway = RealLivePlaybackGateway(store, http, capabilities = liveRepository::capabilities)

@@ -156,10 +156,15 @@ class FakeServerRepository(signedIn: Boolean = true, several: Boolean = true) : 
         if (next != null) use(next.server.id)
     }
 
-    /** The server in use ended this device's sign-in (signed out from another device): it stays in use, signed out. */
-    fun signInEnded() {
-        val id = currentId.value ?: return
+    /** [serverId], or with none the server in use, ended this device's sign-in (signed out from another device): it stays where it was, signed out. */
+    fun signInEnded(serverId: String? = null) {
+        val id = serverId ?: currentId.value ?: return
         entries.update { list -> list.map { if (it.server.id == id) it.copy(account = null) else it } }
+    }
+
+    /** What a kept server said of itself when asked which server it is (its name, version and level), kept in place of what it said before. */
+    fun says(server: Server) {
+        entries.update { list -> list.map { if (it.server.id == server.id) it.copy(server = server) else it } }
     }
 
     private fun use(id: String) {

@@ -1,6 +1,9 @@
 package media.watchmy.client.core.data
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import media.watchmy.client.core.api.apis.BrowseApi
 import media.watchmy.client.core.api.apis.FilesApi
 import media.watchmy.client.core.api.apis.LibrariesApi
@@ -28,6 +31,7 @@ import media.watchmy.client.model.SearchResults
 import media.watchmy.client.model.SeasonDetail
 import media.watchmy.client.model.ShowDetail
 import media.watchmy.client.model.SignedOutException
+import media.watchmy.client.model.couldntReach
 import media.watchmy.client.model.episodeCode
 
 internal class RealLibraryRepository(
@@ -36,6 +40,8 @@ internal class RealLibraryRepository(
     events: ServerEvents,
     scope: kotlinx.coroutines.CoroutineScope,
     clock: () -> Long,
+    /** Asks a kept server that isn't in use which server it is, before its sign-in goes there ([RealServerRepository.askFirst]). */
+    private val askFirst: suspend (serverId: String) -> Unit,
 ) : LibraryRepository {
     /** The library list, asked again after a scan or a change to a library, or after a while ([SessionMemo]). */
     private val libraryList = SessionMemo(store, scope, clock) {
@@ -122,17 +128,56 @@ internal class RealLibraryRepository(
     }
 
     /**
-     * The call is built for [serverId] alone: its address and its sign-in
-     * ([Http.bindTo]), so what is typed goes to each server as its own
-     * person and no sign-in is sent to another server's address.
+     * The call is built for [serverId] alone: its address and its sign-in,
+     * so what is typed goes to each server as its own person and no sign-in
+     * is sent to another server's address. Its address is asked which
+     * server it is first, with no sign-in ([askFirst]): the sign-in goes
+     * only to the server remembered, and to nothing else that answers
+     * there. A call that fails forgets the answer, so the next asks again.
      */
     override suspend fun searchOn(serverId: String, text: String): SearchResults {
         val q = text.trim().take(MAX_SEARCH)
         if (q.isEmpty()) return SearchResults(emptyList(), emptyList(), emptyList())
         val server = store.value.servers.firstOrNull { it.id == serverId }
-        val access = server?.account?.let { http.bindTo(serverId, it.userId) } ?: throw SignedOutException()
-        val r = access.call { base, client -> browse(base, client).search(q) }
+        val account = server?.account ?: throw SignedOutException()
+        askFirst(serverId)
+        // A new visit to Search began just as it answered: it is asked once more. Still unanswered, nothing is sent.
+        val access = http.bindToAnswered(serverId, account.userId)
+            ?: run {
+                askFirst(serverId)
+                http.bindToAnswered(serverId, account.userId)
+            }
+            ?: throw ApiException(null, "${couldntReach(server.name)}.")
+        val r = try {
+            access.call { base, client -> browse(base, client).search(q) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            http.forgetAnswers(serverId)
+            throw e
+        }
         return SearchResults(r.movies.map { it.toBrowseItem() }, r.shows.map { it.toBrowseItem() }, r.episodes.map { it.toCard() })
+    }
+
+    /**
+     * What every other server said is forgotten, and those in [showing] are
+     * asked again now, each on its own: one that doesn't answer is found out
+     * by the next search, which says so.
+     */
+    override suspend fun searchVisit(showing: Collection<String>) {
+        http.forgetAnswers()
+        coroutineScope {
+            showing.distinct().forEach { id ->
+                launch {
+                    try {
+                        askFirst(id)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        }
     }
 
     override suspend fun setWatched(kind: ContinueItem.Kind, id: Long, watched: Boolean) {

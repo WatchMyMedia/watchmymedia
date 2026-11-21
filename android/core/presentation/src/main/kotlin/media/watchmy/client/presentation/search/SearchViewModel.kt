@@ -58,6 +58,12 @@ import media.watchmy.client.model.watchTarget
  *   too old, gets a line ([State.unlisted]) and, having failed, isn't asked
  *   again for [failedForMs] on this visit, so typing doesn't queue timeouts.
  * - A new keystroke cancels every call still out.
+ * - A server that isn't in use is asked which server it is, with no sign-in,
+ *   before its sign-in goes to it (the data layer's part, within the same
+ *   [timeoutMs]): once a visit, and a visit begins each time Search comes on
+ *   screen ([setShown]). One that says it is too old, or whose sign-in has
+ *   ended, is told apart from one that didn't answer and isn't offered Try
+ *   again.
  *
  * What can be requested, and marking watched, stay the server in use's.
  */
@@ -205,6 +211,23 @@ class SearchViewModel(
         search(debounce = false)
     }
 
+    private var shown = false
+
+    /**
+     * Search is on screen, or no longer. Each time it comes on screen is a
+     * new visit: the device may have changed network while it was away, so
+     * every other server is asked which server it is again before its
+     * sign-in goes to it. Those whose results are showing are asked now, so
+     * the pictures of what they found go on loading.
+     */
+    fun setShown(shown: Boolean) {
+        if (shown == this.shown) return
+        this.shown = shown
+        if (!shown || servers == null) return
+        val showing = _state.value.elsewhere.map { it.serverId }
+        viewModelScope.launch { attempt { library.searchVisit(showing) } }
+    }
+
     fun setWatched(item: BrowseItem, watched: Boolean) {
         val target = item.watchTarget() ?: return
         mark(target, watched) { results ->
@@ -292,6 +315,8 @@ class SearchViewModel(
     /** Every signed-in server at once, merged as each settles. */
     private suspend fun searchAll(text: String, revision: Int, plan: Plan) = coroutineScope {
         val answers = arrayOfNulls<Result<SearchResults>>(plan.asked.size)
+        // Why a server that failed isn't listed, when it isn't that it didn't answer.
+        val reasons = arrayOfNulls<Unlisted>(plan.asked.size)
         var late = false
 
         fun publish() {
@@ -309,7 +334,7 @@ class SearchViewModel(
                 val answer = answers[i] ?: break
                 answer.getOrNull()?.takeIf { !it.isEmpty() }?.let { others += ServerResults(plan.asked[i].id, plan.asked[i].name, it) }
             }
-            val failed = plan.asked.filterIndexed { i, _ -> answers[i]?.isFailure == true }.map { Unlisted(it.id, didntAnswer(it.name), retry = true) }
+            val failed = plan.asked.mapIndexedNotNull { i, s -> if (answers[i]?.isFailure == true) reasons[i] ?: Unlisted(s.id, didntAnswer(s.name), retry = true) else null }
             // No server answered at all: the search failed, as it does with one server.
             val nothing = pending.isEmpty() && answers.all { it?.isFailure == true }
             _state.update {
@@ -337,8 +362,16 @@ class SearchViewModel(
                     withTimeoutOrNull(timeoutMs) { if (server.inUse) library.search(text) else library.searchOn(server.id, text) }
                         ?: throw ApiException(null, didntAnswer(server.name))
                 }
+                if (answer.isFailure && !server.inUse) {
+                    // What it said of itself, or its reply to the sign-in, may have changed how it is kept: then that is why, and asking again won't help.
+                    val kept = servers?.saved?.first()?.firstOrNull { it.server.id == server.id }
+                    when {
+                        kept?.server?.tooOld == true -> reasons[i] = Unlisted(server.id, tooOldNotListed(kept.server.name), retry = false)
+                        kept != null && !kept.signedIn -> reasons[i] = Unlisted(server.id, signedOutNotListed(kept.server.name), retry = false)
+                        else -> failedAt[server.id] = now()
+                    }
+                }
                 answers[i] = answer
-                if (answer.isFailure && !server.inUse) failedAt[server.id] = now()
                 if (answers.none { it == null }) stillAsking.cancel()
                 publish()
             }

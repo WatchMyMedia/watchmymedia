@@ -201,6 +201,48 @@ internal class Http(
         return bind(Session(server, account))
     }
 
+    /**
+     * The kept servers, other than the one in use, that have just said who
+     * they are: each one's id, the address that answered, and the network
+     * the device was on. A kept address is only an address: `192.168.1.20`
+     * on another network is someone else's machine. So a search of every
+     * server sends a server's sign-in (the search, and the pictures of what
+     * it found) only while the server is here, which
+     * [RealServerRepository.askFirst] decides, and an answer stands only on
+     * the network it was given on.
+     */
+    private val answers = java.util.concurrent.ConcurrentHashMap<String, Answer>()
+
+    private data class Answer(val baseUrl: String, val network: Long?)
+
+    /** The network the device is on now, as [NetworkMonitor] names it: taken before a server is asked, for [noteAnswer]. */
+    fun networkNow(): Long? = network.network.value
+
+    /** [server], which isn't the one in use, has said at the address kept, on the network the device is still on, that it is the server remembered. */
+    fun answered(server: StoredServer): Boolean = answers[server.id] == Answer(server.baseUrl, networkNow())
+
+    /** [server] has just said so, asked while the device was on [network]. */
+    fun noteAnswer(server: StoredServer, network: Long?) {
+        answers[server.id] = Answer(server.baseUrl, network)
+    }
+
+    /** Forgets what [serverId] said, or with none what every server said: each is asked again before its sign-in next goes to it. */
+    fun forgetAnswers(serverId: String? = null) {
+        if (serverId == null) answers.clear() else answers.remove(serverId)
+    }
+
+    /**
+     * [bindTo] for a search of every server: access to [serverId] as
+     * [userId] when it is the server in use, or one that has [answered];
+     * null otherwise, and no call is made.
+     */
+    fun bindToAnswered(serverId: String, userId: Long): ServerAccess? {
+        val stored = store.value
+        val server = stored.servers.firstOrNull { it.id == serverId } ?: return null
+        if (server.id != stored.currentId && !answered(server)) return null
+        return bindTo(serverId, userId)
+    }
+
     /** Bind an already captured atomic identity/revision snapshot (Live TV). */
     internal fun bind(session: Session?): ServerAccess {
         return object : ServerAccess {
@@ -285,14 +327,15 @@ internal class Http(
 
     /**
      * The sign-in of the server an untagged [request] is for: the one in
-     * use, or another kept server that is signed in (a picture from a search
-     * of every server). A server's token is opened only for a request to its
-     * own address, and goes nowhere else.
+     * use, or another kept server that is signed in and has [answered] (a
+     * picture from a search of every server). A server's token is opened
+     * only for a request to its own address, and goes nowhere else; one that
+     * hasn't just said who it is gets the request with no sign-in.
      */
     private fun current(request: Request): Credential? {
         val stored = store.value
         val server = stored.current?.takeIf { owns(it.baseUrl, request.url) }
-            ?: stored.servers.firstOrNull { it.account != null && owns(it.baseUrl, request.url) }
+            ?: stored.servers.firstOrNull { it.account != null && owns(it.baseUrl, request.url) && answered(it) }
             ?: return null
         val account = server.account ?: return null
         val token = store.tokenForRequest(server.id, account) ?: return null
