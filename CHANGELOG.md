@@ -5,6 +5,72 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release. A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 2.0.0
+
+The phone, tablet and TV apps stay signed in to several servers at once, switch between them
+without a password and search all of them together. Search everywhere lists the best matches
+first and finds titles however they are typed. From this release the iPhone, iPad and Apple TV
+apps carry the server's version number.
+
+- This release changes the server's database. Back up before updating: Settings › Backups ›
+  Back up now, or `watchmymedia backup`. Going back to 1.8.0 afterwards needs that backup.
+- Search lists the best matches first, in the web app and every other app: the title that is
+  what you typed, then titles that start with it, then titles where a word starts with it, then
+  titles with it anywhere. Before, results came in alphabetical order, so "star" listed the
+  first 20 titles with those letters anywhere in them and could leave out a film called Star.
+- Search no longer minds accents, punctuation or the order of the words. "amelie" finds Amélie,
+  "spiderman" and "spider man" find Spider-Man, and "wall e" finds WALL·E. Words can be left
+  out, and a year after them finds the title from that year ("dune 2021"). Everything the old
+  search found is still found.
+- Search is quicker on a large library. The server finds titles through an index instead of
+  reading the whole library for each search: with 40,000 titles a one-word search takes about
+  2 ms where it took 34, and ten searches at once take 0.14 s where they took half a second.
+  The index adds about 7 MB to a database of that size.
+- The Android app (phones, tablets and Android TV) and the iPhone, iPad and Apple TV apps stay
+  signed in to as many as 12 servers. The account button, or the last tab on Apple TV, opens
+  Servers: the servers this device is signed in to, Add a server and Manage servers. Choosing
+  one switches to it at once, with no password, and says "Now on" with its name. A server that
+  doesn't answer leaves the app where it was, with Try again. Before, changing servers meant
+  signing in again each time.
+- Search in those apps asks every server the device is signed in to. The results of the server
+  in use come first, and each other server's follow with its name on them. Opening one switches
+  to its server and shows the title there. A server that takes longer than four seconds is
+  named in a line with Try again, and nothing already on screen moves.
+- Settings lists the servers, under Account & devices › Servers on Android and under Server on
+  iPhone, iPad and Apple TV. A server's page shows its address, its version and who is signed
+  in, with Switch to this server and Remove this server. Removing a server signs this device
+  out of it and deletes its downloads from the device. Signing out of the server in use moves
+  to the one used most recently rather than to the sign-in screen.
+- A server's sign-in goes only to that server. The address an app keeps for a server is where
+  it last saw it, and on another network that address can be someone else's machine. So before
+  an app sends the sign-in of a server that isn't the one in use, for a search, a download's
+  report or a sign-out, it asks the address which server it is, and sends nothing unless the
+  server it remembers answers.
+- On phones and tablets, Downloads says what the device holds from the other servers, and a
+  link or a notification for another server switches to it before it opens. New-episode
+  notifications keep their place for each server.
+- Removing a server that wasn't the one in use now deletes its downloads from the phone or
+  tablet. Before, they stayed on the device.
+- Several servers asks nothing new of a server, so the servers the apps worked with before can
+  be among them.
+- Matching a file to its title waits when the database is busy, for up to a minute, rather
+  than giving the file up. Before, such a file could end in Unmatched as "TMDB did not answer:
+  database is locked" and wasn't tried again until the next day or a rematch. A file whose
+  match still can't be saved stays waiting and is matched on the next run, and Unmatched says
+  the database was busy.
+- The Samsung TV app gets several servers too, in its 2.0.0 update. That update follows the
+  app's first version, which is still in Samsung's review.
+- On Android TV, Right from the end of any row of Search's keyboard moves to the results.
+  Before, only the keyboard's bottom row could reach them.
+- On Android TV, Search's key hints stay under the keyboard rather than running under the
+  results. The line under a Live TV result that says what OK does is no longer cut off at the
+  foot of the screen, and it goes when focus leaves the row.
+- On Android TV, TalkBack is told which Live TV result and which cell of the Live TV guide has
+  focus. Before, neither ever said it had focus.
+- The iPhone, iPad and Apple TV apps are 2.0.0, the server's own version. Until now their App
+  Store version ran ahead of the server's: 1.8.0's apps were 1.11.0.
+- On Unraid, WatchMyMedia is in Community Applications: search for it in the Apps tab.
+
 ## 1.8.0
 
 The server gets ready for WatchMyMedia's Samsung TV app, signs app requests in by their own token
