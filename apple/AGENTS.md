@@ -77,6 +77,24 @@ server, and on iPad in both a regular and a compact width.
     `SeveralServersTests` checks that neither server sees the other's token.
     A picture is signed for the server its address is on
     (`LocalStore.signedIn(for:)`).
+  - A kept address is only where a server was last seen: on another
+    network `http://192.168.x.y` is someone else's machine. So before a
+    sign-in goes to a server that isn't the one in use, that server is
+    asked which one it is, with no sign-in (GET /api/server,
+    `RealServerRepository.askOther`), and the sign-in goes only when the id
+    is the one remembered. `LocalStore.other(serverID:)` enforces it: it
+    hands out no sign-in until the server has answered
+    (`ServerNotAskedError`), so search, its pictures and anything new that
+    reaches another server are covered without asking themselves. The
+    answer stands for a visit to Search (`SearchModel.visitEnded()`, from
+    the search screens when another tab is chosen or the app leaves the
+    screen), five minutes at most, and goes when another server comes into
+    use or the network changes. Removing a server that isn't in use asks
+    first too, and sends nothing to an address that doesn't answer as it.
+    A server that doesn't answer as itself gets the line any failure gets;
+    don't word it differently, and never fall back to sending the sign-in.
+    The offline downloads' own calls for a server that isn't in use
+    (`RealOfflineGateway`) don't ask yet.
   - Screens switch through `ServersModel` (`switchTo`, `remove`,
     `signingOut`, `open`), one for the app in the environment, not by
     calling `ServerRepository.select` or `forget` themselves: it asks the
@@ -290,12 +308,37 @@ server, and on iPad in both a regular and a compact width.
     `defaultFocus` only if what was replaced was built in the same body.
     With the pairing pieces moved into views of their own, nothing had
     focus after the switch (tvOS 27.2 simulator, `BusyFocusTests`), so the
-    pieces sign-in and Switch server share are `@ViewBuilder` functions
+    pieces sign-in and Add a server share are `@ViewBuilder` functions
     (`pairingCodeArea(_:)` in `TV/Screens/SignIn/SignInScreen.swift`).
-    Even built in the same body, Switch server's form was left with nothing
+    Even built in the same body, Add a server's form was left with nothing
     focused on CI's tvOS 26.5 simulator (never on this Mac's, loaded or
     not), so it moves focus itself when the way in changes
-    (`onChange(of: signIn.codeSignIn)` in `SwitchServerScreen.swift`).
+    (`onChange(of: signIn.codeSignIn)` in `AddServerScreen.swift`).
+  - On Apple TV nothing beside the system tab bar takes focus from it. A
+    focusable button drawn in the page at the bar's height, and one in the
+    bar's own trailing or leading accessory, were tried for the account
+    (tvOS 27.2): Right from the last tab stays put, and focus asked for
+    from inside the accessory lands in the page. What is reached from the
+    tabs has to be a tab, so the account is the bar's last tab and Servers
+    is its page (`TV/Shell/MainTabs.swift`). The bar's pill is about
+    1260 pt at its widest and scrolls past that, so the tab cuts a long
+    name short.
+  - Menu on a tab's root page, left to the system, goes to the tab focus
+    came from on tvOS 27.2 and to the first tab on 26.5: set
+    `onExitCommand` where it matters (Servers closes for Home).
+  - Tabs rebuilt by a switch to another server start with focus in the tab
+    bar, where Menu leaves the app. A page the switch opens (a search
+    result on another server) is given focus, asked until it lands
+    (`FocusOnArrival` in `MainTabs.swift`), so Menu goes back to the
+    results. State kept in a screen under the tabs is lost at every
+    switch: a once-a-launch flag (the debug launch arguments) lives in
+    `AppFlow`.
+  - Taking a focused button away in the same update that changes the tab
+    sends focus into the page behind, not to the tabs: Servers forgets a
+    failure, and its Try again, in `onDisappear`.
+  - The note after a switch is up for four seconds, less than a UI test on
+    a busy simulator needs to read it: `-serverNoteSeconds <n>` (debug
+    builds) keeps it up longer.
   - On tvOS 26.5 focus asked through a `@FocusState` of a view a lazy grid
     hasn't drawn yet is dropped without a word, and no `onChange` follows
     (the library grid's Menu from the letter index, once a letter's jump
@@ -320,14 +363,39 @@ server, and on iPad in both a regular and a compact width.
   - On iPad the toolbar beside the tab bar holds little: a third trailing
     item sends the rest into a ⋯ menu. Put a page's own buttons in its title
     row (the Live TV guide's search, Reminders and Guide/Channels switch).
+    The account button is on Home's and Live TV's bars only for that reason,
+    and shows the server's name beside the initial only where it fits whole.
+  - Servers has one model and three places that can show it
+    (`ServersPresenter` in `App/Screens/Servers/ServersView.swift`): the
+    account button's popover, Settings' sheet and the tabs' sheet. Exactly
+    one answers at a time, so a switch that fails from Downloads or a
+    server's page opens Servers where the person is. A `Binding(get:)` for a
+    popover or sheet reads its `@Observable` in `body`, not in the getter:
+    read only in the getter, nothing redraws the view when the model
+    changes and the popover never opens. A popover asked for before the
+    toolbar exists never opens either (`-servers` waits a second).
+  - What must follow Servers closing (Add a server's sheet, Settings where
+    that is a sheet) runs from its `onDisappear`
+    (`AppFlow.afterServersClose`): a sheet presented while another is
+    leaving is dropped.
+  - A Settings page pushed by `NavigationLink` that read
+    `@Environment(\.dismiss)` to pop itself was redrawn without end, with
+    the pages under it (75–150 s stalls, two pushes in five on the iOS 27
+    simulator). Push by state with `navigationDestination(item:)` and let
+    the page clear that state through a closure (`RegisteredServerPage`).
+  - On iOS 27 a `confirmationDialog` grows from the button that asked, as a
+    popover on iPhone too: a UI test finds it in `app.popovers` and
+    answers Cancel with a tap outside it (`PopoverDismissRegion`). An iPad
+    UI test waits for a field's `hasKeyboardFocus` before typing; on a
+    busy simulator the tap can land before the field takes focus.
 - **Settings** (README, Settings). A task with steps
   is a sheet in `TaskFrame`, presented from `SettingsTasks` in
   `SettingsScreen.swift` so both widths share it, with its model kept in
   `AppFlow` so a resized iPad window keeps the step. `.linkTV` in the
   Settings tab's path is that sheet, never a pushed page: `MainTabView`
   leaves it out of the stack's path (`[Route].pushed`) and keeps it when the
-  stack changes the path. A finished Switch server shows its last step until
-  Done (`AppFlow.serverSwitchDone`); only then does `RootView` rebuild the
+  stack changes the path. A finished Add a server shows its last step until
+  Done (`AppFlow.addingServerDone`); only then does `RootView` rebuild the
   tabs. A sheet that must ask before a swipe throws away what was typed uses
   `asksBeforeDismissing`: `interactiveDismissDisabled` alone refuses the swipe
   without saying so, and the helper hears UIKit's attempt through a proxy in

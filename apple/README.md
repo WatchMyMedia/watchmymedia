@@ -45,6 +45,32 @@ another server with `E2E_SERVER=… E2E_USER=… E2E_PASSWORD=…`. Simulator bu
 are signed to run locally (ad hoc): unsigned, the Keychain refuses the app and
 nothing it signs in to survives a relaunch.
 
+`UITests/ServersEndToEndTests.swift` does the same for several servers,
+against two throwaway servers that each have their own id, name and library
+(a copy of one database counts as one server) and a title the same words
+find. It signs in to the first, adds the second from Servers, switches back
+without a password, searches both, opens the second's result and plays it
+there. Run it by itself, from a fresh install (`xcrun simctl uninstall` and
+`simctl keychain <udid> reset`, as `make apple-e2e` does):
+
+```bash
+TEST_RUNNER_WMM_E2E_SERVER=localhost:<port> TEST_RUNNER_WMM_E2E_USER=… TEST_RUNNER_WMM_E2E_PASSWORD=… \
+TEST_RUNNER_WMM_E2E_SERVER_2=localhost:<port> TEST_RUNNER_WMM_E2E_USER_2=… TEST_RUNNER_WMM_E2E_PASSWORD_2=… \
+xcodebuild -project apple/WatchMyMedia.xcodeproj -scheme WatchMyMediaE2E -destination 'platform=iOS Simulator,id=<udid>' \
+  -derivedDataPath apple/build/DerivedData CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= \
+  -only-testing:WatchMyMediaUITests/ServersEndToEndTests test
+```
+
+Two more runs follow that one, without reinstalling. Stop the second server
+and add `TEST_RUNNER_WMM_E2E_SERVER_2_STOPPED=1`: the app moves to the first
+server, choosing the second in Servers says it couldn't be reached, and
+search says it didn't answer. Or end the simulator's sign-in on the second
+server from somewhere else (DELETE /api/auth/sessions/{id} as the same
+person) and add `TEST_RUNNER_WMM_E2E_SERVER_2_SIGNED_OUT=1`: the app shows
+that server's sign-in, Change server opens the first without a password, and
+Servers says the second is signed out here. `WMM_E2E_SEARCH` gives the words
+to search for ("harbor" unless set).
+
 `make apple-gen` writes `WatchMyMedia.xcodeproj` from `project.yml`; open it
 in Xcode to run on a simulator or a device. The project and `App/Info.plist`
 are generated and not committed: change `project.yml` instead. `App/`, `TV/`,
@@ -153,7 +179,7 @@ filter panel, and Show/Movie details and Search use two panes. Title-sorted
 libraries offer an A–Z index when the server supplies it. In portrait the
 player shows the season below the video; in landscape it fills the screen.
 Audio, Subtitles and Quality open a side panel and keep the video playing.
-Settings keeps Switch server's steps inside its split view.
+Settings keeps Add a server's steps inside its split view.
 
 The Apple TV app takes the same `-fakes`, `-fakesMember`, `-fakesSignedOut`,
 `-fakesNoServer`, `-tab` and `-open` arguments (`watchmymedia://link` is the
@@ -212,20 +238,20 @@ does along its bottom: Name this Apple TV (room names, and Type another name
 for the keyboard), Add a language (every language by name in a grid that
 scrolls, with Search languages above it for the keyboard or the
 microphone), the codes to scan for Change password and Server settings, and
-Switch server's three steps, which `RootView` keeps above the tabs because a
-switch rebuilds them. Sign-out questions open on the button that keeps
+Add a server's three steps, which `RootView` keeps above the tabs because a
+server added rebuilds them, and a registered server's page. Sign-out questions open on the button that keeps
 things, and Menu is that button. The groups and their lines
 (`tvSettingsGroups`), the words, each row's save (`saveState(_:)`,
 `qualitySave`, `deviceNameSave`, `LiveExtrasStore.leadSave`), the dialogs,
-the steps and Switch server's sign-in (`pairsByDefault`, starting on the
+the steps and Add a server's sign-in (`pairsByDefault`, starting on the
 code) are the Kit's; the panel's own text is
 `TV/Screens/Settings/SettingsPanelWords.swift`. `-fakesSaveFails recap`
 (the Kit's, with `:422`, a list, `languages` or `all`) makes a save fail,
 to see a row say why.
 `-settingsGroup playback|languages|homeRows|account|requests|server|about`
 shows a group with focus on it at launch; `-renameDevice`, `-changePassword`,
-`-serverSettingsCode`, `-signOutQuestion`, `-switchServer`,
-`-subtitlesSettings` (with `-addLanguage audio|subtitles`) and
+`-serverSettingsCode`, `-signOutQuestion`, `-addServer`,
+`-serverPage <server id>`, `-subtitlesSettings` (with `-addLanguage audio|subtitles`) and
 `-homeRowsSettings` open the rest, in debug builds.
 `TVUITests/SettingsTests.swift` drives them with the remote.
 
@@ -378,8 +404,8 @@ each device.
   switches anyway to the offline Home. A server whose sign-in ended says so
   and opens its sign-in. `ServersModel` (`WMMFeatures/Account`) is the one
   model for all of it, shared through the environment, since Settings,
-  Search, Downloads and links switch too; nothing else calls
-  `ServerRepository.select` to change server.
+  Search, Downloads and links switch too; only it, sign-in's picker and Add
+  a server call `ServerRepository.select`.
 - **Add a server** is a task of three steps, Choose a server, Sign in, Added
   (`AddServerModel`). Servers already registered aren't offered, and an
   address that reaches one is refused. Cancel, or a failure at any step,
@@ -393,7 +419,14 @@ each device.
   in.
 - **Search looks in every server signed in to.** Each is asked at once, to
   its own address with its own sign-in (`LibraryRepository.search(_:serverID:)`,
-  through an API built for that server alone). The server in use's results
+  through an API built for that server alone). First each is asked which
+  server it is, with no sign-in (GET /api/server), and its sign-in is sent
+  only when it answers as the one remembered: the address kept for a server
+  is where it was last seen, and on another network that can be someone
+  else's machine. One question covers a visit to Search, not each
+  keystroke, and shares the server's 4 s; another server at the address, or
+  none, is a server that didn't answer, and is sent nothing. The answer
+  also keeps the server's name, version and API level up to date. The server in use's results
   come first in each group and the others' follow in the Servers list's
   order, each naming its server; the same title on two servers is listed
   twice. A server gets 4 s; one still out after 1 s is named at the end of
@@ -413,6 +446,38 @@ each device.
   Downloads list shows the server in use's, with a line for each other
   server's ("3 more from Cabin server") that switches to it. Live TV
   reminders and the Top Shelf follow the server in use.
+
+On iPhone and iPad (`App/Screens/Servers/ServersView.swift`) the account
+button is the person's initial at the right of Home's and Live TV's bars. It
+opens Servers as a sheet on a compact width and as a popover under the button
+on a regular one. With two or more servers, the name of the one in use is
+under Home's title on a compact width and beside the initial on a regular one
+(where the bar has room for it whole). Where Live TV has taken Settings' tab,
+Servers also has a Settings row, since the initial used to be the way there.
+"Now on Cabin server" is a pill at the top that goes by itself. A switch
+started from a server's page or the Downloads list that fails opens Servers
+there, as a sheet. `UITests/ServersTests.swift` runs all of it on the fakes,
+on an iPhone and an iPad, and `UITests/TabletAddServerTests.swift` adds a
+server on an iPad across a rotation.
+
+On Apple TV the account is the tab bar's last tab (`TV/Shell/MainTabs.swift`):
+the person's name, or the server in use when there are several. Right from
+Settings reaches it and its page is Servers (`TV/Screens/Servers/`), a panel
+at the right; Down lands on the first server that can be chosen, the foot of
+the panel says what Select does, and Menu closes it for Home. It is a tab
+because nothing beside the system tab bar takes focus from it. After a switch
+a banner at the top right says "Now on Cabin server", and the Top Shelf is
+published again for that server, whichever screen the switch lands on.
+Settings › Server lists Your servers; a server's page takes the screen
+(`TV/Screens/Settings/ServerPage.swift`), with Switch to this server, or
+Sign in again, and Remove this server, whose question opens on the button
+that keeps it. Search's cards from another server name it under the title,
+and the servers still being asked or not listed are tiles at the end of the
+last row. A title opened on another server takes focus, so Menu goes back to
+the results. Apple TV keeps no downloads, so a server that doesn't answer
+offers only Try again. `TVUITests/ServersTests.swift` drives it with the
+remote; `-servers` opens Servers at launch, `-serversChoose <server id>`
+chooses a server in it, and `-serverNoteSeconds <n>` keeps the banner up.
 
 On the fakes, `-fakesServers` signs Sam in to three servers: Living room
 server (in use, the sample library), Cabin server, with a small library of
@@ -489,15 +554,15 @@ On iPhone and iPad (`App/Screens/Settings/`):
   episode and Live TV reminders, which were pages of their own. **Account &
   devices** holds this device's name (Rename is a sheet), Change password (a
   sheet with the system's password fields, naming the devices it signs out),
-  Signed-in devices, Link a TV and Sign out of this iPhone. **Server** offers
-  Switch server, and Server settings to admins only, as the server says they
-  stand here. **Audio & subtitles'** Add language is a sheet of every language
+  Signed-in devices, Link a TV and Sign out of this iPhone. **Server** lists
+  Your servers, each opening its page, with Add a server under them, and
+  offers Server settings to admins only, as the server says they stand here. **Audio & subtitles'** Add language is a sheet of every language
   by name (the Kit's `LanguagePicker`), to search.
 - **Tasks are sheets** (`Components/Account/TaskSheet.swift`): Cancel, the
   task's name, the steps bar ("Step 2 of 3"), one filled button at the bottom
   (Return presses it on a hardware keyboard, Escape is Cancel) and a last step
   that says what changed and what happens next, closed with Done. Link a TV and
-  Switch server are the two; on iPad Switch server stays in the detail column.
+  Add a server are the two; on iPad Add a server stays in the detail column.
   Their models live in `AppFlow` (`Shell/RootView.swift`), as the sign-in form
   does, so a window resized mid-task keeps its step. A sheet with something
   typed asks before a swipe throws it away (`asksBeforeDismissing`).
@@ -513,9 +578,10 @@ On iPhone and iPad (`App/Screens/Settings/`):
 `downloads`, `server`, `inbox` and `about` (and the old `skip`, `liveTV`,
 `thisDevice` and `devices`, which open the page they moved into);
 `-open 'watchmymedia://link?code=K7M4PQ'` opens Link a TV at its second step,
-`-linkTVApprove` at its last; `-settingsPage server -switchServer` starts
-Switch server, whose Sign in offers a code from a signed-in device in place
-of the password (the fakes approve it after a few seconds). The refusals
+`-linkTVApprove` at its last; `-settingsPage server -addServer` starts
+Add a server (`-addServerAddress <address>` connects to an address at once),
+whose Sign in offers a code from a signed-in device in place of the password
+(the fakes approve it after a few seconds); `-servers` opens Servers. The refusals
 above reach a row's failed line and Change password's errors.
 `UITests/SettingsTasksTests.swift` runs both tasks through every step on the
 fakes, with Back and Cancel, a row that saves and one that fails, Rename,
@@ -1221,7 +1287,7 @@ lines, enough to fill the code and turn pages (`TVUITests/DiagnosticsTests.swift
 | `Kit/Sources/WMMFakes` | In-memory fakes of every protocol, with the mockups' library and a pretend player (`AppServices.fake()`) |
 | `Kit/Sources/WMMUI` | Brand tokens (`Palette`), `Artwork`, `Badge`, `Tag`, `ProgressStrip`, `WatchedCheck`, `BrandMark`, button styles, `Chip`, `LoadableView` and the empty and error states |
 | `Kit/Sources/WMMTopShelf` | The Apple TV Top Shelf's snapshot in the App Group: its format, what it may hold (`TopShelfRules`), the store, and the sections the system draws. Foundation and TVServices only, so the extension links nothing else |
-| `Kit/Sources/WMMFeatures` | Screen models and navigation, shared with the Apple TV app: `Navigation/` (`Navigator`, `Route`, `AppTab`, `DeepLink`), `Browse/` (Home, Library, Show, Movie, Search), `Account/` (server picker, sign-in and pairing, Settings with its hub, words and saving states, Link a TV, Switch server, Change password), `Player/` (the controls' timing, double-tap seek, the scrubber, the picker's wording, and `TVPlayerModel` for the Apple TV's system player) |
+| `Kit/Sources/WMMFeatures` | Screen models and navigation, shared with the Apple TV app: `Navigation/` (`Navigator`, `Route`, `AppTab`, `DeepLink`), `Browse/` (Home, Library, Show, Movie, Search), `Account/` (server picker, sign-in and pairing, Settings with its hub, words and saving states, Link a TV, Servers and Add a server, Change password), `Player/` (the controls' timing, double-tap seek, the scrubber, the picker's wording, and `TVPlayerModel` for the Apple TV's system player) |
 | `App/` | The iPhone and iPad app: `Shell/` (app, root flow, tabs, `ServicesFactory`), `Screens/<feature>/` (SwiftUI views; a screen lays itself out for a regular width with `PadLayout` from `Components/Layout.swift`), `Components/Browse` and `Components/Account` (views those screens share) |
 | `TV/` | The Apple TV app, target "WatchMyMedia TV" (tvOS 18+, the same bundle ID for the universal purchase): `Shell/` (app, root flow, the tab bar, `TabPage`, its own `ServicesFactory` with the TV profile), `Screens/<feature>/`, `Components/` (focus, buttons, chips, cards, rows), `Resources/` (the layered icon and Top Shelf images from `brand/`) |
 | `TopShelf/` | The Apple TV app's Top Shelf extension, target "WatchMyMedia TopShelf": `ContentProvider` reads the snapshot (see Top Shelf), its privacy manifest and entitlements |
@@ -1285,8 +1351,8 @@ brand views and the QR code in `WMMUI`. The two targets share no files.
 - **Concurrency**: Swift 6 language mode. Repositories, models and the
   controller are `@MainActor`; network work suspends off it.
 - **Apple TV**: every page is a `TabPage` (a scroll view from the screen's
-  edges, the artboards' 90 pt gutter, the lockup and initial beside the tab
-  bar). Buttons, cards and rows draw the focus themselves from
+  edges, the artboards' 90 pt gutter, the lockup beside the tab bar, whose
+  last tab is the account). Buttons, cards and rows draw the focus themselves from
   `isFocused` (`TVButtonStyle`, `TVChipStyle`, `focusRim`): the system's
   lift and shadow plus the gold rim. A row of cards is a `ShelfRow`, a
   focus section that remembers its focused card. Every row of cards shows
