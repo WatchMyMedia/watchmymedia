@@ -7,100 +7,25 @@ package db
 
 import (
 	"context"
+	"strings"
 )
 
-const searchEpisodes = `-- name: SearchEpisodes :many
-SELECT e.id, e.season_id, e.show_id, e.number, e.title, e.overview, e.air_date, e.still_path, e.runtime_min, e.rating, e.file_named, se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path, MAX(f.id) AS file_id
-FROM episodes e
-JOIN seasons se ON se.id = e.season_id
-JOIN shows s ON s.id = e.show_id
-JOIN episode_files ef ON ef.episode_id = e.id
-JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
-WHERE e.title LIKE ?
-GROUP BY e.id
-ORDER BY s.title COLLATE NOCASE, se.number, e.number
-LIMIT ?
+const listMoviesByIDs = `-- name: ListMoviesByIDs :many
+SELECT id, library_id, tmdb_id, imdb_id, title, original_title, year, release_date, overview, tagline, runtime_min, genres, rating, poster_path, backdrop_path, created_at, updated_at, credits, content_rating, trailers, trailers_checked_at, poster_tmdb, poster_source, collection_id, collection_name, related_checked_at FROM movies WHERE id IN (/*SLICE:ids*/?)
 `
 
-type SearchEpisodesParams struct {
-	Title string `json:"title"`
-	Limit int64  `json:"limit"`
-}
-
-type SearchEpisodesRow struct {
-	ID             int64       `json:"id"`
-	SeasonID       int64       `json:"season_id"`
-	ShowID         int64       `json:"show_id"`
-	Number         int64       `json:"number"`
-	Title          string      `json:"title"`
-	Overview       string      `json:"overview"`
-	AirDate        *string     `json:"air_date"`
-	StillPath      *string     `json:"still_path"`
-	RuntimeMin     *int64      `json:"runtime_min"`
-	Rating         *float64    `json:"rating"`
-	FileNamed      int64       `json:"file_named"`
-	SeasonNumber   int64       `json:"season_number"`
-	ShowTitle      string      `json:"show_title"`
-	ShowPosterPath *string     `json:"show_poster_path"`
-	FileID         interface{} `json:"file_id"`
-}
-
-func (q *Queries) SearchEpisodes(ctx context.Context, arg SearchEpisodesParams) ([]SearchEpisodesRow, error) {
-	rows, err := q.db.QueryContext(ctx, searchEpisodes, arg.Title, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []SearchEpisodesRow{}
-	for rows.Next() {
-		var i SearchEpisodesRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.SeasonID,
-			&i.ShowID,
-			&i.Number,
-			&i.Title,
-			&i.Overview,
-			&i.AirDate,
-			&i.StillPath,
-			&i.RuntimeMin,
-			&i.Rating,
-			&i.FileNamed,
-			&i.SeasonNumber,
-			&i.ShowTitle,
-			&i.ShowPosterPath,
-			&i.FileID,
-		); err != nil {
-			return nil, err
+func (q *Queries) ListMoviesByIDs(ctx context.Context, ids []int64) ([]Movie, error) {
+	query := listMoviesByIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
 		}
-		items = append(items, i)
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const searchMovies = `-- name: SearchMovies :many
-SELECT m.id, m.library_id, m.tmdb_id, m.imdb_id, m.title, m.original_title, m.year, m.release_date, m.overview, m.tagline, m.runtime_min, m.genres, m.rating, m.poster_path, m.backdrop_path, m.created_at, m.updated_at, m.credits, m.content_rating, m.trailers, m.trailers_checked_at, m.poster_tmdb, m.poster_source, m.collection_id, m.collection_name, m.related_checked_at FROM movies m
-JOIN media_files f ON f.movie_id = m.id AND f.status = 'present'
-WHERE m.title LIKE ? OR m.original_title LIKE ?
-GROUP BY m.id
-ORDER BY m.title COLLATE NOCASE
-LIMIT ?
-`
-
-type SearchMoviesParams struct {
-	Title         string  `json:"title"`
-	OriginalTitle *string `json:"original_title"`
-	Limit         int64   `json:"limit"`
-}
-
-func (q *Queries) SearchMovies(ctx context.Context, arg SearchMoviesParams) ([]Movie, error) {
-	rows, err := q.db.QueryContext(ctx, searchMovies, arg.Title, arg.OriginalTitle, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}
@@ -149,25 +74,102 @@ func (q *Queries) SearchMovies(ctx context.Context, arg SearchMoviesParams) ([]M
 	return items, nil
 }
 
-const searchShows = `-- name: SearchShows :many
-SELECT s.id, s.library_id, s.tmdb_id, s.title, s.original_title, s.year, s.first_air_date, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path, s.created_at, s.updated_at, s.last_air_date, s.next_air_date, s.credits, s.content_rating, s.poster_tmdb, s.poster_source, s.related_checked_at FROM shows s
-JOIN episodes e ON e.show_id = s.id
-JOIN episode_files ef ON ef.episode_id = e.id
-JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
-WHERE s.title LIKE ? OR s.original_title LIKE ?
-GROUP BY s.id
-ORDER BY s.title COLLATE NOCASE
-LIMIT ?
+const listSearchEpisodesByIDs = `-- name: ListSearchEpisodesByIDs :many
+SELECT e.id, e.season_id, e.show_id, e.number, e.title, e.overview, e.air_date, e.still_path, e.runtime_min, e.rating, e.file_named, se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path,
+       CAST(COALESCE((SELECT MAX(f.id) FROM episode_files ef
+                      CROSS JOIN media_files f ON f.id = ef.media_file_id
+                      WHERE ef.episode_id = e.id AND f.status = 'present'), 0) AS INTEGER) AS file_id
+FROM episodes e
+JOIN seasons se ON se.id = e.season_id
+JOIN shows s ON s.id = e.show_id
+WHERE e.id IN (/*SLICE:ids*/?)
 `
 
-type SearchShowsParams struct {
-	Title         string  `json:"title"`
-	OriginalTitle *string `json:"original_title"`
-	Limit         int64   `json:"limit"`
+type ListSearchEpisodesByIDsRow struct {
+	ID             int64    `json:"id"`
+	SeasonID       int64    `json:"season_id"`
+	ShowID         int64    `json:"show_id"`
+	Number         int64    `json:"number"`
+	Title          string   `json:"title"`
+	Overview       string   `json:"overview"`
+	AirDate        *string  `json:"air_date"`
+	StillPath      *string  `json:"still_path"`
+	RuntimeMin     *int64   `json:"runtime_min"`
+	Rating         *float64 `json:"rating"`
+	FileNamed      int64    `json:"file_named"`
+	SeasonNumber   int64    `json:"season_number"`
+	ShowTitle      string   `json:"show_title"`
+	ShowPosterPath *string  `json:"show_poster_path"`
+	FileID         int64    `json:"file_id"`
 }
 
-func (q *Queries) SearchShows(ctx context.Context, arg SearchShowsParams) ([]Show, error) {
-	rows, err := q.db.QueryContext(ctx, searchShows, arg.Title, arg.OriginalTitle, arg.Limit)
+// The episodes search shows, each with its newest present file (0 when it
+// has none any more).
+func (q *Queries) ListSearchEpisodesByIDs(ctx context.Context, ids []int64) ([]ListSearchEpisodesByIDsRow, error) {
+	query := listSearchEpisodesByIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSearchEpisodesByIDsRow{}
+	for rows.Next() {
+		var i ListSearchEpisodesByIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SeasonID,
+			&i.ShowID,
+			&i.Number,
+			&i.Title,
+			&i.Overview,
+			&i.AirDate,
+			&i.StillPath,
+			&i.RuntimeMin,
+			&i.Rating,
+			&i.FileNamed,
+			&i.SeasonNumber,
+			&i.ShowTitle,
+			&i.ShowPosterPath,
+			&i.FileID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listShowsByIDs = `-- name: ListShowsByIDs :many
+SELECT id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source, related_checked_at FROM shows WHERE id IN (/*SLICE:ids*/?)
+`
+
+func (q *Queries) ListShowsByIDs(ctx context.Context, ids []int64) ([]Show, error) {
+	query := listShowsByIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}
@@ -198,6 +200,392 @@ func (q *Queries) SearchShows(ctx context.Context, arg SearchShowsParams) ([]Sho
 			&i.PosterTmdb,
 			&i.PosterSource,
 			&i.RelatedCheckedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const scanEpisodeTitles = `-- name: ScanEpisodeTitles :many
+SELECT e.id, e.title, e.number, se.number AS season_number, s.title AS show_title,
+       CAST(e.title LIKE ?1 AS INTEGER) AS legacy
+FROM episodes_search x
+CROSS JOIN episodes e ON e.id = x.rowid
+CROSS JOIN seasons se ON se.id = e.season_id
+CROSS JOIN shows s ON s.id = e.show_id
+WHERE ((x.words LIKE ?2 AND x.words LIKE ?3 AND x.words LIKE ?4)
+       OR x.title LIKE ?5)
+  AND EXISTS (SELECT 1 FROM episode_files ef
+              CROSS JOIN media_files f ON f.id = ef.media_file_id
+              WHERE ef.episode_id = x.rowid AND f.status = 'present')
+`
+
+type ScanEpisodeTitlesParams struct {
+	Legacy string  `json:"legacy"`
+	Word1  string  `json:"word1"`
+	Word2  string  `json:"word2"`
+	Word3  string  `json:"word3"`
+	Marks  *string `json:"marks"`
+}
+
+type ScanEpisodeTitlesRow struct {
+	ID           int64  `json:"id"`
+	Title        string `json:"title"`
+	Number       int64  `json:"number"`
+	SeasonNumber int64  `json:"season_number"`
+	ShowTitle    string `json:"show_title"`
+	Legacy       int64  `json:"legacy"`
+}
+
+// ScanMovieTitles for episodes.
+func (q *Queries) ScanEpisodeTitles(ctx context.Context, arg ScanEpisodeTitlesParams) ([]ScanEpisodeTitlesRow, error) {
+	rows, err := q.db.QueryContext(ctx, scanEpisodeTitles,
+		arg.Legacy,
+		arg.Word1,
+		arg.Word2,
+		arg.Word3,
+		arg.Marks,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ScanEpisodeTitlesRow{}
+	for rows.Next() {
+		var i ScanEpisodeTitlesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Number,
+			&i.SeasonNumber,
+			&i.ShowTitle,
+			&i.Legacy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const scanMovieTitles = `-- name: ScanMovieTitles :many
+SELECT m.id, m.title, m.original_title, m.year,
+       CAST(m.title LIKE ?1 OR COALESCE(m.original_title LIKE ?1, 0) AS INTEGER) AS legacy
+FROM movies_search x
+CROSS JOIN movies m ON m.id = x.rowid
+WHERE ((x.words LIKE ?2 AND x.words LIKE ?3 AND x.words LIKE ?4)
+       OR x.title LIKE ?5 OR x.original_title LIKE ?5)
+  AND EXISTS (SELECT 1 FROM media_files f WHERE f.movie_id = x.rowid AND f.status = 'present')
+`
+
+type ScanMovieTitlesParams struct {
+	Legacy string  `json:"legacy"`
+	Word1  string  `json:"word1"`
+	Word2  string  `json:"word2"`
+	Word3  string  `json:"word3"`
+	Marks  *string `json:"marks"`
+}
+
+type ScanMovieTitlesRow struct {
+	ID            int64   `json:"id"`
+	Title         string  `json:"title"`
+	OriginalTitle *string `json:"original_title"`
+	Year          *int64  `json:"year"`
+	Legacy        int64   `json:"legacy"`
+}
+
+// SearchMovieTitles for words of one or two letters, anywhere in a title,
+// which the index cannot look up: it reads every title the index keeps,
+// a few bytes each where the table's rows hold the descriptions and
+// credits too. A title is a candidate when it holds each of up to three
+// words, as LIKE patterns; a word not used is '%'. Every title that
+// matched before is among them: it holds what was typed, so it holds each
+// word of it. A search with no letters or digits at all has no words, and
+// gives what was typed as marks, to look for in the titles themselves.
+func (q *Queries) ScanMovieTitles(ctx context.Context, arg ScanMovieTitlesParams) ([]ScanMovieTitlesRow, error) {
+	rows, err := q.db.QueryContext(ctx, scanMovieTitles,
+		arg.Legacy,
+		arg.Word1,
+		arg.Word2,
+		arg.Word3,
+		arg.Marks,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ScanMovieTitlesRow{}
+	for rows.Next() {
+		var i ScanMovieTitlesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.OriginalTitle,
+			&i.Year,
+			&i.Legacy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const scanShowTitles = `-- name: ScanShowTitles :many
+SELECT s.id, s.title, s.original_title, s.year,
+       CAST(s.title LIKE ?1 OR COALESCE(s.original_title LIKE ?1, 0) AS INTEGER) AS legacy
+FROM shows_search x
+CROSS JOIN shows s ON s.id = x.rowid
+WHERE ((x.words LIKE ?2 AND x.words LIKE ?3 AND x.words LIKE ?4)
+       OR x.title LIKE ?5 OR x.original_title LIKE ?5)
+  AND EXISTS (SELECT 1 FROM episodes e
+              CROSS JOIN episode_files ef ON ef.episode_id = e.id
+              CROSS JOIN media_files f ON f.id = ef.media_file_id
+              WHERE e.show_id = x.rowid AND f.status = 'present')
+`
+
+type ScanShowTitlesParams struct {
+	Legacy string  `json:"legacy"`
+	Word1  string  `json:"word1"`
+	Word2  string  `json:"word2"`
+	Word3  string  `json:"word3"`
+	Marks  *string `json:"marks"`
+}
+
+type ScanShowTitlesRow struct {
+	ID            int64   `json:"id"`
+	Title         string  `json:"title"`
+	OriginalTitle *string `json:"original_title"`
+	Year          *int64  `json:"year"`
+	Legacy        int64   `json:"legacy"`
+}
+
+// ScanMovieTitles for shows.
+func (q *Queries) ScanShowTitles(ctx context.Context, arg ScanShowTitlesParams) ([]ScanShowTitlesRow, error) {
+	rows, err := q.db.QueryContext(ctx, scanShowTitles,
+		arg.Legacy,
+		arg.Word1,
+		arg.Word2,
+		arg.Word3,
+		arg.Marks,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ScanShowTitlesRow{}
+	for rows.Next() {
+		var i ScanShowTitlesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.OriginalTitle,
+			&i.Year,
+			&i.Legacy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchEpisodeTitles = `-- name: SearchEpisodeTitles :many
+SELECT e.id, e.title, e.number, se.number AS season_number, s.title AS show_title,
+       CAST(e.title LIKE ?1 AS INTEGER) AS legacy
+FROM episodes_search(CAST(?2 AS TEXT)) x
+CROSS JOIN episodes e ON e.id = x.rowid
+CROSS JOIN seasons se ON se.id = e.season_id
+CROSS JOIN shows s ON s.id = e.show_id
+WHERE EXISTS (SELECT 1 FROM episode_files ef
+              CROSS JOIN media_files f ON f.id = ef.media_file_id
+              WHERE ef.episode_id = x.rowid AND f.status = 'present')
+`
+
+type SearchEpisodeTitlesParams struct {
+	Legacy string `json:"legacy"`
+	Words  string `json:"words"`
+}
+
+type SearchEpisodeTitlesRow struct {
+	ID           int64  `json:"id"`
+	Title        string `json:"title"`
+	Number       int64  `json:"number"`
+	SeasonNumber int64  `json:"season_number"`
+	ShowTitle    string `json:"show_title"`
+	Legacy       int64  `json:"legacy"`
+}
+
+// SearchMovieTitles for episodes, with what orders episodes that match
+// equally well: the show's title, the season and the number.
+func (q *Queries) SearchEpisodeTitles(ctx context.Context, arg SearchEpisodeTitlesParams) ([]SearchEpisodeTitlesRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchEpisodeTitles, arg.Legacy, arg.Words)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchEpisodeTitlesRow{}
+	for rows.Next() {
+		var i SearchEpisodeTitlesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Number,
+			&i.SeasonNumber,
+			&i.ShowTitle,
+			&i.Legacy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchMovieTitles = `-- name: SearchMovieTitles :many
+SELECT m.id, m.title, m.original_title, m.year,
+       CAST(m.title LIKE ?1 OR COALESCE(m.original_title LIKE ?1, 0) AS INTEGER) AS legacy
+FROM movies_search(CAST(?2 AS TEXT)) x
+CROSS JOIN movies m ON m.id = x.rowid
+WHERE EXISTS (SELECT 1 FROM media_files f WHERE f.movie_id = x.rowid AND f.status = 'present')
+`
+
+type SearchMovieTitlesParams struct {
+	Legacy string `json:"legacy"`
+	Words  string `json:"words"`
+}
+
+type SearchMovieTitlesRow struct {
+	ID            int64   `json:"id"`
+	Title         string  `json:"title"`
+	OriginalTitle *string `json:"original_title"`
+	Year          *int64  `json:"year"`
+	Legacy        int64   `json:"legacy"`
+}
+
+// Search runs in two steps. The first (Search...Titles, or Scan...Titles
+// for short words) finds the titles that might match and have a file to
+// play, and reads only what ranking them needs; internal/api ranks them and
+// the second (List...ByIDs) reads the rows of the few that are shown.
+//
+// This one asks the trigram index (migration 00045) for the titles holding
+// every one of the words given, each a quoted string of three characters
+// or more: a word of the search as typed, or the first letters of a word
+// after the index's two marks. The index looks in the title, the original
+// title and both without their hyphens and apostrophes.
+//
+// legacy is what search matched before the index: the words as typed,
+// anywhere in the title or the original title. Those titles are always
+// kept, however the words are read now.
+//
+// The order is pinned. Without statistics SQLite starts "has a present
+// file" from every present file in the library, once for each title found
+// (69 s for one search of the large seeded library), so each EXISTS reads
+// the title's own files first, and the index is read before the table it
+// describes. EXISTS asks by the index's rowid, so a title with no file is
+// dropped before its row is read: most episodes TMDB lists have none.
+func (q *Queries) SearchMovieTitles(ctx context.Context, arg SearchMovieTitlesParams) ([]SearchMovieTitlesRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchMovieTitles, arg.Legacy, arg.Words)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchMovieTitlesRow{}
+	for rows.Next() {
+		var i SearchMovieTitlesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.OriginalTitle,
+			&i.Year,
+			&i.Legacy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchShowTitles = `-- name: SearchShowTitles :many
+SELECT s.id, s.title, s.original_title, s.year,
+       CAST(s.title LIKE ?1 OR COALESCE(s.original_title LIKE ?1, 0) AS INTEGER) AS legacy
+FROM shows_search(CAST(?2 AS TEXT)) x
+CROSS JOIN shows s ON s.id = x.rowid
+WHERE EXISTS (SELECT 1 FROM episodes e
+              CROSS JOIN episode_files ef ON ef.episode_id = e.id
+              CROSS JOIN media_files f ON f.id = ef.media_file_id
+              WHERE e.show_id = x.rowid AND f.status = 'present')
+`
+
+type SearchShowTitlesParams struct {
+	Legacy string `json:"legacy"`
+	Words  string `json:"words"`
+}
+
+type SearchShowTitlesRow struct {
+	ID            int64   `json:"id"`
+	Title         string  `json:"title"`
+	OriginalTitle *string `json:"original_title"`
+	Year          *int64  `json:"year"`
+	Legacy        int64   `json:"legacy"`
+}
+
+// SearchMovieTitles for shows. A show is listed when one of its episodes
+// has a present file.
+func (q *Queries) SearchShowTitles(ctx context.Context, arg SearchShowTitlesParams) ([]SearchShowTitlesRow, error) {
+	rows, err := q.db.QueryContext(ctx, searchShowTitles, arg.Legacy, arg.Words)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchShowTitlesRow{}
+	for rows.Next() {
+		var i SearchShowTitlesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.OriginalTitle,
+			&i.Year,
+			&i.Legacy,
 		); err != nil {
 			return nil, err
 		}

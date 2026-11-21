@@ -248,7 +248,7 @@ is encrypted with `GRADLE_ENCRYPTION_KEY`, the only secret `ci.yml` may read
 |---|---|
 | Go code | `cd server && go vet ./... && go test ./...`; `make lint` for golangci-lint |
 | SQL queries or migrations | `make gen-sqlc`, the tests, and the query plan without statistics ([server/AGENTS.md](server/AGENTS.md)) |
-| History, statistics, home, browse or recording-list queries | `make bench` |
+| History, statistics, home, browse, search or recording-list queries | `make bench` |
 | API types | `make gen-api`, `make apple-api`, `make apple-test`, `cd web && pnpm typecheck`; Android's client if used |
 | Web app | `cd web && pnpm lint && pnpm typecheck && pnpm test && pnpm build` (these cover the Samsung TV app too; CI's `web` job runs the `:web` scripts, which leave it out) |
 | Samsung TV app (`web/tizen/`, `deploy/samsung/`), or the `web/src/lib/` and `web/src/api/` code it imports | `cd web && pnpm lint:tizen && pnpm test:tizen && pnpm build:tizen && pnpm check:tizen` (`build:tizen` checks the types first), and `python3 -I -m unittest discover -s deploy/samsung -p '*_test.py'` |
