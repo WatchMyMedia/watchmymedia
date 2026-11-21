@@ -108,8 +108,12 @@ final class FakeGateway: OfflineGateway {
         return MediaToken(token: "o1.test\(tokensMade)", expiresAt: Date().addingTimeInterval(6 * 3600))
     }
 
-    func authorizedRequest(_ owner: OfflineOwner, url: URL) -> URLRequest? {
-        signedIn(owner) ? URLRequest(url: url) : nil
+    /// Thrown by ``authorizedRequest(_:url:)`` when set: the owner's server didn't answer as itself.
+    var requestError: (any Error)?
+
+    func authorizedRequest(_ owner: OfflineOwner, url: URL) async throws -> URLRequest? {
+        if let requestError { throw requestError }
+        return signedIn(owner) ? URLRequest(url: url) : nil
     }
 
     func sync(_ owner: OfflineOwner, client: ClientInfo, sentAt: Date, downloads: [SyncedDownload], progress: [OfflineProgress]) async throws -> SyncReply {

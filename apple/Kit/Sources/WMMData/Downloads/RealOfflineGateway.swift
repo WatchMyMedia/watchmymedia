@@ -49,7 +49,11 @@ final class RealOfflineGateway: OfflineGateway {
         store.state.servers.first { $0.server.id == owner.serverID }?.server.apiLevel ?? owner.apiLevel
     }
 
-    /// Runs a call as `owner`; a refused token signs that account out.
+    /// Runs a call as `owner`; a refused token signs that account out. While
+    /// `owner`'s server isn't the one in use, each call asks it which
+    /// server it is before the sign-in goes (the store's API does), and
+    /// fails as a server that can't be reached does when it doesn't answer
+    /// as itself.
     private func call<T: Sendable>(_ owner: OfflineOwner, _ operation: @Sendable (Client) async throws -> T) async throws -> T {
         let (server, credential) = try access(owner)
         return try await store.api(serverID: owner.serverID, baseURL: server?.baseURL ?? owner.baseURL, token: credential.token).call(operation)
@@ -111,10 +115,14 @@ final class RealOfflineGateway: OfflineGateway {
     }
 
     /// Nil for an address that isn't on the owner's server as it is kept now:
-    /// the sign-in goes only to the server that issued it.
-    func authorizedRequest(_ owner: OfflineOwner, url: URL) -> URLRequest? {
+    /// the sign-in goes only to the server that issued it. A server that
+    /// isn't the one in use is asked which server it is first, as before
+    /// every call made here for it; it throws when that server doesn't
+    /// answer as itself.
+    func authorizedRequest(_ owner: OfflineOwner, url: URL) async throws -> URLRequest? {
         guard let (_, credential) = try? access(owner) else { return nil }
-        return store.signer(baseURL: baseURL(owner), token: credential.token).signedRequest(url)
+        let signer = store.signer(serverID: owner.serverID, baseURL: baseURL(owner), token: credential.token)
+        return signer.signedRequest(url, asked: try await signer.asked(for: url))
     }
 
     func sync(_ owner: OfflineOwner, client: ClientInfo, sentAt: Date, downloads: [SyncedDownload], progress: [OfflineProgress]) async throws -> SyncReply {

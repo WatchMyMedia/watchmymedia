@@ -95,7 +95,7 @@ public final class DataServices {
         )
         authRepository = RealAuthRepository(store: store, minimumPoll: tuning.minimumPoll, now: tuning.now)
         libraryRepository = RealLibraryRepository(store: store, events: events, askOther: { [serverRepository] in try await serverRepository.askOther($0) })
-        store.answersAsItself = { [serverRepository] in (try? await serverRepository.identify($0)) != nil }
+        store.whichServer = { [serverRepository] in try await serverRepository.whichServer(at: $0) }
         requestsRepository = RealRequestsRepository(store: store, events: events)
         preferencesRepository = RealPreferencesRepository(store: store)
         servers = serverRepository

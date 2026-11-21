@@ -425,6 +425,26 @@ each device.
   nothing is kept to send later: the server and its downloads leave this
   device at once all the same, and the session stays on that server until
   it runs out or someone ends it from that server's list of devices.
+- **A sign-in goes only to the server it is for.** The address kept for a
+  server is where it was last seen, and on another network that can be
+  someone else's machine. So before the sign-in of a server that is not,
+  or is no longer, the one in use goes to its kept address, that address
+  is asked which server it is, with no sign-in (GET /api/server), and the
+  sign-in goes only when it answers as the one remembered. It is asked in
+  the one place a sign-in is put on a request (`RequestSigner`), so it
+  holds for everything: search across servers and its pictures, a
+  download's calls to the server it came from (its sync, its tokens, the
+  fetch of an original file and its subtitles), a sign-out, and whatever
+  was still sending to one server when another came into use. Search
+  keeps the answer for its visit, a sign-out or a removal for all it
+  sends, and background work asks each time; an answer holds only on the
+  network it was given on. When nothing, or another server, answers, the
+  call fails as one that couldn't reach its server does, and a download
+  tries again later. The server in use is never asked. Not asked either:
+  an HLS download's media requests, which carry a short-lived offline
+  token in the address, and the transfer of an original file once the
+  system has it (it is asked when the transfer is created, not when the
+  system resumes it by itself).
 - **Search looks in every server signed in to.** Each is asked at once, to
   its own address with its own sign-in (`LibraryRepository.search(_:serverID:)`,
   through an API built for that server alone). First each is asked which
