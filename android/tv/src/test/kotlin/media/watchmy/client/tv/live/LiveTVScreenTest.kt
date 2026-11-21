@@ -22,7 +22,6 @@ import kotlinx.coroutines.runBlocking
 import media.watchmy.client.fake.Cabin
 import media.watchmy.client.fake.FakeAppServices
 import media.watchmy.client.fake.FakeLiveChannels
-import media.watchmy.client.fake.OfficeMini
 import media.watchmy.client.fake.fakeLatencyMs
 import media.watchmy.client.model.AppServices
 import media.watchmy.client.model.LiveCapabilities
