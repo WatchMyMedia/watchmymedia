@@ -100,6 +100,10 @@ final class TestLibrary: LibraryRepository {
     private(set) var otherSearches: [(server: String, text: String)] = []
     /// The searches of other servers that were given up on before they answered.
     private(set) var otherCancelled: [String] = []
+    /// How many visits to Search were said to have ended.
+    private(set) var visitsEnded = 0
+
+    func searchVisitEnded() { visitsEnded += 1 }
 
     func search(_ text: String, serverID: String) async throws -> SearchResults {
         otherSearches.append((serverID, text))

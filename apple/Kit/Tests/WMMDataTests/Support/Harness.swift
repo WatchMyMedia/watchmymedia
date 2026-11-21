@@ -228,16 +228,20 @@ func eventually(_ timeout: Duration = .seconds(5), _ condition: () -> Bool) asyn
 
 /// A network path the test turns off and on.
 final class FakeNetworkPath: NetworkPath, @unchecked Sendable {
-    private var continuation: AsyncStream<Bool>.Continuation?
+    private let continuations = Mutex<[AsyncStream<Bool>.Continuation]>([])
 
     /// Every change in order, so a test that turns the network off and on
-    /// again needn't wait between them for the first to be read.
+    /// again needn't wait between them for the first to be read. Each
+    /// caller hears every change: the event stream follows the path, and so
+    /// does what is remembered of the other servers' answers.
     func updates() -> AsyncStream<Bool> {
         AsyncStream { continuation in
-            self.continuation = continuation
+            continuations.withLock { $0.append(continuation) }
             continuation.yield(true)
         }
     }
 
-    func set(_ satisfied: Bool) { continuation?.yield(satisfied) }
+    func set(_ satisfied: Bool) {
+        for continuation in continuations.withLock({ $0 }) { continuation.yield(satisfied) }
+    }
 }

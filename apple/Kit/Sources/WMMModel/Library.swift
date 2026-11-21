@@ -754,6 +754,9 @@ extension LibraryRepository {
 
     /// A repository for one server alone has no other's pictures.
     public func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL? { nil }
+
+    /// A repository for one server alone asked no other.
+    public func searchVisitEnded() {}
 }
 
 /// The page whose related titles are asked for: a
@@ -814,10 +817,26 @@ public protocol LibraryRepository: AnyObject {
     /// Search on a server this device is signed in to that isn't the one in
     /// use, for search across servers: GET /api/search at that server's own
     /// address with its own sign-in, never the current server's. Every id in
-    /// the reply is that server's. Throws ``SignedOutError`` when no sign-in
-    /// is kept for it, ``ServerTooOldError`` when it is too old for this app,
-    /// else ``APIError``.
+    /// the reply is that server's.
+    ///
+    /// The address kept for a server is only where it was last seen, and on
+    /// another network it can be someone else's machine. So before the
+    /// sign-in is sent the server is asked, with no sign-in, which server
+    /// it is, and the sign-in goes only when it answers as the one
+    /// remembered. It is asked once for a visit to Search, not for every
+    /// search (``searchVisitEnded()``); its pictures load with its sign-in
+    /// only while that answer stands.
+    ///
+    /// Throws ``SignedOutError`` when no sign-in is kept for it,
+    /// ``ServerTooOldError`` when it is too old for this app, else
+    /// ``APIError``, which nothing answering, or another server answering at
+    /// its address, also is.
     func search(_ text: String, serverID: String) async throws -> SearchResults
+
+    /// The visit to Search ended (another tab, or the app left the screen):
+    /// the other servers' answers to which server they are are forgotten,
+    /// and each is asked again before the next search sends its sign-in.
+    func searchVisitEnded()
 
     /// ``imageURL(_:size:)`` on a server that isn't the one in use: a picture
     /// loads from the server its title is on, with that server's sign-in.

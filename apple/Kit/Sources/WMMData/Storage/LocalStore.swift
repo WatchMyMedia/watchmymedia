@@ -3,6 +3,11 @@ import Observation
 import WMMAPI
 import WMMModel
 
+/// A server that isn't the one in use hasn't said yet, asked without a
+/// sign-in, that it is the one remembered at its kept address: its sign-in
+/// isn't sent (``LocalStore/other(serverID:)``).
+struct ServerNotAskedError: Error, Equatable {}
+
 /// The sign-in a request goes out with.
 struct SignedInSession: Sendable {
     let serverID: String
@@ -34,6 +39,18 @@ final class LocalStore {
     @ObservationIgnored private var cachedAPI: (key: String, api: ServerAPI)?
     /// The APIs of the other servers signed in to, by server ID, for search across servers and their pictures.
     @ObservationIgnored private var otherAPIs: [String: (key: String, api: ServerAPI)] = [:]
+    /// The servers that aren't in use and have said, asked with no sign-in,
+    /// that they are the ones remembered at the addresses kept for them, and
+    /// when (``noteAnswer(serverID:)``). A kept address is only where the
+    /// server was last seen: on another network it can be someone else's
+    /// machine, so ``other(serverID:)`` hands out a sign-in only while its
+    /// server's answer stands.
+    @ObservationIgnored private var answers: [String: (baseURL: URL, at: Date)] = [:]
+    /// Now, for how long an answer stands; tests move it.
+    @ObservationIgnored var now: @Sendable () -> Date = { Date() }
+    /// How long an answer stands when nothing ends it sooner (the visit to
+    /// Search ending, another server coming into use, the network changing).
+    static let answerAge: TimeInterval = 300
     /// Run before a sign-in is ended on its server (``beforeSignOut(_:)``).
     @ObservationIgnored private var signOutHooks: [SignOutHook] = []
     @ObservationIgnored private var signInRemovedListeners: [() -> Void] = []
@@ -231,6 +248,8 @@ final class LocalStore {
         guard key != sessionKey else { return }
         sessionKey = key
         revision += 1
+        // Another server or account in use: which servers are the others changed with it.
+        answers = [:]
         let signedIn = currentCredential != nil
         for listener in sessionListeners { listener(signedIn) }
     }
@@ -255,13 +274,36 @@ final class LocalStore {
         return SignedInSession(serverID: server.id, token: credential.token, api: api)
     }
 
+    /// The server kept as `serverID`, which isn't the one in use, answered
+    /// as itself at its kept address a moment ago: its sign-in may go there.
+    func noteAnswer(serverID: String) {
+        guard let server = state.servers.first(where: { $0.server.id == serverID })?.server else { return }
+        answers[serverID] = (server.baseURL, now())
+    }
+
+    /// Whether `serverID`'s answer stands: given at the address kept for it now, within ``answerAge``.
+    func answered(_ serverID: String) -> Bool {
+        guard let answer = answers[serverID], let server = state.servers.first(where: { $0.server.id == serverID })?.server else { return false }
+        return answer.baseURL == server.baseURL && now().timeIntervalSince(answer.at) < Self.answerAge
+    }
+
+    /// Every answer is forgotten: the visit to Search ended, or the network
+    /// changed. The next sign-in for another server waits for a new one.
+    func forgetAnswers() {
+        answers = [:]
+    }
+
     /// The API of a server this device is signed in to that isn't the one
     /// in use, with its own sign-in on its own address. ``SignedOutError``
-    /// when no sign-in is kept for it, ``ServerTooOldError`` when it is too old.
+    /// when no sign-in is kept for it, ``ServerTooOldError`` when it is too
+    /// old, and ``ServerNotAskedError`` until the server has said, without a
+    /// sign-in, that it is the one remembered (``answered(_:)``): nothing
+    /// gets its sign-in on the strength of a kept address alone.
     func other(serverID: String) throws -> SignedInSession {
         guard let server = state.servers.first(where: { $0.server.id == serverID })?.server,
               let credential = credentials[serverID] else { throw SignedOutError() }
         if server.tooOld { throw ServerTooOldError(server: server) }
+        guard answered(serverID) else { throw ServerNotAskedError() }
         let key = "\(server.baseURL.absoluteString) \(credential.token)"
         if let cached = otherAPIs[serverID], cached.key == key {
             return SignedInSession(serverID: serverID, token: credential.token, api: cached.api)
@@ -273,8 +315,9 @@ final class LocalStore {
 
     /// The sign-in a request for `url` goes out with: the server's that the
     /// address is on, the one in use first, then any other this device is
-    /// signed in to. For an address on none of them, the sign-in in use,
-    /// which doesn't sign it (``RequestSigner``).
+    /// signed in to whose answer stands (``answered(_:)``). For an address
+    /// on none of them, the sign-in in use, which doesn't sign it
+    /// (``RequestSigner``).
     func signedIn(for url: URL) -> SignedInSession? {
         let current = try? signedIn()
         if let current, ServerAPI.owns(current.api.baseURL, url) { return current }

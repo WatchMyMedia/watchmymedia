@@ -187,6 +187,15 @@ public final class SearchModel {
     @ObservationIgnored private var currentFailure: String?
     /// When each server last failed to answer, by server ID.
     @ObservationIgnored private var failedAt: [String: Date] = [:]
+    /// The servers that answered, on this visit, that they are too old for
+    /// this app: not asked again on it, so typing doesn't ask one each time.
+    @ObservationIgnored private var tooOldNow: Set<String> = []
+    /// When each other server last answered a search on this visit, by
+    /// server ID: a switch to one that just answered doesn't ask it which
+    /// server it is again.
+    @ObservationIgnored private var answeredAt: [String: Date] = [:]
+    /// The visit to Search ended and no new one has begun.
+    @ObservationIgnored private var visitOver = false
 
     /// - Parameters:
     ///   - servers: the registered servers; with it, search looks in every one signed in to.
@@ -209,6 +218,34 @@ public final class SearchModel {
     }
 
     // MARK: Across servers
+
+    /// How long a server's answer to a search stands for a switch to it
+    /// without asking which server it is: the device may have changed
+    /// networks since, and a kept address is someone else's machine there.
+    static let answerStands: TimeInterval = 300
+
+    /// The visit to Search ended: another tab was chosen, or the app left
+    /// the screen. Each other server is asked which server it is once for a
+    /// visit, before its sign-in is sent, and what they said is forgotten
+    /// here (``LibraryRepository/searchVisitEnded()``).
+    public func visitEnded() {
+        guard !visitOver else { return }
+        visitOver = true
+        // A server that didn't answer is left alone for the rest of a visit's half minute, not the next visit's.
+        failedAt = [:]
+        tooOldNow = []
+        answeredAt = [:]
+        library.searchVisitEnded()
+    }
+
+    /// Search is on screen again after ``visitEnded()``. With other
+    /// servers' titles listed, the search is asked again, so each server
+    /// says which it is before its pictures load with its sign-in.
+    public func visitBegan() {
+        guard visitOver else { return }
+        visitOver = false
+        if acrossServers, !resultsFor.isEmpty, !trimmedQuery.isEmpty { schedule(after: nil) }
+    }
 
     /// The registered servers besides the one in use, in the Servers list's order.
     private var otherServers: [SavedServer] {
@@ -321,6 +358,7 @@ public final class SearchModel {
     /// Try again, when the search failed: asks every server, those that didn't answer lately too.
     public func retry() async {
         failedAt = [:]
+        tooOldNow = []
         schedule(after: nil)
         await pending?.value
         await pendingRequestables?.value
@@ -380,15 +418,17 @@ public final class SearchModel {
         navigator.play(request)
     }
 
-    /// Switches to `server`, which answered this search, so it isn't asked
-    /// which server it is again: Home there, Search with the same words, and
-    /// the title over it.
+    /// Switches to `server`: Home there, Search with the same words, and
+    /// the title over it. A server that just answered this search isn't
+    /// asked which server it is again; one whose answer is older than
+    /// ``answerStands`` is, since its rows may have been on screen a while.
     private func leave(for server: SearchSource, route: Route?) {
         guard let switcher else { return }
         let words = resultsFor.isEmpty ? trimmedQuery : resultsFor
+        let justAnswered = answeredAt[server.id].map { now().timeIntervalSince($0) < Self.answerStands } ?? false
         cancelCalls()
         Task {
-            await switcher.switchTo(server.id, arriving: ServerArrival(serverID: server.id, tab: .search, search: words, route: route), asking: false)
+            await switcher.switchTo(server.id, arriving: ServerArrival(serverID: server.id, tab: .search, search: words, route: route), asking: !justAnswered)
         }
     }
 
@@ -510,7 +550,7 @@ public final class SearchModel {
         if across {
             for saved in otherServers {
                 let source = SearchSource(id: saved.server.id, name: saved.server.name)
-                if saved.server.tooOld {
+                if saved.server.tooOld || tooOldNow.contains(source.id) {
                     roundUnlisted.append(UnlistedServer(server: source, line: SearchWords.tooOld(source.name), canRetry: false))
                 } else if !saved.signedIn {
                     roundUnlisted.append(UnlistedServer(server: source, line: SearchWords.signedOut(source.name), canRetry: false))
@@ -603,12 +643,16 @@ public final class SearchModel {
             if !anyAnswered { remember(resultsFor.isEmpty ? trimmedQuery : resultsFor) }
             anyAnswered = true
             early[source.id] = found
+            answeredAt[source.id] = now()
         case .failure(let error):
             guard !(error is CancellationError) else { return }
             let line: UnlistedServer
             switch error {
             case is SignedOutError: line = UnlistedServer(server: source, line: SearchWords.signedOut(source.name), canRetry: false)
-            case is ServerTooOldError: line = UnlistedServer(server: source, line: SearchWords.tooOld(source.name), canRetry: false)
+            case is ServerTooOldError:
+                // It said so itself, asked which server it is: not asked again on this visit.
+                tooOldNow.insert(source.id)
+                line = UnlistedServer(server: source, line: SearchWords.tooOld(source.name), canRetry: false)
             default:
                 failedAt[source.id] = now()
                 line = UnlistedServer(server: source, line: SearchWords.didNotAnswer(source.name), canRetry: true)

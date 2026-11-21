@@ -116,6 +116,54 @@ final class RealServerRepository: ServerRepository {
         )
     }
 
+    /// How long a server has to say which server it is, as a switch gives it.
+    private static let identifyTimeout: Duration = .seconds(5)
+
+    /// Asks the server kept as `serverID` which server it is: GET
+    /// /api/server at the address kept for it, with no sign-in. Returns what
+    /// it said of itself when its id is the one remembered; throws when
+    /// nothing answers there, or another server does.
+    func identify(_ serverID: String) async throws -> Server {
+        guard let saved = store.state.servers.first(where: { $0.server.id == serverID })?.server else { throw SignedOutError() }
+        // In the caller's own task, so a search that is cancelled (a keystroke, its time limit) takes the question with it.
+        let found: Server
+        do {
+            found = try await lookUp(saved.baseURL, within: min(probeTimeout, Self.identifyTimeout))
+        } catch {
+            if Task.isCancelled || error is CancellationError { throw CancellationError() }
+            throw APIError(status: nil, message: "\(saved.name) didn’t answer at the address kept for it.")
+        }
+        guard found.id == serverID else {
+            throw APIError(status: nil, message: "Another server answered at the address kept for \(saved.name).")
+        }
+        return found
+    }
+
+    /// Before a sign-in goes to a server that isn't the one in use (search
+    /// across servers, and its pictures): the server is asked which one it
+    /// is, unless its answer still stands (``LocalStore/answered(_:)``). A
+    /// kept address is only where the server was last seen, and on another
+    /// network it can be anyone's machine, so the sign-in waits for the
+    /// answer. Throws when nothing answers or another server does, and
+    /// ``ServerTooOldError`` when it has become too old for this app (kept
+    /// as it was, as for the server in use); otherwise keeps its name,
+    /// version and API level as it gave them, and its answer.
+    func askOther(_ serverID: String) async throws {
+        guard serverID != store.state.currentID, !store.answered(serverID) else { return }
+        // With no sign-in to send there, or a server kept as too old, there is nothing to ask for.
+        guard let known = store.state.servers.first(where: { $0.server.id == serverID })?.server,
+              store.credentials[serverID] != nil else { throw SignedOutError() }
+        if known.tooOld { throw ServerTooOldError(server: known) }
+        let found = try await identify(serverID)
+        // As it is kept now: the question may have been out a while.
+        guard let kept = store.state.servers.first(where: { $0.server.id == serverID })?.server, kept.baseURL == found.baseURL else {
+            throw CancellationError()
+        }
+        if found.tooOld { throw ServerTooOldError(server: found) }
+        if found != kept { store.update { $0.updateServer(serverID) { $0.server = found } } }
+        store.noteAnswer(serverID: serverID)
+    }
+
     /// Only an explicitly selected LAN endpoint is trusted for AirPlay.
     /// Discovery and a matching public ID cannot authenticate another origin.
     /// Otherwise keep the original media URL instead of forwarding its token.
@@ -222,9 +270,23 @@ final class RealServerRepository: ServerRepository {
     /// sign-out does for the server in use: its downloads here report every
     /// copy removed (``LocalStore/runSignOutHooks(serverID:)``). Then the
     /// sign-in goes, and its downloads are deleted from this device.
+    ///
+    /// A server that isn't the one in use is asked which server it is
+    /// first (``identify(_:)``): when nothing answers at its kept address,
+    /// or another server does, nothing is sent there with its sign-in, and
+    /// it is forgotten on this device alone.
     func forget(serverID: String) async {
         guard store.state.servers.contains(where: { $0.server.id == serverID }) else { return }
-        if store.loadCredential(serverID: serverID) != nil { await store.runSignOutHooks(serverID: serverID) }
+        let signedIn = store.loadCredential(serverID: serverID) != nil
+        let itself: Bool
+        if serverID == store.state.currentID {
+            itself = true
+        } else if signedIn {
+            itself = (try? await identify(serverID)) != nil
+        } else {
+            itself = false
+        }
+        if signedIn, itself { await store.runSignOutHooks(serverID: serverID) }
         // As it stands now: the hooks may have waited on a server that doesn't answer.
         guard let gone = store.state.servers.first(where: { $0.server.id == serverID }) else { return }
         let credential = store.credentials[serverID]
@@ -233,7 +295,7 @@ final class RealServerRepository: ServerRepository {
             if state.currentID == serverID { state.currentID = nil }
         }
         store.setCredential(nil, serverID: serverID)
-        if let credential {
+        if let credential, itself {
             let store = store
             Task { await store.signOutQuietly(baseURL: gone.server.baseURL, token: credential.token) }
         }

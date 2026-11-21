@@ -55,6 +55,7 @@ private struct SearchView: View {
     @State var live: LiveSearchModel
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Posters are narrower across servers, to leave room for the server's line under a title.
     private var posterWidth: CGFloat { model.acrossServers ? 160 : 200 }
@@ -81,6 +82,15 @@ private struct SearchView: View {
                     prompt: live.available ? "Shows, movies, episodes, Live TV" : "Shows, movies, episodes")
         .autocorrectionDisabled()
         .messagePill($model.message)
+        // A visit to Search ends when another tab is chosen or the app leaves the screen. Each
+        // other server says which server it is once for a visit, before a search sends its sign-in
+        // to the address kept for it, so the next visit asks them again.
+        .onChange(of: navigator.tab) { _, tab in
+            if tab == .search { model.visitBegan() } else { model.visitEnded() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { model.visitEnded() } else if phase == .active, navigator.tab == .search { model.visitBegan() }
+        }
         .onChange(of: live.available, initial: true) { _, _ in live.availabilityChanged() }
         .task {
             // After a switch from a result on another server: the same words, asked again here.

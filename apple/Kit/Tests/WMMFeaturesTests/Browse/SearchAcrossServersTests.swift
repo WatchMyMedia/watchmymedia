@@ -335,6 +335,73 @@ import WMMModel
         #expect(listing.shows.contains { $0.server?.name == "Living room server" })
     }
 
+    /// A result that has been on screen a while: its server's answer is too
+    /// old to switch on, since the device may be on another network now.
+    @Test func aResultListedLongAgoAsksItsServerWhichItIsBeforeSwitching() async throws {
+        await search("harbor")
+        let movie = try #require(try listing().movies.first { $0.server == cabin })
+        clock.now += SearchModel.answerStands + 1
+        let probesBefore = servers.probes
+        model.open(movie)
+        #expect(await eventually { servers.current?.server.id == FakeServers.cabin.id })
+        #expect(servers.probes == probesBefore + 1, "asked which server it is, as a switch from Servers is")
+    }
+
+    // MARK: The visit
+
+    /// Each other server says which server it is once for a visit to Search.
+    /// The visit ends when Search leaves the screen; back on it, with other
+    /// servers' titles listed, the search is asked again, so they say so again.
+    @Test func leavingSearchEndsTheVisitAndComingBackAsksAgain() async throws {
+        await search("harbor")
+        #expect(library.visitsEnded == 0)
+        model.visitEnded()
+        model.visitEnded()
+        #expect(library.visitsEnded == 1, "said once")
+        #expect(library.otherSearches.count == 2, "nothing is asked while Search is away")
+
+        model.visitBegan()
+        await model.pending?.value
+        await time.settle()
+        #expect(library.searches == ["harbor", "harbor"], "the same words, asked again")
+        #expect(library.otherSearches.count == 4)
+        #expect(try listing().movies.map(\.server) == [cabin], "the rows stay as they were")
+        model.visitBegan()
+        await model.pending?.value
+        #expect(library.searches.count == 2, "only after a visit ended")
+    }
+
+    @Test func comingBackWithNothingSearchedAsksNothing() async throws {
+        model.visitEnded()
+        model.visitBegan()
+        await model.pending?.value
+        #expect(library.searches.isEmpty)
+        #expect(library.otherSearches.isEmpty)
+        #expect(library.visitsEnded == 1)
+    }
+
+    /// A server that says, asked which server it is, that it is now too old
+    /// for this app: left out in the too-old words, and not asked again on
+    /// this visit, whatever is typed.
+    @Test func aServerThatTurnsOutTooOldIsNotAskedAgainOnThisVisit() async throws {
+        library.otherAnswers[FakeServers.cabin.id] = .failure(ServerTooOldError(server: FakeServers.cabin))
+        await search("harbor")
+        #expect(model.unlisted.first { $0.id == FakeServers.cabin.id }?.line == "Cabin server is too old for this app, so its titles aren’t listed.")
+        #expect(model.unlisted.first { $0.id == FakeServers.cabin.id }?.canRetry == false)
+        await search("harbor l")
+        #expect(library.otherSearches.filter { $0.server == FakeServers.cabin.id }.count == 1, "not asked for every keystroke")
+        #expect(model.unlisted.contains { $0.id == FakeServers.cabin.id && !$0.canRetry })
+
+        // A new visit asks it again: it may have been updated.
+        library.otherAnswers[FakeServers.cabin.id] = nil
+        model.visitEnded()
+        model.visitBegan()
+        await model.pending?.value
+        await time.settle()
+        #expect(library.otherSearches.filter { $0.server == FakeServers.cabin.id }.count == 2)
+        #expect(!model.unlisted.contains { $0.id == FakeServers.cabin.id })
+    }
+
     @Test func anEpisodeOnAnotherServerSwitchesToo() async throws {
         await search("harbour run")
         let episode = try #require(try listing().episodes.first { $0.server == cabin })

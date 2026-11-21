@@ -38,6 +38,7 @@ private struct SearchView: View {
     @Environment(LiveExtrasStore.self) private var extras
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(Navigator.self) private var navigator
+    @Environment(\.scenePhase) private var scenePhase
     @State private var width: CGFloat = 0
     @FocusState private var fieldFocused: Bool
 
@@ -80,6 +81,15 @@ private struct SearchView: View {
             guard let words = navigator.takeSearchWords() else { return }
             model.selectRecentQuery(words)
             live.setQuery(words)
+        }
+        // A visit to Search ends when another tab is chosen or the app leaves the screen. Each
+        // other server says which server it is once for a visit, before a search sends its sign-in
+        // to the address kept for it, so the next visit asks them again.
+        .onChange(of: navigator.tab) { _, tab in
+            if tab == .search { model.visitBegan() } else { model.visitEnded() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { model.visitEnded() } else if phase == .active, navigator.tab == .search { model.visitBegan() }
         }
         .liveRemindFlow()
         .messageToast($model.message)

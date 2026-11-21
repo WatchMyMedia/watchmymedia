@@ -8,14 +8,17 @@ import WMMModel
 final class RealLibraryRepository: LibraryRepository {
     private let store: LocalStore
     private let events: ServerEvents
+    /// Asks a server that isn't in use which server it is, before its sign-in goes to it.
+    private let askOther: @MainActor (_ serverID: String) async throws -> Void
 
     private static let maxPage = 1000
     private static let maxSearch = 100
     private static let maxShowGuesses = 3
 
-    init(store: LocalStore, events: ServerEvents) {
+    init(store: LocalStore, events: ServerEvents, askOther: @escaping @MainActor (_ serverID: String) async throws -> Void) {
         self.store = store
         self.events = events
+        self.askOther = askOther
     }
 
     /// From ``rowsAPILevel`` Home comes arranged: its rows in the person's
@@ -90,12 +93,23 @@ final class RealLibraryRepository: LibraryRepository {
 
     /// GET /api/search on a server that isn't in use, through an API built
     /// for that server alone: its address, its token (``LocalStore/other(serverID:)``).
-    /// A 401 there forgets that sign-in and leaves the one in use alone.
+    /// First the server is asked, with no sign-in, which server it is
+    /// (``RealServerRepository/askOther(_:)``), once while its answer
+    /// stands: the sign-in goes only to an address where the remembered
+    /// server answered. A 401 there forgets that sign-in and leaves the one
+    /// in use alone.
     func search(_ text: String, serverID: String) async throws -> SearchResults {
         let q = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxSearch))
         guard !q.isEmpty else { return SearchResults() }
+        try await askOther(serverID)
         let r = try await store.other(serverID: serverID).api.call { try await $0.search(query: .init(q: q)).ok.body.json }
         return SearchResults(movies: r.movies.map(\.browseItem), shows: r.shows.map(\.browseItem), episodes: r.episodes.map(\.card))
+    }
+
+    /// The visit to Search ended: the other servers' answers are forgotten,
+    /// and each is asked again before the next search sends its sign-in.
+    func searchVisitEnded() {
+        store.forgetAnswers()
     }
 
     /// Each mark tells every listener what changed, and the server's echo of
