@@ -14,7 +14,6 @@ final class RealAuthRepository: AuthRepository {
     @ObservationIgnored private let store: LocalStore
     @ObservationIgnored private let minimumPoll: Duration
     @ObservationIgnored private let now: @Sendable () -> Date
-    @ObservationIgnored private var signOutHooks: [@MainActor @Sendable () async -> Void] = []
 
     private static let maximumPoll: Duration = .seconds(10)
 
@@ -114,20 +113,23 @@ final class RealAuthRepository: AuthRepository {
         }
     }
 
-    /// Runs `hook` before a sign-out ends the session, while the server still
-    /// takes it (offline downloads report themselves removed); each gets 5 s.
-    func beforeSignOut(_ hook: @escaping @MainActor @Sendable () async -> Void) {
-        signOutHooks.append(hook)
-    }
-
+    /// Before the session ends, while the server still takes it, what
+    /// ``LocalStore/beforeSignOut(_:)`` holds runs (offline downloads report
+    /// themselves removed).
+    ///
+    /// First the server is asked which server it is, with no sign-in, once
+    /// for all a sign-out sends. When nothing answers at its kept address,
+    /// or another server does, nothing is sent: no report and no sign-out,
+    /// and nothing is kept to try again later. This device is signed out at
+    /// once all the same; the session stays on the server until it runs
+    /// out or is ended from that server's list of devices.
     func signOut() async {
         guard let server = store.current?.server, let credential = store.currentCredential else { return }
-        for hook in signOutHooks {
-            _ = try? await withDeadline(.seconds(5)) { await hook() }
-        }
+        let itself = await store.answersAsItself(server.id)
+        if itself { await store.runSignOutHooks(serverID: server.id) }
         guard store.credentials[server.id]?.token == credential.token else { return }
         store.setCredential(nil, serverID: server.id)
-        await store.signOutQuietly(baseURL: server.baseURL, token: credential.token)
+        if itself { await store.signOutQuietly(baseURL: server.baseURL, token: credential.token) }
     }
 
     func sessions(all: Bool) async throws -> [DeviceSession] {

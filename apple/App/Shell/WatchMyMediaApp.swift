@@ -11,7 +11,7 @@ import WMMUI
 struct WatchMyMediaApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var services: AppServices
-    @State private var navigator = Navigator()
+    @State private var navigator: Navigator
     @State private var cast: CastService
     @Environment(\.scenePhase) private var scenePhase
     /// Live TV favourites and reminders, shared by every screen.
@@ -20,6 +20,9 @@ struct WatchMyMediaApp: App {
     /// The shows the person follows, and this device's new-episode check.
     @State private var follows: FollowsStore
     @State private var newEpisodes: NewEpisodeNotifier
+    /// Servers, the switcher: one for the app, since Home, Settings, Search,
+    /// Downloads and links all switch.
+    @State private var servers: ServersModel
 
     init() {
         // Launch to Home's first content, and MetricKit's reports for Copy diagnostics.
@@ -31,12 +34,15 @@ struct WatchMyMediaApp: App {
         #if DEBUG
         // `-newEpisodesReset`: this device starts as if it had never checked or explained (UI tests).
         if ProcessInfo.processInfo.arguments.contains("-newEpisodesReset") {
-            memory.forget(unlessFor: nil)
+            memory.forgetAll()
             memory.explained = false
             memory.notifyHere = true
         }
         #endif
-        let newEpisodes = NewEpisodeNotifier(follows: services.follows, router: NotificationRouter.shared, memory: memory)
+        let newEpisodes = NewEpisodeNotifier(follows: services.follows, router: NotificationRouter.shared, servers: services.servers, memory: memory)
+        let navigator = Navigator()
+        _navigator = State(initialValue: navigator)
+        _servers = State(initialValue: ServersModel(servers: services.servers, downloads: services.downloads, navigator: navigator))
         _follows = State(initialValue: FollowsStore(repository: services.follows))
         _newEpisodes = State(initialValue: newEpisodes)
         BackgroundSync.register(services, newEpisodes: newEpisodes)
@@ -57,10 +63,12 @@ struct WatchMyMediaApp: App {
                 .environment(NotificationRouter.shared)
                 .environment(follows)
                 .environment(newEpisodes)
+                .environment(servers)
                 .environment(\.imageLoader, services.images)
                 .preferredColorScheme(.dark)
                 .tint(Palette.gold)
-                // A play or channel link acts only when the app published it for this server.
+                // A play or channel link acts only when the app published it for a server
+                // this device is signed in to; one for another of them switches to it first.
                 .onOpenURL { url in open(url) }
                 .task { await navigator.applyLaunchArguments(ProcessInfo.processInfo.arguments, library: services.library, liveTV: services.liveTV) }
                 // A reminder's notification opens its channel; a new episode's, its show.
@@ -85,10 +93,10 @@ struct WatchMyMediaApp: App {
 
 extension WatchMyMediaApp {
     /// A `watchmymedia://` link from outside the app or one it published
-    /// (``DeepLink/opening(_:signedInServer:)``).
+    /// (``ServersModel/open(_:library:liveTV:accepts:)``): one published for
+    /// another server this device is signed in to switches to it, then opens.
     private func open(_ url: URL) {
-        guard let link = DeepLink.opening(url, signedInServer: services.servers.current?.server.id) else { return }
-        Task { await navigator.open(link, library: services.library, liveTV: services.liveTV) }
+        Task { await servers.open(url, library: services.library, liveTV: services.liveTV) }
     }
 }
 

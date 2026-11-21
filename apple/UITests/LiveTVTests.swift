@@ -39,10 +39,12 @@ final class LiveTVTests: XCTestCase {
         app.buttons["480p"].tap()
         app.buttons["Stop and close live TV"].tap()
         XCTAssertTrue(search.waitForExistence(timeout: 10))
-        app.buttons["Settings"].firstMatch.tap()
+        // Live TV has Settings' place in the tab bar: the account button opens Servers, and Settings is there.
+        app.openSettings()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 10))
-        XCTAssertTrue(element(app, containing: "Signed-in devices").exists)
-        shot("Live TV profile opens Settings")
+        // Settings' root: the account's card and the hub's rows.
+        XCTAssertTrue(app.buttons["settings-accountCard"].waitForExistence(timeout: 10))
+        shot("Servers opens Settings where Live TV has its tab")
         app.buttons["Done"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10))
     }
@@ -79,7 +81,7 @@ final class LiveTVTests: XCTestCase {
         app.launchArguments = ["-fakes", "-tab", "settings"]
         app.launch()
         defer { app.terminate() }
-        XCTAssertTrue(element(app, containing: "Signed-in devices").waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["settings-accountCard"].waitForExistence(timeout: 20))
         XCTAssertFalse(app.buttons["Live TV"].exists)
         XCTAssertFalse(app.buttons["live-channel-2.1"].exists)
         XCTAssertFalse(app.buttons["Done"].exists, "older servers retain the Settings tab")

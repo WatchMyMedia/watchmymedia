@@ -3,6 +3,11 @@ import Observation
 import WMMAPI
 import WMMModel
 
+/// A server that isn't the one in use hasn't said yet, asked without a
+/// sign-in, that it is the one remembered at its kept address: its sign-in
+/// isn't sent (``LocalStore/other(serverID:)``).
+struct ServerNotAskedError: Error, Equatable {}
+
 /// The sign-in a request goes out with.
 struct SignedInSession: Sendable {
     let serverID: String
@@ -32,6 +37,28 @@ final class LocalStore {
     @ObservationIgnored private var sessionKey: String?
     @ObservationIgnored private var sessionListeners: [(_ signedIn: Bool) -> Void] = []
     @ObservationIgnored private var cachedAPI: (key: String, api: ServerAPI)?
+    /// The APIs of the other servers signed in to, by server ID, for search across servers and their pictures.
+    @ObservationIgnored private var otherAPIs: [String: (key: String, api: ServerAPI)] = [:]
+    /// The servers that aren't in use and have said, asked with no sign-in,
+    /// that they are the ones remembered at the addresses kept for them
+    /// (``noteAnswer(serverID:)``), each with the address it answered at. A
+    /// kept address is only where the server was last seen: on another
+    /// network it can be someone else's machine, so ``other(serverID:)``
+    /// hands out a sign-in only while its server's answer stands. An answer
+    /// stands for a visit to Search and on the network it was given on: it
+    /// goes when the visit ends, the network changes, another server comes
+    /// into use, or a call to that server fails.
+    @ObservationIgnored private var answers: [String: URL] = [:]
+    /// Asks the server kept as an id which server it is, with no sign-in,
+    /// and says whether it answered as itself (``RealServerRepository/identify(_:)``).
+    /// A sign-out asks it once, for all it sends.
+    @ObservationIgnored var answersAsItself: @MainActor (_ serverID: String) async -> Bool = { _ in true }
+    /// Run before a sign-in is ended on its server (``beforeSignOut(_:)``).
+    @ObservationIgnored private var signOutHooks: [SignOutHook] = []
+    @ObservationIgnored private var signInRemovedListeners: [() -> Void] = []
+
+    /// What runs before `serverID`'s sign-in ends, with the sign-in that is ending.
+    typealias SignOutHook = @MainActor @Sendable (_ server: Server, _ credential: StoredCredential) async -> Void
     /// Servers whose sign-in couldn't be read (a launch before the first
     /// unlock), read again when protected data becomes available.
     @ObservationIgnored private(set) var unreadable: Set<String> = []
@@ -149,13 +176,20 @@ final class LocalStore {
     /// Keeps (or with nil, forgets) the sign-in on a server.
     func setCredential(_ credential: StoredCredential?, serverID: String) {
         unreadable.remove(serverID)
+        let before = revision
+        let previous = credentials[serverID]
         mutate {
-            let previous = credentials[serverID]
             credentials[serverID] = credential
             storage.setCredential(credential, serverID: serverID)
             if let name = credential?.user.name ?? previous?.user.name {
                 state.updateServer(serverID) { $0.lastUserName = name }
             }
+        }
+        otherAPIs[serverID] = nil
+        // The sign-in of a server that isn't in use went: the session in use
+        // didn't change, so its listeners heard nothing.
+        if credential == nil, previous != nil, revision == before {
+            for listener in signInRemovedListeners { listener() }
         }
     }
 
@@ -185,6 +219,29 @@ final class LocalStore {
         sessionListeners.append(listener)
     }
 
+    /// Calls `listener` when the sign-in kept for a server that isn't the
+    /// one in use goes (the server was removed, or its session refused),
+    /// which ``onSessionChange(_:)`` doesn't report.
+    func onSignInRemoved(_ listener: @escaping () -> Void) {
+        signInRemovedListeners.append(listener)
+    }
+
+    /// Runs `hook` before a sign-in is ended on its server, while the server
+    /// still takes it (offline downloads report themselves removed).
+    func beforeSignOut(_ hook: @escaping SignOutHook) {
+        signOutHooks.append(hook)
+    }
+
+    /// Runs the sign-out hooks for `serverID`'s sign-in, each for at most 5 s;
+    /// nothing when no sign-in is kept for it.
+    func runSignOutHooks(serverID: String) async {
+        guard let server = state.servers.first(where: { $0.server.id == serverID })?.server,
+              let credential = credentials[serverID] else { return }
+        for hook in signOutHooks {
+            _ = try? await withDeadline(.seconds(5)) { await hook(server, credential) }
+        }
+    }
+
     private func mutate(_ body: () -> Void) {
         let before = state
         body()
@@ -193,6 +250,8 @@ final class LocalStore {
         guard key != sessionKey else { return }
         sessionKey = key
         revision += 1
+        // Another server or account in use: which servers are the others changed with it.
+        answers = [:]
         let signedIn = currentCredential != nil
         for listener in sessionListeners { listener(signedIn) }
     }
@@ -215,6 +274,65 @@ final class LocalStore {
         let api = api(serverID: server.id, baseURL: server.baseURL, token: credential.token)
         cachedAPI = (key, api)
         return SignedInSession(serverID: server.id, token: credential.token, api: api)
+    }
+
+    /// The server kept as `serverID`, which isn't the one in use, answered
+    /// as itself at its kept address a moment ago: its sign-in may go there.
+    func noteAnswer(serverID: String) {
+        guard let server = state.servers.first(where: { $0.server.id == serverID })?.server else { return }
+        answers[serverID] = server.baseURL
+    }
+
+    /// Whether `serverID`'s answer stands: given at the address kept for it now, and not forgotten since.
+    func answered(_ serverID: String) -> Bool {
+        guard let answer = answers[serverID], let server = state.servers.first(where: { $0.server.id == serverID })?.server else { return false }
+        return answer == server.baseURL
+    }
+
+    /// Every answer is forgotten: the visit to Search ended, or the network
+    /// changed. The next sign-in for another server waits for a new one.
+    func forgetAnswers() {
+        answers = [:]
+    }
+
+    /// A call to `serverID` failed: whatever answered before may not be
+    /// there now, so it is asked again before its sign-in goes out (Try again).
+    func forgetAnswer(_ serverID: String) {
+        answers[serverID] = nil
+    }
+
+    /// The API of a server this device is signed in to that isn't the one
+    /// in use, with its own sign-in on its own address. ``SignedOutError``
+    /// when no sign-in is kept for it, ``ServerTooOldError`` when it is too
+    /// old, and ``ServerNotAskedError`` until the server has said, without a
+    /// sign-in, that it is the one remembered (``answered(_:)``): nothing
+    /// gets its sign-in on the strength of a kept address alone.
+    func other(serverID: String) throws -> SignedInSession {
+        guard let server = state.servers.first(where: { $0.server.id == serverID })?.server,
+              let credential = credentials[serverID] else { throw SignedOutError() }
+        if server.tooOld { throw ServerTooOldError(server: server) }
+        guard answered(serverID) else { throw ServerNotAskedError() }
+        let key = "\(server.baseURL.absoluteString) \(credential.token)"
+        if let cached = otherAPIs[serverID], cached.key == key {
+            return SignedInSession(serverID: serverID, token: credential.token, api: cached.api)
+        }
+        let api = api(serverID: serverID, baseURL: server.baseURL, token: credential.token)
+        otherAPIs[serverID] = (key, api)
+        return SignedInSession(serverID: serverID, token: credential.token, api: api)
+    }
+
+    /// The sign-in a request for `url` goes out with: the server's that the
+    /// address is on, the one in use first, then any other this device is
+    /// signed in to whose answer stands (``answered(_:)``). For an address
+    /// on none of them, the sign-in in use, which doesn't sign it
+    /// (``RequestSigner``).
+    func signedIn(for url: URL) -> SignedInSession? {
+        let current = try? signedIn()
+        if let current, ServerAPI.owns(current.api.baseURL, url) { return current }
+        for stored in state.servers where stored.server.id != state.currentID && ServerAPI.owns(stored.server.baseURL, url) {
+            if let session = try? other(serverID: stored.server.id) { return session }
+        }
+        return current
     }
 
     /// Runs a call as the signed-in user; a refused token signs out (in

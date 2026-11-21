@@ -21,6 +21,10 @@ import WMMPlayback
 /// Settings › Notifications' list and Home's New from shows you follow.
 /// `-fakesRelated` puts it at API level 30: movie
 /// and show pages end in their collection and More like this.
+/// `-fakesServers` signs Sam in to three servers: Living room server (in
+/// use), Cabin server, with a small library of its own, and Den server,
+/// which doesn't answer. `-fakesSlowServer` makes Cabin server take a few
+/// seconds to answer a search from another server.
 @MainActor
 enum ServicesFactory {
     static func make(arguments: [String]) -> AppServices {
@@ -62,9 +66,11 @@ enum ServicesFactory {
             liveAutomatic: arguments.contains("-fakesLiveAutomatic"),
             rows: arguments.contains("-fakesRows"),
             follows: arguments.contains("-fakesFollows"),
-            related: arguments.contains("-fakesRelated")
+            related: arguments.contains("-fakesRelated"),
+            several: arguments.contains("-fakesServers")
         )
         (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
+        if arguments.contains("-fakesSlowServer") { (services.library as? FakeLibraryRepository)?.otherServerDelay = .milliseconds(2500) }
         if let i = arguments.firstIndex(of: "-fakesAudioLanguages"), arguments.indices.contains(i + 1), !arguments[i + 1].hasPrefix("-") {
             (services.preferences as? FakePreferencesRepository)?.seedLanguages(arguments[i + 1].split(separator: ",").map(String.init))
         }

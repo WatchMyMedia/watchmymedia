@@ -3,18 +3,33 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Whether the person asked to pick another server (from sign-in or Settings).
+/// Whether the person asked to pick another server (from sign-in), and the
+/// tasks that outlive the screen that started them.
 @MainActor
 @Observable
 final class AppFlow {
     var choosingServer = false
-    /// Kept above the size-class branches, so resizing retains the form and
-    /// the original account needed by Cancel.
-    var serverSwitch: ServerSwitchModel?
-    /// Whether the server had Live TV when the switch began. The tabs and
-    /// Settings keep that layout until the switch ends (`MainTabView`).
-    var serverSwitchLiveTV = false
-    var appliedSwitchLaunch = false
+    /// Add a server's steps (and Sign in again to a server whose sign-in
+    /// ended), kept above the size-class branches, so resizing retains the
+    /// form and the original account needed by Cancel.
+    var addingServer: AddServerModel?
+    /// Whether the server had Live TV when the task began. The tabs and
+    /// Settings keep that layout until it ends (`MainTabView`).
+    var addingServerLiveTV = false
+    /// The tab the task was started from (Home, from Servers; Settings),
+    /// where Cancel goes back to.
+    var addingServerFrom: AppTab = .settings
+    var appliedAddLaunch = false
+    /// `-servers` opened Servers once this launch; the tabs are rebuilt on every switch.
+    var appliedServersLaunch = false
+    /// A Settings page asked for from outside Settings (Manage servers in
+    /// Servers): Settings opens it and clears this.
+    var settingsPage: SettingsPage?
+    /// Servers is on screen, as a sheet or a popover.
+    var serversShowing = false
+    /// What Servers started that needs it gone first (another sheet, or
+    /// Settings where that is a sheet): run once it has disappeared.
+    @ObservationIgnored var afterServers: (() -> Void)?
     /// Rename this iPhone and Change password while their sheets are up. The
     /// sheet shows while its model is here; the fields write to the model,
     /// since a field writes its text back as it loses focus while closing.
@@ -22,11 +37,11 @@ final class AppFlow {
     var changePassword: ChangePasswordModel?
     /// Next step cards answered Not now, until the app is next launched.
     var dismissedSteps: Set<SettingsNextStep.Kind> = []
-    /// Done on Switch server's last step: the root then shows the new server's Home.
-    var serverSwitchDone = false
-    /// Link a TV's steps, kept here for the same reason as the server switch.
+    /// Done on Add a server's last step: the root then shows the new server's Home.
+    var addingServerDone = false
+    /// Link a TV's steps, kept here for the same reason as Add a server.
     @ObservationIgnored private var linkTV: LinkTVModel?
-    /// The sign-in form, kept here like the server switch, so an iPad window
+    /// The sign-in form, kept here like Add a server, so an iPad window
     /// resized during sign-in (which swaps the iPhone and iPad screens) keeps
     /// what was typed.
     @ObservationIgnored private let signIn = SignInForm()
@@ -49,11 +64,36 @@ final class AppFlow {
     /// Link a TV's sheet closed: the next one starts afresh.
     func forgetLinkTV() { linkTV = nil }
 
-    /// Switch server's sheet went away: swiped down, it is Cancel, unless the
-    /// switch finished, when it is Done.
-    func closeServerSwitchSheet() {
-        guard let switching = serverSwitch else { return }
-        if switching.outcome == .switched { serverSwitchDone = true } else { Task { await switching.cancel() } }
+    /// Starts Add a server from `tab`; with `serverID`, on Sign in for that
+    /// registered server, whose sign-in ended. Nothing while one is under
+    /// way, or with nobody signed in to come back to.
+    func startAddingServer(_ services: AppServices, from tab: AppTab, signingInTo serverID: String? = nil) {
+        guard addingServer == nil, let model = AddServerModel(servers: services.servers, auth: services.auth) else { return }
+        addingServerLiveTV = services.liveTV.capabilities?.available == true
+        addingServerFrom = tab
+        addingServer = model
+        if let serverID { Task { await model.signIn(to: serverID) } }
+    }
+
+    /// Add a server's sheet went away: swiped down, it is Cancel, unless the
+    /// server was added, when it is Done.
+    func closeAddServerSheet() {
+        guard let adding = addingServer else { return }
+        if adding.outcome == .added { addingServerDone = true } else { Task { await adding.cancel() } }
+    }
+
+    /// Runs `action` now, or once Servers has gone when it is on screen:
+    /// what it does may present a sheet of its own.
+    func afterServersClose(_ action: @escaping () -> Void) {
+        if serversShowing { afterServers = action } else { action() }
+    }
+
+    /// Servers has gone from the screen.
+    func serversClosed() {
+        serversShowing = false
+        let action = afterServers
+        afterServers = nil
+        action?()
     }
 }
 
@@ -69,13 +109,21 @@ struct RootView: View {
     @Environment(NotificationRouter.self) private var router
     @Environment(FollowsStore.self) private var follows
     @Environment(NewEpisodeNotifier.self) private var newEpisodes
+    @Environment(ServersModel.self) private var servers
     private var notifier: LiveReminderNotifier { .shared }
     @State private var flow = AppFlow()
     @State private var accountGeneration = 0
 
     var body: some View {
         Group {
-            if flow.serverSwitch != nil || (services.servers.current != nil && services.auth.user != nil && !flow.choosingServer) {
+            if servers.moving {
+                // A server was removed, or the one in use signed out of, and
+                // the app is on its way to the next: neither sign-in nor the picker shows.
+                ProgressView()
+                    .tint(Palette.muted)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityLabel("Changing server")
+            } else if flow.addingServer != nil || (services.servers.current != nil && services.auth.user != nil && !flow.choosingServer) {
                 MainTabView()
                     .id(accountGeneration)
             } else if sizeClass.isWide && services.auth.user == nil {
@@ -94,28 +142,43 @@ struct RootView: View {
             flow.forgetSignIn()
             // Another account's reminders never notify here.
             Task { await notifier.reschedule([]) }
-            // Nor are its new episodes kept, once the change is real: Switch
-            // server picks the new server before signing in there, and Cancel
-            // goes back to the old one, whose cursor must still be there.
-            if flow.serverSwitch == nil { Task { await newEpisodes.accountChanged() } }
-            if let switching = flow.serverSwitch {
-                switching.accountChanged()
+            // What was kept for a server signed out of or removed goes, once
+            // the change is real: Add a server picks the new server before
+            // signing in there, and Cancel goes back to the old one, whose
+            // place must still be there.
+            if flow.addingServer == nil { Task { await newEpisodes.accountChanged() } }
+            if let adding = flow.addingServer {
+                adding.accountChanged()
             } else {
                 // Link a TV can be queued before signing in. Keep that
                 // intent while discarding every account's browse routes.
                 resetAccountViews(preservingLink: old.user == nil)
+                land()
             }
         }
-        // A switch that finished shows what changed until Done;
-        // cancelled or overtaken, it ends at once.
-        .onChange(of: flow.serverSwitch?.outcome) { _, outcome in
-            guard let outcome, outcome != .switched else { return }
-            endServerSwitch(outcome)
+        // Add a server has the screen: Servers, asked for meanwhile (a link whose
+        // server didn't answer), doesn't open once the task ends.
+        .onChange(of: flow.addingServer != nil) { _, adding in
+            if adding { servers.presented = false }
         }
-        .onChange(of: flow.serverSwitchDone) { _, done in
+        // A server that was added shows what changed until Done;
+        // cancelled or overtaken, the task ends at once.
+        .onChange(of: flow.addingServer?.outcome) { _, outcome in
+            guard let outcome, outcome != .added else { return }
+            endAddingServer(outcome)
+        }
+        .onChange(of: flow.addingServerDone) { _, done in
             guard done else { return }
-            flow.serverSwitchDone = false
-            endServerSwitch(.switched)
+            flow.addingServerDone = false
+            endAddingServer(.added)
+        }
+        // A registered server whose sign-in ended was chosen, in Servers or
+        // on its page: Add a server's steps, starting on Sign in for it.
+        .onChange(of: servers.signInRequest) { _, request in
+            guard let request else { return }
+            servers.signInRequest = nil
+            let tab = navigator.tab
+            flow.afterServersClose { flow.startAddingServer(services, from: tab, signingInTo: request.server.id) }
         }
         // At launch, on every return to the app and on every sign-in (which
         // doesn't change scenePhase): one task, so launch asks once. A server
@@ -194,12 +257,21 @@ struct RootView: View {
                 user: services.auth.user, signedIn: services.servers.current?.signedIn == true)
     }
 
-    private func endServerSwitch(_ outcome: ServerSwitchModel.Outcome) {
+    private func endAddingServer(_ outcome: AddServerModel.Outcome) {
         if outcome != .cancelled { Task { await newEpisodes.accountChanged() } }
-        flow.serverSwitch = nil
+        flow.addingServer = nil
         flow.choosingServer = false
         resetAccountViews(rebuild: outcome != .cancelled)
-        navigator.tab = outcome == .cancelled ? .settings : .home
+        // Cancelled, back where it was started; added, the new server's Home.
+        navigator.tab = outcome == .cancelled ? flow.addingServerFrom : .home
+    }
+
+    /// The tabs were rebuilt on another server: goes where the switch was
+    /// headed (Search with the same words and a title over it, or a link),
+    /// which the reset would otherwise have thrown away.
+    private func land() {
+        guard let link = navigator.land(on: services.servers.current?.server.id) else { return }
+        Task { await navigator.open(link, library: services.library, liveTV: services.liveTV) }
     }
 
     private func resetAccountViews(preservingLink: Bool = false, rebuild: Bool = true) {

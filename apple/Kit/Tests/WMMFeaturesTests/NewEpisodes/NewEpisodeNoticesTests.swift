@@ -113,17 +113,46 @@ import WMMModel
         #expect(model.save == .saved("Saved. This iPhone now shows a notification when a show you follow gets a new episode."))
     }
 
-    @Test func theMemoryKeepsOneRecordForOneSignIn() {
+    @Test func theMemoryKeepsARecordForEachServerAndItsPerson() {
         let defaults = scratchDefaults()
         let memory = NewEpisodeMemory(defaults: defaults)
         #expect(memory.notifyHere, "on by default")
         memory.keep(cursor: "5", for: "srv-a:1")
+        memory.keep(cursor: "70", for: "srv-b:4")
         let again = NewEpisodeMemory(defaults: defaults)
         #expect(again.cursor(for: "srv-a:1") == "5", "kept across launches")
-        #expect(again.cursor(for: "srv-a:2") == nil)
-        again.forget(unlessFor: "srv-a:1")
-        #expect(again.cursor(for: "srv-a:1") == "5", "its own is kept")
-        again.forget(unlessFor: nil)
+        #expect(again.cursor(for: "srv-b:4") == "70", "each server has its own place")
+        #expect(again.cursor(for: "srv-a:2") == nil, "another person's on the same server isn't theirs")
+
+        // Another server in use: both places stay, so coming back to the first finds it.
+        again.forget(unlessFor: "srv-b:4", servers: ["srv-a", "srv-b"])
+        #expect(again.cursor(for: "srv-a:1") == "5")
+        #expect(again.cursor(for: "srv-b:4") == "70")
+
+        // Another person signed in on srv-a: the place kept there for the first goes.
+        again.forget(unlessFor: "srv-a:2", servers: ["srv-a", "srv-b"])
         #expect(again.cursor(for: "srv-a:1") == nil)
+        #expect(again.cursor(for: "srv-b:4") == "70")
+        again.keep(cursor: "9", for: "srv-a:2")
+        #expect(again.cursor(for: "srv-a:2") == "9")
+
+        // srv-b removed, or signed out of: its place goes, the other's stays.
+        again.forget(unlessFor: "srv-a:2", servers: ["srv-a"])
+        #expect(again.cursor(for: "srv-b:4") == nil)
+        #expect(again.cursor(for: "srv-a:2") == "9")
+
+        // Nobody signed in anywhere.
+        again.forget(unlessFor: nil, servers: [])
+        #expect(again.cursor(for: "srv-a:2") == nil)
+    }
+
+    /// The one record an earlier version kept is read as its server's.
+    @Test func theRecordKeptBeforeThereWasOneAServerIsCarriedOver() throws {
+        let defaults = scratchDefaults()
+        defaults.set(try JSONEncoder().encode(NewEpisodeMemory.Record(context: "srv-a:1", cursor: "1840")), forKey: NewEpisodeMemory.recordKey)
+        let memory = NewEpisodeMemory(defaults: defaults)
+        #expect(memory.cursor(for: "srv-a:1") == "1840")
+        #expect(defaults.data(forKey: NewEpisodeMemory.recordKey) == nil, "moved, not kept twice")
+        #expect(NewEpisodeMemory(defaults: defaults).cursor(for: "srv-a:1") == "1840")
     }
 }

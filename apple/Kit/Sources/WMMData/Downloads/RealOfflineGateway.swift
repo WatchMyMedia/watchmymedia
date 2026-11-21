@@ -10,11 +10,9 @@ import WMMModel
 @MainActor
 final class RealOfflineGateway: OfflineGateway {
     private let store: LocalStore
-    private let auth: RealAuthRepository
 
-    init(store: LocalStore, auth: RealAuthRepository) {
+    init(store: LocalStore) {
         self.store = store
-        self.auth = auth
     }
 
     func owner() -> OfflineOwner? {
@@ -28,10 +26,13 @@ final class RealOfflineGateway: OfflineGateway {
 
     func onSessionChange(_ listener: @escaping @MainActor () -> Void) {
         store.onSessionChange { _ in listener() }
+        store.onSignInRemoved { listener() }
     }
 
-    func beforeSignOut(_ hook: @escaping @MainActor @Sendable () async -> Void) {
-        auth.beforeSignOut(hook)
+    func beforeSignOut(_ hook: @escaping @MainActor @Sendable (_ owner: OfflineOwner) async -> Void) {
+        store.beforeSignOut { server, credential in
+            await hook(OfflineOwner(serverID: server.id, userID: credential.user.id, baseURL: server.baseURL, apiLevel: server.apiLevel))
+        }
     }
 
     /// The owner's server as it is kept now (its address may have moved), with its sign-in.

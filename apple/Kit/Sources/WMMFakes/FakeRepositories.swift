@@ -19,6 +19,15 @@ public enum FakeServers {
     public static let remoteHome = Server(id: "srv-remote", name: "home.watchmy.media", baseURL: URL(string: "https://home.watchmy.media")!, version: "0.9.3", apiLevel: 6, turnstile: true)
     /// Remembered, but older than this app works with.
     public static let oldNAS = Server(id: "srv-nas", name: "Old NAS", baseURL: URL(string: "http://nas.local:27587")!, version: "0.6.0", apiLevel: 0)
+    /// With several servers (`-fakesServers`): a second one signed in to,
+    /// with a small library of its own (``FakeCabin``). The addresses are
+    /// documentation addresses, no real server's.
+    public static let cabin = Server(id: "srv-cabin", name: "Cabin server", baseURL: URL(string: "http://192.0.2.31:27587")!, version: "1.4.5", apiLevel: 6)
+    /// With several servers: a third one signed in to, which doesn't answer.
+    public static let den = Server(id: "srv-den", name: "Den server", baseURL: URL(string: "http://192.0.2.52:27587")!, version: "1.3.2", apiLevel: 6)
+
+    /// What a server that doesn't answer throws, as the real repositories word it.
+    static let unreachable = APIError(status: nil, message: "Couldn’t reach the server. Check the connection and try again.")
 }
 
 @MainActor
@@ -38,7 +47,14 @@ public final class FakeServerRepository: ServerRepository {
 
     var currentUser: User? { current.flatMap { user(on: $0.server) } }
 
-    public init(signedIn: Bool = true, chosen: Bool = true, admin: Bool = true, liveTV: Bool = false, liveGuide: Bool = false, liveExtras: Bool = false, apiLevel: Int? = nil) {
+    /// The server in use is the one that doesn't answer (``FakeServers/den``):
+    /// the app is there to watch its downloads.
+    public var reachable: Bool? { current?.server.id == FakeServers.den.id ? false : nil }
+
+    /// - Parameter several: this device is signed in to three servers, as
+    ///   Sam on each: Living room server (in use), Cabin server, with a small
+    ///   library of its own, and Den server, which doesn't answer.
+    public init(signedIn: Bool = true, chosen: Bool = true, admin: Bool = true, liveTV: Bool = false, liveGuide: Bool = false, liveExtras: Bool = false, apiLevel: Int? = nil, several: Bool = false) {
         let account = admin ? User(id: 1, name: "Sam", isAdmin: true) : User(id: 2, name: "Alex", isAdmin: false)
         var livingRoom = FakeServers.livingRoom
         if liveTV { livingRoom.apiLevel = ServerFeatures.Level.liveTV }
@@ -50,10 +66,24 @@ public final class FakeServerRepository: ServerRepository {
             SavedServer(server: FakeServers.remoteHome, userName: "Sam", signedIn: false, lastUsedAt: .now.addingTimeInterval(-3 * 86_400)),
             SavedServer(server: FakeServers.oldNAS, userName: "Sam", signedIn: false, lastUsedAt: .now.addingTimeInterval(-90 * 86_400)),
         ]
+        if several {
+            let sam = User(id: 1, name: "Sam", isAdmin: true)
+            saved = [
+                saved[0],
+                SavedServer(server: FakeServers.cabin, userName: sam.name, signedIn: true, lastUsedAt: .now.addingTimeInterval(-86_400)),
+                SavedServer(server: FakeServers.den, userName: sam.name, signedIn: true, lastUsedAt: .now.addingTimeInterval(-5 * 86_400)),
+            ]
+            for server in [FakeServers.cabin, FakeServers.den] { credentials[server.id] = Credential(user: sam, baseURL: server.baseURL) }
+        }
         current = chosen ? saved.first : nil
         if signedIn {
             credentials[FakeServers.livingRoom.id] = Credential(user: account, baseURL: FakeServers.livingRoom.baseURL)
         }
+    }
+
+    /// Whether this device is signed in on `serverID`, for the fakes that answer for a server not in use.
+    func signedIn(on serverID: String) -> Bool {
+        saved.first { $0.server.id == serverID }.map { user(on: $0.server) != nil } ?? false
     }
 
     public func startDiscovery() {
@@ -64,11 +94,30 @@ public final class FakeServerRepository: ServerRepository {
 
     public func stopDiscovery() {}
 
+    /// How many times an address was asked which server it is (tests).
+    public private(set) var probes = 0
+
+    /// Keeps `entry` among the remembered servers, over one with its id, and
+    /// signs Sam in there when it says signed in: for a state choosing a
+    /// server can't reach, such as one that became too old (tests).
+    public func remember(_ entry: SavedServer) {
+        saved = saved.filter { $0.server.id != entry.server.id } + [entry]
+        credentials[entry.server.id] = entry.signedIn ? Credential(user: User(id: 1, name: entry.userName ?? "Sam", isAdmin: true), baseURL: entry.server.baseURL) : nil
+        accountRevision += 1
+    }
+
     public func probe(_ address: String) async throws -> Server {
+        probes += 1
         await FakeLatency.wait()
         let a = address.trimmingCharacters(in: .whitespaces)
         if a.isEmpty || a.contains(" ") { throw APIError(status: nil, message: "That doesn't look like a server address.") }
-        return [FakeServers.livingRoom, FakeServers.officeMini, FakeServers.remoteHome, FakeServers.oldNAS].first { $0.baseURL.absoluteString.contains(a) } ?? FakeServers.livingRoom
+        // Den server doesn't answer.
+        if FakeServers.den.baseURL.absoluteString.contains(a) {
+            throw APIError(status: nil, message: "Couldn't reach \(a). Check the address and that the server is running.")
+        }
+        // As it is kept (its level may be set for this run), else as it is known.
+        let known = saved.map(\.server) + [FakeServers.livingRoom, FakeServers.officeMini, FakeServers.remoteHome, FakeServers.oldNAS, FakeServers.cabin]
+        return known.first { $0.baseURL.absoluteString.contains(a) } ?? FakeServers.livingRoom
     }
 
     public func select(_ server: Server) async throws {
@@ -329,9 +378,56 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public init() {}
 
+    /// The server in use is Cabin server, which has its own library (``FakeCabin``).
+    private var onCabin: Bool { servers?.current?.server.id == FakeServers.cabin.id }
+
+    /// How long Cabin server takes to answer a search from another server,
+    /// to see Search say it is still asking (`-fakesSlowServer`).
+    public var otherServerDelay: Duration = .zero
+
+    /// A server this device is signed in to that isn't the one in use:
+    /// Cabin server answers from its own library, Den server doesn't answer,
+    /// and any other (Living room server, or one added on the fakes) answers
+    /// from the sample's.
+    public func search(_ text: String, serverID: String) async throws -> SearchResults {
+        await FakeLatency.wait()
+        guard let servers, servers.signedIn(on: serverID) else { throw SignedOutError() }
+        let t = text.trimmingCharacters(in: .whitespaces)
+        switch serverID {
+        case FakeServers.cabin.id:
+            if otherServerDelay > .zero { try await Task.sleep(for: otherServerDelay) }
+            answered.insert(serverID)
+            return FakeCabin.search(t)
+        case FakeServers.den.id:
+            answered.remove(serverID)
+            throw FakeServers.unreachable
+        default:
+            answered.insert(serverID)
+            return Self.sampleSearch(t)
+        }
+    }
+
+    /// The other servers that answered on this visit to Search, as the real
+    /// one keeps which servers said they are the ones remembered.
+    private var answered: Set<String> = []
+
+    public func searchVisitEnded() { answered = [] }
+
+    public func askServer(_ serverID: String) async throws {
+        await FakeLatency.wait()
+        guard let servers, servers.signedIn(on: serverID) else { throw SignedOutError() }
+        guard serverID != FakeServers.den.id else { throw FakeServers.unreachable }
+        answered.insert(serverID)
+    }
+
+    public func answerStands(serverID: String) -> Bool { answered.contains(serverID) }
+
+    public func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL? { FakeBackdrops.url(path, size: size) }
+
     public func home() async throws -> HomeData {
         await FakeLatency.wait()
         try checkOnline()
+        if onCabin { return FakeCabin.home() }
         if firstRun != nil {
             return HomeData(hero: nil, continueWatching: [], recentlyAddedShows: [], recentlyAired: [], recentlyAddedMovies: [], recentlyReleased: [], totals: LibraryTotals(movies: 0, shows: 0, episodes: 0, files: 0, totalSizeBytes: 0), lastScannedAt: nil, movieLibraryID: nil, tvLibraryID: nil)
         }
@@ -363,7 +459,8 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public func items(_ query: ItemQuery) async throws -> ItemPage {
         await FakeLatency.wait()
-        let all = query.libraryID == FakeData.movieLibrary ? (largeLibrary ? FakeData.largeMovies : FakeData.movies) : FakeData.shows
+        let all = onCabin ? (query.libraryID == FakeCabin.movieLibrary ? FakeCabin.movies : FakeCabin.shows)
+            : query.libraryID == FakeData.movieLibrary ? (largeLibrary ? FakeData.largeMovies : FakeData.movies) : FakeData.shows
         var list = all.filter { item in
             switch query.filter {
             case .all: true
@@ -408,6 +505,7 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     /// The library's counts, with the large library's in the Movies' when it holds them.
     private func summary(libraryID: Int) -> LibrarySummary {
+        if onCabin { return FakeCabin.summary(libraryID: libraryID) }
         var summary = FakeData.summary(libraryID: libraryID)
         if largeLibrary, libraryID == FakeData.movieLibrary { summary.items = FakeData.largeMovies.count }
         return summary
@@ -416,6 +514,10 @@ public final class FakeLibraryRepository: LibraryRepository {
     public func show(id: Int) async throws -> ShowDetail {
         await FakeLatency.wait()
         try checkOnline()
+        if onCabin {
+            guard FakeCabin.holds(showID: id) else { throw APIError(status: 404, message: "Not found.") }
+            return FakeCabin.show(id: id)
+        }
         var show = FakeData.show(id: id)
         show.seasons = show.seasons.map { s in
             var copy = s
@@ -433,6 +535,12 @@ public final class FakeLibraryRepository: LibraryRepository {
     public func season(showID: Int, number: Int) async throws -> SeasonDetail {
         await FakeLatency.wait()
         try checkOnline()
+        if onCabin {
+            guard FakeCabin.holds(showID: showID) else { throw APIError(status: 404, message: "Not found.") }
+            var season = FakeCabin.season(showID: showID, number: number)
+            season.episodes = season.episodes.map { applied($0, showID: showID, number: number, request: nil) }
+            return season
+        }
         var season = FakeData.season(showID: showID, number: number)
         let request = seasonRequests[SeasonKey(showID: showID, season: number)]
         season.season.request = request
@@ -461,6 +569,14 @@ public final class FakeLibraryRepository: LibraryRepository {
     public func movie(id: Int) async throws -> MovieDetail {
         await FakeLatency.wait()
         try checkOnline()
+        if onCabin {
+            guard FakeCabin.holds(movieID: id) else { throw APIError(status: 404, message: "Not found.") }
+            var movie = FakeCabin.movie(id: id)
+            if let mark = marks[.movie(id: id)] {
+                movie.watch = mark ? WatchProgress(positionMs: 0, durationMs: (movie.runtimeMin ?? 100) * 60_000, completed: true) : nil
+            }
+            return movie
+        }
         var movie = FakeData.movie(id: id)
         if let trailerKeys, movie.trailers.contains(where: { $0.youTube != nil }) {
             movie.trailers = movie.trailers.filter { $0.youTube == nil } + trailerKeys.enumerated().compactMap { i, key in
@@ -475,6 +591,7 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public var offersRelated: Bool {
         guard let servers else { return true }
+        if onCabin { return false }
         return ServerFeatures(apiLevel: servers.current?.server.apiLevel).related && servers.currentUser != nil
     }
 
@@ -502,9 +619,15 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public func search(_ text: String) async throws -> SearchResults {
         await FakeLatency.wait()
+        try checkOnline()
         let t = text.trimmingCharacters(in: .whitespaces)
         guard !t.isEmpty else { return SearchResults() }
-        return SearchResults(
+        return onCabin ? FakeCabin.search(t) : Self.sampleSearch(t)
+    }
+
+    /// The sample library's matches, Living room server's.
+    private static func sampleSearch(_ t: String) -> SearchResults {
+        SearchResults(
             movies: FakeData.movies.filter { $0.title.localizedCaseInsensitiveContains(t) },
             shows: FakeData.shows.filter { $0.title.localizedCaseInsensitiveContains(t) },
             episodes: FakeData.recentlyAired().filter { $0.title.localizedCaseInsensitiveContains(t) || $0.showTitle.localizedCaseInsensitiveContains(t) }
@@ -526,11 +649,12 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public func playRequest(fileID: Int) async throws -> PlayRequest {
         await FakeLatency.wait()
-        return FakeData.playRequest(fileID: fileID)
+        return onCabin ? FakeCabin.playRequest(fileID: fileID) : FakeData.playRequest(fileID: fileID)
     }
 
     public func filePage(fileID: Int) async throws -> FilePage? {
         await FakeLatency.wait()
+        if onCabin { return FakeCabin.filePage(fileID: fileID) }
         if let m = FakeData.movies.first(where: { fileID == 9400 + $0.id || fileID == 9500 + $0.id }) { return .movie(id: m.id) }
         if let found = FakeData.playbackEpisode(fileID: fileID) {
             return .episode(showID: found.show.id, season: found.episode.season, episode: found.episode.id)
@@ -539,7 +663,8 @@ public final class FakeLibraryRepository: LibraryRepository {
     }
 
     private func checkOnline() throws {
-        if offline { throw APIError(status: nil, message: "Couldn’t reach the server. Check the connection and try again.") }
+        // Offline, or the server in use is the one that doesn't answer.
+        if offline || servers?.reachable == false { throw FakeServers.unreachable }
     }
 
     /// The fake library's only pictures are its backdrops (``FakeBackdrops``);

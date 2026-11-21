@@ -113,6 +113,8 @@ private struct HomeView: View {
                         }
                 } else {
                     ScrollView {
+                        // With several servers, the one in use, under the title.
+                        HomeServerName()
                         // Arranged, Live TV is a row in its place.
                         if !home.isArranged || home.isEmpty { LiveHomeRow() }
                         if home.isEmpty {
@@ -154,33 +156,16 @@ private struct HomeView: View {
         .accessibilityIdentifier("homeFirstRun")
     }
 
+    /// The account button: the person's initial, which opens Servers.
     @ToolbarContentBuilder private var avatar: some ToolbarContent {
-        if let initial = model.initial {
+        if model.initial != nil {
             if #available(iOS 26.0, *) {
-                ToolbarItem(placement: .topBarTrailing) { avatarButton(initial) }
+                ToolbarItem(placement: .topBarTrailing) { AccountButton(tab: .home) }
                     .sharedBackgroundVisibility(.hidden)
             } else {
-                ToolbarItem(placement: .topBarTrailing) { avatarButton(initial) }
+                ToolbarItem(placement: .topBarTrailing) { AccountButton(tab: .home) }
             }
         }
-    }
-
-    /// The user's initial in a burgundy circle; it opens Settings.
-    private func avatarButton(_ initial: String) -> some View {
-        Button {
-            navigator.select(.settings)
-        } label: {
-            Text(initial)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Palette.text)
-                .frame(width: 34, height: 34)
-                .background(Palette.burgundy, in: Circle())
-                .frame(width: 44, height: 44)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Settings")
-        .accessibilityValue(model.userName.map { "Signed in as \($0)" } ?? "")
     }
 
     private func url(_ path: String?, _ size: ImageSize) -> URL? {

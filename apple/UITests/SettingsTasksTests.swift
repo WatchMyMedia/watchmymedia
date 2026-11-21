@@ -2,10 +2,10 @@ import XCTest
 import UIKit
 
 /// Settings' tasks on the fakes: Link a TV and
-/// Switch server from the first step to the last, Back and Cancel at each
+/// Add a server from the first step to the last, Back and Cancel at each
 /// step, swiping a sheet down with something typed, Rename, and both
 /// sign-out questions. On an iPhone, and on an iPad, where the tasks are
-/// form sheets and Switch server stays in the detail column.
+/// form sheets and Add a server stays in the detail column.
 final class SettingsTasksTests: XCTestCase {
     override func setUp() async throws { continueAfterFailure = false }
 
@@ -155,87 +155,92 @@ final class SettingsTasksTests: XCTestCase {
         shot(app, "iPad — Account & devices in two columns")
     }
 
-    // MARK: Switch server
+    // MARK: Add a server
 
     @MainActor
-    func testSwitchServerFromFirstStepToLastWithBackAndAWrongPassword() {
+    func testAddAServerFromFirstStepToLastWithBackAndAWrongPassword() {
         let app = launch(["-settingsPage", "server"])
         defer { app.terminate() }
-        tap(app.buttons["server-switch"])
+        tap(app.buttons["server-add"])
         XCTAssertTrue(steps(app).waitForExistence(timeout: 10))
         XCTAssertEqual(steps(app).label, "Step 1 of 3, Choose a server")
+        // The servers this iPhone is registered with aren't offered again; the step names them.
+        XCTAssertTrue(text(app, "Already added: Living room server").waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["add-server-srv-living"].exists)
         chooseServer("Office Mac mini", in: app)
-        XCTAssertTrue(app.textFields["switch-name"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.textFields["add-name"].waitForExistence(timeout: 15))
         XCTAssertEqual(steps(app).label, "Step 2 of 3, Sign in")
 
         // Back returns to the servers, still on the first one.
         tap(app.buttons["task-back"])
-        XCTAssertTrue(app.textFields["switch-address"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textFields["add-address"].waitForExistence(timeout: 10))
         XCTAssertTrue(text(app, "Living room server").exists)
         chooseServer("Office Mac mini", in: app)
 
-        let name = app.textFields["switch-name"]
+        let name = app.textFields["add-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 15))
         name.tap()
         name.typeText("Robin")
-        let password = app.secureTextFields["switch-password"]
+        let password = app.secureTextFields["add-password"]
         password.tap()
         password.typeText("wrong")
-        tap(app.buttons["switch-sign-in"])
+        tap(app.buttons["add-sign-in"])
         XCTAssertTrue(text(app, "You’re still on Living room server").waitForExistence(timeout: 10), "a refusal says where you still are")
-        shot(app, "Switch server — wrong password")
+        shot(app, "Add a server — wrong password")
 
         password.tap()
         password.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 5) + "password")
-        tap(app.buttons["switch-sign-in"])
-        XCTAssertTrue(app.buttons["switch-done"].waitForExistence(timeout: 15))
-        XCTAssertEqual(steps(app).label, "Switched")
-        XCTAssertTrue(text(app, "You’re on Office Mac mini").exists)
-        XCTAssertTrue(text(app, "switching back needs no password").exists || text(app, "It needs no password").exists)
-        shot(app, "Switch server — switched")
-        tap(app.buttons["switch-done"])
-        XCTAssertTrue(app.buttons["switch-done"].waitForNonExistence(timeout: 10))
+        tap(app.buttons["add-sign-in"])
+        XCTAssertTrue(app.buttons["add-done"].waitForExistence(timeout: 15))
+        XCTAssertEqual(steps(app).label, "Added")
+        XCTAssertTrue(text(app, "Office Mac mini is added").exists)
+        XCTAssertTrue(text(app, "You’re on it now, signed in as Robin.").exists)
+        XCTAssertTrue(text(app, "is signed in to 2 servers. Search looks in all of them.").exists)
+        XCTAssertTrue(text(app, "It doesn’t ask for a password again").exists)
+        shot(app, "Add a server — added")
+        tap(app.buttons["add-done"])
+        XCTAssertTrue(app.buttons["add-done"].waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 15), "Done shows the new server's Home")
     }
 
     /// "Use a code from a signed-in device instead" swaps the form for a
     /// code, and back; the fakes approve a code after a few seconds, so
-    /// the switch ends on Switched without a password.
+    /// the task ends on Added without a password.
     @MainActor
-    func testSwitchServerSignsInWithACodeFromASignedInDevice() {
+    func testAddAServerSignsInWithACodeFromASignedInDevice() {
         let app = launch(["-settingsPage", "server"])
         defer { app.terminate() }
-        tap(app.buttons["server-switch"])
+        tap(app.buttons["server-add"])
         chooseServer("Office Mac mini", in: app)
-        XCTAssertTrue(app.textFields["switch-name"].waitForExistence(timeout: 15))
-        let other = app.buttons["switch-other-way"]
+        XCTAssertTrue(app.textFields["add-name"].waitForExistence(timeout: 15))
+        let other = app.buttons["add-other-way"]
         XCTAssertEqual(other.label, "Use a code from a signed-in device instead")
         tap(other)
-        XCTAssertTrue(app.descendants(matching: .any)["switch-code"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.textFields["switch-name"].exists)
-        XCTAssertEqual(app.buttons["switch-other-way"].label, "Sign in with a password instead")
-        shot(app, "Switch server — a code from a signed-in device")
-        tap(app.buttons["switch-other-way"])
-        XCTAssertTrue(app.textFields["switch-name"].waitForExistence(timeout: 10), "back to the form")
-        tap(app.buttons["switch-other-way"])
-        XCTAssertTrue(app.buttons["switch-done"].waitForExistence(timeout: 30), "the code was approved")
-        XCTAssertEqual(steps(app).label, "Switched")
+        XCTAssertTrue(app.descendants(matching: .any)["add-code"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.textFields["add-name"].exists)
+        XCTAssertEqual(app.buttons["add-other-way"].label, "Sign in with a password instead")
+        shot(app, "Add a server — a code from a signed-in device")
+        tap(app.buttons["add-other-way"])
+        XCTAssertTrue(app.textFields["add-name"].waitForExistence(timeout: 10), "back to the form")
+        tap(app.buttons["add-other-way"])
+        XCTAssertTrue(app.buttons["add-done"].waitForExistence(timeout: 30), "the code was approved")
+        XCTAssertEqual(steps(app).label, "Added")
     }
 
     @MainActor
-    func testSwitchServerCancelsAtEachStepAndStaysOnTheFirstServer() {
+    func testAddAServerCancelsAtEachStepAndStaysOnTheFirstServer() {
         let app = launch(["-settingsPage", "server"])
         defer { app.terminate() }
-        tap(app.buttons["server-switch"])
+        tap(app.buttons["server-add"])
         tap(app.buttons["task-cancel"])
         XCTAssertTrue(app.buttons["task-cancel"].waitForNonExistence(timeout: 10))
         XCTAssertTrue(text(app, "Living room server").exists)
 
-        tap(app.buttons["server-switch"])
+        tap(app.buttons["server-add"])
         chooseServer("Office Mac mini", in: app)
-        XCTAssertTrue(app.textFields["switch-name"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.textFields["add-name"].waitForExistence(timeout: 15))
         tap(app.buttons["task-cancel"])
-        XCTAssertTrue(app.textFields["switch-name"].waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.textFields["add-name"].waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.navigationBars["Server"].waitForExistence(timeout: 10))
         XCTAssertTrue(text(app, "Sam · admin").exists, "Cancel keeps Sam on Living room server")
     }
@@ -518,7 +523,17 @@ final class SettingsTasksTests: XCTestCase {
     private func tap(_ element: XCUIElement) {
         // A row low on a long page is below the fold until scrolled to.
         if element.waitForExistence(timeout: 10) {
-            for _ in 0..<6 where !element.isHittable { app(of: element).swipeUp(velocity: .slow) }
+            let app = app(of: element)
+            for _ in 0..<6 where !element.isHittable {
+                if pad, app.keyboards.firstMatch.exists {
+                    // An iPad's keyboard has the middle of the screen, where a
+                    // swipe on the app would start: drag the page above it.
+                    let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.33))
+                    from.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.19)))
+                } else {
+                    app.swipeUp(velocity: .slow)
+                }
+            }
         }
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND hittable == true"), object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed, "\(element) to tap")

@@ -11,7 +11,8 @@ import WMMModel
 /// (``NewEpisodeNotifier``), and keeps what both share: what iOS says of the
 /// app's notifications, its question, and opening a tapped notification's
 /// link once the app's navigator exists. A link the app published for
-/// another server opens nothing (``DeepLink/opening(_:signedInServer:)``).
+/// another server this device is signed in to switches to it first; one for
+/// any other server opens nothing (``DeepLink/opening(_:signedInServer:others:)``).
 @MainActor @Observable
 final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationRouter()

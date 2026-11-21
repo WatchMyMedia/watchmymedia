@@ -36,6 +36,8 @@ final class FakeGateway: OfflineGateway {
     var made: [OfflineRecord] = []
     var records: [String: OfflineRecord] = [:]
     var syncs: [(downloads: [SyncedDownload], progress: [OfflineProgress])] = []
+    /// Whose each sync was, in order.
+    var syncOwners: [OfflineOwner] = []
     /// What the next syncs answer; by default every record held, ready.
     var reply: ((_ downloads: [SyncedDownload]) -> SyncReply)?
     var syncError: Error?
@@ -47,12 +49,12 @@ final class FakeGateway: OfflineGateway {
     var createHook: (@MainActor () async -> Void)?
     var createError: Error?
     private var sessionListeners: [@MainActor () -> Void] = []
-    private var signOutHooks: [@MainActor @Sendable () async -> Void] = []
+    private var signOutHooks: [@MainActor @Sendable (OfflineOwner) async -> Void] = []
 
     func owner() -> OfflineOwner? { current }
     func signedIn(_ owner: OfflineOwner) -> Bool { signedInKeys.contains(owner.key) }
     func onSessionChange(_ listener: @escaping @MainActor () -> Void) { sessionListeners.append(listener) }
-    func beforeSignOut(_ hook: @escaping @MainActor @Sendable () async -> Void) { signOutHooks.append(hook) }
+    func beforeSignOut(_ hook: @escaping @MainActor @Sendable (_ owner: OfflineOwner) async -> Void) { signOutHooks.append(hook) }
 
     func select(_ owner: OfflineOwner) {
         current = owner
@@ -62,9 +64,17 @@ final class FakeGateway: OfflineGateway {
 
     /// Signs the current account out, as the app does: the hooks first, then the session goes.
     func signOut() async {
-        for hook in signOutHooks { await hook() }
+        for hook in signOutHooks { await hook(sam) }
         signedInKeys.remove(sam.key)
         current = nil
+        for listener in sessionListeners { listener() }
+    }
+
+    /// Removes a server that isn't the one in use, as the app does: the hooks
+    /// for its account while its session stands, then its sign-in goes.
+    func forget(_ owner: OfflineOwner) async {
+        for hook in signOutHooks { await hook(owner) }
+        signedInKeys.remove(owner.key)
         for listener in sessionListeners { listener() }
     }
 
@@ -103,6 +113,7 @@ final class FakeGateway: OfflineGateway {
     }
 
     func sync(_ owner: OfflineOwner, client: ClientInfo, sentAt: Date, downloads: [SyncedDownload], progress: [OfflineProgress]) async throws -> SyncReply {
+        syncOwners.append(owner)
         syncs.append((downloads, progress))
         if let syncError {
             // A 401 signs the account out, as the real gateway does.

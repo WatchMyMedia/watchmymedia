@@ -24,6 +24,8 @@ struct PosterCard: View {
     var width: CGFloat = 160
     /// The line under the title; the grid's by default.
     var line: String?
+    /// The server the title is on, when that isn't the one in use (a search result): named under the title.
+    var server: String?
     @Environment(\.isFocused) private var focused
     @Environment(\.displayScale) private var scale
 
@@ -36,11 +38,11 @@ struct PosterCard: View {
                 .overlay { FocusSheen(focused: focused) }
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .focusRim(focused, cornerRadius: 16)
-            CardCaption(title: item.title, line: line ?? item.gridSubtitle, focused: focused)
+            CardCaption(title: item.title, line: line ?? item.gridSubtitle, focused: focused, server: server)
         }
         .frame(width: width, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel([item.title, line ?? item.gridSubtitle, item.watched ? "Watched" : nil].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityLabel([item.title, server, line ?? item.gridSubtitle, item.watched ? "Watched" : nil].compactMap { $0 }.joined(separator: ", "))
     }
 
     @ViewBuilder private var badges: some View {
@@ -63,6 +65,8 @@ struct WideCard<Overlay: View>: View {
     var width: CGFloat = 320
     /// An episode not in the library: a dashed box instead of artwork.
     var missing = false
+    /// The server the card's title is on, when that isn't the one in use (a search result).
+    var server: String?
     @ViewBuilder var overlay: () -> Overlay
     @Environment(\.isFocused) private var focused
     @Environment(\.displayScale) private var scale
@@ -83,7 +87,7 @@ struct WideCard<Overlay: View>: View {
             .overlay { FocusSheen(focused: focused) }
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .focusRim(focused, cornerRadius: 16)
-            CardCaption(title: title, line: line, focused: focused)
+            CardCaption(title: title, line: line, focused: focused, server: server)
         }
         .frame(width: width, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -91,10 +95,12 @@ struct WideCard<Overlay: View>: View {
 }
 
 /// The title and line under a card; they move down while the card is lifted.
+/// A search result from another server names it between the two.
 struct CardCaption: View {
     let title: String
     let line: String?
     let focused: Bool
+    var server: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -102,6 +108,14 @@ struct CardCaption: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(focused ? .white : Color.tvTitle)
                 .lineLimit(1)
+            if let server {
+                // The icon inside the text: a focused borderless button enlarges an Image of its own (apple/AGENTS.md).
+                Text("\(Text(Image(systemName: "server.rack")).foregroundStyle(Palette.gold)) \(server)")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.tvTitle)
+                    .lineLimit(1)
+                    .padding(.top, 2)
+            }
             if let line {
                 Text(line).font(.system(size: 17)).foregroundStyle(Palette.muted).lineLimit(1)
             }

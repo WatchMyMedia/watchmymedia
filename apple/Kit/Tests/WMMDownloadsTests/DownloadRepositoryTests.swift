@@ -483,6 +483,38 @@ struct DownloadRepositoryTests {
         #expect(repo.downloads.isEmpty)
     }
 
+    /// Removing a server that isn't the one in use: its copies are reported
+    /// removed as its own account, while its session stands, and then deleted
+    /// from this device. They used to stay on disk until the next change of
+    /// the sign-in in use.
+    @Test func removingAServerThatIsNotInUseReportsItsCopiesRemovedThenDeletesThem() async throws {
+        let h = Harness()
+        let cabin = OfflineOwner(serverID: "cabin", userID: 7, baseURL: URL(string: "http://127.0.0.1:27601")!, apiLevel: offlineAPILevel)
+        h.gateway.current = cabin
+        h.gateway.signedInKeys.insert(cabin.key)
+        h.gateway.made = [record("cabin-copy", fileID: 42), record("home-copy", fileID: 43)]
+        let repo = h.make()
+        try await repo.download(DownloadChoice(fileID: 42, quality: .original))
+        h.engine.finish("cabin-copy")
+        h.gateway.select(sam)
+        try await repo.download(DownloadChoice(fileID: 43, quality: .original))
+        h.engine.finish("home-copy")
+        await settle()
+        #expect(repo.downloads.map(\.id) == ["home-copy"], "the list is the server in use's")
+        #expect(repo.elsewhere == [ServerDownloads(serverID: "cabin", count: 1, bytes: 3_900_000_000)], "the other server's are counted, not listed")
+
+        h.gateway.syncs = []
+        h.gateway.syncOwners = []
+        await h.gateway.forget(cabin)
+
+        #expect(h.gateway.syncOwners == [cabin], "reported as the account being removed")
+        #expect(h.gateway.syncs.first?.downloads == [SyncedDownload(id: "cabin-copy", state: .removed)])
+        #expect(h.engine.removed == ["cabin-copy"], "its bytes go at once")
+        #expect(h.store.state.records.map(\.id) == ["home-copy"])
+        #expect(repo.downloads.map(\.id) == ["home-copy"], "the server in use keeps its own")
+        #expect(repo.elsewhere.isEmpty)
+    }
+
     @Test func aRefusedSyncDeletesTheAccountsDownloads() async throws {
         let h = Harness()
         h.gateway.made = [record("aaaaaaaaaaaaaaaa", fileID: 42)]

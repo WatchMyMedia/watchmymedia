@@ -13,29 +13,32 @@ struct MainTabView: View {
     @Environment(AppFlow.self) private var flow
     @Environment(AppServices.self) private var services
     @Environment(CastService.self) private var cast
+    @Environment(ServersModel.self) private var servers
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var liveAvailable: Bool { services.liveTV.capabilities?.available == true }
     /// Live TV as the tabs are laid out: with it, Settings leaves the tab bar
-    /// for a sheet. A server switch keeps the layout it began in until it
+    /// for a sheet. Add a server keeps the layout it began in until it
     /// ends, since the account it changes can turn Live TV on or off midway.
-    /// Following it closed the sheet holding the switch: an iPad switching
-    /// from a server with a tuner to one without went back to Settings
+    /// Following it closed the sheet holding the task: an iPad adding a
+    /// server without a tuner from one with a tuner went back to Settings
     /// before Sign in, every time (2026-11-18).
-    private var liveTVLayout: Bool { flow.serverSwitch == nil ? liveAvailable : flow.serverSwitchLiveTV }
-    private var settingsPresented: Bool { liveTVLayout && (navigator.tab == .settings || flow.serverSwitch != nil) }
+    private var liveTVLayout: Bool { flow.addingServer == nil ? liveAvailable : flow.addingServerLiveTV }
+    private var settingsPresented: Bool { liveTVLayout && (navigator.tab == .settings || flow.addingServer != nil) }
     private var unavailableLivePresented: Bool {
         services.liveTV.capabilities != nil && !liveAvailable && navigator.tab == .liveTV && navigator.playbackPresentation == nil
     }
     private var tabs: [AppTab] { AppTab.phoneTabs(liveTV: liveTVLayout) }
 
     var body: some View {
-        TabView(selection: Binding(get: { (settingsPresented || (!liveTVLayout && navigator.tab == .liveTV)) ? .home : (flow.serverSwitch == nil ? navigator.tab : .settings) }, set: {
-            if flow.serverSwitch == nil { navigator.select($0) }
+        // Read here, in the body, so the tabs are drawn again when Servers opens.
+        let serversHere = ServersPresenter.current(navigator, flow, servers) == .tabs
+        TabView(selection: Binding(get: { (settingsPresented || (!liveTVLayout && navigator.tab == .liveTV)) ? .home : (flow.addingServer == nil ? navigator.tab : .settings) }, set: {
+            if flow.addingServer == nil { navigator.select($0) }
         })) {
             ForEach(tabs, id: \.self) { tab in
                 Tab(tab.title, systemImage: tab.systemImage, value: tab) {
-                    if flow.serverSwitch != nil && tab != .settings {
+                    if flow.addingServer != nil && tab != .settings {
                         // Do not keep unsigned browse views or their tasks
                         // alive while the Settings pane changes accounts.
                         Palette.ground
@@ -43,8 +46,8 @@ struct MainTabView: View {
                         // Its root beside the page it shows, with Link a TV as a sheet.
                         SettingsScreen()
                     } else {
-                        NavigationStack(path: Binding(get: { flow.serverSwitch == nil ? navigator.path(for: tab).pushed : [] }, set: {
-                            if flow.serverSwitch == nil { navigator.setPath($0.keepingTask(of: navigator.path(for: tab)), for: tab) }
+                        NavigationStack(path: Binding(get: { flow.addingServer == nil ? navigator.path(for: tab).pushed : [] }, set: {
+                            if flow.addingServer == nil { navigator.setPath($0.keepingTask(of: navigator.path(for: tab)), for: tab) }
                         })) {
                             root(tab)
                                 .safeAreaInset(edge: .bottom) { CastMiniController() }
@@ -53,7 +56,7 @@ struct MainTabView: View {
                         .toolbar { ToolbarItem(placement: .topBarTrailing) { CastButton() } }
                     }
                 }
-                .unavailableDuringServerSwitch(flow.serverSwitch != nil && tab != .settings)
+                .unavailableWhileAddingServer(flow.addingServer != nil && tab != .settings)
                 // Admins: what waits in the Inbox.
                 .badge(tab == .settings ? services.requests.options.inbox : 0)
             }
@@ -61,7 +64,7 @@ struct MainTabView: View {
         .tabViewStyle(.sidebarAdaptable)
         // The bar at the top first, as the iPad artboards draw it; the sidebar is a tap away.
         .defaultAdaptableTabBarPlacement(.tabBar)
-        .fullScreenCover(item: Binding(get: { flow.serverSwitch == nil ? navigator.playbackPresentation : nil }, set: { if $0 == nil { navigator.closePlayer() } }), onDismiss: continueOnDevice) { target in
+        .fullScreenCover(item: Binding(get: { flow.addingServer == nil ? navigator.playbackPresentation : nil }, set: { if $0 == nil { navigator.closePlayer() } }), onDismiss: continueOnDevice) { target in
             Group {
                 switch target {
                 case .file(let request): CastFilePresentation(request: request)
@@ -75,15 +78,30 @@ struct MainTabView: View {
                 else { SettingsSheet { destination($0) } }
             }
             .safeAreaInset(edge: .top, alignment: .trailing) {
-                Button("Done") { navigator.select(.home) }.padding().disabled(flow.serverSwitch != nil)
+                Button("Done") { navigator.select(.home) }.padding().disabled(flow.addingServer != nil)
             }
             .presentationBackground(Palette.ground)
-            .interactiveDismissDisabled(flow.serverSwitch != nil)
+            .interactiveDismissDisabled(flow.addingServer != nil)
+        }
+        // Servers, opened by a switch that couldn't reach its server, where no account
+        // button is on screen to hold it (a library tab, Search, a pushed page).
+        .sheet(isPresented: Binding(get: { serversHere }, set: { if !$0 { servers.presented = false } })) {
+            ServersView()
         }
         .modifier(TabShellKeys())
         // A note left by a page that has gone ("Deleted").
         .messageToast(Binding(get: { navigator.toast }, set: { navigator.toast = $0 }))
+        // "Now on Cabin server", after a switch.
+        .modifier(ServerNote())
         .fullScreenCover(isPresented: Binding(get: { cast.remotePresented }, set: { cast.remotePresented = $0 }), onDismiss: continueOnDevice) { CastRemoteScreen() }
+        // `-servers` (DEBUG) opens Servers at launch, for screenshots.
+        .task {
+            guard ScreenshotLaunch.has("-servers"), !flow.appliedServersLaunch else { return }
+            flow.appliedServersLaunch = true
+            // Once Home's bar holds the account button: a popover asked for before then never opens.
+            try? await Task.sleep(for: .seconds(1))
+            servers.presented = true
+        }
         // What the user may request, and the Inbox's count, follow the server's
         // events; Live TV follows its own.
         .task {
@@ -142,26 +160,26 @@ private struct TabShellKeys: ViewModifier {
             .background {
                 Button("Search") { navigator.findInSearch() }
                     .keyboardShortcut("f", modifiers: .command)
-                    .disabled(flow.serverSwitch != nil)
+                    .disabled(flow.addingServer != nil)
                     .opacity(0)
                     .frame(width: 0, height: 0)
                     .accessibilityHidden(true)
             }
             .onAppear { PlaceKeeping.restoreOnce(navigator, services: services) }
             .onChange(of: navigator.place) { _, _ in
-                if flow.serverSwitch == nil { PlaceKeeping.save(navigator, services: services) }
+                if flow.addingServer == nil { PlaceKeeping.save(navigator, services: services) }
             }
     }
 }
 
 private extension TabContent {
     @TabContentBuilder<TabValue>
-    func unavailableDuringServerSwitch(_ unavailable: Bool) -> some TabContent<TabValue> {
+    func unavailableWhileAddingServer(_ unavailable: Bool) -> some TabContent<TabValue> {
         if #available(iOS 18.4, *) {
             disabled(unavailable)
         } else {
             // Earlier iOS 18 releases cannot disable a tab. Hide the other
-            // destinations until the switch ends; Settings remains mounted.
+            // destinations until the task ends; Settings remains mounted.
             // The selection binding and content gates also stay in force.
             hidden(unavailable)
         }

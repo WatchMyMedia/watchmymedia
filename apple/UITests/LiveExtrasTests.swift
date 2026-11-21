@@ -212,9 +212,7 @@ final class LiveExtrasTests: XCTestCase {
         try XCTSkipIf(pad, "The iPad's Settings is a split view")
         let app = launch()
         defer { app.terminate() }
-        let profile = app.buttons["Settings"].firstMatch
-        XCTAssertTrue(profile.waitForExistence(timeout: 20))
-        profile.tap()
+        app.openSettings()
         // Live TV reminders are Playback's: Remind me is a menu.
         let playback = app.buttons["settings-playback"]
         XCTAssertTrue(playback.waitForExistence(timeout: 10))
@@ -239,9 +237,7 @@ final class LiveExtrasTests: XCTestCase {
         let app = launch(["-fakesLiveReminderSoon"])
         defer { app.terminate() }
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let profile = app.buttons["Settings"].firstMatch
-        XCTAssertTrue(profile.waitForExistence(timeout: 20))
-        profile.tap()
+        app.openSettings()
         XCTAssertTrue(app.buttons["settings-playback"].waitForExistence(timeout: 10))
         app.buttons["settings-playback"].tap()
         let notifications = app.buttons["playback-notifications"]

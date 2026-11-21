@@ -20,14 +20,21 @@ struct NewEpisodeCheckerTests {
     }
     let posted = Posted()
 
+    /// The servers this device is signed in to, as the app tells the checker.
+    final class SignedIn {
+        var servers: Set<String> = ["srv-a", "srv-b"]
+    }
+    let signedIn = SignedIn()
+
     func checker(permission: NotificationPermission = .allowed) -> NewEpisodeChecker {
-        let posted = posted, time = time
+        let posted = posted, time = time, signedIn = signedIn
         return NewEpisodeChecker(repository: repository, memory: memory, permission: { permission },
                                  post: { notice in
                                      posted.notices.append(notice)
                                      posted.after?(posted.notices.count)
                                  },
-                                 sleep: { try await time.sleep($0) })
+                                 sleep: { try await time.sleep($0) },
+                                 signedInServers: { signedIn.servers })
     }
 
     private func two() -> NewEpisodesPage {
@@ -105,22 +112,51 @@ struct NewEpisodeCheckerTests {
         #expect(repository.calls.isEmpty, "nothing asked the server")
     }
 
-    @Test func anotherServerOrPersonStartsFromNowAndASignOutForgets() async {
+    @Test func anotherServerStartsFromNowAndTheFirstKeepsItsPlace() async {
         memory.keep(cursor: "1840", for: "srv-a:1")
         repository.contextID = "srv-b:4"
         repository.serverID = "srv-b"
         repository.pages[""] = NewEpisodesPage(cursor: "12")
         #expect(await checker().check() == .started)
         #expect(memory.cursor(for: "srv-b:4") == "12")
-        #expect(memory.cursor(for: "srv-a:1") == nil)
+        #expect(memory.cursor(for: "srv-a:1") == "1840", "still signed in there: coming back announces what arrived meanwhile")
 
-        repository.contextID = nil
-        repository.serverID = nil
-        checker().accountChanged()
-        #expect(memory.cursor(for: "srv-b:4") == nil, "a sign-out forgets it")
+        // Back on the first server: its feed is asked after the place it kept.
+        repository.contextID = "srv-a:1"
+        repository.serverID = "srv-a"
+        repository.pages["1840"] = two()
+        #expect(await checker().check() == .checked(posted: 2))
+        #expect(memory.cursor(for: "srv-a:1") == "1846")
+        #expect(memory.cursor(for: "srv-b:4") == "12")
     }
 
-    /// Switch server picks the new server before signing in there, and
+    @Test func anotherPersonOnTheServerStartsFromNow() async {
+        memory.keep(cursor: "1840", for: "srv-a:1")
+        repository.contextID = "srv-a:2"
+        repository.pages[""] = NewEpisodesPage(cursor: "1900")
+        #expect(await checker().check() == .started)
+        #expect(memory.cursor(for: "srv-a:1") == nil)
+        #expect(memory.cursor(for: "srv-a:2") == "1900")
+    }
+
+    @Test func aServerSignedOutOfOrRemovedLosesItsPlace() async {
+        memory.keep(cursor: "1840", for: "srv-a:1")
+        memory.keep(cursor: "12", for: "srv-b:4")
+        // srv-b was removed while srv-a is in use.
+        signedIn.servers = ["srv-a"]
+        checker().accountChanged()
+        #expect(memory.cursor(for: "srv-b:4") == nil)
+        #expect(memory.cursor(for: "srv-a:1") == "1840")
+
+        // Signed out of the server in use.
+        repository.contextID = nil
+        repository.serverID = nil
+        signedIn.servers = []
+        checker().accountChanged()
+        #expect(memory.cursor(for: "srv-a:1") == nil, "a sign-out forgets it")
+    }
+
+    /// Add a server picks the new server before signing in there, and
     /// Cancel goes back: a check in between forgets nothing.
     @Test func aCheckBetweenServersDuringASwitchForgetsNothing() async {
         memory.keep(cursor: "1840", for: "srv-a:1")

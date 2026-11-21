@@ -109,7 +109,7 @@ final class LiveExtrasFixtureTests: XCTestCase {
 
         // The lead time is the server's preference.
         app.navigationBars.buttons.firstMatch.tap()
-        app.buttons["Settings"].firstMatch.tap()
+        app.openSettings()
         // Live TV reminders are Playback's: Remind me is a menu.
         let row = app.buttons["settings-playback"]
         XCTAssertTrue(row.waitForExistence(timeout: 10))

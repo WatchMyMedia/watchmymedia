@@ -6,11 +6,11 @@ import WMMFakes
 import WMMModel
 
 @MainActor
-@Suite struct ServerSwitchModelTests {
+@Suite struct AddServerModelTests {
     @Test func theAppsFakesRestoreTheOriginalAccountWhenSignInIsCancelled() async throws {
         FakeLatency.duration = .zero
         let services = AppServices.fake(client: .fakePad)
-        let model = try #require(ServerSwitchModel(servers: services.servers, auth: services.auth))
+        let model = try #require(AddServerModel(servers: services.servers, auth: services.auth))
         model.picker.address = FakeServers.officeMini.baseURL.absoluteString
         await model.connectToAddress()
         #expect(model.phase == .signingIn)
@@ -27,7 +27,7 @@ import WMMModel
     @Test func theAppsFakesSignInAndSwitchBetweenRememberedAccounts() async throws {
         FakeLatency.duration = .zero
         let services = AppServices.fake(client: .fakePad)
-        let model = try #require(ServerSwitchModel(servers: services.servers, auth: services.auth))
+        let model = try #require(AddServerModel(servers: services.servers, auth: services.auth))
         model.picker.address = FakeServers.officeMini.baseURL.absoluteString
         await model.connectToAddress()
         let form = try #require(model.signIn)
@@ -35,34 +35,58 @@ import WMMModel
         form.password = "password"
         await form.signIn()
         model.accountChanged()
-        #expect(model.outcome == .switched)
+        #expect(model.outcome == .added)
         #expect(services.auth.user?.name == "Robin")
 
-        let returning = try #require(ServerSwitchModel(servers: services.servers, auth: services.auth))
+        // Living room server is registered: its address isn't added again, and nothing changes.
+        let returning = try #require(AddServerModel(servers: services.servers, auth: services.auth))
         returning.picker.address = FakeServers.livingRoom.baseURL.absoluteString
         await returning.connectToAddress()
-        #expect(returning.outcome == .switched)
-        #expect(returning.signIn == nil)
-        #expect(services.auth.user?.name == "Sam")
-        #expect(services.servers.saved.first { $0.id == FakeServers.officeMini.id }?.signedIn == true)
+        #expect(returning.outcome == nil)
+        #expect(returning.phase == .picking)
+        #expect(returning.chooseProblem == SettingsNotice(
+            title: "Living room server is already added",
+            body: "Choose it in Servers to switch to it. You’re still on Office Mac mini."))
+        #expect(returning.picker.addressError == "Living room server is already added. Choose it in Servers to switch to it.")
+        #expect(services.auth.user?.name == "Robin")
+        #expect(services.servers.current?.server.id == FakeServers.officeMini.id)
+        #expect(services.servers.saved.first { $0.id == FakeServers.livingRoom.id }?.signedIn == true)
     }
 
     @Test func startsOnlyForASignedInAccount() {
         let account = SwitchAccount()
         account.users = [:]
-        #expect(ServerSwitchModel(servers: account, auth: account) == nil)
+        #expect(AddServerModel(servers: account, auth: account) == nil)
     }
 
-    @Test func rememberedSignInFinishesWithoutAForm() async throws {
+    /// A sign-in kept from before a reinstall, for a server this install has
+    /// never listed: choosing the server signs in at once.
+    @Test func aKeptSignInFinishesWithoutAForm() async throws {
         let account = SwitchAccount()
+        account.entries[FakeServers.officeMini.id] = nil
+        account.probeAnswer = FakeServers.officeMini
         account.users[FakeServers.officeMini.baseURL] = viewer
-        let model = try #require(ServerSwitchModel(servers: account, auth: account))
+        let model = try #require(AddServerModel(servers: account, auth: account))
         model.picker.address = FakeServers.officeMini.baseURL.absoluteString
         await model.connectToAddress()
-        #expect(model.outcome == .switched)
+        #expect(model.outcome == .added)
+        #expect(model.skippedSignIn)
         #expect(model.signIn == nil)
         #expect(account.user == viewer)
         #expect(account.users[FakeServers.livingRoom.baseURL] == sam)
+        #expect(model.finished(device: "iPhone", signedIn: 2)?.title == "Office Mac mini is added")
+    }
+
+    @Test func anAddressThatReachesARegisteredServerIsNotAddedAgain() async throws {
+        let account = SwitchAccount()
+        account.users[FakeServers.officeMini.baseURL] = viewer
+        let model = try #require(AddServerModel(servers: account, auth: account))
+        model.picker.address = FakeServers.officeMini.baseURL.absoluteString
+        await model.connectToAddress()
+        #expect(model.phase == .picking)
+        #expect(account.selected.isEmpty, "nothing is chosen")
+        #expect(model.chooseProblem?.title == "Office Mac mini is already added")
+        #expect(account.user == sam)
     }
 
     @Test func newServerWaitsForPasswordAndKeepsTheOriginalSignIn() async throws {
@@ -76,7 +100,7 @@ import WMMModel
         form.password = "password"
         await form.signIn()
         model.accountChanged()
-        #expect(model.outcome == .switched)
+        #expect(model.outcome == .added)
         #expect(account.user == viewer)
         #expect(account.users[FakeServers.livingRoom.baseURL] == sam)
     }
@@ -89,7 +113,7 @@ import WMMModel
         #expect(model.outcome == nil)
         account.users[FakeServers.remoteHome.baseURL] = viewer
         model.accountChanged()
-        #expect(model.outcome == .switched)
+        #expect(model.outcome == .added)
     }
 
     @Test func cancellingTheListDoesNotReselectOrSignOut() async throws {
@@ -237,9 +261,85 @@ import WMMModel
         #expect(account.user == sam)
     }
 
-    private func fixture() throws -> (SwitchAccount, ServerSwitchModel) {
+    // MARK: Registered servers
+
+    @Test func serversAlreadyRegisteredLeaveThePickerAndAreNamedUnderIt() async throws {
+        FakeLatency.duration = .zero
+        let servers = FakeServerRepository(several: true)
+        let auth = FakeAuthRepository(servers: servers)
+        let model = try #require(AddServerModel(servers: servers, auth: auth))
+        model.picker.startDiscovery()
+        // Living room server announces itself, and so does the Office Mac mini; only the second is offered.
+        #expect(model.picker.found.map(\.name) == ["Living room server", "Office Mac mini"])
+        #expect(model.found.map(\.name) == ["Office Mac mini"])
+        #expect(model.remembered.isEmpty, "Cabin server and Den server are registered")
+        #expect(model.alreadyAdded == "Already added: Living room server, Cabin server, Den server.")
+
+        // A server chosen once and never signed in to is still offered.
+        try await servers.select(FakeServers.remoteHome)
+        try await servers.select(FakeServers.livingRoom)
+        let again = try #require(AddServerModel(servers: servers, auth: auth))
+        #expect(again.remembered.map(\.name) == ["home.watchmy.media"])
+    }
+
+    @Test func addingAServerEndsOnItWithEveryOtherStillSignedIn() async throws {
+        FakeLatency.duration = .zero
+        let servers = FakeServerRepository(several: true)
+        let auth = FakeAuthRepository(servers: servers)
+        let model = try #require(AddServerModel(servers: servers, auth: auth))
+        model.picker.startDiscovery()
+        await model.choose(try #require(model.found.first))
+        #expect(model.phase == .signingIn)
+        let form = try #require(model.signIn)
+        form.name = "Sam"
+        form.password = "password"
+        await form.signIn()
+        model.accountChanged()
+        #expect(model.outcome == .added)
+        #expect(model.addedServer?.id == FakeServers.officeMini.id)
+        #expect(servers.current?.server.id == FakeServers.officeMini.id, "the new server is the one in use")
+        let signedIn = servers.registered.filter(\.signedIn)
+        #expect(signedIn.map(\.server.name) == ["Office Mac mini", "Living room server", "Cabin server", "Den server"])
+        let words = try #require(model.finished(device: "iPhone", signedIn: signedIn.count))
+        #expect(words.title == "Office Mac mini is added")
+        #expect(words.whatChanged == ["This iPhone is signed in to 4 servers. Search looks in all of them."])
+    }
+
+    @Test func aFailureAtAnyStepLeavesTheAppOnTheServerItWasOn() async throws {
+        FakeLatency.duration = .zero
+        let servers = FakeServerRepository(several: true)
+        let auth = FakeAuthRepository(servers: servers)
+        let model = try #require(AddServerModel(servers: servers, auth: auth))
+        // Den server's address doesn't answer.
+        model.picker.address = FakeServers.den.baseURL.absoluteString
+        await model.connectToAddress()
+        #expect(model.phase == .picking)
+        #expect(model.chooseProblem?.body.hasSuffix("You’re still on Living room server.") == true)
+        #expect(servers.current?.server.id == FakeServers.livingRoom.id)
+        #expect(auth.user?.name == "Sam")
+    }
+
+    /// A registered server whose sign-in ended, chosen in Servers: the same steps, starting on Sign in.
+    @Test func signingInAgainToARegisteredServerStartsOnSignIn() async throws {
+        FakeLatency.duration = .zero
+        let servers = FakeServerRepository()
+        let auth = FakeAuthRepository(servers: servers)
+        let model = try #require(AddServerModel(servers: servers, auth: auth))
+        #expect(!model.remembered.contains { $0.id == FakeServers.remoteHome.id }, "registered, so not offered as new")
+        await model.signIn(to: FakeServers.remoteHome.id)
+        #expect(model.phase == .signingIn)
+        #expect(model.signingInAgain)
+        #expect(model.signInTitle == "Sign in to home.watchmy.media")
+        #expect(model.signIn?.codeSignIn == true, "it takes no passwords from apps")
+        await model.cancel()
+        #expect(model.outcome == .cancelled)
+        #expect(servers.current?.server.id == FakeServers.livingRoom.id)
+        #expect(auth.user?.name == "Sam")
+    }
+
+    private func fixture() throws -> (SwitchAccount, AddServerModel) {
         let account = SwitchAccount()
-        let model = try #require(ServerSwitchModel(servers: account, auth: account))
+        let model = try #require(AddServerModel(servers: account, auth: account))
         model.picker.address = FakeServers.officeMini.baseURL.absoluteString
         return (account, model)
     }
@@ -257,6 +357,8 @@ final class SwitchAccount: ServerRepository, AuthRepository {
     var probed: [String] = []
     var selectError: (any Error)?
     var probeError: (any Error)?
+    /// What answers at every address, when set: another server than the one remembered there.
+    var probeAnswer: Server?
     var holdProbe = false
     var probeGate: CheckedContinuation<Void, Never>?
     var discovered: [DiscoveredServer] = []
@@ -276,8 +378,17 @@ final class SwitchAccount: ServerRepository, AuthRepository {
     func localAddress() async -> URL? { nil }
     func probe(_ address: String) async throws -> Server {
         probed.append(address)
-        if holdProbe { await withCheckedContinuation { probeGate = $0 } }
+        if holdProbe {
+            // Held until released, or until the caller gives up on it, as a request is.
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { probeGate = $0 }
+            } onCancel: {
+                Task { @MainActor in self.releaseProbe() }
+            }
+            try Task.checkCancellation()
+        }
         if let probeError { throw probeError }
+        if let probeAnswer { return probeAnswer }
         return try #require(entries.values.first { $0.baseURL.absoluteString == address })
     }
     func releaseProbe() { probeGate?.resume(); probeGate = nil }

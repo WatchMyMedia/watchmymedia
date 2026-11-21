@@ -5,8 +5,10 @@ import WMMFeatures
 /// The Home Screen quick actions (a long press on the app's icon) and the
 /// App Shortcuts (Siri, Spotlight, the Shortcuts app) for Search, Live TV,
 /// Downloads and Continue watching. Each opens
-/// one of the app's links, published for the server signed in, so
-/// it opens nothing for another server; signed out, the app opens as it is.
+/// one of the app's links, published for the server signed in: one left
+/// from another server this device is signed in to switches to that server
+/// first, one for any other server opens nothing, and signed out, the app
+/// opens as it is.
 /// The quick actions show only what this sign-in has: Live TV when the
 /// server offers it, Downloads when they are on. Continue watching opens
 /// Home at its top, where that row is.

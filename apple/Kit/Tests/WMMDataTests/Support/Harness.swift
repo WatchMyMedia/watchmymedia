@@ -23,7 +23,7 @@ struct Reply: Sendable {
 /// order, since DataServices makes calls of its own in the background (it
 /// checks the session and loads preferences after each sign-in), as
 /// android/core/data/src/test/.../TestServer.kt does. Unrouted requests get
-/// 404; /api/auth/me and /api/me/preferences have defaults.
+/// 404; /api/server, /api/auth/me and /api/me/preferences have defaults.
 final class Router: Sendable {
     let server = StubServer()
     /// The stub's session, reading streamed request bodies to the end first.
@@ -75,6 +75,8 @@ final class Router: Sendable {
         if let next { return next }
         if let fixed = fixed.withLock({ $0[route] }) { return fixed }
         switch route {
+        // Asked before a sign-out or a removal sends anything: it is the test server (``Harness/testServer``).
+        case "GET /api/server": return .json(#"{"id":"srv-test","name":"Test server","version":"1.0.0","apiLevel":1,"setupRequired":false,"turnstile":false}"#)
         case "GET /api/auth/me": return .json(#"{"id":2,"name":"viewer","isAdmin":false}"#)
         case "GET /api/me/preferences": return .json(Fixtures.preferences)
         default: return .problem(404, "no route for \(route) in this test")
@@ -228,16 +230,20 @@ func eventually(_ timeout: Duration = .seconds(5), _ condition: () -> Bool) asyn
 
 /// A network path the test turns off and on.
 final class FakeNetworkPath: NetworkPath, @unchecked Sendable {
-    private var continuation: AsyncStream<Bool>.Continuation?
+    private let continuations = Mutex<[AsyncStream<Bool>.Continuation]>([])
 
     /// Every change in order, so a test that turns the network off and on
-    /// again needn't wait between them for the first to be read.
+    /// again needn't wait between them for the first to be read. Each
+    /// caller hears every change: the event stream follows the path, and so
+    /// does what is remembered of the other servers' answers.
     func updates() -> AsyncStream<Bool> {
         AsyncStream { continuation in
-            self.continuation = continuation
+            continuations.withLock { $0.append(continuation) }
             continuation.yield(true)
         }
     }
 
-    func set(_ satisfied: Bool) { continuation?.yield(satisfied) }
+    func set(_ satisfied: Bool) {
+        for continuation in continuations.withLock({ $0 }) { continuation.yield(satisfied) }
+    }
 }

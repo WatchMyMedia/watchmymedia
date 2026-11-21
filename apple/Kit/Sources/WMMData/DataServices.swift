@@ -58,6 +58,8 @@ public final class DataServices {
     let preferencesRepository: RealPreferencesRepository
     let events: ServerEvents
     let serverInfo: ServerInfoReader
+    /// Follows the device's network path for as long as these services live.
+    private var networkWatch: Task<Void, Never>?
 
     /// - Parameters:
     ///   - client: how this device describes itself; the ID is replaced by the
@@ -66,7 +68,8 @@ public final class DataServices {
     ///   - apiCache: `session`'s HTTP cache, emptied whenever the sign-in in
     ///     use changes (another server or account, or signed out), so one
     ///     account's replies are never on disk under another.
-    ///   - network: the device's path, which the event stream follows.
+    ///   - network: the device's path, which the event stream follows; a
+    ///     change of it forgets which other servers answered as themselves.
     init(
         storage: any LocalStorage,
         client: ClientInfo,
@@ -91,7 +94,8 @@ public final class DataServices {
             probeTimeout: tuning.probeTimeout, localAddressTimeout: tuning.localAddressTimeout, now: tuning.now, reader: serverInfo
         )
         authRepository = RealAuthRepository(store: store, minimumPoll: tuning.minimumPoll, now: tuning.now)
-        libraryRepository = RealLibraryRepository(store: store, events: events)
+        libraryRepository = RealLibraryRepository(store: store, events: events, askOther: { [serverRepository] in try await serverRepository.askOther($0) })
+        store.answersAsItself = { [serverRepository] in (try? await serverRepository.identify($0)) != nil }
         requestsRepository = RealRequestsRepository(store: store, events: events)
         preferencesRepository = RealPreferencesRepository(store: store)
         servers = serverRepository
@@ -100,13 +104,13 @@ public final class DataServices {
         requests = requestsRepository
         liveTV = RealLiveTVRepository(store: store, events: events)
         preferences = preferencesRepository
-        offline = RealOfflineGateway(store: store, auth: authRepository)
+        offline = RealOfflineGateway(store: store)
         casting = RealCastGateway(store: store, reader: serverInfo)
         rows = RealRowsRepository(store: store, events: events)
         follows = RealFollowsRepository(store: store, events: events)
         images = CachedImageLoader(
             session: imageSession ?? session,
-            current: { [weak store] in try? store?.signedIn() }
+            signIn: { [weak store] url in store?.signedIn(for: url) }
         )
 
         // On each sign-in (and at launch, when signed in): check the session is still good and load the
@@ -121,6 +125,20 @@ public final class DataServices {
         let servers = serverRepository
         events.onReconnect = { [weak servers] in await servers?.refreshCurrent(fresh: true) }
         if store.currentCredential != nil { Task { await loadSession() } }
+        // On another network a kept address can be another machine: the other
+        // servers are asked which they are again before their sign-ins go out.
+        if let network {
+            networkWatch = Task { [weak store] in
+                var first = true
+                for await _ in network.updates() {
+                    if first { first = false } else { store?.forgetAnswers() }
+                }
+            }
+        }
+    }
+
+    isolated deinit {
+        networkWatch?.cancel()
     }
 
     /// The API's own HTTP cache under Caches,

@@ -8,14 +8,17 @@ import WMMModel
 final class RealLibraryRepository: LibraryRepository {
     private let store: LocalStore
     private let events: ServerEvents
+    /// Asks a server that isn't in use which server it is, before its sign-in goes to it.
+    private let askOther: @MainActor (_ serverID: String) async throws -> Void
 
     private static let maxPage = 1000
     private static let maxSearch = 100
     private static let maxShowGuesses = 3
 
-    init(store: LocalStore, events: ServerEvents) {
+    init(store: LocalStore, events: ServerEvents, askOther: @escaping @MainActor (_ serverID: String) async throws -> Void) {
         self.store = store
         self.events = events
+        self.askOther = askOther
     }
 
     /// From ``rowsAPILevel`` Home comes arranged: its rows in the person's
@@ -86,6 +89,43 @@ final class RealLibraryRepository: LibraryRepository {
         guard !q.isEmpty else { return SearchResults() }
         let r = try await store.call { try await $0.search(query: .init(q: q)).ok.body.json }
         return SearchResults(movies: r.movies.map(\.browseItem), shows: r.shows.map(\.browseItem), episodes: r.episodes.map(\.card))
+    }
+
+    /// GET /api/search on a server that isn't in use, through an API built
+    /// for that server alone: its address, its token (``LocalStore/other(serverID:)``).
+    /// First the server is asked, with no sign-in, which server it is
+    /// (``RealServerRepository/askOther(_:)``), once while its answer
+    /// stands: the sign-in goes only to an address where the remembered
+    /// server answered. A 401 there forgets that sign-in and leaves the one
+    /// in use alone.
+    func search(_ text: String, serverID: String) async throws -> SearchResults {
+        let q = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxSearch))
+        guard !q.isEmpty else { return SearchResults() }
+        try await askOther(serverID)
+        do {
+            let r = try await store.other(serverID: serverID).api.call { try await $0.search(query: .init(q: q)).ok.body.json }
+            return SearchResults(movies: r.movies.map(\.browseItem), shows: r.shows.map(\.browseItem), episodes: r.episodes.map(\.card))
+        } catch {
+            // Whatever answered a moment ago may not be there now: Try again asks it again first.
+            if !(error is CancellationError), !Task.isCancelled { store.forgetAnswer(serverID) }
+            throw error
+        }
+    }
+
+    /// Asks a server that isn't in use which server it is, without
+    /// searching it: its pictures go on loading with its sign-in.
+    func askServer(_ serverID: String) async throws {
+        try await askOther(serverID)
+    }
+
+    func answerStands(serverID: String) -> Bool {
+        store.answered(serverID)
+    }
+
+    /// The visit to Search ended: the other servers' answers are forgotten,
+    /// and each is asked again before its sign-in next goes to it.
+    func searchVisitEnded() {
+        store.forgetAnswers()
     }
 
     /// Each mark tells every listener what changed, and the server's echo of
@@ -228,9 +268,15 @@ final class RealLibraryRepository: LibraryRepository {
     }
 
     func imageURL(_ path: String?, size: ImageSize) -> URL? {
-        guard let p = Mapping.nonBlank(path?.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let base = store.current?.server.baseURL
-        else { return nil }
+        Self.imageURL(path, size: size, base: store.current?.server.baseURL)
+    }
+
+    func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL? {
+        Self.imageURL(path, size: size, base: store.state.servers.first { $0.server.id == serverID }?.server.baseURL)
+    }
+
+    private static func imageURL(_ path: String?, size: ImageSize, base: URL?) -> URL? {
+        guard let p = Mapping.nonBlank(path?.trimmingCharacters(in: .whitespacesAndNewlines)), let base else { return nil }
         return URL(string: base.absoluteString + "/api/images/\(size.rawValue)" + (p.hasPrefix("/") ? p : "/" + p))
     }
 

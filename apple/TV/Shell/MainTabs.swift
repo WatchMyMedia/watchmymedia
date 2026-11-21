@@ -7,10 +7,25 @@ import WMMUI
 /// Home, TV Shows, Movies and Settings, each tab with its own stack. Menu
 /// pops a stack, and from a section's root goes to Home (from Settings'
 /// list, to the top bar); the player covers everything.
+///
+/// The bar's last tab is the account: the person, on the server in use. It
+/// takes focus as any tab does (Right from Settings), and its page is
+/// Servers (``ServersScreen``), which Menu closes for Home. It is a tab because nothing else beside the
+/// tab bar can take focus from it: on tvOS 27.2 focus never left the tabs
+/// sideways, for a button drawn in the page at the bar's height or for one
+/// in the bar's own trailing accessory (which draws, and stays out of reach).
 struct MainTabs: View {
     @Environment(Navigator.self) private var navigator
     @Environment(AppServices.self) private var services
     @Environment(LiveExtrasStore.self) private var extras
+    @Environment(ServersModel.self) private var servers
+    @Environment(AppFlow.self) private var flow
+
+    /// What the tab bar selects: one of the app's tabs, or the account, whose page is Servers.
+    private enum Selection: Hashable {
+        case tab(AppTab)
+        case servers
+    }
 
     private var liveAvailable: Bool { services.liveTV.capabilities?.available == true }
     private var tabs: [AppTab] {
@@ -20,11 +35,35 @@ struct MainTabs: View {
         return tabs
     }
 
+    /// Servers is open while the account tab is the one chosen (`ServersModel.presented`):
+    /// a switch, Add a server and Manage servers close it, and a server that
+    /// didn't answer from somewhere else opens it, by setting that.
+    private var selection: Binding<Selection> {
+        Binding(get: { servers.presented ? .servers : .tab(navigator.tab) }, set: { chosen in
+            switch chosen {
+            case .servers:
+                servers.presented = true
+            case .tab(let tab):
+                guard servers.presented else { return navigator.select(tab) }
+                servers.presented = false
+                // Back on the tab it left: its pages stay as they were (choosing a tab again goes to its root).
+                if tab != navigator.tab { navigator.select(tab) }
+            }
+        })
+    }
+
     var body: some View {
-        TabView(selection: Binding(get: { navigator.tab }, set: { navigator.select($0) })) {
-            Tab(value: AppTab.search, role: .search) { stack(.search) }
+        TabView(selection: selection) {
+            Tab(value: Selection.tab(.search), role: .search) { stack(.search) }
             ForEach(tabs, id: \.self) { tab in
-                Tab(value: tab) { stack(tab) } label: { label(tab) }
+                Tab(value: Selection.tab(tab)) { stack(tab) } label: { label(tab) }
+            }
+            if let user = services.auth.user {
+                Tab(value: Selection.servers) { ServersScreen() } label: {
+                    // The server in use when this Apple TV has several, else the person.
+                    Label(Self.tabName(servers.currentName ?? user.name, room: tabs.contains(.liveTV) ? 12 : 22), systemImage: "person.crop.circle.fill")
+                        .accessibilityLabel(ServersWords.accountLabel(user: user.name, server: servers.currentName))
+                }
             }
         }
         .fullScreenCover(item: Binding(get: { navigator.playbackPresentation }, set: { if $0 == nil { navigator.closePlayer() } })) { target in
@@ -57,6 +96,30 @@ struct MainTabs: View {
                 await services.requests.refreshOptions()
             }
         }
+        #if DEBUG
+        // `-servers` opens Servers at launch, and `-serversChoose <server id>` chooses that
+        // server in it, for screenshots and UI checks. Once: a switch rebuilds these tabs.
+        .task {
+            let arguments = ProcessInfo.processInfo.arguments
+            guard !flow.appliedServersLaunch, arguments.contains("-servers") || arguments.contains("-serversChoose") else { return }
+            flow.appliedServersLaunch = true
+            servers.presented = true
+            if let i = arguments.firstIndex(of: "-serversChoose"), arguments.indices.contains(i + 1),
+               let row = servers.rows.first(where: { $0.id == arguments[i + 1] }) {
+                await servers.choose(row)
+            }
+        }
+        #endif
+    }
+
+    /// A server's or a person's name as the account tab shows it: cut short
+    /// when it is longer than the bar has `room` for. The bar is 1260 pt at
+    /// its widest and scrolls past that, which would leave the last tab, this
+    /// one, cut off at its edge: with Live TV's tab there is room for about
+    /// twelve characters, without it about twenty-two. The tab's spoken label
+    /// says the whole name.
+    private static func tabName(_ name: String, room: Int) -> String {
+        name.count > room ? name.prefix(room - 1).trimmingCharacters(in: .whitespaces) + "…" : name
     }
 
     /// The tab's name; for admins, Settings with what waits in the Inbox in
@@ -70,7 +133,10 @@ struct MainTabs: View {
     private func stack(_ tab: AppTab) -> some View {
         NavigationStack(path: Binding(get: { navigator.path(for: tab) }, set: { navigator.setPath($0, for: tab) })) {
             root(tab)
-                .navigationDestination(for: Route.self) { destination($0, tab: tab) }
+                .navigationDestination(for: Route.self) { route in
+                    // The page a switch landed on takes focus, so Menu goes back from it.
+                    destination(route, tab: tab).modifier(FocusOnArrival(wanted: flow.landed == AppFlow.Landing(tab: tab, route: route)))
+                }
                 // Menu at a section's root goes Home. At Home's (and on the search
                 // keyboard) it is the system's, and in Settings, whose page goes back
                 // to its list itself, the list's Menu is the system's: the top bar.
@@ -108,13 +174,39 @@ struct MainTabs: View {
     }
 }
 
-/// The lockup at the left of the tab bar and the account's initial at its
-/// right. Each page puts them at the top of its scrolling
-/// content (``SwiftUICore/View/tabBarAccessories()``), so they scroll away
-/// with the tab bar.
-struct TabBarAccessories: View {
-    @Environment(AppServices.self) private var services
+/// Puts focus into a page that the tabs were rebuilt on (a search result on
+/// another server opens its title there): new tabs start with focus in the
+/// tab bar, and Menu from the tab bar leaves the app, where the person
+/// expects to go back to the results. Asked until the page has loaded and
+/// taken it.
+private struct FocusOnArrival: ViewModifier {
+    let wanted: Bool
 
+    func body(content: Content) -> some View {
+        if wanted { content.modifier(MovesFocusIn()) } else { content }
+    }
+
+    private struct MovesFocusIn: ViewModifier {
+        @FocusState private var holdsFocus: Bool
+
+        func body(content: Content) -> some View {
+            content
+                .focused($holdsFocus)
+                .task {
+                    for _ in 0..<24 {
+                        if holdsFocus { break }
+                        holdsFocus = true
+                        try? await Task.sleep(for: .milliseconds(150))
+                    }
+                }
+        }
+    }
+}
+
+/// The lockup at the left of the tab bar. Each page puts it at the top of
+/// its scrolling content, so it scrolls away with the tab bar. The account
+/// is the bar's last tab, since it takes focus.
+struct TabBarAccessories: View {
     var body: some View {
         HStack {
             HStack(spacing: 12) {
@@ -122,14 +214,6 @@ struct TabBarAccessories: View {
                 Wordmark(size: 22)
             }
             Spacer()
-            if let user = services.auth.user {
-                Text(String(user.name.prefix(1)).uppercased())
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Palette.text)
-                    .frame(width: 48, height: 48)
-                    .background(Palette.burgundy, in: Circle())
-                    .accessibilityLabel("Signed in as \(user.name)")
-            }
         }
         .padding(.horizontal, TVLayout.gutter)
         // Centred on the system tab bar, 80 pt from the top of the screen.
@@ -140,8 +224,8 @@ struct TabBarAccessories: View {
 
 /// A page under the tab bar: a vertical scroll view whose content runs
 /// from the screen's edges (the artboards' 90 pt gutter is from the edge, not
-/// tvOS's safe area), with the lockup and the account's initial beside the
-/// tab bar, scrolling away with it. A page that keeps something below the
+/// tvOS's safe area), with the lockup beside the tab bar, scrolling away
+/// with it. A page that keeps something below the
 /// fold passes `fold`, which says how tall the first screen is.
 struct TabPage<Content: View>: View {
     var fold: Binding<PageFold>?

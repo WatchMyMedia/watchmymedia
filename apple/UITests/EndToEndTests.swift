@@ -118,12 +118,10 @@ final class EndToEndTests: XCTestCase {
         }
 
         // Settings: this phone is among the signed-in devices.
-        let settings = app.buttons["Settings"].firstMatch
         // Dismissing the landscape player rotates back asynchronously. An
-        // existing tab can still have an off-screen hit point until it settles.
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: settings)
-        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 15), .completed)
-        settings.tap()
+        // existing tab can still have an off-screen hit point until it settles,
+        // so this waits until the way to Settings can be tapped.
+        app.openSettings()
         // Signed-in devices are on Account & devices.
         let account = app.buttons["settings-account"]
         XCTAssertTrue(account.waitForExistence(timeout: 15), "Settings finished opening")

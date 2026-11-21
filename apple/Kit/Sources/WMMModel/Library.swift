@@ -748,6 +748,21 @@ extension LibraryRepository {
 
     /// A repository that can't ask has none.
     public func relatedRows(_ title: RelatedTitle) async throws -> [ScreenRow] { [] }
+
+    /// A repository for one server alone has no other to ask.
+    public func search(_ text: String, serverID: String) async throws -> SearchResults { throw SignedOutError() }
+
+    /// A repository for one server alone has no other's pictures.
+    public func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL? { nil }
+
+    /// A repository for one server alone asked no other.
+    public func searchVisitEnded() {}
+
+    /// A repository for one server alone has no other to ask.
+    public func askServer(_ serverID: String) async throws {}
+
+    /// A repository for one server alone heard from no other.
+    public func answerStands(serverID: String) -> Bool { false }
 }
 
 /// The page whose related titles are asked for: a
@@ -804,6 +819,47 @@ public protocol LibraryRepository: AnyObject {
     /// The full URL of a TMDB image path at `size`, or nil for no image. The
     /// image loader adds the sign-in, so the URL carries no token.
     func imageURL(_ path: String?, size: ImageSize) -> URL?
+
+    /// Search on a server this device is signed in to that isn't the one in
+    /// use, for search across servers: GET /api/search at that server's own
+    /// address with its own sign-in, never the current server's. Every id in
+    /// the reply is that server's.
+    ///
+    /// The address kept for a server is only where it was last seen, and on
+    /// another network it can be someone else's machine. So before the
+    /// sign-in is sent the server is asked, with no sign-in, which server
+    /// it is, and the sign-in goes only when it answers as the one
+    /// remembered. It is asked once for a visit to Search, not for every
+    /// search (``searchVisitEnded()``): a search that is cancelled leaves
+    /// the question out, and the next waits for the same answer. Its
+    /// pictures load with its sign-in only while that answer stands, and a
+    /// search there that fails forgets it, so trying again asks again.
+    ///
+    /// Throws ``SignedOutError`` when no sign-in is kept for it,
+    /// ``ServerTooOldError`` when it is too old for this app, else
+    /// ``APIError``, which nothing answering, or another server answering at
+    /// its address, also is.
+    func search(_ text: String, serverID: String) async throws -> SearchResults
+
+    /// The visit to Search ended (Search left the screen, or the app did):
+    /// the other servers' answers to which server they are are forgotten,
+    /// and each is asked again before its sign-in next goes to it.
+    func searchVisitEnded()
+
+    /// Asks a server that isn't the one in use which server it is, as
+    /// ``search(_:serverID:)`` does first, without searching it: back on
+    /// Search, the servers whose titles are listed are asked again, so
+    /// their pictures go on loading. Throws as that search would.
+    func askServer(_ serverID: String) async throws
+
+    /// Whether `serverID`, which isn't the one in use, has answered as
+    /// itself on this visit to Search and on this network: a switch to it
+    /// then needn't ask it again.
+    func answerStands(serverID: String) -> Bool
+
+    /// ``imageURL(_:size:)`` on a server that isn't the one in use: a picture
+    /// loads from the server its title is on, with that server's sign-in.
+    func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL?
 
     /// Yields when watch state or the library changed (a mark watched here, or
     /// the server's watch.changed and library.changed events), so screens

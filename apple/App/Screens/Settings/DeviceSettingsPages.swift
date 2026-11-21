@@ -17,6 +17,7 @@ struct AccountSettingsPage: View {
     @Environment(AppServices.self) private var services
     @Environment(AppFlow.self) private var flow
     @Environment(Navigator.self) private var navigator
+    @Environment(ServersModel.self) private var servers
     @State private var confirmingSignOut = false
 
     var body: some View {
@@ -172,7 +173,8 @@ struct AccountSettingsPage: View {
             .accessibilityIdentifier("account-signOut")
             // A dialog from the button that asked: a popover on iPhone and iPad alike.
             .confirmationDialog(words.title, isPresented: $confirmingSignOut, titleVisibility: .visible) {
-                Button(words.confirm, role: .destructive) { Task { await model.signOut() } }
+                // With another server signed in to, the app moves to it rather than to this one's sign-in.
+                Button(words.confirm, role: .destructive) { [servers, model] in Task { await servers.signingOut { await model.signOut() } } }
                 Button(words.keep, role: .cancel) {}
             } message: {
                 Text(words.message)

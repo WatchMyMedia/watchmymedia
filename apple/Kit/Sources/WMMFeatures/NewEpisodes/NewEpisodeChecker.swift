@@ -48,6 +48,7 @@ public final class NewEpisodeChecker {
     private let permission: @MainActor () async -> NotificationPermission
     private let post: @MainActor (NewEpisodeNotice) async -> Void
     private let sleep: @MainActor (Duration) async throws -> Void
+    private let signedInServers: (@MainActor () -> Set<String>)?
     private var running: Task<Outcome, Never>?
     /// A check was asked for while one ran: it runs again when that one ends.
     private var again = false
@@ -56,15 +57,19 @@ public final class NewEpisodeChecker {
     ///   - permission: what the system says of the app's notifications now.
     ///   - post: shows one notification; they come in the order to post them.
     ///   - sleep: waits out the library's three minutes; tests pass a clock they move.
+    ///   - signedInServers: the ids of the servers this device is signed in
+    ///     to, whose places are kept; without it every server's is kept.
     public init(repository: any FollowsRepository, memory: NewEpisodeMemory,
                 permission: @escaping @MainActor () async -> NotificationPermission,
                 post: @escaping @MainActor (NewEpisodeNotice) async -> Void,
-                sleep: @escaping @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
+                sleep: @escaping @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+                signedInServers: (@MainActor () -> Set<String>)? = nil) {
         self.repository = repository
         self.memory = memory
         self.permission = permission
         self.post = post
         self.sleep = sleep
+        self.signedInServers = signedInServers
     }
 
     /// Checks. A caller while a check runs shares it, and it runs once more
@@ -89,11 +94,14 @@ public final class NewEpisodeChecker {
         return outcome
     }
 
-    /// A real sign-out, or a sign-in to another server or as another person
-    /// (not a Switch server that was cancelled): what was kept for anyone
-    /// else goes, so the next sign-in starts from now.
+    /// A sign-out, a server removed, another server in use or another
+    /// person signed in (not an Add a server that was cancelled): the place
+    /// of each server still signed in to is kept, so coming back to it
+    /// announces what arrived meanwhile; what was kept for a server signed
+    /// out of or removed, or for another person on the server in use, goes,
+    /// so a new sign-in starts from now.
     public func accountChanged() {
-        memory.forget(unlessFor: repository.contextID)
+        memory.forget(unlessFor: repository.contextID, servers: signedInServers?())
     }
 
     /// While the app is open: checks ``afterLibraryChange`` after the last
@@ -117,13 +125,13 @@ public final class NewEpisodeChecker {
     }
 
     private func run() async -> Outcome {
-        // Nobody signed in (a sign-out, or Switch server between servers):
+        // Nobody signed in (a sign-out, or Add a server between servers):
         // nothing is asked and nothing forgotten here; accountChanged() forgets.
         guard repository.available, let context = repository.contextID, let serverID = repository.serverID else {
             return .unavailable
         }
-        // Signed in to another server or as another person: theirs starts from now.
-        memory.forget(unlessFor: context)
+        // Signed in as another person here: theirs starts from now. Other servers' places stay.
+        memory.forget(unlessFor: context, servers: signedInServers?())
         guard memory.notifyHere else {
             memory.forgetCursor()
             return .switchedOff

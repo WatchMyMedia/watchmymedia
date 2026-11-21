@@ -86,7 +86,54 @@ final class TestLibrary: LibraryRepository {
     func search(_ text: String) async throws -> SearchResults {
         try check()
         searches.append(text)
+        if let searchGate { try await searchGate.wait() }
         return try await fake.search(text)
+    }
+
+    /// Holds the server in use's search until opened, for an answer still on its way.
+    var searchGate: Gate?
+    /// What each other server answers a search with, by server ID; one with
+    /// none answers from the fake's servers. A gate holds its answer.
+    var otherAnswers: [String: Result<SearchResults, any Error>] = [:]
+    var otherGates: [String: Gate] = [:]
+    /// Each search asked of another server, in order.
+    private(set) var otherSearches: [(server: String, text: String)] = []
+    /// The searches of other servers that were given up on before they answered.
+    private(set) var otherCancelled: [String] = []
+    /// How many visits to Search were said to have ended.
+    private(set) var visitsEnded = 0
+    /// The servers asked which server they are without a search, in order.
+    private(set) var asked: [String] = []
+    /// The servers whose answer no longer stands (the network changed), though they answered a search.
+    var forgotten: Set<String> = []
+
+    func searchVisitEnded() {
+        visitsEnded += 1
+        fake.searchVisitEnded()
+    }
+
+    func askServer(_ serverID: String) async throws {
+        asked.append(serverID)
+        if let answer = otherAnswers[serverID] { _ = try answer.get() }
+        try await fake.askServer(serverID)
+    }
+
+    func answerStands(serverID: String) -> Bool { !forgotten.contains(serverID) && fake.answerStands(serverID: serverID) }
+
+    func search(_ text: String, serverID: String) async throws -> SearchResults {
+        otherSearches.append((serverID, text))
+        if let gate = otherGates[serverID] {
+            do { try await gate.wait() } catch {
+                otherCancelled.append(serverID)
+                throw error
+            }
+        }
+        if let answer = otherAnswers[serverID] { return try answer.get() }
+        return try await fake.search(text, serverID: serverID)
+    }
+
+    func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL? {
+        path.flatMap { URL(string: "https://\(serverID).example\($0)") }
     }
 
     func setWatched(_ kind: WatchKind, id: Int, watched: Bool) async throws {
@@ -188,3 +235,34 @@ let testToday: Date = parseDay("2026-10-30")!
 /// An unmatched film (one file) and an unmatched show folder, as a real server sends them.
 let unmatchedFilm = BrowseItem(kind: .unmatched, id: 7001, libraryID: FakeData.movieLibrary, title: "Glass Tide (2023).mkv", subtitle: "Not looked up yet", fileName: "Glass Tide (2023)/Glass Tide (2023).mkv", fileCount: 1)
 let unmatchedFolder = BrowseItem(kind: .unmatched, id: 7002, libraryID: FakeData.tvLibrary, title: "Night Shift Diner (2020)", subtitle: "Not looked up yet", fileName: "Night Shift Diner (2020)", fileCount: 6)
+
+/// Holds a call until the test opens it, or until the caller gives up on it
+/// (as a cancelled request ends), when it throws.
+@MainActor
+final class Gate {
+    private var waiters: [Int: CheckedContinuation<Void, Never>] = [:]
+    private var next = 0
+    private var opened = false
+    /// Calls held now.
+    var waiting: Int { waiters.count }
+
+    func wait() async throws {
+        if opened { return }
+        let id = next
+        next += 1
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { waiters[id] = $0 }
+        } onCancel: {
+            Task { @MainActor in self.waiters.removeValue(forKey: id)?.resume() }
+        }
+        try Task.checkCancellation()
+    }
+
+    /// Lets through the calls held and every later one.
+    func open() {
+        opened = true
+        let held = waiters
+        waiters = [:]
+        for continuation in held.values { continuation.resume() }
+    }
+}
