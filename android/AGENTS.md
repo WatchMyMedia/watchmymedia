@@ -241,10 +241,15 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   row with an `enter` card (`CardRow`) takes the remembered card as its way
   in when it is composed again
   (`tv/src/main/kotlin/media/watchmy/client/tv/detail/RelatedRows.kt`).
-- **Focus tests and cleared semantics.** `HomeFocusTest` finds the focused
-  element by its `Focused` semantics. A card that `clearAndSetSemantics` to
-  read as one thing must set `focused` itself (as `TvOnNowCard` does), or the
-  test sees nothing focused after a move onto it.
+- **Cleared semantics and focus.** A card or cell that `clearAndSetSemantics`
+  to read as one thing clears its own focus state with its parts', so it
+  must set `focused` itself (as `TvOnNowCard` does). Without it TalkBack is
+  never told the element is in focus, and a test that finds the focused
+  element by its `Focused` semantics (`HomeFocusTest`) sees nothing after a
+  move onto it. Search's Live TV results and every cell of the Live TV
+  guide were like that until 20 November 2026; `adb shell uiautomator dump`
+  showed no focused node while one plainly had focus. Read the state only
+  in the semantics, so a move of focus composes nothing again.
 
 ## Emulators
 

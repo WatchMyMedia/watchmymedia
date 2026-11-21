@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -143,6 +144,10 @@ internal fun TvGuideRow(
         }
     }
     val watch = remember(channel, actions) { { if (channel.available) actions.watch(channel) } }
+    // A cell reads as one thing; its focus state stays in the semantics it clears, so TalkBack (and the focus tests) see it.
+    // Read there and nowhere else: a cell taking focus composes nothing again.
+    var channelFocused by remember { mutableStateOf(false) }
+    var rowFocused by remember { mutableStateOf(false) }
     Row(modifier.fillMaxWidth().height(RowHeight).border(0.5.dp, WmmColors.Line)) {
         val channelCell: @Composable (Boolean) -> Unit = { focused ->
             Row(Modifier.fillMaxSize().background(if (focused) WmmColors.Surface3 else WmmColors.Surface).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -174,7 +179,10 @@ internal fun TvGuideRow(
             FocusableBox(
                 onClick = watch,
                 onLongClick = star,
-                modifier = focusing.clearAndSetSemantics { contentDescription = "Watch ${channel.number} ${channel.name}" + (if (favourite) ", favourite" else "") + (row.programmes.firstOrNull { it.airingAt(now) }?.let { ", ${it.title}" } ?: "") },
+                modifier = focusing.onFocusChanged { channelFocused = it.isFocused }.clearAndSetSemantics {
+                    contentDescription = "Watch ${channel.number} ${channel.name}" + (if (favourite) ", favourite" else "") + (row.programmes.firstOrNull { it.airingAt(now) }?.let { ", ${it.title}" } ?: "")
+                    focused = channelFocused
+                },
                 cornerRadius = 0.dp, focusedScale = 1f, ringOffset = (-3).dp,
             ) { focused -> channelCell(focused) }
         } else Box(Modifier.width(ChannelColumn).fillMaxHeight()) { channelCell(false) }
@@ -186,7 +194,10 @@ internal fun TvGuideRow(
             Box(Modifier.weight(1f).fillMaxHeight()) {
                 FocusableBox(
                     onClick = choose,
-                    modifier = focusing.clearAndSetSemantics { contentDescription = "${channel.number} ${channel.name}, ${if (channel.available) "No listings, Watch live" else "Unavailable"}" },
+                    modifier = focusing.onFocusChanged { rowFocused = it.isFocused }.clearAndSetSemantics {
+                        contentDescription = "${channel.number} ${channel.name}, ${if (channel.available) "No listings, Watch live" else "Unavailable"}"
+                        focused = rowFocused
+                    },
                     cornerRadius = 0.dp, focusedScale = 1f, ringOffset = (-3).dp,
                 ) { focused ->
                     Column(Modifier.fillMaxSize().background(if (focused) WmmColors.Surface3 else Color(0xFF131315)).padding(horizontal = 14.dp), verticalArrangement = Arrangement.Center) {
@@ -295,10 +306,15 @@ private fun TvGuideCell(
     reminded: Boolean = false,
 ) {
     val airing = programme.airingAt(now)
+    // As the row's other cells: the focus state stays in the semantics the cell clears.
+    var isFocused by remember { mutableStateOf(false) }
     FocusableBox(
         onClick = onClick,
         onLongClick = onLongClick,
-        modifier = modifier.clearAndSetSemantics { contentDescription = programme.spokenName(format) + (if (reminded) ", reminder set" else "") + programme.recordingSpoken() },
+        modifier = modifier.onFocusChanged { isFocused = it.isFocused }.clearAndSetSemantics {
+            contentDescription = programme.spokenName(format) + (if (reminded) ", reminder set" else "") + programme.recordingSpoken()
+            focused = isFocused
+        },
         cornerRadius = 0.dp, focusedScale = 1f, ringOffset = (-3).dp,
     ) { focused ->
         Box(Modifier.fillMaxSize().background(if (focused) WmmColors.Surface3 else if (airing) Color(0xFF1E1E21) else WmmColors.Surface).border(0.5.dp, WmmColors.Line)) {

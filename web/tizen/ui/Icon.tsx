@@ -19,6 +19,9 @@ const PATHS = {
   alert: 'M12 3 2 20h20L12 3zM12 10v4M12 17h.01',
   bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0',
   down: 'M6 9l6 6 6-6',
+  plus: 'M12 5v14M5 12h14',
+  swap: 'M4 7h14M15 4l3 3-3 3M20 17H6M9 14l-3 3 3 3',
+  trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',
 } as const
 
 export type IconName = keyof typeof PATHS

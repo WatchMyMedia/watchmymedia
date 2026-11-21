@@ -53,9 +53,9 @@ context, and imports nothing from the shell's folders.
 | Folder | What |
 |---|---|
 | `app/` | The shell: `main.tsx` makes the session, the input and the one Player, then `app/App.tsx` shows the start screens or the signed-in `app/Shell.tsx`. Routes, the screens stack, focus, keys and the platform calls |
-| `session/` | Everything about servers and accounts: typed addresses, remembered servers, pairing and password sign-in, the signed-in session (client, cache, media token, events) |
+| `session/` | Everything about servers and accounts: typed addresses, remembered servers, pairing and password sign-in, the signed-in session (client, cache, media token, events), switching between servers, and asking a server other than the current one (`peers.ts`) |
 | `ui/` | The kit: components, `tokens.css` and `kit.css`, and their pure helpers (`problemWords`, `qr`, `railBadge`, `tones`) |
-| `screens/` | One folder per feature: `start/` (server, sign-in, problems), `browse/` (Home, libraries, See all, lists), `details/` (movie and show pages, YouTube trailers), `player/`, `live/`, `search/`, `requests/` and `settings/` |
+| `screens/` | One folder per feature: `start/` (server, sign-in, problems), `servers/` (the Servers panel, Settings' Servers pages, the note after a switch), `browse/` (Home, libraries, See all, lists), `details/` (movie and show pages, YouTube trailers), `player/`, `live/`, `search/`, `requests/` and `settings/` |
 | `player/` | The player engine (above) |
 | `fakes/` | The fictional server for the browser preview and tests |
 
@@ -140,17 +140,73 @@ shows "This TV was signed out" and forgets the token.
 
 Sign-in, servers and the start problems are `session/session.ts`
 (`AppSession`), drawn by `screens/start/`. `useApp()` gives its commands to
-the signed-in app too: `signOut()` (revokes, then shows a code) and
-`switchServer()`.
+the signed-in app too: `switchTo(id)`, `addServer()`, `remove(id)` and
+`signOut()`; `useAppState()` redraws a screen as they change things.
+
+### Several servers
+
+This TV keeps up to 12 servers by server ID (`session/servers.ts`), each
+with its own sign-in, and the app is on one of them. Nothing ties them
+together but this list, which stays on the TV.
+
+- **One session takes over from another.** `switchTo` asks the other
+  server which one it is (5 s at most), checks its kept sign-in, readies a
+  new `ActiveSession` (`ready()`), and only then attaches it and detaches
+  the old one. Until that moment nothing has changed, so a server that
+  doesn't answer, or isn't the one remembered at its address, leaves the
+  app where it was: `switching` in the signed-in state says why, and
+  Servers draws it with Try again. Keep that order in anything new: attach
+  the new session before the old one is detached, never the reverse
+  (`detach()` leaves the queries' client alone once another session has it).
+- **Flows that start from the signed-in app keep its session alive**
+  underneath: Add a server, and the sign-in of a server signed out here.
+  Return walks back to the app (`cancel()`), on the screen it was on: the
+  shell keeps each session's stack. A server being added is remembered only
+  once it is signed in to, and the address of a server this TV already has
+  is refused there (`AlreadyAddedError`): it is switched to from Servers.
+- **`arrival`** in the signed-in state is how the app came to a session:
+  `switched` shows "Now on …" for 4 s (a note that takes no focus), `added`
+  the last step of Add a server, and `open` builds the stack a search
+  result asked for (Home, Search with the same words, the title). A session
+  says it once.
+- **A sign-in only ever goes to its own server.** Search asks every other
+  signed-in server through a `PeerServer` (`session/peers.ts`): a bearer
+  client of its own for that server's address, never the session's `api`,
+  and only after the server has said, without a token, that it is the one
+  remembered. Its pictures use its own media token. Anything new that
+  reaches another server goes through a `PeerServer` too.
+- **Search across servers** is `screens/search/crossSearch.ts`:
+  `CrossSearch` asks the others (4 s each, 30 s before one that failed is
+  asked again, a keystroke cancels the calls out) and `mergeResults` orders
+  what is drawn: the current server's titles, then each other server's in
+  Servers' order, added only when every server before it has answered or
+  failed, so a card on screen never moves. With other servers to list, the
+  current one gets the same 4 s (its late answer is dropped). `searchLines`
+  gives the lines under the results: a server that didn't answer has Try
+  again; one this TV is signed out of, or one too old for this app, says so
+  and isn't asked (`serversLeftOut`); when none answers it is the plain
+  "Search didn't work". Only library titles cross servers; suggestions,
+  Live TV and requests stay the current server's.
+- **Words and rows** for all of it are `screens/servers/serverRows.ts` and
+  `screens/search/searchResults.ts`, tested beside them. A server is called
+  by its name, never "the server". The Android and Apple apps say the same
+  things in the same words: change one, change all three.
+- **Focus.** The rail's account button opens Servers and gets focus back
+  when Return closes it (`Modal`'s `returnFocus`). The focus geometry
+  prefers an aligned card to a wide line nearer by, so a full-width line
+  among cards (Search's Try again) needs its own ▲ ▼ rule; don't rely on
+  geometry to reach one.
 
 ### The kit
 
 `ui/` components, all keyed by `id` (their `data-focus`):
 
-- `Rail` (the shell draws it), `Button` (`primary`, `ghost`, `danger`; `icon`,
-  `busy`, `onHold`), `KeyHints`, `Brand`, `Icon`, `PlayGlyph`.
+- `Rail` (the shell draws it; its account button at the foot opens Servers),
+  `Button` (`primary`, `ghost`, `danger`; `icon`, `busy`, `onHold`),
+  `KeyHints`, `Brand`, `Icon`, `PlayGlyph`.
 - `Card` in `poster`, `wide`, `episode`, `continue` and `live`, with
-  `progress`, `badges`, `image`, `onPress`, `onHold`.
+  `progress`, `badges`, `image`, `onPress`, `onHold`, and `server` for a
+  title on another server (a line under the title).
 - `Row` (title, counter, `items`, `itemKey`, `variant`, `renderItem(item,
   focusId)`): moved with a transform, the card before the focused one in
   view, only the cards near the view drawn. `Grid`: rows of 8 posters or 5
@@ -176,7 +232,9 @@ sheets). Both add the session's media token, kept fresh by
 `session/media.ts`, and only for the media routes of the signed-in server;
 an address is reused until shortly before its token runs out, so a new token
 doesn't fetch every picture again. The player engine signs its own streams
-with the decision's token through `session.playerMediaUrl`.
+with the decision's token through `session.playerMediaUrl`. A picture from
+another server (a search result's) comes from that server's `PeerServer`,
+whose `media` holds its own media token.
 
 ### The player
 
@@ -196,8 +254,11 @@ server (`lakeside.local`) in front of `fetch`, and refuses every other
 address, so the preview reaches nothing on the network. It pairs by itself
 after 8 s, signs in Sam with the password `watching`, and serves every
 screen. `?fakes=away` adds a remembered server away from home over http;
-`old`, `setup` and `expire` give the start problems; the README lists the
-other modes. The first registration of a route answers, so the order in
+`?fakes=servers` is a TV with four servers (`fakes/others.ts`): Lakeside,
+signed in and current; Cabin, signed in, with a Home and titles of its own;
+Den, signed in, which never answers; and Attic, signed out here. `old`,
+`setup` and `expire` give the start problems; the README lists the other
+modes. The first registration of a route answers, so the order in
 `createFakeServer` matters where two areas serve the same route. The TV build leaves the fakes out (`main.tsx` imports
 them behind `import.meta.env.DEV`). A feature adds its routes in its own
 `fakes/<area>.ts` (`server.route('GET', '/api/movies/:id', handler)`) with
