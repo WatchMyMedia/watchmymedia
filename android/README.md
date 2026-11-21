@@ -370,10 +370,11 @@ nothing ties two servers together, and the server has no part in this.
     again later, as one that can't reach its server always was.
   - **Removing a server**, and signing out of one when another takes its
     place: asked once, for what the removal reports and for the sign-out
-    after. When it doesn't say it is that server, it is removed from the
-    device all the same and nothing is sent; its session then stays on the
-    server until it runs out, or someone ends it from that server's list
-    of devices.
+    after. When it doesn't say it is that server, the server and its
+    downloads are removed from the device at once all the same, and the
+    sign-out is not sent, then or later: the session stays on that server
+    until it runs out, or someone ends it from that server's list of
+    devices.
   - **What outlives a switch**: a player's last report, a setting still
     being saved. Each asks before it sends.
 
