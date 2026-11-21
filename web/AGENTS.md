@@ -127,6 +127,18 @@ the user asks in this conversation; see Authority in the root file.
   (`src/lib/packageInstall.ts`, `src/lib/transcoder.ts`). A new kind, or new
   advice that names Docker, a container or a service, goes through those, not
   inline in a page. Commands people copy are drawn with `CommandLine`.
+- **Get the app** (`src/components/GetApp.tsx`, rules in
+  `src/lib/getApp.ts`): computers get a button in the bar whose panel holds
+  the App Store badge above Google Play's. Phones and tablets get no button:
+  Android browsers, and Chrome, Firefox or Edge on an iPhone or iPad, get
+  that device's own app above the bar until it is dismissed, and Safari on
+  an iPhone or iPad shows Apple's banner from `index.html`'s
+  `apple-itunes-app` tag. That also keeps both out of the app's in-app
+  Safari. Neither shows on the players, a Settings task or sign-in, and the
+  Samsung TV app has neither. The badges in `src/assets/badges/` are the
+  stores' own artwork: never redrawn, recoloured or cropped, the same
+  height, a quarter of it clear around each, with the stores' trademark
+  lines under them; an app gets a badge only once its store lists it.
 - **Server features by level**: the web app is served by the same server it
   talks to, so it can rely on the current API. The receiver can't: it is
   deployed separately and loads against any server version, so it reads the

@@ -16,6 +16,8 @@ import { NewEpisodeNotices } from './components/NewEpisodeNotices'
 import { useNotificationClicks } from './components/newEpisodeHooks'
 import { serverCastsLive } from './lib/liveCast'
 import { isSettingsFlow } from './lib/settingsRoutes'
+import { AppPrompt, GetAppMenu } from './components/GetApp'
+import { appPrompt, showsGetAppMenu } from './lib/getApp'
 
 export function Layout() {
   const auth = useAuth()
@@ -31,6 +33,8 @@ function Shell() {
   const auth = useAuth()
   const [status, setStatus] = useState(false)
   const [menu, setMenu] = useState(false)
+  // Computers get Get the app in the bar; phones and tablets their own app above it.
+  const [apps] = useState(() => ({ menu: showsGetAppMenu(navigator.userAgent, navigator.maxTouchPoints), prompt: appPrompt(navigator.userAgent, navigator.maxTouchPoints) }))
   const navigate = useNavigate()
   const path = useRouterState({ select: (s) => s.location.pathname })
   const { scans, matches, connected } = useEventState()
@@ -75,6 +79,7 @@ function Shell() {
 
   return <>
     <div className="flex min-h-screen flex-col">
+      {apps.prompt && <AppPrompt app={apps.prompt} />}
       <header className="sticky top-0 z-30 border-b border-line bg-ground/90 backdrop-blur">
         <div className="relative flex items-center gap-3 px-4 py-2 md:px-12">
           <Link to="/" className="mr-2 shrink-0" aria-label="WatchMyMedia home">
@@ -119,6 +124,7 @@ function Shell() {
               <path d="m13 13 4.5 4.5" />
             </svg>
           </Link>}
+          {apps.menu && <GetAppMenu />}
           {(!path.startsWith('/live-tv') || castsLive) && <CastButton />}
           {hasLibraries && <button
             type="button"
