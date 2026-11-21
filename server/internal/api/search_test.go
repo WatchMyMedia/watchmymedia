@@ -906,7 +906,7 @@ func TestSearchStopsWhenDropped(t *testing.T) {
 	begin := time.Now()
 	var n int64
 	err = conn.QueryRowContext(short, `WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 100000000) SELECT COUNT(*) FROM c`).Scan(&n)
-	if err == nil || time.Since(begin) > 5*time.Second {
-		t.Errorf("a query outlived its context: %v after %v", err, time.Since(begin).Round(time.Millisecond))
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(begin) > 5*time.Second {
+		t.Errorf("a query outlived its context, or ended for another reason: %v after %v", err, time.Since(begin).Round(time.Millisecond))
 	}
 }
