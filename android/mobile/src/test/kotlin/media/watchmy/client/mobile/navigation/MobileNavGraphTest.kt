@@ -46,7 +46,7 @@ class MobileNavGraphTest {
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides fake) {
                 nav = rememberNavController()
-                MobileNavHost(onSwitchServer = {}, onSignedOut = {}, nav = nav)
+                MobileNavHost(onAddServer = {}, onSignedOut = {}, nav = nav)
             }
         }
         compose.waitForIdle()

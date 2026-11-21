@@ -38,7 +38,9 @@ import media.watchmy.client.model.LiveCastRemote
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.PlaybackController
 import media.watchmy.client.model.PreferencesRepository
+import media.watchmy.client.model.SavedServer
 import media.watchmy.client.model.ServerRepository
+import media.watchmy.client.model.User
 import androidx.media3.cast.Cast as Media3Cast
 import com.google.android.gms.cast.framework.CastState as SdkCastState
 
@@ -126,6 +128,14 @@ class RealCastService(
                     serverCasts = id != null && withContext(Dispatchers.IO) { gateway.serverCasts() }
                     publish()
                 }
+        }
+        // A cast plays as the person signed in on the server in use: another server or person, or signing out, ends it.
+        scope.launch {
+            var playsAs = castIdentity(servers.current.value, auth.user.value)
+            combine(servers.current, auth.user, ::castIdentity).distinctUntilChanged().collect { now ->
+                if (endsCast(playsAs, now)) disconnect()
+                playsAs = now
+            }
         }
     }
 
@@ -250,6 +260,19 @@ internal fun castState(
     sdkState == SdkCastState.NO_DEVICES_AVAILABLE -> CastState.NoDevices
     else -> CastState.Available
 }
+
+/** Who a cast from this phone plays as: the server in use and the person signed in on it; null when no one is. */
+internal fun castIdentity(server: SavedServer?, user: User?): String? =
+    if (server != null && user != null) "${server.server.id}/${user.id}" else null
+
+/**
+ * Whether the cast session ends when the sign-in in use goes from [before]
+ * to [after] ([castIdentity]): a switch to another server, another person,
+ * or signing out. The TV would otherwise go on playing as someone the
+ * phone's remote no longer speaks for. Signing in from signed out ends
+ * nothing.
+ */
+internal fun endsCast(before: String?, after: String?): Boolean = before != null && before != after
 
 /** Whether the server in use issues cast tokens; no server, an older one or one that can't be reached can't. */
 internal suspend fun CastGateway.serverCasts(): Boolean = try {

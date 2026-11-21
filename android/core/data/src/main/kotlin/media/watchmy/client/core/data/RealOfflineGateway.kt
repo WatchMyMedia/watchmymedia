@@ -65,9 +65,9 @@ internal class RealOfflineGateway(
     override fun signedIn(owner: OfflineOwner): Boolean =
         store.value.servers.firstOrNull { it.id == owner.serverId }?.account?.userId == owner.userId
 
-    override fun onSessionChange(listener: () -> Unit) = store.onSessionChange { listener() }
+    override fun onSessionChange(listener: () -> Unit) = store.onSignInsChange(listener)
 
-    override fun beforeSignOut(hook: suspend () -> Unit) = auth.beforeSignOut(hook)
+    override fun beforeSignOut(hook: suspend (owner: OfflineOwner) -> Unit) = auth.beforeSignOut(hook)
 
     private suspend fun <T> call(owner: OfflineOwner, block: suspend (OfflineApi) -> T): T {
         val access = http.bindTo(owner.serverId, owner.userId) ?: throw SignedOutException()

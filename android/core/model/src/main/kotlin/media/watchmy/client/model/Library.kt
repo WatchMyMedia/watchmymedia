@@ -397,6 +397,31 @@ interface LibraryRepository {
 
     suspend fun search(text: String): SearchResults
 
+    /**
+     * [search] on the registered server [serverId], as the person signed in
+     * there, whichever server is in use: the call goes to that server's own
+     * address with its own sign-in. Every id in the reply is that server's.
+     * Throws [SignedOutException] when no one is signed in there.
+     *
+     * A server that isn't the one in use is first asked which server it is,
+     * with no sign-in, and gets its sign-in only when it is the one
+     * remembered: its address may be another machine's on another network.
+     * It is asked once a visit to Search ([searchVisit]), and again after a
+     * call to it fails. When it doesn't say so, this throws as a server
+     * that can't be reached and nothing is sent.
+     */
+    suspend fun searchOn(serverId: String, text: String): SearchResults = search(text)
+
+    /**
+     * A visit to Search begins: Search is on screen, for the first time or
+     * after being away (under another page, or with the app in the
+     * background, which is when a device changes network). Each other server
+     * is asked which server it is again before a sign-in next goes to it,
+     * for a search or a picture; those in [showing], whose results are on
+     * screen, are asked now, so their pictures go on loading.
+     */
+    suspend fun searchVisit(showing: Collection<String> = emptyList()) {}
+
     suspend fun setWatched(kind: ContinueItem.Kind, id: Long, watched: Boolean)
 
     suspend fun setSeasonWatched(showId: Long, season: Int, watched: Boolean)
@@ -426,6 +451,15 @@ interface LibraryRepository {
      * image loader adds the sign-in, so the URL carries no token.
      */
     fun imageUrl(path: String?, size: ImageSize): String?
+
+    /**
+     * [imageUrl] for a picture on the registered server [serverId]: its own
+     * address, which the image loader signs with that server's sign-in while
+     * the server has said, on this visit to Search, that it is the one
+     * remembered ([searchOn]); otherwise the picture is asked for with no
+     * sign-in, and doesn't load.
+     */
+    fun imageUrlOn(serverId: String, path: String?, size: ImageSize): String? = imageUrl(path, size)
 
     /**
      * Emits when watch state or the library changed on the server (the

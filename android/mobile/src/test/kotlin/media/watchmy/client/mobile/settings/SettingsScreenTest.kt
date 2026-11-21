@@ -75,7 +75,7 @@ class SettingsScreenTest {
             CompositionLocalProvider(LocalAppServices provides services) {
                 WatchMyMediaPhoneTheme {
                     SettingsScreen(
-                        onSwitchServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {},
+                        onAddServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {},
                         open = open, onOpenPage = onOpenPage,
                         onOpenRequests = {}, onOpenInbox = {}, inboxCount = 3,
                     )

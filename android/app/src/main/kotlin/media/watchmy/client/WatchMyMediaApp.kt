@@ -16,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import media.watchmy.client.newepisodes.NewEpisodeFollower
 import media.watchmy.client.newepisodes.NewEpisodeNotifier
@@ -190,16 +191,23 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
     /**
      * New episodes of the shows the person follows:
      * the check's periodic work follows this device's switch and the
-     * permission, and a sign-out or another account cancels it and takes
-     * away what is showing.
+     * permission, for the server in use. Each account signed in here keeps
+     * its place in the feed; a sign-in that ends loses it, and takes away
+     * what is showing.
      */
     private fun followNewEpisodes(data: DataServices, account: () -> String?) {
         val notifier = NewEpisodeNotifier(this).also { it.createChannel() }
         val session = combine(data.auth.user, data.servers.current) { user, server -> user to server }
         // The cursor is keyed by the server's and the person's ids, so a rename keeps it; links name the account as Watch Next does.
         val cursorAccount = { media.watchmy.client.model.followsAccount(data.servers.current.value?.server, data.auth.user.value) }
+        // Every account signed in on this phone keeps its place in the feed; one signed out, or whose server is removed, loses it.
+        val signedIn: suspend () -> Set<String> = {
+            data.servers.saved.first().mapNotNull { s ->
+                s.userId?.takeIf { s.signedIn }?.let { id -> media.watchmy.client.model.followsAccount(s.server, media.watchmy.client.model.User(id, s.userName.orEmpty(), false)) }
+            }.toSet()
+        }
         val follower = NewEpisodeFollower(
-            data.follows, data.libraryContentsChanged, session, account, cursorAccount,
+            data.follows, data.libraryContentsChanged, session, account, cursorAccount, signedIn,
             StoredNewEpisodesCursors(this), WorkManagerNewEpisodeSchedule(this), notifier, appScope,
         ).also { newEpisodes = it }
         data.onSessionChange(follower::sessionChanged)

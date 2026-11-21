@@ -65,8 +65,13 @@ import media.watchmy.client.ui.rememberModelTextField
  * pairing code and QR code for the link page, renewed when it runs out, or a
  * name and password typed on the on-screen keyboard.
  */
+/**
+ * [cancel]: the TV switched to this server for its sign-in (one being added,
+ * or one whose sign-in ended), so [onSwitchServer] is Cancel, which Back is
+ * too: back on the server it was on.
+ */
 @Composable
-fun SignInScreen(onSwitchServer: () -> Unit) {
+fun SignInScreen(onSwitchServer: () -> Unit, cancel: Boolean = false) {
     val services = LocalAppServices.current
     // Its own for each visit, not the Activity's: after a sign-out or another server, a new code for the server in use.
     val vm = viewModel(rememberViewModelStoreOwner()) { SignInViewModel(services.auth, services.servers, codeFirst = true) }
@@ -96,14 +101,16 @@ fun SignInScreen(onSwitchServer: () -> Unit) {
                 onSwitchServer = onSwitchServer,
                 // A server that wants a browser check first refuses password sign-in from apps.
                 passwordAllowed = server?.server?.turnstile != true,
+                switchLabel = if (cancel) "Cancel" else "Switch server",
             )
+            if (cancel) BackHandler(onBack = onSwitchServer)
         }
         Footer(server, deviceName, Modifier.align(Alignment.BottomCenter))
     }
 }
 
 @Composable
-private fun PairingSignIn(vm: SignInViewModel, state: SignInViewModel.State, serverName: String, onPassword: () -> Unit, onSwitchServer: () -> Unit, passwordAllowed: Boolean = true) {
+private fun PairingSignIn(vm: SignInViewModel, state: SignInViewModel.State, serverName: String, onPassword: () -> Unit, onSwitchServer: () -> Unit, passwordAllowed: Boolean = true, switchLabel: String = "Switch server") {
     val pairing = state.pairing ?: PairingState.Starting
     val first = remember { FocusRequester() }
     val waiting = (pairing as? PairingState.Waiting)?.code
@@ -128,7 +135,7 @@ private fun PairingSignIn(vm: SignInViewModel, state: SignInViewModel.State, ser
                 TvButton("Try again", vm::newCode, style = TvButtonStyle.Primary)
             }
             if (passwordAllowed) TvButton("Sign in with a password instead", onPassword, Modifier.focusRequester(first))
-            TvButton("Switch server", onSwitchServer, if (passwordAllowed) Modifier else Modifier.focusRequester(first))
+            TvButton(switchLabel, onSwitchServer, if (passwordAllowed) Modifier else Modifier.focusRequester(first))
         }
     }
 

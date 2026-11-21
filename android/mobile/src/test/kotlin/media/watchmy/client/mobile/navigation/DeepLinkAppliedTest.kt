@@ -34,7 +34,8 @@ import org.robolectric.annotation.Config
 class DeepLinkAppliedTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
-    private val services = FakeAppServices(signedIn = false)
+    // Signed in to one server, so signing out goes to its sign-in.
+    private val services = FakeAppServices(signedIn = false, several = false)
 
     /** A show that isn't on Home, so its title on screen means its page is open. */
     private val show = FakeData.home().let { home ->

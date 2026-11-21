@@ -11,7 +11,6 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 import media.watchmy.client.WatchMyMediaApp
-import media.watchmy.client.model.NewEpisodesCursor
 import media.watchmy.client.model.NewEpisodesCursors
 
 /**
@@ -82,35 +81,43 @@ class NewEpisodeWorker(context: Context, params: WorkerParameters) : CoroutineWo
 }
 
 /**
- * The cursor the device keeps, for one server and person at a time, in
- * the app's own preferences. Left out of backups (data_extraction_rules.xml),
- * since a cursor restored on another phone would skip what arrived meanwhile.
+ * The cursors the device keeps, one for each server and person signed in on
+ * it, in the app's own preferences: a switch to another server and back
+ * carries on from where that server's last check left off. Left out of
+ * backups (data_extraction_rules.xml), since a cursor restored on another
+ * phone would skip what arrived meanwhile.
  */
 class StoredNewEpisodesCursors(private val context: Context) : NewEpisodesCursors {
     /** Opened at the first check, not at start. */
-    private val prefs by lazy { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+    private val prefs by lazy { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).also(::moveSingleCursor) }
 
-    override fun read(): NewEpisodesCursor? = synchronized(LOCK) {
-        val account = prefs.getString(ACCOUNT, null) ?: return null
-        val cursor = prefs.getString(CURSOR, null) ?: return null
-        NewEpisodesCursor(account, cursor)
+    override fun read(account: String): String? = synchronized(LOCK) { prefs.getString(CURSOR_OF + account, null) }
+
+    override fun keep(account: String, cursor: String) = synchronized(LOCK) { prefs.edit { putString(CURSOR_OF + account, cursor) } }
+
+    override fun forget(account: String) = synchronized(LOCK) { prefs.edit { remove(CURSOR_OF + account) } }
+
+    override fun keepOnly(accounts: Set<String>) = synchronized(LOCK) {
+        val gone = prefs.all.keys.filter { it.startsWith(CURSOR_OF) && it.removePrefix(CURSOR_OF) !in accounts }
+        if (gone.isNotEmpty()) prefs.edit { gone.forEach(::remove) }
     }
 
-    override fun keep(cursor: NewEpisodesCursor?) = synchronized(LOCK) {
+    /** A version that kept one cursor, for one account at a time, kept it under two keys: it becomes that account's. */
+    private fun moveSingleCursor(prefs: android.content.SharedPreferences) = synchronized(LOCK) {
+        val account = prefs.getString(ACCOUNT, null)
+        val cursor = prefs.getString(CURSOR, null)
+        if (account == null && cursor == null) return@synchronized
         prefs.edit {
-            if (cursor == null) {
-                remove(ACCOUNT)
-                remove(CURSOR)
-            } else {
-                putString(ACCOUNT, cursor.account)
-                putString(CURSOR, cursor.cursor)
-            }
+            if (account != null && cursor != null) putString(CURSOR_OF + account, cursor)
+            remove(ACCOUNT)
+            remove(CURSOR)
         }
     }
 
     private companion object {
         const val ACCOUNT = "account"
         const val CURSOR = "cursor"
+        const val CURSOR_OF = "cursor:"
         val LOCK = Any()
     }
 }

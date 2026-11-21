@@ -44,7 +44,8 @@ class SessionScopeTest {
     private fun open() = ViewModelProvider.create(compose.activity, viewModelFactory { initializer { SessionStores() } })[SessionStores::class].open
 
     @Test fun `signing out on the phone ends the session's ViewModels, and the next account starts its own`() {
-        val fake = FakeAppServices()
+        // Signed in to one server, so signing out leaves no session.
+        val fake = FakeAppServices(several = false)
         compose.setContent { CompositionLocalProvider(LocalAppServices provides fake) { MobileApp() } }
         compose.waitForIdle()
         assertEquals("signed in: one session", 1, open())

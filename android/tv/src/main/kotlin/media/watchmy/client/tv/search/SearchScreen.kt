@@ -37,6 +37,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
 import media.watchmy.client.model.BrowseItem
+import media.watchmy.client.model.DeepLink
+import media.watchmy.client.model.SEARCH_YOUR_SERVERS
+import media.watchmy.client.model.noMatchesOnServers
+import media.watchmy.client.model.noMatchesOnServersLine
+import media.watchmy.client.model.searchYourServersLine
+import media.watchmy.client.model.stillAsking
+import media.watchmy.client.presentation.search.pageElsewhere
+import media.watchmy.client.tv.components.TvButton
+import media.watchmy.client.tv.components.TvButtonSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.text.style.TextOverflow
 import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.PlayRequest
@@ -72,6 +84,7 @@ import media.watchmy.client.tv.components.rememberFocusMemory
 import media.watchmy.client.presentation.library.gridSubtitle
 import media.watchmy.client.tv.requests.RequestDialog
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.ReportShown
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.WmmIcons
@@ -122,6 +135,12 @@ private val ResultsInset = 40.dp
  * on the left, and shows, movies and episodes matching the title on the
  * right as the viewer types. An episode opens its page; holding centre on
  * one plays it.
+ *
+ * With two or more servers signed in it looks in all of them: the server in
+ * use's cards first, then each other server's at the end of its row, with
+ * that server's name under the title. One from another server opens there
+ * ([onOpenElsewhere]): the TV switches to it and comes back to Search with
+ * the same words ([words], taken once) under the title's page.
  */
 @Composable
 fun SearchScreen(
@@ -132,12 +151,25 @@ fun SearchScreen(
     onOpenEpisode: (showId: Long, season: Int, episodeId: Long) -> Unit = { id, _, _ -> onOpenShow(id) },
     onWatchLive: (LiveChannel) -> Unit = {},
     onOpenLive: (LiveSearchHit) -> Unit = {},
+    words: String? = null,
+    onWordsTaken: () -> Unit = {},
+    onOpenElsewhere: (serverId: String, query: String, page: DeepLink) -> Unit = { _, _, _ -> },
 ) {
     val services = LocalAppServices.current
-    val vm = viewModel { SearchViewModel(services.library, auth = services.auth, requests = services.requests, saved = createSavedStateHandle()) }
+    val vm = viewModel { SearchViewModel(services.library, auth = services.auth, requests = services.requests, saved = createSavedStateHandle(), servers = services.servers) }
     val state by vm.state.collectAsStateWithLifecycle()
+    // Each time Search comes on screen is a new visit: the other servers are asked which they are again before a sign-in goes to them.
+    ReportShown(vm::setShown)
     // The field holds its text, which the keyboard edits; the model searches a moment after it changes.
     val query = rememberModelTextField(state.query, state.revision, vm::setQuery)
+    // The words a result on another server was found with, searched again on the server the TV switched to.
+    LaunchedEffect(words) {
+        if (words != null) {
+            vm.selectRecentQuery(words)
+            onWordsTaken()
+        }
+    }
+    val elsewhere = { serverId: String, page: DeepLink -> onOpenElsewhere(serverId, state.query.trim(), page) }
     // On Live TV (android-tv/LiveSearch): the listings' titles too, from API level 15 with Live TV.
     val liveTv = LocalLiveTVAvailable.current
     val liveSearch = viewModel(key = "tv-live-search") { LiveSearchViewModel(createSavedStateHandle(), services.live, services.servers) }
@@ -192,11 +224,14 @@ fun SearchScreen(
             val results = state.results
             when {
                 state.error != null -> ErrorState(state.error!!, vm::retry, title = "Search didn't work")
-                state.query.isBlank() -> Hint("Find anything in your library", "Type part of a title. Shows, movies and episodes appear here as you type.")
+                state.query.isBlank() ->
+                    if (state.several) Hint(SEARCH_YOUR_SERVERS, searchYourServersLine(state.searched))
+                    else Hint("Find anything in your library", "Type part of a title. Shows, movies and episodes appear here as you type.")
                 results == null -> LoadingState()
-                results.isEmpty() && state.requestable.isEmpty() && (liveRow == null || live.results.isEmpty()) ->
-                    Hint("Nothing matches", "No titles in your library match “${state.resultsFor}”.")
-                else -> Results(results, state.requestable, services.library, memory, onOpenShow, onOpenMovie, onPlay, onAsk = { asking = it }, viaSeerr = state.options.viaSeerr, onOpenEpisode = onOpenEpisode, liveRow = liveRow)
+                state.noResults && (liveRow == null || live.results.isEmpty()) && state.unlisted.none { it.retry } ->
+                    if (state.several) Hint(noMatchesOnServers(state.searched), noMatchesOnServersLine(state.resultsFor))
+                    else Hint("Nothing matches", "No titles in your library match “${state.resultsFor}”.")
+                else -> Results(state, results, services.library, memory, onOpenShow, onOpenMovie, onPlay, onAsk = { asking = it }, onOpenEpisode = onOpenEpisode, onOpenElsewhere = elsewhere, onRetry = vm::retry, liveRow = liveRow)
             }
         }
         Notice(state.message, vm::messageShown)
@@ -238,33 +273,41 @@ private fun Hint(title: String, message: String) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun Results(
+    state: SearchViewModel.State,
     results: SearchResults,
-    requestable: List<Requestable>,
     library: LibraryRepository,
     memory: FocusMemory,
     onOpenShow: (Long) -> Unit,
     onOpenMovie: (Long) -> Unit,
     onPlay: (PlayRequest) -> Unit,
     onAsk: (Requestable) -> Unit,
-    viaSeerr: Boolean,
     onOpenEpisode: (showId: Long, season: Int, episodeId: Long) -> Unit,
+    onOpenElsewhere: (serverId: String, page: DeepLink) -> Unit,
+    onRetry: () -> Unit,
     liveRow: (@Composable () -> Unit)? = null,
 ) {
     val notMatched = rememberNotMatchedNotice()
+    val requestable = state.requestable
+    val viaSeerr = state.options.viaSeerr
+    val shows = state.shows
+    val movies = state.movies
+    val episodes = state.episodes
+    // A card on the server in use opens as it always did; one on another server opens there, after a switch.
+    val open = { hit: SearchViewModel.Hit<BrowseItem> ->
+        val server = hit.serverId
+        if (server == null) hit.item.open(onOpenShow, onOpenMovie, onPlay, notMatched)
+        else hit.item.pageElsewhere()?.let { onOpenElsewhere(server, it) } ?: notMatched()
+    }
     val density = LocalDensity.current
     val spec = remember(density) { with(density) { KeepInViewSpec(leading = 90.dp.toPx(), trailing = 40.dp.toPx()) } }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
         // The list starts right of the keyboard, so ▶ from the last key of any of its rows comes here (ResultsInset).
         LazyColumn(Modifier.fillMaxSize().padding(start = ContentStart - ResultsInset), state = rememberLazyListState(), contentPadding = PaddingValues(top = 60.dp, bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            if (results.shows.isNotEmpty()) {
-                item("shows") {
-                    PosterSection("TV Shows", results.shows, library, memory) { it.open(onOpenShow, onOpenMovie, onPlay, notMatched) }
-                }
+            if (shows.isNotEmpty()) {
+                item("shows") { PosterSection("TV Shows", shows, library, memory, state.several, open) }
             }
-            if (results.movies.isNotEmpty()) {
-                item("movies") {
-                    PosterSection("Movies", results.movies, library, memory) { it.open(onOpenShow, onOpenMovie, onPlay, notMatched) }
-                }
+            if (movies.isNotEmpty()) {
+                item("movies") { PosterSection("Movies", movies, library, memory, state.several, open) }
             }
             if (liveRow != null) item("live") { liveRow() }
             val notInLibrary = requestable.besides(results)
@@ -286,21 +329,25 @@ private fun Results(
                     }
                 }
             }
-            if (results.episodes.isNotEmpty()) {
+            if (episodes.isNotEmpty()) {
                 item("episodes") {
                     Column {
-                        SectionHeader("Episodes", small = "${results.episodes.size}", start = ResultsInset)
+                        SectionHeader("Episodes", small = "${episodes.size}", start = ResultsInset)
                         CardRow(start = ResultsInset) {
-                            items(results.episodes, key = { it.episodeId }) { e ->
+                            items(episodes, key = { "${it.serverId.orEmpty()}:${it.item.episodeId}" }) { hit ->
+                                val e = hit.item
+                                val server = hit.serverId
                                 MediaCard(
                                     title = e.showTitle,
                                     subtitle = e.airedLine(),
-                                    imageUrl = library.imageUrl(e.stillPath ?: e.showBackdropPath, ImageSize.W780),
+                                    imageUrl = hit.picture(library, e.stillPath ?: e.showBackdropPath, ImageSize.W780),
                                     artWidth = 320.dp,
                                     artHeight = 180.dp,
-                                    onClick = { onOpenEpisode(e.showId, e.season, e.episodeId) },
-                                    onLongClick = { e.playRequest()?.let(onPlay) ?: onOpenShow(e.showId) },
-                                    modifier = Modifier.focusMemory(memory, "ep:${e.episodeId}"),
+                                    onClick = { if (server == null) onOpenEpisode(e.showId, e.season, e.episodeId) else onOpenElsewhere(server, e.pageElsewhere()) },
+                                    // Holding OK plays on the server in use; one on another server is opened there first.
+                                    onLongClick = if (server == null) ({ e.playRequest()?.let(onPlay) ?: onOpenShow(e.showId) }) else null,
+                                    modifier = Modifier.focusMemory(memory, "ep:${server.orEmpty()}:${e.episodeId}").onServer(e.showTitle, hit.serverName),
+                                    line = serverLine(hit.serverName, state.several),
                                 ) {
                                     if (e.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(10.dp), BadgeStyle.Gold)
                                     if (!e.hasFile) ArtBadge("Not in library", Modifier.align(Alignment.TopEnd).padding(10.dp), BadgeStyle.Warn)
@@ -311,6 +358,66 @@ private fun Results(
                         }
                     }
                 }
+            }
+            if (state.stillAsking.isNotEmpty() || state.unlisted.isNotEmpty()) {
+                item("servers") { ServersTail(state, onRetry, Modifier.padding(start = ResultsInset, end = 58.dp)) }
+            }
+        }
+    }
+}
+
+/** A picture from the server its title is on. */
+private fun SearchViewModel.Hit<*>.picture(library: LibraryRepository, path: String?, size: ImageSize): String? =
+    serverId?.let { library.imageUrlOn(it, path, size) } ?: library.imageUrl(path, size)
+
+/** A card on another server says so to TalkBack: "Harbor Nights, on Cabin server". */
+private fun Modifier.onServer(title: String, serverName: String?): Modifier =
+    if (serverName == null) this else semantics { contentDescription = "$title, on $serverName" }
+
+/**
+ * The line under a card's title that names its server (`.sv`), when it isn't
+ * the one in use. With several servers searched every card keeps the line's
+ * room ([keepRoom]), so a row doesn't grow, and nothing under it moves, when
+ * another server's titles arrive.
+ */
+private fun serverLine(serverName: String?, keepRoom: Boolean): (@Composable () -> Unit)? = when {
+    serverName != null -> {
+        {
+            Row(Modifier.padding(top = 2.dp).height(24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Icon(WmmIcons.Server, contentDescription = null, tint = WmmColors.TextSoft, modifier = Modifier.size(16.dp))
+                Text(serverName, style = inter(17.sp, FontWeight.SemiBold), color = Color(0xFFE5E5E5), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+    keepRoom -> {
+        { Box(Modifier.padding(top = 2.dp).height(24.dp)) }
+    }
+    else -> null
+}
+
+/**
+ * The end of the results when search looks in several servers: the ones
+ * still being asked, then a line for each whose titles aren't listed, with
+ * Try again where asking again may help.
+ */
+@Composable
+private fun ServersTail(state: SearchViewModel.State, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (state.stillAsking.isNotEmpty()) {
+            Row(
+                Modifier.heightIn(min = 56.dp).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                CircularProgressIndicator(Modifier.size(22.dp), color = WmmColors.Accent, strokeWidth = 3.dp, trackColor = Color.White.copy(alpha = 0.22f))
+                Text(stillAsking(state.stillAsking), style = inter(20.sp), color = WmmColors.TextSoft)
+            }
+        }
+        state.unlisted.forEach { server ->
+            Row(Modifier.heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Icon(WmmIcons.Alert, contentDescription = null, tint = WmmColors.Warn, modifier = Modifier.size(24.dp))
+                Text(server.line, style = inter(20.sp, lineHeight = 28.sp), color = WmmColors.TextSoft, modifier = Modifier.weight(1f, fill = false).semantics { liveRegion = LiveRegionMode.Polite })
+                if (server.retry) TvButton("Try again", onRetry, Modifier.padding(start = 8.dp), size = TvButtonSize.Settings)
             }
         }
     }
@@ -347,20 +454,29 @@ private fun NotInLibraryCard(item: Requestable, library: LibraryRepository, memo
 }
 
 @Composable
-private fun PosterSection(title: String, items: List<BrowseItem>, library: LibraryRepository, memory: FocusMemory, onOpen: (BrowseItem) -> Unit) {
+private fun PosterSection(
+    title: String,
+    items: List<SearchViewModel.Hit<BrowseItem>>,
+    library: LibraryRepository,
+    memory: FocusMemory,
+    several: Boolean,
+    onOpen: (SearchViewModel.Hit<BrowseItem>) -> Unit,
+) {
     Column {
         SectionHeader(title, small = "${items.size}", start = ResultsInset)
         CardRow(start = ResultsInset) {
-            items(items, key = { it.id }) { item ->
+            items(items, key = { "${it.serverId.orEmpty()}:${it.item.id}" }) { hit ->
+                val item = hit.item
                 MediaCard(
                     title = item.title,
                     subtitle = item.gridSubtitle(),
-                    imageUrl = library.imageUrl(item.posterPath, ImageSize.W342),
+                    imageUrl = hit.picture(library, item.posterPath, ImageSize.W342),
                     artWidth = 190.dp,
                     artHeight = 285.dp,
-                    onClick = { onOpen(item) },
+                    onClick = { onOpen(hit) },
                     focusedScale = 1.08f,
-                    modifier = Modifier.focusMemory(memory, "${item.kind}:${item.id}"),
+                    modifier = Modifier.focusMemory(memory, "${item.kind}:${hit.serverId.orEmpty()}:${item.id}").onServer(item.title, hit.serverName),
+                    line = serverLine(hit.serverName, several),
                 ) {
                     if (item.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(8.dp), BadgeStyle.Gold)
                     ArtWatched(item.watched)

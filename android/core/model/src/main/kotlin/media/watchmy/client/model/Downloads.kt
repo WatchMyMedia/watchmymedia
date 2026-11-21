@@ -163,6 +163,11 @@ data class DownloadStorage(val usedBytes: Long, val freeBytes: Long, val totalBy
 
 data class DownloadSettings(val quality: DownloadQuality = DownloadQuality.Original, val wifiOnly: Boolean = true)
 
+/** How many downloads a device holds from one server, and the space they take. */
+data class DownloadTotals(val count: Int, val bytes: Long)
+
+private val NoTotals: StateFlow<Map<String, DownloadTotals>> = MutableStateFlow(emptyMap<String, DownloadTotals>()).asStateFlow()
+
 /**
  * Downloads to watch offline on a phone or tablet.
  * Everything here is for the account signed in now. Methods that talk to
@@ -180,6 +185,13 @@ interface DownloadRepository {
     val downloads: StateFlow<List<OfflineDownload>>
 
     val settings: StateFlow<DownloadSettings>
+
+    /**
+     * What this device holds from each registered server, by server id: the
+     * one in use and the others signed in here. A server with nothing here
+     * is left out.
+     */
+    val byServer: StateFlow<Map<String, DownloadTotals>> get() = NoTotals
 
     /** How [fileId] would download at each quality. */
     suspend fun plan(fileId: Long): DownloadPlan

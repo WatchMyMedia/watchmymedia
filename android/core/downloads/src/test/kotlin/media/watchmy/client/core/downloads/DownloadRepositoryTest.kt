@@ -276,7 +276,7 @@ class DownloadRepositoryTest {
         r.mark(42, true)
         gateway.syncError = null
         gateway.syncs.clear()
-        gateway.beforeSignOutHooks.forEach { it() }
+        gateway.beforeSignOutHooks.forEach { it(OWNER) }
         val sent = gateway.syncs.single()
         assertEquals(DeviceDownloadState.Removed, sent.downloads.single().state)
         assertEquals(true, sent.progress.single().watched)
@@ -300,6 +300,30 @@ class DownloadRepositoryTest {
         gateway.current = OWNER
         gateway.changeSession()
         assertEquals(1, r.downloads.value.size)
+    }
+
+    @Test
+    fun `removing a server that isn't in use reports its downloads removed and deletes them at once`() = runTest {
+        val r = repo()
+        r.download(DownloadChoice(42, DownloadQuality.Original))
+        // On another server, signed in too: the first one's download is kept, and counted as its own.
+        val other = OfflineOwner("other", 9, "http://other", 10)
+        gateway.current = other
+        gateway.signedIn += other.key
+        gateway.changeSession()
+        assertEquals(setOf(OWNER.serverId), r.byServer.value.keys)
+        assertEquals(1, r.byServer.value.getValue(OWNER.serverId).count)
+        // The first server is removed while the other is in use: its sign-in ends, which the gateway says.
+        gateway.syncs.clear()
+        gateway.syncedAs.clear()
+        gateway.beforeSignOutHooks.forEach { it(OWNER) }
+        assertEquals("reported to the server it came from, as its own account", listOf(OWNER), gateway.syncedAs)
+        assertEquals(DeviceDownloadState.Removed, gateway.syncs.single().downloads.single().state)
+        gateway.signedIn -= OWNER.key
+        gateway.changeSession()
+        assertTrue("deleted without waiting for a switch or a sync", RECORD_ID in engine.removed)
+        assertTrue(r.byServer.value.isEmpty())
+        assertTrue(r.downloads.value.isEmpty())
     }
 
     @Test
@@ -468,7 +492,10 @@ class DownloadRepositoryTest {
         var current: OfflineOwner? = OWNER
         val signedIn = mutableSetOf(OWNER.key)
         private val listeners = mutableListOf<() -> Unit>()
-        val beforeSignOutHooks = mutableListOf<suspend () -> Unit>()
+        val beforeSignOutHooks = mutableListOf<suspend (OfflineOwner) -> Unit>()
+
+        /** Whose each sync was, in order. */
+        val syncedAs = mutableListOf<OfflineOwner>()
         var allowed = true
         var state = OfflineRecordState.Ready
         var replacedBy: Long? = null
@@ -493,7 +520,7 @@ class DownloadRepositoryTest {
         override fun onSessionChange(listener: () -> Unit) {
             listeners += listener
         }
-        override fun beforeSignOut(hook: suspend () -> Unit) {
+        override fun beforeSignOut(hook: suspend (owner: OfflineOwner) -> Unit) {
             beforeSignOutHooks += hook
         }
         override suspend fun allowed(owner: OfflineOwner) = allowed
@@ -533,6 +560,7 @@ class DownloadRepositoryTest {
                 throw SignedOutException()
             }
             syncs += Sync(downloads, progress)
+            syncedAs += owner
             val listedRecords = if (!listed) emptyList() else records.values.filter { r -> downloads.any { it.id == r.id && it.state != DeviceDownloadState.Removed } }
                 .map { it.copy(state = state, replacedBy = replacedBy.takeIf { state == OfflineRecordState.Replaced }) }
             return SyncReply(allowed, listedRecords, progress.map { SyncResult(SyncOutcome.Applied, watch) })

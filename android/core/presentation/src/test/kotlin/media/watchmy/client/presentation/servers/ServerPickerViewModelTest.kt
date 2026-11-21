@@ -9,6 +9,7 @@ import media.watchmy.client.fake.FakeServerRepository
 import media.watchmy.client.presentation.MainDispatcherRule
 import media.watchmy.client.presentation.keepCollecting
 import media.watchmy.client.model.ApiException
+import media.watchmy.client.model.alreadyAdded
 import media.watchmy.client.model.SavedServer
 import media.watchmy.client.model.Server
 import media.watchmy.client.model.ServerRepository
@@ -50,8 +51,8 @@ class ServerPickerViewModelTest {
         assertEquals("192.168.1.20:27587 · v0.9.3 · signed in as Sam", found[0].detail)
         assertEquals("office-mini.local:27587 · v0.9.1 · not signed in", found[1].detail)
         assertTrue(found[0].current)
-        assertEquals(listOf("home.watchmy.media"), s.remembered.map { it.name })
-        assertTrue(s.remembered[0].detail, s.remembered[0].detail.startsWith("Last used 3 days ago"))
+        assertEquals("most recently used first", listOf("Cabin server", "Den server", "home.watchmy.media"), s.remembered.map { it.name })
+        assertTrue(s.remembered[2].detail, s.remembered[2].detail.startsWith("Last used 3 days ago"))
     }
 
     @Test fun `a remembered server over plain http beyond this network is marked Not encrypted`() = runTest {
@@ -63,7 +64,10 @@ class ServerPickerViewModelTest {
         keepCollecting(vm.state)
         val s = vm.state.value
         assertEquals("on this network", listOf(false, false), s.discovered!!.map { it.notEncrypted })
-        assertEquals(mapOf("home.watchmy.media" to false, "Lake house" to true), s.remembered.associate { it.name to it.notEncrypted })
+        assertEquals(
+            mapOf("Cabin server" to false, "Den server" to false, "home.watchmy.media" to false, "Lake house" to true),
+            s.remembered.associate { it.name to it.notEncrypted },
+        )
     }
 
     @Test fun `choosing a server selects it and reports back`() = runTest {
@@ -115,8 +119,60 @@ class ServerPickerViewModelTest {
 
     @Test fun `forgetting a remembered server removes it`() = runTest {
         keepCollecting(vm.state)
-        vm.forget(vm.state.value.remembered.single())
-        assertTrue(vm.state.value.remembered.isEmpty())
+        vm.forget(vm.state.value.remembered.first { it.name == "home.watchmy.media" })
+        assertEquals(listOf("Cabin server", "Den server"), vm.state.value.remembered.map { it.name })
+    }
+
+    @Test fun `Add a server leaves out the servers already registered and names them`() = runTest {
+        val vm = ServerPickerViewModel(servers, adding = true)
+        keepCollecting(vm.state)
+        val s = vm.state.value
+        assertEquals("the Living room server is on this network, and added already", listOf("Office Mac mini"), s.discovered!!.map { it.name })
+        assertTrue(s.remembered.isEmpty())
+        assertEquals("the one in use first", listOf("Living room server", "Cabin server", "Den server", "home.watchmy.media"), s.alreadyAdded)
+        assertEquals("Already added: Living room server, Cabin server, Den server, home.watchmy.media.", alreadyAdded(s.alreadyAdded))
+        assertFalse(s.full)
+    }
+
+    @Test fun `Add a server chooses one that isn't registered`() = runTest {
+        val vm = ServerPickerViewModel(servers, adding = true)
+        keepCollecting(vm.state)
+        vm.chosen.test {
+            vm.choose(vm.state.value.discovered!!.single())
+            awaitItem()
+        }
+        assertEquals("srv-office", servers.current.value?.server?.id)
+    }
+
+    @Test fun `an address that reaches a registered server says it is added already, and chooses nothing`() = runTest {
+        val vm = ServerPickerViewModel(servers, adding = true)
+        keepCollecting(vm.state)
+        vm.setAddress("192.168.4.31")
+        vm.connectToAddress()
+        assertEquals("Cabin server is already added. Choose it in Servers to switch to it.", vm.state.value.addressError)
+        assertEquals("srv-living", servers.current.value?.server?.id)
+        assertNull(vm.state.value.connecting)
+    }
+
+    @Test fun `with twelve registered, Add a server adds nothing until one is removed`() = runTest {
+        val twelve = (1..12).map { SavedServer(Server("srv-$it", "Server $it", "http://10.0.0.$it:27587", "0.9.3", 7), "Sam", true, it.toLong(), 1) }
+        val full = object : ServerRepository by servers {
+            override val saved: Flow<List<SavedServer>> = MutableStateFlow(twelve)
+        }
+        val vm = ServerPickerViewModel(full, adding = true, device = "tablet")
+        keepCollecting(vm.state)
+        assertTrue(vm.state.value.full)
+        vm.setAddress("office-mini.local")
+        vm.connectToAddress()
+        assertEquals(
+            "This tablet keeps up to 12 servers. Remove one in Settings › Account & devices › Servers, then add this one.",
+            vm.state.value.addressError,
+        )
+        assertEquals("srv-living", servers.current.value?.server?.id)
+        // Outside Add a server the picker has no limit: it only chooses among servers.
+        val picker = ServerPickerViewModel(full)
+        keepCollecting(picker.state)
+        assertFalse(picker.state.value.full)
     }
 
     @Test fun `each choice is told once, and a later look at the picker is not told again`() = runTest {

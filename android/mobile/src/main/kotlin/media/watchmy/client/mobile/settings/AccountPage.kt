@@ -39,7 +39,7 @@ import media.watchmy.client.mobile.components.PhoneIcons
 import media.watchmy.client.mobile.downloads.DangerText
 import media.watchmy.client.model.DeviceSession
 import media.watchmy.client.model.REVOKE_BODY
-import media.watchmy.client.model.displayAddress
+import media.watchmy.client.model.SERVERS
 import media.watchmy.client.model.formatAgo
 import media.watchmy.client.model.kindLabel
 import media.watchmy.client.model.plural
@@ -62,7 +62,8 @@ import media.watchmy.client.ui.components.skeletonLine
 /**
  * Settings › Account & devices, in the web's order: who and
  * where, Change password, this device's name, the signed-in devices, Link a
- * TV, the server, and signing out apart at the bottom. Signing a device or
+ * TV, the servers this device is signed in to, and signing out apart at the
+ * bottom. Signing a device or
  * this one out asks first. What was just done shows as a card at the top
  * until it is put away or the page is left.
  */
@@ -71,11 +72,12 @@ internal fun AccountPage(
     tablet: Boolean,
     onChangePassword: () -> Unit,
     onLinkTv: () -> Unit,
-    onSwitchServer: () -> Unit,
+    onServers: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val vm = settingsModel()
     val state by vm.state.collectAsStateWithLifecycle()
+    val servers by serversModel().state.collectAsStateWithLifecycle()
     val downloads by downloadsModel().state.collectAsStateWithLifecycle()
     val services = LocalAppServices.current
     val device = deviceWord()
@@ -176,9 +178,9 @@ internal fun AccountPage(
         if (tablet) {
             // The tablet board's foot: Switch server beside Sign out, apart from the panels.
             Row(Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onSwitchServer) {
-                    Text("Switch server", style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = WmmColors.TextSoft))
-                    if (server != null) Text(" · ${server.name}", style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = WmmColors.TextMuted))
+                TextButton(onClick = onServers) {
+                    Text(SERVERS, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = WmmColors.TextSoft))
+                    if (server != null) Text(" · ${servers.summary}", style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = WmmColors.TextMuted))
                 }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { dialog = DIALOG_SIGN_OUT }) {
@@ -190,10 +192,11 @@ internal fun AccountPage(
         } else {
             PageHeading("Server", tablet = false)
             ListRow(
-                "Switch server",
-                subtitle = server?.let { "${it.name} · ${displayAddress(it.baseUrl)}" },
+                SERVERS,
+                // Before the list is in, the server in use by its name.
+                subtitle = if (servers.rows.isEmpty()) server?.name else servers.summary,
                 minHeight = 60.dp,
-                modifier = Modifier.clickable(onClick = onSwitchServer),
+                modifier = Modifier.clickable(onClick = onServers),
                 leading = { IconTile(WmmIcons.Server, background = WmmColors.Surface2, tint = WmmColors.TextSoft) },
                 trailing = { Chevron() },
             )

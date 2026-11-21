@@ -1,5 +1,10 @@
 package media.watchmy.client.mobile.downloads
 
+import androidx.compose.ui.semantics.Role
+import media.watchmy.client.mobile.components.ListRow
+import media.watchmy.client.mobile.navigation.OpenServers
+import media.watchmy.client.model.moreDownloadsFrom
+import media.watchmy.client.presentation.servers.ServersViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -95,6 +100,8 @@ fun DownloadsScreen(
     onOpenEpisode: (showId: Long, season: Int, episodeId: Long) -> Unit,
     onNavigate: (Any) -> Unit,
     modifier: Modifier = Modifier,
+    /** The other registered servers this device holds downloads from: a line each under the list, which switches to it. */
+    elsewhere: List<ServersViewModel.Row> = emptyList(),
 ) {
     val services = LocalAppServices.current
     val vm = viewModel { DownloadsViewModel(services.downloads) }
@@ -121,6 +128,24 @@ fun DownloadsScreen(
                 PhoneDownloads(state, open, { menuFor = it.id }, onOpenShow, onRemove = { vm.remove(it.id) }, onHome = { onNavigate(MobileRoutes.Home) })
             }
             MessageHost(state.message, vm::messageShown, Modifier.align(Alignment.BottomCenter))
+        }
+        // The list is the server in use's. What is held from another is a switch away.
+        if (elsewhere.isNotEmpty()) {
+            Column(Modifier.fillMaxWidth().background(WmmColors.Ground)) {
+                Box(Modifier.fillMaxWidth().height(1.dp).background(WmmColors.Line))
+                elsewhere.forEach { server ->
+                    val count = server.downloads?.count ?: return@forEach
+                    ListRow(
+                        moreDownloadsFrom(count, server.name),
+                        minHeight = 52.dp,
+                        titleSize = 14,
+                        modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Switch to ${server.name}") { onNavigate(OpenServers(choose = server.serverId)) }
+                            .padding(horizontal = if (layout.isTablet) 8.dp else 0.dp),
+                        leading = { Icon(WmmIcons.Server, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(20.dp)) },
+                        trailing = { Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(22.dp)) },
+                    )
+                }
+            }
         }
     }
 

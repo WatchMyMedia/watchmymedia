@@ -77,7 +77,7 @@ class AccessibilityTest {
     fun `the autoplay row is one switch, and On mobile data picks a quality`() {
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides FakeAppServices()) {
-                SettingsScreen(onSwitchServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {}, open = SettingsGroup.Playback)
+                SettingsScreen(onAddServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {}, open = SettingsGroup.Playback)
             }
         }
         val autoplay = compose.onNode(hasText("Autoplay next episode") and isToggleable())

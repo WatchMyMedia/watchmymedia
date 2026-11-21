@@ -8,6 +8,9 @@ import media.watchmy.client.model.CastGateway
 import media.watchmy.client.model.CastServer
 import media.watchmy.client.model.CastState
 import media.watchmy.client.model.CastToken
+import media.watchmy.client.model.SavedServer
+import media.watchmy.client.model.Server
+import media.watchmy.client.model.User
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -17,6 +20,22 @@ import com.google.android.gms.cast.framework.CastState as Sdk
 
 /** What the phone's Cast button shows ([castState]) and whether the server casts ([serverCasts]). */
 class CastStateTest {
+    @Test
+    fun `a cast ends when the sign-in in use changes, and not when one begins`() {
+        val living = SavedServer(Server("srv-living", "Living room server", "http://192.168.1.20:27587", "1.0.0", 30), "Sam", true, 0, 1)
+        val cabin = SavedServer(Server("srv-cabin", "Cabin server", "http://192.168.4.31:27587", "1.0.0", 30), "Sam", true, 0, 1)
+        val sam = User(1, "Sam", true)
+        val onLiving = castIdentity(living, sam)
+        assertEquals("the same person's id on another server is another sign-in", false, onLiving == castIdentity(cabin, sam))
+        assertTrue("a switch to another server", endsCast(onLiving, castIdentity(cabin, sam)))
+        assertTrue("another person on the same server", endsCast(onLiving, castIdentity(living, User(2, "Alex", false))))
+        assertTrue("signing out", endsCast(onLiving, castIdentity(living, null)))
+        assertFalse("nothing changed", endsCast(onLiving, castIdentity(living, sam)))
+        assertFalse("a rename is the same sign-in", endsCast(onLiving, castIdentity(living, sam.copy(name = "Samira"))))
+        assertFalse("signing in from signed out", endsCast(null, onLiving))
+        assertFalse(endsCast(castIdentity(null, null), castIdentity(living, null)))
+    }
+
     @Test
     fun `examples`() {
         assertEquals(CastState.Unavailable, state(sdkReady = false))

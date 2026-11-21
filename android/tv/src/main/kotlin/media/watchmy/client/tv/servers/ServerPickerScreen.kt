@@ -40,6 +40,9 @@ import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
+import media.watchmy.client.model.ADD_A_SERVER
+import media.watchmy.client.model.alreadyAdded
+import media.watchmy.client.model.serversFull
 import media.watchmy.client.model.MIN_SERVER_VERSION
 import media.watchmy.client.model.needsHttpsNudge
 import media.watchmy.client.tv.components.FocusableBox
@@ -68,12 +71,16 @@ private const val HTTP_NOTE =
  * servers on this network, remembered ones, or a typed address. [onBack],
  * when given, leaves without changing the server (picking again from
  * sign-in or Settings).
+ *
+ * [adding] is Add a server: the same screen without the servers this TV is
+ * signed in to already, which are named under the list, since choosing one
+ * of those is a switch, made in Servers.
  */
 @Composable
-fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null) {
+fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null, adding: Boolean = false) {
     val services = LocalAppServices.current
     // Its own for each visit, not the Activity's: a second visit starts afresh, and looking for servers stops when it goes.
-    val vm = viewModel(rememberViewModelStoreOwner()) { ServerPickerViewModel(services.servers) }
+    val vm = viewModel(rememberViewModelStoreOwner()) { ServerPickerViewModel(services.servers, adding = adding, device = "TV") }
     val form by vm.state.collectAsStateWithLifecycle()
     // One list on the TV: found on this network, then remembered.
     val rows = form.discovered?.let { it + form.remembered }
@@ -101,13 +108,14 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
 
         Column(Modifier.padding(start = 160.dp, top = 200.dp).width(820.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
             Kicker("Servers")
-            Text("Choose a server", style = inter(60.sp, FontWeight.Bold, lineHeight = 65.sp, tracking = -0.02f), color = WmmColors.Text)
+            Text(if (adding) ADD_A_SERVER else "Choose a server", style = inter(60.sp, FontWeight.Bold, lineHeight = 65.sp, tracking = -0.02f), color = WmmColors.Text)
             Text("Servers on this network appear by themselves.", style = inter(24.sp), color = WmmColors.TextMuted)
+            if (adding && form.full) Text(serversFull("TV"), style = inter(22.sp, lineHeight = 32.sp), color = WmmColors.Warn)
             val list = rows
             when {
                 list == null -> Text("Looking for servers…", style = inter(22.sp), color = WmmColors.TextMuted)
                 list.isEmpty() && !showAccess -> Text(
-                    "No servers found on this network yet. Enter an address instead.",
+                    if (adding && form.alreadyAdded.isNotEmpty()) "No other servers found on this network yet. Enter an address instead." else "No servers found on this network yet. Enter an address instead.",
                     style = inter(22.sp),
                     color = WmmColors.TextMuted,
                 )
@@ -129,6 +137,8 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                     }
                 }
             }
+            // The ones this TV is signed in to already aren't offered again.
+            alreadyAdded(form.alreadyAdded)?.let { Text(it, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.TextMuted) }
             form.error?.let { Text(it, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.Error) }
         }
 

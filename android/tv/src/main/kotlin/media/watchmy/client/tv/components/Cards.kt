@@ -93,6 +93,8 @@ fun MediaCard(
     onLongClick: (() -> Unit)? = null,
     focusedScale: Float = 1.06f,
     seed: String = title,
+    /** A line between the title and the grey line: the server a search result is on. */
+    line: (@Composable () -> Unit)? = null,
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val row = LocalCardRowFocus.current
@@ -134,6 +136,7 @@ fun MediaCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            line?.invoke()
             Text(
                 subtitle.orEmpty(),
                 modifier = Modifier.padding(top = 2.dp),

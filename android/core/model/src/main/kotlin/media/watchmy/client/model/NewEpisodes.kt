@@ -154,20 +154,27 @@ fun followsAccount(server: Server?, user: User?): String? {
     return java.security.MessageDigest.getInstance("SHA-256").digest(identity.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 }
 
-/** The cursor a device keeps, and the account ([followsAccount]) it is for: one server and person. */
-data class NewEpisodesCursor(val account: String, val cursor: String)
-
-/** Where a device keeps its [NewEpisodesCursor]; one at a time, for the account signed in. */
+/**
+ * Where a device keeps its place in the new-episode feed: one cursor for
+ * each account ([followsAccount]) signed in on it, so coming back to a
+ * server carries on from where its last check left off.
+ */
 interface NewEpisodesCursors {
-    fun read(): NewEpisodesCursor?
+    /** The cursor kept for [account]; null before its first check. */
+    fun read(account: String): String?
 
-    /** Keeps [cursor]; null forgets it (signed out, or another server or person). */
-    fun keep(cursor: NewEpisodesCursor?)
+    fun keep(account: String, cursor: String)
+
+    /** Forgets [account]'s cursor, so its next check starts from now. */
+    fun forget(account: String)
+
+    /** Forgets every cursor but those of [accounts]: the accounts no longer signed in on this device. */
+    fun keepOnly(accounts: Set<String>)
 }
 
 /** How one check ended. */
 sealed interface NewEpisodeCheck {
-    /** No one is signed in: the cursor is forgotten. */
+    /** No one is signed in: nothing is asked. */
     data object SignedOut : NewEpisodeCheck
 
     /** The first check for this server and person: the cursor is kept and nothing is shown, as the device starts from now. */
@@ -188,9 +195,9 @@ sealed interface NewEpisodeCheck {
  * feed with the cursor kept for this server and person, [show] a
  * notification for each show in the reply, then keep the new cursor. The
  * first check for an account asks without a cursor and only keeps the one it
- * gets. A cursor kept for another account is not used. [account] is asked
- * again before anything is shown or kept, so a sign-out or switch while the
- * server answers leaves nothing behind.
+ * gets. Each account has its own cursor, so another's is never used.
+ * [account] is asked again before anything is shown or kept, so a sign-out
+ * or switch while the server answers leaves nothing behind.
  */
 suspend fun checkNewEpisodes(
     account: () -> String?,
@@ -198,12 +205,8 @@ suspend fun checkNewEpisodes(
     fetch: suspend (after: String?) -> NewEpisodes,
     show: (List<NewEpisodeGroup>) -> Unit,
 ): NewEpisodeCheck {
-    val who = account()
-    if (who == null) {
-        cursors.keep(null)
-        return NewEpisodeCheck.SignedOut
-    }
-    val after = cursors.read()?.takeIf { it.account == who }?.cursor
+    val who = account() ?: return NewEpisodeCheck.SignedOut
+    val after = cursors.read(who)
     val reply = try {
         fetch(after)
     } catch (e: CancellationException) {
@@ -213,11 +216,11 @@ suspend fun checkNewEpisodes(
     }
     if (account() != who) return NewEpisodeCheck.Moved
     if (after == null) {
-        cursors.keep(NewEpisodesCursor(who, reply.cursor))
+        cursors.keep(who, reply.cursor)
         return NewEpisodeCheck.Started
     }
     if (reply.shows.isNotEmpty()) show(reply.shows)
-    cursors.keep(NewEpisodesCursor(who, reply.cursor))
+    cursors.keep(who, reply.cursor)
     return NewEpisodeCheck.Shown(reply.shows)
 }
 

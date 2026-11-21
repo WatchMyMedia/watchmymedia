@@ -2,6 +2,7 @@ package media.watchmy.client.model
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import java.util.Locale
 
 /** The API level this app needs; servers below it are refused (GET /api/server). */
@@ -224,7 +225,44 @@ data class SavedServer(
     val userName: String?,
     val signedIn: Boolean,
     val lastUsedAtMs: Long,
-)
+    /** The person signed in on it; null when no one is. With [server] it names the account its links carry ([linkAccount]). */
+    val userId: Long? = null,
+) {
+    /**
+     * Registered: this device has signed in to it and not removed it. One
+     * whose sign-in ended stays registered, as signed out, until it is signed
+     * in to again or removed. A server chosen and never signed in to is not.
+     */
+    val registered: Boolean get() = userName != null
+}
+
+/** The most servers a device keeps registered; Add a server says to remove one first. */
+const val MAX_SERVERS = 12
+
+/**
+ * The registered servers as Servers lists them: the one in use first, then
+ * the most recently used.
+ */
+fun List<SavedServer>.registered(currentId: String?): List<SavedServer> =
+    filter { it.registered }.sortedWith(compareByDescending<SavedServer> { it.server.id == currentId }.thenByDescending { it.lastUsedAtMs })
+
+/** How a switch to another registered server ended ([ServerRepository.switchTo]). */
+enum class ServerSwitch {
+    /** It is the server in use now, signed in. */
+    Switched,
+
+    /** It is the server in use now and its sign-in has ended there: the app shows its sign-in. */
+    NeedsSignIn,
+
+    /** It didn't answer, or another server answers at its address: the server in use is unchanged. */
+    Unreachable,
+
+    /** It answered and is older than this app works with: the server in use is unchanged. */
+    TooOld,
+
+    /** It is no longer on this device. */
+    Gone,
+}
 
 /**
  * Servers: found on the network, remembered, and the one in use. Methods
@@ -250,6 +288,26 @@ interface ServerRepository {
     /** Makes [server] the one in use. */
     suspend fun select(server: Server)
 
-    /** Forgets a remembered server and its sign-in. */
+    /**
+     * Makes the registered server [serverId] the one in use and keeps every
+     * sign-in. It is asked which server it is first (GET /api/server at the
+     * address kept, a few seconds at most): the id must be the one
+     * remembered, and when it doesn't answer the server in use stays as it
+     * was. [ask] false skips the question: the server has just answered (a
+     * search), or the person chose to watch its downloads without it.
+     */
+    suspend fun switchTo(serverId: String, ask: Boolean = true): ServerSwitch {
+        val target = saved.first().firstOrNull { it.server.id == serverId } ?: return ServerSwitch.Gone
+        select(target.server)
+        return if (target.signedIn) ServerSwitch.Switched else ServerSwitch.NeedsSignIn
+    }
+
+    /**
+     * Removes a remembered server: ends its session there when it can be
+     * reached, and deletes its sign-in and what the device kept for it, its
+     * downloads included. When it was the one in use, the most recently used
+     * server that is still signed in takes its place; with none, no server is
+     * chosen.
+     */
     suspend fun forget(serverId: String)
 }
