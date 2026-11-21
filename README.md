@@ -15,7 +15,7 @@ This README is for building and running it from source.
 ## Layout
 
 - `server/` — Go server (chi + huma API, SQLite via sqlc/goose, ffmpeg orchestration, embedded web UI)
-- `web/` — React + Vite web client, API types generated from the server's OpenAPI; the Cast receiver in `web/receiver`
+- `web/` — React + Vite web client, API types generated from the server's OpenAPI; the Cast receiver in `web/receiver`, and the Samsung TV app in `web/tizen` ([web/tizen/README.md](web/tizen/README.md))
 - `android/` — Android app for phones, tablets, Google TV and Android TV ([android/README.md](android/README.md))
 - `apple/` — iPhone, iPad and Apple TV apps ([apple/README.md](apple/README.md))
 - `macos/` — the Mac menu bar app that runs the server
@@ -363,6 +363,16 @@ The native apps (Android below; the iPhone app below that) use the same server:
 - **Signed-in devices.** Settings lists every browser and app signed in to your account, with
   Sign out for each. Admins can see everyone's. Changing your password signs out everything
   except the browser you changed it from.
+- **Several servers.** The Android, Apple and Samsung TV apps stay signed in to as many as 12
+  servers, each with its own sign-in. Servers, from the account button (the last tab on Apple
+  TV), switches between them without a password, and Add a server signs in to another. Search
+  asks every server signed in, and a result from another server switches to it. The list stays
+  on the device and the server has no part in it, so any server the apps work with can be one
+  of them. A kept address is only where that server was last seen, so before an app sends the
+  sign-in of a server that isn't the one in use, it asks the address which server it is
+  (`GET /api/server`) and sends nothing unless the id is the one it remembers. Each app's
+  README has the details: [Android](android/README.md#several-servers),
+  [Apple](apple/README.md#several-servers), [Samsung TV](web/tizen/README.md).
 
 ## Android app
 
@@ -862,6 +872,14 @@ else is a server binary someone runs. A pre-release
 server is offered pre-releases too, and a development build is never offered an update.
 Nothing is checked in the background; `updates.enabled: false`
 (`WATCHMYMEDIA_UPDATES_ENABLED=false`) hides the button.
+
+A release whose changelog says it changes the server's database, as 2.0.0 does, can't be
+undone by installing the older version alone: an older server can't use the changed database.
+Make a backup before updating. To go back, install the older version (for Docker, its tag,
+such as `ghcr.io/watchmymedia/watchmymedia:1.8.0`) and restore that backup. The Debian, Ubuntu
+and Fedora packages update with the system, so there the last backup made before the update,
+nightly or at a start, is the one to restore; the server makes one soon after each start, so
+the newest may already be from after it.
 
 ## Web UI
 
@@ -1512,9 +1530,10 @@ History stays on the server.
 
 ## Offline downloads
 
-The Android app on phones and tablets can download a movie or an episode to watch with no
-connection, and its progress reaches the server when the device is back online
-(the server and web side are built, the app follows).
+The Android app on phones and tablets and the iPhone and iPad app can download a movie or an
+episode to watch with no connection, and its progress reaches the server when the device is
+back online. A download belongs to the server it came from: removing that server from a device,
+or signing out of it, deletes its downloads there.
 
 **Who may.** Settings › Users › Who can download: no one, admins only (the default) or everyone
 with an account. Turning it off for someone removes their downloads the next time their device

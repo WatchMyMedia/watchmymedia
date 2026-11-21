@@ -95,9 +95,11 @@ server. Collect, in this order:
    Activity in WatchMyMedia for the encoder.
 6. Two plays at once plus a Live TV channel; a recording into `/recordings`.
 7. Cast from the web app to a Chromecast on the LAN (Host networking).
-8. After a new `latest`: Check for Updates on the Docker page, apply, and
-   the library is still there. Settings › General says to update from the
-   Docker page.
+8. After a new `latest`: back up in Settings › Backups, then Check for
+   Updates on the Docker page, apply, and the library is still there.
+   Settings › General says to update from the Docker page. For a release
+   that changes the database, also check that the previous tag with that
+   backup restored brings the library back.
 9. Plex's hardware transcoding on the same box is the control: if Plex uses
    the GPU, the drivers and device are known good, and any failure is ours.
 
@@ -107,8 +109,9 @@ titles or screenshots of their media.
 ## Submitting to Community Applications
 
 WatchMyMedia was submitted on 2026-11-19 and approved automatically, as a
-Docker-only submission can be; it appears in Community Applications after
-the next catalog build, listed as "WatchMyMedia's Repository". It had waited
+Docker-only submission can be, and appeared in Community Applications at
+the next catalog build, on 2026-11-20, listed as "WatchMyMedia's Repository".
+It had waited
 for the repository to be open-sourced and the GHCR package to be public:
 the portal's scan refuses an image it cannot
 pull, and the policy wants a maintainer's own app to be open source. The
@@ -135,3 +138,4 @@ steps, kept for a resubmission or another templates repository:
    next catalog build.
 7. Afterwards: link the listing from the site's download page, and change
    the guide's "install by hand" step to "search Community Applications".
+   Both were done on 2026-11-20.

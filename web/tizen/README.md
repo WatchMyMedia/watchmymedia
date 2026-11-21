@@ -5,9 +5,11 @@ playing with Samsung's AVPlay. It is built for Chromium 108, the engine those
 TVs shipped with; the first test TV, a 2024 QN90D, has since been updated to
 Tizen 9.0 with Chrome 120. It matches the Android TV app's features, Live TV
 included.
-It needs a server at API level 32 or newer (WatchMyMedia 1.8). It has
-been signed with a Samsung certificate and run on that TV (below); the store
-package id and the submission are still to come.
+It needs a server at API level 32 or newer (WatchMyMedia 1.8.0). It has
+been signed with a Samsung certificate and run on that TV (below). Its first
+version, 1.0.0, went to Samsung's review on 2026-11-20. This code is 2.0.0
+(`public/config.xml`), which adds several servers; it goes to Samsung once
+1.0.0 is approved.
 
 ## Where it stands
 
@@ -25,7 +27,7 @@ Built on 2026-11-19 and checked in the browser preview; the first TV session (be
   pages on what opened them, each screen remembering its place, Return
   walking back and asking before leaving at Home, Hold OK, the remote's media,
   channel and number keys, and the offline banner.
-- Several servers: the rail's account button opens Servers (the servers
+- Several servers, from 2.0.0: the rail's account button opens Servers (the servers
   this TV has, the current one marked, Add a server, Manage servers). OK on
   another one switches at once, with "Now on …" for a moment; one that
   doesn't answer leaves the app where it was, with Try again; one signed out
@@ -239,9 +241,9 @@ Done on 2026-11-20 with a 2024 QN90D. In order:
    prints a port for Chrome's inspector (`sdb forward tcp:<local> tcp:<port>`,
    then `http://127.0.0.1:<local>/json`). If `sdb connect` keeps failing while
    port 26101 answers, `sdb kill-server` and connect again.
-5. **A server at API level 32**: until a release has it, build one from `main`
-   and run the synthetic fixture above with `WATCHMYMEDIA_HOST=0.0.0.0`, on
-   the home network only for the test, discovery off, and stop it afterwards.
+5. **A server at API level 32**, 1.8.0 or newer: a release, or one built from
+   `main` running the synthetic fixture above with `WATCHMYMEDIA_HOST=0.0.0.0`,
+   on the home network only for the test, discovery off, and stopped afterwards.
 
 What the first session on the QN90D found:
 
