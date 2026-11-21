@@ -63,6 +63,8 @@ import media.watchmy.client.mobile.components.PhoneIcons
 import media.watchmy.client.mobile.live.rememberReminderSettings
 import media.watchmy.client.mobile.navigation.MobileRoutes
 import media.watchmy.client.mobile.navigation.OnTabReselected
+import androidx.compose.foundation.layout.offset
+import media.watchmy.client.model.SERVERS
 import media.watchmy.client.model.TURN_ON_NOTIFICATIONS
 import media.watchmy.client.model.text
 import media.watchmy.client.model.title
@@ -93,10 +95,14 @@ import media.watchmy.client.ui.rememberTabletLayout
  * [onOpenPage] opens a group's page: pushed on a phone, in place of the one
  * beside the list on a tablet ([beside]). Home rows, Your requests, the
  * Inbox and Server settings open their own screens.
+ *
+ * [servers] is Account & devices' Servers page or one server's page, in
+ * the place a group's page has; [onOpenServers] opens the list (null) or a
+ * server's page, and [onAddServer] starts Add a server.
  */
 @Composable
 fun SettingsScreen(
-    onSwitchServer: () -> Unit,
+    onAddServer: () -> Unit,
     onSignedOut: () -> Unit,
     onLinkTv: () -> Unit,
     onNavigate: (Any) -> Unit,
@@ -108,6 +114,8 @@ fun SettingsScreen(
     onOpenRequests: (() -> Unit)? = null,
     onOpenInbox: (() -> Unit)? = null,
     inboxCount: Int = 0,
+    servers: ServersPage? = null,
+    onOpenServers: (serverId: String?) -> Unit = {},
 ) {
     val services = LocalAppServices.current
     val vm = settingsModel()
@@ -212,7 +220,11 @@ fun SettingsScreen(
                 onOpenPlayback = { onOpenPage(SettingsGroup.Playback, twoPane) },
                 modifier = pageModifier,
             )
-            SettingsGroup.Account -> AccountPage(twoPane, onChangePassword = { onChangePassword(twoPane) }, onLinkTv = onLinkTv, onSwitchServer = onSwitchServer, modifier = pageModifier)
+            SettingsGroup.Account -> when (servers) {
+                null -> AccountPage(twoPane, onChangePassword = { onChangePassword(twoPane) }, onLinkTv = onLinkTv, onServers = { onOpenServers(null) }, modifier = pageModifier)
+                ServersPage.List -> ServersListPage(twoPane, onOpenServer = onOpenServers, onAdd = onAddServer, modifier = pageModifier)
+                is ServersPage.Server -> ServerPage(servers.id, twoPane, onGone = onBack, modifier = pageModifier)
+            }
             SettingsGroup.About -> AboutPage(twoPane, openWeb, pageModifier)
             else -> Unit
         }
@@ -220,14 +232,27 @@ fun SettingsScreen(
 
     val scroll = rememberScrollState()
     OnTabReselected(MobileTab.Settings) { if (!twoPane && open != null) onBack() else scroll.animateScrollTo(0) }
-    LaunchedEffect(open, twoPane) { scroll.scrollTo(0) }
+    LaunchedEffect(open, twoPane, servers) { scroll.scrollTo(0) }
+    // A Servers page takes its group's place, under its own title, with the way back to where it came from.
+    val serversTitle = when (servers) {
+        null -> null
+        ServersPage.List -> SERVERS
+        is ServersPage.Server -> serversModel().state.collectAsStateWithLifecycle().value.row(servers.id)?.name ?: SERVERS
+    }
     when {
         twoPane -> {
             val shown = open ?: SettingsGroup.Playback
             TabletSettings(
                 groups = groups,
                 open = shown,
-                title = groups.firstOrNull { it.group == shown }?.title ?: shown.title,
+                title = serversTitle ?: groups.firstOrNull { it.group == shown }?.title ?: shown.title,
+                up = when (servers) {
+                    null -> null
+                    ServersPage.List -> SettingsGroup.Account.title
+                    is ServersPage.Server -> SERVERS
+                },
+                // Up from the list is its group's page, whichever way the list was opened; up from a server is the list.
+                onUp = { if (servers == ServersPage.List) onOpenPage(SettingsGroup.Account, true) else onBack() },
                 userName = user?.name,
                 role = listOfNotNull(if (user?.isAdmin == true) "Admin" else "Member", server?.name).joinToString(" · "),
                 onChoose = choose,
@@ -271,7 +296,7 @@ fun SettingsScreen(
         }
         else -> Column(modifier.fillMaxSize().background(WmmColors.Ground)) {
             // The page's title matches its row; system Back and Up do the same.
-            BackTopBar(groups.firstOrNull { it.group == open }?.title ?: open.title, onBack)
+            BackTopBar(serversTitle ?: groups.firstOrNull { it.group == open }?.title ?: open.title, onBack)
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(bottom = 24.dp)) {
                 page(open, Modifier)
             }
@@ -412,6 +437,9 @@ private fun TabletSettings(
     onChoose: (SettingsGroup) -> Unit,
     scroll: ScrollState,
     modifier: Modifier = Modifier,
+    /** The page this one was opened from, by name, for a page inside a group (Servers, a server); null for a group's own. */
+    up: String? = null,
+    onUp: () -> Unit = {},
     page: @Composable () -> Unit,
 ) {
     val wide = windowWidth() >= 1000.dp
@@ -446,6 +474,16 @@ private fun TabletSettings(
         Box(Modifier.width(1.dp).fillMaxHeight().background(WmmColors.Line))
         Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(scroll).statusBarsPadding().padding(start = if (wide) 40.dp else 24.dp, end = if (wide) 48.dp else 24.dp, top = 34.dp, bottom = 32.dp)) {
             Column(Modifier.widthIn(max = 720.dp)) {
+                if (up != null) {
+                    Row(
+                        Modifier.offset(x = (-8).dp).clip(RoundedCornerShape(20.dp)).clickable(role = Role.Button, onClickLabel = "Back to $up", onClick = onUp).padding(start = 4.dp, end = 12.dp).heightIn(min = 40.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(WmmIcons.ChevronLeft, contentDescription = null, tint = WmmColors.TextSoft, modifier = Modifier.size(20.dp))
+                        Text(up, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = WmmColors.TextSoft))
+                    }
+                }
                 Text(title, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 28.sp, color = WmmColors.Text), modifier = Modifier.padding(bottom = 2.dp).semantics { heading() })
                 page()
             }

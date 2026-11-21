@@ -3,6 +3,8 @@ package media.watchmy.client.core.data
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -13,10 +15,16 @@ import media.watchmy.client.core.api.apis.AuthApi
 import media.watchmy.client.core.api.apis.SystemApi
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.DiscoveredServer
+import media.watchmy.client.model.OfflineOwner
+import media.watchmy.client.model.REQUIRED_API_LEVEL
+import media.watchmy.client.model.ServerSwitch
 import media.watchmy.client.model.SavedServer
 import media.watchmy.client.model.Server
 import media.watchmy.client.model.ServerRepository
 import media.watchmy.client.model.ServerTooOldException
+import media.watchmy.client.model.SignedOutException
+import media.watchmy.client.model.couldntReach
+import media.watchmy.client.model.tooOldNotListed
 
 internal class RealServerRepository(
     private val store: LocalStore,
@@ -107,19 +115,171 @@ internal class RealServerRepository(
         }
     }
 
-    override suspend fun forget(serverId: String) {
-        val gone = store.value.servers.firstOrNull { it.id == serverId } ?: return
-        store.updateAndSave { s ->
-            s.copy(servers = s.servers.filter { it.id != serverId }, currentId = s.currentId.takeIf { it != serverId })
+    /**
+     * Asks the server first, so one that is off, or away on its own
+     * network, leaves the app where it was. It runs in [scope] while the
+     * caller waits: the switch closes the screens that asked for it, which
+     * must not stop it halfway.
+     */
+    override suspend fun switchTo(serverId: String, ask: Boolean): ServerSwitch = scope.async { switch(serverId, ask) }.await()
+
+    private suspend fun switch(serverId: String, ask: Boolean): ServerSwitch {
+        val target = store.value.servers.firstOrNull { it.id == serverId } ?: return ServerSwitch.Gone
+        var name = target.name
+        var version = target.version
+        var apiLevel = target.apiLevel
+        if (ask) {
+            val info = withTimeoutOrNull(SWITCH_ASK_MS) {
+                try {
+                    Http.call(signedIn = false) { SystemApi(target.baseUrl, http.probeClient).getServer() }
+                } catch (_: ApiException) {
+                    null
+                }
+            }
+            // Another server at the address it had is not this server: its sign-in is never sent there.
+            if (info == null || info.id != target.id) return ServerSwitch.Unreachable
+            if (info.apiLevel.toInt() < REQUIRED_API_LEVEL) return ServerSwitch.TooOld
+            name = info.name
+            version = info.version
+            apiLevel = info.apiLevel.toInt()
+        } else if (target.toServer().tooOld) {
+            return ServerSwitch.TooOld
         }
-        // Ends the session on the server too, when it can be reached; forgetting works offline either way.
-        val token = gone.account?.let(store::tokenOrNull) ?: return
-        signOutLater(gone.baseUrl, token)
+        val now = clock()
+        var signedIn = false
+        var gone = false
+        store.updateAndSave { s ->
+            val kept = s.servers.firstOrNull { it.id == serverId }
+            if (kept == null) {
+                gone = true
+                return@updateAndSave s
+            }
+            signedIn = kept.account != null
+            val entry = kept.copy(name = name, version = version, apiLevel = apiLevel, lastUsedAtMs = now)
+            s.copy(servers = listOf(entry) + s.servers.filter { it.id != serverId }, currentId = serverId)
+        }
+        // Another server is in use: what the others said was for the search this one left.
+        http.forgetAnswers()
+        return when {
+            gone -> ServerSwitch.Gone
+            signedIn -> ServerSwitch.Switched
+            else -> ServerSwitch.NeedsSignIn
+        }
+    }
+
+    /** The questions out now, one a server: everyone who asks waits for the same answer. */
+    private val asking = HashMap<String, Deferred<Result<Unit>>>()
+
+    /**
+     * Before a sign-in goes to a kept server that isn't the one in use (a
+     * search of every server): asks its address, with no sign-in, which
+     * server it is, and lets the sign-in go there only when it is the one
+     * remembered. Until this the app sent only the sign-in of the server in
+     * use; a search sends every signed-in server's, on whatever network the
+     * device is on.
+     *
+     * The answer is kept ([Http.answered]) until a call to that server fails,
+     * Search is left or the device changes network, so typing asks once,
+     * and what the server says of
+     * itself (name, version, level) is kept as a switch keeps it. Nothing at
+     * the address, or another server there, throws as a server that can't
+     * be reached and no sign-in is sent. One that is the same server but too
+     * old for this app throws too, after its level is kept, which leaves it
+     * out of the searches that follow.
+     *
+     * The question runs in [scope]: a keystroke cancels the search that
+     * asked, not the question, and the next search waits for the same one.
+     */
+    suspend fun askFirst(serverId: String) {
+        val stored = store.value
+        val server = stored.servers.firstOrNull { it.id == serverId } ?: throw SignedOutException()
+        if (server.id == stored.currentId || http.answered(server)) return
+        val question = synchronized(asking) {
+            asking[serverId] ?: scope.async { runCatching { ask(server) } }.also { out ->
+                asking[serverId] = out
+                out.invokeOnCompletion { synchronized(asking) { if (asking[serverId] === out) asking.remove(serverId) } }
+            }
+        }
+        question.await().getOrThrow()
+    }
+
+    private suspend fun ask(server: StoredServer) {
+        // The answer is for the network it is asked on: a device that moves while it waits asks again.
+        val network = http.networkNow()
+        val info = withTimeoutOrNull(SWITCH_ASK_MS) {
+            try {
+                Http.call(signedIn = false) { SystemApi(server.baseUrl, http.probeClient).getServer() }
+            } catch (_: ApiException) {
+                null
+            }
+        }
+        // Nothing there, or another server at the address it had: its sign-in is not sent.
+        if (info == null || info.id != server.id) throw ApiException(null, "${couldntReach(server.name)}.")
+        val level = info.apiLevel.toInt()
+        store.update { s ->
+            s.withServer(server.id) {
+                val same = it.name == info.name && it.version == info.version && it.apiLevel == level
+                if (same || it.baseUrl != server.baseUrl) it else it.copy(name = info.name, version = info.version, apiLevel = level)
+            }
+        }
+        if (level < REQUIRED_API_LEVEL) throw ApiException(null, tooOldNotListed(info.name))
+        http.noteAnswer(server, network)
+    }
+
+    /** What runs before a sign-in ends on this device, while its server still takes it ([beforeSignInEnds]). */
+    private val endingHooks = java.util.concurrent.CopyOnWriteArrayList<suspend (OfflineOwner) -> Unit>()
+
+    /** Runs [hook] before a sign-in ends here (Sign out, or its server removed), for up to a few seconds; its failures are ignored. */
+    fun beforeSignInEnds(hook: suspend (OfflineOwner) -> Unit) {
+        endingHooks += hook
+    }
+
+    /** The hooks for [account]'s sign-in on [server], which is about to end. */
+    suspend fun signInEnding(server: StoredServer, account: StoredAccount) {
+        val owner = OfflineOwner(server.id, account.userId, server.baseUrl, server.apiLevel)
+        endingHooks.forEach { hook ->
+            try {
+                withTimeoutOrNull(ENDING_HOOK_MS) { hook(owner) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // The sign-in ends whatever the hook met.
+            }
+        }
+    }
+
+    /**
+     * Runs in [scope] while the caller waits: removing the server in use
+     * closes Settings as soon as its sign-in goes, halfway through, and must
+     * not take the rest with it.
+     */
+    override suspend fun forget(serverId: String) = scope.async { remove(serverId) }.await()
+
+    private suspend fun remove(serverId: String) {
+        val gone = store.value.servers.firstOrNull { it.id == serverId } ?: return
+        // What the device holds from it is reported while its session still stands.
+        gone.account?.let { signInEnding(gone, it) }
+        val token = gone.account?.let(store::tokenOrNull)
+        val now = clock()
+        store.updateAndSave { s ->
+            val without = s.copy(servers = s.servers.filter { it.id != serverId })
+            // Removing the one in use moves to the server used last that is still signed in; with none, the picker.
+            if (s.currentId == serverId) without.movedToSignedIn(now) ?: without.copy(currentId = null) else without
+        }
+        http.forgetAnswers(serverId)
+        // Ends the session on the server too, when it can be reached; removing works offline either way.
+        if (token != null) signOutLater(gone.baseUrl, token)
     }
 
     private companion object {
         /** An address answered with more redirects than this is not a server to keep. */
         const val MAX_REDIRECTS = 3
+
+        /** How long a server gets to say which server it is before a switch gives up. */
+        const val SWITCH_ASK_MS = 5_000L
+
+        /** How long each hook gets before a sign-in ends without it. */
+        const val ENDING_HOOK_MS = 5_000L
     }
 
     /** [signOutQuietly] in the background, for a session nothing waits on. */

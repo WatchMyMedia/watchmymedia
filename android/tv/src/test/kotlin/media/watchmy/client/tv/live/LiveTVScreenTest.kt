@@ -19,9 +19,9 @@ import androidx.compose.ui.test.pressKey
 import androidx.media3.common.Player
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
+import media.watchmy.client.fake.Cabin
 import media.watchmy.client.fake.FakeAppServices
 import media.watchmy.client.fake.FakeLiveChannels
-import media.watchmy.client.fake.OfficeMini
 import media.watchmy.client.fake.fakeLatencyMs
 import media.watchmy.client.model.AppServices
 import media.watchmy.client.model.LiveCapabilities
@@ -46,6 +46,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.isFocused
 
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -76,19 +79,7 @@ class LiveTVScreenTest {
         val previous = fakeLatencyMs
         fakeLatencyMs = 0
         try {
-            val services = FakeAppServices(tv = true)
-            val listed = runBlocking { services.live.channels() }
-            compose.setContent {
-                CompositionLocalProvider(LocalAppServices provides services, LocalLiveTVAvailable provides true) {
-                    TvTheme {
-                        LiveChannelsScreen(
-                            LiveChannelsViewModel.State(supported = true, guideLevel = true, capabilities = LiveCapabilities(true, true, true, guide = true), channels = listed, selectedId = "live-2-2"),
-                            onSelect = {}, onWatch = {}, onRefresh = {}, onNavigate = {},
-                        )
-                    }
-                }
-            }
-            compose.waitForIdle()
+            showGuide()
             compose.onNodeWithText("Watch 2.2").assertExists()
             press(Key.DirectionDown)
             compose.onNodeWithText("Watch 2.3", substring = true).assertExists()
@@ -98,6 +89,28 @@ class LiveTVScreenTest {
             press(Key.DirectionDown)
             compose.onNodeWithText("No listings · Plays live").assertExists()
             compose.onNodeWithText("Go to channel").assertExists()
+        } finally { fakeLatencyMs = previous }
+    }
+
+    /**
+     * The guide's cells clear their parts' semantics so each reads as one
+     * thing, and their focus state went with them: nothing on the guide said
+     * it was in focus, to TalkBack or to a test.
+     */
+    @Test fun `the guide's cell in focus reads as focused`() {
+        val previous = fakeLatencyMs
+        fakeLatencyMs = 0
+        try {
+            showGuide(personal = true)
+            // The guide opens on what the chosen channel has on: a programme's cell.
+            assertTrue("\"${focusedSpoken()}\" has focus, not 2.2's programme", focusedSpoken().endsWith("Weather Now"))
+            // Left of it, the channel's own cell.
+            press(Key.DirectionLeft)
+            assertTrue("\"${focusedSpoken()}\" has focus, not 2.2's own cell", focusedSpoken().startsWith("Watch 2.2 Harbor Weather"))
+            // Down the rows to a channel without listings, which is one cell.
+            press(Key.DirectionRight)
+            repeat(4) { press(Key.DirectionDown) }
+            assertEquals("4.3 Coast Shop, No listings, Watch live", focusedSpoken())
         } finally { fakeLatencyMs = previous }
     }
 
@@ -247,7 +260,8 @@ class LiveTVScreenTest {
             compose.onNodeWithContentDescription("Live TV").performClick()
             compose.onNodeWithContentDescription("2.1 HRBR-HD, Watch live").performClick()
             compose.onNode(hasText("Pause") and hasClickAction()).assertExists()
-            compose.runOnIdle { runBlocking { base.servers.select(OfficeMini) } }
+            // Another server this TV is signed in to.
+            compose.runOnIdle { runBlocking { base.servers.switchTo(Cabin.id) } }
             compose.onNode(hasText("Play") and hasClickAction()).assertIsFocused()
             assertEquals(2, controllers.size)
             assertEquals(1, controllers.last().releases)
@@ -262,6 +276,27 @@ class LiveTVScreenTest {
         }
         compose.waitForIdle()
     }
+    /** The guide with listings, opened on 2.2; [personal] adds favourites and reminders, which make a channel's own cell a place focus goes. */
+    private fun showGuide(personal: Boolean = false) {
+        val services = FakeAppServices(tv = true)
+        val listed = runBlocking { services.live.channels() }
+        compose.setContent {
+            CompositionLocalProvider(LocalAppServices provides services, LocalLiveTVAvailable provides true) {
+                TvTheme {
+                    LiveChannelsScreen(
+                        LiveChannelsViewModel.State(supported = true, guideLevel = true, personalLevel = personal, capabilities = LiveCapabilities(true, true, true, guide = true), channels = listed, selectedId = "live-2-2"),
+                        onSelect = {}, onWatch = {}, onRefresh = {}, onNavigate = {},
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+    }
+
+    /** What TalkBack is given for the element in focus. */
+    private fun focusedSpoken(): String =
+        compose.onNode(isFocused()).fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() ?: error("The focused element says nothing")
+
     private fun press(key: Key) {
         compose.onRoot().performKeyInput { pressKey(key) }
         compose.waitForIdle()

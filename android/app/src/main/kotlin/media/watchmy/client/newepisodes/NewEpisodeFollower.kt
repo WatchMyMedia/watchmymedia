@@ -50,10 +50,16 @@ interface NewEpisodeNotices {
  * - [libraryWaitMs] after the last library.changed while the app is open
  *   ([libraryChanged]); scans that change nothing don't put it back.
  *
- * Turning the switch off, or Android no longer allowing the channel,
- * forgets the cursor, so turning them on again starts from now. A
- * sign-out or another server or person ([sessionChanged]) cancels the work,
- * forgets the cursor and takes away what is showing. In a process started in
+ * Each server and person signed in on this device has a cursor of its own,
+ * so coming back to a server carries on from its last check. Turning the
+ * switch off forgets the cursor of the account it is off for, and Android
+ * no longer allowing the channel forgets them all, so turning either on
+ * again starts from now. When the sign-in in use changes ([sessionChanged]),
+ * the cursors of accounts no longer signed in here are forgotten; what is
+ * showing stays through a switch, since a notification for another server
+ * signed in here switches to it when it is opened, and goes when a sign-in
+ * here ended, so a tap can't open an account that is gone. The check, and
+ * its work, follow the server in use. In a process started in
  * the background Android hasn't been asked yet, so the work is left as it
  * is unless something known stops it. The schedule and the cursor are
  * touched on [io], one at a time, never on the main thread at start.
@@ -62,7 +68,8 @@ interface NewEpisodeNotices {
  * is signed in where, as notification links name them
  * ([media.watchmy.client.model.watchNextAccount]); [cursorAccount] the same
  * by ids alone ([media.watchmy.client.model.followsAccount]), so a rename
- * keeps the cursor.
+ * keeps the cursor. [signedInAccounts] is every account signed in on this
+ * device, named as [cursorAccount] names the one in use.
  */
 class NewEpisodeFollower(
     private val follows: FollowsRepository,
@@ -70,6 +77,7 @@ class NewEpisodeFollower(
     private val session: Flow<Any?>,
     private val account: () -> String?,
     private val cursorAccount: () -> String?,
+    private val signedInAccounts: suspend () -> Set<String>,
     private val cursors: NewEpisodesCursors,
     private val schedule: NewEpisodeSchedule,
     private val notices: NewEpisodeNotices,
@@ -88,11 +96,16 @@ class NewEpisodeFollower(
     /** Checks asked for with the app open; those within [gatherMs] of each other are one. */
     private val wanted = Channel<Unit>(Channel.CONFLATED)
 
-    /** What the schedule should be, and whether a stop is this device's own choice or Android's, which forgets the cursor. */
-    private data class Decision(val checks: NewEpisodeChecks, val forget: Boolean)
+    /** What the schedule should be, and whether a stop is this account's own choice ([off]) or Android's ([blocked]), which forget cursors. */
+    private data class Decision(val checks: NewEpisodeChecks, val off: Boolean, val blocked: Boolean)
+
+    /** The accounts signed in when the sign-in in use last changed: one fewer means a sign-in here ended. */
+    private var known: Set<String>? = null
 
     /** Follows the switch and the permission until the scope ends, checking whenever [lifecycle] comes to the foreground. */
     fun start(lifecycle: Lifecycle) {
+        // Who is signed in now, so the first change of sign-in can tell a switch from a sign-in that ended.
+        scope.launch(worker) { if (known == null) known = signedInAccounts() }
         scope.launch {
             for (ask in wanted) {
                 // The foreground and the work being scheduled both ask at once: one check.
@@ -103,7 +116,7 @@ class NewEpisodeFollower(
         }
         scope.launch {
             combine(session, follows.notifyHere, allowed) { _, on, ok ->
-                Decision(newEpisodeChecks(follows.supported && account() != null, on, ok), forget = !on || ok == false)
+                Decision(newEpisodeChecks(follows.supported && account() != null, on, ok), off = !on, blocked = ok == false)
             }
                 .distinctUntilChanged()
                 .collect { decision ->
@@ -115,7 +128,7 @@ class NewEpisodeFollower(
                         }
                         NewEpisodeChecks.Stop -> withContext(worker) {
                             schedule.cancel()
-                            if (decision.forget && cursors.read() != null) cursors.keep(null)
+                            if (decision.blocked) cursors.keepOnly(emptySet()) else if (decision.off) cursorAccount()?.let(cursors::forget)
                         }
                         NewEpisodeChecks.Unknown -> Unit
                     }
@@ -161,12 +174,19 @@ class NewEpisodeFollower(
         }
     }
 
-    /** Signed out, or another server or person: no more checks for the last one, their cursor goes, and so does what is showing. */
+    /**
+     * The sign-in in use changed. A switch between two servers signed in
+     * here keeps both cursors and what is showing; a sign-in that ended
+     * (signed out, or its server removed) has its cursor forgotten, and what
+     * is showing goes with it.
+     */
     fun sessionChanged() {
-        notices.cancelShown()
         scope.launch(worker) {
-            schedule.cancel()
-            cursors.keep(null)
+            val accounts = signedInAccounts()
+            val before = known
+            known = accounts
+            if (before == null || !accounts.containsAll(before)) notices.cancelShown()
+            cursors.keepOnly(accounts)
         }
     }
 

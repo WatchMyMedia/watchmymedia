@@ -42,7 +42,8 @@ class SessionScopeTest {
     private fun open() = ViewModelProvider.create(compose.activity, viewModelFactory { initializer { SessionStores() } })[SessionStores::class].open
 
     @Test fun `signing out on the TV ends the session's ViewModels, and the next account starts its own`() {
-        val services = quietTvFakes()
+        // Signed in to one server, so signing out leaves no session.
+        val services = quietTvFakes(several = false)
         compose.setContent { CompositionLocalProvider(LocalAppServices provides services) { TvApp() } }
         compose.waitForIdle()
         assertEquals("signed in: one session", 1, open())

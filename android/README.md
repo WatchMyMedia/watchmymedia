@@ -73,6 +73,13 @@ level (`FAKE_SERVER_API_LEVEL`); a test that selects one at a lower level
 gets what that level offers, as from a real server: no requests below 5, no
 Delete below 6, no Automatic quality below 3, no seek thumbnails below 9, no Live TV listings below 13, no casting a channel below 14, no trailers below 20, no arranged rows or lists below 22, no Notify me below 29, no related titles below 30.
 
+The fakes are a device signed in to several servers ("Several servers"
+below): the Living room server in use, the Cabin server with a small library
+of its own (`FakeCabin`), the Den server, which never answers, one more
+signed out, and the Office Mac mini on the network and not added yet.
+Search for "harbor" finds titles on the first two. A test of a device with
+one server makes its fakes with `several = false`.
+
 Requests, missing episodes' state and Report a problem need a server at API
 level 5 and the corresponding `getRequestOptions` capability. Requests can
 go through Radarr/Sonarr or Seerr; unlinked Seerr users cannot request.
@@ -277,6 +284,95 @@ keep 15 s of played video so a jump back plays at once (`PlayerOptions`);
 TVs keep none, as it would come out of the buffer ahead of a 4K remux, and
 neither do low-RAM devices.
 
+### Several servers
+
+A device can be signed in to several servers at once, each with its own
+sign-in, and one is in use: Home, the libraries, Live TV, requests and
+Settings' account pages are its. A server it has signed in to and not
+removed is registered (`SavedServer.registered`), up to 12 (`MAX_SERVERS`);
+one whose sign-in ended stays, as signed out. The list stays on the device:
+nothing ties two servers together, and the server has no part in this.
+
+- **Servers, the switcher.** The account button (the person's initial) opens
+  it: a sheet on a phone, a popover beside the tablet's rail, a panel from
+  the left on the TV, where OK on the button at the rail's foot opens it and
+  Back closes it onto the button. It lists the registered servers, the one
+  in use first, then Add a server and Manage servers (`ServersViewModel`,
+  shared by the three). With two or more, a phone's Home names the server
+  in use under its title; the rails have no room, so there it is the
+  button's label. With Live TV in the bar Settings has no tab, so there
+  Servers ends with a Settings row.
+- **A switch** asks the server which one it is first (`GET /api/server` at
+  the address kept, five seconds at most, the id must be the one
+  remembered: `ServerRepository.switchTo`). It answers and its sign-in is
+  kept: it is in use at once, the signed-in screens are rebuilt on it, and a
+  note says "Now on Cabin server" for four seconds (a snackbar on phones and
+  tablets, a banner at the top right of the TV that takes no focus). Its
+  sign-in has ended: its sign-in screen opens, and Cancel goes back. The
+  device learns of a sign-in ended elsewhere only from that server's first
+  reply, after the switch; Cancel then goes to the server used last that is
+  still signed in. It
+  doesn't answer, or another server answers at its address: the app stays
+  where it was and says so, with Try again and, on a device holding
+  downloads from it, Watch its downloads, which switches without asking.
+  A cast ends when the sign-in in use changes.
+- **Add a server** is the server picker without the registered servers,
+  which it names under the list (`ServerPickerViewModel(adding = true)`),
+  then that server's sign-in, then on phones and tablets a last step that
+  says what changed. Closing it at any step leaves the app where it was,
+  and a server chosen and never signed in to isn't kept.
+- **Settings › Account & devices › Servers** lists them, each opening its
+  page: its address, version, who is signed in and what the device holds
+  from it, Switch to this server, and Remove this server…, which asks
+  first. Removing signs the device out of it and deletes its downloads
+  here at once, whether or not it is the one in use, and changes nothing on
+  the server. Removing or signing out of the server in use moves to the
+  one used last that is still signed in.
+- **Search** looks in every server signed in (`SearchViewModel`): each is
+  asked at once, as its own person at its own address
+  (`LibraryRepository.searchOn`), and gets four seconds. The server in
+  use's results draw first; each other server's are added to the end of
+  each group, with its name on them, once every server before it in
+  Servers' order has answered or failed, so nothing on screen moves. One
+  still out after a second is named at the end; one that fails gets a line
+  with Try again and isn't asked again for 30 seconds on that visit. A
+  result on another server opens there: the app switches (without asking
+  the server again), then shows Search with the same words under the
+  title's page. What can be requested, and marking watched, stay the
+  server in use's. A picture from another server is asked for with that
+  server's sign-in, which goes to no other address.
+- **Asked first.** A kept address is only an address: at home it is the
+  Cabin server, and on another network it is someone else's machine. So
+  before a search sends a server that isn't in use its sign-in, the app
+  asks that address which server it is, with no sign-in (`GET /api/server`),
+  and sends the sign-in only when the id is the one remembered
+  (`RealServerRepository.askFirst`, which `searchOn` calls; the answer is
+  kept in `Http`, and the pictures of what a server found are signed only
+  while it stands). It asks once a visit to Search, not once a letter, and
+  the question shares the server's four seconds. A visit begins each time
+  Search comes on screen (`SearchViewModel.setShown`), since a device
+  changes network while the app is away; servers whose results are showing
+  are asked then, so their pictures go on loading. An answer stands only on
+  the network it was given on, so a device that moves with Search open asks
+  again. A call to a server that fails forgets its answer, so Try again
+  asks again. Nothing at the
+  address, or another server there: no sign-in is sent, and the server gets
+  the line and the rest any failure gets. What it says of itself (name,
+  version, level) is kept; one that says it is too old is left out and
+  said to be too old. The server in use is not asked for each search: its
+  sign-in goes to it as it always has.
+- **Above the signed-in screens.** Those screens are rebuilt on every
+  switch (`key(server.id, user)`), so the note, Add a server's steps, the
+  way back from a sign-in and a search result's landing are kept by
+  `ServerSwitchViewModel`, which `MobileApp` and `TvApp` make for the
+  activity. A landing names its server, and only that server's screens get
+  it (`landingFor`): the switch takes a moment, and the screens of the
+  server still in use would otherwise open the page and use the landing up.
+- **Links and notifications.** A launcher's or notification's link names
+  its account (`account=`). One for another account signed in on the
+  device switches to its server before it opens (`DeepLink.serverFor`); one
+  for an account that isn't here still opens nothing.
+
 ### Rows people arrange, and rows made from lists
 
 From API level 22 Home and each
@@ -357,13 +453,17 @@ themselves (`app/newepisodes/`; the rule is `checkNewEpisodes` in
   `new-episodes` preferences, so a start with nothing to cancel doesn't
   start it. Each foreground schedules the work again with
   `ExistingPeriodicWorkPolicy.UPDATE`, which keeps its timing.
-- **The cursor** is kept per server and person, by their ids
-  (`followsAccount`, so a rename keeps it), in the `new-episodes` preferences
-  (out of backups). The first check keeps only the cursor; an unreachable
-  server, or a 404 or 501 from the feed, keeps it and the work. Turning the
-  switch off, or Android no longer allowing the channel, forgets it, so on
-  again starts from now. A sign-out or another account cancels the work,
-  forgets the cursor and takes away the notifications showing.
+- **The cursor** is kept for each server and person signed in on the
+  device, by their ids (`followsAccount`, so a rename keeps it), in the
+  `new-episodes` preferences (out of backups), so coming back to a server
+  carries on from its last check. The first check keeps only the cursor; an
+  unreachable server, or a 404 or 501 from the feed, keeps it and the work.
+  Turning the switch off forgets that account's, and Android no longer
+  allowing the channel forgets them all, so on again starts from now. The
+  check and its work follow the server in use. A sign-in that ends (signed
+  out, or its server removed) loses its cursor and takes away the
+  notifications showing; a switch between two servers signed in keeps both,
+  since a notification for the other switches to it when it is opened.
 - **The notifications** are on the `new-episodes` channel ("New episodes",
   default importance), one a show under its own tag, each opening
   `watchmymedia://shows/{id}?season=&episode=&source=new-episodes&account=`

@@ -1,6 +1,7 @@
 package media.watchmy.client.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -63,5 +64,26 @@ class DeepLinkTest {
         assertEquals(DeepLink.LinkTv("KQ7F2W"), DeepLink.open("watchmymedia://link?code=KQ7F2W", null))
         assertNull(DeepLink.open("https://example.com/play/4", "viewer-a"))
         assertNull(DeepLink.open(null, "viewer-a"))
+    }
+
+    @Test fun `a launcher's link names the registered server whose account it was published for`() {
+        fun saved(id: String, userId: Long?, signedIn: Boolean = userId != null) =
+            SavedServer(Server(id, "$id server", "http://$id.local:27587", "1.0.0", 30), "Sam", signedIn, 0, userId)
+        val living = saved("living", 1)
+        val cabin = saved("cabin", 1)
+        val den = saved("den", null)
+        val all = listOf(living, cabin, den)
+        assertNotEquals("the same person's id on two servers is two accounts", living.linkAccount(), cabin.linkAccount())
+        assertNull("no one signed in there, so no account", den.linkAccount())
+        assertNull(saved("left", 1, signedIn = false).linkAccount())
+
+        val forCabin = DeepLink.newEpisode(showId = 700, season = 2, episodeId = 700023, account = cabin.linkAccount()!!)
+        assertEquals(cabin, DeepLink.serverFor(forCabin, all))
+        assertEquals(living, DeepLink.serverFor(DeepLink.live("5.1", living.linkAccount()!!), all))
+        assertEquals(living, DeepLink.serverFor("watchmymedia://play/4?source=watch-next&account=${living.linkAccount()}", all))
+        assertNull("an account that isn't on this device", DeepLink.serverFor(DeepLink.home("someone-else"), all))
+        assertNull("a launcher link naming no account", DeepLink.serverFor("watchmymedia://play/4?source=watch-next", all))
+        assertNull("a link from anywhere else names none", DeepLink.serverFor("watchmymedia://movies/500", all))
+        assertNull(DeepLink.serverFor(null, all))
     }
 }

@@ -58,7 +58,17 @@ import media.watchmy.client.mobile.components.ListRow
 import media.watchmy.client.mobile.components.NotEncryptedMark
 import media.watchmy.client.mobile.components.SectionLabel
 import media.watchmy.client.mobile.components.fieldColors
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import media.watchmy.client.mobile.settings.NoteTone
+import media.watchmy.client.mobile.settings.StatusCard
+import media.watchmy.client.model.AddServerStep
+import media.watchmy.client.model.MAX_SERVERS
 import media.watchmy.client.model.MIN_SERVER_VERSION
+import media.watchmy.client.model.alreadyAdded
+import media.watchmy.client.model.plural
+import media.watchmy.client.model.serversFull
 import media.watchmy.client.model.needsHttpsNudge
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.LocalAppServices
@@ -78,11 +88,17 @@ import androidx.compose.foundation.border
  * Choosing a server: on this network, remembered, or
  * a typed address. [onBack] is null when there is nowhere to go back to (no
  * server chosen yet).
+ *
+ * [adding] is Add a server's first step: the same lists without the servers
+ * already registered, which are named under them, since choosing one of
+ * those is a switch, made in Servers.
  */
 @Composable
-fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null) {
+fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null, adding: Boolean = false) {
     val services = LocalAppServices.current
-    val vm = viewModel { ServerPickerViewModel(services.servers) }
+    val device = if (LocalConfiguration.current.smallestScreenWidthDp >= 600) "tablet" else "phone"
+    // Add a server's own model: the picker's lives as long as the app, and lists every server.
+    val vm = if (adding) viewModel(key = "add-server") { ServerPickerViewModel(services.servers, adding = true, device = device) } else viewModel { ServerPickerViewModel(services.servers) }
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.chosen.collect { onServerChosen() } }
     // The field holds its text; the model hears it as it is typed.
@@ -98,7 +114,9 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
 
     Box(Modifier.fillMaxSize().background(WmmColors.Ground), contentAlignment = Alignment.TopCenter) {
         Column(Modifier.widthIn(max = 720.dp).fillMaxSize()) {
-            if (onBack != null) {
+            if (adding) {
+                AddServerBar(onBack ?: {})
+            } else if (onBack != null) {
                 BackTopBar("Servers", onBack)
             } else {
                 Row(Modifier.statusBarsPadding().height(64.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -106,16 +124,29 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null)
                 }
             }
             BoxWithConstraints(Modifier.fillMaxSize().navigationBarsPadding().imePadding()) {
-                Column(Modifier.verticalScroll(rememberScrollState()).heightIn(min = maxHeight).padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.verticalScroll(rememberScrollState()).heightIn(min = maxHeight).padding(top = if (adding) 0.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (adding) {
+                        AddServerSteps(AddServerStep.Choose)
+                        Text(
+                            "Which server?",
+                            style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 30.sp, color = WmmColors.Text),
+                            modifier = Modifier.padding(horizontal = 16.dp).semantics { heading() },
+                        )
+                        if (state.full) StatusCard("${plural(MAX_SERVERS, "server")} are added", serversFull(device), NoteTone.Warn, Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                    }
                     SectionLabel("On this network")
                     val found = state.discovered
                     when {
                         found == null -> Hint("Looking for servers…", busy = true)
                         found.isEmpty() -> {
-                            Hint("No servers found on this network. Enter an address below.")
+                            Hint(if (adding && state.alreadyAdded.isNotEmpty()) "No other servers found on this network. Enter an address below." else "No servers found on this network. Enter an address below.")
                             if (access.needed) LocalNetworkCard(access)
                         }
                         else -> found.forEach { row -> ServerRow(row, connecting = state.connecting == row.key, remembered = false, onClick = { vm.choose(row) }, onForget = {}) }
+                    }
+                    // The ones this device is signed in to already aren't offered again.
+                    alreadyAdded(state.alreadyAdded)?.let { line ->
+                        Text(line, style = TextStyle(fontFamily = Inter, fontSize = 13.sp, lineHeight = 19.5.sp, color = WmmColors.TextMuted), modifier = Modifier.padding(horizontal = 16.dp))
                     }
                     state.error?.let { ErrorNote(it, vm::dismissError) }
 

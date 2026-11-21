@@ -2,6 +2,8 @@ package media.watchmy.client.mobile.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,13 +28,20 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import media.watchmy.client.model.onServerLabel
+import media.watchmy.client.ui.TestTags
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,9 +55,24 @@ import media.watchmy.client.ui.components.WmmIcons
 private val BarTitle = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, color = WmmColors.Text)
 
 /**
- * The top bar of the bottom-bar screens: title, search and the avatar
- * (Settings). [searchLabel] names the search ("Search listings" on Live TV),
- * and [actions] come between it and the avatar.
+ * The account button's part in Servers, from the signed-in screens' host:
+ * what it is called ("Sam on Living room server. Open Servers"), the server
+ * in use's name where two or more are registered, and what opens Servers.
+ */
+@Immutable
+class ServersButton(val label: String, val serverName: String?, val open: () -> Unit)
+
+/** Null where there is no Servers to open (a preview, a screen on its own): the avatar then does what its screen says. */
+@Suppress("ComposeCompositionLocalUsage")
+val LocalServersButton = compositionLocalOf<ServersButton?> { null }
+
+/**
+ * The top bar of the bottom-bar screens: title, search and the avatar, the
+ * account button, which opens Servers ([LocalServersButton]; [onAvatar]
+ * where there is none). [searchLabel] names the search ("Search listings" on
+ * Live TV), and [actions] come between it and the avatar. [showServer]
+ * (Home) writes the server in use's name under the title when there are
+ * several, as a second way into Servers.
  */
 @Composable
 fun MainTopBar(
@@ -59,14 +83,30 @@ fun MainTopBar(
     modifier: Modifier = Modifier,
     showCast: Boolean = true,
     searchLabel: String = "Search",
+    showServer: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
+    val servers = LocalServersButton.current
+    val serverName = servers?.serverName?.takeIf { showServer }
     Row(
         modifier.fillMaxWidth().background(WmmColors.Ground).statusBarsPadding().height(64.dp).padding(start = 16.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(title, style = BarTitle, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = BarTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (serverName != null && servers != null) {
+                Row(
+                    Modifier.heightIn(min = 22.dp).clip(RoundedCornerShape(6.dp)).clickable(role = Role.Button, onClick = servers.open)
+                        .clearAndSetSemantics { contentDescription = onServerLabel(serverName) },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(serverName, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = WmmColors.TextSoft), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    Icon(WmmIcons.ChevronDown, contentDescription = null, tint = WmmColors.TextSoft, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
         if (showCast) CastButton()
         if (onSearch != null) {
             IconButton(onClick = onSearch, modifier = Modifier.size(48.dp)) {
@@ -75,7 +115,11 @@ fun MainTopBar(
         }
         actions()
         if (onAvatar != null) {
-            IconButton(onClick = onAvatar, modifier = Modifier.size(48.dp).semantics { contentDescription = "Settings" }) { Avatar(userName) }
+            // The button's own words say who and where; the initial under it isn't read again.
+            IconButton(
+                onClick = servers?.open ?: onAvatar,
+                modifier = Modifier.size(48.dp).testTag(TestTags.ACCOUNT).semantics { contentDescription = servers?.label ?: "Settings" },
+            ) { Box(Modifier.clearAndSetSemantics {}) { Avatar(userName) } }
         } else if (userName != null) {
             Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { Avatar(userName) }
         }

@@ -57,7 +57,7 @@ class DiagnosticsTest {
         }
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides services) {
-                WatchMyMediaPhoneTheme { SettingsScreen(onSwitchServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {}, open = SettingsGroup.About) }
+                WatchMyMediaPhoneTheme { SettingsScreen(onAddServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = {}, open = SettingsGroup.About) }
             }
         }
         compose.onNodeWithText("Copy diagnostics").performScrollTo().performClick()

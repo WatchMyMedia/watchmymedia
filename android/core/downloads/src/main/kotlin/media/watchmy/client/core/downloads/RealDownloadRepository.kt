@@ -28,6 +28,7 @@ import media.watchmy.client.model.DownloadRepository
 import media.watchmy.client.model.DownloadSettings
 import media.watchmy.client.model.DownloadStatus
 import media.watchmy.client.model.DownloadStorage
+import media.watchmy.client.model.DownloadTotals
 import media.watchmy.client.model.OFFLINE_API_LEVEL
 import media.watchmy.client.model.OfflineDownload
 import media.watchmy.client.model.OfflineGateway
@@ -101,6 +102,20 @@ internal class RealDownloadRepository(
     override val enabled: StateFlow<Boolean> = combine(canDownload, downloads) { can, held -> can || held.isNotEmpty() }
         .stateIn(scope, SharingStarted.Eagerly, false)
 
+    /** What is held from each server whose account is still signed in, the one in use included. */
+    override val byServer: StateFlow<Map<String, DownloadTotals>> =
+        combine(store.state, owner, engineChanges) { s, _, _ -> totals(s) }.stateIn(scope, SharingStarted.Eagerly, totals(store.value))
+
+    private fun totals(s: StoredState): Map<String, DownloadTotals> {
+        val engineDownloads = engine.downloads()
+        return s.records.filter { gateway.signedIn(it.owner) }.groupBy { it.owner.serverId }.mapValues { (_, records) ->
+            DownloadTotals(
+                count = records.size,
+                bytes = records.sumOf { rec -> engineDownloads[rec.id]?.bytes?.takeIf { it > 0 } ?: parse(rec)?.sizeBytes ?: 0L },
+            )
+        }
+    }
+
     override val settings: StateFlow<DownloadSettings> = store.state.map { DownloadSettings(DownloadQuality.byId(it.quality), it.wifiOnly) }
         .stateIn(scope, SharingStarted.Eagerly, DownloadSettings(DownloadQuality.byId(store.value.quality), store.value.wifiOnly))
 
@@ -109,13 +124,17 @@ internal class RealDownloadRepository(
         engine.listen(::onEngineChange)
         settleCompleted()
         gateway.onSessionChange { scope.launch { onSessionChange() } }
-        gateway.beforeSignOut { reportAllRemoved() }
+        gateway.beforeSignOut { reportAllRemoved(it) }
         scope.launch { onSessionChange() }
     }
 
     // --- the account ---
 
-    /** Another account or server, or signed out: deletes what belongs to accounts no longer signed in, then checks what this one may do. */
+    /**
+     * Another account or server, or a sign-in ended (the one in use, or one
+     * on a server that isn't): deletes what belongs to accounts no longer
+     * signed in, then checks what this one may do.
+     */
     private suspend fun onSessionChange() {
         owner.value = gateway.owner()
         prune()
@@ -569,9 +588,8 @@ internal class RealDownloadRepository(
         if (removedHere && again) syncOwner(o, again = false)
     }
 
-    /** Before signing out: the progress made here and every copy, reported removed, while the session stands. */
-    private suspend fun reportAllRemoved() {
-        val o = owner.value ?: return
+    /** Before [o]'s sign-in ends (signed out, or its server removed): the progress made here and every copy, reported removed, while the session stands. */
+    private suspend fun reportAllRemoved(o: OfflineOwner) {
         val held = store.value.records.filter { it.ownerKey == o.key }
         if (held.isEmpty() && store.value.progress.none { it.ownerKey == o.key }) return
         val entries = store.value.progress.filter { it.ownerKey == o.key && it.downloadId !in held.filter { r -> r.mark == StoredRecord.MARK_GONE }.map { r -> r.id } }

@@ -55,7 +55,7 @@ class NotificationsPageTest {
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides services) {
                 WatchMyMediaPhoneTheme {
-                    SettingsScreen(onSwitchServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = { route -> (route as? media.watchmy.client.mobile.navigation.MobileRoutes.Show)?.let { opened(it.id) } }, open = open)
+                    SettingsScreen(onAddServer = {}, onSignedOut = {}, onLinkTv = {}, onNavigate = { route -> (route as? media.watchmy.client.mobile.navigation.MobileRoutes.Show)?.let { opened(it.id) } }, open = open)
                 }
             }
         }

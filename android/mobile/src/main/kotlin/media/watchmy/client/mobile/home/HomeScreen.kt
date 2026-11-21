@@ -166,7 +166,7 @@ fun HomeScreen(
     Column(Modifier.fillMaxSize().background(WmmColors.Ground)) {
         // Offline there is nothing to search.
         val offline = state.home == null && state.offline && held.enabled
-        MainTopBar("Home", user?.name, onSearch = { onNavigate(MobileRoutes.Search) }.takeIf { !offline }, onAvatar = { onNavigate(MobileRoutes.Settings) })
+        MainTopBar("Home", user?.name, onSearch = { onNavigate(MobileRoutes.Search) }.takeIf { !offline }, onAvatar = { onNavigate(MobileRoutes.Settings) }, showServer = true)
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val home = state.home
             when {

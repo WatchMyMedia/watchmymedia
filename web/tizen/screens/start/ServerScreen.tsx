@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useApp } from '../../app/hooks'
 import { displayAddress, isNotEncrypted } from '../../session/address'
-import { MIN_SERVER_VERSION } from '../../session/session'
+import { AlreadyAddedError, MIN_SERVER_VERSION } from '../../session/session'
 import type { StartState } from '../../session/session'
 import { Button, KeyHints } from '../../ui/Button'
 import { Brand, Icon } from '../../ui/Icon'
 import { TextField } from '../../ui/TextField'
 import { problemWords } from '../../ui/problemWords'
+import { alreadyAdded, alreadyAddedLine } from '../servers/serverRows'
 import { serverDetail } from './startWords'
 
 type Servers = Extract<StartState, { screen: 'servers' }>
@@ -14,14 +15,16 @@ type Servers = Extract<StartState, { screen: 'servers' }>
 function AddressForm({ state, first }: { state: Servers; first: boolean }) {
   const app = useApp()
   const connecting = state.busy === 'address'
-  const error = state.error ? problemWords(state.error) : undefined
+  const words = state.error ? problemWords(state.error) : undefined
+  const error = state.error instanceof AlreadyAddedError ? alreadyAddedLine(state.error.server) : words && `${words.title}. ${words.body}`
   return <>
     <span className="tv-label">Server address</span>
     <TextField id="address" label="Server address" type="url" value={state.address} autoFocus={first && !connecting}
       placeholder="192.168.1.20:27587 or https://home.example.net" onChange={(v) => app.editAddress(v)} onSubmit={() => void app.connect()}/>
     {connecting ? <p role="status" className="start-status"><span className="tv-spinner" aria-hidden="true"/>Connecting to {state.address.trim()}…</p>
-      : error ? <p role="alert" className="tv-error"><Icon name="alert"/>{error.title}. {error.body}</p>
+      : error ? <p role="alert" className="tv-error"><Icon name="alert"/>{error}</p>
         : first ? <p className="start-status"><span className="tv-kbd">OK</span>Press OK to type with the TV’s keyboard</p> : null}
+    {state.adding && state.adding.registered.length > 0 && <p className="tv-note">{alreadyAdded(state.adding.registered)}</p>}
     <div className="tv-actions start-actions">
       {connecting ? <>
         <Button id="connecting" variant="primary" busy>Connecting…</Button>
@@ -32,28 +35,32 @@ function AddressForm({ state, first }: { state: Servers; first: boolean }) {
 }
 
 /**
- * Choosing a server: the servers this TV
- * remembers, each with Remove, and an address typed with the TV's keyboard.
- * There is no discovery on Samsung TVs. Plain http to a server away from
- * home is marked Not encrypted.
+ * Choosing a server: the servers this TV remembers and an address typed
+ * with the TV's keyboard. There is no discovery on Samsung TVs. Plain http
+ * to a server away from home is marked Not encrypted. Opened as Add a
+ * server from the signed-in app, it offers none of the servers this TV
+ * already has and names them under the field; Return goes back to the app.
+ * Removing a server is in Settings › Account & devices › Servers.
  */
 export function ServerScreen({ state }: { state: Servers }) {
   const app = useApp()
   const [now] = useState(() => Date.now())
   const [focused, setFocused] = useState<string>()
   const first = state.servers.length === 0
+  const adding = !!state.adding
   const warn = state.servers.find((s) => s.id === focused && isNotEncrypted(s.baseUrl)) ?? (focused ? undefined : state.servers.find((s) => isNotEncrypted(s.baseUrl)))
   const hints = state.busy ? [{ key: 'Return', label: 'Cancel' }]
-    : first ? [{ key: 'OK', label: 'Type the address' }, { key: '▼', label: 'Go to Connect' }]
-      : [{ key: 'OK', label: 'Connect' }, { key: '▶', label: 'Remove' }, { key: '▲ ▼', label: 'Move' }]
+    : first ? [{ key: 'OK', label: 'Type the address' }, { key: '▼', label: 'Go to Connect' }, ...(adding ? [{ key: 'Return', label: 'Back' }] : [])]
+      : [{ key: 'OK', label: 'Connect' }, { key: '▲ ▼', label: 'Move' }]
   return <div className="tv-page">
     <div className="tv-glow"/>
     <div className="start-brand"><Brand/></div>
     {first ? <>
       <div className="start-main">
-        <p className="tv-kicker">Servers</p>
-        <h1 className="tv-h1">Connect to your server</h1>
-        <p className="tv-lede">Type the address of your WatchMyMedia server. This TV remembers it for next time.</p>
+        <p className="tv-kicker">{adding ? 'Add a server' : 'Servers'}</p>
+        <h1 className="tv-h1">{adding ? 'Choose a server' : 'Connect to your server'}</h1>
+        <p className="tv-lede">{adding ? 'Type the address of another WatchMyMedia server. This TV stays signed in to the ones it has.'
+          : 'Type the address of your WatchMyMedia server. This TV remembers it for next time.'}</p>
         <div className="start-form"><AddressForm state={state} first/></div>
       </div>
       <aside className="start-help" aria-labelledby="help-head">
@@ -82,7 +89,6 @@ export function ServerScreen({ state }: { state: Servers }) {
                 {busy && <span className="tv-spinner" aria-hidden="true"/>}
                 {plain && <span className="tv-tag tv-tag--warn"><Icon name="unlocked"/>Not encrypted</span>}
               </button>
-              <Button id={`remove/${s.id}`} label={`Remove ${s.name}`} onPress={() => app.remove(s.id)}>Remove</Button>
             </li>
           })}
         </ul>

@@ -80,7 +80,7 @@ internal data class StoredServer(
 ) {
     fun toServer() = Server(id, name, baseUrl, version, apiLevel, setupRequired, turnstile)
 
-    fun toSaved() = SavedServer(toServer(), account?.userName ?: lastUserName, account != null, lastUsedAtMs)
+    fun toSaved() = SavedServer(toServer(), account?.userName ?: lastUserName, account != null, lastUsedAtMs, account?.userId)
 }
 
 /** Everything kept on the device. */
@@ -102,6 +102,16 @@ internal data class Stored(
 
     fun withServer(id: String, change: (StoredServer) -> StoredServer): Stored =
         copy(servers = servers.map { if (it.id == id) change(it) else it })
+
+    /**
+     * This with the most recently used server that is still signed in as the
+     * one in use, used at [now]; null when none is. Where the app goes when
+     * the server in use is signed out of or removed.
+     */
+    fun movedToSignedIn(now: Long): Stored? {
+        val next = servers.filter { it.account != null && it.id != currentId }.maxByOrNull { it.lastUsedAtMs } ?: return null
+        return withServer(next.id) { it.copy(lastUsedAtMs = now) }.copy(currentId = next.id)
+    }
 }
 
 /** The current server and its sign-in, as one snapshot for a request. */
@@ -140,11 +150,13 @@ internal class LocalStore(
     private val opened = HashMap<String, String?>()
 
     private var sessionKey: String?
+    private var signInsKey: String
     @Volatile var revision: Long = 0
         private set
     private val sessionRevisionState = MutableStateFlow(0L)
     val sessionChanges: StateFlow<Long> = sessionRevisionState.asStateFlow()
     private val sessionListeners = CopyOnWriteArrayList<(signedIn: Boolean) -> Unit>()
+    private val signInListeners = CopyOnWriteArrayList<() -> Unit>()
 
     init {
         val loaded = preloaded ?: runBlocking { load() }
@@ -158,6 +170,7 @@ internal class LocalStore(
         autoState = MutableStateFlow(autoQuality(initial))
         deviceState = MutableStateFlow(device(initial))
         sessionKey = sessionKey(initial)
+        signInsKey = signInsKey(initial)
         if (initial !== loaded) writeBehind()
     }
 
@@ -232,6 +245,17 @@ internal class LocalStore(
         sessionListeners += listener
     }
 
+    /**
+     * Calls [listener] as [onSessionChange] does, and also when a sign-in on
+     * a server that isn't the one in use ends: signed out there, or the
+     * server removed. What is kept for each sign-in (its downloads) follows
+     * this, so removing a server that isn't in use deletes them at once.
+     * Once for each change.
+     */
+    fun onSignInsChange(listener: () -> Unit) {
+        signInListeners += listener
+    }
+
     fun seal(token: String): String = sealer.seal(token).also { synchronized(opened) { opened[it] = token } }
 
     /** Changes the state in memory at once and writes it behind. */
@@ -296,6 +320,7 @@ internal class LocalStore(
 
     private fun apply(transform: (Stored) -> Stored): Stored {
         var sessionChanged = false
+        var signInsChanged = false
         val next = synchronized(lock) {
             val next = transform(state.value)
             state.value = next
@@ -313,13 +338,22 @@ internal class LocalStore(
                 sessionRevisionState.value = revision
                 sessionChanged = true
             }
+            val signIns = signInsKey(next)
+            if (signIns != signInsKey) {
+                signInsKey = signIns
+                signInsChanged = true
+            }
             next
         }
         if (sessionChanged) sessionListeners.forEach { it(next.current?.account != null) }
+        if (sessionChanged || signInsChanged) signInListeners.forEach { it() }
         return next
     }
 
     private fun sessionKey(s: Stored) = s.current?.let { "${it.id} ${it.baseUrl} ${it.account?.userId} ${it.account?.token}" }
+
+    /** Who is signed in where, on every server kept: it changes when any sign-in begins or ends. */
+    private fun signInsKey(s: Stored) = s.servers.mapNotNull { server -> server.account?.let { "${server.id}/${it.userId}" } }.sorted().joinToString(" ")
 
     private suspend fun save() = writeLock.withLock {
         // Always the newest state, so writes that overtake each other still end right.

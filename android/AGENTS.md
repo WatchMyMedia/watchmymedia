@@ -48,6 +48,35 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   ViewModel in `core:presentation`, tested there against the fakes; the TV
   and phone screens only draw it. Where the two UIs used to differ, the
   Apple apps' `WMMFeatures` models decide.
+- **Several servers.** A device is signed in to several servers, one in
+  use (README, "Several servers"). The signed-in screens are rebuilt on
+  every switch (`key(server.id, user)` in `MobileApp` and `TvApp`), so
+  anything that must outlive one (a note, a flow's step, where to land)
+  belongs to `ServerSwitchViewModel`, above them. A call to a server that
+  isn't in use goes through `Http.bindTo(serverId, userId)`, which builds
+  it for that server's address and sign-in; never send the current
+  sign-in to an address taken from another server's reply. Before a
+  sign-in goes to a server that isn't in use from Search, its address is
+  asked which server it is with no sign-in, and gets the sign-in only if
+  it is the one remembered: use `Http.bindToAnswered` after
+  `RealServerRepository.askFirst`, as `searchOn` does, not `bindTo`, and
+  test it on the test servers' recorded requests (no `Authorization`
+  header at all for a stranger at the address). `bindTo` itself doesn't
+  ask: offline downloads report to the server they came from with it, as
+  they did before there were several. The fakes are
+  signed in to several too, so signing out there moves to the next server:
+  a test of what a device with one server does makes them with
+  `several = false` (`quietTvFakes(several = false)` on the TV).
+  Two things only real servers showed, on an emulator with two throwaway
+  ones. A switch takes a moment (it runs in the data layer's scope), so
+  what is set before it is drawn once for the server still in use: a search
+  result's landing was opened, and used up, by the old server's screens, and
+  the app arrived on Home. Name the server such state is for and hand it
+  only to that server's screens (`State.landingFor`); the fakes' switch
+  waits their usual delay so a fakes build shows the same order. And
+  `LocalStore` sets the server in use before the saved list: a collector of
+  `current` on the main thread can run between the two, so count or look up
+  the server in use from `current`, and only the others from `saved`.
 - **Server changes.** A page's ViewModel reloads for `libraryChanges`
   (core:model's `LibraryChange`, with the items and libraries an event
   names) through `Freshness` in core:presentation, which ignores changes
@@ -188,6 +217,11 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   it; a `LaunchedEffect` a frame later finds focus already elsewhere. A
   `FocusRequester` whose element has left the composition throws on
   `requestFocus()`; use `tryFocus()` (`tv/src/main/kotlin/media/watchmy/client/tv/components/Focus.kt`).
+- **Focus in a panel.** A `TvDialog`'s content is a composition of its
+  own. Ask for focus from inside it (a `LaunchedEffect` in its content): one
+  outside runs before the panel's rows exist, the request finds nothing,
+  and focus opens on the panel's first row instead. Settings' Servers page
+  opened on the server in use that way.
 - **A list beside other controls.** A focus search in a direction takes
   only what starts further that way than the focused item, and it judges a
   scrolling list by the list's own bounds, not its cards'. Search's results
@@ -215,10 +249,15 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   row with an `enter` card (`CardRow`) takes the remembered card as its way
   in when it is composed again
   (`tv/src/main/kotlin/media/watchmy/client/tv/detail/RelatedRows.kt`).
-- **Focus tests and cleared semantics.** `HomeFocusTest` finds the focused
-  element by its `Focused` semantics. A card that `clearAndSetSemantics` to
-  read as one thing must set `focused` itself (as `TvOnNowCard` does), or the
-  test sees nothing focused after a move onto it.
+- **Cleared semantics and focus.** A card or cell that `clearAndSetSemantics`
+  to read as one thing clears its own focus state with its parts', so it
+  must set `focused` itself (as `TvOnNowCard` does). Without it TalkBack is
+  never told the element is in focus, and a test that finds the focused
+  element by its `Focused` semantics (`HomeFocusTest`) sees nothing after a
+  move onto it. Search's Live TV results and every cell of the Live TV
+  guide were like that until 20 November 2026; `adb shell uiautomator dump`
+  showed no focused node while one plainly had focus. Read the state only
+  in the semantics, so a move of focus composes nothing again.
 
 ## Emulators
 
