@@ -52,6 +52,9 @@ export class FakeServer {
     return token
   }
 
+  /** Takes a token as signed in: one this TV kept from a sign-in before the preview started. */
+  trust(token: string) { this.tokens.add(token) }
+
   revokeToken(token: string) { this.tokens.delete(token) }
 
   /** Every token stops working: "signed out from another device". */

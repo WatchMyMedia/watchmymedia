@@ -2,6 +2,7 @@ import type { components } from '../../src/api/schema'
 import { REQUIRED_API_LEVEL } from '../session/session'
 import { FakeServer, problem } from './server'
 import { FAKE_USER } from './data'
+import { LAKESIDE, type FakeIdentity } from './others'
 
 type ServerInfo = components['schemas']['ServerInfo']
 
@@ -16,11 +17,11 @@ const APPROVE_AFTER_MS = 8000
  * seconds, password sign-in, who is signed in, media tokens and the event
  * stream. `mode` picks a server problem: "old" (below this TV's API level),
  * "setup" (no accounts yet) or "expire" (signed out from another device 30 s
- * after signing in).
+ * after signing in). `identity` is which server it says it is.
  */
-export function registerStart(server: FakeServer, mode: string) {
+export function registerStart(server: FakeServer, mode: string, identity: FakeIdentity = LAKESIDE) {
   const info: ServerInfo = {
-    id: 'fake-lakeside', name: 'Lakeside', version: mode === 'old' ? 'v1.7.0' : 'v1.8.0', platform: 'linux',
+    id: identity.id, name: identity.name, version: mode === 'old' ? 'v1.7.0' : 'v1.8.0', platform: 'linux',
     apiLevel: mode === 'old' ? REQUIRED_API_LEVEL - 1 : REQUIRED_API_LEVEL,
     setupRequired: mode === 'setup', turnstile: false, casting: false,
   }

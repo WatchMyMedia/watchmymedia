@@ -77,7 +77,7 @@ button { border: 0; background: none; padding: 0; text-align: inherit; cursor: p
 .tv-rail:focus-within .tv-rail__item { width: 15.625rem; }
 .tv-rail__icon { position: relative; display: grid; place-items: center; width: 3.75rem; height: 3.75rem; flex: none; }
 .tv-rail__icon svg { width: 1.875rem; height: 1.875rem; }
-.tv-rail__label { display: none; font-size: 1.3125rem; font-weight: 600; white-space: nowrap; }
+.tv-rail__label { display: none; min-width: 0; padding-right: 1rem; font-size: 1.3125rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tv-rail:focus-within .tv-rail__label { display: block; }
 .tv-rail__item[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
 .tv-rail__item:focus { color: var(--text); background: var(--ghost); outline: var(--focus-width) solid var(--accent); outline-offset: var(--focus-offset); transform: scale(var(--focus-scale)); }
@@ -85,6 +85,9 @@ button { border: 0; background: none; padding: 0; text-align: inherit; cursor: p
 .tv-rail__badge { position: absolute; top: .125rem; right: .125rem; min-width: 1.5rem; height: 1.5rem; padding: 0 .375rem; border-radius: .75rem; background: var(--accent); color: var(--on-accent); font-size: .875rem; font-weight: 800; display: grid; place-items: center; }
 .tv-rail__spacer { flex: 1; }
 .tv-rail__avatar { display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 50%; background: var(--brand); color: var(--text); font-size: 1.25rem; font-weight: 700; }
+/* Servers open beside the rail: the rail stays lit over the dimmed screen, and the button that opened it keeps a gold ring. */
+.tv-rail--beside { z-index: 22; pointer-events: none; }
+.tv-rail__avatar--open { box-shadow: 0 0 0 .1875rem var(--ground), 0 0 0 .375rem var(--accent); }
 .tv-rail__item--pulse::after { content: ""; position: absolute; inset: 0; border-radius: 1rem; border: .1875rem solid var(--accent); animation: tv-pulse 520ms ease-out forwards; pointer-events: none; }
 @keyframes tv-pulse { from { opacity: .75; transform: scale(1); } to { opacity: 0; transform: scale(1.6); } }
 
@@ -107,6 +110,9 @@ button { border: 0; background: none; padding: 0; text-align: inherit; cursor: p
 .tv-badge--live::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; }
 .tv-card__title { display: block; margin-top: .75rem; font-size: 1.25rem; font-weight: 600; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tv-card__sub { display: block; margin-top: .125rem; font-size: 1.0625rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-card__server { display: flex; align-items: center; gap: .4375rem; margin-top: .125rem; font-size: 1.0625rem; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+.tv-card__server svg { width: 1.0625rem; height: 1.0625rem; flex: none; }
+.tv-card__server span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tv-card:focus { transform: scale(var(--focus-scale)); z-index: 2; }
 .tv-card:focus .tv-card__art { outline: var(--focus-width) solid var(--accent); outline-offset: var(--focus-offset); box-shadow: 0 1.625rem 3.75rem rgba(0, 0, 0, .6); }
 .tv-card:focus .tv-card__title { color: var(--text); }

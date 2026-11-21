@@ -1,4 +1,4 @@
-import { useLayoutEffect, type ReactNode } from 'react'
+import { useEffectEvent, useLayoutEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { LayerContext, useBack, useFocus, useKeys } from '../app/hooks'
 import { Button, type ButtonProps } from './Button'
@@ -6,18 +6,26 @@ import { Icon, type IconName } from './Icon'
 
 /**
  * Holds focus inside a modal while it is open (data-scope="modal") and puts
- * it back on what the screen had when it closes. Its keys come first.
+ * it back on what the screen had when it closes, or where `returnFocus`
+ * puts it (the rail's button that opened a panel). Its keys come first.
  */
-function useModalFocus() {
+function useModalFocus(returnFocus?: () => boolean) {
   const focus = useFocus()
+  const elsewhere = useEffectEvent(() => returnFocus?.() === true)
   useLayoutEffect(() => {
     focus.restore([], 'modal')
-    return () => queueMicrotask(() => { if (!focus.scope('modal')) focus.focusContent() })
+    return () => queueMicrotask(() => { if (!focus.scope('modal') && !elsewhere()) focus.focusContent() })
   }, [focus])
 }
 
-function Modal({ children, onClose, className }: { children: ReactNode; onClose(): void; className: string }) {
-  useModalFocus()
+function Modal({ children, onClose, className, returnFocus }: {
+  children: ReactNode
+  onClose(): void
+  className: string
+  /** Where focus goes when this closes, when that isn't the screen: return true once it is there. */
+  returnFocus?: () => boolean
+}) {
+  useModalFocus(returnFocus)
   useBack(() => { onClose(); return true }, true, 'modal')
   return createPortal(<LayerContext.Provider value="modal">
     <div className={`tv-scrim ${className}`} data-scope="modal">{children}</div>

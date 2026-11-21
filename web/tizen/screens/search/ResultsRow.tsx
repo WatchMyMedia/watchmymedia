@@ -8,7 +8,7 @@ import { rowWindow } from '../../app/focusRules'
  * the focused one in view, only the cards near the view drawn, back on the
  * card it remembers) for `visible` cards of `cell` width.
  */
-export function ResultsRow<T>({ id, title, count, items, itemKey, cell, visible, renderItem, foot }: {
+export function ResultsRow<T>({ id, title, count, items, itemKey, cell, visible, renderItem, foot, room }: {
   id: string
   title: string
   count?: ReactNode
@@ -20,6 +20,8 @@ export function ResultsRow<T>({ id, title, count, items, itemKey, cell, visible,
   renderItem(item: T, focusId: string): ReactNode
   /** Under the row: the focused card's keys. */
   foot?: ReactNode
+  /** The row's height from the start, as CSS: room for a line some cards get later (their server), so the rows under it never move. */
+  room?: string
 }) {
   const remembered = useGroupMemory(id)
   const [focus, setFocus] = useState(() => Math.max(0, items.findIndex((item) => `${id}/${itemKey(item)}` === remembered)))
@@ -33,7 +35,7 @@ export function ResultsRow<T>({ id, title, count, items, itemKey, cell, visible,
   return <section className="search-section" data-group={id} data-vitem aria-label={title}>
     <h2 className="tv-h2">{title}{count !== undefined && <small>{count}</small>}</h2>
     <div className="search-section__viewport" data-clip>
-      <div className="search-section__track" data-row onFocus={onFocus} style={{ '--cell-w': cell, transform: `translateX(calc(${-start} * ${step}))` } as CSSProperties}>
+      <div className="search-section__track" data-row onFocus={onFocus} style={{ '--cell-w': cell, minHeight: room, transform: `translateX(calc(${-start} * ${step}))` } as CSSProperties}>
         {from > 0 && <span style={{ flex: 'none', width: `calc(${from} * ${step} - var(--card-gap))` }}/>}
         {items.slice(from, to).map((item, k) => <div key={itemKey(item)} className="search-section__cell" data-index={from + k}>{renderItem(item, `${id}/${itemKey(item)}`)}</div>)}
       </div>

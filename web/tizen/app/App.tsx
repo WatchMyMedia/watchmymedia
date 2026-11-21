@@ -12,7 +12,7 @@ export function App({ app, input, player, exit }: { app: AppSession; input: Inpu
   return <InputContext.Provider value={input}>
     <AppContext.Provider value={app}>
       <PlayerContext.Provider value={player}>
-        {state.screen === 'signedIn' ? <Shell key={state.session.serial} session={state.session} exit={exit}/> : <StartFlow state={state} exit={exit}/>}
+        {state.screen === 'signedIn' ? <Shell key={state.session.serial} session={state.session} arrival={state.arrival} exit={exit}/> : <StartFlow state={state} exit={exit}/>}
       </PlayerContext.Provider>
     </AppContext.Provider>
   </InputContext.Provider>
