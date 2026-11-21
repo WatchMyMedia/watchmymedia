@@ -244,6 +244,12 @@ SET match_status = ?, movie_id = ?, match_candidates = ?, match_error = ?, match
     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE id = ?;
 
+-- name: NotePendingMatch :exec
+-- Says, on a file still waiting for its match, why a try at it left no
+-- result (the database was too busy to take one), and changes nothing else
+-- about it: it is tried again, and the next result replaces the note.
+UPDATE media_files SET match_error = ? WHERE id = ? AND match_status = 'pending';
+
 -- name: CountMediaFilesByMatch :many
 -- Present files still to match, per library and status. Matched files,
 -- most of a library, are skipped on the match index rather than read, and

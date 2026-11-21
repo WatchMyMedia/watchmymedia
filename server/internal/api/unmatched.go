@@ -412,6 +412,12 @@ func groupReason(libraryType string, g *UnmatchedGroup) string {
 				return "TMDB did not answer: " + f.MatchError
 			}
 		}
+		// A file still waiting says why, when a try at it left a note.
+		for _, f := range g.Files {
+			if f.MatchStatus == metadata.StatusPending && f.MatchError != "" {
+				return f.MatchError
+			}
+		}
 		return "Not looked up on TMDB yet."
 	case GroupEpisodes:
 		for _, f := range g.Files {

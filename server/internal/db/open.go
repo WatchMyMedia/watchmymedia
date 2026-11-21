@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/url"
+	"time"
 
 	"github.com/pressly/goose/v3"
 	"github.com/pressly/goose/v3/database"
@@ -36,9 +37,18 @@ const IdleConns = 8
 // once with SQLITE_BUSY when another connection has written meanwhile; the
 // busy timeout does not apply there. Read-only transactions
 // (sql.TxOptions{ReadOnly: true}) still begin deferred.
-func Open(path string) (*sql.DB, error) {
+func Open(path string) (*sql.DB, error) { return OpenBusy(path, BusyTimeout) }
+
+// BusyTimeout is how long a statement, or the start of a transaction,
+// waits for another connection's write to finish before it fails with
+// SQLITE_BUSY (IsBusy).
+const BusyTimeout = 5 * time.Second
+
+// OpenBusy is Open with another busy timeout: tests of what happens when
+// it runs out cannot wait five seconds each time.
+func OpenBusy(path string, busy time.Duration) (*sql.DB, error) {
 	dsn := "file:" + url.PathEscape(path) +
-		"?_pragma=busy_timeout(5000)" +
+		fmt.Sprintf("?_pragma=busy_timeout(%d)", busy.Milliseconds()) +
 		"&_pragma=journal_mode(WAL)" +
 		"&_pragma=foreign_keys(1)" +
 		"&_pragma=synchronous(NORMAL)" +

@@ -63,6 +63,10 @@ type Options struct {
 	// Watch moves watch state in rematches; nil makes one over the same
 	// queries and bus.
 	Watch *watchstate.Service
+	// BusyWait is how long a write keeps being tried while another writer
+	// holds the database, after the wait every statement has
+	// (db.BusyTimeout); zero means a minute.
+	BusyWait time.Duration
 }
 
 type Matcher struct {
@@ -75,6 +79,11 @@ type Matcher struct {
 	mu     sync.Mutex
 	ctx    context.Context
 	states map[int64]*state
+
+	// onBusy and onGiveUp, when set, are called each time a write finds
+	// the database locked and when one has waited as long as it will: tests
+	// let go of the database there.
+	onBusy, onGiveUp func()
 
 	// shows serialises storing one show of a library, so the episode
 	// workers of a show don't all fetch it from TMDB, while other shows go
@@ -155,6 +164,9 @@ func New(q *db.Queries, client *tmdb.Client, bus *events.Bus, log *slog.Logger, 
 	}
 	if opts.Watch == nil {
 		opts.Watch = watchstate.New(q, bus)
+	}
+	if opts.BusyWait <= 0 {
+		opts.BusyWait = time.Minute
 	}
 	return &Matcher{q: q, tmdb: client, bus: bus, log: log, opts: opts, ctx: context.Background(), states: map[int64]*state{},
 		// A shared lookup gives up after a minute, retries included.
@@ -517,6 +529,9 @@ func (m *Matcher) matchFile(ctx context.Context, lib db.Library, f db.MediaFile)
 		err = fmt.Errorf("unsupported library type %q", lib.Type)
 	}
 
+	if db.IsBusy(err) {
+		return m.leftBusy(ctx, f, err)
+	}
 	status := StatusMatched
 	var errMsg *string
 	switch {
@@ -530,9 +545,51 @@ func (m *Matcher) matchFile(ctx context.Context, lib db.Library, f db.MediaFile)
 		status = StatusUnmatched
 	}
 	if setErr := m.record(ctx, f.ID, status, movieID, episodeIDs, candidates, errMsg, false); setErr != nil {
+		if db.IsBusy(setErr) {
+			return m.leftBusy(ctx, f, setErr)
+		}
 		return StatusFailed, setErr
 	}
 	return status, err
+}
+
+// write runs the matcher's writes for one result in a transaction, as
+// Queries.Transaction does, and tries again while another writer holds the
+// database, for as long as Options.BusyWait. A scan, an import or another
+// worker storing a long show can hold it for longer than the 5 s every
+// statement waits; that is nothing about the file being matched, and the
+// run has nobody waiting for it. fn runs again from the start each time,
+// so it sets nothing outside the transaction but what it sets every time.
+func (m *Matcher) write(ctx context.Context, fn func(*db.Queries) error) error {
+	return db.RetryBusy(ctx, m.opts.BusyWait, func() error {
+		err := m.q.Transaction(ctx, fn)
+		if m.onBusy != nil && db.IsBusy(err) {
+			m.onBusy()
+		}
+		return err
+	})
+}
+
+// BusyNote is the match error of a file that is still waiting for its
+// match because the database was locked for longer than the matcher waits.
+const BusyNote = "The database was busy when this was matched, so the match was not saved. It is tried again within a day."
+
+// leftBusy leaves a file as it was when the database stayed locked for as
+// long as the matcher waits (err). Before, such a file was recorded as
+// failed with "database is locked" as what TMDB said, and waited a day; or,
+// when recording that was refused too, was left pending with nothing to
+// say why. It stays as it is, so one waiting for its first match is matched
+// by the next run (after a scan that finds a change, at startup, and once a
+// day), with a note of why if the database takes one now. The run counts
+// it as failed and logs err.
+func (m *Matcher) leftBusy(ctx context.Context, f db.MediaFile, err error) (string, error) {
+	if m.onGiveUp != nil {
+		m.onGiveUp()
+	}
+	if noteErr := m.q.NotePendingMatch(ctx, db.NotePendingMatchParams{MatchError: new(BusyNote), ID: f.ID}); noteErr != nil && !db.IsBusy(noteErr) && ctx.Err() == nil {
+		m.log.Warn("note a match left for later", "file", f.Path, "err", noteErr)
+	}
+	return StatusFailed, fmt.Errorf("the database stayed locked for %v, the match is left for the next run: %w", m.opts.BusyWait, err)
 }
 
 // isLookupFailure separates "TMDB could not be reached" from "no good match".
@@ -594,7 +651,7 @@ func (m *Matcher) record(ctx context.Context, fileID int64, status string, movie
 	}
 	// One transaction: a failure part way must not leave a file matched with
 	// its old episodes gone and only some of the new ones linked.
-	err = m.q.Transaction(ctx, func(q *db.Queries) error {
+	err = m.write(ctx, func(q *db.Queries) error {
 		if err := q.SetMediaFileMatch(ctx, db.SetMediaFileMatchParams{
 			MatchStatus: status, MovieID: movieID, MatchCandidates: cand, MatchError: errMsg,
 			MatchedAt: matchedAt, MatchLocked: lockedInt, ID: fileID,
@@ -730,7 +787,7 @@ func (m *Matcher) storeMovie(ctx context.Context, lib db.Library, tmdbID int) (i
 	// The details came with what related titles need too, so the movie's
 	// tags are stored with it.
 	var id int64
-	err = m.q.Transaction(ctx, func(q *db.Queries) error {
+	err = m.write(ctx, func(q *db.Queries) error {
 		row, err := q.UpsertMovie(ctx, db.UpsertMovieParams{
 			LibraryID:     lib.ID,
 			TmdbID:        int64(mv.ID),
@@ -935,7 +992,7 @@ func (m *Matcher) storeShow(ctx context.Context, lib db.Library, tmdbID int) (db
 	}
 	genres, _ := json.Marshal(genreNames(tv.Genres))
 	var show db.Show
-	err = m.q.Transaction(ctx, func(q *db.Queries) error {
+	err = m.write(ctx, func(q *db.Queries) error {
 		var err error
 		show, err = q.UpsertShow(ctx, db.UpsertShowParams{
 			LibraryID:     lib.ID,
@@ -1001,7 +1058,7 @@ func (m *Matcher) storeSeason(ctx context.Context, show db.Show, number int) (db
 		return db.Season{}, err
 	}
 	var row db.Season
-	err = m.q.Transaction(ctx, func(q *db.Queries) error {
+	err = m.write(ctx, func(q *db.Queries) error {
 		var err error
 		row, err = writeSeason(ctx, q, show, s)
 		return err

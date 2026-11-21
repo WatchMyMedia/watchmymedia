@@ -94,7 +94,7 @@ func (m *Matcher) linkFileNamed(ctx context.Context, lib db.Library, tmdbID int,
 	var ids []int64
 	// One transaction, so the sweep never finds a season made here without
 	// its episodes.
-	err = m.q.Transaction(ctx, func(q *db.Queries) error {
+	err = m.write(ctx, func(q *db.Queries) error {
 		ids = nil
 		for _, s := range seasons {
 			if err := q.InsertFileNamedSeason(ctx, db.InsertFileNamedSeasonParams{ShowID: show.ID, Number: int64(s), Name: fmt.Sprintf("Season %d", s)}); err != nil {
