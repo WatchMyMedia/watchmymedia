@@ -31,7 +31,6 @@ import media.watchmy.client.model.SearchResults
 import media.watchmy.client.model.SeasonDetail
 import media.watchmy.client.model.ShowDetail
 import media.watchmy.client.model.SignedOutException
-import media.watchmy.client.model.couldntReach
 import media.watchmy.client.model.episodeCode
 
 internal class RealLibraryRepository(
@@ -40,8 +39,6 @@ internal class RealLibraryRepository(
     events: ServerEvents,
     scope: kotlinx.coroutines.CoroutineScope,
     clock: () -> Long,
-    /** Asks a kept server that isn't in use which server it is, before its sign-in goes there ([RealServerRepository.askFirst]). */
-    private val askFirst: suspend (serverId: String) -> Unit,
 ) : LibraryRepository {
     /** The library list, asked again after a scan or a change to a library, or after a while ([SessionMemo]). */
     private val libraryList = SessionMemo(store, scope, clock) {
@@ -131,23 +128,16 @@ internal class RealLibraryRepository(
      * The call is built for [serverId] alone: its address and its sign-in,
      * so what is typed goes to each server as its own person and no sign-in
      * is sent to another server's address. Its address is asked which
-     * server it is first, with no sign-in ([askFirst]): the sign-in goes
-     * only to the server remembered, and to nothing else that answers
-     * there. A call that fails forgets the answer, so the next asks again.
+     * server it is first, with no sign-in ([Http.askFirst], which the
+     * access does): the sign-in goes only to the server remembered, and to
+     * nothing else that answers there. The answer is kept for this visit to
+     * Search; a call that fails forgets it, so the next asks again.
      */
     override suspend fun searchOn(serverId: String, text: String): SearchResults {
         val q = text.trim().take(MAX_SEARCH)
         if (q.isEmpty()) return SearchResults(emptyList(), emptyList(), emptyList())
         val server = store.value.servers.firstOrNull { it.id == serverId }
-        val account = server?.account ?: throw SignedOutException()
-        askFirst(serverId)
-        // A new visit to Search began just as it answered: it is asked once more. Still unanswered, nothing is sent.
-        val access = http.bindToAnswered(serverId, account.userId)
-            ?: run {
-                askFirst(serverId)
-                http.bindToAnswered(serverId, account.userId)
-            }
-            ?: throw ApiException(null, "${couldntReach(server.name)}.")
+        val access = server?.account?.let { http.bindTo(serverId, it.userId, keepAnswer = true) } ?: throw SignedOutException()
         val r = try {
             access.call { base, client -> browse(base, client).search(q) }
         } catch (e: CancellationException) {
@@ -168,9 +158,10 @@ internal class RealLibraryRepository(
         http.forgetAnswers()
         coroutineScope {
             showing.distinct().forEach { id ->
+                val server = store.value.servers.firstOrNull { it.id == id } ?: return@forEach
                 launch {
                     try {
-                        askFirst(id)
+                        http.askFirst(server, keep = true)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (_: Exception) {

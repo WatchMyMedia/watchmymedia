@@ -102,14 +102,37 @@ class ServerRepositoryTest {
     }
 
     @Test
-    fun `forgetting the current server signs out there too`() = runBlocking {
+    fun `forgetting the current server signs out there too, once it has said which server it is`() = runBlocking {
         h.signIn()
+        server.always("GET /api/server", json(TEST_INFO.format(5)))
         server.on("POST /api/auth/logout", noContent())
+        h.services.awaitIdle()
+        server.requests.clear()
         servers.forget(h.testServer.id)
         assertNull(h.services.auth.user.value)
         assertFalse(servers.saved.first().any { it.server.id == h.testServer.id })
         val logout = waitFor("POST /api/auth/logout")
         assertEquals("Bearer tok-viewer", logout.getHeader("Authorization"))
+        // It is no longer the server in use when the sign-out goes: its address is asked first, with no sign-in.
+        assertEquals(listOf("GET /api/server", "POST /api/auth/logout"), server.requests.map { "${it.method} ${it.requestUrl!!.encodedPath}" })
+        assertNull(server.requests[0].getHeader("Authorization"))
+    }
+
+    @Test
+    fun `forgetting a server at whose address another now answers removes it here and sends that one nothing`() = runBlocking {
+        h.signIn()
+        server.always("GET /api/server", json(TEST_INFO.format(5).replace("srv-test", "someone-else")))
+        server.always("POST /api/auth/logout", noContent())
+        h.services.awaitIdle()
+        server.requests.clear()
+        servers.forget(h.testServer.id)
+        assertNull(h.services.auth.user.value)
+        assertFalse("it is gone from this device all the same", servers.saved.first().any { it.server.id == h.testServer.id })
+        waitFor("GET /api/server")
+        // The sign-out would follow the answer at once.
+        Thread.sleep(300)
+        assertTrue("no sign-out was sent", server.requests("POST /api/auth/logout").isEmpty())
+        assertTrue(server.requests.none { it.getHeader("Authorization") != null })
     }
 
     @Test

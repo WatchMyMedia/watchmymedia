@@ -343,24 +343,42 @@ nothing ties two servers together, and the server has no part in this.
   server's sign-in, which goes to no other address.
 - **Asked first.** A kept address is only an address: at home it is the
   Cabin server, and on another network it is someone else's machine. So
-  before a search sends a server that isn't in use its sign-in, the app
+  before the sign-in of a server that isn't in use goes anywhere, the app
   asks that address which server it is, with no sign-in (`GET /api/server`),
   and sends the sign-in only when the id is the one remembered
-  (`RealServerRepository.askFirst`, which `searchOn` calls; the answer is
-  kept in `Http`, and the pictures of what a server found are signed only
-  while it stands). It asks once a visit to Search, not once a letter, and
-  the question shares the server's four seconds. A visit begins each time
-  Search comes on screen (`SearchViewModel.setShown`), since a device
-  changes network while the app is away; servers whose results are showing
-  are asked then, so their pictures go on loading. An answer stands only on
-  the network it was given on, so a device that moves with Search open asks
-  again. A call to a server that fails forgets its answer, so Try again
-  asks again. Nothing at the
-  address, or another server there: no sign-in is sent, and the server gets
-  the line and the rest any failure gets. What it says of itself (name,
-  version, level) is kept; one that says it is too old is left out and
-  said to be too old. The server in use is not asked for each search: its
-  sign-in goes to it as it always has.
+  (`Http.askFirst`). Nothing in the app has to remember to: every access to
+  a server (`ServerAccess`, from `Http.bind` and `bindTo`) asks before each
+  call when its server is not, or is no longer, the one in use, and so do
+  the event stream's calls and the end of a session. The server in use is
+  never asked: its sign-in goes to it as it always has. What a server says
+  of itself (name, version, level) is kept; one that says it is too old is
+  left out. Nothing at the address, or another server there: no sign-in is
+  sent, and the call fails as one that can't reach its server. What asks:
+  - **Search.** Once a visit, not once a letter, and the question shares
+    the server's four seconds. A visit begins each time Search comes on
+    screen (`SearchViewModel.setShown`), since a device changes network
+    while the app is away; servers whose results are showing are asked
+    then, so their pictures go on loading (a picture is signed only while
+    its server's answer stands). A call that fails forgets the answer, so
+    Try again asks again. A server that doesn't say so gets the line and
+    the rest any failure gets; one too old, or that refuses the sign-in, is
+    said to be too old or signed out here.
+  - **A download's reports** to the server it came from, while another is
+    in use (`RealOfflineGateway`): each call asks, since they run in the
+    background, hours apart and on any network, with nothing to say when
+    an answer has grown old. A report that isn't sent fails and is tried
+    again later, as one that can't reach its server always was.
+  - **Removing a server**, and signing out of one when another takes its
+    place: asked once, for what the removal reports and for the sign-out
+    after. When it doesn't say it is that server, it is removed from the
+    device all the same and nothing is sent; its session then stays on the
+    server until it runs out, or someone ends it from that server's list
+    of devices.
+  - **What outlives a switch**: a player's last report, a setting still
+    being saved. Each asks before it sends.
+
+  An answer stands only on the network it was given on, and only for the
+  work that asked: one visit to Search, or one removal.
 - **Above the signed-in screens.** Those screens are rebuilt on every
   switch (`key(server.id, user)`), so the note, Add a server's steps, the
   way back from a sign-in and a search result's landing are kept by
