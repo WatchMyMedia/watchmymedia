@@ -148,12 +148,12 @@ func TestRunPreservesLocalChoiceArrivingImmediatelyBeforeCommit(t *testing.T) {
 	}
 }
 func TestRunParentRematchOrOrderChangeCannotMarkApprovedOldEpisode(t *testing.T) {
-	for _, replacement := range []string{`{"ratingKey":"301","type":"show","episodeOrdering":"tmdbAiring","Guid":[{"id":"tmdb://999999"}]}`, `{"ratingKey":"301","type":"show","episodeOrdering":"dvd","Guid":[{"id":"tmdb://820001"}]}`} {
+	for _, replacement := range []string{`{"ratingKey":"301","type":"show","showOrdering":"tmdbAiring","Guid":[{"id":"tmdb://999999"}]}`, `{"ratingKey":"301","type":"show","showOrdering":"dvd","Guid":[{"id":"tmdb://820001"}]}`} {
 		t.Run(replacement, func(t *testing.T) {
 			e := newEnv(t)
 			e.f.SetItems("owner", "2", plextest.EpisodeJSON("201", "Pilot", "301", 1, 1, 1))
 			e.f.Set(func(f *plextest.Fake) {
-				f.Shows["301"] = `{"ratingKey":"301","type":"show","episodeOrdering":"tmdbAiring","Guid":[{"id":"tmdb://820001"}]}`
+				f.Shows["301"] = `{"ratingKey":"301","type":"show","showOrdering":"tmdbAiring","Guid":[{"id":"tmdb://820001"}]}`
 			})
 			c := e.connect()
 			c = e.link(c, []PlexUserLink{{PlexUserID: 701, UserID: e.admin}}, []PlexLibraryLink{{SectionID: 2, LibraryID: e.tv}})
@@ -697,7 +697,7 @@ func TestUnresolvedParentCanBecomeMatchedOnLaterReconciliation(t *testing.T) {
 		t.Fatal("unproved parent was stored as a canonical source identity")
 	}
 	e.f.Set(func(f *plextest.Fake) {
-		f.Shows["301"] = `{"ratingKey":"301","type":"show","title":"Signal Keepers","episodeOrdering":"tmdbAiring","Guid":[{"id":"tmdb://820001"}]}`
+		f.Shows["301"] = `{"ratingKey":"301","type":"show","title":"Signal Keepers","showOrdering":"tmdbAiring","Guid":[{"id":"tmdb://820001"}]}`
 	})
 	if _, err := e.q.SetPlexSync(ctx, db.SetPlexSyncParams{ID: c.ID, Generation: c.Generation, SyncEnabled: 1}); err != nil {
 		t.Fatal(err)
@@ -753,5 +753,45 @@ func TestHistoryOnlyRetryCannotExpandAnAlreadyCompletedWatchScope(t *testing.T) 
 	r = e.tickRun(c, r)
 	if r.Status != "complete" || r.Counts.Marked != 1 || r.Counts.HistoryImported != 201 || e.watchRow(e.admin, e.ids["copper"]) != nil {
 		t.Fatalf("history retry changed initial watch scope %+v", r)
+	}
+}
+
+// In a Plex library numbered by TheTVDB, an import marks the episodes whose
+// air dates agree with the ones here, and links their earlier viewings to
+// them; the rest stay as they were.
+func TestRunImportsEpisodesFromATheTVDBLibrary(t *testing.T) {
+	e := newEnv(t)
+	ctx := t.Context()
+	pilot := plex.Item{RatingKey: "211", Type: "episode", LibrarySectionID: "2", Title: "Pilot", GrandparentRatingKey: "311", SeasonNumber: new(int64(1)), EpisodeNumber: new(int64(1)), AiredOn: "2024-01-07"}
+	e.f.SetItems("owner", "2",
+		plextest.AiredEpisodeJSON("211", "Pilot", "311", 1, 1, 1, "2024-01-07"),
+		plextest.AiredEpisodeJSON("212", "Second", "311", 1, 2, 1, "2024-01-15"),
+	)
+	e.f.Set(func(f *plextest.Fake) {
+		f.Orders["2"] = "aired"
+		f.Shows["311"] = `{"ratingKey":"311","type":"show","title":"Signal Keepers","Guid":[{"id":"tmdb://820001"}]}`
+		f.HistoryEvents["owner"] = map[string][]plex.HistoryEvent{"2": {historyEvent("911", 1, pilot)}}
+	})
+	c := e.link(e.connect(), []PlexUserLink{{PlexUserID: 701, UserID: e.admin}}, []PlexLibraryLink{{SectionID: 2, LibraryID: e.tv}})
+	r := e.tickRun(c, e.previewRun(c, false))
+	if r.Status != "complete" || r.Counts.Marked != 1 || r.Counts.Ambiguous != 1 || r.Counts.HistoryImported != 1 {
+		t.Fatalf("run = %s %+v; want the pilot marked, the second left alone and one viewing", r.Status, r.Counts)
+	}
+	watched := func(id int64) bool {
+		v, err := e.q.GetWatchState(ctx, db.GetWatchStateParams{UserID: e.admin, ItemType: "episode", ItemID: id})
+		if errors.Is(err, sql.ErrNoRows) {
+			return false
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v.Completed == 1
+	}
+	if !watched(e.ids["s1e1"]) || watched(e.ids["s1e2"]) {
+		t.Errorf("pilot watched %v, second watched %v; want only the pilot", watched(e.ids["s1e1"]), watched(e.ids["s1e2"]))
+	}
+	list, err := e.svc.History(ctx, e.admin, 50, 0)
+	if err != nil || len(list.Items) != 1 || list.Items[0].ItemID == nil || *list.Items[0].ItemID != e.ids["s1e1"] {
+		t.Fatalf("history = %+v %v; want the pilot's viewing linked to it", list, err)
 	}
 }

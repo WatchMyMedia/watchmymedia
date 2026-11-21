@@ -275,7 +275,7 @@ func (f *fixture) seed(ctx context.Context, watch *watchstate.Service) error {
 	f.fake.SetItems("owner", "2", plextest.EpisodeJSON("201", "Beacon", "200", 1, 1, 1))
 	f.fake.SetItems("synthetic-server-706", "2", plextest.EpisodeJSON("202", "Crossing", "200", 1, 2, 1))
 	f.fake.Set(func(p *plextest.Fake) {
-		p.Shows["200"] = `{"ratingKey":"200","type":"show","title":"Signal Keepers","episodeOrdering":"tmdbAiring","Guid":[{"id":"tmdb://820001"}]}`
+		p.Shows["200"] = `{"ratingKey":"200","type":"show","title":"Signal Keepers","showOrdering":"tmdbAiring","Guid":[{"id":"tmdb://820001"}]}`
 		at := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
 		owner := plex.HistoryEvent{HistoryKey: "/status/sessions/history/1001", AccountID: 1, ViewedAt: at,
 			Item: plex.Item{RatingKey: "101", Type: "movie", LibrarySectionID: "1", Title: "Harbor Lights", ExternalIDs: plex.ExternalIDs{TMDB: "810001"}}}

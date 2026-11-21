@@ -50,8 +50,11 @@ type Fake struct {
 	// visible limits a person's libraries, by token; all when absent.
 	Visible map[string][]string
 	// items is each server token's watched marks, by section.
-	Items   map[string]map[string][]string
-	Shows   map[string]string
+	Items map[string]map[string][]string
+	Shows map[string]string
+	// Orders is each library's default episode numbering (its showOrdering
+	// setting), by section; a library absent here has no such setting.
+	Orders  map[string]string
 	History int
 	// HistoryEvents uses a server credential, then a section ID. The owner
 	// entry contains all people's history for account-filtered admin reads;
@@ -97,6 +100,7 @@ func New(t Reporter) *Fake {
 		Sections:      `{"MediaContainer":{"size":3,"Directory":[{"key":"1","uuid":"fictional-movies","title":"Fictional Movies","type":"movie"},{"key":"2","uuid":"fictional-shows","title":"Fictional Shows","type":"show"},{"key":"3","uuid":"fictional-music","title":"Fictional Music","type":"artist"}]}}`,
 		Items:         map[string]map[string][]string{},
 		Shows:         map[string]string{},
+		Orders:        map[string]string{},
 		HistoryEvents: map[string]map[string][]plex.HistoryEvent{},
 	}
 	f.Cloud = httptest.NewServer(http.HandlerFunc(f.serveCloud))
@@ -119,6 +123,11 @@ func MovieJSON(key, title string, tmdb, imdb string, viewCount int) string {
 
 func EpisodeJSON(key, title, show string, season, episode, viewCount int) string {
 	return fmt.Sprintf(`{"ratingKey":%q,"type":"episode","title":%q,"grandparentRatingKey":%q,"parentIndex":%d,"index":%d,"viewCount":%d}`, key, title, show, season, episode, viewCount)
+}
+
+// AiredEpisodeJSON is an episode with the air date Plex gives it.
+func AiredEpisodeJSON(key, title, show string, season, episode, viewCount int, aired string) string {
+	return fmt.Sprintf(`{"ratingKey":%q,"type":"episode","title":%q,"grandparentRatingKey":%q,"parentIndex":%d,"index":%d,"viewCount":%d,"originallyAvailableAt":%q}`, key, title, show, season, episode, viewCount, aired)
 }
 
 func (f *Fake) SetItems(token, section string, items ...string) {
@@ -290,6 +299,13 @@ func (f *Fake) servePMS(w http.ResponseWriter, r *http.Request) {
 		total := len(items)
 		items = items[offset:min(offset+pageSize, total)]
 		write(w, `{"MediaContainer":{"size":%d,"totalSize":%d,"offset":%d,"librarySectionID":%q,"Metadata":[%s]}}`, len(items), total, offset, section, strings.Join(items, ","))
+	case strings.HasPrefix(path, "/library/sections/") && strings.HasSuffix(path, "/prefs"):
+		section := strings.TrimSuffix(strings.TrimPrefix(path, "/library/sections/"), "/prefs")
+		settings := []string{`{"id":"enableCinemaTrailers","type":"bool","default":true,"value":true}`}
+		if order, ok := f.Orders[section]; ok {
+			settings = append(settings, fmt.Sprintf(`{"id":"showOrdering","label":"Episode ordering","type":"text","default":"","value":%q,"enumValues":"tmdbAiring:The Movie Database|aired:TheTVDB"}`, order))
+		}
+		write(w, `{"MediaContainer":{"size":%d,"Setting":[%s]}}`, len(settings), strings.Join(settings, ","))
 	case strings.HasPrefix(path, "/library/metadata/"):
 		show, ok := f.Shows[strings.TrimPrefix(path, "/library/metadata/")]
 		if !ok {
@@ -361,7 +377,13 @@ func (f *Fake) serveHistory(w http.ResponseWriter, r *http.Request, token string
 		row := map[string]any{
 			"historyKey": event.HistoryKey, "accountID": event.AccountID, "viewedAt": event.ViewedAt.Unix(),
 			"type": item.Type, "title": item.Title, "guid": item.GUID, "Guid": guids,
-			"parentIndex": item.SeasonNumber, "index": item.EpisodeNumber, "episodeOrdering": item.EpisodeOrdering,
+			"parentIndex": item.SeasonNumber, "index": item.EpisodeNumber,
+		}
+		if item.ShowOrdering != "" {
+			row["showOrdering"] = item.ShowOrdering
+		}
+		if item.AiredOn != "" {
+			row["originallyAvailableAt"] = item.AiredOn
 		}
 		for key, value := range map[string]string{"ratingKey": item.RatingKey, "librarySectionID": item.LibrarySectionID, "parentRatingKey": item.ParentRatingKey, "grandparentRatingKey": item.GrandparentRatingKey} {
 			if value != "" {

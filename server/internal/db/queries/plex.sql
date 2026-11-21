@@ -78,8 +78,8 @@ SELECT id, tmdb_id FROM movies WHERE library_id = ? AND imdb_id = ?;
 -- name: MatchEpisode :many
 -- The library's episode for a show's TMDB ID and its season and episode
 -- numbers, each step through a unique index: show, then season, then
--- episode.
-SELECT e.id
+-- episode. Its air date confirms a match made in TheTVDB's numbering.
+SELECT e.id, e.air_date
 FROM shows sh
 CROSS JOIN seasons se
 CROSS JOIN episodes e

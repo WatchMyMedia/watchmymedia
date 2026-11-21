@@ -393,7 +393,7 @@ func (q *Queries) ListPlexUserLinks(ctx context.Context, connectionID int64) ([]
 }
 
 const matchEpisode = `-- name: MatchEpisode :many
-SELECT e.id
+SELECT e.id, e.air_date
 FROM shows sh
 CROSS JOIN seasons se
 CROSS JOIN episodes e
@@ -409,10 +409,15 @@ type MatchEpisodeParams struct {
 	Episode   int64 `json:"episode"`
 }
 
+type MatchEpisodeRow struct {
+	ID      int64   `json:"id"`
+	AirDate *string `json:"air_date"`
+}
+
 // The library's episode for a show's TMDB ID and its season and episode
 // numbers, each step through a unique index: show, then season, then
-// episode.
-func (q *Queries) MatchEpisode(ctx context.Context, arg MatchEpisodeParams) ([]int64, error) {
+// episode. Its air date confirms a match made in TheTVDB's numbering.
+func (q *Queries) MatchEpisode(ctx context.Context, arg MatchEpisodeParams) ([]MatchEpisodeRow, error) {
 	rows, err := q.db.QueryContext(ctx, matchEpisode,
 		arg.LibraryID,
 		arg.TmdbID,
@@ -423,13 +428,13 @@ func (q *Queries) MatchEpisode(ctx context.Context, arg MatchEpisodeParams) ([]i
 		return nil, err
 	}
 	defer rows.Close()
-	items := []int64{}
+	items := []MatchEpisodeRow{}
 	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
+		var i MatchEpisodeRow
+		if err := rows.Scan(&i.ID, &i.AirDate); err != nil {
 			return nil, err
 		}
-		items = append(items, id)
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

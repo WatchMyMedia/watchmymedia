@@ -141,6 +141,7 @@ const REASONS: Record<string, string> = {
   not_in_library: 'This title was not found in the chosen library here.',
   special: 'This special episode could not be matched for sure. It was left alone.',
   alternate_order: 'Plex uses different or unconfirmed episode numbers. This episode was left alone.',
+  air_date_differs: 'Plex numbers this show by TheTVDB, and this episode’s air date there doesn’t match the one here, so it might be a different episode. It was left alone.',
   several_matches: 'More than one title matches. This item was left alone.',
   edition: 'This is a particular cut of a movie. It was left alone to avoid marking a different cut watched.',
   show_unreadable: 'The show’s details could not be read in Plex. Check Plex and try again.',

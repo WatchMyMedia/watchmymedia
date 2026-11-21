@@ -89,7 +89,12 @@ func newEnv(t *testing.T) *env {
 			t.Fatal(err)
 		}
 		for _, n := range []int64{1, 2} {
-			ep, err := q.UpsertEpisode(ctx, db.UpsertEpisodeParams{SeasonID: se.ID, ShowID: sh.ID, Number: n})
+			// Season 1 aired weekly from 7 January 2024, as TMDB dates it.
+			var aired *string
+			if s == 1 {
+				aired = new(fmt.Sprintf("2024-01-%02d", 7*n))
+			}
+			ep, err := q.UpsertEpisode(ctx, db.UpsertEpisodeParams{SeasonID: se.ID, ShowID: sh.ID, Number: n, AirDate: aired})
 			if err != nil {
 				t.Fatal(err)
 			}
