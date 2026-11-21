@@ -15,6 +15,11 @@ import WMMModel
 /// refused token calls `onSignedOut` before ``SignedOutError`` reaches the
 /// caller, whether the request was the generated client's, a plain fetch
 /// (``data(_:session:)``) or the event stream's (``tokenRefused()``).
+///
+/// An API made for a sign-in kept on the device also carries a
+/// ``SignInCheck``: its sign-in goes out freely only while its server is the
+/// one in use, and otherwise only after the server has said, asked with no
+/// sign-in, that it is the one remembered.
 public struct ServerAPI: Sendable {
     public let baseURL: URL
     public let client: Client
@@ -44,12 +49,13 @@ public struct ServerAPI: Sendable {
         userAgent: String?,
         token: @escaping @Sendable () -> String?,
         onSignedOut: @escaping @Sendable () async -> Void = {},
-        localNetwork: LocalNetworkAccess?
+        localNetwork: LocalNetworkAccess?,
+        check: SignInCheck? = nil
     ) {
         self.localNetwork = localNetwork
         self.baseURL = baseURL
         self.session = session
-        let signer = RequestSigner(baseURL: baseURL, token: token, userAgent: userAgent)
+        let signer = RequestSigner(baseURL: baseURL, token: token, userAgent: userAgent, check: check)
         self.signer = signer
         self.onSignedOut = onSignedOut
         client = Client(
@@ -91,7 +97,9 @@ public struct ServerAPI: Sendable {
 
     /// A request for `url` with the user agent, and the bearer token only when
     /// `url` is on this server, for what the generated client does not cover
-    /// (images, the event stream, subtitle text).
+    /// (images, the event stream, subtitle text). It can't wait for a
+    /// server to say which one it is, so for a server that isn't the one in
+    /// use it carries the token only while that server's answer stands.
     public func authorizedRequest(_ url: URL) -> URLRequest {
         signer.request(url)
     }
@@ -99,7 +107,7 @@ public struct ServerAPI: Sendable {
     /// Fetches `url` (on `session`, else this API's) with the bearer token,
     /// failing as ``call`` does: a 401 with the token signs out.
     public func data(_ url: URL, session: URLSession? = nil) async throws -> Data {
-        let request = authorizedRequest(url)
+        let request = try await signer.askedRequest(url)
         let data: Data, response: URLResponse
         do {
             (data, response) = try await (session ?? self.session).data(for: request)
@@ -222,48 +230,94 @@ public struct ServerAPI: Sendable {
 /// host and port, under its path), so a token never reaches another host.
 /// The generated client's requests, plain fetches, the event stream, images
 /// and the offline routes all go through it.
+///
+/// It is also where a kept sign-in waits for its server (``SignInCheck``).
+/// The address kept for a server is only where it was last seen: on another
+/// network it can be someone else's machine. So the token of a server that
+/// is not, or is no longer, the one in use goes out only once that address
+/// has said, asked with no sign-in, that it is the server remembered. A
+/// request that can wait asks first (``asked(for:)``, which the generated
+/// client's requests and plain fetches do); one that can't carries the
+/// token only while an answer stands. Every sign-in the app keeps is put on
+/// requests here, so no call has to remember to ask.
 struct RequestSigner: Sendable {
     let baseURL: URL
     /// Read on every request; nil sends none.
     let token: @Sendable () -> String?
     let userAgent: String?
+    /// When the token may go out; nil for a signer that keeps no sign-in of
+    /// the device's (signing in, a test), whose token goes freely.
+    let check: SignInCheck?
 
-    init(baseURL: URL, token: @escaping @Sendable () -> String?, userAgent: String?) {
+    init(baseURL: URL, token: @escaping @Sendable () -> String?, userAgent: String?, check: SignInCheck? = nil) {
         self.baseURL = baseURL
         self.token = token
         self.userAgent = userAgent
+        self.check = check
     }
 
-    init(baseURL: URL, token: String, userAgent: String?) {
-        self.init(baseURL: baseURL, token: { token }, userAgent: userAgent)
+    init(baseURL: URL, token: String, userAgent: String?, check: SignInCheck? = nil) {
+        self.init(baseURL: baseURL, token: { token }, userAgent: userAgent, check: check)
     }
 
-    /// A request for `url` with the user agent, and the token when `url` is on this server.
-    func request(_ url: URL) -> URLRequest {
+    /// The token may go on a request made now: no check to pass, the server
+    /// is the one in use, its answer stands, or it was `asked` for this request.
+    private func free(_ asked: Bool) -> Bool {
+        asked || (check?.stands() ?? true)
+    }
+
+    /// A request for `url` with the user agent, and the token when `url` is
+    /// on this server and the token may go there now (`asked`: the server
+    /// was asked which one it is for this request, ``asked(for:)``).
+    func request(_ url: URL, asked: Bool = false) -> URLRequest {
         var request = URLRequest(url: url)
         if let userAgent { request.setValue(userAgent, forHTTPHeaderField: "User-Agent") }
-        if let t = token(), ServerAPI.owns(baseURL, url) { request.setValue("Bearer \(t)", forHTTPHeaderField: "Authorization") }
+        if free(asked), let t = token(), ServerAPI.owns(baseURL, url) { request.setValue("Bearer \(t)", forHTTPHeaderField: "Authorization") }
         return request
     }
 
-    /// ``request(_:)`` when it carries the token; nil for an address that isn't
-    /// on this server, or with no token, for a caller that needs the sign-in.
-    func signedRequest(_ url: URL) -> URLRequest? {
-        let request = request(url)
+    /// ``request(_:asked:)`` when it carries the token; nil for an address
+    /// that isn't on this server, with no token, or for a server that would
+    /// have to be asked first, for a caller that needs the sign-in.
+    func signedRequest(_ url: URL, asked: Bool = false) -> URLRequest? {
+        let request = request(url, asked: asked)
         return Self.signed(request) ? request : nil
     }
 
+    /// ``request(_:asked:)`` for a caller that can wait: a server that
+    /// isn't the one in use is asked which one it is first. Throws when it
+    /// doesn't answer as itself, and nothing is sent.
+    func askedRequest(_ url: URL) async throws -> URLRequest {
+        request(url, asked: try await asked(for: url))
+    }
+
+    /// Before a request for `url` that would carry the token: asks the
+    /// server which one it is, with no sign-in, unless the token may go
+    /// freely. True when it asked and the server answered as itself; throws
+    /// when it didn't, so the request isn't sent at all.
+    func asked(for url: URL) async throws -> Bool {
+        guard let check, token() != nil, ServerAPI.owns(baseURL, url), !check.stands() else { return false }
+        try await check.ask()
+        return true
+    }
+
+    /// ``asked(for:)`` for a generated call to `path` on `server`.
+    func asked(path: String?, server: URL, operationID: String) async throws -> Bool {
+        guard operationID != "login", let path, let url = URL(string: server.absoluteString + path) else { return false }
+        return try await asked(for: url)
+    }
+
     /// A generated call to `path` on `server` (the client's own server URL):
-    /// the user agent, and the token unless it is the password sign-in or the
-    /// address isn't on this server.
-    func sign(_ fields: inout HTTPFields, path: String?, server: URL, operationID: String) {
+    /// the user agent, and the token unless it is the password sign-in, the
+    /// address isn't on this server, or the token may not go there now.
+    func sign(_ fields: inout HTTPFields, path: String?, server: URL, operationID: String, asked: Bool = false) {
         if let userAgent { fields[.userAgent] = userAgent }
-        if let authorization = authorization(path: path, server: server, operationID: operationID) { fields[.authorization] = authorization }
+        if let authorization = authorization(path: path, server: server, operationID: operationID, asked: asked) { fields[.authorization] = authorization }
     }
 
     /// The Authorization header for a generated call to `path` on `server`, or nil.
-    func authorization(path: String?, server: URL, operationID: String) -> String? {
-        guard operationID != "login", let t = token(), let path,
+    func authorization(path: String?, server: URL, operationID: String, asked: Bool = false) -> String? {
+        guard operationID != "login", free(asked), let t = token(), let path,
               let url = URL(string: server.absoluteString + path), ServerAPI.owns(baseURL, url) else { return nil }
         return "Bearer \(t)"
     }
@@ -273,7 +327,20 @@ struct RequestSigner: Sendable {
     }
 }
 
-/// Signs the generated client's requests (``RequestSigner``).
+/// When a kept sign-in may go out to its server (``RequestSigner``).
+struct SignInCheck: Sendable {
+    /// The server is the one in use, or it has said it is the one
+    /// remembered and that answer stands: the sign-in may go now. Read on
+    /// any thread, for every request.
+    let stands: @Sendable () -> Bool
+    /// Asks the server which one it is, at the address kept for it and
+    /// with no sign-in. Throws when nothing answers there, or another
+    /// server does.
+    let ask: @Sendable () async throws -> Void
+}
+
+/// Signs the generated client's requests (``RequestSigner``), asking a
+/// server that isn't the one in use which one it is first.
 struct HeadersMiddleware: ClientMiddleware {
     let signer: RequestSigner
 
@@ -282,7 +349,8 @@ struct HeadersMiddleware: ClientMiddleware {
         next: @Sendable (HTTPRequest, HTTPBody?, URL) async throws -> (HTTPResponse, HTTPBody?)
     ) async throws -> (HTTPResponse, HTTPBody?) {
         var request = request
-        signer.sign(&request.headerFields, path: request.path, server: baseURL, operationID: operationID)
+        let asked = try await signer.asked(path: request.path, server: baseURL, operationID: operationID)
+        signer.sign(&request.headerFields, path: request.path, server: baseURL, operationID: operationID, asked: asked)
         return try await next(request, body, baseURL)
     }
 }

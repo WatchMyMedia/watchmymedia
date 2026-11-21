@@ -91,11 +91,14 @@ private final class NoPlayback: PlaybackControllerFactory {
     @Test func aRequestForAnotherAddressIsRefused() async throws {
         try await h.signIn()
         let owner = try #require(h.services.offline.owner())
-        let own = try #require(h.services.offline.authorizedRequest(owner, url: URL(string: h.router.baseURL.absoluteString + "/api/offline/d1/playlist.m3u8")!))
+        let offline = h.services.offline
+        let own = try #require(try await offline.authorizedRequest(owner, url: URL(string: h.router.baseURL.absoluteString + "/api/offline/d1/playlist.m3u8")!))
         #expect(own.value(forHTTPHeaderField: "Authorization") == "Bearer tok-viewer")
-        #expect(h.services.offline.authorizedRequest(owner, url: URL(string: "https://elsewhere.example.net/api/offline/d1/playlist.m3u8")!) == nil)
-        let otherPort = URL(string: "http://\(h.server.host):9999/api/offline/d1/playlist.m3u8")!
-        #expect(h.services.offline.authorizedRequest(owner, url: otherPort) == nil)
+        let elsewhere = try await offline.authorizedRequest(owner, url: URL(string: "https://elsewhere.example.net/api/offline/d1/playlist.m3u8")!)
+        #expect(elsewhere == nil)
+        let otherPort = try await offline.authorizedRequest(owner, url: URL(string: "http://\(h.server.host):9999/api/offline/d1/playlist.m3u8")!)
+        #expect(otherPort == nil)
+        #expect(h.router.requests("GET /api/server").isEmpty, "the server in use is never asked which server it is")
         #expect(own.value(forHTTPHeaderField: "User-Agent") == "WatchMyMedia/1.0 (ios; iOS 18.0)")
     }
 
