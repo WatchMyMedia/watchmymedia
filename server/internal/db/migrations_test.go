@@ -853,10 +853,16 @@ func TestMigrationSearchIndex(t *testing.T) {
 	exec(`INSERT INTO shows (id, library_id, tmdb_id, title) VALUES (3, 2, 77, 'Inspector Vane''s Road')`)
 	exec(`INSERT INTO seasons (id, show_id, number) VALUES (4, 3, 1)`)
 	// As many episodes as a large library lists: 60,000, a tenth of them
-	// with a hyphen to leave out.
-	exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60000)
+	// with a hyphen to leave out. Under -short, which the race detector's
+	// run passes, 3,000: under the detector SQLite's triggers are many
+	// times slower, and 60,000 took minutes.
+	episodes := int64(60000)
+	if testing.Short() {
+		episodes = 3000
+	}
+	exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
 		INSERT INTO episodes (id, season_id, show_id, number, title)
-		SELECT i, 4, 3, i, CASE WHEN i % 10 = 0 THEN 'Co-Pilot ' || i ELSE 'Night Ferry ' || i END FROM n`)
+		SELECT i, 4, 3, i, CASE WHEN i % 10 = 0 THEN 'Co-Pilot ' || i ELSE 'Night Ferry ' || i END FROM n`, episodes)
 
 	begin := time.Now()
 	if _, err := p.UpTo(ctx, 45); err != nil {
@@ -873,14 +879,14 @@ func TestMigrationSearchIndex(t *testing.T) {
 		{"movies", `"laternen"`, []int64{8}},
 		{"movies", `"cafe" AND "soleil"`, []int64{9}},
 		{"shows", `"vanes" AND "road"`, []int64{3}},
-		{"episodes", `"copilot" AND "60000"`, []int64{60000}},
-		{"episodes", `"ferry" AND "59999"`, []int64{59999}},
+		{"episodes", fmt.Sprintf(`"copilot" AND "%d"`, episodes), []int64{episodes}},
+		{"episodes", fmt.Sprintf(`"ferry" AND "%d"`, episodes-1), []int64{episodes - 1}},
 	} {
 		if got := found(c.table, c.words); !slices.Equal(got, c.want) {
 			t.Errorf("%s %s found %v, want %v", c.table, c.words, got, c.want)
 		}
 	}
-	if n := count("episodes_search"); n != 60000 {
+	if n := count("episodes_search"); int64(n) != episodes {
 		t.Errorf("%d episodes in the index", n)
 	}
 	// The words the index keeps: two unit separators before each word, and
@@ -901,7 +907,7 @@ func TestMigrationSearchIndex(t *testing.T) {
 	}
 	exec(`UPDATE movies SET title = 'Harbour Lights' WHERE id = 7`)
 	exec(`DELETE FROM movies WHERE id = 9`)
-	exec(`DELETE FROM shows WHERE id = 3`) // and its 60,000 episodes
+	exec(`DELETE FROM shows WHERE id = 3`) // and its episodes
 	if got := found("movies", `"harbor"`); len(got) != 0 {
 		t.Errorf("the old title still finds %v", got)
 	}
