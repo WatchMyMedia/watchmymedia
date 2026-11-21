@@ -105,7 +105,7 @@ class DataServices internal constructor(
     /** How this device describes itself, with the name as it is now (it is editable in Settings). */
     val client: ClientInfo get() = base.copy(name = store.deviceName.value.ifBlank { base.name })
 
-    private val http = Http(httpClient, store, "WatchMyMedia/${base.version} (${base.platform}; Android ${Build.VERSION.RELEASE})", httpCache, network)
+    private val http = Http(httpClient, store, "WatchMyMedia/${base.version} (${base.platform}; Android ${Build.VERSION.RELEASE})", httpCache, network, scope)
 
     init {
         // The clients' TLS set-up, off the main thread, before the first call needs it.
@@ -137,7 +137,7 @@ class DataServices internal constructor(
 
     val servers: ServerRepository = serverRepository
     val auth: AuthRepository = authRepository
-    val library: LibraryRepository = RealLibraryRepository(store, http, events, scope, clock, serverRepository::askFirst)
+    val library: LibraryRepository = RealLibraryRepository(store, http, events, scope, clock)
     private val liveRepository = RealLiveRepository(http, store, scope, clock, events)
     val live: LiveRepository = liveRepository
     val livePlaybackGateway: LivePlaybackGateway = RealLivePlaybackGateway(store, http, capabilities = liveRepository::capabilities)

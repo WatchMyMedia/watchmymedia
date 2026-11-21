@@ -55,15 +55,20 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   belongs to `ServerSwitchViewModel`, above them. A call to a server that
   isn't in use goes through `Http.bindTo(serverId, userId)`, which builds
   it for that server's address and sign-in; never send the current
-  sign-in to an address taken from another server's reply. Before a
-  sign-in goes to a server that isn't in use from Search, its address is
-  asked which server it is with no sign-in, and gets the sign-in only if
-  it is the one remembered: use `Http.bindToAnswered` after
-  `RealServerRepository.askFirst`, as `searchOn` does, not `bindTo`, and
-  test it on the test servers' recorded requests (no `Authorization`
-  header at all for a stranger at the address). `bindTo` itself doesn't
-  ask: offline downloads report to the server they came from with it, as
-  they did before there were several. The fakes are
+  sign-in to an address taken from another server's reply. Before the
+  sign-in of a server that isn't in use goes anywhere, its address is asked
+  which server it is with no sign-in, and gets the sign-in only if it is
+  the one remembered (`Http.askFirst`; README, "Asked first"). `Http` does
+  it for you: a `ServerAccess` asks before each call, and account
+  credentials are made nowhere else. So reach another server through
+  `Http.bindTo`, `bind` or `accountCalls`, never through `http.calls` with
+  a `Credential` of your own; where a token no longer in the store has to
+  be sent (the end of a session), call `askFirst` yourself first, as
+  `signOutQuietly` does. Test it on the test servers' recorded requests:
+  no `Authorization` header at all for a stranger at the address. A test
+  whose server stops being the one in use now needs that server to answer
+  `GET /api/server` with its id, and should let the sign-in's own checks
+  finish (`awaitIdle`) before it counts requests. The fakes are
   signed in to several too, so signing out there moves to the next server:
   a test of what a device with one server does makes them with
   `several = false` (`quietTvFakes(several = false)` on the TV).
