@@ -417,6 +417,14 @@ each device.
   changes nothing on the server. When it was the one in use, or after Sign
   out, the app moves to the server used most recently that is still signed
   in.
+- **A sign-out is sent only to the server itself.** Removing a server, or
+  signing out of one, first asks the address kept for it which server it
+  is, with no sign-in, once for all it sends. When that server answers,
+  its downloads here report themselves removed and the session is ended
+  there. When nothing answers, or another server does, nothing is sent and
+  nothing is kept to send later: the server and its downloads leave this
+  device at once all the same, and the session stays on that server until
+  it runs out or someone ends it from that server's list of devices.
 - **Search looks in every server signed in to.** Each is asked at once, to
   its own address with its own sign-in (`LibraryRepository.search(_:serverID:)`,
   through an API built for that server alone). First each is asked which
@@ -424,7 +432,14 @@ each device.
   only when it answers as the one remembered: the address kept for a server
   is where it was last seen, and on another network that can be someone
   else's machine. One question covers a visit to Search, not each
-  keystroke, and shares the server's 4 s; another server at the address, or
+  keystroke, and shares the server's 4 s: a keystroke cancels the search,
+  not the question, so the next search waits for the same answer. A visit
+  begins each time Search comes on screen (the first time, back from a
+  title or another tab, back from the background); on the way back the
+  servers whose titles are listed are asked again at once, so their
+  pictures go on loading, and nothing is searched again. An answer stands
+  only on the network it was given on, and a search there that fails
+  forgets it, so Try again asks first. Another server at the address, or
   none, is a server that didn't answer, and is sent nothing. The answer
   also keeps the server's name, version and API level up to date. The server in use's results
   come first in each group and the others' follow in the Servers list's

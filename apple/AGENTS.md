@@ -86,15 +86,30 @@ server, and on iPad in both a regular and a compact width.
     hands out no sign-in until the server has answered
     (`ServerNotAskedError`), so search, its pictures and anything new that
     reaches another server are covered without asking themselves. The
-    answer stands for a visit to Search (`SearchModel.visitEnded()`, from
-    the search screens when another tab is chosen or the app leaves the
-    screen), five minutes at most, and goes when another server comes into
-    use or the network changes. Removing a server that isn't in use asks
-    first too, and sends nothing to an address that doesn't answer as it.
-    A server that doesn't answer as itself gets the line any failure gets;
+    answer stands for a visit to Search and on the network it was given
+    on. A visit begins each time Search comes on screen
+    (`SearchModel.visitBegan()` and `visitEnded()`, from the search
+    screens' `onAppear`, `onDisappear` and the scene's phase): back on
+    Search the servers whose titles are listed are asked again without
+    being searched (`LibraryRepository.askServer`). The answer goes when
+    the visit ends, the network changes, another server comes into use, or
+    a call to that server fails. A keystroke cancels the search, not the
+    question (`SharedQuestion`): the next search waits for the same
+    answer.
+  - A sign-out is sent only to the server itself. Removing a server and
+    signing out of one ask its kept address which server it is first, once
+    for all they send (`RealServerRepository.forget`,
+    `RealAuthRepository.signOut`). When it doesn't answer as itself,
+    nothing is sent and nothing is kept to send later; the device forgets
+    it at once all the same. Don't add a retry.
+  - A server that doesn't answer as itself gets the line any failure gets;
     don't word it differently, and never fall back to sending the sign-in.
-    The offline downloads' own calls for a server that isn't in use
-    (`RealOfflineGateway`) don't ask yet.
+    The server in use is never asked. Two paths send a sign-in to a server
+    that isn't in use without asking yet: the offline downloads' calls for
+    the server a download came from (`RealOfflineGateway.call` and
+    `authorizedRequest`), and an operation that began on one server
+    and is still sending when another comes into use (a setting being
+    saved).
   - Screens switch through `ServersModel` (`switchTo`, `remove`,
     `signingOut`, `open`), one for the app in the environment, not by
     calling `ServerRepository.select` or `forget` themselves: it asks the
