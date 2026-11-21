@@ -7,7 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import media.watchmy.client.model.DeepLink
+import media.watchmy.client.presentation.servers.ServerSwitchViewModel
+import media.watchmy.client.tv.servers.LocalServersHost
+import media.watchmy.client.tv.servers.ServersHost
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onKeyEvent
@@ -106,17 +111,45 @@ private fun ShowPage(nav: NavHostController, showId: Long, arrival: ShowArrival)
  * by [media.watchmy.client.tv.TvApp] before this. [deepLink] (a
  * watchmymedia:// link) opens on top of Home; [onDeepLinkHandled] is called
  * once it has.
+ *
+ * [onAddServer] starts Add a server, from Servers and from Settings. A
+ * search result on another server is the app's to open ([onOpenElsewhere]):
+ * it switches, and the new server's screens then get [landing], Search with
+ * the same words under the title's page, once ([onLandingShown]).
  */
 @Composable
 fun TvNavHost(
-    onSwitchServer: () -> Unit,
+    onAddServer: () -> Unit,
     onSignedOut: () -> Unit,
     nav: NavHostController = rememberNavController(),
     deepLink: String? = null,
     onDeepLinkHandled: () -> Unit = {},
+    landing: ServerSwitchViewModel.Landing? = null,
+    onLandingShown: () -> Unit = {},
+    onOpenElsewhere: (serverId: String, query: String, page: DeepLink) -> Unit = { _, _, _ -> },
 ) {
     val handled by rememberUpdatedState(onDeepLinkHandled)
     val services = media.watchmy.client.ui.LocalAppServices.current
+    // What Servers, on every screen's rail, needs from the app above these screens.
+    val addServer by rememberUpdatedState(onAddServer)
+    val openElsewhere by rememberUpdatedState(onOpenElsewhere)
+    val serversHost = remember { ServersHost(onAdd = { addServer() }, onOpenElsewhere = { id, query, page -> openElsewhere(id, query, page) }) }
+    // The words a result on another server was found with, for Search on the server the app switched to.
+    var searchWords by rememberSaveable { mutableStateOf<String?>(null) }
+    val landed by rememberUpdatedState(onLandingShown)
+    LaunchedEffect(landing) {
+        val to = landing ?: return@LaunchedEffect
+        // Home, then Search with the words, then the title: Back from the title is Search, and Back from Search is Home.
+        searchWords = to.query
+        nav.navigateSection(TvRoutes.Search)
+        when (val page = to.page) {
+            is DeepLink.Show -> nav.navigate(TvRoutes.Show(page.id, page.season, page.episode))
+            is DeepLink.Movie -> nav.navigate(TvRoutes.Movie(page.id))
+            is DeepLink.Play -> nav.navigate(TvRoutes.Player(fileId = page.fileId, title = page.title.orEmpty()))
+            else -> Unit
+        }
+        landed()
+    }
     val liveModel = viewModel { LiveChannelsViewModel(services.live, services.servers, services.auth) }
     val live by liveModel.state.collectAsStateWithLifecycle()
     // The channel list is polled only while a screen showing channels is on screen.
@@ -165,7 +198,7 @@ fun TvNavHost(
         handled()
     }
     val badge by rememberRequestBadge(services.requests)
-    CompositionLocalProvider(LocalRequestBadge provides badge, LocalLiveTVAvailable provides live.available, LocalLiveChannelsShown provides showChannels) {
+    CompositionLocalProvider(LocalRequestBadge provides badge, LocalLiveTVAvailable provides live.available, LocalLiveChannelsShown provides showChannels, LocalServersHost provides serversHost) {
         // The banner never takes focus: Hold OK watches and Back dismisses, before the screen sees them.
         Box(
             Modifier.fillMaxSize().onBack(enabled = banner != null, overlay = true) { dismiss() }.onPreviewKeyEvent { event ->
@@ -218,7 +251,7 @@ fun TvNavHost(
                 }
                 composable<TvRoutes.RowSettings> {
                     SettingsScreen(
-                        onSwitchServer = onSwitchServer,
+                        onAddServer = onAddServer,
                         onSignedOut = onSignedOut,
                         onNavigate = { r -> nav.navigateSection(r) },
                         onOpenRequests = { inbox -> nav.navigate(TvRoutes.Requests(inbox)) },
@@ -263,6 +296,9 @@ fun TvNavHost(
                         onOpenEpisode = { show, season, episode -> nav.navigate(TvRoutes.Episode(show, season, episode)) },
                         onWatchLive = watchLive,
                         onOpenLive = { hit -> openInGuide(LiveGuideViewModel.Target(hit.channel.id, hit.programme.id, hit.programme.startMs)) },
+                        words = searchWords,
+                        onWordsTaken = { searchWords = null },
+                        onOpenElsewhere = onOpenElsewhere,
                     )
                 }
                 composable<TvRoutes.LiveTV> {
@@ -294,7 +330,7 @@ fun TvNavHost(
                 }
                 composable<TvRoutes.Settings> {
                     SettingsScreen(
-                        onSwitchServer = onSwitchServer,
+                        onAddServer = onAddServer,
                         onSignedOut = onSignedOut,
                         onNavigate = { r -> nav.navigateSection(r) },
                         onOpenRequests = { inbox -> nav.navigate(TvRoutes.Requests(inbox)) },

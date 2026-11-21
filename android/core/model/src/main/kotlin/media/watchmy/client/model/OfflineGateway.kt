@@ -71,11 +71,18 @@ interface OfflineGateway {
     /** Whether [owner] is still signed in on its server. */
     fun signedIn(owner: OfflineOwner): Boolean
 
-    /** Called whenever the sign-in in use changes: another server or account, or signed out. */
+    /**
+     * Called whenever a sign-in on this device changes: another server or
+     * account in use, signed out, or a server that isn't the one in use
+     * signed out of or removed.
+     */
     fun onSessionChange(listener: () -> Unit)
 
-    /** Runs [hook] before a sign-out ends the session, while the server still takes it. */
-    fun beforeSignOut(hook: suspend () -> Unit)
+    /**
+     * Runs [hook] before a sign-in on this device ends (Sign out, or its
+     * server removed), with whose it is, while the server still takes it.
+     */
+    fun beforeSignOut(hook: suspend (owner: OfflineOwner) -> Unit)
 
     /** Whether [owner] may download now ([OFFLINE_API_LEVEL] and RequestOptions.offline). */
     suspend fun allowed(owner: OfflineOwner): Boolean

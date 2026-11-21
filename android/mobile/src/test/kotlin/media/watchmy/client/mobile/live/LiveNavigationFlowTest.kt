@@ -5,11 +5,13 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import kotlinx.coroutines.runBlocking
+import media.watchmy.client.fake.Cabin
 import media.watchmy.client.fake.FakeAppServices
 import media.watchmy.client.fake.FakeLiveChannels
 import media.watchmy.client.fake.FakeLivePlaybackController
@@ -21,6 +23,7 @@ import media.watchmy.client.model.AppServices
 import media.watchmy.client.model.LivePlaybackController
 import media.watchmy.client.model.LivePlaybackControllerFactory
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.TestTags
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -73,10 +76,14 @@ class LiveNavigationFlowTest {
     }
 
     @Test
-    fun `profile opens settings while live occupies the old settings tab`() {
+    fun `the account button's Servers keeps the way to Settings while live occupies the old settings tab`() {
         open()
         tab("Live TV").performClick()
-        compose.onAllNodes(hasContentDescription("Settings") and hasClickAction()).onFirst().performClick()
+        compose.onAllNodes(hasTestTag(TestTags.ACCOUNT) and hasClickAction()).onFirst().performClick()
+        compose.waitForIdle()
+        // Servers: Settings has no tab of its own here, so it is a row at the end.
+        compose.onNode(hasText("Settings") and hasClickAction()).performClick()
+        compose.waitForIdle()
         assertTrue(compose.onAllNodes(hasText("Settings")).fetchSemanticsNodes().isNotEmpty())
         // Settings' overview: signing out is in Account & devices.
         assertTrue(compose.onAllNodes(hasText("Account & devices") and hasClickAction()).fetchSemanticsNodes().isNotEmpty())
@@ -89,14 +96,17 @@ class LiveNavigationFlowTest {
         runBlocking { fake.auth.signOut() }
         compose.waitForIdle()
         assertEquals(1, released)
-        assertTrue(compose.onAllNodes(hasText("Sign in")).fetchSemanticsNodes().isNotEmpty())
+        // Signed in to another server too: the phone moves to it, and says so.
+        assertEquals(Cabin.id, fake.servers.current.value?.server?.id)
+        assertTrue(compose.onAllNodes(hasText("Now on Cabin server")).fetchSemanticsNodes().isNotEmpty())
     }
 
     @Test
     fun `server change removes old live navigation and releases its controller`() {
         open()
         play()
-        runBlocking { fake.servers.select(OfficeMini) }
+        // Another server this phone is signed in to.
+        runBlocking { fake.servers.switchTo(Cabin.id) }
         compose.waitForIdle()
         assertEquals(1, released)
         assertEquals(1, created)

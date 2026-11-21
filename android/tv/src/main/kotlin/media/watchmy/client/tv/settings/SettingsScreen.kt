@@ -61,6 +61,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Text
+import media.watchmy.client.model.REMOVE_SERVER_KEEPS
+import media.watchmy.client.model.removeServerDoes
+import media.watchmy.client.model.removeServerTitle
+import media.watchmy.client.presentation.servers.ServersViewModel
+import media.watchmy.client.tv.servers.LocalServersHost
 import media.watchmy.client.model.AudioPassthrough
 import media.watchmy.client.model.DeviceSession
 import media.watchmy.client.model.LIVE_REMINDERS_NOTE_TV
@@ -137,6 +142,9 @@ import media.watchmy.client.ui.onBack
 internal enum class Overlay {
     Quality, Passthrough, SubtitleSize, SubtitleChoice, AddLanguage, LanguageActions, DeviceName, Privacy, Licences, ReminderLead, Diagnostics,
     Skip, ChangePassword, SignOut, Revoke, FollowedShow,
+
+    /** Account & devices' Servers page, one server's page, and the question Remove this server… asks. */
+    Servers, Server, RemoveServer,
 }
 
 /** A followed show's side panel (the boards' `tv-settings`): its page, or stop notifying. */
@@ -201,7 +209,9 @@ private val LastRowSaver = listSaver<SnapshotStateMap<SettingsGroup, String>, St
  * leaves Settings, and nothing asks first. Every row is one focus stop, and
  * a choice opens the side panel, where OK saves, closes it and puts focus
  * back on the row. Signing out, signing another device out and resetting
- * rows ask first ([ConfirmDialog]).
+ * rows ask first ([ConfirmDialog]). Account & devices' Servers row opens the
+ * Servers page in that side panel, each server its own page there, and
+ * Remove this server… asks first; [onAddServer] starts Add a server.
  *
  * Downloads is the phone's; Audio & subtitles and Home rows show where the
  * server serves them; Your requests where requests are possible; Inbox and
@@ -212,7 +222,7 @@ private val LastRowSaver = listSaver<SnapshotStateMap<SettingsGroup, String>, St
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SettingsScreen(
-    onSwitchServer: () -> Unit,
+    onAddServer: () -> Unit,
     onSignedOut: () -> Unit,
     onNavigate: (Any) -> Unit,
     onOpenRequests: (inbox: Boolean) -> Unit = {},
@@ -242,6 +252,10 @@ fun SettingsScreen(
     val notifications = if (followsAvailable) viewModel(key = "tv-notifications") { NotificationsViewModel(services.follows) } else null
     val notificationsState = notifications?.state?.collectAsStateWithLifecycle()?.value
     var followedShow by rememberSaveable { mutableStateOf<Long?>(null) }
+    // The servers this TV is signed in to, for Account & devices' row and its panels.
+    val serversModel = viewModel(key = "tv-settings-servers") { ServersViewModel(services.servers, cast = services.cast) }
+    val servers by serversModel.state.collectAsStateWithLifecycle()
+    var serverId by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Your requests' line, in the group and on its pane; "Where each one stands" until they have loaded.
     val requestsLine = (myRequestsState?.mine as? Load.Ready)?.data?.let { requestsSummary(it) } ?: "Where each one stands"
@@ -289,8 +303,22 @@ fun SettingsScreen(
     var retryingAccount by remember { mutableStateOf(false) }
     LaunchedEffect(state.account) { if (state.account !is AccountLoad.Loading) retryingAccount = false }
 
-    val switchServer by rememberUpdatedState(onSwitchServer)
     val openRequests by rememberUpdatedState(onOpenRequests)
+    // A server removed: its page gives way to the list. One removed while in use takes the app to another server.
+    LaunchedEffect(serversModel) {
+        serversModel.events.collect { if (it is ServersViewModel.Event.Removed && overlay != null) overlay = Overlay.Servers }
+    }
+    // Manage servers, from the rail's Servers panel: Account & devices, with its Servers page open.
+    val host = LocalServersHost.current
+    LaunchedEffect(host?.manage) {
+        if (host?.manage == true) {
+            host.manage = false
+            panes.open = SettingsGroup.Account
+            // When the panel closes focus is on the group, and ▶ goes into its pane on the row that opens this page.
+            panes.rowFocused(SERVERS_ROW)
+            overlay = Overlay.Servers
+        }
+    }
     val calls = remember(vm) {
         object : SettingsCalls {
             override fun show(overlay: Overlay) {
@@ -335,8 +363,6 @@ fun SettingsScreen(
                 languageList = list
                 overlayTo(Overlay.AddLanguage)
             }
-
-            override fun switchServer() = switchServer()
 
             override fun openRequests(inbox: Boolean) = openRequests(inbox)
 
@@ -412,7 +438,7 @@ fun SettingsScreen(
                         onEmptied = { panes.toGroup() },
                         onShown = notifications::setShown,
                     )
-                    SettingsGroup.Account -> AccountPane(state, server?.let { "${it.name} · ${displayAddress(it.baseUrl)}" }, panes.first, calls)
+                    SettingsGroup.Account -> AccountPane(state, if (servers.rows.isEmpty()) server?.name else servers.summary, panes.first, calls)
                     SettingsGroup.Requests -> RequestsPane(requestsLine, panes.first, calls)
                     SettingsGroup.About -> AboutPane(
                         serverLine = server?.let { "${it.name} · ${versionLabel(it.version)} · ${displayAddress(it.baseUrl)}" } ?: "Not chosen",
@@ -605,6 +631,52 @@ fun SettingsScreen(
                     },
                     onGo = { vm.revoke(session) },
                 ) { ConfirmPart(null, REVOKE_BODY) }
+            }
+        }
+        Overlay.Servers -> ServersListPanel(
+            servers,
+            focusOn = serverId,
+            onOpen = {
+                serverId = it
+                overlay = Overlay.Server
+            },
+            onAdd = {
+                overlay = null
+                onAddServer()
+            },
+            onDismiss = {
+                serverId = null
+                overlay = null
+            },
+        )
+        Overlay.Server, Overlay.RemoveServer -> {
+            val row = servers.row(serverId)
+            if (row == null) {
+                // It is gone (removed): back to the list.
+                SideEffect { overlay = Overlay.Servers }
+            } else if (overlay == Overlay.Server) {
+                ServerPagePanel(
+                    row,
+                    failure = servers.failure?.takeIf { it.serverId == row.serverId },
+                    onSwitch = { serversModel.choose(row.serverId) },
+                    onRetry = serversModel::retry,
+                    onRemove = { overlay = Overlay.RemoveServer },
+                    onDismiss = {
+                        serversModel.dismissFailure()
+                        overlay = Overlay.Servers
+                    },
+                )
+            } else {
+                ConfirmDialog(
+                    ConfirmWords(removeServerTitle(row.name, "TV"), keep = "Keep", go = "Remove", busy = "Removing…"),
+                    working = servers.removing == row.serverId,
+                    failure = null,
+                    onKeep = { overlay = Overlay.Server },
+                    onGo = { serversModel.remove(row.serverId) },
+                ) {
+                    ConfirmPart(null, removeServerDoes("TV", row.downloads?.count ?: 0))
+                    ConfirmPart(null, REMOVE_SERVER_KEEPS, color = WmmColors.TextSoft)
+                }
             }
         }
         Overlay.Privacy -> PrivacyDialog(onDismiss = { overlay = null })

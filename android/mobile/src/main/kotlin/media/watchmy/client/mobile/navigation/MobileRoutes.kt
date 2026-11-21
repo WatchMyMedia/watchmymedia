@@ -38,6 +38,10 @@ object MobileRoutes {
     @Serializable data object SettingsNotifications
     @Serializable data object SettingsAccount
     @Serializable data object SettingsAbout
+    /** Account & devices' Servers page: the servers this device is signed in to. */
+    @Serializable data object SettingsServers
+    /** One server's page, from the Servers page. */
+    @Serializable data class SettingsServer(val id: String)
     /** Change password: full screen on a phone. */
     @Serializable data object ChangePassword
     /** The same, as a centred surface over Settings on a tablet. */
@@ -70,3 +74,11 @@ object MobileRoutes {
  * that page.
  */
 internal data class LibraryTab(val type: LibraryType)
+
+/**
+ * Not a destination: Servers, the switcher, over the screen that asked for
+ * it. With [choose] it opens already switching to that server (the Downloads
+ * page's line for another server's downloads), so a server that doesn't
+ * answer is said there, with its ways on.
+ */
+internal data class OpenServers(val choose: String? = null)

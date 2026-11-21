@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import media.watchmy.client.core.api.apis.AuthApi
 import media.watchmy.client.core.api.models.ChangePasswordInputBody
 import media.watchmy.client.core.api.models.ClaimPairingInputBody
@@ -20,6 +19,7 @@ import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.AuthRepository
 import media.watchmy.client.model.ClientInfo
 import media.watchmy.client.model.DeviceSession
+import media.watchmy.client.model.OfflineOwner
 import media.watchmy.client.model.PairingCode
 import media.watchmy.client.model.PairingState
 import media.watchmy.client.model.PendingDevice
@@ -41,13 +41,8 @@ internal class RealAuthRepository(
 
     override val deviceName: StateFlow<String> = store.deviceName
 
-    /** What runs before Sign out ends the session, while the server still takes it ([beforeSignOut]). */
-    private val signOutHooks = java.util.concurrent.CopyOnWriteArrayList<suspend () -> Unit>()
-
-    /** Runs [hook] before each sign-out from this device, for up to a few seconds; its failures are ignored. */
-    fun beforeSignOut(hook: suspend () -> Unit) {
-        signOutHooks += hook
-    }
+    /** Runs [hook] before a sign-in ends on this device (Sign out, or its server removed), for up to a few seconds; its failures are ignored. */
+    fun beforeSignOut(hook: suspend (OfflineOwner) -> Unit) = servers.beforeSignInEnds(hook)
 
     override suspend fun setDeviceName(name: String) {
         val trimmed = name.trim().take(MAX_NAME)
@@ -141,17 +136,14 @@ internal class RealAuthRepository(
     private suspend fun endSession() {
         val session = store.session() ?: return
         val account = session.account ?: return
-        signOutHooks.forEach { hook ->
-            try {
-                withTimeoutOrNull(SIGN_OUT_HOOK_MS) { hook() }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // Signing out goes on whatever the hook met.
-            }
-        }
+        servers.signInEnding(session.server, account)
         val token = store.tokenOrNull(account)
-        store.updateAndSave { s -> s.withServer(session.server.id) { it.copy(account = null, lastUserName = account.userName) } }
+        val now = clock()
+        store.updateAndSave { s ->
+            val signedOut = s.withServer(session.server.id) { it.copy(account = null, lastUserName = account.userName) }
+            // The server stays on the list, signed out. With another still signed in the app moves to it rather than to this one's sign-in.
+            if (s.currentId == session.server.id) signedOut.movedToSignedIn(now) ?: signedOut else signedOut
+        }
         if (token != null) servers.signOutQuietly(session.server.baseUrl, token)
     }
 
@@ -225,7 +217,6 @@ internal class RealAuthRepository(
         const val MAX_NAME = 64
         private const val MIN_POLL_MS = 250L
         private const val MAX_POLL_MS = 10_000L
-        private const val SIGN_OUT_HOOK_MS = 5_000L
 
         /**
          * The approval page for the QR code: the server's [linkPath] taken

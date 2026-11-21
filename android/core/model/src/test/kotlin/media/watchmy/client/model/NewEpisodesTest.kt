@@ -9,10 +9,34 @@ import org.junit.Test
 
 /** The check's rule and what a notification says. */
 class NewEpisodesTest {
-    private class Cursors(var kept: NewEpisodesCursor? = null) : NewEpisodesCursors {
-        override fun read() = kept
-        override fun keep(cursor: NewEpisodesCursor?) {
-            kept = cursor
+    private data class NewEpisodesCursor(val account: String, val cursor: String)
+
+    /** The cursors by account; [kept] is the only one, where a test has one account. */
+    private class Cursors(kept: NewEpisodesCursor? = null) : NewEpisodesCursors {
+        val all = LinkedHashMap<String, String>()
+
+        init {
+            kept?.let { all[it.account] = it.cursor }
+        }
+
+        var kept: NewEpisodesCursor?
+            get() = all.entries.singleOrNull()?.let { NewEpisodesCursor(it.key, it.value) }
+            set(value) {
+                all.clear()
+                value?.let { all[it.account] = it.cursor }
+            }
+
+        override fun read(account: String) = all[account]
+        override fun keep(account: String, cursor: String) {
+            all[account] = cursor
+        }
+
+        override fun forget(account: String) {
+            all.remove(account)
+        }
+
+        override fun keepOnly(accounts: Set<String>) {
+            all.keys.retainAll(accounts)
         }
     }
 
@@ -69,21 +93,21 @@ class NewEpisodesTest {
     }
 
     @Test
-    fun `another account's cursor is not used, and is replaced by this one's`() = runBlocking {
+    fun `each account has a cursor of its own, so another's is not used and stays`() = runBlocking {
         val cursors = Cursors(NewEpisodesCursor("acct-a", "1841"))
         val asked = mutableListOf<String?>()
         val result = checkNewEpisodes({ "acct-b" }, cursors, { after -> asked += after; NewEpisodes("900", listOf(group(1, "Copperline", 1 to 1))) }, { error("starts from now") })
         assertEquals(NewEpisodeCheck.Started, result)
         assertEquals(listOf<String?>(null), asked)
-        assertEquals(NewEpisodesCursor("acct-b", "900"), cursors.kept)
+        assertEquals("coming back to the first server carries on from its place", mapOf("acct-a" to "1841", "acct-b" to "900"), cursors.all)
     }
 
     @Test
-    fun `signed out forgets the cursor and asks nothing`() = runBlocking {
+    fun `signed out asks nothing and changes no cursor`() = runBlocking {
         val cursors = Cursors(NewEpisodesCursor("acct-a", "1841"))
         val result = checkNewEpisodes({ null }, cursors, { error("no one to ask for") }, { error("nothing to show") })
         assertEquals(NewEpisodeCheck.SignedOut, result)
-        assertNull(cursors.kept)
+        assertEquals(NewEpisodesCursor("acct-a", "1841"), cursors.kept)
     }
 
     @Test

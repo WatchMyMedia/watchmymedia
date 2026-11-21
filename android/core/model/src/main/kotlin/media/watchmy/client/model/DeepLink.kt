@@ -14,7 +14,8 @@ import java.net.URLDecoder
  * `home` (the new-episode notifications' "more shows").
  * Open links with [open],
  * which plays only what a launcher or reminder published for the account
- * signed in.
+ * signed in. A launcher's link for another registered account switches to
+ * its server first ([serverFor]).
  */
 sealed interface DeepLink {
     data class Play(val fileId: Long, val startMs: Long? = null, val title: String? = null, val subtitle: String? = null) : DeepLink
@@ -119,6 +120,18 @@ sealed interface DeepLink {
             val (_, query) = read(link) ?: return null
             if (query["source"] !in LAUNCHER_SOURCES && "account" !in query) return null
             return query["account"].orEmpty()
+        }
+
+        /**
+         * The registered server a launcher's [link] was published for: the
+         * one among [saved] whose signed-in account it names
+         * ([linkAccount]). Null for a link that names no account, or one for
+         * an account that isn't signed in on this device. The app switches
+         * to it before opening the link when it isn't the one in use.
+         */
+        fun serverFor(link: String?, saved: List<SavedServer>): SavedServer? {
+            val account = launcherAccount(link)?.takeIf { it.isNotEmpty() } ?: return null
+            return saved.firstOrNull { it.linkAccount() == account }
         }
 
         /** The link and its query, keys and values decoded; null when it is not a watchmymedia:// link. */

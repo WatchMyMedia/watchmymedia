@@ -32,10 +32,24 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import media.watchmy.client.mobile.components.LocalServersButton
+import media.watchmy.client.mobile.components.ServersButton
+import media.watchmy.client.mobile.servers.ServersPopover
+import media.watchmy.client.mobile.servers.ServersSheet
+import media.watchmy.client.mobile.settings.ServersPage
+import media.watchmy.client.model.accountButtonLabel
+import media.watchmy.client.presentation.servers.ServerSwitchViewModel
+import media.watchmy.client.presentation.servers.ServersViewModel
+import media.watchmy.client.ui.TestTags
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -131,6 +145,8 @@ private fun NavDestination.tab(): MobileTab? = when {
     hasRoute<MobileRoutes.SettingsNotifications>() -> MobileTab.Settings
     hasRoute<MobileRoutes.SettingsAccount>() -> MobileTab.Settings
     hasRoute<MobileRoutes.SettingsAbout>() -> MobileTab.Settings
+    hasRoute<MobileRoutes.SettingsServers>() -> MobileTab.Settings
+    hasRoute<MobileRoutes.SettingsServer>() -> MobileTab.Settings
     else -> null
 }
 
@@ -160,6 +176,20 @@ private fun NavHostController.openSettingsPage(group: SettingsGroup, beside: Boo
             popUpTo<MobileRoutes.Settings>()
             launchSingleTop = true
         }
+    }
+}
+
+/**
+ * Opens Account & devices' Servers page ([serverId] null) or one server's
+ * page, from Settings or from Servers' Manage servers: over the page it was
+ * opened from on a phone, so Back is Up; on a tablet the list's page stays
+ * the one page under Settings' own, and a server's page goes over the list.
+ */
+private fun NavHostController.openServersPage(serverId: String?, beside: Boolean) {
+    if (serverId != null) return navigate(MobileRoutes.SettingsServer(serverId)) { launchSingleTop = true }
+    navigate(MobileRoutes.SettingsServers) {
+        if (beside) popUpTo<MobileRoutes.Settings>()
+        launchSingleTop = true
     }
 }
 
@@ -207,14 +237,24 @@ private fun NavHostController.go(route: Any) {
  * top-level screens. Sign-in and the server picker are shown by
  * [media.watchmy.client.mobile.MobileApp] before this. [deepLink] is opened
  * once, then [onDeepLinkHandled] is called.
+ *
+ * The account button opens Servers here: a sheet on a phone, a popover
+ * beside the rail on a tablet. [onAddServer] starts Add a server, which the
+ * app shows over these screens. A search result on another server is the
+ * app's to open ([onOpenElsewhere]): it switches, and the new server's
+ * screens then get [landing], Search with the same words under the title's
+ * page, once ([onLandingShown]).
  */
 @Composable
 fun MobileNavHost(
-    onSwitchServer: () -> Unit,
+    onAddServer: () -> Unit,
     onSignedOut: () -> Unit,
     nav: NavHostController = rememberNavController(),
     deepLink: DeepLink? = null,
     onDeepLinkHandled: () -> Unit = {},
+    landing: ServerSwitchViewModel.Landing? = null,
+    onLandingShown: () -> Unit = {},
+    onOpenElsewhere: (serverId: String, query: String, page: DeepLink) -> Unit = { _, _, _ -> },
 ) {
     val services = LocalAppServices.current
     val liveModel = viewModel { LiveChannelsViewModel(services.live, services.servers, services.auth) }
@@ -291,7 +331,35 @@ fun MobileNavHost(
     val openSeason = { id: Long, season: Int -> nav.navigate(MobileRoutes.Show(id, season)) }
     val openEpisode = { id: Long, season: Int, episode: Long -> nav.navigate(MobileRoutes.Episode(id, season, episode)) }
     val openMovie = { id: Long -> nav.navigate(MobileRoutes.Movie(id)) }
-    val go = { route: Any -> nav.go(route) }
+    // Servers, the switcher: the account button opens it over whichever screen is up.
+    val serversModel = viewModel(key = "servers") { ServersViewModel(services.servers, services.downloads, services.cast) }
+    val servers by serversModel.state.collectAsStateWithLifecycle()
+    var serversOpen by rememberSaveable { mutableStateOf(false) }
+    // A switch that happened, or one that went to a sign-in, closes it; the app then rebuilds these screens.
+    LaunchedEffect(serversModel) { serversModel.events.collect { serversOpen = false } }
+    val go: (Any) -> Unit = { route ->
+        if (route is OpenServers) {
+            serversOpen = true
+            route.choose?.let(serversModel::choose)
+        } else {
+            nav.go(route)
+        }
+    }
+    // The words a result on another server was found with, for Search on the server the app switched to.
+    var searchWords by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(landing) {
+        val to = landing ?: return@LaunchedEffect
+        // Home, then Search with the words, then the title: Back from the title is Search, and Back from Search is Home.
+        searchWords = to.query
+        nav.openTabRoot(MobileTab.Search)
+        when (val page = to.page) {
+            is DeepLink.Show -> nav.navigate(MobileRoutes.Show(page.id, page.season, page.episode))
+            is DeepLink.Movie -> nav.navigate(MobileRoutes.Movie(page.id))
+            is DeepLink.Play -> nav.play(resolvePlayLink(services.library, page.fileId))
+            else -> Unit
+        }
+        onLandingShown()
+    }
     // Reminder time is in Settings › Playback.
     val openReminderTime = {
         go(MobileRoutes.Settings)
@@ -299,6 +367,12 @@ fun MobileNavHost(
     }
 
     val user by services.auth.user.collectAsStateWithLifecycle()
+    val server by services.servers.current.collectAsStateWithLifecycle()
+    // What the account button is called, and the server's name under Home's title where there are several.
+    val serverName = server?.server?.name
+    val serversButton = remember(user?.name, serverName, servers.several) {
+        ServersButton(accountButtonLabel(user?.name, serverName), serverName.takeIf { servers.several }) { serversOpen = true }
+    }
     val layout = rememberTabletLayout()
     val adaptive = currentWindowAdaptiveInfoV2()
     val showRail = layout.isTablet && adaptive.windowSizeClass.isWidthAtLeastBreakpoint(600) &&
@@ -325,7 +399,7 @@ fun MobileNavHost(
     // Tapping the tab already shown takes its page to the top rather than doing nothing.
     val reselect = remember { TabReselect() }
     val selectTab = { t: MobileTab -> if (t == tab) reselect.reselect(t) else nav.openTab(t) }
-    CompositionLocalProvider(LocalTabReselect provides reselect, LocalLiveChannelsShown provides showChannels) {
+    CompositionLocalProvider(LocalTabReselect provides reselect, LocalLiveChannelsShown provides showChannels, LocalServersButton provides serversButton) {
         Box(Modifier.fillMaxSize()) {
             NavigationSuiteScaffold(
                 layoutType = if (showRail) NavigationSuiteType.NavigationRail else NavigationSuiteType.None,
@@ -393,10 +467,16 @@ fun MobileNavHost(
                             )
                         }
                         composable<MobileRoutes.Downloads> {
-                            DownloadsScreen(onPlay = nav::play, onOpenMovie = openMovie, onOpenShow = openShow, onOpenEpisode = openEpisode, onNavigate = go)
+                            DownloadsScreen(
+                                onPlay = nav::play, onOpenMovie = openMovie, onOpenShow = openShow, onOpenEpisode = openEpisode, onNavigate = go,
+                                elsewhere = servers.rows.filter { !it.current && it.downloads != null },
+                            )
                         }
                         composable<MobileRoutes.Search> {
-                            SearchScreen(onOpenShow = openShow, onOpenMovie = openMovie, onPlay = nav::play, onNavigate = go, onOpenSeason = openSeason, onOpenEpisode = openEpisode)
+                            SearchScreen(
+                                onOpenShow = openShow, onOpenMovie = openMovie, onPlay = nav::play, onNavigate = go, onOpenSeason = openSeason, onOpenEpisode = openEpisode,
+                                words = searchWords, onWordsTaken = { searchWords = null }, onOpenElsewhere = onOpenElsewhere,
+                            )
                         }
                         composable<MobileRoutes.LiveTV> {
                             LiveChannelsScreen(
@@ -444,10 +524,12 @@ fun MobileNavHost(
                             )
                         }
                         // Settings and a route per group, all on the Settings entry's models.
-                        val settings = @Composable { entry: NavBackStackEntry, open: SettingsGroup? ->
+                        val settings = @Composable { entry: NavBackStackEntry, open: SettingsGroup?, page: ServersPage? ->
                             SettingsRoute(nav, entry) {
                                 SettingsScreen(
-                                    onSwitchServer = onSwitchServer,
+                                    onAddServer = onAddServer,
+                                    servers = page,
+                                    onOpenServers = { id -> nav.openServersPage(id, beside = layoutIsTablet(nav)) },
                                     onSignedOut = onSignedOut,
                                     onLinkTv = { nav.navigate(MobileRoutes.LinkTv()) },
                                     onNavigate = go,
@@ -461,13 +543,16 @@ fun MobileNavHost(
                                 )
                             }
                         }
-                        composable<MobileRoutes.Settings> { settings(it, null) }
-                        composable<MobileRoutes.SettingsPlayback> { settings(it, SettingsGroup.Playback) }
-                        composable<MobileRoutes.SettingsLanguages> { settings(it, SettingsGroup.Languages) }
-                        composable<MobileRoutes.SettingsDownloads> { settings(it, SettingsGroup.Downloads) }
-                        composable<MobileRoutes.SettingsNotifications> { settings(it, SettingsGroup.Notifications) }
-                        composable<MobileRoutes.SettingsAccount> { settings(it, SettingsGroup.Account) }
-                        composable<MobileRoutes.SettingsAbout> { settings(it, SettingsGroup.About) }
+                        composable<MobileRoutes.Settings> { settings(it, null, null) }
+                        composable<MobileRoutes.SettingsPlayback> { settings(it, SettingsGroup.Playback, null) }
+                        composable<MobileRoutes.SettingsLanguages> { settings(it, SettingsGroup.Languages, null) }
+                        composable<MobileRoutes.SettingsDownloads> { settings(it, SettingsGroup.Downloads, null) }
+                        composable<MobileRoutes.SettingsNotifications> { settings(it, SettingsGroup.Notifications, null) }
+                        composable<MobileRoutes.SettingsAccount> { settings(it, SettingsGroup.Account, null) }
+                        composable<MobileRoutes.SettingsAbout> { settings(it, SettingsGroup.About, null) }
+                        // Account & devices' Servers pages, in its place beside the tablet's list.
+                        composable<MobileRoutes.SettingsServers> { settings(it, SettingsGroup.Account, ServersPage.List) }
+                        composable<MobileRoutes.SettingsServer> { settings(it, SettingsGroup.Account, ServersPage.Server(it.toRoute<MobileRoutes.SettingsServer>().id)) }
                         composable<MobileRoutes.ChangePassword> { ChangePasswordRoute(nav, it, asDialog = false) }
                         // Not put away by a tap beside it: what was typed would go. Back is the screen's.
                         // The window draws under the keyboard and pads for it: on a tablet held sideways the
@@ -513,14 +598,47 @@ fun MobileNavHost(
                 }
             }
             if (showRail) {
+                // The rail has no room for the server's name: it is the button's label, and the first row of Servers.
                 IconButton(
-                    onClick = { nav.openTab(MobileTab.Settings) },
-                    modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(start = 16.dp, bottom = 16.dp).semantics { contentDescription = "Settings" },
-                ) { Avatar(user?.name) }
+                    onClick = { serversOpen = true },
+                    modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(start = 16.dp, bottom = 16.dp).testTag(TestTags.ACCOUNT)
+                        .semantics { contentDescription = serversButton.label },
+                ) {
+                    // Ringed in gold while its popover is open. The button's own words say who and where.
+                    Box((if (serversOpen) Modifier.border(2.dp, WmmColors.Accent, CircleShape).padding(4.dp) else Modifier).clearAndSetSemantics {}) { Avatar(user?.name) }
+                }
+            }
+            if (serversOpen) {
+                val close = {
+                    serversOpen = false
+                    serversModel.dismissFailure()
+                }
+                val add = {
+                    close()
+                    onAddServer()
+                }
+                val manage = {
+                    close()
+                    nav.openTab(MobileTab.Settings)
+                    // On a phone the page sits over Account & devices, where its row is, so Back is Up.
+                    if (!layout.isTablet) nav.openSettingsPage(SettingsGroup.Account, beside = false)
+                    nav.openServersPage(null, beside = layout.isTablet)
+                }
+                val device = if (layout.isTablet) "tablet" else "phone"
+                // With Live TV in the bar, Settings has no tab: the account button was its way in, so Servers keeps one.
+                val settings = {
+                    close()
+                    nav.openTab(MobileTab.Settings)
+                }.takeIf { MobileTab.Settings !in tabs }
+                if (showRail) ServersPopover(servers, serversModel, device, railWidth = RailWidth, onAdd = add, onManage = manage, onDismiss = close, onSettings = settings)
+                else ServersSheet(servers, serversModel, device, onAdd = add, onManage = manage, onDismiss = close, onSettings = settings)
             }
         }
     }
 }
+
+/** The navigation rail's width, which the Servers popover opens beside. */
+private val RailWidth = 80.dp
 
 /** Whether the window is a tablet's now, for a link into Settings from elsewhere. */
 private fun layoutIsTablet(nav: NavHostController): Boolean {

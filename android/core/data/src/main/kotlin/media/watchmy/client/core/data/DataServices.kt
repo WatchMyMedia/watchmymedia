@@ -137,7 +137,7 @@ class DataServices internal constructor(
 
     val servers: ServerRepository = serverRepository
     val auth: AuthRepository = authRepository
-    val library: LibraryRepository = RealLibraryRepository(store, http, events, scope, clock)
+    val library: LibraryRepository = RealLibraryRepository(store, http, events, scope, clock, serverRepository::askFirst)
     private val liveRepository = RealLiveRepository(http, store, scope, clock, events)
     val live: LiveRepository = liveRepository
     val livePlaybackGateway: LivePlaybackGateway = RealLivePlaybackGateway(store, http, capabilities = liveRepository::capabilities)
@@ -199,8 +199,10 @@ class DataServices internal constructor(
     class CastPlayback(val gateway: PlaybackGateway, val preferences: PreferencesRepository, val imageUrl: (path: String?) -> String?)
 
     /**
-     * For the image loader (Coil's `OkHttpNetworkFetcherFactory`): sends the
-     * bearer token on requests to the current server, and only there. Images
+     * For the image loader (Coil's `OkHttpNetworkFetcherFactory`): sends a
+     * server's bearer token on requests to that server, and only there: the
+     * one in use, and any other signed in here whose pictures a search of
+     * every server shows. Images
      * have a Dispatcher of their own, so a screenful of posters doesn't queue
      * the API calls behind it (OkHttp runs 5 calls per host at a time); they
      * share the connection pool, not the API's HTTP cache. Made with the

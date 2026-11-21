@@ -1,11 +1,14 @@
 package media.watchmy.client.fake
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import media.watchmy.client.model.ApiException
@@ -19,6 +22,7 @@ import media.watchmy.client.model.DownloadRepository
 import media.watchmy.client.model.DownloadSettings
 import media.watchmy.client.model.DownloadStatus
 import media.watchmy.client.model.DownloadStorage
+import media.watchmy.client.model.DownloadTotals
 import media.watchmy.client.model.OfflineDownload
 import media.watchmy.client.model.OfflineItem
 import media.watchmy.client.model.PlaybackMode
@@ -36,6 +40,10 @@ import media.watchmy.client.model.WatchProgress
  * versions and the episodes as the file; Tin Sky's fail at 35%, for
  * Couldn't download. [allowed] is Who can download: admins, as a server has
  * it by default.
+ *
+ * With [servers], each fake server's account has its own downloads: the list
+ * is the server in use's, the Cabin and Den servers hold three each, and a
+ * server signed out of or removed loses its own, as on a real device.
  */
 class FakeDownloadRepository(
     private val allowed: () -> Boolean = { true },
@@ -44,9 +52,55 @@ class FakeDownloadRepository(
     private val stepMs: Long = 400,
     private val freeBytes: Long = 103_500_000_000,
     private val now: () -> Long = System::currentTimeMillis,
+    servers: FakeServerRepository? = null,
 ) : DownloadRepository {
     private val _downloads = MutableStateFlow(if (sample) sample(now()) else emptyList())
     override val downloads: StateFlow<List<OfflineDownload>> = _downloads.asStateFlow()
+
+    /** What the servers that aren't in use hold here, by server id. */
+    private val kept = HashMap<String, List<OfflineDownload>>().apply {
+        if (servers != null && sample) {
+            put(Cabin.id, cabinSample(now()))
+            put(Den.id, denSample(now()))
+        }
+    }
+    private var serverId: String? = null
+    private val _byServer = MutableStateFlow<Map<String, DownloadTotals>>(emptyMap())
+    override val byServer: StateFlow<Map<String, DownloadTotals>> = _byServer.asStateFlow()
+
+    init {
+        if (servers != null) {
+            // Unconfined: the lists follow a switch, a sign-out or a removal at once, as the fake servers' own flows do.
+            CoroutineScope(SupervisorJob() + Dispatchers.Unconfined).launch {
+                combine(servers.current, servers.saved) { current, saved -> current?.server?.id to saved.filter { it.signedIn }.map { it.server.id }.toSet() }
+                    .collect { (current, signedIn) -> onServers(current, signedIn) }
+            }
+            launchTotals()
+        }
+    }
+
+    /** The server in use changed, or a sign-in ended: the list is the one in use's, and what a signed-out or removed server held is deleted. */
+    private fun onServers(current: String?, signedIn: Set<String>) {
+        if (serverId == null) {
+            serverId = current
+        } else if (current != serverId) {
+            serverId?.let { kept[it] = _downloads.value }
+            _downloads.value = current?.let { kept.remove(it) }.orEmpty()
+            serverId = current
+            refresh()
+        }
+        kept.keys.retainAll(signedIn)
+        totals()
+    }
+
+    private fun launchTotals() {
+        CoroutineScope(SupervisorJob() + Dispatchers.Unconfined).launch { _downloads.collect { totals() } }
+    }
+
+    private fun totals() {
+        val all = kept + listOfNotNull(serverId?.let { it to _downloads.value })
+        _byServer.value = all.filterValues { it.isNotEmpty() }.mapValues { (_, list) -> DownloadTotals(list.size, list.sumOf { it.sizeBytes }) }
+    }
 
     private val _can = MutableStateFlow(allowed())
     override val canDownload: StateFlow<Boolean> = _can.asStateFlow()
@@ -203,6 +257,20 @@ class FakeDownloadRepository(
 
         /** What a fake file is: a movie's version, or an episode by the fake library's numbering. */
         fun itemFor(fileId: Long): OfflineItem {
+            // The Cabin server's files: a movie's is 7000 + its id, an episode's 7000 + (show − 700) × 100 + season × 10 + episode.
+            FakeCabin.movies.firstOrNull { fileId == 7000 + it.id }?.let { m ->
+                return OfflineItem(OfflineItem.Kind.Movie, m.title, movieId = m.id, year = m.year)
+            }
+            if (fileId in 7000L until 7600L) {
+                val rest = fileId - 7000
+                val show = FakeCabin.shows.firstOrNull { it.id == 700 + rest / 100 }
+                val season = (rest % 100 / 10).toInt()
+                val episode = (rest % 10).toInt()
+                if (show != null) {
+                    val detail = FakeCabin.season(show.id, season).episodes.firstOrNull { it.number == episode }
+                    return OfflineItem(OfflineItem.Kind.Episode, detail?.title ?: "Low Water", showId = show.id, episodeId = detail?.id, showTitle = show.title, season = season, episode = episode)
+                }
+            }
             FakeData.movies.firstOrNull { fileId == 9400 + it.id || fileId == 9500 + it.id }?.let { m ->
                 return OfflineItem(OfflineItem.Kind.Movie, m.title, movieId = m.id, year = m.year)
             }
@@ -220,6 +288,24 @@ class FakeDownloadRepository(
         }
 
         private fun episodeFile(showId: Long, season: Int, episode: Int) = 9300 + showId * 100 + season * 10 + episode
+
+        private fun held(fileId: Long, item: OfflineItem, size: Long, age: Int, now: Long, minutes: Long = 47) = OfflineDownload(
+            id = "fake-$fileId", fileId = fileId, item = item, quality = DownloadQuality.Original, mode = PlaybackMode.Direct, protocol = StreamProtocol.File,
+            sizeBytes = size, sizeEstimated = false, status = DownloadStatus.Downloaded,
+            createdAtMs = now - age * 86_400_000L, completedAtMs = now - age * 86_400_000L + 3_600_000, durationMs = minutes * 60_000,
+        )
+
+        /** What this device holds from the Cabin server: Harbor Nights and two episodes of Harbour Run, 12.4 GB. */
+        private fun cabinSample(now: Long): List<OfflineDownload> = listOf(
+            held(7000 + FakeCabin.HARBOR_NIGHTS, OfflineItem(OfflineItem.Kind.Movie, "Harbor Nights", movieId = FakeCabin.HARBOR_NIGHTS, year = 2015), 7_730_000_000, 5, now, minutes = 108),
+            held(7022, OfflineItem(OfflineItem.Kind.Episode, "Tally", showId = FakeCabin.HARBOUR_RUN, episodeId = FakeCabin.HARBOUR_RUN * 1000 + 22, showTitle = "Harbour Run", season = 2, episode = 2), 2_790_000_000, 6, now),
+            held(7023, OfflineItem(OfflineItem.Kind.Episode, "Low Water", showId = FakeCabin.HARBOUR_RUN, episodeId = FakeCabin.HARBOUR_RUN * 1000 + 23, showTitle = "Harbour Run", season = 2, episode = 3), 2_790_000_000, 2, now),
+        )
+
+        /** What it holds from the Den server, which doesn't answer: three episodes to watch all the same. */
+        private fun denSample(now: Long): List<OfflineDownload> = (1..3).map { e ->
+            held(6000L + e, OfflineItem(OfflineItem.Kind.Episode, listOf("First Light", "The Crossing", "Night Ferry")[e - 1], showId = 600, episodeId = 600_010L + e, showTitle = "Night Ferry", season = 1, episode = e), 2_150_000_000, 9 - e, now, minutes = 44)
+        }
 
         private fun sample(now: Long): List<OfflineDownload> {
             val day = 86_400_000L
