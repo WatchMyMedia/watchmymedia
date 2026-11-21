@@ -40,6 +40,28 @@ struct DownloadRepositoryTests {
         #expect(h.notices.said == ["ask"])
     }
 
+    /// An original file and its subtitles are fetched with the owner's
+    /// sign-in. The engine asks for each request as it starts the fetch:
+    /// when the owner's server (not the one in use) doesn't answer as
+    /// itself the request fails, and the engine tries the transfer later;
+    /// once signed out there is no request at all.
+    @Test func aFetchsSignedRequestFailsWhenItsServerDoesNotAnswerAsItself() async throws {
+        let h = Harness()
+        h.gateway.made = [record("aaaaaaaaaaaaaaaa", fileID: 42)]
+        let repo = h.make()
+        _ = try await repo.plan(fileID: 42)
+        try await repo.download(DownloadChoice(fileID: 42, quality: .original))
+        let added = try #require(h.engine.added.first)
+        #expect(try await repo.request(for: added.id, url: added.url)?.url == added.url)
+
+        h.gateway.requestError = APIError(status: nil, message: "Cabin server didn’t answer at the address kept for it.")
+        await #expect(throws: APIError.self) { _ = try await repo.request(for: added.id, url: added.url) }
+        #expect(repo.downloads.count == 1, "the download stays, to be tried again")
+
+        h.gateway.requestError = nil
+        #expect(try await repo.request(for: "no-such-download", url: added.url) == nil)
+    }
+
     @Test func theListIsBuiltOncePerEngineTickNotAtEveryRead() async throws {
         // The screens read `downloads` many times a tick.
         let h = Harness()

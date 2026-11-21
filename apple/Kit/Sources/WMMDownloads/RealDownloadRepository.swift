@@ -298,9 +298,9 @@ public final class RealDownloadRepository: DownloadRepository, EngineDelegate {
         return t
     }
 
-    func request(for id: String, url: URL) -> URLRequest? {
+    func request(for id: String, url: URL) async throws -> URLRequest? {
         guard let rec = stored.record(id) else { return nil }
-        return gateway.authorizedRequest(rec.owner, url: url)
+        return try await gateway.authorizedRequest(rec.owner, url: url)
     }
 
     private func completed(_ rec: StoredRecord) {

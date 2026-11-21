@@ -63,6 +63,8 @@ final class SystemDownloadEngine: NSObject, DownloadEngine {
     /// The running main task of each download, and its subtitle tasks.
     private var tasks: [String: URLSessionTask] = [:]
     private var partTasks: [String: URLSessionTask] = [:]
+    /// The parts whose signed request is being made (its server may be asked which one it is first).
+    private var signingParts: Set<String> = []
     /// Getting a download ready to fetch (its token, the master playlist), cancelled by pause or remove.
     private var preparing: [String: Task<Void, Never>] = [:]
     /// Why the HTTP response of a finished file task refused it, until the task completes.
@@ -256,14 +258,27 @@ final class SystemDownloadEngine: NSObject, DownloadEngine {
         startParts(e)
         preparing[id] = Task { [weak self] in
             guard let self else { return }
-            if e.request.hls { await self.startHLS(id) } else { self.startFile(id) }
+            if e.request.hls { await self.startHLS(id) } else { await self.startFile(id) }
             self.preparing[id] = nil
         }
     }
 
-    private func startFile(_ id: String) {
-        guard let e = entries[id], e.state == .preparing else { return }
-        guard let request = delegate?.request(for: id, url: e.request.url).map(limited) else { return giveUp(id, .refused(401)) }
+    /// An original file is fetched with its owner's sign-in. When the
+    /// owner's server isn't the one in use it is asked which server it is
+    /// first; one that doesn't answer as itself is tried again later, as a
+    /// server that couldn't be reached is, and its sign-in goes nowhere.
+    private func startFile(_ id: String) async {
+        guard let e = entries[id], e.state == .preparing, let delegate else { return }
+        let request: URLRequest
+        do {
+            guard let signed = try await delegate.request(for: id, url: e.request.url) else { return giveUp(id, .refused(401)) }
+            request = limited(signed)
+        } catch {
+            if Task.isCancelled || error is CancellationError { return }
+            return retry(id)
+        }
+        // Paused or removed while its server was asked.
+        guard !Task.isCancelled, entries[id]?.state == .preparing else { return }
         let task: URLSessionDownloadTask
         if let data = try? Data(contentsOf: resumeFile(id)) {
             task = fileSession.downloadTask(withResumeData: data)
@@ -349,14 +364,25 @@ final class SystemDownloadEngine: NSObject, DownloadEngine {
         changed(id)
     }
 
-    /// Subtitles are small: they go at once, beside the media.
+    /// Subtitles are small: they go at once, beside the media. Each is
+    /// fetched with the owner's sign-in, so a server that isn't the one in
+    /// use is asked which server it is first; when it doesn't answer as
+    /// itself the subtitle waits for the next time the parts are started.
     private func startParts(_ e: Entry) {
-        for (track, url) in e.request.parts where e.parts[track] == nil && partTasks[partKey(e.request.id, track)] == nil {
-            guard let request = delegate?.request(for: e.request.id, url: url).map(limited) else { continue }
-            let task = fileSession.downloadTask(with: request)
-            task.taskDescription = partKey(e.request.id, track)
-            partTasks[partKey(e.request.id, track)] = task
-            task.resume()
+        for (track, url) in e.request.parts where e.parts[track] == nil {
+            let key = partKey(e.request.id, track)
+            guard partTasks[key] == nil, !signingParts.contains(key) else { continue }
+            signingParts.insert(key)
+            Task { [weak self] in
+                let request = try? await self?.delegate?.request(for: e.request.id, url: url)
+                guard let self else { return }
+                self.signingParts.remove(key)
+                guard let request, self.entries[e.request.id] != nil, self.partTasks[key] == nil else { return }
+                let task = self.fileSession.downloadTask(with: self.limited(request))
+                task.taskDescription = key
+                self.partTasks[key] = task
+                task.resume()
+            }
         }
     }
 

@@ -129,7 +129,8 @@ final class RealAuthRepository: AuthRepository {
         if itself { await store.runSignOutHooks(serverID: server.id) }
         guard store.credentials[server.id]?.token == credential.token else { return }
         store.setCredential(nil, serverID: server.id)
-        if itself { await store.signOutQuietly(baseURL: server.baseURL, token: credential.token) }
+        // Still the server in use, signed out of: asked above, its sign-out goes without asking again.
+        if itself { await store.signOutQuietly(serverID: server.id, baseURL: server.baseURL, token: credential.token) }
     }
 
     func sessions(all: Bool) async throws -> [DeviceSession] {
@@ -189,14 +190,14 @@ final class RealAuthRepository: AuthRepository {
         guard store.revision == revision, let saved = store.state.servers.first(where: { $0.server.id == server.id }),
               ServerAPI.sameEndpoint(saved.server.baseURL, server.baseURL) else {
             let store = store
-            Task { await store.signOutQuietly(baseURL: server.baseURL, token: token) }
+            Task { await store.signOutQuietly(serverID: server.id, baseURL: server.baseURL, token: token) }
             return false
         }
         let replaced = store.credentials[server.id]
         store.setCredential(StoredCredential(user: user, sessionID: sessionID, token: token, baseURL: server.baseURL), serverID: server.id)
         if let replaced, replaced.token != token {
             let store = store
-            Task { await store.signOutQuietly(baseURL: server.baseURL, token: replaced.token) }
+            Task { await store.signOutQuietly(serverID: server.id, baseURL: server.baseURL, token: replaced.token) }
         }
         return true
     }

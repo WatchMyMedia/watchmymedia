@@ -49,6 +49,7 @@ struct SeveralServersTests {
                 let status = searchStatus.withLock { $0 }
                 return status == 200 ? (200, Data(#"{"movies":[],"shows":[],"episodes":[]}"#.utf8)) : (status, Data(#"{"title":"Error","status":\#(status),"detail":"refused"}"#.utf8))
             case "GET /api/images/w342/far.jpg": return (200, Data([7, 7]))
+            case "POST /api/offline/downloads/d1/token": return (200, Data(#"{"token":"o1.cabin","expiresAt":"2099-01-01T00:00:00Z","param":"token"}"#.utf8))
             case "POST /api/auth/logout", "POST /api/offline/sync": return (204, Data())
             default: return (404, Data())
             }

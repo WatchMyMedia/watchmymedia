@@ -172,7 +172,10 @@ public protocol OfflineGateway: AnyObject {
 
     /// A request for `url` on `owner`'s server with its session as the
     /// bearer, which the offline routes also take; nil once it is signed out.
-    func authorizedRequest(_ owner: OfflineOwner, url: URL) -> URLRequest?
+    /// While that server isn't the one in use it is asked which server it
+    /// is first, with no sign-in: this throws, as any call for `owner` does,
+    /// when nothing answers at its kept address or another server does.
+    func authorizedRequest(_ owner: OfflineOwner, url: URL) async throws -> URLRequest?
 
     func sync(_ owner: OfflineOwner, client: ClientInfo, sentAt: Date, downloads: [SyncedDownload], progress: [OfflineProgress]) async throws -> SyncReply
 }

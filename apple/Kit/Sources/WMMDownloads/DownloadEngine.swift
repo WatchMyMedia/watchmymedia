@@ -52,8 +52,10 @@ protocol EngineDelegate: AnyObject {
 
     /// `url` with the download owner's session as the bearer (an original
     /// file and subtitles), so a transfer resumed hours later still goes
-    /// through; nil once signed out.
-    func request(for id: String, url: URL) -> URLRequest?
+    /// through; nil once signed out. Throws when the owner's server, not
+    /// being the one in use, didn't say it is the server remembered: the
+    /// transfer is tried again later, as one that couldn't reach it.
+    func request(for id: String, url: URL) async throws -> URLRequest?
 
     /// A download changed state, or failed for good; nil for a change of the network.
     func engineChanged(_ id: String?, failure: EngineFailure?)

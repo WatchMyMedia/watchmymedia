@@ -107,10 +107,10 @@ struct ServerRepositoryTests {
         let nowhere = "nowhere-\(UUID().uuidString.lowercased()).local"
         let probed = await #expect(throws: APIError.self) { try await servers.probe(nowhere) }
         #expect(probed?.message == localNetworkOffMessage)
-        let lan = h.services.store.api(baseURL: URL(string: "http://\(nowhere):27587")!, token: "tok")
+        let lan = h.services.store.api(baseURL: URL(string: "http://\(nowhere):27587")!)
         await #expect(throws: APIError(status: nil, message: localNetworkOffMessage)) { try await lan.call { try await $0.getHome().ok.body.json } }
 
-        let elsewhere = h.services.store.api(baseURL: URL(string: "https://nowhere-\(UUID().uuidString.lowercased()).example.net")!, token: "tok")
+        let elsewhere = h.services.store.api(baseURL: URL(string: "https://nowhere-\(UUID().uuidString.lowercased()).example.net")!)
         await #expect(throws: APIError(status: nil, message: "Couldn't reach the server. Check the connection and try again.")) {
             try await elsewhere.call { try await $0.getHome().ok.body.json }
         }
