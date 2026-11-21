@@ -1,7 +1,8 @@
 # Contributing
 
 Thanks for looking at WatchMyMedia. This repository holds the server, the web
-app and the Android, Apple, Mac and Windows apps.
+app and its Cast receiver, and the Android, Apple, Samsung TV, Mac and Windows
+apps.
 
 ## Licence
 

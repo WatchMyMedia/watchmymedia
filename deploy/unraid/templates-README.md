@@ -94,7 +94,10 @@ CPU, it says so there, with **Test again**.
 - **Update**: on the **Docker** tab, click **Check for Updates**. When
   WatchMyMedia shows an update, apply it. Your library, settings and artwork
   stay in appdata. **Settings › General** in the web app says whether a newer
-  version is out.
+  version is out. Back up first (**Settings › Backups › Back up now**): some
+  versions, 2.0.0 among them, change the database, and going back to an
+  older one afterwards means setting **Repository** to its tag, such as
+  `ghcr.io/watchmymedia/watchmymedia:1.8.0`, and restoring that backup.
 - **Back up**: the server makes a backup every night, in the `backups` folder
   inside appdata. **Settings › Backups** can make one now and download it.
   Keep a copy somewhere other than this server.
