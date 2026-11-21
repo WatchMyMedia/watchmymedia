@@ -102,12 +102,28 @@ final class RealLibraryRepository: LibraryRepository {
         let q = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxSearch))
         guard !q.isEmpty else { return SearchResults() }
         try await askOther(serverID)
-        let r = try await store.other(serverID: serverID).api.call { try await $0.search(query: .init(q: q)).ok.body.json }
-        return SearchResults(movies: r.movies.map(\.browseItem), shows: r.shows.map(\.browseItem), episodes: r.episodes.map(\.card))
+        do {
+            let r = try await store.other(serverID: serverID).api.call { try await $0.search(query: .init(q: q)).ok.body.json }
+            return SearchResults(movies: r.movies.map(\.browseItem), shows: r.shows.map(\.browseItem), episodes: r.episodes.map(\.card))
+        } catch {
+            // Whatever answered a moment ago may not be there now: Try again asks it again first.
+            if !(error is CancellationError), !Task.isCancelled { store.forgetAnswer(serverID) }
+            throw error
+        }
+    }
+
+    /// Asks a server that isn't in use which server it is, without
+    /// searching it: its pictures go on loading with its sign-in.
+    func askServer(_ serverID: String) async throws {
+        try await askOther(serverID)
+    }
+
+    func answerStands(serverID: String) -> Bool {
+        store.answered(serverID)
     }
 
     /// The visit to Search ended: the other servers' answers are forgotten,
-    /// and each is asked again before the next search sends its sign-in.
+    /// and each is asked again before its sign-in next goes to it.
     func searchVisitEnded() {
         store.forgetAnswers()
     }

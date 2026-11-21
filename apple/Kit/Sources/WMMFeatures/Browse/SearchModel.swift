@@ -190,12 +190,10 @@ public final class SearchModel {
     /// The servers that answered, on this visit, that they are too old for
     /// this app: not asked again on it, so typing doesn't ask one each time.
     @ObservationIgnored private var tooOldNow: Set<String> = []
-    /// When each other server last answered a search on this visit, by
-    /// server ID: a switch to one that just answered doesn't ask it which
-    /// server it is again.
-    @ObservationIgnored private var answeredAt: [String: Date] = [:]
     /// The visit to Search ended and no new one has begun.
     @ObservationIgnored private var visitOver = false
+    /// The servers being asked which they are, back on Search; tests await them.
+    @ObservationIgnored private(set) var reasking: [String: Task<Void, Never>] = [:]
 
     /// - Parameters:
     ///   - servers: the registered servers; with it, search looks in every one signed in to.
@@ -219,32 +217,35 @@ public final class SearchModel {
 
     // MARK: Across servers
 
-    /// How long a server's answer to a search stands for a switch to it
-    /// without asking which server it is: the device may have changed
-    /// networks since, and a kept address is someone else's machine there.
-    static let answerStands: TimeInterval = 300
-
-    /// The visit to Search ended: another tab was chosen, or the app left
-    /// the screen. Each other server is asked which server it is once for a
-    /// visit, before its sign-in is sent, and what they said is forgotten
-    /// here (``LibraryRepository/searchVisitEnded()``).
+    /// The visit to Search ended: Search left the screen (a title opened
+    /// over it, another tab) or the app did. A phone changes network while
+    /// the app is away, so what each other server said of which server it
+    /// is is forgotten here (``LibraryRepository/searchVisitEnded()``): it
+    /// is asked once for a visit, before its sign-in is sent.
     public func visitEnded() {
         guard !visitOver else { return }
         visitOver = true
         // A server that didn't answer is left alone for the rest of a visit's half minute, not the next visit's.
         failedAt = [:]
         tooOldNow = []
-        answeredAt = [:]
+        for task in reasking.values { task.cancel() }
+        reasking = [:]
         library.searchVisitEnded()
     }
 
-    /// Search is on screen again after ``visitEnded()``. With other
-    /// servers' titles listed, the search is asked again, so each server
-    /// says which it is before its pictures load with its sign-in.
+    /// Search is on screen again after ``visitEnded()``: a new visit. The
+    /// servers whose titles are listed are asked which they are again, at
+    /// once, so their pictures go on loading with their sign-ins. Nothing
+    /// is searched again.
     public func visitBegan() {
         guard visitOver else { return }
         visitOver = false
-        if acrossServers, !resultsFor.isEmpty, !trimmedQuery.isEmpty { schedule(after: nil) }
+        for (server, _) in added where reasking[server.id] == nil {
+            reasking[server.id] = Task { [weak self, library] in
+                try? await library.askServer(server.id)
+                self?.reasking[server.id] = nil
+            }
+        }
     }
 
     /// The registered servers besides the one in use, in the Servers list's order.
@@ -419,13 +420,13 @@ public final class SearchModel {
     }
 
     /// Switches to `server`: Home there, Search with the same words, and
-    /// the title over it. A server that just answered this search isn't
-    /// asked which server it is again; one whose answer is older than
-    /// ``answerStands`` is, since its rows may have been on screen a while.
+    /// the title over it. A server that answered as itself on this visit
+    /// isn't asked which server it is again; one whose answer no longer
+    /// stands (the network changed since) is, as a switch from Servers is.
     private func leave(for server: SearchSource, route: Route?) {
         guard let switcher else { return }
         let words = resultsFor.isEmpty ? trimmedQuery : resultsFor
-        let justAnswered = answeredAt[server.id].map { now().timeIntervalSince($0) < Self.answerStands } ?? false
+        let justAnswered = library.answerStands(serverID: server.id)
         cancelCalls()
         Task {
             await switcher.switchTo(server.id, arriving: ServerArrival(serverID: server.id, tab: .search, search: words, route: route), asking: !justAnswered)
@@ -643,7 +644,6 @@ public final class SearchModel {
             if !anyAnswered { remember(resultsFor.isEmpty ? trimmedQuery : resultsFor) }
             anyAnswered = true
             early[source.id] = found
-            answeredAt[source.id] = now()
         case .failure(let error):
             guard !(error is CancellationError) else { return }
             let line: UnlistedServer

@@ -25,23 +25,32 @@ struct SeveralServersTests {
             #"{"id":"\#(id)","name":"\#(name)","version":"\#(version)","apiLevel":\#(apiLevel),"setupRequired":false,"turnstile":false}"#
         }
 
+        /// Holds its answer to GET /api/server until released, when a test sets one.
+        let hold = Mutex<ReplyGate?>(nil)
+
         init() {
-            server.respond { [weak self] method, path, _ in
-                switch "\(method) \(path)" {
-                case "GET /api/server":
-                    guard let info = self?.itself.withLock({ $0 }) else { return (502, Data(#"{"title":"Error","status":502,"detail":"bad gateway"}"#.utf8)) }
-                    return (200, Data(info.utf8))
-                case "POST /api/auth/login":
-                    return (200, Data(#"{"id":7,"name":"sam","isAdmin":true,"sessionId":"5c1e0d90b273fc14","token":"tok-cabin","expiresAt":"2027-10-29T17:09:01Z"}"#.utf8))
-                case "GET /api/auth/me": return (200, Data(#"{"id":7,"name":"sam","isAdmin":true}"#.utf8))
-                case "GET /api/me/preferences": return (200, Data(Fixtures.preferences.utf8))
-                case "GET /api/search":
-                    let status = self?.searchStatus.withLock { $0 } ?? 200
-                    return status == 200 ? (200, Data(#"{"movies":[],"shows":[],"episodes":[]}"#.utf8)) : (status, Data(#"{"title":"Error","status":401,"detail":"sign in required"}"#.utf8))
-                case "GET /api/images/w342/far.jpg": return (200, Data([7, 7]))
-                case "POST /api/auth/logout", "POST /api/offline/sync": return (204, nil)
-                default: return (404, nil)
-                }
+            server.respondAsync { [weak self] request in
+                let route = "\(request.httpMethod ?? "GET") \(request.url?.path ?? "")"
+                if route == "GET /api/server", let gate = self?.hold.withLock({ $0 }) { await gate.wait() }
+                return self?.reply(route) ?? (404, Data())
+            }
+        }
+
+        private func reply(_ route: String) -> (Int, Data) {
+            switch route {
+            case "GET /api/server":
+                guard let info = itself.withLock({ $0 }) else { return (502, Data(#"{"title":"Error","status":502,"detail":"bad gateway"}"#.utf8)) }
+                return (200, Data(info.utf8))
+            case "POST /api/auth/login":
+                return (200, Data(#"{"id":7,"name":"sam","isAdmin":true,"sessionId":"5c1e0d90b273fc14","token":"tok-cabin","expiresAt":"2027-10-29T17:09:01Z"}"#.utf8))
+            case "GET /api/auth/me": return (200, Data(#"{"id":7,"name":"sam","isAdmin":true}"#.utf8))
+            case "GET /api/me/preferences": return (200, Data(Fixtures.preferences.utf8))
+            case "GET /api/search":
+                let status = searchStatus.withLock { $0 }
+                return status == 200 ? (200, Data(#"{"movies":[],"shows":[],"episodes":[]}"#.utf8)) : (status, Data(#"{"title":"Error","status":\#(status),"detail":"refused"}"#.utf8))
+            case "GET /api/images/w342/far.jpg": return (200, Data([7, 7]))
+            case "POST /api/auth/logout", "POST /api/offline/sync": return (204, Data())
+            default: return (404, Data())
             }
         }
 
@@ -204,29 +213,77 @@ struct SeveralServersTests {
         #expect(second.requests("GET /api/search").count == 5)
     }
 
-    /// An answer stands five minutes at most, and goes when the network
-    /// changes: the device may be somewhere else by then.
-    @Test func anAnswerGoesWithTimeAndWithTheNetwork() async throws {
+    /// An answer stands only on the network it was given on: the device may
+    /// be somewhere else after a change, where the address is another machine.
+    @Test func anAnswerGoesWhenTheNetworkChanges() async throws {
         h.network = FakeNetworkPath()
         h.reopen()
         let (second, cabin) = try await signInOnBoth()
         _ = try await h.services.library.search("harbor", serverID: cabin.id)
-        h.clock.now += 299
         _ = try await h.services.library.search("harbor", serverID: cabin.id)
         #expect(second.requests("GET /api/server").count == 1)
-        h.clock.now += 2
-        _ = try await h.services.library.search("harbor", serverID: cabin.id)
-        #expect(second.requests("GET /api/server").count == 2, "after five minutes it is asked again")
+        #expect(h.services.library.answerStands(serverID: cabin.id))
 
         h.network?.set(false)
         h.network?.set(true)
+        #expect(await eventually { !h.services.library.answerStands(serverID: cabin.id) })
+        // Its picture carries no sign-in until it has answered again.
         let far = try #require(h.services.library.imageURL("/far.jpg", size: .w342, serverID: cabin.id))
-        #expect(await eventually {
-            // The picture's sign-in is gone once the change has been heard.
-            h.services.store.signedIn(for: far)?.serverID != cabin.id
-        })
+        _ = try? await h.services.images.data(for: far)
+        #expect(second.requests("GET /api/images/w342/far.jpg").last?.value(forHTTPHeaderField: "Authorization") == nil)
         _ = try await h.services.library.search("harbor", serverID: cabin.id)
-        #expect(second.requests("GET /api/server").count == 3, "after a change of network it is asked again")
+        #expect(second.requests("GET /api/server").count == 2, "after a change of network it is asked again")
+    }
+
+    /// A keystroke cancels the search, not the question: the search leaves
+    /// at once, and the next one waits for the same answer.
+    @Test func aCancelledSearchLeavesTheQuestionOutForTheNextOne() async throws {
+        let (second, cabin) = try await signInOnBoth()
+        let gate = ReplyGate()
+        second.hold.withLock { $0 = gate }
+        let library = h.services.library
+        let first = Task { try await library.search("h", serverID: cabin.id) }
+        #expect(await eventually { second.requests("GET /api/server").count == 1 })
+        first.cancel()
+        await #expect(throws: CancellationError.self) { _ = try await first.value }
+
+        let next = Task { try await library.search("ha", serverID: cabin.id) }
+        let again = Task { try await library.search("har", serverID: cabin.id) }
+        await gate.release()
+        _ = try await next.value
+        _ = try await again.value
+        #expect(second.requests("GET /api/server").count == 1, "asked once, whatever was typed meanwhile")
+        #expect(second.requests("GET /api/search").count == 2, "the cancelled search never went")
+        #expect(authorizations(second.requests("GET /api/search")) == ["Bearer tok-cabin"])
+    }
+
+    /// A search there that fails forgets the answer: trying again asks first.
+    @Test func aSearchThatFailsForgetsTheAnswer() async throws {
+        let (second, cabin) = try await signInOnBoth()
+        _ = try await h.services.library.search("harbor", serverID: cabin.id)
+        second.searchStatus.withLock { $0 = 500 }
+        await #expect(throws: APIError.self) { _ = try await h.services.library.search("harbor", serverID: cabin.id) }
+        #expect(!h.services.library.answerStands(serverID: cabin.id))
+        second.searchStatus.withLock { $0 = 200 }
+        _ = try await h.services.library.search("harbor", serverID: cabin.id)
+        #expect(second.requests("GET /api/server").count == 2)
+    }
+
+    /// Back on Search: the servers whose titles are listed are asked which
+    /// they are without being searched, and their pictures load again.
+    @Test func askingWithoutSearchingLetsItsPicturesLoad() async throws {
+        let (second, cabin) = try await signInOnBoth()
+        _ = try await h.services.library.search("harbor", serverID: cabin.id)
+        h.services.library.searchVisitEnded()
+        #expect(!h.services.library.answerStands(serverID: cabin.id))
+
+        try await h.services.library.askServer(cabin.id)
+        #expect(h.services.library.answerStands(serverID: cabin.id))
+        #expect(second.requests("GET /api/server").count == 2)
+        #expect(second.requests("GET /api/search").count == 1, "nothing is searched again")
+        let far = try #require(h.services.library.imageURL("/far.jpg", size: .w342, serverID: cabin.id))
+        #expect(try await h.services.images.data(for: far) == Data([7, 7]))
+        #expect(second.requests("GET /api/images/w342/far.jpg").last?.value(forHTTPHeaderField: "Authorization") == "Bearer tok-cabin")
     }
 
     @Test func itsAnswerRefreshesWhatIsKeptOfIt() async throws {
@@ -326,6 +383,42 @@ struct SeveralServersTests {
             #expect(after.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == nil })
             #expect(!after.contains { $0.url?.path == "/api/auth/logout" })
             #expect(h.services.auth.user?.name == "viewer")
+        }
+    }
+
+    /// Signing out, or removing the server in use, with its kept address now
+    /// somebody else's machine or nothing: this device is signed out at
+    /// once, and nothing is sent there or kept to send later.
+    @Test func signingOutSendsNothingToAnAddressThatIsNotTheServer() async throws {
+        for answer in [Reply.json(Second.info(id: "srv-somebody-elses")), Reply.problem(502, "bad gateway")] {
+            for removing in [false, true] {
+                let h = Harness()
+                try await h.signIn()
+                final class Heard { var owners: [OfflineOwner] = [] }
+                let heard = Heard()
+                h.services.offline.beforeSignOut { heard.owners.append($0) }
+                // The sign-in's own calls (the session's check, the settings) have gone to the server in use first.
+                #expect(await eventually { !h.router.requests("GET /api/auth/me").isEmpty && !h.router.requests("GET /api/me/preferences").isEmpty })
+                try await Task.sleep(for: .milliseconds(50))
+                let before = h.server.seen.count
+                h.router.always("GET /api/server", answer)
+                h.router.always("POST /api/auth/logout", .noContent)
+
+                if removing { await h.services.servers.forget(serverID: "srv-test") } else { await h.services.auth.signOut() }
+
+                #expect(h.services.auth.user == nil, "signed out here at once")
+                #expect(h.storage.credentials["srv-test"] == nil)
+                #expect(heard.owners.isEmpty, "its downloads report nothing")
+                try await Task.sleep(for: .milliseconds(150))
+                let after = Array(h.server.seen.dropFirst(before))
+                #expect(after.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == nil })
+                #expect(h.router.requests("POST /api/auth/logout").isEmpty, "no sign-out is sent, now or later")
+                // Nothing waits to be sent on a later launch either.
+                let reopened = h.reopen()
+                try await Task.sleep(for: .milliseconds(100))
+                #expect(reopened.auth.user == nil)
+                #expect(h.router.requests("POST /api/auth/logout").isEmpty)
+            }
         }
     }
 

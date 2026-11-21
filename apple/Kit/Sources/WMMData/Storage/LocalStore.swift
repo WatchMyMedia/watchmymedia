@@ -40,17 +40,19 @@ final class LocalStore {
     /// The APIs of the other servers signed in to, by server ID, for search across servers and their pictures.
     @ObservationIgnored private var otherAPIs: [String: (key: String, api: ServerAPI)] = [:]
     /// The servers that aren't in use and have said, asked with no sign-in,
-    /// that they are the ones remembered at the addresses kept for them, and
-    /// when (``noteAnswer(serverID:)``). A kept address is only where the
-    /// server was last seen: on another network it can be someone else's
-    /// machine, so ``other(serverID:)`` hands out a sign-in only while its
-    /// server's answer stands.
-    @ObservationIgnored private var answers: [String: (baseURL: URL, at: Date)] = [:]
-    /// Now, for how long an answer stands; tests move it.
-    @ObservationIgnored var now: @Sendable () -> Date = { Date() }
-    /// How long an answer stands when nothing ends it sooner (the visit to
-    /// Search ending, another server coming into use, the network changing).
-    static let answerAge: TimeInterval = 300
+    /// that they are the ones remembered at the addresses kept for them
+    /// (``noteAnswer(serverID:)``), each with the address it answered at. A
+    /// kept address is only where the server was last seen: on another
+    /// network it can be someone else's machine, so ``other(serverID:)``
+    /// hands out a sign-in only while its server's answer stands. An answer
+    /// stands for a visit to Search and on the network it was given on: it
+    /// goes when the visit ends, the network changes, another server comes
+    /// into use, or a call to that server fails.
+    @ObservationIgnored private var answers: [String: URL] = [:]
+    /// Asks the server kept as an id which server it is, with no sign-in,
+    /// and says whether it answered as itself (``RealServerRepository/identify(_:)``).
+    /// A sign-out asks it once, for all it sends.
+    @ObservationIgnored var answersAsItself: @MainActor (_ serverID: String) async -> Bool = { _ in true }
     /// Run before a sign-in is ended on its server (``beforeSignOut(_:)``).
     @ObservationIgnored private var signOutHooks: [SignOutHook] = []
     @ObservationIgnored private var signInRemovedListeners: [() -> Void] = []
@@ -278,19 +280,25 @@ final class LocalStore {
     /// as itself at its kept address a moment ago: its sign-in may go there.
     func noteAnswer(serverID: String) {
         guard let server = state.servers.first(where: { $0.server.id == serverID })?.server else { return }
-        answers[serverID] = (server.baseURL, now())
+        answers[serverID] = server.baseURL
     }
 
-    /// Whether `serverID`'s answer stands: given at the address kept for it now, within ``answerAge``.
+    /// Whether `serverID`'s answer stands: given at the address kept for it now, and not forgotten since.
     func answered(_ serverID: String) -> Bool {
         guard let answer = answers[serverID], let server = state.servers.first(where: { $0.server.id == serverID })?.server else { return false }
-        return answer.baseURL == server.baseURL && now().timeIntervalSince(answer.at) < Self.answerAge
+        return answer == server.baseURL
     }
 
     /// Every answer is forgotten: the visit to Search ended, or the network
     /// changed. The next sign-in for another server waits for a new one.
     func forgetAnswers() {
         answers = [:]
+    }
+
+    /// A call to `serverID` failed: whatever answered before may not be
+    /// there now, so it is asked again before its sign-in goes out (Try again).
+    func forgetAnswer(_ serverID: String) {
+        answers[serverID] = nil
     }
 
     /// The API of a server this device is signed in to that isn't the one

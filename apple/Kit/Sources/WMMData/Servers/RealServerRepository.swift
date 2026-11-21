@@ -28,6 +28,9 @@ final class RealServerRepository: ServerRepository {
     @ObservationIgnored private let reader: ServerInfoReader
     /// The screens browsing now; discovery runs while there is one.
     @ObservationIgnored private var browsing = 0
+    /// The question to each other server that is out now, by server ID
+    /// (``askOther(_:)``): whoever needs its answer waits for the same one.
+    @ObservationIgnored private var questions: [String: SharedQuestion] = [:]
 
     /// - Parameters:
     ///   - probeSession: for looking up a typed address; gives up connecting quickly.
@@ -125,7 +128,6 @@ final class RealServerRepository: ServerRepository {
     /// nothing answers there, or another server does.
     func identify(_ serverID: String) async throws -> Server {
         guard let saved = store.state.servers.first(where: { $0.server.id == serverID })?.server else { throw SignedOutError() }
-        // In the caller's own task, so a search that is cancelled (a keystroke, its time limit) takes the question with it.
         let found: Server
         do {
             found = try await lookUp(saved.baseURL, within: min(probeTimeout, Self.identifyTimeout))
@@ -148,12 +150,37 @@ final class RealServerRepository: ServerRepository {
     /// ``ServerTooOldError`` when it has become too old for this app (kept
     /// as it was, as for the server in use); otherwise keeps its name,
     /// version and API level as it gave them, and its answer.
+    ///
+    /// One question is out at a time for a server. A caller that is
+    /// cancelled (a keystroke cancels its search) leaves at once and the
+    /// question carries on, so the next search waits for the same answer:
+    /// typing while a server is slow asks it once, not once a keystroke.
     func askOther(_ serverID: String) async throws {
         guard serverID != store.state.currentID, !store.answered(serverID) else { return }
         // With no sign-in to send there, or a server kept as too old, there is nothing to ask for.
         guard let known = store.state.servers.first(where: { $0.server.id == serverID })?.server,
               store.credentials[serverID] != nil else { throw SignedOutError() }
         if known.tooOld { throw ServerTooOldError(server: known) }
+        if let question = questions[serverID] { return try await question.wait() }
+        let question = SharedQuestion()
+        questions[serverID] = question
+        Task { [weak self] in
+            let outcome: Result<Void, any Error>
+            do {
+                try await self?.ask(serverID)
+                outcome = .success(())
+            } catch {
+                outcome = .failure(error)
+            }
+            // Gone before anyone waiting hears: a caller after a failure asks anew.
+            if self?.questions[serverID] === question { self?.questions[serverID] = nil }
+            question.finish(outcome)
+        }
+        try await question.wait()
+    }
+
+    /// The question itself, and what its answer changes.
+    private func ask(_ serverID: String) async throws {
         let found = try await identify(serverID)
         // As it is kept now: the question may have been out a while.
         guard let kept = store.state.servers.first(where: { $0.server.id == serverID })?.server, kept.baseURL == found.baseURL else {
@@ -271,21 +298,18 @@ final class RealServerRepository: ServerRepository {
     /// copy removed (``LocalStore/runSignOutHooks(serverID:)``). Then the
     /// sign-in goes, and its downloads are deleted from this device.
     ///
-    /// A server that isn't the one in use is asked which server it is
-    /// first (``identify(_:)``): when nothing answers at its kept address,
-    /// or another server does, nothing is sent there with its sign-in, and
-    /// it is forgotten on this device alone.
+    /// The server is asked which server it is first (``identify(_:)``),
+    /// once for all a removal sends, whether or not it is the one in use.
+    /// When nothing answers at its kept address, or another server does,
+    /// nothing is sent there with its sign-in: no report from its
+    /// downloads and no sign-out, and nothing is kept to try again later.
+    /// It leaves this device at once all the same, with its downloads; its
+    /// session stays on the server until it runs out or is ended from that
+    /// server's list of devices.
     func forget(serverID: String) async {
         guard store.state.servers.contains(where: { $0.server.id == serverID }) else { return }
         let signedIn = store.loadCredential(serverID: serverID) != nil
-        let itself: Bool
-        if serverID == store.state.currentID {
-            itself = true
-        } else if signedIn {
-            itself = (try? await identify(serverID)) != nil
-        } else {
-            itself = false
-        }
+        let itself = signedIn ? (try? await identify(serverID)) != nil : false
         if signedIn, itself { await store.runSignOutHooks(serverID: serverID) }
         // As it stands now: the hooks may have waited on a server that doesn't answer.
         guard let gone = store.state.servers.first(where: { $0.server.id == serverID }) else { return }
@@ -295,6 +319,7 @@ final class RealServerRepository: ServerRepository {
             if state.currentID == serverID { state.currentID = nil }
         }
         store.setCredential(nil, serverID: serverID)
+        questions[serverID] = nil
         if let credential, itself {
             let store = store
             Task { await store.signOutQuietly(baseURL: gone.server.baseURL, token: credential.token) }

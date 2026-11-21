@@ -56,6 +56,8 @@ private struct SearchView: View {
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
     @Environment(\.scenePhase) private var scenePhase
+    /// Search is the screen showing, not a page over it or another tab.
+    @State private var onScreen = false
 
     /// Posters are narrower across servers, to leave room for the server's line under a title.
     private var posterWidth: CGFloat { model.acrossServers ? 160 : 200 }
@@ -82,14 +84,20 @@ private struct SearchView: View {
                     prompt: live.available ? "Shows, movies, episodes, Live TV" : "Shows, movies, episodes")
         .autocorrectionDisabled()
         .messagePill($model.message)
-        // A visit to Search ends when another tab is chosen or the app leaves the screen. Each
-        // other server says which server it is once for a visit, before a search sends its sign-in
-        // to the address kept for it, so the next visit asks them again.
-        .onChange(of: navigator.tab) { _, tab in
-            if tab == .search { model.visitBegan() } else { model.visitEnded() }
+        // A visit to Search begins each time Search comes on screen: the first time, back from a
+        // title or another tab, back from the background. Each other server says which server it
+        // is once for a visit, before its sign-in goes to the address kept for it; a phone
+        // changes network while the app is away, so the next visit asks again.
+        .onAppear {
+            onScreen = true
+            model.visitBegan()
+        }
+        .onDisappear {
+            onScreen = false
+            model.visitEnded()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background { model.visitEnded() } else if phase == .active, navigator.tab == .search { model.visitBegan() }
+            if phase == .background { model.visitEnded() } else if phase == .active, onScreen { model.visitBegan() }
         }
         .onChange(of: live.available, initial: true) { _, _ in live.availabilityChanged() }
         .task {

@@ -23,7 +23,7 @@ struct Reply: Sendable {
 /// order, since DataServices makes calls of its own in the background (it
 /// checks the session and loads preferences after each sign-in), as
 /// android/core/data/src/test/.../TestServer.kt does. Unrouted requests get
-/// 404; /api/auth/me and /api/me/preferences have defaults.
+/// 404; /api/server, /api/auth/me and /api/me/preferences have defaults.
 final class Router: Sendable {
     let server = StubServer()
     /// The stub's session, reading streamed request bodies to the end first.
@@ -75,6 +75,8 @@ final class Router: Sendable {
         if let next { return next }
         if let fixed = fixed.withLock({ $0[route] }) { return fixed }
         switch route {
+        // Asked before a sign-out or a removal sends anything: it is the test server (``Harness/testServer``).
+        case "GET /api/server": return .json(#"{"id":"srv-test","name":"Test server","version":"1.0.0","apiLevel":1,"setupRequired":false,"turnstile":false}"#)
         case "GET /api/auth/me": return .json(#"{"id":2,"name":"viewer","isAdmin":false}"#)
         case "GET /api/me/preferences": return .json(Fixtures.preferences)
         default: return .problem(404, "no route for \(route) in this test")

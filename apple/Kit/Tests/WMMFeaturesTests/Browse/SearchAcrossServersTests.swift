@@ -335,12 +335,12 @@ import WMMModel
         #expect(listing.shows.contains { $0.server?.name == "Living room server" })
     }
 
-    /// A result that has been on screen a while: its server's answer is too
-    /// old to switch on, since the device may be on another network now.
-    @Test func aResultListedLongAgoAsksItsServerWhichItIsBeforeSwitching() async throws {
+    /// A result whose server's answer no longer stands (the network changed
+    /// while Search was open): its server is asked which it is before the switch.
+    @Test func aResultWhoseServersAnswerNoLongerStandsAsksBeforeSwitching() async throws {
         await search("harbor")
         let movie = try #require(try listing().movies.first { $0.server == cabin })
-        clock.now += SearchModel.answerStands + 1
+        library.forgotten = [FakeServers.cabin.id]
         let probesBefore = servers.probes
         model.open(movie)
         #expect(await eventually { servers.current?.server.id == FakeServers.cabin.id })
@@ -349,35 +349,51 @@ import WMMModel
 
     // MARK: The visit
 
-    /// Each other server says which server it is once for a visit to Search.
-    /// The visit ends when Search leaves the screen; back on it, with other
-    /// servers' titles listed, the search is asked again, so they say so again.
-    @Test func leavingSearchEndsTheVisitAndComingBackAsksAgain() async throws {
+    /// A visit begins each time Search comes on screen. What the other
+    /// servers said of which server they are is forgotten when it leaves;
+    /// back on it, the servers whose titles are listed are asked again at
+    /// once, so their pictures go on loading, and nothing is searched again.
+    @Test func backOnSearchTheServersListedAreAskedAgainAndNothingIsSearched() async throws {
         await search("harbor")
         #expect(library.visitsEnded == 0)
+        #expect(library.asked.isEmpty, "the first time on screen asks nothing by itself")
         model.visitEnded()
         model.visitEnded()
         #expect(library.visitsEnded == 1, "said once")
-        #expect(library.otherSearches.count == 2, "nothing is asked while Search is away")
+        #expect(!library.answerStands(serverID: FakeServers.cabin.id))
 
         model.visitBegan()
-        await model.pending?.value
-        await time.settle()
-        #expect(library.searches == ["harbor", "harbor"], "the same words, asked again")
-        #expect(library.otherSearches.count == 4)
+        for task in model.reasking.values { await task.value }
+        #expect(library.asked == [FakeServers.cabin.id], "the one whose titles are showing; Den server listed none")
+        #expect(library.answerStands(serverID: FakeServers.cabin.id))
+        #expect(library.searches == ["harbor"], "nothing is searched again")
+        #expect(library.otherSearches.count == 2)
         #expect(try listing().movies.map(\.server) == [cabin], "the rows stay as they were")
+
         model.visitBegan()
-        await model.pending?.value
-        #expect(library.searches.count == 2, "only after a visit ended")
+        #expect(library.asked.count == 1, "only after a visit ended")
     }
 
-    @Test func comingBackWithNothingSearchedAsksNothing() async throws {
+    @Test func comingBackWithNothingListedAsksNothing() async throws {
         model.visitEnded()
         model.visitBegan()
-        await model.pending?.value
+        #expect(model.reasking.isEmpty)
+        #expect(library.asked.isEmpty)
         #expect(library.searches.isEmpty)
-        #expect(library.otherSearches.isEmpty)
         #expect(library.visitsEnded == 1)
+    }
+
+    /// The half minute a failed server is left alone is that visit's: on
+    /// the next visit it is asked again.
+    @Test func aServerThatFailedIsAskedAgainOnTheNextVisit() async throws {
+        await search("harbor")
+        #expect(library.otherSearches.filter { $0.server == FakeServers.den.id }.count == 1)
+        await search("harbor l")
+        #expect(library.otherSearches.filter { $0.server == FakeServers.den.id }.count == 1, "left alone on this visit")
+        model.visitEnded()
+        model.visitBegan()
+        await search("harbor li")
+        #expect(library.otherSearches.filter { $0.server == FakeServers.den.id }.count == 2)
     }
 
     /// A server that says, asked which server it is, that it is now too old
@@ -396,8 +412,7 @@ import WMMModel
         library.otherAnswers[FakeServers.cabin.id] = nil
         model.visitEnded()
         model.visitBegan()
-        await model.pending?.value
-        await time.settle()
+        await search("harbor li")
         #expect(library.otherSearches.filter { $0.server == FakeServers.cabin.id }.count == 2)
         #expect(!model.unlisted.contains { $0.id == FakeServers.cabin.id })
     }

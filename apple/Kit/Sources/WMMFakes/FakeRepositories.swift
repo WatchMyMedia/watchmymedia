@@ -396,13 +396,31 @@ public final class FakeLibraryRepository: LibraryRepository {
         switch serverID {
         case FakeServers.cabin.id:
             if otherServerDelay > .zero { try await Task.sleep(for: otherServerDelay) }
+            answered.insert(serverID)
             return FakeCabin.search(t)
         case FakeServers.den.id:
+            answered.remove(serverID)
             throw FakeServers.unreachable
         default:
+            answered.insert(serverID)
             return Self.sampleSearch(t)
         }
     }
+
+    /// The other servers that answered on this visit to Search, as the real
+    /// one keeps which servers said they are the ones remembered.
+    private var answered: Set<String> = []
+
+    public func searchVisitEnded() { answered = [] }
+
+    public func askServer(_ serverID: String) async throws {
+        await FakeLatency.wait()
+        guard let servers, servers.signedIn(on: serverID) else { throw SignedOutError() }
+        guard serverID != FakeServers.den.id else { throw FakeServers.unreachable }
+        answered.insert(serverID)
+    }
+
+    public func answerStands(serverID: String) -> Bool { answered.contains(serverID) }
 
     public func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL? { FakeBackdrops.url(path, size: size) }
 

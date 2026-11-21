@@ -39,6 +39,8 @@ private struct SearchView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(Navigator.self) private var navigator
     @Environment(\.scenePhase) private var scenePhase
+    /// Search is the screen showing, not a page over it or another tab.
+    @State private var onScreen = false
     @State private var width: CGFloat = 0
     @FocusState private var fieldFocused: Bool
 
@@ -82,14 +84,20 @@ private struct SearchView: View {
             model.selectRecentQuery(words)
             live.setQuery(words)
         }
-        // A visit to Search ends when another tab is chosen or the app leaves the screen. Each
-        // other server says which server it is once for a visit, before a search sends its sign-in
-        // to the address kept for it, so the next visit asks them again.
-        .onChange(of: navigator.tab) { _, tab in
-            if tab == .search { model.visitBegan() } else { model.visitEnded() }
+        // A visit to Search begins each time Search comes on screen: the first time, back from a
+        // title or another tab, back from the background. Each other server says which server it
+        // is once for a visit, before its sign-in goes to the address kept for it; a phone
+        // changes network while the app is away, so the next visit asks again.
+        .onAppear {
+            onScreen = true
+            model.visitBegan()
+        }
+        .onDisappear {
+            onScreen = false
+            model.visitEnded()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background { model.visitEnded() } else if phase == .active, navigator.tab == .search { model.visitBegan() }
+            if phase == .background { model.visitEnded() } else if phase == .active, onScreen { model.visitBegan() }
         }
         .liveRemindFlow()
         .messageToast($model.message)

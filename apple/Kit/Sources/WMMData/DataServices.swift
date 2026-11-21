@@ -84,7 +84,6 @@ public final class DataServices {
         tuning: DataTuning = DataTuning()
     ) {
         let store = LocalStore(storage: storage, session: session, userAgent: userAgent, client: client)
-        store.now = tuning.now
         self.store = store
         events = ServerEvents(store: store, session: eventSession ?? session, backoff: tuning.eventBackoff, linger: tuning.eventLinger,
                               now: tuning.now, network: network, sleep: tuning.eventSleep)
@@ -96,6 +95,7 @@ public final class DataServices {
         )
         authRepository = RealAuthRepository(store: store, minimumPoll: tuning.minimumPoll, now: tuning.now)
         libraryRepository = RealLibraryRepository(store: store, events: events, askOther: { [serverRepository] in try await serverRepository.askOther($0) })
+        store.answersAsItself = { [serverRepository] in (try? await serverRepository.identify($0)) != nil }
         requestsRepository = RealRequestsRepository(store: store, events: events)
         preferencesRepository = RealPreferencesRepository(store: store)
         servers = serverRepository

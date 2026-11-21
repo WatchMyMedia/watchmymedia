@@ -102,8 +102,23 @@ final class TestLibrary: LibraryRepository {
     private(set) var otherCancelled: [String] = []
     /// How many visits to Search were said to have ended.
     private(set) var visitsEnded = 0
+    /// The servers asked which server they are without a search, in order.
+    private(set) var asked: [String] = []
+    /// The servers whose answer no longer stands (the network changed), though they answered a search.
+    var forgotten: Set<String> = []
 
-    func searchVisitEnded() { visitsEnded += 1 }
+    func searchVisitEnded() {
+        visitsEnded += 1
+        fake.searchVisitEnded()
+    }
+
+    func askServer(_ serverID: String) async throws {
+        asked.append(serverID)
+        if let answer = otherAnswers[serverID] { _ = try answer.get() }
+        try await fake.askServer(serverID)
+    }
+
+    func answerStands(serverID: String) -> Bool { !forgotten.contains(serverID) && fake.answerStands(serverID: serverID) }
 
     func search(_ text: String, serverID: String) async throws -> SearchResults {
         otherSearches.append((serverID, text))
