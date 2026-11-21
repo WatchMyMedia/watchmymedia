@@ -155,9 +155,8 @@ final class ServersEndToEndTests: XCTestCase {
         close.tap()
 
         // Back from the title: Search with the same words, asked again on the second server.
-        let back = app.navigationBars.buttons.firstMatch
-        XCTAssertTrue(waitUntil(timeout: 15) { back.exists && back.isHittable })
-        back.tap()
+        // Leaving the landscape player rotates back, and until that settles the button has no point to tap.
+        tap(app.navigationBars.buttons.firstMatch)
         XCTAssertTrue(results(elsewhere: true).firstMatch.waitForExistence(timeout: 20), "the first server's title names its server now")
         XCTAssertEqual(app.searchFields.firstMatch.value as? String, words, "the same words")
         shot("7 Search again, on the second server")
