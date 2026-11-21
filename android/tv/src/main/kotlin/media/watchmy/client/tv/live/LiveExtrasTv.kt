@@ -20,7 +20,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.layout.onSizeChanged
+import media.watchmy.client.tv.components.bringWholeIntoView
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.focused
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -256,6 +262,13 @@ internal class BannerKeys(private val onWatch: () -> Unit, private val holdsOk: 
  * Search's On Live TV row (android-tv/LiveSearch): programmes on now and later
  * that match [query]. OK watches one that is on and opens a later one in the
  * guide; Hold OK opens Remind me and Watch.
+ *
+ * A card in focus brings the whole row into view, down to the line under the
+ * cards that says what OK and Hold OK do. Left to the card's picture, the
+ * page stopped scrolling with that line cut off at the foot of the screen.
+ * The line is there only while one of the row's cards has focus (or its
+ * menu is open): left in place, it went on naming a card and its keys after
+ * focus had gone to another row or the keyboard.
  */
 @Composable
 fun TvLiveSearchRow(
@@ -270,7 +283,20 @@ fun TvLiveSearchRow(
     if (!state.available || state.searched == null || state.error != null) return
     var focused by remember { mutableStateOf<LiveSearchHit?>(null) }
     var menu by remember { mutableStateOf<LiveSearchHit?>(null) }
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    // The line under the cards comes with a card in focus, after the page has scrolled for it: ask again once the row has grown.
+    val whole = remember { BringIntoViewRequester() }
+    var hasFocus by remember { mutableStateOf(false) }
+    var height by remember { mutableIntStateOf(0) }
+    LaunchedEffect(hasFocus, height) { if (hasFocus) whole.bringIntoView() }
+    Column(
+        modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(whole)
+            .onSizeChanged { height = it.height }
+            .onFocusChanged { hasFocus = it.hasFocus }
+            .bringWholeIntoView(),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
             Text("On Live TV", style = inter(30.sp, FontWeight.Bold), color = WmmColors.Text)
             if (state.results.isNotEmpty()) Text("${state.results.size}", style = inter(20.sp), color = WmmColors.TextMuted)
@@ -289,7 +315,7 @@ fun TvLiveSearchRow(
                 )
             }
         }
-        focused?.let { hit ->
+        focused?.takeIf { hasFocus || menu != null }?.let { hit ->
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(hit.programme.title, style = inter(20.sp, FontWeight.SemiBold), color = WmmColors.TextSoft, maxLines = 1)
                 Text("·", style = inter(20.sp), color = WmmColors.TextMuted)
@@ -320,11 +346,20 @@ fun TvLiveSearchRow(
 private fun TvLiveSearchCard(hit: LiveSearchHit, now: Long, format: LiveClockFormat, reminded: Boolean, onClick: () -> Unit, onLongClick: () -> Unit, onFocus: () -> Unit, modifier: Modifier = Modifier) {
     val p = hit.programme
     val airing = p.airingAt(now)
+    // The card reads as one thing; its focus state stays in the semantics it clears, so TalkBack (and the focus tests) see it.
+    var isFocused by remember { mutableStateOf(false) }
     Column(modifier.width(340.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FocusableBox(
             onClick = onClick, onLongClick = onLongClick,
-            modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onFocus() }
-                .clearAndSetSemantics { contentDescription = if (airing) "Watch ${hit.channel.number} ${hit.channel.name}, ${p.title}, ${liveMinutesLeft(now, p.endMs)}" else hit.spokenName(now, format, "Opens it in the guide") + if (reminded) ", reminder set" else "" },
+            modifier = Modifier.fillMaxWidth()
+                .onFocusChanged {
+                    isFocused = it.isFocused
+                    if (it.isFocused) onFocus()
+                }
+                .clearAndSetSemantics {
+                    contentDescription = if (airing) "Watch ${hit.channel.number} ${hit.channel.name}, ${p.title}, ${liveMinutesLeft(now, p.endMs)}" else hit.spokenName(now, format, "Opens it in the guide") + if (reminded) ", reminder set" else ""
+                    focused = isFocused
+                },
             cornerRadius = 12.dp,
         ) {
             Box(Modifier.fillMaxWidth().background(WmmColors.Surface2, RoundedCornerShape(12.dp))) {
