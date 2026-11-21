@@ -891,6 +891,14 @@ up on TMDB again each day. Once TMDB lists the episode it takes TMDB's title and
 keeping everyone's progress; lining it up elsewhere carries the progress with it. Files named
 by air date, specials and files with no numbers still need a person.
 
+Search lists movies, shows and episodes that have a file to play, by title or original
+title, each group with its best matches first: the whole title, then titles that start with
+what you typed, then titles where it starts a word, then anywhere in a title. Capitals,
+accents and punctuation don't matter ("amelie" finds *Amélie*, "spiderman" and "spider man"
+find *Spider-Man*), the words can be in any order or left out ("lord rings"), and a year
+after them finds the title from that year ("dune 2021"). The server does the matching, so
+the apps search the same way.
+
 "Recently added" rows, the added sort and the NEW badge use each file's modified date
 from when a scan first found it, so the first scan of an existing collection keeps the
 order the files arrived in. A file that changes later keeps its place. Files copied
@@ -1595,7 +1603,9 @@ make lint
 
 `make bench` seeds 250,000 plays and fails if any history, search or statistics query
 misses its time budget at the 95th percentile; `go test` runs
-the same check with 50,000 plays and five times the budgets.
+the same check with 50,000 plays and five times the budgets. It also seeds a library the
+size of a large household's and holds Home, the library pages and library search to
+budgets of their own, alone and with ten requests at once.
 
 `make server-deps` reports the server's Go modules with newer releases, the newest Go
 patch release, the tools CI pins and what govulncheck finds. `make server-deps UPDATE=patch`

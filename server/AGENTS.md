@@ -102,6 +102,11 @@ SQLite plans joins without statistics, and a plan that looks fine after
   `internal/db/queries/metadata.sql` do.
 - Adding `ANALYZE` or `PRAGMA optimize` would change many plans at once; it is
   a change of its own, not part of another.
+- An `EXISTS` is planned like a join. "Has a present file" written as
+  `EXISTS (SELECT 1 FROM episode_files ef JOIN media_files f ...)` started
+  from every present file in the library, once for each row outside it: one
+  search of the large seeded library took 69 s. Inside it too, put the
+  row's own table first with `CROSS JOIN` (`internal/db/queries/search.sql`).
 - Trailer files are `media_files` rows too: `extra_kind = 'trailer'`.
   A query that reads
   `media_files` other than through `movie_id` or `episode_files` leaves them
@@ -128,6 +133,11 @@ SQLite plans joins without statistics, and a plan that looks fine after
   slice moved last (`ListProgrammesWindow` in
   `internal/db/queries/live_tv_guide.sql`). Test such a query with at least
   two values in the slice.
+- sqlc reads an FTS5 table's columns from its `CREATE VIRTUAL TABLE`, but
+  not the column named after the table, so `WHERE t MATCH ?` fails to
+  generate ("column does not exist"). Ask as a table function,
+  `FROM t(CAST(sqlc.arg(words) AS TEXT))`, and cast a computed column that
+  would otherwise come out as `interface{}`.
 - The modernc driver gains almost nothing from parallel queries: ten heavy
   queries at once take ten times one. Measure pages under the number of
   requests a client actually fires together, and prefer per-item queries to
@@ -147,7 +157,12 @@ SQLite plans joins without statistics, and a plan that looks fine after
   `TestRelatedSpeed` (`internal/api/related_speed_test.go`) gives it TMDB-like tags and times a movie's and a show's related rows, alone and ten at once, and checks their plans; `TestNewEpisodesSpeed` (`internal/api/follows_speed_test.go`) adds 500
   follows and a week of arrivals to it and times the new-episodes feed, the
   follows list and Home's followed row, alone and ten at once, and fails
-  when their plans read a whole table;
+  when their plans read a whole table; `TestSearchSpeed`
+  (`internal/api/search_speed_test.go`) gives it titles of made-up words,
+  and descriptions as long as TMDB's, and times a search of one letter, two
+  letters, a common word, a full title and words that match nothing, alone
+  and ten at once, checks the title queries' plans, and times
+  `GET /api/server` while ten searches run;
   `internal/activity`'s speed test seeds plays; `internal/livetv/dvr` measures list and guide-mark bursts over 10,000 recordings without statistics. `make bench` fails over budget;
   plain `go test` runs smaller versions with looser budgets. Name such a
   test `Test...Speed`: CI's `server` and `windows-server` jobs skip `Speed$` in the
@@ -187,6 +202,66 @@ others, moves their watch state there and removes them. Counts of what TMDB
 lists (requests' season availability) leave them out; the show and season
 pages count them.
 
+**Search.** `GET /api/search` (`internal/api/search.go`) reads a trigram
+index of the titles, `movies_search`, `shows_search` and `episodes_search`
+(FTS5, migration `00045_search_index.sql`), which triggers on the three
+tables keep: nothing that writes a title has to know about it, and writing
+rows with `sqlite3` keeps it right too. It holds titles only. Whether a
+title has a present file is asked at search time, so a file that goes
+missing or a rematch needs no index write. Don't put file state in it.
+
+- The index gives candidates; `internal/api/search_match.go` decides what
+  matches and in what order (`searchQuery.rank`), on text folded in Go.
+  Anything the old search matched (what was typed, anywhere in a title, by
+  `LIKE`) is always kept: each title query returns that as `legacy`, and
+  `TestSearchKeepsWhatItFound` runs the old queries beside the new search.
+  Keep that test passing when the matching changes.
+- The index looks up three characters or more, and finds nothing at all for
+  fewer. A word goes to it only with three letters or digits
+  (`searchLetters`; an accent typed apart from its letter does not count,
+  since the index drops it). Shorter words ask for the titles where they
+  start a word (`searchQuery.startsMatch`): the index's `words` column has
+  two unit separators at the start of a title and after every space, so
+  one letter there is three characters; two letters are also asked for
+  after each mark a word can follow (`searchBreaks`), which is three
+  characters with the mark and needs nothing kept. Only when those don't
+  fill the list is every title read (`searchQuery.hits`). So with one
+  letter typed and a full list, a title whose word follows a hyphen or a
+  bracket is not in it until the second letter.
+- The triggers are compiled into every statement that writes a title, each
+  time it is prepared, whether or not they fire, and the queries here are
+  prepared on every call. Keep them to one statement and a few function
+  calls. A first version worked the words out in a helper table's trigger
+  with some fifty `replace()` calls: a title write, changed or not, went
+  from 42 to 245 microseconds, and under the race detector from 1.1 to
+  8.8 ms, where the matcher's two writers then waited for each other up to
+  1.65 s on a Mac and past the 5 s busy timeout on CI
+  (`TestMatchByOtherNames` left a file pending). As they are, a new title
+  costs 101 microseconds and one written again unchanged 64 (2.9 and
+  2.1 ms under the detector); measure a change to them the same way,
+  with and without `-race`.
+- The marks the index leaves out of a title's second form (`searchJoiners`)
+  and its two separators are written out in the migration nine times (the
+  first fill, the insert trigger and the update trigger of each table),
+  since SQLite has no function for them and a shared helper costs every
+  write. A change to them is a new migration that replaces the triggers
+  and rebuilds the three indexes, with the Go constants changed to match;
+  `TestSearchIndexWords` and `TestMigrationSearchIndex` compare every copy.
+- The triggers belong to `movies`, `shows` and `episodes`. A migration that
+  rebuilds one of those tables (a new table, the rows copied, the old one
+  dropped) drops its triggers with it and has to make them again;
+  `TestSearchIndexFollowsTheLibrary` fails on the latest schema if one is
+  gone.
+- An app gives up on a search at the next keystroke. The handler's queries
+  run on the request's context, which ends when the connection closes
+  (`TestSearchStopsWhenDropped`): keep new work in it on that context.
+- `GET /api/server`, which an app asks before it switches servers, reads
+  the database three times and is not kept in memory, because it does not
+  wait for the requests beside it: with ten Home requests running on the
+  large seeded library it took a median 0.27 ms against 0.08 ms alone, and
+  `GET /api/health`, which reads nothing, 0.13 ms (2026-11-20).
+  `TestSearchSpeed` holds it to a budget beside ten searches.
+
 **Watch state.** Change `watch_state` only through `internal/watchstate`, never
 with its queries directly: each change must also take a revision and leave a
 local guard in the same transaction, or an import can later overwrite the
@@ -199,7 +274,17 @@ have a file present, so a new episode isn't already watched when it comes.
 
 **Migrations.** New numbered files in `internal/db/migrations/` (`000NN_name.sql`)
 with `-- +goose Up` and `-- +goose Down` and a comment saying why. Never edit
-one that has shipped. Test data-moving migrations in `migrations_test.go` by
+one that has shipped. The schema has to be readable by the `sqlite3` tool
+people have, not only by the server's own SQLite: the fixture scripts
+(`deploy/fixture/golden-replies.sh`) and checks on a scratch database write
+rows with it. A trigger it cannot read fails every statement on the
+database. A draft of the search index had fifty `replace()` calls inside
+one another in a trigger, which the server read and sqlite3 3.45 refused
+("parser stack overflow"); keep an expression to a dozen.
+`TestSQLiteToolWritesTitles` (`internal/db`) writes titles with the
+`sqlite3` on the `PATH`, when it is 3.45 or later. A trigger also costs
+every write to its table, fired or not (see Search): time a write to the
+table before and after adding one. Test data-moving migrations in `migrations_test.go` by
 migrating up to the version before, inserting rows, then migrating on.
 Use raw SQL until the database is at the latest version: the generated
 queries list every column of today's schema, so one run at an older version

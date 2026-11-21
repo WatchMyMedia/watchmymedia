@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -797,5 +798,154 @@ func TestMigrationClearsUnairedMarks(t *testing.T) {
 	}
 	if _, err := p.Up(ctx); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestMigrationSearchIndex checks that the search index is filled from a
+// library that was there before it: every title, its original title and
+// the form without hyphens and apostrophes, for tens of thousands of
+// episodes at once; that its triggers then follow the tables; and that the
+// way down leaves the tables writable. The words themselves are checked
+// against the matcher's marks in internal/api (TestSearchIndexWords).
+func TestMigrationSearchIndex(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	p, q := migrateTo(t, 44)
+	conn := q.db
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := conn.ExecContext(ctx, query, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// found asks the index as search does: for each word, never for a run
+	// of words, which the marks between them break.
+	found := func(table, words string) (ids []int64) {
+		t.Helper()
+		rows, err := conn.QueryContext(ctx, fmt.Sprintf(`SELECT rowid FROM %s_search(?) ORDER BY rowid`, table), words)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			ids = append(ids, id)
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		return ids
+	}
+	count := func(table string) (n int) {
+		t.Helper()
+		if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+table).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+
+	exec(`INSERT INTO libraries (id, type, name, path) VALUES (1, 'movie', 'Movies', '/m'), (2, 'tv', 'TV', '/tv')`)
+	exec(`INSERT INTO movies (id, library_id, tmdb_id, title, original_title) VALUES
+		(7, 1, 949, 'Harbor Lights', NULL), (8, 1, 950, 'Lantern-Man', 'Der Laternen-Mann'), (9, 1, 951, 'Café Soleil', 'Café Soleil')`)
+	exec(`INSERT INTO shows (id, library_id, tmdb_id, title) VALUES (3, 2, 77, 'Inspector Vane''s Road')`)
+	exec(`INSERT INTO seasons (id, show_id, number) VALUES (4, 3, 1)`)
+	// As many episodes as a large library lists: 60,000, a tenth of them
+	// with a hyphen to leave out. Under -short, which the race detector's
+	// run passes, 3,000: under the detector SQLite's triggers are many
+	// times slower, and 60,000 took minutes.
+	episodes := int64(60000)
+	if testing.Short() {
+		episodes = 3000
+	}
+	exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
+		INSERT INTO episodes (id, season_id, show_id, number, title)
+		SELECT i, 4, 3, i, CASE WHEN i % 10 = 0 THEN 'Co-Pilot ' || i ELSE 'Night Ferry ' || i END FROM n`, episodes)
+
+	begin := time.Now()
+	if _, err := p.UpTo(ctx, 45); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("indexed %d episodes in %v", count("episodes"), time.Since(begin).Round(time.Millisecond))
+	for _, c := range []struct {
+		table, words string
+		want         []int64
+	}{
+		{"movies", `"harbor"`, []int64{7}},
+		{"movies", `"lanternman"`, []int64{8}},
+		{"movies", `"laternenmann"`, []int64{8}},
+		{"movies", `"laternen"`, []int64{8}},
+		{"movies", `"cafe" AND "soleil"`, []int64{9}},
+		{"shows", `"vanes" AND "road"`, []int64{3}},
+		{"episodes", fmt.Sprintf(`"copilot" AND "%d"`, episodes), []int64{episodes}},
+		{"episodes", fmt.Sprintf(`"ferry" AND "%d"`, episodes-1), []int64{episodes - 1}},
+	} {
+		if got := found(c.table, c.words); !slices.Equal(got, c.want) {
+			t.Errorf("%s %s found %v, want %v", c.table, c.words, got, c.want)
+		}
+	}
+	if n := count("episodes_search"); int64(n) != episodes {
+		t.Errorf("%d episodes in the index", n)
+	}
+	// The words the index keeps: two unit separators at the start and after
+	// each space and line break, and a title with a hyphen a second time
+	// without it.
+	for id, want := range map[int64]string{
+		7: "\x1f\x1fHarbor \x1f\x1fLights\n\x1f\x1f",
+		8: "\x1f\x1fLantern-Man\n\x1f\x1fDer \x1f\x1fLaternen-Mann\n\x1f\x1fLanternMan\n\x1f\x1fDer \x1f\x1fLaternenMann",
+	} {
+		var words string
+		if err := conn.QueryRowContext(ctx, `SELECT words FROM movies_search WHERE rowid = ?`, id).Scan(&words); err != nil || words != want {
+			t.Errorf("words of movie %d = %q, %v; want %q", id, words, err, want)
+		}
+	}
+	for table, want := range map[string]string{
+		"shows WHERE rowid = 3":     "\x1f\x1fInspector \x1f\x1fVane's \x1f\x1fRoad\n\x1f\x1f\n\x1f\x1fInspector \x1f\x1fVanes \x1f\x1fRoad\n\x1f\x1f",
+		"episodes WHERE rowid = 10": "\x1f\x1fCo-Pilot \x1f\x1f10\n\x1f\x1fCoPilot \x1f\x1f10",
+		"episodes WHERE rowid = 11": "\x1f\x1fNight \x1f\x1fFerry \x1f\x1f11",
+	} {
+		var words string
+		if err := conn.QueryRowContext(ctx, `SELECT words FROM `+strings.Replace(table, " WHERE", "_search WHERE", 1)).Scan(&words); err != nil || words != want {
+			t.Errorf("words of %s = %q, %v; want %q", table, words, err, want)
+		}
+	}
+
+	// The triggers, on the queries of today's schema.
+	if _, err := p.Up(ctx); err != nil {
+		t.Fatal(err)
+	}
+	exec(`UPDATE movies SET title = 'Harbour Lights' WHERE id = 7`)
+	exec(`DELETE FROM movies WHERE id = 9`)
+	exec(`DELETE FROM shows WHERE id = 3`) // and its episodes
+	if got := found("movies", `"harbor"`); len(got) != 0 {
+		t.Errorf("the old title still finds %v", got)
+	}
+	if got := found("movies", `"harbour"`); !slices.Equal(got, []int64{7}) {
+		t.Errorf("the new title finds %v", got)
+	}
+	if count("movies_search") != 2 || count("shows_search") != 0 || count("episodes_search") != 0 {
+		t.Errorf("after deletes the index holds %d movies, %d shows, %d episodes", count("movies_search"), count("shows_search"), count("episodes_search"))
+	}
+
+	// Down, and the tables take writes with no index to keep; up again
+	// indexes what was written meanwhile.
+	if _, err := p.DownTo(ctx, 44); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(`sqlite_master WHERE name LIKE '%\_search%' ESCAPE '\'`); n != 0 {
+		t.Errorf("%d tables and triggers of the index left after the way down", n)
+	}
+	exec(`INSERT INTO movies (id, library_id, tmdb_id, title) VALUES (10, 1, 952, 'Quiet Field')`)
+	exec(`UPDATE movies SET title = 'Harbor Lights' WHERE id = 7`)
+	if _, err := p.UpTo(ctx, 45); err != nil {
+		t.Fatal(err)
+	}
+	if got := found("movies", `"quiet" AND "field"`); !slices.Equal(got, []int64{10}) {
+		t.Errorf("a movie added before the index finds %v", got)
+	}
+	if got := found("movies", `"harbor"`); !slices.Equal(got, []int64{7}) {
+		t.Errorf("a title changed before the index finds %v", got)
 	}
 }

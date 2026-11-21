@@ -99,6 +99,11 @@ type EpisodeFile struct {
 	MediaFileID int64 `json:"media_file_id"`
 }
 
+type EpisodesSearch struct {
+	Title string `json:"title"`
+	Words string `json:"words"`
+}
+
 type HistoryItem struct {
 	ID            int64  `json:"id"`
 	ItemType      string `json:"item_type"`
@@ -425,6 +430,12 @@ type MovieTag struct {
 	Kind    string `json:"kind"`
 	Value   string `json:"value"`
 	Rank    int64  `json:"rank"`
+}
+
+type MoviesSearch struct {
+	Title         string `json:"title"`
+	OriginalTitle string `json:"original_title"`
+	Words         string `json:"words"`
 }
 
 type OfflineDownload struct {
@@ -788,6 +799,12 @@ type ShowTag struct {
 	Kind   string `json:"kind"`
 	Value  string `json:"value"`
 	Rank   int64  `json:"rank"`
+}
+
+type ShowsSearch struct {
+	Title         string `json:"title"`
+	OriginalTitle string `json:"original_title"`
+	Words         string `json:"words"`
 }
 
 type Trickplay struct {

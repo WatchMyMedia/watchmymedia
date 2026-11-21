@@ -1,9 +1,10 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"net/http"
-	"strings"
+	"slices"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -45,41 +46,267 @@ func registerSearch(h huma.API, deps Deps) {
 		Summary:     "Search titles across libraries",
 		Tags:        []string{"browse"},
 	}, func(ctx context.Context, in *SearchInput) (*SearchOutput, error) {
-		pattern := "%" + strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(in.Q), "%", ""), "_", "") + "%"
-		out := &SearchOutput{Body: SearchResults{Movies: []Movie{}, Shows: []Show{}, Episodes: []SearchEpisode{}}}
-		movies, err := deps.Queries.SearchMovies(ctx, db.SearchMoviesParams{Title: pattern, OriginalTitle: &pattern, Limit: in.Limit})
+		res, err := searchLibrary(ctx, deps, in.Q, in.Limit)
 		if err != nil {
 			return nil, err
 		}
-		for _, m := range movies {
-			out.Body.Movies = append(out.Body.Movies, movieFromDB(m))
+		return &SearchOutput{Body: *res}, nil
+	})
+}
+
+// searchLibrary finds up to limit movies, shows and episodes for what
+// someone typed, each group with its best matches first.
+//
+// Each group is read in two steps: the titles that might match and have a
+// present file, with only what ranking needs, and then the rows of the ones
+// shown. Before, each group read every present file in the library and the
+// title it belongs to, on every keystroke.
+func searchLibrary(ctx context.Context, deps Deps, typed string, limit int64) (*SearchResults, error) {
+	s := parseSearch(typed)
+	out := &SearchResults{Movies: []Movie{}, Shows: []Show{}, Episodes: []SearchEpisode{}}
+	q := deps.Queries
+
+	hits, err := searchMovieHits(ctx, q, &s, limit)
+	if err != nil {
+		return nil, err
+	}
+	ids := bestHits(hits, limit)
+	movies, err := q.ListMoviesByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range inOrder(ids, movies, func(m db.Movie) int64 { return m.ID }) {
+		out.Movies = append(out.Movies, movieFromDB(m))
+	}
+
+	if hits, err = searchShowHits(ctx, q, &s, limit); err != nil {
+		return nil, err
+	}
+	ids = bestHits(hits, limit)
+	shows, err := q.ListShowsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, sh := range inOrder(ids, shows, func(sh db.Show) int64 { return sh.ID }) {
+		out.Shows = append(out.Shows, showFromDB(sh))
+	}
+
+	if hits, err = searchEpisodeHits(ctx, q, &s, limit); err != nil {
+		return nil, err
+	}
+	ids = bestHits(hits, limit)
+	episodes, err := q.ListSearchEpisodesByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	watched, err := watchedEpisodes(ctx, deps, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range inOrder(ids, episodes, func(e db.ListSearchEpisodesByIDsRow) int64 { return e.ID }) {
+		if e.FileID == 0 {
+			continue // its file went missing since it was found
 		}
-		shows, err := deps.Queries.SearchShows(ctx, db.SearchShowsParams{Title: pattern, OriginalTitle: &pattern, Limit: in.Limit})
+		out.Episodes = append(out.Episodes, SearchEpisode{
+			ID: e.ID, ShowID: e.ShowID, ShowTitle: e.ShowTitle, ShowPosterPath: deref(e.ShowPosterPath), SeasonNumber: e.SeasonNumber,
+			Number: e.Number, Title: e.Title, StillPath: deref(e.StillPath), AirDate: deref(e.AirDate), FileID: e.FileID,
+			Watched: watched[e.ID],
+		})
+	}
+	return out, nil
+}
+
+// searchHit is a title that matches a search, with what orders it among
+// the others: how well it matches, then its title. An episode's title here
+// is its show's, followed by its season and number, as episodes were
+// ordered before they were ranked.
+type searchHit struct {
+	id             int64
+	rank           int
+	title          string
+	season, number int64
+}
+
+func (a searchHit) compare(b searchHit) int {
+	return cmp.Or(
+		cmp.Compare(a.rank, b.rank),
+		compareNoCase(a.title, b.title),
+		cmp.Compare(a.season, b.season),
+		cmp.Compare(a.number, b.number),
+		cmp.Compare(a.id, b.id),
+	)
+}
+
+// bestHits is the ids of the first limit hits, best first. A common word
+// matches thousands of titles, so it keeps the best so far in order rather
+// than sorting them all.
+func bestHits(hits []searchHit, limit int64) []int64 {
+	best := make([]searchHit, 0, min(limit, int64(len(hits)))+1)
+	for _, h := range hits {
+		if int64(len(best)) == limit && h.compare(best[limit-1]) >= 0 {
+			continue
+		}
+		at, _ := slices.BinarySearchFunc(best, h, searchHit.compare)
+		best = slices.Insert(best, at, h)
+		best = best[:min(int64(len(best)), limit)]
+	}
+	ids := make([]int64, len(best))
+	for i, h := range best {
+		ids[i] = h.id
+	}
+	return ids
+}
+
+// inOrder is rows in the order of ids. A row deleted since its id was
+// found is left out.
+func inOrder[R any](ids []int64, rows []R, id func(R) int64) []R {
+	byID := make(map[int64]R, len(rows))
+	for _, r := range rows {
+		byID[id(r)] = r
+	}
+	out := make([]R, 0, len(rows))
+	for _, i := range ids {
+		if r, ok := byID[i]; ok {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// searchTitleRow is a movie or show that might match: what the four title
+// queries return.
+type searchTitleRow struct {
+	ID            int64
+	Title         string
+	OriginalTitle *string
+	Year          *int64
+	Legacy        int64
+}
+
+func (s *searchQuery) titleHits(rows []searchTitleRow) []searchHit {
+	hits := make([]searchHit, 0, len(rows))
+	for _, r := range rows {
+		if rank, ok := s.rank(r.Title, deref(r.OriginalTitle), deref(r.Year), r.Legacy != 0); ok {
+			hits = append(hits, searchHit{id: r.ID, rank: rank, title: r.Title})
+		}
+	}
+	return hits
+}
+
+// hits finds a group's titles for the search, by these steps.
+//
+// A search with a word of three letters or more asks the index for the
+// titles that hold every such word.
+//
+// A search of shorter words first asks the index for the titles where each
+// word starts a word. When those fill a list of limit, that is the answer:
+// a title with the letters elsewhere comes after every one of them. The
+// first letter someone types is in most of a library, and reading every
+// title for it, then every match's files, took longer than search did
+// before it had an index. One letter is only looked up at the start of a
+// title and after a space, so while the list is full a title where it
+// follows a hyphen or a bracket waits for the second letter
+// (startsMatch).
+//
+// Otherwise it also reads every title for the words anywhere, as search
+// always did, and adds what that finds.
+func (s *searchQuery) hits(limit int64, indexed func(words string) ([]searchHit, error), scan func() ([]searchHit, error)) ([]searchHit, error) {
+	if len(s.index) > 0 {
+		return indexed(s.indexMatch())
+	}
+	var hits []searchHit
+	if len(s.scan) > 0 {
+		var err error
+		hits, err = indexed(s.startsMatch())
 		if err != nil {
 			return nil, err
 		}
-		for _, s := range shows {
-			out.Body.Shows = append(out.Body.Shows, showFromDB(s))
+		starts := int64(0)
+		for _, h := range hits {
+			if h.rank <= searchWordsHit {
+				starts++
+			}
 		}
-		episodes, err := deps.Queries.SearchEpisodes(ctx, db.SearchEpisodesParams{Title: pattern, Limit: in.Limit})
-		if err != nil {
-			return nil, err
+		if starts >= limit {
+			return hits, nil
 		}
-		ids := make([]int64, len(episodes))
-		for i, e := range episodes {
-			ids[i] = e.ID
+	}
+	rest, err := scan()
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[int64]bool, len(hits))
+	for _, h := range hits {
+		seen[h.id] = true
+	}
+	for _, h := range rest {
+		if !seen[h.id] {
+			hits = append(hits, h)
 		}
-		watched, err := watchedEpisodes(ctx, deps, ids)
-		if err != nil {
-			return nil, err
+	}
+	return hits, nil
+}
+
+func searchMovieHits(ctx context.Context, q *db.Queries, s *searchQuery, limit int64) ([]searchHit, error) {
+	return s.hits(limit, func(words string) ([]searchHit, error) {
+		found, err := q.SearchMovieTitles(ctx, db.SearchMovieTitlesParams{Legacy: s.legacy, Words: words})
+		rows := make([]searchTitleRow, len(found))
+		for i, r := range found {
+			rows[i] = searchTitleRow(r)
 		}
-		for _, e := range episodes {
-			out.Body.Episodes = append(out.Body.Episodes, SearchEpisode{
-				ID: e.ID, ShowID: e.ShowID, ShowTitle: e.ShowTitle, ShowPosterPath: deref(e.ShowPosterPath), SeasonNumber: e.SeasonNumber,
-				Number: e.Number, Title: e.Title, StillPath: deref(e.StillPath), AirDate: deref(e.AirDate), FileID: toInt64(e.FileID),
-				Watched: watched[e.ID],
-			})
+		return s.titleHits(rows), err
+	}, func() ([]searchHit, error) {
+		one, two, three, marks := s.scanPatterns()
+		found, err := q.ScanMovieTitles(ctx, db.ScanMovieTitlesParams{Legacy: s.legacy, Word1: one, Word2: two, Word3: three, Marks: marks})
+		rows := make([]searchTitleRow, len(found))
+		for i, r := range found {
+			rows[i] = searchTitleRow(r)
 		}
-		return out, nil
+		return s.titleHits(rows), err
+	})
+}
+
+func searchShowHits(ctx context.Context, q *db.Queries, s *searchQuery, limit int64) ([]searchHit, error) {
+	return s.hits(limit, func(words string) ([]searchHit, error) {
+		found, err := q.SearchShowTitles(ctx, db.SearchShowTitlesParams{Legacy: s.legacy, Words: words})
+		rows := make([]searchTitleRow, len(found))
+		for i, r := range found {
+			rows[i] = searchTitleRow(r)
+		}
+		return s.titleHits(rows), err
+	}, func() ([]searchHit, error) {
+		one, two, three, marks := s.scanPatterns()
+		found, err := q.ScanShowTitles(ctx, db.ScanShowTitlesParams{Legacy: s.legacy, Word1: one, Word2: two, Word3: three, Marks: marks})
+		rows := make([]searchTitleRow, len(found))
+		for i, r := range found {
+			rows[i] = searchTitleRow(r)
+		}
+		return s.titleHits(rows), err
+	})
+}
+
+// searchEpisodeHits finds episodes by their own titles. A year after the
+// words is only a word here: an episode has no year of its own.
+func searchEpisodeHits(ctx context.Context, q *db.Queries, s *searchQuery, limit int64) ([]searchHit, error) {
+	hits := func(rows []db.SearchEpisodeTitlesRow) []searchHit {
+		out := make([]searchHit, 0, len(rows))
+		for _, r := range rows {
+			if rank, ok := s.rank(r.Title, "", 0, r.Legacy != 0); ok {
+				out = append(out, searchHit{id: r.ID, rank: rank, title: r.ShowTitle, season: r.SeasonNumber, number: r.Number})
+			}
+		}
+		return out
+	}
+	return s.hits(limit, func(words string) ([]searchHit, error) {
+		found, err := q.SearchEpisodeTitles(ctx, db.SearchEpisodeTitlesParams{Legacy: s.legacy, Words: words})
+		return hits(found), err
+	}, func() ([]searchHit, error) {
+		one, two, three, marks := s.scanPatterns()
+		found, err := q.ScanEpisodeTitles(ctx, db.ScanEpisodeTitlesParams{Legacy: s.legacy, Word1: one, Word2: two, Word3: three, Marks: marks})
+		rows := make([]db.SearchEpisodeTitlesRow, len(found))
+		for i, r := range found {
+			rows[i] = db.SearchEpisodeTitlesRow(r)
+		}
+		return hits(rows), err
 	})
 }
