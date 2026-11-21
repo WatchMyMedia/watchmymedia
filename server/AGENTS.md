@@ -150,6 +150,16 @@ SQLite plans joins without statistics, and a plan that looks fine after
   `db.IdleConns` (8) connections warm and does not cap open ones: code that
   holds rows or a transaction while running another query would deadlock a
   capped pool under a burst of requests.
+- A write that still finds the database locked after `busy_timeout` (5 s,
+  `db.BusyTimeout`) fails with "database is locked" (`db.IsBusy`). That is
+  about another writer, not about what was being written: don't store it
+  as the outcome of the work. A request someone is waiting for returns the
+  error. Work nobody waits for tries again with `db.RetryBusy`, as the
+  matcher's writes do; what it runs has to be safe to run twice, so a
+  transaction that counts or collects as it goes resets that at its start.
+  To test it, open a second connection with `db.OpenBusy` and a wait of
+  milliseconds, hold the lock on the first with `BeginTx`, and let go from
+  a hook rather than after a sleep (`internal/metadata/busy_test.go`).
 - `TestHomeSpeed` (`internal/api/home_speed_test.go`) seeds a library the size
   of the largest real one (about 2,850 movies, 1,100 shows, 18,700 files),
   with ten 250-entry lists and three library lists on Home, and times each
@@ -170,6 +180,19 @@ SQLite plans joins without statistics, and a plan that looks fine after
   a time. Beside the other packages on a three-core runner,
   `TestHistorySpeed` went over its budget (PR #16, 2026-11-12) though alone
   it has six times the room.
+
+**Matching and a busy database.** The matcher's writes of a result
+(`record`, `storeMovie`, `storeShow`, `storeSeason`, `linkFileNamed`) go
+through `Matcher.write` (`internal/metadata/matcher.go`), which tries again
+for a minute (`Options.BusyWait`) while another writer holds the database.
+When it stays locked for longer, `leftBusy` leaves the file as it was, so
+one waiting for its first match is matched by the next run (after a scan
+that finds a change, at startup, and once a day), with `BusyNote` as its
+match error if the database takes that; the run counts it as failed.
+Before, such a file was recorded as `failed` with "database is locked" as
+what TMDB said, which only the daily retry picks up, or left pending with
+nothing to say why. Keep a new write of the matcher's on `Matcher.write`,
+and its function safe to run again.
 
 **Episode links and arrivals.** Link files to episodes only through
 `Matcher.record` (`internal/metadata/matcher.go`): in the same transaction it

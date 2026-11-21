@@ -1499,6 +1499,23 @@ func (q *Queries) ListShowsWithoutContentRating(ctx context.Context, libraryID i
 	return items, nil
 }
 
+const notePendingMatch = `-- name: NotePendingMatch :exec
+UPDATE media_files SET match_error = ? WHERE id = ? AND match_status = 'pending'
+`
+
+type NotePendingMatchParams struct {
+	MatchError *string `json:"match_error"`
+	ID         int64   `json:"id"`
+}
+
+// Says, on a file still waiting for its match, why a try at it left no
+// result (the database was too busy to take one), and changes nothing else
+// about it: it is tried again, and the next result replaces the note.
+func (q *Queries) NotePendingMatch(ctx context.Context, arg NotePendingMatchParams) error {
+	_, err := q.db.ExecContext(ctx, notePendingMatch, arg.MatchError, arg.ID)
+	return err
+}
+
 const setMediaFileIgnored = `-- name: SetMediaFileIgnored :exec
 UPDATE media_files SET match_ignored = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE id = ?

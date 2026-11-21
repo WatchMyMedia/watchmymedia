@@ -27,3 +27,12 @@ func IsDiskFull(err error) bool {
 	e, ok := errors.AsType[*sqlite.Error](err)
 	return ok && e.Code()&0xff == sqlite3.SQLITE_FULL
 }
+
+// IsBusy reports whether SQLite gave up waiting for the database: another
+// connection held the write lock for longer than the busy timeout
+// ("database is locked"). That says nothing about what was being written;
+// the same write succeeds once the other writer is done.
+func IsBusy(err error) bool {
+	e, ok := errors.AsType[*sqlite.Error](err)
+	return ok && e.Code()&0xff == sqlite3.SQLITE_BUSY
+}
