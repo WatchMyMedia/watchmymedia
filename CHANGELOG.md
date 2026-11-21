@@ -5,6 +5,25 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release. A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 2.0.1
+
+Importing from Plex now marks the episodes people watched there, not only the movies. This
+release changes only the server and the web app.
+
+- This release doesn't change the server's database, so going back to 2.0.0 needs no backup.
+- An import from Plex marked no episodes at all. Check what will change left every watched
+  episode alone, saying "Plex uses different or unconfirmed episode numbers", because the server
+  looked for each show's episode order under a name Plex doesn't use and never read the order
+  its library sets. It now reads the show's order, or else its library's.
+- Episodes in a show that Plex numbers in TMDB's aired order are marked by season and episode,
+  as before. Episodes numbered in TheTVDB's aired order are marked when the date Plex says they
+  aired is the date here. TheTVDB's order mostly agrees with TMDB's, but daily shows, anime and
+  some reality shows are numbered differently. When the dates differ, the episode is left alone,
+  and Check what will change says its air date doesn't match. DVD and absolute orders are still
+  left alone.
+- If you checked or imported from Plex before, run Check what will change again in
+  Settings › Plex, then import. The earlier imports marked only movies.
+
 ## 2.0.0
 
 The phone, tablet and TV apps stay signed in to several servers at once, switch between them
