@@ -113,6 +113,9 @@ import androidx.compose.foundation.layout.height
 import media.watchmy.client.tv.components.TvKeyboardOpener
 import media.watchmy.client.ui.onBack
 
+/** How wide the keyboard is: ten keys and the gaps between them. Its box, its note and the key hints keep to it. */
+private val KeyboardWidth = 712.dp
+
 /** Where the results start: right of the keyboard (154 + 712 + 60). */
 private val ResultsStart = 926.dp
 
@@ -185,7 +188,7 @@ fun SearchScreen(
     TvScaffold(RailSection.Search, onNavigate) {
         // Back while listening stops it now, before anything else takes Back.
         Column(
-            Modifier.padding(start = ContentStart, top = 56.dp).width(712.dp).onBack(enabled = listening, onBack = voice::stop),
+            Modifier.padding(start = ContentStart, top = 56.dp).width(KeyboardWidth).onBack(enabled = listening, onBack = voice::stop),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Text("Search", style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
@@ -528,17 +531,25 @@ private fun VoiceLine(text: String, listening: Boolean) {
     }
 }
 
-/** The board's key hints at the foot of the keyboard, while typing. */
+/**
+ * The key hints at the foot of the keyboard, while typing: one a line, and
+ * no wider than the keyboard. On one line, the two a TV with a microphone
+ * gets ran out across the results, and a third row of results (On Live TV)
+ * drew over them.
+ */
 @Composable
 private fun KeyHints(mic: Boolean, modifier: Modifier = Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (mic) {
-            KeyCap("▲")
-            Text("From the top row: the search box, and ▶ from there the microphone", style = inter(19.sp), color = WmmColors.TextSoft)
-            Box(Modifier.width(18.dp))
-        }
-        KeyCap("▼")
-        Text("From the bottom row: the TV’s keyboard", style = inter(19.sp), color = WmmColors.TextSoft)
+    Column(modifier.width(KeyboardWidth), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (mic) KeyHint("▲", "From the top row: the search box, and ▶ from there the microphone")
+        KeyHint("▼", "From the bottom row: the TV’s keyboard")
+    }
+}
+
+@Composable
+private fun KeyHint(key: String, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        KeyCap(key)
+        Text(text, style = inter(19.sp), color = WmmColors.TextSoft)
     }
 }
 
