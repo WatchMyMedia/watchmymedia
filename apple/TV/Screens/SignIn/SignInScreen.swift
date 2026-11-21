@@ -3,6 +3,12 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
+/// Sign-in's way to the server picker, for a server that isn't the one
+/// chosen. Settings has no Switch server any more (Servers switches, and
+/// Add a server adds), but before anyone is signed in this is still how
+/// another server is chosen.
+private let switchServerTitle = "Switch server"
+
 /// Signing in to the chosen server. By pairing first: a
 /// code to enter on the server's link page from a phone or computer, the
 /// page's QR code, and a new code when one runs out; this Apple TV signs in

@@ -4,7 +4,7 @@ import XCTest
 /// on the fakes, driven with the Siri Remote: the groups beside
 /// the page, Menu from a page back to its group and then the top bar, each
 /// group's remembered row, a question that opens on the button that keeps
-/// things, a row that keeps focus while it saves and says so, and Switch
+/// things, a row that keeps focus while it saves and says so, and Add a
 /// server from its first step to its last. `-settingsGroup <group>` shows a
 /// group with focus on it at launch. Runs in `make apple-tv-test-sim`.
 final class SettingsTests: XCTestCase {
@@ -223,14 +223,18 @@ final class SettingsTests: XCTestCase {
     }
 
     @MainActor
-    func testSwitchServerFromTheFirstStepToTheLast() {
+    func testAddAServerFromTheFirstStepToTheLast() {
         let app = launch(["-settingsGroup", "server"])
         let server = app.buttons["settings-group-server"]
         XCTAssertTrue(server.waitUntilExists(timeout: 20))
         XCTAssertTrue(focused(server))
         remote.press(.right)
-        let row = app.buttons["settings-row-switch"]
-        XCTAssertTrue(focused(row), "Right moves into Server, on Switch server")
+        // Your servers comes first: the server in use, then the others, then Add a server.
+        XCTAssertTrue(focused(app.buttons["settings-row-registered-srv-living"]), "Right moves into Server, on the server in use")
+        let row = app.buttons["settings-row-add"]
+        XCTAssertTrue(move(.down, to: row, in: app), "Add a server follows the servers")
+        let help = app.descendants(matching: .any)["settings-help"]
+        XCTAssertTrue(help.waitForLabel(containing: "switching between them needs no password"), help.label)
         remote.press(.select)
         let steps = app.descendants(matching: .any)["task-steps"]
         XCTAssertTrue(app.staticTexts["Which server?"].waitUntilExists(timeout: 10), "the first step takes the screen")
@@ -239,25 +243,27 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(app.waitForFocusedButton { _ in true }, "a server has focus")
         remote.press(.menu)
         XCTAssertTrue(app.staticTexts["Which server?"].waitUntilGone(timeout: 10), "Menu on the first step goes back to Settings")
-        XCTAssertTrue(focused(row), "on Switch server")
+        XCTAssertTrue(focused(row), "on Add a server")
 
         remote.press(.select)
         XCTAssertTrue(app.staticTexts["Which server?"].waitUntilExists(timeout: 10))
         XCTAssertTrue(app.waitForFocusedButton { _ in true })
         let office = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Office Mac mini")).firstMatch
         XCTAssertTrue(office.waitUntilExists(timeout: 10), "a server on this network is listed")
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Living room server")).firstMatch.exists,
+                       "the server this Apple TV is on already isn't offered")
         XCTAssertTrue(move(.down, to: office, in: app))
-        shot("Switch server, step 1")
+        shot("Add a server, step 1")
         remote.press(.select)
         XCTAssertTrue(app.staticTexts["Sign in to Office Mac mini"].waitUntilExists(timeout: 10), "a server not signed in to asks to sign in")
         XCTAssertEqual(steps.label, "Step 2 of 3, Sign in")
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "On a phone or computer signed in to Office Mac mini")).firstMatch.exists,
                       "Sign in starts on the code")
         // The password form, with focus on its name, and back to the code.
-        let otherWay = app.buttons["switch-other-way"]
+        let otherWay = app.buttons["add-other-way"]
         XCTAssertTrue(focused(otherWay), "the other way in has focus under the code")
         XCTAssertEqual(otherWay.label, "Sign in with a password instead")
-        shot("Switch server, step 2")
+        shot("Add a server, step 2")
         remote.press(.select)
         XCTAssertTrue(focused(app.textFields["Username"]), "the form starts on the name")
         XCTAssertTrue(otherWay.waitForLabel(containing: "Use a code"), otherWay.label)
@@ -271,12 +277,13 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(otherWay.waitForLabel(containing: "with a password"), "back to the code: \(otherWay.label)")
         XCTAssertTrue(focused(otherWay), "with focus on the other way in again")
         // The fakes approve the pairing code by themselves after a few seconds.
-        XCTAssertTrue(app.staticTexts["You’re on Office Mac mini"].waitUntilExists(timeout: 30), "the last step says where this Apple TV is now")
-        XCTAssertEqual(steps.label, "Switched", "the last step is named alone")
-        XCTAssertTrue(app.staticTexts["You’re still signed in on Living room server."].exists || app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "still signed in on Living room server")).firstMatch.exists)
-        let home = app.buttons["switch-go-home"]
+        XCTAssertTrue(app.staticTexts["Office Mac mini is added"].waitUntilExists(timeout: 30), "the last step says it is added")
+        XCTAssertEqual(steps.label, "Added", "the last step is named alone")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Search looks in all of them")).firstMatch.exists,
+                      "and that search looks in every server")
+        let home = app.buttons["add-go-home"]
         XCTAssertTrue(focused(home), "with focus on Go to Home")
-        shot("Switch server, switched")
+        shot("Add a server, added")
         remote.press(.select)
         XCTAssertTrue(home.waitUntilGone(timeout: 10))
         XCTAssertTrue(app.buttons["Go to episode"].waitUntilExists(timeout: 10), "Go to Home goes to Home")

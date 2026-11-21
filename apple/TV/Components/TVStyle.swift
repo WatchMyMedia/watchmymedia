@@ -24,6 +24,8 @@ extension Color {
     static let tvDangerEdge = Color(hex: 0xE5484D)
     /// #FF6B63: the words of a button or row that signs out, on the dark ground.
     static let tvRedText = Color(hex: 0xFF6B63)
+    /// #FF9B95: Remove this server's words, a paler red that reads at 4.5:1 on a row and on a question's button.
+    static let tvPaleRedText = Color(hex: 0xFF9B95)
 }
 
 /// The brand's focus on the native look: lifted, shadowed, and a 3 pt gold
@@ -57,11 +59,12 @@ extension View {
 /// A 10-foot button (the artboards' `.btn`): translucent, burgundy for the
 /// main action, or red for a destructive one; focused, white with dark text
 /// (red for a destructive one), lifted, with the gold rim. `redText` is
-/// translucent with red words (`.btn.red`, Sign out in a question);
+/// translucent with red words (`.btn.red`, Sign out in a question), and
+/// `paleRedText` the same with the paler red (Remove this server);
 /// `goldText` translucent with gold words, dark gold when focused (the show
 /// page's Notifications on, `.tvbtn.on`).
 struct TVButtonStyle: ButtonStyle {
-    enum Kind { case primary, secondary, danger, redText, goldText }
+    enum Kind { case primary, secondary, danger, redText, paleRedText, goldText }
 
     var kind: Kind = .secondary
     var height: CGFloat = 68
@@ -88,7 +91,7 @@ struct TVButtonStyle: ButtonStyle {
                 .frame(height: height)
                 .background(background, in: RoundedRectangle(cornerRadius: 16))
                 .overlay {
-                    if kind != .secondary && kind != .redText && kind != .goldText && !focused {
+                    if kind != .secondary && kind != .redText && kind != .paleRedText && kind != .goldText && !focused {
                         RoundedRectangle(cornerRadius: 16).strokeBorder(kind == .danger ? Color.tvDangerEdge : Palette.burgundyEdge, lineWidth: 1)
                     }
                 }
@@ -99,7 +102,7 @@ struct TVButtonStyle: ButtonStyle {
 
         private var foreground: Color {
             switch kind {
-            case .danger, .redText: focused ? .tvDanger : kind == .redText ? .tvRedText : .white
+            case .danger, .redText, .paleRedText: focused ? .tvDanger : kind == .redText ? .tvRedText : kind == .paleRedText ? .tvPaleRedText : .white
             case .goldText: focused ? Color(hex: 0x8A5A00) : Palette.gold
             case .primary, .secondary: focused ? Palette.ground : .white
             }
@@ -109,7 +112,7 @@ struct TVButtonStyle: ButtonStyle {
             if focused { return Palette.text }
             switch kind {
             case .primary: return Palette.burgundy
-            case .secondary, .redText, .goldText: return .white.opacity(0.14)
+            case .secondary, .redText, .paleRedText, .goldText: return .white.opacity(0.14)
             case .danger: return .tvDanger
             }
         }

@@ -66,6 +66,8 @@ struct SettingsRow<Accessory: View>: View {
     var detail: String?
     var note: RowNote?
     var red = false
+    /// The red of a `red` row's title at rest; a paler one where the usual falls short on its ground.
+    var redText: Color = .tvRedText
     @ViewBuilder var accessory: () -> Accessory
     @Environment(\.isFocused) private var focused
 
@@ -74,7 +76,7 @@ struct SettingsRow<Accessory: View>: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(red ? (focused ? Color.tvDanger : Color.tvRedText) : focused ? Palette.ground : Palette.text)
+                    .foregroundStyle(red ? (focused ? Color.tvDanger : redText) : focused ? Palette.ground : Palette.text)
                     .lineLimit(1)
                 if let line = note?.text ?? detail {
                     Text(line)
@@ -435,19 +437,22 @@ struct TVQuestion: Identifiable {
     let keep: String
     /// "Sign out of this Apple TV".
     let act: String
+    /// The acting button's words are the paler red (Remove this server's question).
+    var paleRed = false
     let action: () async -> Void
 
-    init(title: String, paragraphs: [String], keep: String, act: String, action: @escaping () async -> Void) {
+    init(title: String, paragraphs: [String], keep: String, act: String, paleRed: Bool = false, action: @escaping () async -> Void) {
         self.title = title
         self.paragraphs = paragraphs
         self.keep = keep
         self.act = act
+        self.paleRed = paleRed
         self.action = action
     }
 
     /// The Kit's words for a question: its title, lines, the keeping button and the acting one.
-    init(_ words: ConfirmWords, action: @escaping () async -> Void) {
-        self.init(title: words.title, paragraphs: words.lines, keep: words.keep, act: words.confirm, action: action)
+    init(_ words: ConfirmWords, paleRed: Bool = false, action: @escaping () async -> Void) {
+        self.init(title: words.title, paragraphs: words.lines, keep: words.keep, act: words.confirm, paleRed: paleRed, action: action)
     }
 }
 
@@ -480,7 +485,7 @@ struct TVQuestionCard: View {
                     .focused($keepFocused)
                     .accessibilityIdentifier("question-keep")
                 Button(action: onAct) { Text(question.act).frame(maxWidth: .infinity) }
-                    .buttonStyle(TVButtonStyle(kind: .redText, height: 64, fontSize: 22))
+                    .buttonStyle(TVButtonStyle(kind: question.paleRed ? .paleRedText : .redText, height: 64, fontSize: 22))
                     .accessibilityIdentifier("question-act")
             }
             .padding(.top, 14)

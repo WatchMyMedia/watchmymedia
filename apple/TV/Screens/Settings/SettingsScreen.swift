@@ -43,6 +43,14 @@ enum SettingsFocus: Hashable {
         if case .group = self { return true }
         return false
     }
+
+    /// Add a server's row in Server.
+    static let addServerKey = "add"
+
+    /// A registered server's row in Server, under Your servers.
+    static func serverRow(_ serverID: String) -> SettingsFocus { .row(.server, serverKey(serverID)) }
+
+    static func serverKey(_ serverID: String) -> String { "registered-\(serverID)" }
 }
 
 /// What takes the screen from Settings.
@@ -76,13 +84,13 @@ private struct SettingsView: View {
     @FocusState private var focus: SettingsFocus?
     @State private var task: SettingsTask?
     @State private var question: TVQuestion?
-    /// The launch arguments are applied once, not each time Settings reappears.
-    @State private var launched = false
+    /// Also says whether the launch arguments were applied: once a launch, not each time Settings reappears.
     @Environment(AppFlow.self) private var flow
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
     @Environment(LiveExtrasStore.self) private var extras
     @Environment(FollowsStore.self) private var follows
+    @Environment(ServersModel.self) private var servers
 
     /// From under the tab bar to the bottom of the screen.
     private static let pageHeight: CGFloat = 880
@@ -110,7 +118,22 @@ private struct SettingsView: View {
         .task(id: follows.available) { if follows.available { await follows.refresh() } }
         .fullScreenCover(item: $task, onDismiss: { if services.rows.available { Task { await homeRows.load() } } }) { taskView($0) }
         .question($question)
+        // A registered server's page takes the screen, like a task; it is in
+        // `AppFlow` so the Servers panel knows to wait while it is up.
+        .fullScreenCover(item: Binding(get: { flow.serverPage.map(ServerPageID.init) }, set: { flow.serverPage = $0?.id })) { shown in
+            TVServerPage(serverID: shown.id, onClose: { flow.serverPage = nil }, onRemoved: serverRemoved)
+        }
         .onAppear(perform: applyLaunchArguments)
+        // Servers' Manage servers, chosen with Settings already on screen: no appearance follows.
+        .onChange(of: flow.settingsReturn) { _, place in
+            if place != nil { applyReturn() }
+        }
+    }
+
+    /// A server was removed from its page: its row has gone, so focus goes to the first of Server's rows.
+    private func serverRemoved() {
+        remembered[.server] = nil
+        lastFocus = target(in: .server)
     }
 
     // MARK: The list of groups
@@ -454,8 +477,10 @@ private struct SettingsView: View {
         .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
     }
 
+    /// Signing out moves the app to the server used most recently that is
+    /// still signed in, when there is one (`ServersModel.signingOut`).
     private func askSignOut() {
-        question = TVQuestion(model.signOutThisDeviceWords()) { [model] in await model.signOut() }
+        question = TVQuestion(model.signOutThisDeviceWords()) { [model, servers] in await servers.signingOut { await model.signOut() } }
     }
 
     private func askRevoke(_ session: DeviceSession) {
@@ -487,18 +512,35 @@ private struct SettingsView: View {
 
     // MARK: Server
 
+    /// Your servers: a row for each server this Apple TV is registered with,
+    /// which opens its page, then Add a server. The server in use's name,
+    /// address and version are on its own page.
     @ViewBuilder private var serverPage: some View {
-        if let server = model.server {
-            SettingsGroup(SettingsWords.thisServer) {
-                FactRow(label: SettingsWords.name, value: server.name)
-                FactRow(label: SettingsWords.address, value: server.displayAddress)
-                FactRow(label: SettingsWords.version, value: server.versionAndAPI)
+        SettingsGroup(ServersWords.yourServers) {
+            Text(ServersWords.yourServersLede(device: family, count: servers.settingsRows.count))
+                .font(.system(size: 18))
+                .lineSpacing(4)
+                .foregroundStyle(Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 4)
+            ForEach(servers.settingsRows) { row in
+                Button { flow.serverPage = row.id } label: {
+                    SettingsRow(title: row.name, detail: row.detail) {
+                        HStack(spacing: 12) {
+                            if row.current { TVBadge(ServersWords.current, style: .gold, size: 13) }
+                            RowValue(text: nil)
+                        }
+                    }
+                }
+                .buttonStyle(SettingsRowStyle())
+                .focused($focus, equals: .serverRow(row.id))
+                .accessibilityIdentifier("settings-row-\(SettingsFocus.serverKey(row.id))")
             }
-        }
-        SettingsGroup(SettingsWords.anotherServer) {
-            navRow(.server, "switch", title: switchServerTitle, detail: SettingsWords.switchServerShortLine, chevron: false) {
-                flow.startSwitch(services)
+            navRow(.server, SettingsFocus.addServerKey, title: ServersWords.add, detail: servers.addLine(device: family)) {
+                // With as many servers as this Apple TV keeps, the row says to remove one first.
+                if servers.canAdd { flow.startAdding(services) }
             }
+            .opacity(servers.canAdd ? 1 : 0.55)
         }
         if services.requests.options.inboxAllowed {
             let waiting = services.requests.options.inbox
@@ -604,7 +646,8 @@ private struct SettingsView: View {
             ["name"] + (model.canSeeEveryone ? ["everyone"] : []) + deviceKeys + ["password", "signout"]
         case .requests: ["mine"]
         case .server:
-            ["switch"] + (services.requests.options.inboxAllowed ? ["inbox"] : []) + (model.serverSettingsRow != nil ? ["server-settings"] : [])
+            servers.settingsRows.map { SettingsFocus.serverKey($0.id) } + [SettingsFocus.addServerKey]
+                + (services.requests.options.inboxAllowed ? ["inbox"] : []) + (model.serverSettingsRow != nil ? ["server-settings"] : [])
         case .about: ["privacy", "diagnostics"]
         case .downloads, .inbox: []
         }
@@ -697,6 +740,9 @@ private struct SettingsView: View {
         if key.hasPrefix("follow-"), let follow = follows.follows.first(where: { "follow-\($0.tmdbID)" == key }) {
             return SettingsHelp(title: follow.title, paragraphs: [follows.line(for: follow).text], hint: NewEpisodeWords.tvShowHint(inLibrary: follow.inLibrary))
         }
+        if let row = servers.settingsRows.first(where: { SettingsFocus.serverKey($0.id) == key }) {
+            return SettingsHelp(title: row.name, paragraphs: ServersWords.tvRowAbout(current: row.current), hint: opens)
+        }
         if key.hasPrefix("device-"), let session = model.sessions.value?.first(where: { "device-\($0.id)" == key }) {
             var paragraphs = SettingsWords.deviceAbout(session)
             if session.userName != model.user?.name { paragraphs.insert("\(session.userName)’s device.", at: 0) }
@@ -739,8 +785,10 @@ private struct SettingsView: View {
             return SettingsHelp(title: SettingsWords.signOutOfThis(family), paragraphs: model.signOutThisDeviceWords().lines, hint: SettingsWords.tvHintAsks)
         case "mine":
             return SettingsHelp(title: SettingsWords.yourRequests, paragraphs: [PanelWords.requestsAbout], hint: opens)
-        case "switch":
-            return SettingsHelp(title: switchServerTitle, paragraphs: SettingsWords.switchServerAbout, hint: SettingsWords.tvHintStarts)
+        case SettingsFocus.addServerKey:
+            return servers.canAdd
+                ? SettingsHelp(title: ServersWords.add, paragraphs: ServersWords.tvAddAbout, hint: SettingsWords.tvHintStarts)
+                : SettingsHelp(title: ServersWords.add, paragraphs: [servers.addLine(device: family)], hint: "Menu goes back to the list")
         case "inbox":
             return SettingsHelp(title: SettingsWords.inbox, paragraphs: ["\(SettingsWords.inboxLine)."], hint: opens)
         case "server-settings":
@@ -800,23 +848,27 @@ private struct SettingsView: View {
 
     // MARK: Launch arguments
 
-    private func applyLaunchArguments() {
-        // Back from Switch server: on its row, in Server.
-        if let place = flow.settingsReturn {
-            flow.settingsReturn = nil
-            chosen = place.section
-            lastFocus = place
-            if case .row(let section, let key) = place { remembered[section] = key }
-            Task {
-                for _ in 0..<5 where focus != place {
-                    focus = place
-                    try? await Task.sleep(for: .milliseconds(120))
-                }
+    /// Back from Add a server, or from Servers' Manage servers: on its row, in Server.
+    private func applyReturn() {
+        guard let place = flow.settingsReturn else { return }
+        flow.settingsReturn = nil
+        chosen = place.section
+        lastFocus = place
+        if case .row(let section, let key) = place { remembered[section] = key }
+        Task {
+            for _ in 0..<5 where focus != place {
+                focus = place
+                try? await Task.sleep(for: .milliseconds(120))
             }
         }
+    }
+
+    private func applyLaunchArguments() {
+        applyReturn()
         #if DEBUG
-        guard !launched else { return }
-        launched = true
+        // Once a launch: a switch to another server rebuilds the tabs, and this screen with them.
+        guard !flow.appliedSettingsLaunch else { return }
+        flow.appliedSettingsLaunch = true
         let arguments = ProcessInfo.processInfo.arguments
         if let i = arguments.firstIndex(of: "-settingsGroup"), arguments.indices.contains(i + 1),
            let section = SettingsDestination(rawValue: arguments[i + 1]), sections.contains(section) {
@@ -829,9 +881,15 @@ private struct SettingsView: View {
         if arguments.contains("-changePassword") { task = .changePassword }
         if arguments.contains("-serverSettingsCode") { task = .serverSettings }
         if arguments.contains("-signOutQuestion") { askSignOut() }
-        if arguments.contains("-switchServer") { flow.startSwitch(services) }
+        if arguments.contains("-addServer") { flow.startAdding(services) }
+        if let i = arguments.firstIndex(of: "-serverPage"), arguments.indices.contains(i + 1) { flow.serverPage = arguments[i + 1] }
         #endif
     }
+}
+
+/// The server whose page is up, as a cover's item.
+private struct ServerPageID: Identifiable {
+    let id: String
 }
 
 /// Server settings in the web app, as a code to scan beside what it holds

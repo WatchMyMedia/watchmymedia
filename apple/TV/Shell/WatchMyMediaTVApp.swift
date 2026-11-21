@@ -10,7 +10,9 @@ import WMMUI
 @main
 struct WatchMyMediaTVApp: App {
     @State private var services: AppServices
-    @State private var navigator = Navigator()
+    @State private var navigator: Navigator
+    /// Servers, the switcher: one for the app, since Servers, Settings, Search and links all switch.
+    @State private var servers: ServersModel
     /// Live TV favourites and reminders, shared by every screen.
     @State private var extras: LiveExtrasStore
     @State private var recordings: LiveRecordingsStore
@@ -23,6 +25,10 @@ struct WatchMyMediaTVApp: App {
         Diagnostics.start()
         let services = ServicesFactory.make(arguments: ProcessInfo.processInfo.arguments)
         _services = State(initialValue: services)
+        let navigator = Navigator()
+        _navigator = State(initialValue: navigator)
+        // Apple TV keeps no downloads, so a server that doesn't answer offers only Try again.
+        _servers = State(initialValue: ServersModel(servers: services.servers, navigator: navigator))
         _extras = State(initialValue: LiveExtrasStore(repository: services.liveTV))
         _recordings = State(initialValue: LiveRecordingsStore(repository: services.liveTV))
         _follows = State(initialValue: FollowsStore(repository: services.follows))
@@ -47,20 +53,22 @@ struct WatchMyMediaTVApp: App {
             RootView()
                 .environment(services)
                 .environment(navigator)
+                .environment(servers)
                 .environment(extras)
                 .environment(recordings)
                 .environment(follows)
                 .environment(\.imageLoader, services.images)
                 .preferredColorScheme(.dark)
                 .tint(Palette.gold)
-                // A play or channel link acts only when the app published it for this server.
+                // A play or channel link acts only when the app published it for a server this
+                // Apple TV is signed in to; one for a server that isn't in use switches to it first.
                 .onOpenURL { url in
-                    guard let link = DeepLink.opening(url, signedInServer: services.servers.current?.server.id), link.opensOnAppleTV else { return }
-                    Task { await navigator.open(link, library: services.library, liveTV: services.liveTV) }
+                    Task { await servers.open(url, library: services.library, liveTV: services.liveTV) { $0.opensOnAppleTV } }
                 }
                 .task { await navigator.applyLaunchArguments(ProcessInfo.processInfo.arguments, library: services.library, liveTV: services.liveTV) }
-                // The Top Shelf shows only the signed-in person's rows (Home publishes them).
-                .clearsTopShelfOnAccountChange(services)
+                // The Top Shelf shows only the signed-in person's rows: cleared when the person or
+                // the server changes, then published again for the server now in use.
+                .keepsTopShelfForTheAccount(services)
                 // The person's other devices change favourites and reminders too.
                 .task { await extras.follow() }
                 .task { await recordings.follow() }
