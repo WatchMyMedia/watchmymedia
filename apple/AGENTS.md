@@ -78,23 +78,37 @@ server, and on iPad in both a regular and a compact width.
     A picture is signed for the server its address is on
     (`LocalStore.signedIn(for:)`).
   - A kept address is only where a server was last seen: on another
-    network `http://192.168.x.y` is someone else's machine. So before a
-    sign-in goes to a server that isn't the one in use, that server is
-    asked which one it is, with no sign-in (GET /api/server,
-    `RealServerRepository.askOther`), and the sign-in goes only when the id
-    is the one remembered. `LocalStore.other(serverID:)` enforces it: it
-    hands out no sign-in until the server has answered
-    (`ServerNotAskedError`), so search, its pictures and anything new that
-    reaches another server are covered without asking themselves. The
-    answer stands for a visit to Search and on the network it was given
-    on. A visit begins each time Search comes on screen
+    network `http://192.168.x.y` is someone else's machine. So the sign-in
+    of a server that is not, or is no longer, the one in use goes to its
+    kept address only after that address has said which server it is,
+    asked with no sign-in (GET /api/server), and the id is the one
+    remembered. This is enforced in the one place a sign-in is put on a
+    request, `RequestSigner`, through its `SignInCheck`: every API and
+    signer the store makes for a kept sign-in carries one
+    (`LocalStore.api(serverID:baseURL:token:)`,
+    `signer(serverID:baseURL:token:)`). A request that can wait asks first
+    (the generated client's calls, `ServerAPI.data`, the offline routes'
+    signed fetches); one that can't (`authorizedRequest`: pictures) carries
+    the sign-in only while an answer stands. So no caller has to remember
+    to ask, and a new one can't forget. Make no API or signer with a token
+    any other way: `LocalStore.api(baseURL:)` sends none.
+  - How long an answer stands is the asker's to say
+    (`LocalStore.ask(serverID:baseURL:)` keeps nothing itself). Search
+    notes it for its visit (`RealServerRepository.askOther`); a sign-out
+    and a removal note it for all they send; background work (a download's
+    calls to the server it came from, an operation still sending after
+    another server came into use) notes nothing and is asked each time,
+    since nothing says when its answer has grown old. A question already
+    out is shared by whoever asks next (`SharedQuestion`). Whatever was
+    noted goes when the network changes, when another server comes into
+    use, or when a call to that server fails. The server in use is never
+    asked.
+  - A visit to Search begins each time Search comes on screen
     (`SearchModel.visitBegan()` and `visitEnded()`, from the search
     screens' `onAppear`, `onDisappear` and the scene's phase): back on
     Search the servers whose titles are listed are asked again without
-    being searched (`LibraryRepository.askServer`). The answer goes when
-    the visit ends, the network changes, another server comes into use, or
-    a call to that server fails. A keystroke cancels the search, not the
-    question (`SharedQuestion`): the next search waits for the same
+    being searched (`LibraryRepository.askServer`). A keystroke cancels
+    the search, not the question: the next search waits for the same
     answer.
   - A sign-out is sent only to the server itself. Removing a server and
     signing out of one ask its kept address which server it is first, once
@@ -102,14 +116,18 @@ server, and on iPad in both a regular and a compact width.
     `RealAuthRepository.signOut`). When it doesn't answer as itself,
     nothing is sent and nothing is kept to send later; the device forgets
     it at once all the same. Don't add a retry.
-  - A server that doesn't answer as itself gets the line any failure gets;
-    don't word it differently, and never fall back to sending the sign-in.
-    The server in use is never asked. Two paths send a sign-in to a server
-    that isn't in use without asking yet: the offline downloads' calls for
-    the server a download came from (`RealOfflineGateway.call` and
-    `authorizedRequest`), and an operation that began on one server
-    and is still sending when another comes into use (a setting being
-    saved).
+  - A server that doesn't answer as itself is a server that couldn't be
+    reached: the line any failure gets in Search, a download's call that
+    fails and is tried again later with nothing said (`APIError` with no
+    status). Don't word it differently, and never fall back to sending
+    the sign-in.
+  - Not asked: an HLS download's media requests, which carry a short-lived
+    offline token in the address, not the account's sign-in; and a
+    transfer of an original file or a subtitle once it has started. That
+    one is signed with the account's sign-in when the engine creates it
+    (asked first then), and from there it is the system's background
+    transfer: when the system resumes it by itself, on whatever network,
+    it sends the same request again and no code of the app runs.
   - Screens switch through `ServersModel` (`switchTo`, `remove`,
     `signingOut`, `open`), one for the app in the environment, not by
     calling `ServerRepository.select` or `forget` themselves: it asks the
