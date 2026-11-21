@@ -144,7 +144,7 @@ internal class RealAuthRepository(
             // The server stays on the list, signed out. With another still signed in the app moves to it rather than to this one's sign-in.
             if (s.currentId == session.server.id) signedOut.movedToSignedIn(now) ?: signedOut else signedOut
         }
-        if (token != null) servers.signOutQuietly(session.server.baseUrl, token)
+        if (token != null) servers.signOutQuietly(session.server, token)
     }
 
     override suspend fun sessions(all: Boolean): List<DeviceSession> =
@@ -197,12 +197,12 @@ internal class RealAuthRepository(
     private suspend fun keep(server: StoredServer, user: User, sessionId: String?, token: String, revision: Long) {
         val serverId = server.id
         val sealed = withContext(Dispatchers.IO) { store.seal(token) }
-        val replaced = store.value.servers.firstOrNull { it.id == serverId }?.let { server -> server.account?.let { server.baseUrl to it } }
+        val replaced = store.value.servers.firstOrNull { it.id == serverId }?.let { kept -> kept.account?.let { kept to it } }
         store.updateAndSave { s ->
             if (store.revision != revision || s.current?.id != server.id ||
                 s.current?.baseUrl?.let { ServerAddress.sameEndpoint(it, server.baseUrl) } != true
             ) {
-                servers.signOutLater(server.baseUrl, token)
+                servers.signOutLater(server, token)
                 throw CancellationException("The server or account changed during sign-in.")
             }
             s.withServer(serverId) {
@@ -210,7 +210,7 @@ internal class RealAuthRepository(
             }
         }
         // Signing in again (another account, or the same one) ends the session it replaces.
-        replaced?.let { (baseUrl, old) -> store.tokenOrNull(old)?.let { servers.signOutLater(baseUrl, it) } }
+        replaced?.let { (kept, old) -> store.tokenOrNull(old)?.let { servers.signOutLater(kept, it) } }
     }
 
     companion object {

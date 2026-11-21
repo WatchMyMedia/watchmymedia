@@ -202,12 +202,79 @@ class OfflineGatewayTest {
         }
     }
 
-    @Test
-    fun `a download's calls go to its own server while another is in use`() = runBlocking {
+    /** Another server comes into use: the test server's downloads stay, and are reported to it from the background. */
+    private fun useAnotherServer() = runBlocking {
         h.services.servers.select(Server("srv-other", "Other", "http://127.0.0.1:9", "1.0.0", 10))
-        server.always("POST /api/offline/downloads/abcdefghijklmnop/token", json("""{"token":"o1.abc","expiresAt":"2026-11-02T00:00:00Z","param":"access_token"}"""))
+        server.always("POST /api/offline/sync", json(SYNC))
+        server.always(TOKEN_ROUTE, json("""{"token":"o1.abc","expiresAt":"2026-11-02T00:00:00Z","param":"access_token"}"""))
+        // The checks the sign-in made in the background are done before a test counts requests.
+        h.services.awaitIdle()
+        server.requests.clear()
+    }
+
+    private fun report() = runBlocking { gateway.sync(owner, h.services.client, 0, listOf(SyncedDownload("abcdefghijklmnop", DeviceDownloadState.Removed)), emptyList()) }
+
+    private fun routes() = server.requests.map { "${it.method} ${it.requestUrl!!.encodedPath}" }
+
+    @Test
+    fun `a download's calls go to its own server while another is in use, once it has said which server it is`() = runBlocking {
+        useAnotherServer()
+        server.always("GET /api/server", json(INFO))
+
         assertEquals("o1.abc", gateway.token(owner, "abcdefghijklmnop").token)
-        assertEquals("Bearer tok-viewer", server.last("POST /api/offline/downloads/abcdefghijklmnop/token").getHeader("Authorization"))
+        assertEquals(listOf("GET /api/server", TOKEN_ROUTE), routes())
+        assertNull("the question carries no sign-in", server.requests[0].getHeader("Authorization"))
+        assertEquals("Bearer tok-viewer", server.last(TOKEN_ROUTE).getHeader("Authorization"))
+
+        // A report on a download: asked again, since nothing keeps an answer between calls made in the background.
+        report()
+        assertEquals(listOf("GET /api/server", TOKEN_ROUTE, "GET /api/server", "POST /api/offline/sync"), routes())
+        assertEquals("Bearer tok-viewer", server.last("POST /api/offline/sync").getHeader("Authorization"))
+        assertTrue(server.requests("GET /api/server").none { it.getHeader("Authorization") != null })
+    }
+
+    @Test
+    fun `a download's server is not asked while it is the one in use`() = runBlocking {
+        server.always("POST /api/offline/sync", json(SYNC))
+        h.services.awaitIdle()
+        server.requests.clear()
+        report()
+        assertEquals(listOf("POST /api/offline/sync"), routes())
+    }
+
+    @Test
+    fun `another server at a download's address gets no sign-in, and the report fails to be tried again`() = runBlocking {
+        useAnotherServer()
+        // The address kept is another machine's on this network, and it is a WatchMyMedia server too.
+        server.always("GET /api/server", json(INFO.replace("srv-test", "someone-else")))
+
+        assertTrue(runCatching { report() }.exceptionOrNull() is ApiException)
+        assertTrue(runCatching { gateway.token(owner, "abcdefghijklmnop") }.exceptionOrNull() is ApiException)
+        assertTrue(runCatching { gateway.allowed(owner) }.exceptionOrNull() is ApiException)
+
+        assertEquals("only ever asked which server it is", setOf("GET /api/server"), routes().toSet())
+        assertTrue("no request to it carried a sign-in", server.requests.none { it.getHeader("Authorization") != null })
+        assertTrue("the sign-in is kept, so the report goes when the server is there again", gateway.signedIn(owner))
+
+        // Home again: the same report is asked for, and sent.
+        server.always("GET /api/server", json(INFO))
+        report()
+        assertEquals("Bearer tok-viewer", server.last("POST /api/offline/sync").getHeader("Authorization"))
+    }
+
+    @Test
+    fun `an address where something else answers, or nothing does, gets no sign-in from a report`() = runBlocking {
+        useAnotherServer()
+        // Something that isn't a WatchMyMedia server: it has no such page.
+        assertTrue(runCatching { report() }.exceptionOrNull() is ApiException)
+        assertEquals(listOf("GET /api/server"), routes())
+        assertTrue(server.requests.none { it.getHeader("Authorization") != null })
+
+        // Nothing at the address at all.
+        server.close()
+        assertTrue(runCatching { report() }.exceptionOrNull() is ApiException)
+        assertEquals("nothing more reached it", 1, server.requests.size)
+        assertTrue(gateway.signedIn(owner))
     }
 
     @Test
@@ -220,6 +287,11 @@ class OfflineGatewayTest {
     }
 
     private companion object {
+        const val TOKEN_ROUTE = "POST /api/offline/downloads/abcdefghijklmnop/token"
+
+        /** What the test server says of itself, as it was added in [signIn]. */
+        const val INFO = """{"id":"srv-test","name":"Test server","version":"1.0.0","apiLevel":10,"setupRequired":false,"turnstile":false}"""
+
         const val OPTIONS = """{"movies":false,"shows":false,"needsApproval":false,"problems":true,"manage":false,"backend":"none","inbox":0,"offline":OFFLINE}"""
 
         const val PLAN = """{"fileId":42,"durationMs":3000000,

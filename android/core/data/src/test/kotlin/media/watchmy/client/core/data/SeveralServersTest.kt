@@ -28,7 +28,9 @@ import org.junit.Test
  * Several servers on one device: a switch that asks the server first and
  * leaves the one in use alone when it doesn't answer, signing out of or
  * removing one, and a search that asks each server as its own person at its
- * own address, after asking a server that isn't in use which server it is.
+ * own address. Whatever is sent to a server that isn't in use (a search, a
+ * report, the end of its session) goes only after it has said, asked with no
+ * sign-in, which server it is.
  * Two servers are signed in: the test server (viewer, token tok-viewer) and
  * a second one (token tok-cabin), which is the one in use.
  */
@@ -60,6 +62,8 @@ class SeveralServersTest {
     }
 
     private fun testInfo(level: Int = 5) = json(INFO.format(level))
+
+    private val cabinInfo get() = json(CABIN_INFO)
 
     /** A search that finds nothing. */
     private val found get() = json("""{"movies":[],"shows":[],"episodes":[]}""")
@@ -136,10 +140,14 @@ class SeveralServersTest {
     @Test
     fun `signing out of the server in use moves to the one used last that is still signed in`() = runBlocking {
         signInOnBoth()
+        second.always("GET /api/server", cabinInfo)
         second.always("POST /api/auth/logout", noContent())
         h.services.auth.signOut()
         assertEquals("srv-test", servers.current.value?.server?.id)
         assertEquals(2L, h.services.auth.user.value?.id)
+        // Another server took its place, so it says which server it is before the sign-out goes to it.
+        assertEquals(listOf("GET /api/server", "POST /api/auth/logout"), second.requests.map { "${it.method} ${it.requestUrl!!.encodedPath}" })
+        assertNull(second.requests[0].getHeader("Authorization"))
         assertEquals("Bearer tok-cabin", second.last("POST /api/auth/logout").getHeader("Authorization"))
         val left = servers.saved.first().first { it.server.id == "srv-cabin" }
         assertFalse("it stays on the list, signed out", left.signedIn)
@@ -149,6 +157,18 @@ class SeveralServersTest {
         h.services.auth.signOut()
         assertEquals("srv-test", servers.current.value?.server?.id)
         assertNull(h.services.auth.user.value)
+    }
+
+    @Test
+    fun `a sign-out is not sent to another server at the address of the one signed out of`() = runBlocking {
+        signInOnBoth()
+        second.always("GET /api/server", json(CABIN_INFO.replace("srv-cabin", "someone-else")))
+        second.always("POST /api/auth/logout", noContent())
+        h.services.auth.signOut()
+        assertEquals("the app moves on all the same", "srv-test", servers.current.value?.server?.id)
+        assertFalse("and is signed out of it here", servers.saved.first().first { it.server.id == "srv-cabin" }.signedIn)
+        assertEquals(listOf("GET /api/server"), second.requests.map { "${it.method} ${it.requestUrl!!.encodedPath}" })
+        assertTrue("no request to it carried a sign-in", second.requests.none { it.getHeader("Authorization") != null })
     }
 
     @Test
@@ -176,6 +196,7 @@ class SeveralServersTest {
             loggedOutBeforeHook = h.server.requests("POST /api/auth/logout").isNotEmpty()
         }
         h.services.offlineGateway.onSessionChange { changes++ }
+        h.server.always("GET /api/server", testInfo())
         h.server.always("POST /api/auth/logout", noContent())
 
         servers.forget("srv-test")
@@ -191,6 +212,84 @@ class SeveralServersTest {
         while (h.server.requests("POST /api/auth/logout").isEmpty() && System.currentTimeMillis() < deadline) Thread.sleep(20)
         assertEquals("Bearer tok-viewer", h.server.last("POST /api/auth/logout").getHeader("Authorization"))
         assertTrue("the server in use is not signed out of", second.requests("POST /api/auth/logout").isEmpty())
+    }
+
+    /** As a download does when its server is removed: tells that server what the device no longer holds. */
+    private fun reportsOnRemoval(): MutableList<Boolean> {
+        val sent = mutableListOf<Boolean>()
+        h.server.always("POST /api/offline/sync", json("""{"serverTime":"2027-01-15T08:00:01Z","offline":true,"downloads":[],"progress":[]}"""))
+        h.services.offlineGateway.beforeSignOut { owner ->
+            repeat(2) {
+                sent += runCatching { h.services.offlineGateway.sync(owner, h.services.client, 0, emptyList(), emptyList()) }.isSuccess
+            }
+        }
+        return sent
+    }
+
+    /** Waits for what a removal sends in the background to stop arriving. */
+    private fun settled(server: TestServer) {
+        var seen = -1
+        while (seen != server.requests.size) {
+            seen = server.requests.size
+            Thread.sleep(250)
+        }
+    }
+
+    @Test
+    fun `a removal asks a server that isn't in use once, for what it reports and for the sign-out after`() = runBlocking {
+        signInOnBoth()
+        val sent = reportsOnRemoval()
+        h.server.always("GET /api/server", testInfo())
+        h.server.always("POST /api/auth/logout", noContent())
+
+        servers.forget("srv-test")
+        settled(h.server)
+
+        assertEquals(listOf(true, true), sent)
+        assertEquals(
+            listOf("GET /api/server", "POST /api/offline/sync", "POST /api/offline/sync", "POST /api/auth/logout"),
+            h.server.requests.map { "${it.method} ${it.requestUrl!!.encodedPath}" },
+        )
+        assertNull("the question carries no sign-in", h.server.requests[0].getHeader("Authorization"))
+        assertTrue(h.server.requests.drop(1).all { it.getHeader("Authorization") == "Bearer tok-viewer" })
+    }
+
+    @Test
+    fun `removing a server at whose address another answers sends it no report and no sign-out, and removes it all the same`() = runBlocking {
+        signInOnBoth()
+        val sent = reportsOnRemoval()
+        h.server.always("GET /api/server", json(INFO.format(5).replace("srv-test", "someone-else")))
+        h.server.always("POST /api/auth/logout", noContent())
+
+        servers.forget("srv-test")
+        settled(h.server)
+
+        assertEquals("srv-cabin", servers.current.value?.server?.id)
+        assertEquals("it is gone from this device", listOf("srv-cabin"), servers.saved.first().map { it.server.id })
+        assertEquals("what it was to be told could not be sent", listOf(false, false), sent)
+        assertEquals("asked which server it is once, and nothing else", listOf("GET /api/server"), h.server.requests.map { "${it.method} ${it.requestUrl!!.encodedPath}" })
+        assertTrue("no request to it carried a sign-in", h.server.requests.none { it.getHeader("Authorization") != null })
+    }
+
+    @Test
+    fun `removing a server whose address doesn't answer removes it all the same, and sends nothing when something else is there`() = runBlocking {
+        signInOnBoth()
+        val sent = reportsOnRemoval()
+        // Something that isn't a WatchMyMedia server has the address: it has no such page.
+        h.server.always("POST /api/auth/logout", noContent())
+
+        servers.forget("srv-test")
+        settled(h.server)
+
+        assertEquals(listOf("srv-cabin"), servers.saved.first().map { it.server.id })
+        assertEquals(listOf(false, false), sent)
+        assertEquals(listOf("GET /api/server"), h.server.requests.map { "${it.method} ${it.requestUrl!!.encodedPath}" })
+        assertTrue(h.server.requests.none { it.getHeader("Authorization") != null })
+
+        // And with nothing at an address at all: the server in use, removed while its machine is off.
+        second.close()
+        servers.forget("srv-cabin")
+        assertTrue(servers.saved.first().isEmpty())
     }
 
     @Test
@@ -427,5 +526,6 @@ class SeveralServersTest {
 
     private companion object {
         const val INFO = """{"id":"srv-test","name":"Test server","version":"1.3.0","apiLevel":%d,"setupRequired":false,"turnstile":false}"""
+        const val CABIN_INFO = """{"id":"srv-cabin","name":"Cabin server","version":"1.0.0","apiLevel":3,"setupRequired":false,"turnstile":false}"""
     }
 }

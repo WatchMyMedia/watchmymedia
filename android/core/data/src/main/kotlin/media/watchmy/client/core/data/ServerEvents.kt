@@ -33,6 +33,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
 import okhttp3.Request
 import okio.BufferedSource
+import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.LibraryChange
 import media.watchmy.client.model.RowsChange
 
@@ -330,7 +331,14 @@ internal class ServerEvents(
         val token = store.tokenForRequest(session.server.id, account) ?: run { close(); return@callbackFlow }
         val baseUrl = session.server.baseUrl
         // The stream client's interceptor sends the token and clears the sign-in on a 401, as for any call.
-        val call = http.calls(http.accountCredential(session.server, token), http.streamClient).newCall(
+        // A server no longer in use (the app switched as this connected) is asked which server it is first, as for any call.
+        val calls = try {
+            http.accountCalls(session.server, token, http.streamClient)
+        } catch (e: ApiException) {
+            close(IOException("the server is no longer the one in use, and didn't say which server it is", e))
+            return@callbackFlow
+        }
+        val call = calls.newCall(
             Request.Builder().url("$baseUrl/api/events").header("Accept", "text/event-stream").build(),
         )
         launch(Dispatchers.IO) {
