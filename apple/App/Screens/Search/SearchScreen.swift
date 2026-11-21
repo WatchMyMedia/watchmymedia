@@ -11,15 +11,22 @@ import WMMUI
 /// Requestable titles follow the library results, retaining the server permissions and Seerr guidance.
 /// From API level 15 with listings, On Live TV follows the library's
 /// groups.
+/// With two or more servers signed in, search looks in all of them: the
+/// server in use's results first in each group, the others' after them,
+/// each naming its server. A server still being asked, and one that didn't
+/// answer (with Try again), are lines at the end. Opening a result on
+/// another server switches the app to it. The merging is the Kit's (``SearchModel``).
 struct SearchScreen: View {
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
     @Environment(LiveExtrasStore.self) private var extras
+    @Environment(ServersModel.self) private var servers
 
     var body: some View {
         // Recent searches are kept between launches for this account on this server.
         let recents = services.servers.current.flatMap { current in services.auth.user.map { RecentSearches(server: current.server.id, user: $0.id) } }
-        SearchView(model: SearchModel(library: services.library, navigator: navigator, requests: services.requests, recents: recents),
+        SearchView(model: SearchModel(library: services.library, navigator: navigator, requests: services.requests, recents: recents,
+                                      servers: services.servers, switcher: servers),
                    live: LiveSearchModel(repository: services.liveTV, extras: extras))
     }
 }
@@ -67,6 +74,13 @@ private struct SearchView: View {
             // `-search harbor` (DEBUG) searches at launch, for screenshots.
             if let query = ScreenshotLaunch.value(after: "-search") { model.setQuery(query); live.setQuery(query) }
         }
+        // A result on another server was opened: the app is on that server now, and
+        // the same words are asked again here when Search shows (Back from the title).
+        .onAppear {
+            guard let words = navigator.takeSearchWords() else { return }
+            model.selectRecentQuery(words)
+            live.setQuery(words)
+        }
         .liveRemindFlow()
         .messageToast($model.message)
         .onChange(of: live.available, initial: true) { _, _ in live.availabilityChanged() }
@@ -93,8 +107,9 @@ private struct SearchView: View {
     }
 
     /// Not in your library: TMDB's matches, with Request, Requested or Downloading.
+    /// They stay the server in use's, which the heading names across servers.
     private func notInLibrary(_ items: [Requestable]) -> some View {
-        ResultGroup(title: "Not in your library", count: items.count) {
+        ResultGroup(title: "Not in your library", detail: model.notInLibraryDetail) {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 Group {
                     if item.state == .requestable {
@@ -150,9 +165,12 @@ private struct SearchView: View {
         case .noMatches(let query):
             // Nothing in the library, but Live TV's group may still have some.
             if case .results = live.phase {} else {
-                EmptyState(systemImage: "text.magnifyingglass", title: "No matches", message: noMatchesMessage(query))
+                let words = model.noMatchesWords(query)
+                EmptyState(systemImage: "text.magnifyingglass", title: words.title, message: words.message)
                     .padding(.top, 100)
             }
+            // A server that wasn't asked, or didn't answer, may still have it.
+            serverLines.padding(.horizontal, wide ? PadLayout.margin : 16)
         case .failed(let message):
             ErrorState(title: "Couldn't search", message: message, retry: model.retry)
                 .padding(.top, 60)
@@ -178,14 +196,58 @@ private struct SearchView: View {
                 } else {
                     ForEach(groups, id: \.self) { group($0, results) }
                 }
+                serverLines
             }
             .padding(.horizontal, wide ? PadLayout.margin : 16)
             .padding(.top, 8)
         }
     }
 
+    /// At the end of the list: a server asked a while ago that hasn't
+    /// answered yet, and each server whose titles aren't listed, with Try
+    /// again for one that didn't answer.
+    @ViewBuilder private var serverLines: some View {
+        if model.stillAsking != nil || !model.unlisted.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                if let asking = model.stillAsking {
+                    HStack(spacing: 10) {
+                        ProgressView().controlSize(.small).tint(Palette.gold)
+                        Text(asking).scaledFont(13).foregroundStyle(Palette.muted)
+                    }
+                    .frame(minHeight: 32)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("search-still-asking")
+                }
+                ForEach(model.unlisted) { server in
+                    HStack(alignment: .center, spacing: 10) {
+                        Image(systemName: "exclamationmark.circle")
+                            .foregroundStyle(Palette.warning)
+                            .accessibilityHidden(true)
+                        Text(server.line)
+                            .scaledFont(13)
+                            .foregroundStyle(Palette.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if server.canRetry {
+                            Button(SearchWords.tryAgain) { model.retry(server) }
+                                .buttonStyle(SmallGhostButtonStyle())
+                                .accessibilityLabel("\(SearchWords.tryAgain), \(server.server.name)")
+                                .accessibilityIdentifier("search-retry-\(server.id)")
+                        }
+                    }
+                    .frame(minHeight: 32)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("search-unlisted-\(server.id)")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 4)
+        }
+    }
+
     private var searchPrompt: some View {
-        EmptyState(systemImage: "magnifyingglass", title: "Search your libraries", message: "Find a show, a movie or an episode by its title.")
+        let words = model.idleWords
+        return EmptyState(systemImage: "magnifyingglass", title: words.title, message: words.message)
     }
 
     private var recentQueries: some View {
@@ -219,25 +281,30 @@ private struct SearchView: View {
         }
     }
 
-    @ViewBuilder private func posters(_ results: SearchResults) -> some View {
+    @ViewBuilder private func posters(_ results: SearchListing) -> some View {
         let items = results.shows + results.movies
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeading("Shows and movies", detail: formatCount(items.count))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: PadLayout.posterMinimum), spacing: 16, alignment: .top)], spacing: 18) {
-                    ForEach(items, id: \.self) { item in
-                        Button { model.open(item) } label: {
+                    ForEach(items) { found in
+                        Button { model.open(found) } label: {
                             VStack(alignment: .leading, spacing: 4) {
-                                PosterCard(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w342), compact: true)
-                                Text(item.kind == .show ? "TV show" : "Movie")
+                                PosterCard(item: found.item, imageURL: services.library.imageURL(found.posterPath, size: .w342, on: found.server), compact: true)
+                                Text(found.kind == .show ? "TV show" : "Movie")
                                     .scaledFont(11, weight: .semibold)
                                     .foregroundStyle(Palette.muted)
+                                // The server it is on, when that isn't the one in use.
+                                if let server = found.server { ServerLabel(name: server.name) }
                             }
                         }
                         .buttonStyle(CardButtonStyle())
+                        .accessibilityValue(found.server.map { "On \($0.name)" } ?? "")
+                        .accessibilityIdentifier("search-result-\(found.id)")
                         .contextMenu {
-                            if item.watchTarget != nil {
-                                WatchToggleButton(watched: item.watched) { await model.setWatched(item, $0) }
+                            // Marking watched stays the server in use's.
+                            if found.server == nil, found.watchTarget != nil {
+                                WatchToggleButton(watched: found.watched) { await model.setWatched(found.item, $0) }
                             }
                         }
                     }
@@ -246,7 +313,7 @@ private struct SearchView: View {
         }
     }
 
-    private func isEmpty(_ group: ResultKind, in results: SearchResults) -> Bool {
+    private func isEmpty(_ group: ResultKind, in results: SearchListing) -> Bool {
         switch group {
         case .shows: results.shows.isEmpty
         case .movies: results.movies.isEmpty
@@ -254,7 +321,7 @@ private struct SearchView: View {
         }
     }
 
-    @ViewBuilder private func group(_ group: ResultKind, _ results: SearchResults) -> some View {
+    @ViewBuilder private func group(_ group: ResultKind, _ results: SearchListing) -> some View {
         switch group {
         case .shows:
             ResultGroup(title: "TV Shows", count: results.shows.count) {
@@ -271,30 +338,33 @@ private struct SearchView: View {
         }
     }
 
-    private func itemRow(_ item: BrowseItem, first: Bool) -> some View {
-        Button { model.open(item) } label: {
-            ResultRow(title: item.title, line: item.searchLine) {
-                Artwork(url: services.library.imageURL(item.posterPath, size: .w185), seed: item.title, maxPixel: 200)
+    private func itemRow(_ found: FoundTitle, first: Bool) -> some View {
+        Button { model.open(found) } label: {
+            ResultRow(title: found.title, line: found.item.searchLine, server: found.server?.name) {
+                Artwork(url: services.library.imageURL(found.posterPath, size: .w185, on: found.server), seed: found.title, maxPixel: 200)
                     .frame(width: wide ? 48 : 44, height: wide ? 72 : 66)
-                    .overlay { if item.watched { WatchedCheck(size: 16).pinned(.bottomTrailing, padding: 4) } }
+                    .overlay { if found.watched { WatchedCheck(size: 16).pinned(.bottomTrailing, padding: 4) } }
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
         .buttonStyle(ResultRowStyle())
         .overlay(alignment: .top) { if !first { RowSeparator() } }
+        .accessibilityIdentifier("search-result-\(found.id)")
         .contextMenu {
-            if item.watchTarget != nil {
-                WatchToggleButton(watched: item.watched) { await model.setWatched(item, $0) }
+            // Marking watched stays the server in use's.
+            if found.server == nil, found.watchTarget != nil {
+                WatchToggleButton(watched: found.watched) { await model.setWatched(found.item, $0) }
             }
         }
     }
 
-    private func episodeRow(_ episode: EpisodeCard, first: Bool) -> some View {
-        Button { model.open(episode) } label: {
-            ResultRow(title: episode.title, line: episode.searchLine()) {
+    private func episodeRow(_ found: FoundEpisode, first: Bool) -> some View {
+        let episode = found.episode
+        return Button { model.open(found) } label: {
+            ResultRow(title: episode.title, line: episode.searchLine(), server: found.server?.name) {
                 Group {
                     if episode.hasFile {
-                        Artwork(url: services.library.imageURL(episode.stillPath ?? episode.showBackdropPath, size: .w300), seed: episode.showTitle, maxPixel: 300)
+                        Artwork(url: services.library.imageURL(episode.stillPath ?? episode.showBackdropPath, size: .w300, on: found.server), seed: episode.showTitle, maxPixel: 300)
                             .overlay {
                                 if episode.isNew { Badge("New", style: .gold).pinned(.topLeading, padding: 4) }
                                 if episode.watched { WatchedCheck(size: 16).pinned(.bottomTrailing, padding: 4) }
@@ -312,24 +382,56 @@ private struct SearchView: View {
         .overlay(alignment: .top) { if !first { RowSeparator() } }
         .accessibilityValue(episode.hasFile ? "" : "Not in library")
         .accessibilityHint("Opens the episode")
+        .accessibilityIdentifier("search-result-\(found.id)")
         .contextMenu {
-            if episode.playRequest != nil {
-                Button { model.play(episode) } label: { Label("Play", systemImage: "play.fill") }
+            // Playing and marking watched stay the server in use's.
+            if found.server == nil {
+                if episode.playRequest != nil {
+                    Button { model.play(episode) } label: { Label("Play", systemImage: "play.fill") }
+                }
+                WatchToggleButton(watched: episode.watched) { await model.setWatched(episode, $0) }
             }
-            WatchToggleButton(watched: episode.watched) { await model.setWatched(episode, $0) }
         }
+    }
+}
+
+/// The name of the server a result is on, when that isn't the one in use: a
+/// small label at the end of its row, or under its poster.
+private struct ServerLabel: View {
+    let name: String
+
+    var body: some View {
+        Text(name)
+            .scaledFont(11, weight: .semibold)
+            .foregroundStyle(Palette.textSecondary)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Palette.outlineStrong))
+            .accessibilityLabel("On \(name)")
     }
 }
 
 /// "TV Shows 1" and its results in one rounded group.
 private struct ResultGroup<Content: View>: View {
     let title: String
-    let count: Int
+    let detail: String
     @ViewBuilder var content: () -> Content
+
+    init(title: String, count: Int, @ViewBuilder content: @escaping () -> Content) {
+        self.init(title: title, detail: formatCount(count), content: content)
+    }
+
+    init(title: String, detail: String, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.detail = detail
+        self.content = content
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeading(title, detail: formatCount(count))
+            SectionHeading(title, detail: detail)
             VStack(spacing: 0) { content() }
                 .background(Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 12))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -338,20 +440,43 @@ private struct ResultGroup<Content: View>: View {
     }
 }
 
-/// A result: its artwork, title and line, and a chevron.
+/// A result: its artwork, title and line, the server it is on when that
+/// isn't the one in use, and a chevron.
 private struct ResultRow<Art: View>: View {
     let title: String
     let line: String
+    var server: String?
     @ViewBuilder var art: () -> Art
+
+    private var lines: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).scaledFont(15, weight: .semibold).foregroundStyle(Palette.text).lineLimit(1)
+            Text(line).scaledFont(13).foregroundStyle(Palette.muted).lineLimit(1)
+        }
+    }
 
     var body: some View {
         HStack(spacing: 12) {
             art().accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).scaledFont(15, weight: .semibold).foregroundStyle(Palette.text).lineLimit(1)
-                Text(line).scaledFont(13).foregroundStyle(Palette.muted).lineLimit(1)
+            if let server {
+                // The server's name at the row's end where the title and its line fit
+                // beside it whole, else under them, so neither is cut short for it.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        lines.fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 0)
+                        ServerLabel(name: server)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        lines
+                        ServerLabel(name: server)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                lines
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
             Image(systemName: "chevron.right")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Palette.faint)

@@ -91,7 +91,7 @@ private struct LiveTVContent: View {
             if model.listings && sizeClass.isWide {
                 ToolbarItem(placement: .principal) { LiveModePicker(mode: $mode) }
             }
-            ToolbarItem(placement: .topBarTrailing) { LiveProfileButton() }
+            ToolbarItem(placement: .topBarTrailing) { AccountButton(tab: .liveTV) }
         }
         .groundBackground()
         .refreshable { await model.refresh() }
@@ -151,20 +151,6 @@ struct LiveChannelRow: View {
         .disabled(!channel.available)
         .accessibilityLabel("\(channel.title)\(selected ? ", playing" : "")")
         .accessibilityIdentifier("live-channel-\(channel.number)")
-    }
-}
-
-struct LiveProfileButton: View {
-    @Environment(AppServices.self) private var services
-    @Environment(Navigator.self) private var navigator
-    var body: some View {
-        Button { navigator.select(.settings) } label: {
-            Text(String(services.auth.user?.name.prefix(1) ?? "?").uppercased())
-                .font(.system(size: 15, weight: .bold)).foregroundStyle(Palette.text)
-                .frame(width: 34, height: 34).background(Palette.burgundy, in: Circle())
-                .frame(width: 44, height: 44)
-        }
-        .buttonStyle(.plain).accessibilityLabel("Settings")
     }
 }
 

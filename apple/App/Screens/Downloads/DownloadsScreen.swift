@@ -7,7 +7,10 @@ import WMMUI
 /// space downloads take, movies, shows with their episodes, and the download
 /// settings under them. Swipe a row to remove it, or use its ⋯ menu. On iPad
 /// (the Settings split view's page) movies and the
-/// settings stand beside the shows when the page is wide enough.
+/// settings stand beside the shows when the page is wide enough. The list is
+/// the server in use's; what this device holds from each other server it is
+/// signed in to is a line under it ("3 more from Cabin server") that
+/// switches to that server.
 struct DownloadsScreen: View {
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
@@ -25,6 +28,8 @@ func downloadsDevice(_ client: ClientInfo) -> String {
 private struct DownloadsView: View {
     @State var model: DownloadsModel
     @State private var width: CGFloat = 0
+    @Environment(AppServices.self) private var services
+    @Environment(ServersModel.self) private var servers
 
     /// Movies and the settings beside the shows once the page has the room (a landscape iPad).
     private var twoColumns: Bool { width >= 700 }
@@ -36,6 +41,7 @@ private struct DownloadsView: View {
                     list {
                         storage
                         if model.all.isEmpty { empty } else { movies }
+                        elsewhere
                         settings
                     }
                     Rectangle().fill(Palette.separator).frame(width: 1)
@@ -47,6 +53,7 @@ private struct DownloadsView: View {
                     if model.all.isEmpty { empty }
                     movies
                     shows
+                    elsewhere
                     settings
                 }
             }
@@ -137,6 +144,31 @@ private struct DownloadsView: View {
                     Text(group.line).font(.footnote).foregroundStyle(Palette.muted).textCase(nil)
                 }
             }
+        }
+    }
+
+    /// The other servers' downloads on this device, a line each. Choosing
+    /// one switches to its server; when that server doesn't answer, Servers
+    /// opens and says so, with Watch its downloads.
+    @ViewBuilder private var elsewhere: some View {
+        let others = model.elsewhere(services.servers)
+        if !others.isEmpty {
+            Section {
+                ForEach(others) { other in
+                    Button { Task { await servers.switchTo(other.serverID) } } label: {
+                        HStack(spacing: 8) {
+                            Text(other.line).foregroundStyle(Palette.text)
+                            Spacer(minLength: 8)
+                            if servers.switching == other.serverID { ProgressView().tint(Palette.gold) } else { RowChevron() }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .disabled(servers.busy)
+                    .accessibilityHint("Switches to that server")
+                    .accessibilityIdentifier("downloads-elsewhere-\(other.serverID)")
+                }
+            }
+            .listRowBackground(Palette.surfaceRaised)
         }
     }
 

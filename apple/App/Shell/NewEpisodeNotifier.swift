@@ -31,14 +31,17 @@ final class NewEpisodeNotifier {
     /// The server and person the delivered notifications were for.
     @ObservationIgnored private var context: String?
 
-    init(follows: any FollowsRepository, router: NotificationRouter, memory: NewEpisodeMemory = NewEpisodeMemory()) {
+    /// - Parameter servers: the servers this device is signed in to keep
+    ///   their place in their feed while another is in use.
+    init(follows: any FollowsRepository, router: NotificationRouter, servers: any ServerRepository, memory: NewEpisodeMemory = NewEpisodeMemory()) {
         self.memory = memory
         self.follows = follows
         context = follows.contextID
         checker = NewEpisodeChecker(
             repository: follows, memory: memory,
             permission: { await router.currentPermission() },
-            post: { notice in await Self.post(notice) }
+            post: { notice in await Self.post(notice) },
+            signedInServers: { Set(servers.registered.filter(\.signedIn).map(\.server.id)) }
         )
     }
 
@@ -51,8 +54,9 @@ final class NewEpisodeNotifier {
     @discardableResult
     func check() async -> NewEpisodeChecker.Outcome { await checker.check() }
 
-    /// A sign-out, another account or another server: the cursor goes, and so
-    /// do the notifications the last one was shown, which name its shows.
+    /// A sign-out, another account or another server: what was kept for a
+    /// server no longer signed in to goes (each other keeps its place), and
+    /// so do the notifications the last one was shown, which name its shows.
     func accountChanged() async {
         checker.accountChanged()
         // The same person on the same server (their name changed, say) keeps what they were shown.

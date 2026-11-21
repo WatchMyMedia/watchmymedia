@@ -28,8 +28,8 @@ enum SettingsPage: String, Hashable, CaseIterable {
 /// Account & devices; then You, This iPhone, Server and About, each row with
 /// how things stand at its right. On iPad the root is
 /// the sidebar of a split view and the page it selects stands beside it. Link
-/// a TV and Switch server are tasks in a sheet over either (Switch server
-/// stays in the iPad's detail column, as Pad2SwitchServer drew it).
+/// a TV and Add a server are tasks in a sheet over either (Add a server
+/// stays in the iPad's detail column).
 struct SettingsScreen: View {
     @Environment(AppServices.self) private var services
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -56,26 +56,35 @@ private let launchPage = ScreenshotLaunch.value(after: "-settingsPage").flatMap(
 /// The tasks Settings starts, presented here so that both widths share them
 /// and a window resized in the middle of one keeps its place: their models
 /// live in ``AppFlow``. Link a TV is a sheet while the Settings tab's path
-/// asks for it (from Account & devices, sign-in or a link); Switch server is
+/// asks for it (from Account & devices, sign-in or a link); Add a server is
 /// a sheet on a compact width and the detail column's on a regular one.
+/// Servers opens here too while Settings is showing: a switch from a
+/// server's page or the Downloads list that couldn't reach the server says
+/// so there, with Try again.
 private struct SettingsTasks: ViewModifier {
     @Environment(Navigator.self) private var navigator
     @Environment(AppFlow.self) private var flow
     @Environment(AppServices.self) private var services
+    @Environment(ServersModel.self) private var servers
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     func body(content: Content) -> some View {
+        // Read here, in the body, so Settings is drawn again when Servers opens.
+        let serversHere = ServersPresenter.current(navigator, flow, servers) == .settings
         content
-            .sheet(isPresented: Binding(get: { flow.serverSwitch == nil && navigator.pendingLinkTV != nil },
+            .sheet(isPresented: Binding(get: { flow.addingServer == nil && navigator.pendingLinkTV != nil },
                                         set: { if !$0 { closeLinkTV() } })) {
                 LinkTVSheet(model: flow.linkTVModel(auth: services.auth, code: navigator.pendingLinkTV?.code,
                                                     serverName: services.servers.current?.server.name), close: closeLinkTV)
             }
-            .sheet(isPresented: Binding(get: { !sizeClass.isWide && flow.serverSwitch != nil },
-                                        set: { if !$0 { flow.closeServerSwitchSheet() } })) {
-                if let switching = flow.serverSwitch {
-                    ServerSwitchSheet(model: switching)
+            .sheet(isPresented: Binding(get: { !sizeClass.isWide && flow.addingServer != nil },
+                                        set: { if !$0 { flow.closeAddServerSheet() } })) {
+                if let adding = flow.addingServer {
+                    AddServerSheet(model: adding)
                 }
+            }
+            .sheet(isPresented: Binding(get: { serversHere }, set: { if !$0 { servers.presented = false } })) {
+                ServersView()
             }
     }
 
@@ -102,21 +111,24 @@ private struct SettingsSplit: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
             SettingsRoot(model: model, selection: $selection, rows: services.rows)
-                .disabled(flow.serverSwitch != nil)
+                .disabled(flow.addingServer != nil)
                 .navigationBarTitleDisplayMode(.large)
                 .navigationSplitViewColumnWidth(min: 320, ideal: 372, max: 420)
         } detail: {
             NavigationStack {
-                if let switching = flow.serverSwitch {
-                    ServerSwitchSettingsPage(model: switching)
+                if let adding = flow.addingServer {
+                    AddServerSettingsPage(model: adding)
                 } else if let selection {
                     SettingsPageView(page: selection, model: model)
                 }
             }
+            // A page of the sidebar's choosing starts at its root: a server's page
+            // pushed over Server doesn't stay up over Playback.
+            .id(selection)
         }
         .navigationSplitViewStyle(.balanced)
-        .onChange(of: flow.serverSwitch != nil, initial: true) { _, switching in
-            if switching { selection = .server }
+        .onChange(of: flow.addingServer != nil, initial: true) { _, adding in
+            if adding { selection = .server }
         }
         // Your requests, the Inbox and Downloads, asked for by a link or the
         // request sheet, are pages of the split view rather than pushed screens.
@@ -204,7 +216,8 @@ struct DownloadsPage: View {
 private struct SettingsRoot: View {
     @State private var model: SettingsModel
     private let selection: Binding<SettingsPage?>?
-    @State private var debugPage = launchPage
+    /// The page pushed without a tap: `-settingsPage` at launch, or one asked for from outside Settings.
+    @State private var openPage = launchPage
     @State private var editingRows = false
     /// Home's rows, for the row's "7 shown · 4 hidden".
     @State private var homeRows: RowEditorModel
@@ -261,15 +274,21 @@ private struct SettingsRoot: View {
         .scrollBounceBehavior(.basedOnSize)
         .groundBackground()
         .navigationTitle("Settings")
-        .navigationDestination(item: selection == nil ? $debugPage : .constant(nil)) { SettingsPageView(page: $0, model: model) }
-        .task(id: flow.serverSwitch != nil) {
-            if flow.serverSwitch == nil { await model.loadSessions() }
+        .navigationDestination(item: selection == nil ? $openPage : .constant(nil)) { SettingsPageView(page: $0, model: model) }
+        // A page asked for from outside Settings (Manage servers, in Servers).
+        .onChange(of: flow.settingsPage, initial: true) { _, page in
+            guard let page else { return }
+            flow.settingsPage = nil
+            if let selection { selection.wrappedValue = page } else { openPage = page }
+        }
+        .task(id: flow.addingServer != nil) {
+            if flow.addingServer == nil { await model.loadSessions() }
         }
         .sheet(isPresented: $editingRows, onDismiss: { Task { await homeRows.load() } }) {
             RowEditorSheet(screen: .home, screenName: "Home")
         }
-        .task(id: flow.serverSwitch != nil) {
-            if flow.serverSwitch == nil { await model.loadPreferences() }
+        .task(id: flow.addingServer != nil) {
+            if flow.addingServer == nil { await model.loadPreferences() }
         }
         .task(id: services.rows.available) {
             if services.rows.available { await homeRows.load() }
@@ -318,7 +337,7 @@ private struct SettingsRoot: View {
         case .account: link(.account, icon: "person.crop.circle", style: .neutral, row: row)
         case .requests: link(.requests, icon: "tray.and.arrow.down", style: .neutral, row: row)
         case .downloads: link(.downloads, icon: "arrow.down.to.line", style: .gold, row: row)
-        // During a switch the row names the server it started on.
+        // While a server is being added the row names the server it started on.
         case .server: link(.server, icon: "server.rack", style: .neutral, title: row.title, value: displayedServer?.name ?? row.value)
         case .inbox: link(.inbox, icon: "tray.full", style: .gold, row: row)
         case .about: link(.about, icon: "info.circle", style: .neutral, row: row)
@@ -389,8 +408,8 @@ private struct SettingsRoot: View {
         }
     }
 
-    private var displayedUser: User? { flow.serverSwitch?.originalUser ?? model.user }
-    private var displayedServer: Server? { flow.serverSwitch?.originalServer ?? model.server }
+    private var displayedUser: User? { flow.addingServer?.originalUser ?? model.user }
+    private var displayedServer: Server? { flow.addingServer?.originalServer ?? model.server }
 
 
     private func group(_ title: String, @ViewBuilder rows: () -> some View) -> some View {
@@ -499,6 +518,7 @@ private struct SettingsRow: View {
     .environment(FollowsStore(repository: UnavailableFollows()))
     .environment(AppFlow())
     .environment(Navigator())
+    .environment(ServersModel(servers: FakeServerRepository(), navigator: Navigator()))
     .preferredColorScheme(.dark)
 }
 #endif

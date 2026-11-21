@@ -3,85 +3,86 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Switch server on iPhone: three steps in a
-/// sheet, Choose a server, Sign in, Switched. A server this device is
-/// already signed in to skips the second. Every failure says you're still on
-/// the first server, and swiping the sheet away is Cancel, which asks first
-/// when something is typed. The model is ``AppFlow``'s, so a window resized
-/// in the middle keeps its place (the iPad's detail column takes it over).
-struct ServerSwitchSheet: View {
-    let model: ServerSwitchModel
+/// Add a server on iPhone: three steps in a sheet, Choose a server, Sign in,
+/// Added. Servers this device is registered with already aren't offered
+/// again, and the step names them. Every failure says you're still on the
+/// first server, and swiping the sheet away is Cancel, which asks first
+/// when something is typed. The same steps, starting on Sign in, sign in
+/// again to a registered server whose sign-in ended. The model is
+/// ``AppFlow``'s, so a window resized in the middle keeps its place (the
+/// iPad's detail column takes it over).
+struct AddServerSheet: View {
+    let model: AddServerModel
     @State private var askingToStop = false
 
     var body: some View {
         NavigationStack {
-            ServerSwitchSteps(model: model)
+            AddServerSteps(model: model)
         }
         .taskSheet()
         .asksBeforeDismissing(when: model.busy || typed) { if !model.busy { askingToStop = true } }
         .discardDialog(SettingsWords.discardTyped(stays: model.stillOn), isPresented: $askingToStop) { Task { await model.cancel() } }
     }
 
-    /// An address or a password is typed and nothing is switched yet.
+    /// An address or a password is typed and nothing is added yet.
     private var typed: Bool {
         guard model.outcome == nil else { return false }
         return !model.picker.address.isEmpty || model.signIn.map { !$0.password.isEmpty } == true
     }
 }
 
-/// Pad2SwitchServer: the same steps in Settings' detail column, beside the
-/// sidebar, on the page's colour.
-struct ServerSwitchSettingsPage: View {
-    let model: ServerSwitchModel
+/// The same steps in Settings' detail column on iPad, beside the sidebar,
+/// on the page's colour.
+struct AddServerSettingsPage: View {
+    let model: AddServerModel
 
     var body: some View {
-        ServerSwitchSteps(model: model)
+        AddServerSteps(model: model)
             .environment(\.taskGround, Palette.ground)
     }
 }
 
-/// The step showing. The steps and words are the Kit's (`ServerSwitchModel`, `FlowSteps.swift`).
-private struct ServerSwitchSteps: View {
-    let model: ServerSwitchModel
+/// The step showing. The steps and words are the Kit's (`AddServerModel`, `FlowSteps.swift`).
+private struct AddServerSteps: View {
+    let model: AddServerModel
     @Environment(AppFlow.self) private var flow
     @Environment(AppServices.self) private var services
 
     var body: some View {
         TaskStepSwitcher(index: model.flowStep.number) {
-            if model.outcome == .switched {
-                switched
+            if model.outcome == .added {
+                added
             } else if let signIn = model.signIn {
-                SwitchSignInStep(model: model, signIn: signIn)
+                AddSignInStep(model: model, signIn: signIn)
             } else {
-                SwitchChooseStep(model: model)
+                AddChooseStep(model: model)
             }
         }
     }
 
-    // MARK: Step 3, Switched
+    // MARK: Step 3, Added
 
-    private var switched: some View {
-        TaskFrame(title: switchServerTitle, steps: model.flowStep) {
-            if let words = model.finished(device: deviceFamily(model: services.client.model),
-                                          downloadsKept: !services.downloads.downloads.isEmpty) {
+    private var added: some View {
+        TaskFrame(title: AddServerModel.title, steps: model.flowStep) {
+            if let words = model.finished(device: deviceFamily(model: services.client.model), signedIn: services.servers.signedInCount) {
                 TaskDone(words: words)
             }
         } actions: {
-            Button(SettingsWords.done) { flow.serverSwitchDone = true }
+            Button(SettingsWords.done) { flow.addingServerDone = true }
                 .buttonStyle(PrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
-                .accessibilityIdentifier("switch-done")
+                .accessibilityIdentifier("add-done")
         }
     }
 }
 
 // MARK: Step 1, Choose a server
 
-/// The server in use, then the ones on this network and the remembered ones
-/// (a tap connects, and one signed in already switches at once), and an
-/// address to type.
-private struct SwitchChooseStep: View {
-    let model: ServerSwitchModel
+/// The servers on this network that aren't registered yet, and those chosen
+/// before and never signed in to (a tap connects), the ones already added
+/// named under them, and an address to type.
+private struct AddChooseStep: View {
+    let model: AddServerModel
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
     @FocusState private var addressFocused: Bool
@@ -90,9 +91,8 @@ private struct SwitchChooseStep: View {
     private var picker: ServerPickerModel { model.picker }
 
     var body: some View {
-        TaskFrame(title: switchServerTitle, steps: model.flowStep, heading: ServerSwitchModel.chooseTitle,
+        TaskFrame(title: AddServerModel.title, steps: model.flowStep, heading: AddServerModel.chooseTitle,
                   cancel: { Task { await model.cancel() } }, problem: problem, busy: model.busy) {
-            current
             if model.phase == .restoring {
                 ProgressView("Returning to \(model.originalServer.name)…")
                     .tint(Palette.gold)
@@ -118,6 +118,9 @@ private struct SwitchChooseStep: View {
                 } else {
                     ForEach(found) { serverRow($0) }
                 }
+            } note: {
+                // The servers this device is registered with aren't offered again.
+                SectionNote(model.alreadyAdded).accessibilityIdentifier("add-already-added")
             }
             if !remembered.isEmpty {
                 SettingsSection(title: "Remembered") {
@@ -146,7 +149,7 @@ private struct SwitchChooseStep: View {
                     .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
                     .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(fieldBorder, lineWidth: addressFocused || addressWarning != nil ? 2 : 1))
                     .disabled(model.busy)
-                    .accessibilityIdentifier("switch-address")
+                    .accessibilityIdentifier("add-address")
                 if let addressWarning {
                     Text(addressWarning).font(.footnote).foregroundStyle(Palette.warning).fixedSize(horizontal: false, vertical: true).padding(.horizontal, 4)
                 } else {
@@ -155,12 +158,12 @@ private struct SwitchChooseStep: View {
             }
         } actions: {
             Button(action: connect) {
-                BusyLabel(title: ServerSwitchModel.connectTitle, busy: picker.connecting == ServerPickerModel.addressKey)
+                BusyLabel(title: AddServerModel.connectTitle, busy: picker.connecting == ServerPickerModel.addressKey)
             }
             .buttonStyle(GhostButtonStyle(height: 50))
             .disabled(model.busy || model.connectOffReason != nil)
             .accessibilityHint(model.connectOffReason ?? "")
-            .accessibilityIdentifier("switch-connect")
+            .accessibilityIdentifier("add-connect")
         }
         .onAppear { picker.startDiscovery(owner: discoveryOwner) }
         .onDisappear { picker.stopDiscovery(owner: discoveryOwner) }
@@ -170,8 +173,8 @@ private struct SwitchChooseStep: View {
         }
     }
 
-    private var found: [ServerPickerModel.Row] { picker.found.filter { $0.id != model.originalServer.id } }
-    private var remembered: [ServerPickerModel.Row] { picker.remembered.filter { $0.id != model.originalServer.id } }
+    private var found: [ServerPickerModel.Row] { model.found }
+    private var remembered: [ServerPickerModel.Row] { model.remembered }
 
     /// Under the address: it needs https. Why it couldn't connect is the step's problem, above the button.
     private var addressWarning: String? {
@@ -187,20 +190,6 @@ private struct SwitchChooseStep: View {
         model.chooseProblem.map { TaskProblem(title: $0.title, message: $0.body) }
     }
 
-    private var current: some View {
-        HStack(spacing: 12) {
-            RowIcon(systemImage: "server.rack", style: .gold, size: 30)
-            RowTitle(title: model.originalServer.name,
-                     line: .plain("\(model.originalServer.displayAddress) · \(model.originalServer.versionLabel) · signed in as \(model.originalUser.name)"))
-            Badge(ServerSwitchModel.current, style: .gold)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.gold.opacity(0.5)))
-        .accessibilityElement(children: .combine)
-    }
-
     private func serverRow(_ row: ServerPickerModel.Row) -> some View {
         Button {
             addressFocused = false
@@ -209,7 +198,7 @@ private struct SwitchChooseStep: View {
             AdaptiveRow {
                 HStack(spacing: 12) {
                     RowIcon(systemImage: row.kind == .found ? "server.rack" : "globe", style: .neutral, size: 30)
-                    RowTitle(title: row.name, line: row.tooOld ? .failed(row.detail) : .plain(model.detail(for: row)))
+                    RowTitle(title: row.name, line: row.tooOld ? .failed(row.detail) : .plain(row.detail))
                 }
             } trailing: {
                 if picker.connecting == row.id { ProgressView().tint(Palette.gold) } else { RowChevron() }
@@ -218,7 +207,7 @@ private struct SwitchChooseStep: View {
         .buttonStyle(SettingsRowStyle())
         .disabled(model.busy)
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("switch-server-\(row.id)")
+        .accessibilityIdentifier("add-server-\(row.id)")
     }
 
     private func connect() {
@@ -232,18 +221,18 @@ private struct SwitchChooseStep: View {
 /// Signing in to the chosen server: the system's name and password fields
 /// (so the keychain offers to fill them), the pairing card where the server
 /// takes no passwords from apps, or its setup card.
-private struct SwitchSignInStep: View {
+private struct AddSignInStep: View {
     private enum Field { case name, password }
 
-    let model: ServerSwitchModel
+    let model: AddServerModel
     @Bindable var signIn: SignInModel
     @Environment(AppServices.self) private var services
     @FocusState private var focus: Field?
 
     var body: some View {
-        TaskFrame(title: switchServerTitle, steps: model.flowStep,
+        TaskFrame(title: AddServerModel.title, steps: model.flowStep,
                   heading: model.signInTitle, lede: model.signInLede,
-                  back: TaskBack(title: ServerSwitchModel.backToServersTitle) { Task { await model.backToPicker() } },
+                  back: TaskBack(title: AddServerModel.backToServersTitle) { Task { await model.backToPicker() } },
                   cancel: { Task { await model.cancel() } },
                   problem: problem, busy: model.busy) {
             if signIn.setupRequired {
@@ -252,7 +241,7 @@ private struct SwitchSignInStep: View {
                 // The server takes no passwords from apps: its web page approves the code.
                 PairingCard(model: signIn, family: deviceFamily(model: services.client.model))
             } else if signIn.codeSignIn {
-                SwitchCodeCard(signIn: signIn, lede: model.codeLede)
+                AddCodeCard(signIn: signIn, lede: model.codeLede)
             } else {
                 field("Name", .name) {
                     TextField("Name", text: $signIn.name)
@@ -262,7 +251,7 @@ private struct SwitchSignInStep: View {
                         .submitLabel(.next)
                         .focused($focus, equals: .name)
                         .onSubmit { focus = .password }
-                        .accessibilityIdentifier("switch-name")
+                        .accessibilityIdentifier("add-name")
                 }
                 field("Password", .password, warning: fieldError) {
                     SecureField("Password", text: $signIn.password)
@@ -270,10 +259,10 @@ private struct SwitchSignInStep: View {
                         .submitLabel(.go)
                         .focused($focus, equals: .password)
                         .onSubmit(submit)
-                        .accessibilityIdentifier("switch-password")
+                        .accessibilityIdentifier("add-password")
                 }
             }
-            // The other way in (Settings2SwitchSignIn): a code from a signed-in device, or the password again.
+            // The other way in: a code from a signed-in device, or the password again.
             if let other = model.otherWayTitle {
                 Button(other) {
                     focus = nil
@@ -281,7 +270,7 @@ private struct SwitchSignInStep: View {
                 }
                 .buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
                 .disabled(model.busy)
-                .accessibilityIdentifier("switch-other-way")
+                .accessibilityIdentifier("add-other-way")
             }
         } actions: {
             if !signIn.setupRequired && !signIn.codeSignIn {
@@ -291,7 +280,7 @@ private struct SwitchSignInStep: View {
                 .buttonStyle(PrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
                 .disabled(model.busy || signIn.errorStatus == 429)
-                .accessibilityIdentifier("switch-sign-in")
+                .accessibilityIdentifier("add-sign-in")
                 if let reason = model.signInOffReason {
                     Text(reason).font(.footnote).foregroundStyle(Palette.faint)
                 }
@@ -342,8 +331,8 @@ private struct SwitchSignInStep: View {
 /// The code to approve from a device signed in to the chosen server, when
 /// the person chose it over the password ("Use a code from a signed-in
 /// device instead"): the code, how long it lasts, a new one, and where to
-/// enter it (`ServerSwitchModel.codeLede`). The step runs the pairing.
-private struct SwitchCodeCard: View {
+/// enter it (`AddServerModel.codeLede`). The step runs the pairing.
+private struct AddCodeCard: View {
     let signIn: SignInModel
     let lede: String
 
@@ -390,6 +379,6 @@ private struct SwitchCodeCard: View {
         .background(Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.separator))
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("switch-code")
+        .accessibilityIdentifier("add-code")
     }
 }

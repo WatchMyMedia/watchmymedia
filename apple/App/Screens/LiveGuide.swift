@@ -113,7 +113,7 @@ struct LiveGuideScreen: View {
                     }
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) { LiveProfileButton() }
+            ToolbarItem(placement: .topBarTrailing) { AccountButton(tab: .liveTV) }
         }
         .groundBackground()
         .liveRemindFlow()
