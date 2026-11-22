@@ -245,7 +245,8 @@ fun WatchlistsTv(onNavigate: (Any) -> Unit, onOpenList: (Long) -> Unit, modifier
 private fun NewTile(onClick: () -> Unit, modifier: Modifier = Modifier) {
     FocusableBox(onClick = onClick, modifier = modifier.fillMaxWidth(), cornerRadius = 16.dp, focusedScale = 1.04f, role = Role.Button) { focused ->
         Column(
-            Modifier.fillMaxWidth().aspectRatio(1.35f).background(if (focused) WmmColors.Surface2 else WmmColors.Surface, RoundedCornerShape(16.dp))
+            // About as tall as a watchlist's tile beside it: four posters and two lines.
+            Modifier.fillMaxWidth().aspectRatio(1.73f).background(if (focused) WmmColors.Surface2 else WmmColors.Surface, RoundedCornerShape(16.dp))
                 .border(2.dp, WmmColors.Line2, RoundedCornerShape(16.dp)),
             verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,

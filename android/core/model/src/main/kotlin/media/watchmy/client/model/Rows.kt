@@ -459,6 +459,16 @@ data class MediaListEntry(
         }
 }
 
+/**
+ * The entry's key in a list page's grid: its rank, except on a watchlist,
+ * whose entries are numbered afresh with every read (a removal moves every
+ * title after it up one), so there it is the title itself.
+ */
+fun MediaListEntry.gridKey(watchlist: Boolean): String {
+    val title = watchlistTitle()?.key
+    return if (watchlist && title != null) "${title.type}:${title.tmdbId}" else "rank:$rank"
+}
+
 /** A page of a list's entries. */
 data class MediaListEntries(val items: List<MediaListEntry>, val total: Int, val inLibrary: Int)
 

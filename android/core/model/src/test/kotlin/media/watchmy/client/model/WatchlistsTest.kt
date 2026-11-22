@@ -83,6 +83,14 @@ class WatchlistsTest {
     }
 
     @Test
+    fun `a watchlist's grid keys its titles by what they are, since its ranks change with every read`() {
+        val entry = MediaListEntry(3, MediaType.Movie, 70299, "Ninety Fathoms", 2025, null, found = true)
+        assertEquals("Movie:70299", entry.gridKey(watchlist = true))
+        assertEquals("Movie:70299", entry.copy(rank = 1).gridKey(watchlist = true))
+        assertEquals("another list's may hold a title twice", "rank:3", entry.gridKey(watchlist = false))
+    }
+
+    @Test
     fun `a watchlist made or renamed, announced for Home, reaches every screen`() {
         assertTrue(RowsChange.Layout(RowScreens.HOME).affects(RowScreens.library(2)))
     }

@@ -64,6 +64,7 @@ import media.watchmy.client.model.MediaType
 import media.watchmy.client.model.WatchlistWords
 import media.watchmy.client.model.deleteBody
 import media.watchmy.client.model.deleteQuestion
+import media.watchmy.client.model.gridKey
 import media.watchmy.client.model.watchlistTitle
 import media.watchmy.client.presentation.watchlists.WatchlistMessage
 import media.watchmy.client.ui.LocalWatchlistControls
@@ -202,7 +203,7 @@ fun ListScreen(
                                 EmptyState(WatchlistWords.EMPTY_TITLE, WatchlistWords.EMPTY_BODY, Modifier.padding(top = 48.dp))
                             }
                         }
-                        items(state.entries, key = { it.rank }, contentType = { if (it.item != null) "have" else "missing" }) { entry ->
+                        items(state.entries, key = { it.gridKey(watchlist) }, contentType = { if (it.item != null) "have" else "missing" }) { entry ->
                             val item = entry.item
                             if (item != null) {
                                 Box {

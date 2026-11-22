@@ -57,6 +57,7 @@ import media.watchmy.client.model.MediaType
 import media.watchmy.client.model.WatchlistWords
 import media.watchmy.client.model.deleteBody
 import media.watchmy.client.model.deleteQuestion
+import media.watchmy.client.model.gridKey
 import media.watchmy.client.model.watchlistTitle
 import media.watchmy.client.tv.components.OptionsDialog
 import media.watchmy.client.tv.settings.ConfirmDialog
@@ -223,8 +224,8 @@ fun ListPageTv(
                         horizontalArrangement = Arrangement.spacedBy(24.dp),
                         verticalArrangement = Arrangement.spacedBy(28.dp),
                     ) {
-                        items(state.entries, key = { it.rank }) { entry ->
-                            val key = "entry:${entry.rank}"
+                        items(state.entries, key = { it.gridKey(watchlist) }) { entry ->
+                            val key = "entry:${entry.gridKey(watchlist)}"
                             val watch = Modifier.focusMemory(memory, key).onFocusChanged { if (it.isFocused) focusedEntry = entry }
                             val item = entry.item
                             if (item != null) {
@@ -268,7 +269,7 @@ fun ListPageTv(
                 }
                 LaunchedEffect(state.entries.size) {
                     withFrameNanos { }
-                    memory.restore(fallback = state.entries.firstOrNull()?.let { "entry:${it.rank}" } ?: "wl:rename".takeIf { watchlist })
+                    memory.restore(fallback = state.entries.firstOrNull()?.let { "entry:${it.gridKey(watchlist)}" } ?: "wl:rename".takeIf { watchlist })
                 }
             }
         }
