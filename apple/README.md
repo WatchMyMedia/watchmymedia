@@ -92,7 +92,8 @@ unsigned instead and signs the app and its Top Shelf extension ad hoc with their
 entitlements (the App Group), and `make apple-tv-upload VERSION=v1.2.3` signs it
 for the App Store when exporting and uploads it to TestFlight. The iPhone app's
 `make apple-archive` and `make apple-upload` work the same way, without a
-development certificate ("Releasing the iPhone app" in the root README).
+development certificate ([Releasing the iPhone app](../docs/releasing.md#releasing-the-iphone-app)
+in the docs).
 
 Nothing can tap a simulator from a script, so two more launch arguments
 reach any screen for a screenshot: `-tab tvShows` (or `home`, `movies`,

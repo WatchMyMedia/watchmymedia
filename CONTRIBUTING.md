@@ -19,8 +19,8 @@ licensed under the same terms.
 
 ## Building and testing
 
-The [README](README.md#develop) has the prerequisites and the commands to run
-the server and the web app; `make help` lists every target. Each folder with
+[docs/development.md](docs/development.md) has the prerequisites and the
+commands to run the server and the web app; `make help` lists every target. Each folder with
 code has its own README.
 
 [AGENTS.md](AGENTS.md) and the `AGENTS.md` in each folder hold the rules the

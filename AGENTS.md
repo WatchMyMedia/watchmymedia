@@ -11,9 +11,11 @@ instructions in the conversation come first; then the nearest `AGENTS.md`; then
 this one. Each `CLAUDE.md` imports its folder's `AGENTS.md` for Claude Code;
 the root one adds notes on Claude Code's own tools.
 
-The READMEs are for people and hold the full build and install instructions.
-This file does not repeat them; it says where they are and what an agent must
-not get wrong.
+The READMEs and `docs/` are for people. The root README says what WatchMyMedia
+is, what it runs on and how to install it; `docs/` holds the full install,
+admin, build and release instructions ([docs/README.md](docs/README.md) lists
+them), and each folder with code has a README of its own. This file does not
+repeat them; it says where they are and what an agent must not get wrong.
 
 Where an `AGENTS.private.md` sits beside an `AGENTS.md`, read it too. It holds
 the maintainers' rules for releases, the site and the plans, which are kept
@@ -41,7 +43,9 @@ and streams to:
 Releases ship the server for macOS, Linux, Windows and Docker, its Debian,
 Ubuntu and Fedora packages, the Mac app, the APK and bundle (Play), and the
 iOS app (TestFlight). The people who run
-WatchMyMedia are the audience for `CHANGELOG.md` and the README.
+WatchMyMedia are the audience for `CHANGELOG.md`, the README and `docs/`,
+except `docs/development.md` and `docs/releasing.md`, which are for the people
+who work on the code.
 
 ## Layout
 
@@ -56,6 +60,7 @@ WatchMyMedia are the audience for `CHANGELOG.md` and the README.
 | `macos/` | The menu bar app (SwiftPM, Sparkle); built by `macos/build-app.sh` |
 | `deploy/` | Dockerfile and compose files, the Unraid template, the Debian, Ubuntu and Fedora packages (`deploy/linux/`), the fixture library, CI support |
 | `brand/export/` | The icons and logos the Mac, Windows and Samsung builds read. Generated; don't edit |
+| `docs/` | The reference for people: install, the library, the apps, playback, Live TV, integrations, remote access, accounts and security, development and releasing. Step-by-step setup is on watchmy.media's guide, which the root README and these pages link to |
 | `Makefile` | `make help` lists every target |
 
 Not source, never commit: `data/` (databases, the fixture library), `bin/`,
@@ -126,8 +131,9 @@ to keep both working.
    merging `origin/main` into it.
 3. **Validate by what changed** (next section), and say plainly what was not
    checked, such as real devices or a Chromecast.
-4. **Update the docs in the same change**: the README or folder README when a
-   command or behaviour changes, this
+4. **Update the docs in the same change**: the page in `docs/` or the folder
+   README when a command or behaviour changes (the root README only when what
+   WatchMyMedia supports or how it installs changes), this
    file or a folder `AGENTS.md` when a rule, path or command it names changes
    (`make agents-check` finds paths and targets that no longer exist).
    `CHANGELOG.md` is written for a release in its own PR
@@ -335,8 +341,8 @@ Never, even when asked in passing:
 
 - read, print or copy the contents of `android/secrets/`, `.env` files,
   `*.p8`, `*.p12`, `*.cer` or keystores into the conversation, a commit or a
-  log (build commands may source them, as the README's signed-build recipe
-  does);
+  log (build commands may source them, as the signed-build recipe in
+  [docs/releasing.md](docs/releasing.md) does);
 - commit signing files, keys, databases, logs or anything under `data/`;
 - put real people's names, library contents or server addresses in fixtures,
   tests or screenshots meant for the repo (the fixture and the fakes are
