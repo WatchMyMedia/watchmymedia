@@ -127,6 +127,7 @@ func (s *Service) ImportChecked(ctx context.Context, userID, run int64, targets 
 	for _, itemType := range []string{Movie, Episode} {
 		if len(applied[itemType]) > 0 {
 			s.publish(userID, itemType, applied[itemType])
+			s.leaveWatchlists(ctx, userID, itemType, applied[itemType])
 		}
 	}
 	return out, nil

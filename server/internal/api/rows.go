@@ -33,17 +33,17 @@ const newWindow = metadata.NewWindow
 // Files that are not matched yet appear too, as kind "unmatched": one item
 // per file, or per show folder, with ID the first file's.
 type BrowseItem struct {
-	Kind      string   `json:"kind" enum:"movie,show,unmatched"`
-	ID        int64    `json:"id"`
+	Kind string `json:"kind" enum:"movie,show,unmatched"`
+	ID   int64  `json:"id"`
 	// TMDBID and Watchlisted are from API level 33.
-	TMDBID      int64 `json:"tmdbId,omitempty" required:"false" doc:"The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved."`
-	Watchlisted bool  `json:"watchlisted,omitempty" required:"false" doc:"It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add."`
-	LibraryID int64    `json:"libraryId"`
-	Title     string   `json:"title"`
-	Year      int64    `json:"year,omitempty"`
-	Overview  string   `json:"overview"`
-	Genres    []string `json:"genres" nullable:"false"`
-	Rating    float64  `json:"rating,omitempty"`
+	TMDBID      int64    `json:"tmdbId,omitempty" required:"false" doc:"The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved."`
+	Watchlisted bool     `json:"watchlisted,omitempty" required:"false" doc:"It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add."`
+	LibraryID   int64    `json:"libraryId"`
+	Title       string   `json:"title"`
+	Year        int64    `json:"year,omitempty"`
+	Overview    string   `json:"overview"`
+	Genres      []string `json:"genres" nullable:"false"`
+	Rating      float64  `json:"rating,omitempty"`
 	// ContentRating is the US certification from TMDB (TV-14, R).
 	ContentRating string    `json:"contentRating,omitempty"`
 	PosterPath    string    `json:"posterPath,omitempty"`
@@ -461,7 +461,7 @@ func toString(v any) string {
 func movieItem(r db.ListMovieItemsRow) BrowseItem {
 	added := db.ParseTime(toString(r.AddedAt))
 	return BrowseItem{
-		Kind: "movie", ID: r.ID, LibraryID: r.LibraryID, Title: r.Title, Year: deref(r.Year), Overview: r.Overview,
+		Kind: "movie", ID: r.ID, LibraryID: r.LibraryID, TMDBID: r.TmdbID, Title: r.Title, Year: deref(r.Year), Overview: r.Overview,
 		Genres: genres(r.Genres), Rating: deref(r.Rating), PosterPath: deref(r.PosterPath), BackdropPath: deref(r.BackdropPath),
 		Quality: qualityLabel(toInt64(r.MaxHeight)), HDR: toInt64(r.HasHdr) == 1, AddedAt: added, IsNew: time.Since(added) < newWindow,
 		TotalSize: toInt64(r.TotalSize), FileCount: r.FileCount, RuntimeMin: deref(r.RuntimeMin), ReleaseDate: deref(r.ReleaseDate),
@@ -472,7 +472,7 @@ func movieItem(r db.ListMovieItemsRow) BrowseItem {
 func showItem(r db.ListShowItemsRow) BrowseItem {
 	added := db.ParseTime(toString(r.AddedAt))
 	return BrowseItem{
-		Kind: "show", ID: r.ID, LibraryID: r.LibraryID, Title: r.Title, Year: deref(r.Year), Overview: r.Overview,
+		Kind: "show", ID: r.ID, LibraryID: r.LibraryID, TMDBID: r.TmdbID, Title: r.Title, Year: deref(r.Year), Overview: r.Overview,
 		Genres: genres(r.Genres), Rating: deref(r.Rating), PosterPath: deref(r.PosterPath), BackdropPath: deref(r.BackdropPath),
 		Quality: qualityLabel(toInt64(r.MaxHeight)), HDR: toInt64(r.HasHdr) == 1, AddedAt: added, IsNew: time.Since(added) < newWindow,
 		TotalSize: toInt64(r.TotalSize), EpisodeCount: r.EpisodeCount, Status: deref(r.Status),
@@ -894,12 +894,14 @@ func watchedEpisodes(ctx context.Context, deps Deps, ids []int64) (map[int64]boo
 }
 
 // watchMarks are the signed-in user's movie states, per-show watched
-// counts and the shows with a New episode they have not watched, read once
-// per request however many items it marks.
+// counts, the shows with a New episode they have not watched and the
+// titles on their watchlists, read once per request however many items it
+// marks.
 type watchMarks struct {
-	movies   map[int64]db.WatchState
-	shows    map[int64]int64
-	newShows map[int64]bool
+	movies      map[int64]db.WatchState
+	shows       map[int64]int64
+	newShows    map[int64]bool
+	watchlisted watchlisted
 }
 
 // loadWatchMarks reads the signed-in user's marks; nil, which marks
@@ -921,7 +923,12 @@ func loadWatchMarks(ctx context.Context, deps Deps) (*watchMarks, error) {
 	if err != nil {
 		return nil, err
 	}
-	m := &watchMarks{movies: make(map[int64]db.WatchState, len(movieStates)), shows: make(map[int64]int64, len(showCounts)), newShows: make(map[int64]bool, len(newShows))}
+	saved, err := loadWatchlisted(ctx, deps, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	m := &watchMarks{movies: make(map[int64]db.WatchState, len(movieStates)), shows: make(map[int64]int64, len(showCounts)), newShows: make(map[int64]bool, len(newShows)),
+		watchlisted: saved}
 	for _, w := range movieStates {
 		m.movies[w.ItemID] = w
 	}
@@ -939,13 +946,14 @@ func loadWatchMarks(ctx context.Context, deps Deps) (*watchMarks, error) {
 // person has watched: a finished movie, or a show none of whose recently
 // added episodes is still unwatched. It only ever clears New, so a card
 // that already judged its own episodes (recentlyAddedShows) keeps its
-// answer.
+// answer. And it says which are on the person's watchlists.
 func (m *watchMarks) apply(items []BrowseItem) {
 	if m == nil {
 		return
 	}
 	for i := range items {
 		it := &items[i]
+		it.Watchlisted = m.watchlisted.has(mediaOf(*it), it.TMDBID)
 		switch it.Kind {
 		case "movie":
 			if w, ok := m.movies[it.ID]; ok {
