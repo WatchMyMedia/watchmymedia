@@ -19,7 +19,7 @@ import { placeholderTone } from '../../ui/tones'
 import { RequestDialog, type RequestTarget } from '../requests/RequestDialog'
 import { CrossSearch, CURRENT, mergeResults, noneAnswered, resultKey, searchLines, SERVER_MS, type Tagged } from './crossSearch'
 import { keepSearch, keptSearch, searchScope } from './keptSearch'
-import { keyRows, typeKey, type KeyboardMode, type KeyPress } from './keyboard'
+import { Keyboard } from './OnScreenKeyboard'
 import { ResultsRow } from './ResultsRow'
 import { askingAgain, didNotAnswer, emptyWords, leftOutLine, episodeSub, libraryBand, liveAction, liveLine, liveWhen, movieSub, noMatchWords, notInLibrary, requestableAction, requestableSub, requestBadge, showSub, stillAsking, suggestionChips } from './searchResults'
 import './search.css'
@@ -62,32 +62,6 @@ function useDebounced(text: string): string {
     return () => clearTimeout(timer)
   }, [text])
   return q
-}
-
-function Keyboard({ text, setText, dim, onTvKeyboard }: { text: string; setText(t: string): void; dim: boolean; onTvKeyboard(): void }) {
-  const [mode, setMode] = useState<KeyboardMode>('letters')
-  const [shift, setShift] = useState(false)
-  const press = (p: KeyPress) => setText(typeKey(text, p))
-  return <div className="search-keys" aria-label="Keyboard" data-group="search/keys" style={{ opacity: dim ? .4 : 1 }}>
-    {keyRows(mode, shift).map((row, r) => <div key={r} className="search-keys__row">
-      {row.map((c, k) => <button key={k} type="button" data-focus={`key/${r}-${k}`} data-autofocus={(r === 1 && k === 0) || undefined} className="search-key"
-        onClick={() => { press({ kind: 'char', char: c }); if (shift) setShift(false) }}>{c}</button>)}
-    </div>)}
-    <div className="search-keys__row">
-      <button type="button" data-focus="key/shift" className="search-key search-key--fn" style={{ width: '6.5rem' }} aria-pressed={shift} disabled={mode === 'symbols'}
-        onClick={() => setShift((s) => !s)}>{shift ? '⇧ ABC' : '⇧ abc'}</button>
-      <button type="button" data-focus="key/mode" className="search-key search-key--fn" style={{ width: '6.5rem' }} onClick={() => { setMode((m) => m === 'letters' ? 'symbols' : 'letters'); setShift(false) }}>
-        {mode === 'letters' ? '#+=' : 'abc'}</button>
-      <button type="button" data-focus="key/space" className="search-key search-key--fn" style={{ width: '12.5rem' }} onClick={() => press({ kind: 'space' })}>Space</button>
-      <button type="button" data-focus="key/delete" className="search-key" style={{ width: '6.5rem' }} aria-label="Delete" onClick={() => press({ kind: 'delete' })}>⌫</button>
-      <button type="button" data-focus="key/clear" className="search-key search-key--fn search-key--gold" style={{ width: '10.5rem' }} onClick={() => press({ kind: 'clear' })}>Clear</button>
-    </div>
-    <button type="button" data-focus="key/tv" className="search-key search-key--wide" onClick={onTvKeyboard}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 6h20v12H2zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
-      Use the TV’s keyboard
-    </button>
-    <p className="search-keys__note">Accents, other alphabets and the remote’s voice key come with the TV’s keyboard. Return or its Done comes back here.</p>
-  </div>
 }
 
 function LiveHitCard({ hit, focusId, now, onPress, onHold }: { hit: LiveHit; focusId: string; now: number; onPress(): void; onHold(): void }) {
@@ -326,7 +300,8 @@ export function SearchScreen() {
           </button>)}
         </div>
       </div>}
-      <Keyboard text={text} setText={setText} dim={inResults} onTvKeyboard={openTvKeyboard}/>
+      <Keyboard group="search/keys" text={text} setText={setText} dim={inResults} onTvKeyboard={openTvKeyboard}
+        note="Accents, other alphabets and the remote’s voice key come with the TV’s keyboard. Return or its Done comes back here."/>
     </section>
 
     <section ref={resultsRef} className="search-results" aria-label="Results">

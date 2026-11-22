@@ -1,4 +1,4 @@
-// Search's on-screen keyboard: four rows
+// The on-screen keyboard Search and a watchlist's name type with: four rows
 // of ten keys, then Shift, the symbols, Space, Delete and Clear. The TV's
 // own keyboard (accents, other alphabets, the voice key) is one key below.
 
@@ -18,12 +18,16 @@ export type KeyPress = { kind: 'char'; char: string } | { kind: 'space' } | { ki
 /** The longest query search takes. */
 export const MAX_QUERY = 100
 
-/** The text after a key: a character or a space at the end (never two spaces, or one first), Delete takes the last off, Clear empties it. */
-export function typeKey(text: string, press: KeyPress): string {
+/**
+ * The text after a key: a character or a space at the end (never two
+ * spaces, or one first), Delete takes the last off, Clear empties it. It
+ * stops at `max` characters (a search's, or a watchlist's name's).
+ */
+export function typeKey(text: string, press: KeyPress, max = MAX_QUERY): string {
   switch (press.kind) {
     case 'clear': return ''
     case 'delete': return [...text].slice(0, -1).join('')
-    case 'space': return !text || text.endsWith(' ') || text.length >= MAX_QUERY ? text : `${text} `
-    case 'char': return text.length >= MAX_QUERY ? text : text + press.char
+    case 'space': return !text || text.endsWith(' ') || text.length >= max ? text : `${text} `
+    case 'char': return text.length >= max ? text : text + press.char
   }
 }

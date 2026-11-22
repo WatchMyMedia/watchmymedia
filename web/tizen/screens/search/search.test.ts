@@ -21,6 +21,7 @@ describe('Search’s keyboard', () => {
     expect(typeKey('café', { kind: 'delete' })).toBe('caf')
     expect(typeKey('harbor', { kind: 'clear' })).toBe('')
     expect(typeKey('x'.repeat(MAX_QUERY), { kind: 'char', char: 'y' })).toHaveLength(MAX_QUERY)
+    expect(typeKey('x'.repeat(60), { kind: 'char', char: 'y' }, 60)).toHaveLength(60)
   })
 })
 
