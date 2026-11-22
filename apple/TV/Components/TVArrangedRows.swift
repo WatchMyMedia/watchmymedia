@@ -152,7 +152,9 @@ struct TVArrangedRow: View {
         }
     }
 
+    /// Add to Watchlist (or Remove, or Save to watchlist…) first, then Mark watched.
     @ViewBuilder private func watchMenu(_ item: BrowseItem) -> some View {
+        TVWatchlistMenuButton(item)
         if let target = item.watchTarget {
             WatchToggleButton(watched: item.watched) { await actions.setWatched(target, $0) }
         }

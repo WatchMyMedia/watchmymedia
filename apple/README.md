@@ -731,6 +731,46 @@ and Tin Sky (`movies/507`) and Glass Country (`shows/108`) have nothing.
 `UITests/RelatedTitlesTests.swift` and `TVUITests/RelatedTitlesTests.swift`
 drive them.
 
+## Watchlists
+
+From API level 33 a person saves movies and shows to watchlists they name.
+A watchlist is one of their lists (`source.kind` `watchlist`), so its rows,
+its place in Edit rows and its page are the lists' own; the server fills
+the rows (only movies on a Movies screen, only shows on a TV screen, and on
+Home without what Continue watching shows).
+
+- **One store** (`WatchlistStore`, WMMFeatures), one for each app in the
+  environment, read at launch, on foreground and on rows.changed and
+  lists.changed: the watchlists and their count, and which watchlists hold
+  each title changed here, over what a card's `watchlisted` or a page's
+  `watchlists` said. With one watchlist or none the button and the menus
+  toggle (the first save makes Watchlist); with two or more they open Save
+  to watchlist (`WatchlistPicker`), and a 409 from a count gone stale opens
+  it too. Every change shows at once and goes back when refused. Its words
+  are `WatchlistWords` (WMMModel).
+- **iPhone and iPad**: the Watchlist button (`WatchlistButton`) beside
+  Trailer on a movie and beside Notify me on a show; Save to watchlist as a
+  popover from the button on a regular width, a sheet on a compact one and
+  from a long press; "Saved to Watchlist" or "Removed from Watchlist" with
+  Undo over the tab on screen, a removal held back until the message goes.
+  Servers has Watchlists in a group of its own; Watchlists lists them, and
+  a watchlist's page (`WatchlistPageView`) has the chips, the sort and ⋯
+  (Rename, Remove titles once watched, Delete), with the watchlists beside
+  it from `PadLayout.sideBySide`.
+- **Apple TV** changes at once and says nothing: the button's words change.
+  Save to watchlist takes the screen (`TVWatchlistPicker`), Menu closes it,
+  and New watchlist… names one with the keyboard. Watchlists is under
+  Manage servers in Servers and opens on Home's stack; a watchlist's page
+  has Rename, Delete and the switch at its top, and Remove in a card's menu.
+
+`-fakesWatchlists` puts the fakes at level 33 (`FakeWatchlistsRepository`):
+Watchlist (with Amberline to request, The Ninth Bell requested and Winter
+Harbor downloading), Halloween, which keeps watched titles, and With the
+kids; `-fakesOneWatchlist` keeps only Watchlist, so the button toggles.
+`-watchlistBannerSeconds <n>` (debug builds) keeps the message up longer.
+`UITests/WatchlistsTests.swift` and `TVUITests/WatchlistsTests.swift` drive
+the button and the picker.
+
 ## First run, audio languages and subtitles
 
 Empty Home explains whether the server has no libraries, is scanning, could not

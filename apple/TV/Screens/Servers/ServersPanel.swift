@@ -20,6 +20,7 @@ struct ServersScreen: View {
     @Environment(AppServices.self) private var services
     @Environment(AppFlow.self) private var flow
     @Environment(Navigator.self) private var navigator
+    @Environment(WatchlistStore.self) private var watchlists
     @FocusState private var focus: Place?
 
     private enum Place: Hashable {
@@ -27,6 +28,7 @@ struct ServersScreen: View {
         case server(String)
         case add
         case manage
+        case watchlists
     }
 
     var body: some View {
@@ -90,6 +92,20 @@ struct ServersScreen: View {
             .buttonStyle(SettingsRowStyle())
             .focused($focus, equals: .manage)
             .accessibilityIdentifier("servers-manage")
+            // The person's watchlists, in a group of their own after a rule: the panel has no Settings row.
+            if watchlists.available {
+                Rectangle().fill(.white.opacity(0.12)).frame(height: 1).padding(.vertical, 12).accessibilityHidden(true)
+                Button(action: openWatchlists) {
+                    SettingsRow(title: WatchlistWords.title) {
+                        RowValue(text: watchlists.loaded ? formatCount(watchlists.lists.count) : nil)
+                    }
+                    .frame(minHeight: 72)
+                }
+                .buttonStyle(SettingsRowStyle())
+                .focused($focus, equals: .watchlists)
+                .accessibilityLabel(WatchlistWords.title)
+                .accessibilityIdentifier("servers-watchlists")
+            }
             Spacer(minLength: 12)
             Text(hint(rows))
                 .font(.system(size: 18))
@@ -122,6 +138,7 @@ struct ServersScreen: View {
         case .server(let id): ServersWords.tvHint(rows.first { $0.id == id })
         case .add: servers.canAdd ? ServersWords.tvHintStart : ServersWords.tvHint(nil)
         case .manage: ServersWords.tvHintOpen
+        case .watchlists: WatchlistWords.tvServersHint
         case nil: ""
         }
     }
@@ -186,6 +203,13 @@ struct ServersScreen: View {
     private func add() {
         guard servers.canAdd else { return }
         flow.startAdding(services, from: .servers)
+    }
+
+    /// Watchlists: on Home, so Menu from them goes back there.
+    private func openWatchlists() {
+        servers.presented = false
+        navigator.tab = .home
+        navigator.setPath([.watchlists], for: .home)
     }
 
     /// Manage servers: Settings › Server, on the row of the server in use.

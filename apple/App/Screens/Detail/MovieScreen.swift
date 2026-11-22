@@ -28,6 +28,7 @@ private struct MovieView: View {
     @State private var scrolled = false
     @State private var report: ReportProblemModel?
     @Environment(AppServices.self) private var services
+    @Environment(WatchlistStore.self) private var watchlists
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var wide: Bool { sizeClass.isWide }
@@ -219,8 +220,11 @@ private struct MovieView: View {
 
     /// Resume (or Play), then From the start and Trailer side by side, then
     /// Mark watched. Without
-    /// From the start, Trailer and Mark watched share the row.
+    /// From the start, Trailer and Mark watched share the row. With
+    /// watchlists, Watchlist pairs with Trailer, and From the start with Mark
+    /// watched; without a trailer, Mark watched with Watchlist.
     @ViewBuilder private func playButtons(_ movie: MovieDetail) -> some View {
+        let watchlist = movie.watchlistTitle.flatMap { watchlists.available ? WatchlistButton(title: $0, said: movie.watchlists) : nil }
         let toggle = Button(model.watchToggleLabel) { Task { await model.setWatched(!model.watched) } }
             .buttonStyle(GhostButtonStyle())
             .disabled(model.busy)
@@ -242,13 +246,26 @@ private struct MovieView: View {
                 HStack(spacing: 8) {
                     Button("From the start") { model.play(fromStart: true) }
                         .buttonStyle(GhostButtonStyle())
-                    if let trailer { trailer } else { toggle }
+                    if watchlist != nil { toggle } else if let trailer { trailer } else { toggle }
                 }
-                if trailer != nil { toggle }
+                if let watchlist {
+                    HStack(spacing: 8) {
+                        if let trailer { trailer }
+                        watchlist
+                    }
+                } else if trailer != nil {
+                    toggle
+                }
             } else if let trailer {
                 HStack(spacing: 8) {
                     trailer
+                    if let watchlist { watchlist } else { toggle }
+                }
+                if watchlist != nil { toggle }
+            } else if let watchlist {
+                HStack(spacing: 8) {
                     toggle
+                    watchlist
                 }
             } else {
                 toggle

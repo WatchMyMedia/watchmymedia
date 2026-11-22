@@ -49,6 +49,7 @@ private struct ShowPageView: View {
     @State private var dialogOpenedAsActionSheet: Bool?
     @Environment(AppServices.self) private var services
     @Environment(FollowsStore.self) private var follows
+    @Environment(WatchlistStore.self) private var watchlists
     @Environment(NotificationRouter.self) private var router
     @Environment(NewEpisodeNotifier.self) private var newEpisodes
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -857,17 +858,27 @@ private struct ShowPageView: View {
     /// width, above the other two as they were: three don't fit one row, and
     /// "Notifications on" mustn't be cut short. On iPad it is first in a row
     /// that wraps rather than squeezing.
+    ///
+    /// With watchlists, Watchlist comes first, beside Notify me: on iPhone the
+    /// two share the bell's row.
     @ViewBuilder private func showButtons(_ show: ShowDetail) -> some View {
         let bell = follows.canFollow(show)
-        if bell || model.canMarkShow || model.canRequestMissingSeasons {
+        let watchlist = show.watchlistTitle.flatMap { watchlists.available ? WatchlistButton(title: $0, said: show.watchlists, fullWidth: !wide) : nil }
+        if bell || watchlist != nil || model.canMarkShow || model.canRequestMissingSeasons {
             VStack(alignment: .leading, spacing: 8) {
                 if wide {
                     FlowLayout(spacing: 10, lineSpacing: 10) {
+                        if let watchlist { watchlist }
                         if bell { bellButton(show) }
                         otherShowButtons
                     }
                 } else {
-                    if bell { bellButton(show) }
+                    if bell || watchlist != nil {
+                        HStack(spacing: 8) {
+                            if let watchlist { watchlist }
+                            if bell { bellButton(show) }
+                        }
+                    }
                     if model.canMarkShow || model.canRequestMissingSeasons {
                         HStack(spacing: 8) { otherShowButtons }
                     }

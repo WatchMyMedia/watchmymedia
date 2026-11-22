@@ -11,13 +11,16 @@ import WMMUI
 /// imported title TMDB couldn't find says Not found. A list whose last fetch
 /// failed says so over the list it kept. Whoever may change the list can
 /// refresh it now or delete it from the ⋯ menu; it is changed on the web.
+/// A watchlist's page is drawn by ``WatchlistPageView``.
 struct MediaListScreen: View {
     let id: Int
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
+    @Environment(WatchlistStore.self) private var watchlists
 
     var body: some View {
-        MediaListView(model: MediaListModel(listID: id, rows: services.rows, library: services.library, requests: services.requests, navigator: navigator))
+        MediaListView(model: MediaListModel(listID: id, rows: services.rows, library: services.library, requests: services.requests, navigator: navigator,
+                                            watchlists: watchlists))
     }
 }
 
@@ -27,6 +30,8 @@ private struct MediaListView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.openURL) private var openURL
     @State private var confirmingDelete = false
+    /// A watchlist's page scrolled past its name: the bar shows it.
+    @State private var scrolled = false
 
     private var wide: Bool { sizeClass.isWide }
     private var margin: CGFloat { wide ? PadLayout.margin : 16 }
@@ -40,6 +45,32 @@ private struct MediaListView: View {
 
     var body: some View {
         LoadableView(model.state, retry: model.retry) { page in
+            if model.isWatchlist {
+                WatchlistPageView(model: model, scrolled: $scrolled)
+            } else {
+                listPage(page)
+            }
+        }
+        .groundBackground()
+        .navigationTitle(model.isWatchlist && !scrolled ? "" : model.title)
+        .navigationBarTitleDisplayMode(model.isWatchlist ? .inline : .large)
+        .toolbar {
+            if !model.isWatchlist, model.canRefresh || model.canDelete {
+                ToolbarItem(placement: .topBarTrailing) { menu }
+            }
+        }
+        .task { await model.run() }
+        .messageToast($model.message)
+        .noticeAlert($model.notice)
+        .sheet(item: RequestSheet.presenting($model.requestSheet, centred: wide)) { sheet in
+            RequestSheet(model: sheet, centred: wide) {
+                model.requestSheetClosed(sheet)
+                model.requestSheet = nil
+            }
+        }
+    }
+
+    private func listPage(_ page: MediaListModel.Page) -> some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     header
@@ -54,24 +85,6 @@ private struct MediaListView: View {
                 .padding(.bottom, 24)
             }
             .refreshable { await model.reload() }
-        }
-        .groundBackground()
-        .navigationTitle(model.title)
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            if model.canRefresh || model.canDelete {
-                ToolbarItem(placement: .topBarTrailing) { menu }
-            }
-        }
-        .task { await model.run() }
-        .messageToast($model.message)
-        .noticeAlert($model.notice)
-        .sheet(item: RequestSheet.presenting($model.requestSheet, centred: wide)) { sheet in
-            RequestSheet(model: sheet, centred: wide) {
-                model.requestSheetClosed(sheet)
-                model.requestSheet = nil
-            }
-        }
     }
 
     /// "From TMDB ↗ · Updated 3 h ago", then "18 of 50 in your library · For everyone".
@@ -145,8 +158,10 @@ private struct MediaListView: View {
 
 /// One title: in the library, the usual poster (opens it, long-press to
 /// mark it); missing, dimmed with Request, Requested or Downloading; not
-/// found, a dashed box. Every card wears its rank.
-private struct EntryCard: View {
+/// found, a dashed box. Every card of a ranked list wears its rank. On a
+/// watchlist the long press removes the title from it; on another list it
+/// saves the title to a watchlist.
+struct EntryCard: View {
     let entry: MediaListEntry
     let canRequest: Bool
     let model: MediaListModel
@@ -169,11 +184,13 @@ private struct EntryCard: View {
             }
             .buttonStyle(CardButtonStyle())
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(entry.accessibilityLine)
+            .accessibilityLabel(entry.accessibilityLine(ranked: !model.isWatchlist))
             .contextMenu {
                 if let target = item.watchTarget {
                     WatchToggleButton(watched: item.watched) { await model.setWatched(target, $0) }
                 }
+                Divider()
+                watchlistItem
             }
         } else if !entry.found {
             VStack(alignment: .leading, spacing: 0) {
@@ -186,7 +203,7 @@ private struct EntryCard: View {
                 caption(entry.title, line: entry.year.map(String.init), dimmed: true)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(entry.accessibilityLine)
+            .accessibilityLabel(entry.accessibilityLine(ranked: !model.isWatchlist))
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 poster(Artwork(url: services.library.imageURL(entry.posterPath, size: .w342), seed: entry.title)) {
@@ -196,6 +213,19 @@ private struct EntryCard: View {
                 state.padding(.top, 6)
             }
             .accessibilityElement(children: .contain)
+            .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 8))
+            .contextMenu { watchlistItem }
+        }
+    }
+
+    /// Remove from this watchlist, or save another list's title to one.
+    @ViewBuilder private var watchlistItem: some View {
+        if model.isWatchlist {
+            Button(role: .destructive) { Task { await model.remove(entry) } } label: {
+                Label(WatchlistWords.remove(from: model.title), systemImage: "bookmark.slash")
+            }
+        } else {
+            WatchlistMenuButton(title: entry.watchlistTitle, said: entry.watchlisted)
         }
     }
 
@@ -205,7 +235,7 @@ private struct EntryCard: View {
             .aspectRatio(2 / 3, contentMode: .fit)
             .overlay { art }
             .overlay { ZStack { overlay() } }
-            .overlay(alignment: .topLeading) { RankBadge(rank: entry.rank).padding(5) }
+            .overlay(alignment: .topLeading) { if !model.isWatchlist { RankBadge(rank: entry.rank).padding(5) } }
             .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 

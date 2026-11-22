@@ -9,25 +9,29 @@ import WMMUI
 // orange message with its button that the show page and Settings share.
 
 /// Notify me (off: the outline bell on a plain button) or Notifications on
-/// (the filled bell, gold on a gold tint with a gold outline).
+/// (the filled bell, gold on a gold tint with a gold outline). The Watchlist
+/// button is the same with a bookmark (`symbol`).
 struct BellButtonStyle: ButtonStyle {
     let on: Bool
     var fullWidth = true
+    /// The outline symbol; on, its `.fill`.
+    var symbol = "bell"
 
     func makeBody(configuration: Configuration) -> some View {
-        BellLabel(configuration: configuration, on: on, fullWidth: fullWidth)
+        BellLabel(configuration: configuration, on: on, fullWidth: fullWidth, symbol: symbol)
     }
 
     private struct BellLabel: View {
         let configuration: Configuration
         let on: Bool
         let fullWidth: Bool
+        let symbol: String
         @ScaledMetric(relativeTo: .subheadline) private var height: CGFloat = 46
         @ScaledMetric(relativeTo: .subheadline) private var fontSize: CGFloat = 16
 
         var body: some View {
             HStack(spacing: 8) {
-                Image(systemName: on ? "bell.fill" : "bell")
+                Image(systemName: on ? "\(symbol).fill" : symbol)
                     .font(.system(size: fontSize + 2, weight: .semibold))
                     .accessibilityHidden(true)
                 configuration.label

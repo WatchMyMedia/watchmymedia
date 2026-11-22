@@ -14,6 +14,7 @@ struct MainTabView: View {
     @Environment(AppServices.self) private var services
     @Environment(CastService.self) private var cast
     @Environment(ServersModel.self) private var servers
+    @Environment(WatchlistStore.self) private var watchlists
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var liveAvailable: Bool { services.liveTV.capabilities?.available == true }
@@ -33,6 +34,7 @@ struct MainTabView: View {
     var body: some View {
         // Read here, in the body, so the tabs are drawn again when Servers opens.
         let serversHere = ServersPresenter.current(navigator, flow, servers) == .tabs
+        let menuPicker = watchlists.picker.flatMap { $0.fromButton ? nil : $0 }
         TabView(selection: Binding(get: { (settingsPresented || (!liveTVLayout && navigator.tab == .liveTV)) ? .home : (flow.addingServer == nil ? navigator.tab : .settings) }, set: {
             if flow.addingServer == nil { navigator.select($0) }
         })) {
@@ -54,6 +56,8 @@ struct MainTabView: View {
                                 .navigationDestination(for: Route.self, destination: destination)
                         }
                         .toolbar { ToolbarItem(placement: .topBarTrailing) { CastButton() } }
+                        // "Saved to Watchlist" with Undo, over this tab's pages, above the tab bar.
+                        .overlay { if navigator.tab == tab { WatchlistBannerView() } }
                     }
                 }
                 .unavailableWhileAddingServer(flow.addingServer != nil && tab != .settings)
@@ -87,6 +91,10 @@ struct MainTabView: View {
         // button is on screen to hold it (a library tab, Search, a pushed page).
         .sheet(isPresented: Binding(get: { serversHere }, set: { if !$0 { servers.presented = false } })) {
             ServersView()
+        }
+        // Save to watchlist from a card's long press; from a title's button it is that button's popover.
+        .sheet(item: Binding(get: { menuPicker }, set: { if $0 == nil { menuPicker?.close() } })) { picker in
+            WatchlistPickerView(picker: picker)
         }
         .modifier(TabShellKeys())
         // A note left by a page that has gone ("Deleted").
@@ -144,6 +152,7 @@ struct MainTabView: View {
         case .liveReminders: LiveRemindersScreen()
         case .liveSearch: LiveListingsSearchScreen()
         case .mediaList(let id): MediaListScreen(id: id)
+        case .watchlists: WatchlistsScreen()
         }
     }
 }

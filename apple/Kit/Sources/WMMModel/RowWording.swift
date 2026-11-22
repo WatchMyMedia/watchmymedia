@@ -116,9 +116,12 @@ extension MediaListEntry {
     }
 
     /// The card's spoken label: "3. Paper Moons, 2021", or with where a missing title stands.
-    public var accessibilityLine: String {
+    public var accessibilityLine: String { accessibilityLine(ranked: true) }
+
+    /// A watchlist's cards have no rank: "Paper Moons, 2021".
+    public func accessibilityLine(ranked: Bool) -> String {
         let line = item == nil ? missingLine : year.map(String.init)
-        return ["\(rank). \(title)", line].compactMap { $0 }.joined(separator: ", ")
+        return [ranked ? "\(rank). \(title)" : title, line].compactMap { $0 }.joined(separator: ", ")
     }
 }
 

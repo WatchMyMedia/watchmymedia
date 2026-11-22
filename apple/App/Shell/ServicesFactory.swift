@@ -83,6 +83,7 @@ enum ServicesFactory {
             rows: arguments.contains("-fakesRows"),
             follows: arguments.contains("-fakesFollows"),
             related: arguments.contains("-fakesRelated"),
+            watchlists: arguments.contains("-fakesWatchlists"),
             several: arguments.contains("-fakesServers")
         )
         if arguments.contains("-fakesSlowServer") { (services.library as? FakeLibraryRepository)?.otherServerDelay = .milliseconds(2500) }
@@ -93,6 +94,7 @@ enum ServicesFactory {
         (services.library as? FakeLibraryRepository)?.offline = arguments.contains("-fakesOffline")
         (services.rows as? FakeRowsRepository)?.twoMovieLibraries = arguments.contains("-fakesTwoMovieLibraries")
         (services.follows as? FakeFollowsRepository)?.manyShows = arguments.contains("-fakesManyNewEpisodes")
+        if arguments.contains("-fakesOneWatchlist") { (services.watchlists as? FakeWatchlistsRepository)?.keepOnlyFirst() }
         if let i = arguments.firstIndex(of: "-fakesTrailerKeys"), arguments.indices.contains(i + 1) {
             (services.library as? FakeLibraryRepository)?.trailerKeys = arguments[i + 1].split(separator: ",").map(String.init)
         }

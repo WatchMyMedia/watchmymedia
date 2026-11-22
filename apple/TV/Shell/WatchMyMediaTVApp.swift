@@ -18,6 +18,8 @@ struct WatchMyMediaTVApp: App {
     @State private var recordings: LiveRecordingsStore
     /// The shows the person follows: the bell, Settings' list. The TV doesn't notify.
     @State private var follows: FollowsStore
+    /// The person's watchlists: changed at once, with no message, as Apple TV says nothing after a change.
+    @State private var watchlists: WatchlistStore
 
     init() {
         // Launch to Home's first content. tvOS has no MetricKit, so start() does nothing here.
@@ -32,6 +34,7 @@ struct WatchMyMediaTVApp: App {
         _extras = State(initialValue: LiveExtrasStore(repository: services.liveTV))
         _recordings = State(initialValue: LiveRecordingsStore(repository: services.liveTV))
         _follows = State(initialValue: FollowsStore(repository: services.follows))
+        _watchlists = State(initialValue: WatchlistStore(repository: services.watchlists, confirms: false))
     }
 
     /// How long a reminder's banner stays: ten seconds, or, in a debug build,
@@ -57,6 +60,7 @@ struct WatchMyMediaTVApp: App {
                 .environment(extras)
                 .environment(recordings)
                 .environment(follows)
+                .environment(watchlists)
                 .environment(\.imageLoader, services.images)
                 .preferredColorScheme(.dark)
                 .tint(Palette.gold)
@@ -73,6 +77,7 @@ struct WatchMyMediaTVApp: App {
                 .task { await extras.follow() }
                 .task { await recordings.follow() }
                 .task { await follows.listen() }
+                .task { await watchlists.listen() }
                 // tvOS notifications carry only badges: a reminder is a banner while the app is open.
                 .task(id: extras.alertsKey) { await extras.runBanners(duration: Self.bannerDuration) }
         }

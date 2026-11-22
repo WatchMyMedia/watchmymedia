@@ -20,6 +20,8 @@ struct WatchMyMediaApp: App {
     /// The shows the person follows, and this device's new-episode check.
     @State private var follows: FollowsStore
     @State private var newEpisodes: NewEpisodeNotifier
+    /// The person's watchlists: the Watchlist button, the menus, Save to watchlist and the pages.
+    @State private var watchlists: WatchlistStore
     /// Servers, the switcher: one for the app, since Home, Settings, Search,
     /// Downloads and links all switch.
     @State private var servers: ServersModel
@@ -44,6 +46,7 @@ struct WatchMyMediaApp: App {
         _navigator = State(initialValue: navigator)
         _servers = State(initialValue: ServersModel(servers: services.servers, downloads: services.downloads, navigator: navigator))
         _follows = State(initialValue: FollowsStore(repository: services.follows))
+        _watchlists = State(initialValue: WatchlistStore(repository: services.watchlists, sleep: Self.watchlistBannerSleep))
         _newEpisodes = State(initialValue: newEpisodes)
         BackgroundSync.register(services, newEpisodes: newEpisodes)
         _cast = State(initialValue: CastServicesFactory.make(services: services, arguments: ProcessInfo.processInfo.arguments))
@@ -62,6 +65,7 @@ struct WatchMyMediaApp: App {
                 .environment(recordings)
                 .environment(NotificationRouter.shared)
                 .environment(follows)
+                .environment(watchlists)
                 .environment(newEpisodes)
                 .environment(servers)
                 .environment(\.imageLoader, services.images)
@@ -82,6 +86,7 @@ struct WatchMyMediaApp: App {
                 // The person's other devices change favourites, reminders and follows too.
                 .task { await extras.follow() }
                 .task { await follows.listen() }
+                .task { await watchlists.listen() }
                 .task { await recordings.follow() }
                 // Once at launch and on each return to the app.
                 .task(id: scenePhase) { if scenePhase == .active { await cast.refresh() } }
@@ -92,6 +97,18 @@ struct WatchMyMediaApp: App {
 }
 
 extension WatchMyMediaApp {
+    /// How long "Saved to Watchlist" and its Undo stay up. `-watchlistBannerSeconds <n>`
+    /// (debug builds) keeps it up longer, for a UI test on a busy simulator.
+    private static var watchlistBannerSleep: @MainActor (Duration) async -> Void {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let i = arguments.firstIndex(of: "-watchlistBannerSeconds"), arguments.indices.contains(i + 1), let seconds = Double(arguments[i + 1]) {
+            return { _ in try? await Task.sleep(for: .seconds(seconds)) }
+        }
+        #endif
+        return { try? await Task.sleep(for: $0) }
+    }
+
     /// A `watchmymedia://` link from outside the app or one it published
     /// (``ServersModel/open(_:library:liveTV:accepts:)``): one published for
     /// another server this device is signed in to switches to it, then opens.

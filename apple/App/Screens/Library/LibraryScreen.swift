@@ -336,6 +336,7 @@ private struct LibraryView: View {
                             if item.watchTarget != nil {
                                 WatchToggleButton(watched: item.watched) { await model.setWatched(item, $0) }
                             }
+                            WatchlistMenuButton(item)
                         }
                         .id(item.id)
                         .onAppear { Task { await model.itemAppeared(item) } }

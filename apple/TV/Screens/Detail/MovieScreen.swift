@@ -36,6 +36,7 @@ private struct MovieView: View {
     /// How tall the first screen is, which the related shelves wait below.
     @State private var fold = PageFold()
     @Environment(AppServices.self) private var services
+    @Environment(WatchlistStore.self) private var watchlists
 
     var body: some View {
         TVLoadable(model.state, retry: model.retry) { movie in page(movie) }
@@ -133,6 +134,14 @@ private struct MovieView: View {
                         .lineLimit(2)
                         .frame(maxWidth: 1000, alignment: .leading)
                 }
+                // With the Watchlist button the row has no room for the bar: it takes a line of its own above.
+                let watchlist = movie.watchlistTitle.flatMap { watchlists.available ? TVWatchlistButton(title: $0, said: movie.watchlists) : nil }
+                if watchlist != nil, model.resumable, let watch = movie.watch {
+                    ProgressStrip(progress: watch.progress, height: 6)
+                        .frame(maxWidth: 420)
+                        .clipShape(Capsule())
+                        .padding(.top, 6)
+                }
                 HStack(spacing: 18) {
                     if !movie.versions.isEmpty {
                         Button { model.play() } label: { Label(model.playLabel, systemImage: "play.fill") }
@@ -150,6 +159,7 @@ private struct MovieView: View {
                             .accessibilityIdentifier("movie-trailer")
                             .accessibilityHint(trailerHint ?? "")
                     }
+                    if let watchlist { watchlist }
                     Button(model.watchToggleLabel) { Task { await model.setWatched(!model.watched) } }
                         .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
                         .disabled(model.busy)
@@ -160,7 +170,7 @@ private struct MovieView: View {
                     }
                     // 160 pt beside Trailer, and the first to give way
                     // when a long Resume label needs the room, so no button is cut short.
-                    if model.resumable, let watch = movie.watch {
+                    if watchlist == nil, model.resumable, let watch = movie.watch {
                         ProgressStrip(progress: watch.progress, height: 6)
                             .frame(minWidth: 60, maxWidth: 160)
                             .clipShape(Capsule())

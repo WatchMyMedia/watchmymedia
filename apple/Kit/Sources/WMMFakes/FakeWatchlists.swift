@@ -72,6 +72,12 @@ public final class FakeWatchlistsRepository: WatchlistsRepository {
         ]
     }
 
+    /// Only the first watchlist, Watchlist, as its seed has it (`-fakesOneWatchlist`):
+    /// the button and the menus toggle rather than open the picker.
+    public func keepOnlyFirst() {
+        kept = Array(kept.prefix(1))
+    }
+
     /// One watchlist, Watchlist, holding `title`: a person who has saved one title.
     public func seedOnlyWatchlist(holding title: WatchlistTitle) {
         kept = [Kept(watchlist: Watchlist(id: Self.watchlist, name: WatchlistWords.firstName, createdAt: now), saved: [Saved(title: title, addedAt: now)])]

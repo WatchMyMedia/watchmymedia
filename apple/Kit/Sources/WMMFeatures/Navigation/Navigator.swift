@@ -100,6 +100,10 @@ public final class Navigator {
     /// had it has gone.
     public var toast: String?
 
+    /// A list's page opened from a Movies or TV Shows screen: a watchlist's
+    /// page opens on that kind of title. Taken by the page that opens.
+    @ObservationIgnored public var listOpenedOn: (listID: Int, mediaType: MediaType)?
+
     /// ⌘F asked for Search: the Search screen puts the cursor in its field, then clears this.
     public var searchFieldRequested = false
 

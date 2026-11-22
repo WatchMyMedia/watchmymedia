@@ -61,6 +61,10 @@ public final class MediaListModel {
         self.requests = requests
         self.navigator = navigator
         self.watchlists = watchlists
+        if let opened = navigator.listOpenedOn, opened.listID == listID {
+            filter = opened.mediaType
+            navigator.listOpenedOn = nil
+        }
     }
 
     // MARK: A watchlist

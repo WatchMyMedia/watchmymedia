@@ -227,7 +227,8 @@ private struct SearchView: View {
         .playPauseCard(found.server == nil ? .card(found.item) : .select) { model.open(found) }
         .accessibilityHint(found.server.map { "Switches to \($0.name)" } ?? "")
         .contextMenu {
-            // Marking watched is the server in use's.
+            // Saving and marking watched are the server in use's.
+            if found.server == nil { TVWatchlistMenuButton(found.item) }
             if found.server == nil, found.item.watchTarget != nil {
                 WatchToggleButton(watched: found.watched) { await model.setWatched(found.item, $0) }
             }

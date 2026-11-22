@@ -102,6 +102,7 @@ struct RootView: View {
     @Environment(Navigator.self) private var navigator
     @Environment(LiveExtrasStore.self) private var extras
     @Environment(FollowsStore.self) private var follows
+    @Environment(WatchlistStore.self) private var watchlists
     @Environment(ServersModel.self) private var servers
     @State private var accountGeneration = 0
     @State private var flow = AppFlow()
@@ -186,8 +187,10 @@ struct RootView: View {
         .task(id: Refresh(account: account, active: scenePhase == .active)) {
             guard scenePhase == .active else { return }
             await services.servers.refreshCurrent()
-            let services = services, extras = extras, follows = follows
+            let services = services, extras = extras, follows = follows, watchlists = watchlists
             await together(
+                // The count of watchlists decides between the toggle and the picker.
+                { await watchlists.refresh() },
                 { await services.requests.refreshOptions() },
                 // Live TV's access, then its reminders, which need it.
                 { try? await services.liveTV.refresh(); await extras.refresh() },
