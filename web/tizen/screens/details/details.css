@@ -34,6 +34,8 @@
 .dt-hint .tv-kbd { min-width: 2.125rem; height: 1.875rem; font-size: .875rem; border-width: 1px; border-color: var(--line-3); color: var(--text-2); }
 .dt-bar { display: block; width: 13.75rem; height: .375rem; border-radius: .1875rem; background: var(--line-2); overflow: hidden; flex: none; }
 .dt-bar > span { display: block; height: 100%; background: var(--accent); }
+/* A movie's progress on a line of its own, above its buttons. */
+.dt-bar--line { width: 32.5rem; }
 
 /* Buttons beside the kit's: a square ⋯, the small ones of the versions and the season bar. */
 .dt-actions { display: flex; align-items: center; gap: 1.125rem; margin-top: .375rem; min-height: 4rem; }

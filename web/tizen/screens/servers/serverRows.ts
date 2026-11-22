@@ -13,6 +13,8 @@ export const serverFocus = (id: string) => `servers/server/${id}`
 export const RETRY_FOCUS = 'servers/retry'
 export const ADD_FOCUS = 'servers/add'
 export const MANAGE_FOCUS = 'servers/manage'
+/** Watchlists, under Manage servers, where the server keeps them. */
+export const WATCHLISTS_FOCUS = 'servers/watchlists'
 
 export type ServerRowState = 'current' | 'ready' | 'switching' | 'signedOut' | 'tooOld'
 
@@ -111,8 +113,8 @@ export function alreadyAdded(names: readonly string[]): string {
 }
 
 /** The rail's account button: its name for a screen reader, and its label when the rail is open (the server, with more than one). */
-export function accountWords(person: string, server: string, servers: number): { label: string; visible: string } {
-  return { label: `Servers. ${person}, on ${server}`, visible: servers > 1 ? server : person }
+export function accountWords(person: string, server: string, servers: number, watchlists = false): { label: string; visible: string } {
+  return { label: `${watchlists ? 'Servers and watchlists' : 'Servers'}. ${person}, on ${server}`, visible: servers > 1 ? server : person }
 }
 
 /** The note after a switch. */

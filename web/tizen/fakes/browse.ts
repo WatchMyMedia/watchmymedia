@@ -1,6 +1,7 @@
 import type { components } from '../../src/api/schema'
 import { FakeServer, problem } from './server'
 import { AIRED, CONTINUE, LIBRARIES, MOVIE_ITEMS, SHOW_ITEMS } from './data'
+import { markWatchlisted, watchlistEntries, watchlistList, watchlistLists, watchlistRows } from './watchlists'
 
 // Home, the libraries, See all and list pages on the fictional server, and
 // what the rail needs: Live TV's capabilities (on, so the rail shows it) and
@@ -46,7 +47,7 @@ function movie(title: string, i: number, over: Partial<BrowseItem> = {}): Browse
     kind: 'movie', id: 1001 + i, libraryId: 1, libraryType: 'movie', title, year, overview: `A made-up film for the TV app’s fakes (${i + 1}).`,
     genres: genresOf(i), hdr: i % 4 === 1, quality: i % 3 === 0 ? '4K' : '1080p', addedAt: ago((i + 15) * DAY * 1.3), isNew: false, totalSize: 4e9,
     watched: i % 6 === 2, runtimeMin: 84 + (i * 11) % 70, rating: 5.5 + (i % 9) * .4, releaseDate: `${year}-${String(1 + i % 12).padStart(2, '0')}-${String(1 + i % 27).padStart(2, '0')}`,
-    progress: i % 7 === 3 ? .4 : undefined, ...over,
+    progress: i % 7 === 3 ? .4 : undefined, tmdbId: 50_000 + 1001 + i, ...over,
   }
 }
 
@@ -54,7 +55,7 @@ function show(title: string, i: number, over: Partial<BrowseItem> = {}): BrowseI
   return {
     kind: 'show', id: 2001 + i, libraryId: 2, libraryType: 'tv', title, year: 2012 + (i % 14), overview: `A made-up series for the TV app’s fakes (${i + 1}).`,
     genres: genresOf(i + 2), hdr: false, quality: i % 4 === 0 ? '4K' : '1080p', addedAt: ago((i + 12) * DAY * 1.1), isNew: false, totalSize: 3e10, watched: false,
-    episodeCount: 6 + (i * 5) % 40, status: i % 3 === 0 ? 'Ended' : 'Returning Series', lastAirDate: day(i * 9 + 3), rating: 6 + (i % 7) * .4, ...over,
+    episodeCount: 6 + (i * 5) % 40, status: i % 3 === 0 ? 'Ended' : 'Returning Series', lastAirDate: day(i * 9 + 3), rating: 6 + (i % 7) * .4, tmdbId: 60_000 + 2001 + i, ...over,
   }
 }
 
@@ -178,7 +179,8 @@ function listRow(list: MediaList): ScreenRow {
   const items = LIST_ENTRIES[list.id].flatMap((e) => (e.item ? [marked(e.item)] : []))
   return {
     id: `list:${list.id}`, style: 'poster', title: list.name, listId: list.id, items, seeAll: { kind: 'list', listId: list.id },
-    source: list.source.kind === 'tmdb' ? { kind: 'tmdb', name: 'TMDB', url: 'https://www.themoviedb.org/list/8812' } : undefined,
+    // Every list's row says where it comes from; a watchlist's has no source (watchlists.ts).
+    source: list.source.kind === 'tmdb' ? { kind: 'tmdb', name: 'TMDB', url: 'https://www.themoviedb.org/list/8812' } : { kind: list.source.kind, name: '' },
     subtitle: `${list.inLibrary} of ${list.entries}${list.source.kind === 'tmdb' ? ' · From TMDB' : ''}`,
   }
 }
@@ -201,6 +203,7 @@ function fakeHome(): HomeData {
   const rows: ScreenRow[] = [
     { id: 'continue', style: 'continue', title: 'Continue watching', continue: CONTINUE },
     { id: 'followed', style: 'episode', title: 'New from shows you follow', episodes: FOLLOWED },
+    ...watchlistRows(),
     { id: 'live', style: 'live', title: 'Live TV' },
     { id: 'recentlyAddedShows', style: 'poster', title: 'Recently added · TV Shows', items: ADDED_SHOWS, seeAll: { kind: 'library', libraryId: 2, sort: 'added' } },
     { id: 'recentlyAired', style: 'episode', title: 'Recently aired · Episodes', episodes: AIRED.map((e, i) => ({ ...e, airDate: day(i + 1) })), seeAll: { kind: 'library', libraryId: 2, sort: 'aired' } },
@@ -231,6 +234,7 @@ function libraryRowsReply(id: number): components['schemas']['LibraryRows'] {
   return {
     recentlyAdded: [], recentlyAired: [], recentlyReleased: [],
     rows: [
+      ...watchlistRows('movie'),
       { id: 'recentlyAdded', style: 'poster', title: 'Recently added', items: recent(MOVIES), seeAll: { kind: 'library', libraryId: 1, sort: 'added' } },
       { id: 'recentlyReleased', style: 'wide', title: 'Recently released', items: [...MOVIES].sort(SORTS.released).slice(0, 10).map(marked), seeAll: { kind: 'library', libraryId: 1, sort: 'released' } },
       listRow(LISTS[2]),
@@ -268,18 +272,20 @@ export function registerBrowse(server: FakeServer, mode = '') {
   const emptyHome = mode === 'empty' || mode === 'scanning' || mode === 'unreadable'
   server.route('GET', '/api/libraries', () => ({ items: libraries(mode) }))
   server.route('GET', '/api/libraries/:id', ({ params }) => libraries(mode).find((l) => l.id === Number(params.id)) ?? problem(404, 'no such library'))
-  server.route('GET', '/api/home', () => (emptyHome ? EMPTY_HOME : fakeHome()))
-  server.route('GET', '/api/libraries/:id/rows', ({ params }) => libraryRowsReply(emptyHome ? 0 : Number(params.id)))
-  server.route('GET', '/api/libraries/:id/items', ({ params, url }) => itemsReply(emptyHome ? 0 : Number(params.id), url.searchParams))
-  server.route('GET', '/api/lists', () => ({ items: LISTS }))
-  server.route('GET', '/api/lists/:id', ({ params }) => LISTS.find((l) => l.id === Number(params.id)) ?? problem(404, 'no such list'))
+  server.route('GET', '/api/home', () => (emptyHome ? EMPTY_HOME : markWatchlisted(fakeHome())))
+  server.route('GET', '/api/libraries/:id/rows', ({ params }) => markWatchlisted(libraryRowsReply(emptyHome ? 0 : Number(params.id))))
+  server.route('GET', '/api/libraries/:id/items', ({ params, url }) => markWatchlisted(itemsReply(emptyHome ? 0 : Number(params.id), url.searchParams)))
+  server.route('GET', '/api/lists', () => ({ items: [...LISTS, ...watchlistLists()] }))
+  server.route('GET', '/api/lists/:id', ({ params }) => watchlistList(Number(params.id)) ?? LISTS.find((l) => l.id === Number(params.id)) ?? problem(404, 'no such list'))
   server.route('GET', '/api/lists/:id/entries', ({ params, url }) => {
     const id = Number(params.id)
+    const watchlist = watchlistEntries(id, url.searchParams)
+    if (watchlist) return watchlist
     const all = LIST_ENTRIES[id]
     if (!all) return problem(404, 'no such list')
     const offset = Number(url.searchParams.get('offset') ?? 0)
     const limit = Number(url.searchParams.get('limit') ?? 100)
-    const items = all.map((e) => (e.item ? { ...e, item: marked(e.item) } : e))
+    const items = markWatchlisted(all.map((e) => (e.item ? { ...e, item: marked(e.item) } : e)))
     return { items: items.slice(offset, offset + limit), total: all.length, inLibrary: inLibrary(id), offset, limit }
   })
   const mark = (on: boolean) => ({ params }: { params: Record<string, string> }) => {

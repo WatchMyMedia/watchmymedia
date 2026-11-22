@@ -69,6 +69,7 @@ describe('Servers’ words', () => {
   it('names the account button for the server it is on, and shows the server with more than one', () => {
     expect(accountWords('Sam', 'Living room server', 3)).toEqual({ label: 'Servers. Sam, on Living room server', visible: 'Living room server' })
     expect(accountWords('Sam', 'Living room server', 1).visible).toBe('Sam')
+    expect(accountWords('Sam', 'Living room server', 1, true).label).toBe('Servers and watchlists. Sam, on Living room server')
     expect(nowOn('Cabin server')).toBe('Now on Cabin server')
   })
 

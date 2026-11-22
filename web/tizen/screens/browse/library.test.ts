@@ -142,4 +142,20 @@ describe('a list’s page', () => {
     expect(entryCard(entry({ found: false, tmdbId: undefined }))).toEqual({ kind: 'notFound', hint: 'Nothing to request' })
     expect(missingLine(entry())).toBe('1988 · Not in your library')
   })
+
+  it('words a watchlist’s page as a watchlist, with no source, update time or ranks', () => {
+    const watchlist = list({ owner: 'me', source: { kind: 'watchlist' }, fetchedAt: new Date().toISOString() })
+    expect(listKicker(watchlist)).toBe('Watchlist')
+    expect(listLine(watchlist)).toBe('')
+    expect(missingLine(entry(), true)).toBe('Not in your library')
+    expect(entryLabel(entry(), entryCard(entry()), false)).toBe('Halfway to Juniper, not in your library')
+  })
+
+  it('opens a title’s actions on Hold OK where the server keeps watchlists, if TMDB has matched it', () => {
+    const movie = entry({ item: { id: 9, kind: 'movie', title: 'Kestrel Point', libraryId: 1, addedAt: '', genres: [], hdr: false, isNew: false, overview: '', totalSize: 0, watched: false } })
+    expect(entryCard(movie, true)).toMatchObject({ kind: 'library', hold: 'Its menu' })
+    expect(entryCard(entry({ requestState: 'requestable' }), true)).toMatchObject({ kind: 'missing', hint: 'Request it', hold: 'Its menu' })
+    expect(entryCard(entry({ tmdbId: undefined }), true)).toMatchObject({ hold: undefined })
+    expect(entryCard(movie)).toMatchObject({ hold: 'Mark watched' })
+  })
 })

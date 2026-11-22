@@ -8,6 +8,7 @@ import { registerSearch } from './search'
 import { registerSettings } from './settings'
 import { registerDetails } from './details'
 import { registerPlayer } from './player'
+import { registerWatchlists } from './watchlists'
 import { FAKE_USER } from './data'
 import { ATTIC, CABIN, CABIN_TITLES, CABIN_TOKEN, DEN, DEN_TOKEN, LAKESIDE, LAKESIDE_TOKEN, registerCabin, type FakeIdentity } from './others'
 
@@ -41,6 +42,7 @@ export function createFakeServer(mode = '', identity: FakeIdentity = LAKESIDE): 
   registerDetails(server, mode, identity.id === CABIN.id ? CABIN_TITLES : undefined)
   registerRequests(server, mode)
   registerBrowse(server, mode)
+  registerWatchlists(server)
   registerSearch(server)
   registerSettings(server, mode)
   if (mode !== 'player') registerPlayer(server, mode)

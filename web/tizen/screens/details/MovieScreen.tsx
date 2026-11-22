@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { movieQuery, movieRelatedQuery, playbackPlansQuery } from '../../../src/api/queries'
 import { requestOptionsQuery, useReportProblem } from '../../../src/api/requests'
 import { useMarkWatched } from '../../../src/api/watch'
+import { watchlistTitle } from '../../../src/lib/watchlists'
 import type { components } from '../../../src/api/schema'
 import { useEntry, useFocus, useKeys, useNav } from '../../app/hooks'
 import { tvTakesHdr10 } from '../../app/platform'
@@ -17,6 +18,8 @@ import { markedMessage, reportSent, useNotice } from './detailWords'
 import { Glyph } from './Glyph'
 import { mainLabel, moviePlay, movieFacts, movieTags, movieVersions, partway, progressOf, resumeVersion, trailerPlay, versionLine, versionTags, versionTitle, versionTracks } from './movieLabels'
 import { relatedPosterRows, type RelatedRow } from './relatedCards'
+import { WatchlistButton } from '../watchlists/WatchlistButton'
+import { useWatchlistsOn } from '../watchlists/useWatchlistsOn'
 import './details.css'
 
 type MovieDetail = components['schemas']['MovieDetail']
@@ -30,7 +33,8 @@ const profile = () => (planProfile ??= samsungProfile({ hdr10: tvTakesHdr10() })
 /**
  * A movie (the Android TV app's MovieScreen):
  * the header with Resume or Play, Play from start,
- * Trailer, Mark watched and More › Report a problem; the versions, each with
+ * Trailer, Watchlist (where the server keeps watchlists), Mark watched and
+ * More › Report a problem; the versions, each with
  * Play this and how it would play here, beside the focused version's tracks
  * and the cast; then the movie's collection and More like this. Return
  * leaves the movie; Return from a related title comes back to its card.
@@ -76,6 +80,8 @@ function MoviePage({ m }: { m: MovieDetail }) {
   const [panel, setPanel] = useState<'more' | 'report'>()
   const [zone, setZone] = useState<Zone>('actions')
   const [tracksOf, setTracksOf] = useState<number>()
+  const [watchlistHint, setWatchlistHint] = useState<string>()
+  const watchlist = useWatchlistsOn() ? watchlistTitle('movie', m.tmdbId) : undefined
 
   const watched = !!m.watch?.completed
   const resume = resumeVersion(m)
@@ -139,14 +145,18 @@ function MoviePage({ m }: { m: MovieDetail }) {
             <h1 className="dt-title">{m.title}</h1>
             <Facts parts={movieFacts(m)} tags={movieTags(m)}/>
             {m.overview && <p className="dt-overview">{m.overview}</p>}
+            {/* On a line of its own, so the buttons have room for Watchlist. */}
+            {progress !== undefined && <Progress value={progress} className="dt-bar dt-bar--line"/>}
             <div className="dt-actions" data-zone="actions">
               {resume && <Button id="play" variant="primary" icon="play" autoFocus onPress={() => nav.play(moviePlay(m, resume))}>{mainLabel(m)}</Button>}
               {resume && p && <Button id="start" onPress={() => nav.play(moviePlay(m, resume, 0))}>Play from start</Button>}
               {trailer && <Button id="trailer" onPress={() => nav.play(trailer)}><Glyph name="clapper"/>Trailer</Button>}
+              {watchlist && <WatchlistButton id="watchlist" target={watchlist} holding={m.watchlists ?? []} title={m.title}
+                onProblem={(title) => say({ title, problem: true })} onHint={setWatchlistHint}/>}
               <Button id="watched" busy={mark.isPending} autoFocus={!resume} onPress={toggleWatched}>{watched ? 'Mark unwatched' : 'Mark watched'}</Button>
               {canReport && <MoreButton id="more" onPress={() => setPanel('more')}/>}
-              {progress !== undefined && <Progress value={progress}/>}
             </div>
+            {watchlistHint && <Hint items={[{ key: 'OK', label: watchlistHint }, { key: 'Return', label: `leaves ${m.title}` }]}/>}
           </section>
         </div>
 

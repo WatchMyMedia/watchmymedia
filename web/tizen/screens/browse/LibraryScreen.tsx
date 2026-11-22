@@ -25,6 +25,7 @@ import {
 } from './libraryView'
 import { itemActions, seeAllRoute, type CardAction, type RowContext } from './rowCards'
 import { Glyph, RowView } from './RowView'
+import { useWatchlistsOn } from '../watchlists/useWatchlistsOn'
 import './browse.css'
 
 type Library = components['schemas']['Library']
@@ -77,6 +78,7 @@ function GridBody({ library, type, choices, first, focusFirst, onFocused, autoFo
   const media = useMediaUrls()
   const focus = useFocus()
   const { run } = useCardActions()
+  const menu = useWatchlistsOn()
   const group = gridGroup(library.id, choices)
   const total = first.total
   const letters = useMemo<readonly LetterOffset[]>(() => (choices.sort === 'title' ? first.letters ?? [] : []), [choices.sort, first.letters])
@@ -171,13 +173,13 @@ function GridBody({ library, type, choices, first, focusFirst, onFocused, autoFo
     : [
       ...(byTitle ? [{ keys: ['▶'], label: 'From the last column: A–Z' }] : []),
       { keys: ['CH ▲', 'CH ▼'], label: 'A screen up or down' },
-      ...(type === 'movie' ? [{ keys: ['Hold OK'], label: 'Mark watched' }] : []),
+      ...(menu ? [{ keys: ['Hold OK'], label: 'Its menu' }] : type === 'movie' ? [{ keys: ['Hold OK'], label: 'Mark watched' }] : []),
       ...(byTitle || choices.sort === 'title' ? [] : [{ note: 'A–Z appears when the list is sorted by title' }]),
     ]
   return <div className="library-grid__body" onFocus={onFocus} data-autofocus={autoFocus || undefined}>
     <Grid key={group} id={group} items={items} itemKey={(_, i) => String(i)} variant="poster" reveal={reveal}
       renderItem={(item, id, i) => {
-        const actions = item ? itemActions(item) : {}
+        const actions = item ? itemActions(item, menu) : {}
         return <div className={`browse-cell${item ? '' : ' browse-slot'}${landing === i ? ' browse-land' : ''}`}>
           <Card id={id} variant="poster" title={item?.title ?? ''} subtitle={item ? gridLine(item) : undefined} image={item && media.imageUrl(item.posterPath, 'w342')}
             progress={item?.progress} badges={item?.isNew ? [{ label: 'New', tone: 'gold' }] : item?.watched ? [{ label: '✓', tone: 'gold' }] : undefined}
@@ -294,17 +296,19 @@ function LibraryView({ library, type, initial, toGrid }: { library: Library; typ
   const root = useRef<HTMLDivElement>(null)
   const hint = useFocusHint(root)
   const refs = libraries.data?.items
+  const menu = useWatchlistsOn()
   const base = useMemo<Omit<RowContext, 'now'>>(() => ({
-    libraries: refs ?? [], channels: [], listings: false,
+    libraries: refs ?? [], channels: [], listings: false, menu,
     // A list's page, or the grid below sorted the row's way; a link to another library has none here.
     seeAll: (target, row): CardAction | undefined => {
       const route = seeAllRoute(target, row, refs ?? [])
-      if (route?.name === 'list') return { kind: 'open', route }
+      // A watchlist's page opens with this screen's type chosen.
+      if (route?.name === 'list') return { kind: 'open', route: { ...route, type } }
       if (target.kind !== 'library' || route?.name !== 'seeAll' || route.libraryId !== library.id) return undefined
       const { sort, filter, genre, decade } = target.search
       return { kind: 'grid', sort, filter, genre, decade }
     },
-  }), [refs, library.id])
+  }), [refs, library.id, menu, type])
   const drawn = useMemo(() => (rows.data ? libraryRows(rows.data, type).filter(drawable) : []), [rows.data, type])
   const onGrid = useCallback((a: Extract<CardAction, { kind: 'grid' }>) => { setChoices(choicesFrom(a)); setGridFocus(true) }, [setChoices])
   const onFocused = useCallback(() => setGridFocus(false), [])

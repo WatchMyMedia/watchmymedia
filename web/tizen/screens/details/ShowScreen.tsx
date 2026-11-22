@@ -4,6 +4,7 @@ import { fileQuery, seasonQuery, showQuery, showRelatedQuery } from '../../../sr
 import { requestOptionsQuery, useMonitorEpisodes, useReportProblem, useSearchMissing } from '../../../src/api/requests'
 import { useMarkSeasonWatched, useMarkShowWatched, useMarkWatched } from '../../../src/api/watch'
 import { useFollowShow } from '../../../src/api/follows'
+import { watchlistTitle } from '../../../src/lib/watchlists'
 import type { components } from '../../../src/api/schema'
 import { pageEpisodes } from '../../../src/lib/episode'
 import { formatBytes } from '../../../src/lib/format'
@@ -27,6 +28,7 @@ import {
   FOLLOW_LIMIT, abilities, arrivalOf, episodeKicker, episodeMore, episodePlay, followRefused, missingOf, onTopFor, replacedMessage, seasonActions, seasonLine, seasonMark,
   showMark, topActions, zoneOffset, type Zone,
 } from './showLabels'
+import { useWatchlistsOn } from '../watchlists/useWatchlistsOn'
 import './details.css'
 
 type ShowDetail = components['schemas']['ShowDetail']
@@ -128,6 +130,7 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
   const file = useQuery({ ...fileQuery(fileId ?? 0), enabled: !!fileId && settled === fileId })
 
   const { notice, say, fail } = useNotice()
+  const watchlistsOn = useWatchlistsOn()
   const mark = useMarkWatched()
   const markSeason = useMarkSeasonWatched()
   const markShow = useMarkShowWatched()
@@ -226,6 +229,8 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
     ...(more.delete ? [{ id: 'more/delete', label: 'Delete episode…', icon: 'trash' as const, danger: true, onPress: () => setDialog('delete') }] : []),
   ]
   const closeDialog = () => setDialog(undefined)
+  const watchlistTarget = watchlistsOn ? watchlistTitle('show', show.tmdbId) : undefined
+  const watchlist = watchlistTarget && { target: watchlistTarget, holding: show.watchlists ?? [] }
 
   // data-vscroll: the page moves itself (zoneOffset), so focus never scrolls it as the browser would.
   return <div ref={page} className="dt-page" data-vscroll onFocus={onFocus}>
@@ -251,7 +256,7 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
           {zone === 'episodes' && <Hint items={[{ key: '◀ ▶', label: 'The episode on top follows focus' }, { key: 'OK', label: 'back up to its buttons, never plays' }, { key: '▲', label: 'the seasons' }, { key: 'Return', label: `leaves ${show.title}` }]}/>}
           {zone === 'seasons' && tabs.length > 1 && <Hint items={[{ key: '◀ ▶', label: 'changes season at once, its first unwatched episode on top' }, { key: '▼', label: 'its episodes' }, { key: '▲', label: 'the episode’s buttons' }]}/>}
         </div>
-        <ShowAbout show={show} today={today} following={show.following} mark={showMark(show.seasons)} marking={markShow.isPending}
+        <ShowAbout show={show} today={today} following={show.following} watchlist={watchlist} onWatchlistProblem={(title) => say({ title, problem: true })} mark={showMark(show.seasons)} marking={markShow.isPending}
           canShowMissing={can.requests || can.admin} showMissing={missingOn} askable={askable} hasRelated={rows.length > 0} focused={zone === 'about'} away={topZone}
           onFollow={doFollow} onShowMissing={setShowMissing} onRequest={() => setDialog({ request: askable })} onDetails={() => setDialog('details')}
           onMark={(watched) => markShow.mutate({ showId: show.id, watched }, { onSuccess: () => say({ title: markedMessage(watched) }), onError: (err) => fail('Couldn’t change the watched marks', err) })}/>

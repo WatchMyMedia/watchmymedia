@@ -18,6 +18,7 @@ import { keepSearch, searchScope } from '../screens/search/keptSearch'
 import { AddedDialog, NOTE_MS, SwitchNote } from '../screens/servers/Arrival'
 import { ServersPanel } from '../screens/servers/ServersPanel'
 import { accountWords } from '../screens/servers/serverRows'
+import { useWatchlistsOn } from '../screens/watchlists/useWatchlistsOn'
 
 /** Shown after the stream has been down this long: brief drops pass unnoticed. */
 const OFFLINE_AFTER_MS = 5000
@@ -52,6 +53,7 @@ function Frame({ nav, entries, arrival, exit }: { nav: NavStack<Route>; entries:
   const liveTV = !!capabilities.data?.enabled && !!capabilities.data.allowed
   const options = useQuery(requestOptionsQuery)
   const current = sectionOf(nav.section())
+  const watchlists = useWatchlistsOn()
 
   const navApi: Nav = useMemo(() => ({
     push: (route) => nav.push(route),
@@ -110,7 +112,7 @@ function Frame({ nav, entries, arrival, exit }: { nav: NavStack<Route>; entries:
 
   const open = (section: Section) => navApi.openSection(SECTION_ROUTES[section])
   const Screen = ROUTES[top.route.name].screen as ComponentType<ScreenProps>
-  const account = { initial: session.account.name.slice(0, 1).toUpperCase(), ...accountWords(session.account.name, session.server.name, app.store.list().length) }
+  const account = { initial: session.account.name.slice(0, 1).toUpperCase(), ...accountWords(session.account.name, session.server.name, app.store.list().length, watchlists) }
   return <NavContext.Provider value={navApi}>
     <div className="tv-shell">
       {chrome === 'rail' && <Rail current={current} liveTV={liveTV} badge={railBadge(options.data, session.isAdmin)} account={account}
@@ -123,7 +125,8 @@ function Frame({ nav, entries, arrival, exit }: { nav: NavStack<Route>; entries:
       {arrived === 'switched' && <SwitchNote/>}
       {arrived === 'added' && <AddedDialog onDone={() => setArrived(undefined)}/>}
       {servers && chrome === 'rail' && <ServersPanel from={servers} onClose={() => setServers(undefined)}
-        onManage={() => { setServers(undefined); nav.openSection({ name: 'settings', group: 'account', servers: true }) }}/>}
+        onManage={() => { setServers(undefined); nav.openSection({ name: 'settings', group: 'account', servers: true }) }}
+        onWatchlists={watchlists ? () => { setServers(undefined); nav.push({ name: 'watchlists' }) } : undefined}/>}
       {leaving && <LeaveDialog onStay={() => setLeaving(false)} onLeave={exit}/>}
     </div>
   </NavContext.Provider>

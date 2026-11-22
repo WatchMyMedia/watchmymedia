@@ -23,6 +23,7 @@ import {
 import { episodeCode, seeAllRoute, type RowCard, type RowContext } from './rowCards'
 import { toneStyle, useFocusOnArrival, useRowCards } from './browseHooks'
 import { Glyph, RowView } from './RowView'
+import { useWatchlistsOn } from '../watchlists/useWatchlistsOn'
 import './browse.css'
 
 type Hero = components['schemas']['HomeHero']
@@ -287,13 +288,14 @@ export function HomeScreen() {
   const libraries = useQuery(librariesQuery)
   const live = useLive()
   const libs = libraries.data?.items
+  const menu = useWatchlistsOn()
   const base = useMemo<Omit<RowContext, 'now'>>(() => {
     const refs = libs ?? []
     return {
-      libraries: refs, channels: live.channels, listings: live.listings,
+      libraries: refs, channels: live.channels, listings: live.listings, menu,
       seeAll: (target, row) => { const route = seeAllRoute(target, row, refs); return route && { kind: 'open', route } },
     }
-  }, [libs, live.channels, live.listings])
+  }, [libs, live.channels, live.listings, menu])
   const rows = useMemo(() => (home.data ? homeScreenRows(home.data, live.channels.length > 0) : []), [home.data, live.channels.length])
 
   if (home.isPending || libraries.isPending || live.pending) return <HomeSkeleton/>

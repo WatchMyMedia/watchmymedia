@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { librariesQuery, mediaListsQuery, rowLayoutQuery, useSaveRowLayout } from '../../../src/api/queries'
+import { LISTS_MADE_ON_WEB } from '../../../src/lib/mediaLists'
 import { placements, type RowLayoutEntry } from '../../../src/lib/rowLayout'
 import { useSession } from '../../app/hooks'
 import { Dialog } from '../../ui/Overlays'
@@ -66,7 +67,7 @@ export function HomeRowsPane({ first, rowsScreen }: PaneProps) {
     })}
     {message && <p role="alert" className="settings-note" style={{ color: 'var(--error-text)' }}>{message}</p>}
     {save.isPending && <PaneNote>Saving…</PaneNote>}
-    <p className="settings-note settings-note--faint">Lists are made in WatchMyMedia on the web. Lists for everyone, and your own, show up here.</p>
+    <p className="settings-note settings-note--faint">{LISTS_MADE_ON_WEB} Lists for everyone, and your own, show up here.</p>
     <SettingRow id={id('reset')} label={`Reset ${screen.name} rows`} detail="Back to the rows everyone on this server starts with" onPress={() => setResetting('asking')}/>
 
     {panel?.kind === 'screen' && <ChoicePanel idPrefix="choice/screen" title="Screen" context="Home rows · whose rows to arrange" onClose={() => setPanel(null)}

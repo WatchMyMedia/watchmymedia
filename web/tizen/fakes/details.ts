@@ -2,6 +2,7 @@ import type { components } from '../../src/api/schema'
 import { setTrailerEmbed } from '../screens/details/trailerPlayer'
 import { FAKE_USER, MOVIE_ITEMS, SHOW_ITEMS } from './data'
 import { FakeServer, json, problem } from './server'
+import { holding, markWatchlisted } from './watchlists'
 
 // The movie and show pages' fictional data:
 // Dead Reckoning Bay with two versions,
@@ -78,7 +79,7 @@ function movieDetail(item: BrowseItem, index: number): MovieDetail {
               : [{ source: 'youtube', key, name: 'Official Trailer' }]
   const runtime = base === 102 ? 134 : item.runtimeMin ?? 100
   return {
-    id: item.id, libraryId: 1, tmdbId: 50_000 + item.id, title: item.title, year: item.year,
+    id: item.id, libraryId: 1, tmdbId: 50_000 + item.id, title: item.title, year: item.year, watchlists: holding('movie', 50_000 + item.id),
     overview: base === 102 ? 'A salvage diver takes a cash job to raise a yacht that sank in calm water, and finds the manifest was written after it went down.' : item.overview,
     genres: base === 102 ? ['Thriller'] : item.genres, runtimeMin: runtime, contentRating: index % 3 === 0 ? 'R' : 'PG-13', rating: base === 102 ? 7.6 : item.rating,
     quality: base === 102 ? '4K' : '1080p', hdr: base === 102, files: versions, fileCount: versions.length, totalSize: versions.reduce((n, v) => n + v.size, 0),
@@ -206,7 +207,7 @@ function showDetail(item: BrowseItem): ShowDetail {
   const upcoming = all.find(({ e }) => !e.aired)
   const summaries = seasons.map((s) => seasonSummary(item.id, s))
   return {
-    id: item.id, libraryId: 2, tmdbId: 60_000 + item.id, title: item.title, year: item.year, overview: item.id % 1000 === 201
+    id: item.id, libraryId: 2, tmdbId: 60_000 + item.id, title: item.title, year: item.year, watchlists: holding('tv', 60_000 + item.id), overview: item.id % 1000 === 201
       ? 'A harbour pilot in a fading fishing town starts to suspect that the lights guiding ships home have been moved on purpose, and that the people who moved them still live on her street.'
       : item.overview,
     genres: item.genres, status: item.status, rating: 8.1, seasons: summaries, episodeCount: summaries.reduce((n, s) => n + s.availableCount, 0),
@@ -251,10 +252,10 @@ export function registerDetails(server: FakeServer, mode = '', titles?: Readonly
   server.route('GET', '/api/movies/:id/related', ({ params }) => {
     const id = Number(params.id)
     const similar = MOVIE_ITEMS.filter((m) => m.id !== id % 1000).map(withWatch)
-    return { rows: [
+    return markWatchlisted({ rows: [
       ...(id % 1000 === 102 ? [{ id: 'collection', style: 'poster', title: 'Dead Reckoning Collection', items: COLLECTION.map(withWatch) }] : []),
       { id: 'similar', style: 'poster', title: 'More like this', items: similar.slice(0, 12) },
-    ] }
+    ] })
   })
   server.route('POST', '/api/playback/plans', ({ body }) => {
     const ids = (body as { fileIds?: number[] })?.fileIds ?? []

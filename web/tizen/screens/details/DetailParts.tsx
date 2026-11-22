@@ -76,14 +76,24 @@ export type MenuItem = { id: string; label: string; icon: GlyphName; danger?: bo
  * the movie or the episode, the dangerous ones last in red under a line.
  * Return closes it, and focus goes back to the ⋯.
  */
-export function MorePanel({ kicker, title, items, note, onClose }: { kicker: string; title: string; items: MenuItem[]; note?: string; onClose(): void }) {
+export function MorePanel({ kicker, title, items, note, start, label, onClose }: {
+  kicker: string
+  title: string
+  items: MenuItem[]
+  note?: string
+  /** The item focus starts on; the first without one. */
+  start?: string
+  /** The menu's name for a screen reader: "More for …" without one. */
+  label?: string
+  onClose(): void
+}) {
   const firstDanger = items.findIndex((i) => i.danger)
   return <SidePanel title={title} onClose={onClose}>
     <p className="dt-panel-kicker">{kicker}</p>
-    <div role="menu" aria-label={`More for ${title}`} className="dt-menu">
+    <div role="menu" aria-label={label ?? `More for ${title}`} className="dt-menu">
       {items.map((item, i) => <div key={item.id}>
         {i === firstDanger && i > 0 && <span role="separator" className="dt-menu__line"/>}
-        <button type="button" role="menuitem" data-focus={item.id} data-autofocus={i === 0 || undefined} className={`dt-menu__item${item.danger ? ' dt-menu__item--danger' : ''}`} onClick={item.onPress}>
+        <button type="button" role="menuitem" data-focus={item.id} data-autofocus={(start ? item.id === start : i === 0) || undefined} className={`dt-menu__item${item.danger ? ' dt-menu__item--danger' : ''}`} onClick={item.onPress}>
           <Glyph name={item.icon}/>{item.label}
         </button>
       </div>)}

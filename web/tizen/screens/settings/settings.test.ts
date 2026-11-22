@@ -95,6 +95,7 @@ describe('Home rows on the TV', () => {
     expect(rowLine(entry('live', { style: 'live' }), lists)).toBe('Built in · On now, or Watch a channel')
     expect(rowLine(entry('list:11', { kind: 'list', listId: 11, owner: 'everyone' }), lists)).toBe('For everyone · 18 of 50 · From TMDB')
     expect(rowLine(entry('list:9', { kind: 'list', listId: 9, owner: 'me' }), lists)).toBe('Your list')
+    expect(rowLine(entry('list:501', { kind: 'list', listId: 501, owner: 'me' }), [{ id: 501, entries: 12, inLibrary: 9, source: { kind: 'watchlist' } }])).toBe('Watchlist · 12 titles · 9 in your library')
     const rows = [entry('a'), entry('list:13', { kind: 'list', shown: false, note: 'server words' }), entry('b', { hidden: true, shown: false })]
     expect(rowNote(rows, 1)).toBe('Not shown: none of it is in your library yet')
     expect(rowNote(rows, 2)).toBeUndefined()

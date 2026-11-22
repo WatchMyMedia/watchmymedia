@@ -1,7 +1,8 @@
 import type { components } from '../../src/api/schema'
 
 // The fakes' fictional household library. Every title, name and server is
-// made up. There are no pictures (no posterPath): cards draw their
+// made up. A title's TMDB id is 50 000 plus its id for a movie and 60 000
+// plus it for a show. There are no pictures (no posterPath): cards draw their
 // placeholders, and the preview fetches nothing from the network.
 
 type BrowseItem = components['schemas']['BrowseItem']
@@ -26,13 +27,13 @@ const GENRES = [['Drama'], ['Thriller', 'Mystery'], ['Comedy'], ['Drama', 'Roman
 export const MOVIE_ITEMS: BrowseItem[] = MOVIES.map((title, i) => ({
   kind: 'movie', id: 101 + i, libraryId: 1, libraryType: 'movie', title, year: 2025 - (i % 9), overview: `A made-up film for the TV app's fakes (${i + 1}).`,
   genres: GENRES[i % GENRES.length], hdr: i % 4 === 0, addedAt: at(i * 3), isNew: i < 3, totalSize: 4_000_000_000 + i * 1e8, watched: i % 5 === 4,
-  runtimeMin: 88 + (i * 7) % 60, rating: 6 + (i % 4) * .5,
+  runtimeMin: 88 + (i * 7) % 60, rating: 6 + (i % 4) * .5, tmdbId: 50_101 + i,
 }))
 
 export const SHOW_ITEMS: BrowseItem[] = SHOWS.map((title, i) => ({
   kind: 'show', id: 201 + i, libraryId: 2, libraryType: 'tv', title, year: 2019 + (i % 7), overview: `A made-up series for the TV app's fakes (${i + 1}).`,
   genres: GENRES[(i + 2) % GENRES.length], hdr: false, addedAt: at(i * 2), isNew: i < 2, totalSize: 30_000_000_000, watched: false,
-  episodeCount: 8 + i * 2, status: i % 3 === 0 ? 'Ended' : 'Returning Series',
+  episodeCount: 8 + i * 2, status: i % 3 === 0 ? 'Ended' : 'Returning Series', tmdbId: 60_201 + i,
 }))
 
 export const CONTINUE: ContinueItem[] = [

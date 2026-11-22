@@ -4,7 +4,8 @@ import type { SwitchView } from '../../session/session'
 import { Button } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
 import { Modal } from '../../ui/Overlays'
-import { ADD_FOCUS, addLine, MANAGE_FOCUS, panelFocus, panelReturn, RETRY_FOCUS, serverFocus, serverRows, switchFailedWords } from './serverRows'
+import { Glyph } from '../details/Glyph'
+import { ADD_FOCUS, addLine, MANAGE_FOCUS, panelFocus, panelReturn, RETRY_FOCUS, serverFocus, serverRows, switchFailedWords, WATCHLISTS_FOCUS } from './serverRows'
 import './servers.css'
 
 /** A switch that didn't happen: which server, why, that the app is where it was, and Try again. */
@@ -21,17 +22,20 @@ export function SwitchFailed({ failed, autoFocus }: { failed: Extract<SwitchView
 
 /**
  * Servers, from the rail's account button: the servers this TV has, the
- * current one marked, then Add a server and Manage servers. OK on another
+ * current one marked, then Add a server and Manage servers, and Watchlists
+ * under them where the server keeps watchlists. OK on another
  * server switches to it at once; one signed out here opens its sign-in. A
  * server that doesn't answer says so above the list, with Try again, and
  * the app stays where it was. Return closes the panel and puts focus back
  * on the button that opened it.
  */
-export function ServersPanel({ from, onClose, onManage }: {
+export function ServersPanel({ from, onClose, onManage, onWatchlists }: {
   /** What opened it: the rail's button, or a screen's switch that failed (a search result on another server). */
   from: 'rail' | 'screen'
   onClose(): void
   onManage(): void
+  /** The person's watchlists; none where the server doesn't keep them. */
+  onWatchlists?(): void
 }) {
   const app = useApp()
   const state = useAppState()
@@ -94,6 +98,14 @@ export function ServersPanel({ from, onClose, onManage }: {
           <span className="servers-row__chevron" aria-hidden="true"><Icon name="down"/></span>
         </button>
       </div>
+      {onWatchlists && <>
+        <div className="servers-rule" aria-hidden="true"/>
+        <button type="button" data-focus={WATCHLISTS_FOCUS} className="servers-row servers-row--short" onClick={onWatchlists}>
+          <span className="servers-row__icon servers-row__icon--plain" aria-hidden="true"><Glyph name="bookmark"/></span>
+          <span className="servers-row__text"><span className="servers-row__label">Watchlists</span></span>
+          <span className="servers-row__chevron" aria-hidden="true"><Icon name="down"/></span>
+        </button>
+      </>}
       <p className="servers-foot">Return closes this panel.</p>
     </aside>
   </Modal>

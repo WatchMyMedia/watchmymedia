@@ -1,5 +1,6 @@
 import type { components } from '../../src/api/schema'
 import { REQUIRED_API_LEVEL } from '../session/session'
+import { WATCHLISTS_API_LEVEL } from '../screens/watchlists/watchlistTv'
 import { FakeServer, problem } from './server'
 import { FAKE_USER } from './data'
 import { LAKESIDE, type FakeIdentity } from './others'
@@ -22,7 +23,8 @@ const APPROVE_AFTER_MS = 8000
 export function registerStart(server: FakeServer, mode: string, identity: FakeIdentity = LAKESIDE) {
   const info: ServerInfo = {
     id: identity.id, name: identity.name, version: mode === 'old' ? 'v1.7.0' : 'v1.8.0', platform: 'linux',
-    apiLevel: mode === 'old' ? REQUIRED_API_LEVEL - 1 : REQUIRED_API_LEVEL,
+    // A server keeps watchlists from level 33; ?fakes=nowatchlists is one that doesn't yet.
+    apiLevel: mode === 'old' ? REQUIRED_API_LEVEL - 1 : mode === 'nowatchlists' ? REQUIRED_API_LEVEL : WATCHLISTS_API_LEVEL,
     setupRequired: mode === 'setup', turnstile: false, casting: false,
   }
   server.route('GET', '/api/server', () => info, { open: true })
