@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.rows
 
+import media.watchmy.client.tv.watchlists.holdFor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -210,7 +211,7 @@ internal fun TvArrangedRow(
                         artWidth = 160.dp,
                         artHeight = 240.dp,
                         onClick = { item.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched, actions.onOpenEpisode) },
-                        onLongClick = actions.onToggleWatched?.takeIf { item.kind == ItemKind.Movie }?.let { toggle -> { toggle(item) } },
+                        onLongClick = holdFor(item, actions.onToggleWatched),
                         modifier = Modifier.rowCard(memory, "${row.id}:${item.kind}${item.id}", i, onFocusItem),
                     ) {
                         if (item.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(8.dp), BadgeStyle.Gold)
@@ -226,7 +227,7 @@ internal fun TvArrangedRow(
                         artWidth = 320.dp,
                         artHeight = 180.dp,
                         onClick = { if (m.kind == ItemKind.Movie) actions.onOpenMovie(m.id) else m.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched) },
-                        onLongClick = actions.onToggleWatched?.takeIf { m.kind == ItemKind.Movie }?.let { toggle -> { toggle(m) } },
+                        onLongClick = holdFor(m, actions.onToggleWatched),
                         modifier = Modifier.rowCard(memory, "${row.id}:${m.kind}${m.id}", i, onFocusItem),
                     ) {
                         formatDate(m.releaseDate)?.let { ArtBadge(it, Modifier.align(Alignment.BottomStart).padding(10.dp)) }

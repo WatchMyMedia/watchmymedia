@@ -51,6 +51,23 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
+import media.watchmy.client.model.ListShown
+import media.watchmy.client.model.ListSort
+import media.watchmy.client.model.MediaType
+import media.watchmy.client.model.WatchlistWords
+import media.watchmy.client.model.deleteBody
+import media.watchmy.client.model.deleteQuestion
+import media.watchmy.client.model.watchlistTitle
+import media.watchmy.client.tv.components.OptionsDialog
+import media.watchmy.client.tv.settings.ConfirmDialog
+import media.watchmy.client.tv.settings.ConfirmPart
+import media.watchmy.client.tv.settings.ConfirmWords
+import media.watchmy.client.tv.watchlists.CardMenu
+import media.watchmy.client.tv.watchlists.CardMenuEntry
+import media.watchmy.client.tv.watchlists.LocalCardMenu
+import media.watchmy.client.tv.watchlists.RenamePanel
+import media.watchmy.client.tv.watchlists.WatchlistHeader
+import media.watchmy.client.ui.LocalWatchlistControls
 import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.ItemKind
 import media.watchmy.client.model.MediaListEntry
@@ -96,7 +113,13 @@ import media.watchmy.client.ui.ReportShown
  * has (or why it couldn't update), and every title in rank order in an
  * 8-column grid. OK opens a title the library has; on a missing one it
  * opens the request dialog when the person may ask for it; Hold OK marks a
- * movie watched. The hint on the right says what OK does on the focused card.
+ * movie watched, or opens the card's menu where the server has watchlists.
+ * The hint on the right says what OK does on the focused card.
+ *
+ * A watchlist's page has Rename, Delete and the switch that keeps watched
+ * titles at its top, the type chips and the sort over the grid, no rank
+ * numbers, and Remove from it first in each card's Hold OK menu (Request
+ * beside it on a missing title). [type] is the chip it opens on.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -107,15 +130,21 @@ fun ListPageTv(
     onPlay: (PlayRequest) -> Unit,
     onNavigate: (Any) -> Unit,
     modifier: Modifier = Modifier,
+    type: String? = null,
 ) {
     val services = LocalAppServices.current
-    val vm = viewModel(key = "tv-list-$listId") { MediaListViewModel(services.rows, services.requests, services.library, listId) }
+    val shown = ListShown.of(MediaType.entries.firstOrNull { it.name.equals(type, ignoreCase = true) })
+    val vm = viewModel(key = "tv-list-$listId") { MediaListViewModel(services.rows, services.requests, services.library, listId, services.watchlists, messages = false, shown = shown) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val notMatched = rememberNotMatchedNotice()
     val memory = rememberFocusMemory()
     var asking by remember { mutableStateOf<Requestable?>(null) }
     var focusedEntry by remember { mutableStateOf<MediaListEntry?>(null) }
+    var sorting by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    val menus = LocalCardMenu.current
+    val controls = LocalWatchlistControls.current
     LaunchedEffect(vm) { vm.events.collect { if (it == MediaListViewModel.Event.Deleted) onNavigate(RailSection.Home.route) } }
 
     TvScaffold(null, onNavigate, modifier, sectionRoot = false) {
@@ -132,8 +161,29 @@ fun ListPageTv(
             Load.Loading -> LoadingState()
             is Load.Failed -> ErrorState(page.message, vm::retry, title = "Couldn't load this list")
             is Load.Ready -> {
-                val list = page.data.list
-                Row(
+                val list = state.shownList ?: page.data.list
+                val watchlist = list.isWatchlist && controls != null
+                // What Hold OK opens on a card: Remove from this watchlist first; elsewhere, the title's watchlist entry.
+                val hold: (MediaListEntry) -> (() -> Unit)? = { entry ->
+                    val saving = if (watchlist) {
+                        entry.watchlistTitle()?.let { CardMenuEntry(WatchlistWords.removeFrom(list.name), WmmIcons.BookmarkFilled) { vm.remove(entry) } }
+                    } else {
+                        controls?.item(entry.watchlistTitle(), entry.watchlisted)?.let { CardMenuEntry(it.label, if (it.on) WmmIcons.BookmarkFilled else WmmIcons.Bookmark, it.onClick) }
+                    }
+                    val item = entry.item
+                    val more = when {
+                        item != null && item.kind == ItemKind.Movie -> CardMenuEntry(if (item.watched) "Mark unwatched" else "Mark watched", WmmIcons.Check) { vm.setWatched(item, !item.watched) }
+                        item == null && entry.requestable && state.options.canRequest -> CardMenuEntry("Request", WmmIcons.Plus) { entry.requestSubject()?.let { asking = it } }
+                        else -> null
+                    }
+                    when {
+                        saving != null && menus != null -> ({ menus.open = CardMenu(entry.title, entry.menuLine(), listOfNotNull(saving, more)) })
+                        item != null && item.kind == ItemKind.Movie -> ({ vm.setWatched(item, !item.watched) })
+                        else -> null
+                    }
+                }
+                if (watchlist) WatchlistHeader(list, state.shown, state.sort, vm::startRename, { confirmDelete = true }, vm::setRemoveWatched, vm::show, { sorting = true }, focusedEntry?.okHint(state.options.canRequest))
+                if (!watchlist) Row(
                     Modifier.padding(start = ContentStart, end = ContentEnd, top = 56.dp).fillMaxWidth(),
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(40.dp),
@@ -159,7 +209,7 @@ fun ListPageTv(
                             Text(failed, style = inter(19.sp, lineHeight = 27.sp), color = WmmColors.Text)
                         }
                     } else {
-                        val hint = focusedEntry?.let { e -> if (e.item == null && e.requestable && state.options.canRequest) "OK requests it" else if (e.item != null) "OK opens the ${if (e.item?.kind == ItemKind.Show) "show" else "movie"}" else null }
+                        val hint = focusedEntry?.okHint(state.options.canRequest)
                         if (hint != null) Text(hint, style = inter(19.sp), color = WmmColors.TextFaint, maxLines = 1)
                     }
                 }
@@ -168,12 +218,12 @@ fun ListPageTv(
                 CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(8),
-                        modifier = Modifier.fillMaxSize().padding(top = 290.dp).focusRestorer(),
+                        modifier = Modifier.fillMaxSize().padding(top = if (watchlist) 380.dp else 290.dp).focusRestorer(),
                         contentPadding = PaddingValues(start = ContentStart, end = ContentEnd, top = 10.dp, bottom = 60.dp),
                         horizontalArrangement = Arrangement.spacedBy(24.dp),
                         verticalArrangement = Arrangement.spacedBy(28.dp),
                     ) {
-                        items(page.data.entries, key = { it.rank }) { entry ->
+                        items(state.entries, key = { it.rank }) { entry ->
                             val key = "entry:${entry.rank}"
                             val watch = Modifier.focusMemory(memory, key).onFocusChanged { if (it.isFocused) focusedEntry = entry }
                             val item = entry.item
@@ -185,11 +235,11 @@ fun ListPageTv(
                                     artWidth = 190.dp,
                                     artHeight = 285.dp,
                                     onClick = { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) },
-                                    onLongClick = if (item.kind == ItemKind.Movie) ({ vm.setWatched(item, !item.watched) }) else null,
+                                    onLongClick = hold(entry),
                                     focusedScale = 1.08f,
                                     modifier = watch,
                                 ) {
-                                    RankBadge(entry.rank)
+                                    if (!watchlist) RankBadge(entry.rank)
                                     ArtWatched(item.watched)
                                     ArtProgress(item.progress)
                                 }
@@ -199,17 +249,26 @@ fun ListPageTv(
                                     services.library.imageUrl(entry.posterPath, ImageSize.W342),
                                     onClick = { if (entry.requestable && state.options.canRequest) entry.requestSubject()?.let { asking = it } },
                                     modifier = watch,
+                                    onLongClick = hold(entry),
+                                    ranked = !watchlist,
                                 )
                             }
                         }
-                        if (page.data.entries.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
-                            Text("Nothing on this list yet.", style = inter(22.sp), color = WmmColors.TextMuted)
+                        if (state.entries.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
+                            if (watchlist) {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text(WatchlistWords.EMPTY_TITLE, style = inter(30.sp, FontWeight.SemiBold), color = WmmColors.Text)
+                                    Text(WatchlistWords.EMPTY_BODY, style = inter(21.sp), color = WmmColors.TextMuted)
+                                }
+                            } else {
+                                Text("Nothing on this list yet.", style = inter(22.sp), color = WmmColors.TextMuted)
+                            }
                         }
                     }
                 }
-                LaunchedEffect(page.data.entries.size) {
+                LaunchedEffect(state.entries.size) {
                     withFrameNanos { }
-                    memory.restore(fallback = page.data.entries.firstOrNull()?.let { "entry:${it.rank}" })
+                    memory.restore(fallback = state.entries.firstOrNull()?.let { "entry:${it.rank}" } ?: "wl:rename".takeIf { watchlist })
                 }
             }
         }
@@ -219,7 +278,35 @@ fun ListPageTv(
     asking?.let { subject ->
         RequestDialog(subject, state.options, onSent = { message -> asking = null; vm.requested(message) }, onDismiss = { asking = null })
     }
+    if (sorting) {
+        OptionsDialog("Sort", ListSort.entries, state.sort, { it.label }, onSelect = { vm.sortBy(it); sorting = false }, onDismiss = { sorting = false })
+    }
+    state.naming?.let { naming -> RenamePanel(naming, vm::cancelRename, vm::rename, vm::nameChanged) }
+    val list = state.list
+    if (confirmDelete && list != null) {
+        ConfirmDialog(
+            ConfirmWords(list.deleteQuestion(), WatchlistWords.CANCEL, WatchlistWords.DELETE, "Deleting…"),
+            working = state.deleting,
+            failure = null,
+            onKeep = { confirmDelete = false },
+            onGo = vm::delete,
+        ) { ConfirmPart(null, list.deleteBody()) }
+    }
 }
+
+/** What OK does on the focused card, for the hint over the grid. */
+private fun MediaListEntry.okHint(canRequest: Boolean): String? = when {
+    item == null && requestable && canRequest -> "OK requests it"
+    item != null -> "OK opens the ${if (item?.kind == ItemKind.Show) "show" else "movie"}"
+    else -> null
+}
+
+/** The line under a card menu's title: "Movie · 2026 · Not in your library". */
+private fun MediaListEntry.menuLine(): String = listOfNotNull(
+    if (mediaType == MediaType.Tv) "TV show" else "Movie",
+    year?.toString(),
+    WatchlistWords.NOT_IN_LIBRARY.takeIf { item == null },
+).joinToString(" · ")
 
 /** The entry's place in the list (`.rank`). */
 @Composable
@@ -238,14 +325,14 @@ private fun BoxScope.RankBadge(rank: Int) {
  * find is a dashed Not found box, which takes focus like the others.
  */
 @Composable
-private fun MissingCardTv(entry: MediaListEntry, imageUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun MissingCardTv(entry: MediaListEntry, imageUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier, onLongClick: (() -> Unit)? = null, ranked: Boolean = true) {
     val status = entry.missingStatus
-    val description = "${entry.rank}. ${entry.title}, " + when {
+    val description = (if (ranked) "${entry.rank}. " else "") + "${entry.title}, " + when {
         !entry.found -> "not found on TMDB"
         entry.requestable -> "not in your library, OK to request"
         else -> status ?: "not in your library"
     }
-    FocusableBox(onClick = onClick, modifier = modifier.width(190.dp).semantics(mergeDescendants = true) { contentDescription = description }, cornerRadius = 12.dp, focusedScale = 1.08f) {
+    FocusableBox(onClick = onClick, onLongClick = onLongClick, modifier = modifier.width(190.dp).semantics(mergeDescendants = true) { contentDescription = description }, cornerRadius = 12.dp, focusedScale = 1.08f) {
         Column {
             Box(Modifier.size(190.dp, 285.dp)) {
                 if (!entry.found) {
@@ -279,10 +366,10 @@ private fun MissingCardTv(entry: MediaListEntry, imageUrl: String?, onClick: () 
                         }
                     }
                 }
-                RankBadge(entry.rank)
+                if (ranked) RankBadge(entry.rank)
             }
             Text(entry.title, style = inter(20.sp, FontWeight.SemiBold), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
-            Text(entry.missingLine, style = inter(17.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+            Text(if (ranked) entry.missingLine else WatchlistWords.NOT_IN_LIBRARY, style = inter(17.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }

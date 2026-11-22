@@ -54,6 +54,9 @@ import media.watchmy.client.model.ProblemKind
 import media.watchmy.client.model.TrackLine
 import media.watchmy.client.model.Trailer
 import media.watchmy.client.model.TrailerText
+import media.watchmy.client.model.watchlistTitle
+import media.watchmy.client.tv.watchlists.WatchlistButtonTv
+import media.watchmy.client.tv.watchlists.savesHere
 import media.watchmy.client.model.formatDuration
 import media.watchmy.client.model.formatRating
 import media.watchmy.client.model.playRequest
@@ -119,7 +122,7 @@ fun MovieScreen(
     // YouTube's player in a WebView here, else the YouTube app.
     var inApp by remember { mutableStateOf(TrailerWebViews.installed()) }
     val youTubeApp = remember(context) { context.canOpenYouTube() }
-    val vm = viewModel(key = "movie-$movieId") { MovieViewModel(services.library, movieId, services.requests, youTube = inApp || youTubeApp, plans = services.playback::plans) }
+    val vm = viewModel(key = "movie-$movieId") { MovieViewModel(services.library, movieId, services.requests, youTube = inApp || youTubeApp, plans = services.playback::plans, watchlists = services.watchlists) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val memory = rememberFocusMemory()
@@ -231,6 +234,7 @@ private fun MovieContent(
                         for (t in tags) TvTag(t)
                     }
                     Overview(movie.overview)
+                    val saves = savesHere(movie.watchlistTitle(), movie.watchlists)
                     Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
                         val partway = movie.partway
                         movie.playRequest(startMs = null)?.let { req ->
@@ -242,6 +246,7 @@ private fun MovieContent(
                             }
                         }
                         if (trailer != null) TrailerButton(handOff = trailer is Trailer.YouTube && !trailerInApp, onTrailer, Modifier.focusMemory(memory, "trailer"))
+                        WatchlistButtonTv(movie.watchlistTitle(), movie.watchlists, Modifier.focusMemory(memory, "watchlist"), size = TvButtonSize.Medium)
                         TvButton(
                             if (movie.watch?.completed == true) "Mark unwatched" else "Mark watched",
                             onToggleWatched,
@@ -249,7 +254,8 @@ private fun MovieContent(
                             size = TvButtonSize.Medium,
                         )
                         if (onMore != null) MoreButton(onMore, Modifier.focusMemory(memory, "more"), size = TvButtonSize.Medium.height, iconSize = 26.dp)
-                        if (partway != null) {
+                        // With Watchlist the row is full: the progress bar has a line of its own under it.
+                        if (partway != null && !saves) {
                             Box(
                                 Modifier
                                     .padding(start = 8.dp)
@@ -259,6 +265,12 @@ private fun MovieContent(
                             ) {
                                 Box(Modifier.fillMaxHeight().fillMaxWidth(partway.positionMs.toFloat() / partway.durationMs).background(WmmColors.Accent, RoundedCornerShape(3.dp)))
                             }
+                        }
+                    }
+                    val partway = movie.partway
+                    if (partway != null && saves) {
+                        Box(Modifier.width(220.dp).height(6.dp).background(WmmColors.Line2, RoundedCornerShape(3.dp))) {
+                            Box(Modifier.fillMaxHeight().fillMaxWidth(partway.positionMs.toFloat() / partway.durationMs).background(WmmColors.Accent, RoundedCornerShape(3.dp)))
                         }
                     }
                 }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,6 +28,9 @@ import androidx.compose.ui.semantics.semantics
 import media.watchmy.client.model.FOLLOW_TV_LINE
 import media.watchmy.client.model.followLabel
 import media.watchmy.client.model.followSpoken
+import media.watchmy.client.model.watchlistTitle
+import media.watchmy.client.tv.watchlists.WatchlistButtonTv
+import media.watchmy.client.tv.watchlists.savesHere
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -88,8 +92,12 @@ internal fun About(show: ShowDetail, flags: AboutFlags, vm: ShowPageActions, lib
                 }
             }
             if (show.overview.isNotBlank()) Text(show.overview, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.TextSoft, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 1100.dp))
-            // Notify me, first of the show's buttons, with who notifies under the buttons while it has focus.
+            // Notify me, first of the show's buttons, with who notifies under the buttons while it has focus,
+            // and Watchlist beside it. With Watchlist there is a second row for the rest: one row can't hold them.
             var bellFocused by remember { mutableStateOf(false) }
+            val saves = savesHere(show.watchlistTitle(), show.watchlists)
+            // The second row's ▲ goes to the first row, not back to the episodes.
+            val up = episodeFocus.takeIf { !saves }
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 flags.following?.let { following ->
                     TvButton(
@@ -101,14 +109,23 @@ internal fun About(show: ShowDetail, flags: AboutFlags, vm: ShowPageActions, lib
                         iconTint = if (following) WmmColors.Accent else Color.White,
                     )
                 }
+                WatchlistButtonTv(show.watchlistTitle(), show.watchlists, nav.focusMemory(memory, "about:watchlist"))
                 if (flags.canMarkShow) TvButton(markShowLabel(flags.showWatched), { vm.setShowWatched(!flags.showWatched) }, nav.focusMemory(memory, "about:mark"), enabled = !flags.acting)
-                if (flags.canShowMissing) TvButton(missingEpisodesLabel(flags.showMissing), { vm.setShowMissing(!flags.showMissing) }, nav.focusMemory(memory, "about:missing"))
-                if (flags.missingSeasons) TvButton("Request missing seasons", { onAsk(ALL_SEASONS) }, nav.focusMemory(memory, "about:request"))
-                TvButton("Cast & details", onDetails, nav.focusMemory(memory, "about:details"), icon = WmmIcons.Info)
+                if (!saves) AboutMore(flags, vm, memory, up, onAsk, onDetails)
             }
+            if (saves) Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) { AboutMore(flags, vm, memory, up, onAsk, onDetails) }
             if (bellFocused && flags.following != null) Text(FOLLOW_TV_LINE, style = inter(19.sp), color = WmmColors.TextMuted)
         }
     }
+}
+
+/** Show missing episodes, Request missing seasons and Cast & details: after the show's first buttons, or on a row of their own. */
+@Composable
+private fun RowScope.AboutMore(flags: AboutFlags, vm: ShowPageActions, memory: FocusMemory, episodeFocus: (() -> FocusRequester)?, onAsk: (Int) -> Unit, onDetails: () -> Unit) {
+    val nav = remember(episodeFocus) { episodeFocus?.let { focus -> Modifier.focusProperties { this.up = focus() } } ?: Modifier }
+    if (flags.canShowMissing) TvButton(missingEpisodesLabel(flags.showMissing), { vm.setShowMissing(!flags.showMissing) }, nav.focusMemory(memory, "about:missing"))
+    if (flags.missingSeasons) TvButton("Request missing seasons", { onAsk(ALL_SEASONS) }, nav.focusMemory(memory, "about:request"))
+    TvButton("Cast & details", onDetails, nav.focusMemory(memory, "about:details"), icon = WmmIcons.Info)
 }
 
 /** What About the show's buttons depend on: the same while focus moves along the episode row. */

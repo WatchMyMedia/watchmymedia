@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.search
 
+import media.watchmy.client.tv.watchlists.holdFor
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -474,6 +475,8 @@ private fun PosterSection(
                     artWidth = 190.dp,
                     artHeight = 285.dp,
                     onClick = { onOpen(hit) },
+                    // Hold OK saves a result on this server to a watchlist; one on another server has nothing to hold.
+                    onLongClick = if (hit.serverId == null) holdFor(item, null) else null,
                     focusedScale = 1.08f,
                     modifier = Modifier.focusMemory(memory, "${item.kind}:${hit.serverId.orEmpty()}:${item.id}").onServer(item.title, hit.serverName),
                     line = serverLine(hit.serverName, several),

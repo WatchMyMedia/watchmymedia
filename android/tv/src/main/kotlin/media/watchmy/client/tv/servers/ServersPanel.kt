@@ -54,6 +54,7 @@ import media.watchmy.client.model.ADD_A_SERVER_LINE
 import media.watchmy.client.model.CURRENT_SERVER
 import media.watchmy.client.model.DeepLink
 import media.watchmy.client.model.MANAGE_SERVERS
+import media.watchmy.client.model.WatchlistWords
 import media.watchmy.client.model.SERVERS
 import media.watchmy.client.model.SIGNED_OUT_HERE
 import media.watchmy.client.model.SWITCHING
@@ -81,7 +82,12 @@ import media.watchmy.client.ui.components.WmmIcons
  * its Servers page ([manage], taken once by Settings).
  */
 @Stable
-class ServersHost(val onAdd: () -> Unit, val onOpenElsewhere: (serverId: String, query: String, page: DeepLink) -> Unit) {
+class ServersHost(
+    val onAdd: () -> Unit,
+    val onOpenElsewhere: (serverId: String, query: String, page: DeepLink) -> Unit,
+    /** Watchlists, under Manage servers; null where the server has none. */
+    val onWatchlists: (() -> Unit)? = null,
+) {
     var manage by mutableStateOf(false)
 }
 
@@ -99,9 +105,11 @@ private val Rail = 96.dp
  * servers. Focus opens on the first server that isn't the one in use, on Add
  * a server when there is one server, and on Try again after a server didn't
  * answer. Back closes it, and focus goes back to the account button.
+ * [onWatchlists] adds Watchlists under Manage servers, after a rule: the TV
+ * has no Settings row here, since Settings is in the rail.
  */
 @Composable
-internal fun ServersPanel(state: ServersViewModel.State, actions: ServersActions, onAdd: () -> Unit, onManage: () -> Unit, onDismiss: () -> Unit) {
+internal fun ServersPanel(state: ServersViewModel.State, actions: ServersActions, onAdd: () -> Unit, onManage: () -> Unit, onDismiss: () -> Unit, onWatchlists: (() -> Unit)? = null) {
     val first = remember { FocusRequester() }
     val retry = remember { FocusRequester() }
     // Where focus opens: the first server that can be switched to; with none, Add a server.
@@ -136,6 +144,12 @@ internal fun ServersPanel(state: ServersViewModel.State, actions: ServersActions
                         modifier = if (entry == null && state.failure == null) Modifier.focusRequester(first) else Modifier,
                     )
                     PanelOption(MANAGE_SERVERS, null, WmmIcons.Sliders, onClick = onManage, minHeight = 68.dp) {
+                        Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(24.dp))
+                    }
+                }
+                if (onWatchlists != null) {
+                    PanelRule()
+                    PanelOption(WatchlistWords.WATCHLISTS, null, WmmIcons.Bookmark, onClick = onWatchlists, minHeight = 68.dp) {
                         Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(24.dp))
                     }
                 }

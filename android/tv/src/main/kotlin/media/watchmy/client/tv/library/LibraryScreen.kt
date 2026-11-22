@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.library
 
+import media.watchmy.client.tv.watchlists.holdFor
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -136,7 +137,7 @@ fun LibraryScreen(
 
     TvScaffold(if (type == LibraryType.Tv) RailSection.Shows else RailSection.Movies, onNavigate) {
         if (rowsVm.arranges && state.libraryId != null) {
-            val actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, { show, season, episode -> onNavigate(TvRoutes.Episode(show, season, episode)) }, notMatched, { vm.setWatched(it, !it.watched) }) { id -> onNavigate(TvRoutes.MediaList(id)) }
+            val actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, { show, season, episode -> onNavigate(TvRoutes.Episode(show, season, episode)) }, notMatched, { vm.setWatched(it, !it.watched) }) { id -> onNavigate(TvRoutes.MediaList(id, type = if (type == LibraryType.Movie) "movie" else "tv")) }
             ArrangedLibrary(
                 type, title, state, rows, actions, memory, gridState, jumps, byTitle,
                 chips = { m -> ChipRow(vm, state, memory, { picker = Picker.Decade }, m, top = 0.dp) },
@@ -193,7 +194,7 @@ fun LibraryScreen(
                                         item = item,
                                         imageUrl = services.library.imageUrl(item.posterPath, ImageSize.W342),
                                         onClick = { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) },
-                                        onLongClick = if (item.kind == ItemKind.Movie) ({ vm.setWatched(item, !item.watched) }) else null,
+                                        onLongClick = holdFor(item) { vm.setWatched(it, !it.watched) },
                                         narrow = byTitle,
                                         modifier = Modifier
                                             .focusMemory(memory, "item:${item.id}")
@@ -361,7 +362,7 @@ private fun ArrangedLibrary(
                             item = item,
                             imageUrl = services.library.imageUrl(item.posterPath, ImageSize.W342),
                             onClick = { onOpen(item) },
-                            onLongClick = actions.onToggleWatched?.takeIf { item.kind == ItemKind.Movie }?.let { toggle -> { toggle(item) } },
+                            onLongClick = holdFor(item, actions.onToggleWatched),
                             narrow = byTitle,
                             modifier = Modifier.focusMemory(memory, "item:${item.id}").toStrip(jumps, byTitle && i % COLUMNS == COLUMNS - 1).onFocusChanged {
                                 if (it.isFocused) {
