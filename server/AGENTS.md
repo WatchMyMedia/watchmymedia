@@ -300,6 +300,11 @@ ones named after files, which have a file instead of an air date), so a bulk
 mark must not mark what can't have been watched: Mark season and Mark show
 watched mark (and guard) only episodes that have aired by today (UTC) or
 have a file present, so a new episode isn't already watched when it comes.
+A change that can finish a movie or an episode calls `leaveWatchlists`
+(`internal/watchstate/watchlists.go`) once, after its transaction commits,
+with the items it changed: it takes what is now finished off the person's
+watchlists that remove watched titles, by the watch's own time. A new kind
+of finishing change needs that call too; `Move` makes none.
 
 **Migrations.** New numbered files in `internal/db/migrations/` (`000NN_name.sql`)
 with `-- +goose Up` and `-- +goose Down` and a comment saying why. Never edit
