@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import { HomeScreen } from '../screens/browse/HomeScreen'
 import { LibraryScreen, SeeAllScreen } from '../screens/browse/LibraryScreen'
 import { ListScreen } from '../screens/browse/ListScreen'
+import { WatchlistsScreen } from '../screens/watchlists/WatchlistsScreen'
 import { MovieScreen } from '../screens/details/MovieScreen'
 import { ShowScreen } from '../screens/details/ShowScreen'
 import { PlayerScreen } from '../screens/player/PlayerScreen'
@@ -38,7 +39,10 @@ export type Route =
   // Pages: each opens on top of what opened it.
   /** A row's See all: its library sorted the row's way. */
   | { name: 'seeAll'; libraryId: number; title: string; sort?: string; filter?: string; genre?: string; decade?: number }
-  | { name: 'list'; id: number }
+  /** A list's page; a watchlist's opens with `type` chosen (its row's See all on a Movies or TV screen). */
+  | { name: 'list'; id: number; type?: 'movie' | 'tv' }
+  /** The person's watchlists, from Servers. */
+  | { name: 'watchlists' }
   | { name: 'movie'; id: number }
   /** The show page: up next on top, or a season's start, or an episode. */
   | { name: 'show'; id: number; season?: number; episodeId?: number }
@@ -71,6 +75,7 @@ export const ROUTES: { [N in Route['name']]: RouteDef<N> } = {
   settings: { screen: SettingsScreen, section: () => 'settings' },
   seeAll: { screen: SeeAllScreen },
   list: { screen: ListScreen },
+  watchlists: { screen: WatchlistsScreen },
   movie: { screen: MovieScreen },
   show: { screen: ShowScreen },
   requests: { screen: RequestsScreen },

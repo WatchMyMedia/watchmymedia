@@ -97,7 +97,9 @@ one play for the administrator, fail another and ask Still watching early;
 `?fakes=nolistings` and `?fakes=notv` give Live TV without listings and
 without access; `?fakes=savefail` refuses every change to the account's
 settings, `?fakes=nosettings` doesn't answer for them, and `?fakes=seerr`
-carries requests out through Seerr. Nothing on the network is asked: every
+carries requests out through Seerr. Sam has three watchlists (Watchlist,
+Halloween and With the kids); `?fakes=nowatchlists` is a server too old to
+keep them, where the app offers none. Nothing on the network is asked: every
 other address fails as an unreachable server would. There is no media to play,
 so the player shows its screens over a simulated stream.
 

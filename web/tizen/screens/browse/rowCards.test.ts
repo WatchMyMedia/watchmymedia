@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { airedDay, cardPanel, panelHint } from './cardPanel'
-import { channelCard, holdWords, posterLine, rowCards, rowHeading, rowVariant, seeAllRoute, spacedCode, timeLeft, type RowContext } from './rowCards'
+import { channelCard, holdWords, itemActions, posterLine, rowCards, rowHeading, rowVariant, seeAllRoute, spacedCode, timeLeft, type RowContext } from './rowCards'
 import { channel, episode, item, libraries, resume, row } from './testData'
 
 const NOW = Date.UTC(2026, 10, 19, 20, 30)
@@ -66,6 +66,8 @@ describe('a row’s cards', () => {
     expect(cards[1].press).toEqual({ kind: 'open', route: { name: 'seeAll', libraryId: 3, title: 'Recently added', sort: 'added', filter: undefined, genre: 'Drama', decade: undefined } })
     // The first library of a type is named too.
     expect(seeAllRoute({ kind: 'library', type: 'tv', search: { sort: 'aired' } }, row(), libraries)).toMatchObject({ name: 'seeAll', libraryId: 2 })
+    // From a Movies or TV screen a list's page opens on that type, as a watchlist's row there holds only it.
+    expect(seeAllRoute({ kind: 'list', listId: 501, type: 'movie' }, row(), libraries)).toEqual({ name: 'list', id: 501, type: 'movie' })
     const list = rowCards(row({ id: 'list:3', listId: 3, style: 'wide', seeAll: { kind: 'list', listId: 3 } }), ctx({ seeAll: home }))
     expect(list[1]).toMatchObject({ variant: 'wide', more: { title: 'See all', glyph: 'list' }, press: { kind: 'open', route: { name: 'list', id: 3 } } })
     // Nowhere to go here: no card.
@@ -105,6 +107,25 @@ describe('a row’s cards', () => {
   })
 })
 
+describe('a title’s actions', () => {
+  // Hold OK opens them where the server keeps watchlists, on a title TMDB has matched; elsewhere it does what it did.
+  it.each<[string, ReturnType<typeof item>, boolean, object]>([
+    ['a movie', item({ id: 4, tmdbId: 77 }), true, { kind: 'menu' }],
+    ['a show', item({ kind: 'show', id: 7, tmdbId: 78 }), true, { kind: 'menu' }],
+    ['a movie TMDB hasn’t matched', item({ id: 4 }), true, { kind: 'watched', movieId: 4, watched: true }],
+    ['a movie on an older server', item({ id: 4, tmdbId: 77 }), false, { kind: 'watched', movieId: 4, watched: true }],
+  ])('Hold OK on %s', (_, title, menu, hold) => {
+    expect(itemActions(title, menu).hold).toMatchObject(hold)
+  })
+
+  it('says a watchlist’s row by its name and the title’s type, and that Hold OK opens the menu', () => {
+    const halloween = row({ id: 'list:502', listId: 502, title: 'Halloween', items: [item({ kind: 'show', id: 7, tmdbId: 78 })] })
+    const cards = rowCards(halloween, ctx({ menu: true }))
+    expect(cardPanel(halloween, cards, 0, ctx())).toMatchObject({ kicker: 'Halloween · TV show' })
+    expect(holdWords(cards[0].hold)).toBe('for its menu')
+  })
+})
+
 describe('the panel over a row screen', () => {
   it('tells the focused card’s kicker, facts, tags and rating', () => {
     const r = row({ id: 'recentlyAddedShows', title: 'Recently added · TV Shows', items: [item({ kind: 'show', title: 'Harbor Lights', subtitle: 'S03E07', episodeId: 70, seasonNumber: 3, year: 2022, episodeCount: 27, genres: ['Drama', 'Mystery', 'Crime'], quality: '4K', hdr: true, rating: 7.84, backdropPath: '/b.jpg' })] })
@@ -117,7 +138,7 @@ describe('the panel over a row screen', () => {
   })
 
   it('ranks a list’s titles and words the other styles', () => {
-    const list = row({ id: 'list:3', listId: 3, items: [item(), item({ id: 2, runtimeMin: 118, year: 2026 })] })
+    const list = row({ id: 'list:3', listId: 3, source: { kind: 'tmdb', name: 'TMDB' }, items: [item(), item({ id: 2, runtimeMin: 118, year: 2026 })] })
     expect(cardPanel(list, rowCards(list, ctx()), 1, ctx())).toMatchObject({ kicker: '#2 on the list', facts: ['2026', '1 h 58 min'], target: 'movie' })
     const y = new Date(Date.now() - 86_400_000)
     const yesterday = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`

@@ -1,6 +1,7 @@
 import type { components } from '../../../src/api/schema'
 import { libraryScreen } from '../../../src/lib/screenRows'
 import { MAX_ROWS, moveRow, setHidden, type RowLayoutEntry } from '../../../src/lib/rowLayout'
+import { isWatchlist, titlesInLibraryWords } from '../../../src/lib/mediaLists'
 
 // Settings › Home rows: the screens whose
 // rows a person arranges, each row's line, and what its side panel offers.
@@ -37,10 +38,15 @@ function fromLine(kind: string | undefined): string | undefined {
   }
 }
 
-/** A row's line: "Built in", "For everyone · 18 of 50 · From TMDB", "Your list · 9 of 24 · Imported". */
+/**
+ * A row's line: "Built in", "For everyone · 18 of 50 · From TMDB", "Your
+ * list · 9 of 24 · Imported", and a watchlist's as the apps all say it,
+ * "Watchlist · 12 titles · 9 in your library".
+ */
 export function rowLine(row: Pick<RowLayoutEntry, 'kind' | 'style' | 'owner' | 'listId'>, lists: readonly MediaList[] | undefined): string {
   if (row.kind !== 'list') return row.style === 'live' ? 'Built in · On now, or Watch a channel' : 'Built in'
   const list = lists?.find((l) => l.id === row.listId)
+  if (list && isWatchlist(list)) return `Watchlist · ${titlesInLibraryWords(list.entries, list.inLibrary)}`
   const owner = row.owner === 'me' ? 'Your list' : row.owner === 'everyone' ? 'For everyone' : 'List'
   return [owner, list ? `${list.inLibrary} of ${list.entries}` : undefined, fromLine(list?.source.kind)].filter(Boolean).join(' · ')
 }

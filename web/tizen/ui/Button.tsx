@@ -18,15 +18,20 @@ export type ButtonProps = {
   autoFocus?: boolean
   /** For an icon-only button. */
   label?: string
+  /** A toggle (Notify me, Watchlist): whether it is on, for a screen reader. */
+  pressed?: boolean
+  /** Can't be pressed now, but keeps focus (Create before a name is typed). */
+  disabled?: boolean
 }
 
 /** The kit's button: 64px tall, burgundy (primary) or glass (ghost), the gold ring on focus. */
-export function Button({ id, children, variant = 'ghost', icon, onPress, onHold, busy, autoFocus, label }: ButtonProps) {
+export function Button({ id, children, variant = 'ghost', icon, onPress, onHold, busy, autoFocus, label, pressed, disabled }: ButtonProps) {
   const ref = useRef<HTMLButtonElement>(null)
-  useHold(ref, busy ? undefined : onHold)
+  const off = busy || disabled
+  useHold(ref, off ? undefined : onHold)
   const iconOnly = !children
-  return <button ref={ref} type="button" data-focus={id} data-autofocus={autoFocus || undefined} aria-label={label} aria-disabled={busy || undefined}
-    className={`tv-btn tv-btn--${variant}${iconOnly ? ' tv-btn--icon' : ''}`} onClick={busy ? undefined : onPress}>
+  return <button ref={ref} type="button" data-focus={id} data-autofocus={autoFocus || undefined} aria-label={label} aria-disabled={off || undefined} aria-pressed={pressed}
+    className={`tv-btn tv-btn--${variant}${iconOnly ? ' tv-btn--icon' : ''}`} onClick={off ? undefined : onPress}>
     {icon === 'play' ? <PlayGlyph/> : icon ? <Icon name={icon}/> : null}
     {children}
   </button>

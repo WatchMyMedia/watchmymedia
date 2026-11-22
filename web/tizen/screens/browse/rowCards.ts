@@ -5,7 +5,8 @@ import { posterLinks, type CardTarget } from '../../../src/lib/cardLinks'
 import { formatDate, formatRuntime, seCode } from '../../../src/lib/format'
 import type { ImageSize } from '../../../src/lib/images'
 import { nowAndNext, progress, timeRange } from '../../../src/lib/liveGuide'
-import { attribution, posterSubtitle, seeAllTarget, seeAllWords, titleParts, type ScreenRow, type SeeAllTarget } from '../../../src/lib/screenRows'
+import { attribution, isListRow, posterSubtitle, seeAllTarget, seeAllWords, titleParts, type ScreenRow, type SeeAllTarget } from '../../../src/lib/screenRows'
+import { watchlistTitle } from '../../../src/lib/watchlists'
 import type { PlayRequest, Route } from '../../app/routes'
 import type { CardBadge, CardVariant } from '../../ui/Card'
 
@@ -26,6 +27,8 @@ export type CardAction =
   | { kind: 'notMatched' }
   /** A library row's See all on its own library's screen: the grid below, sorted the row's way. */
   | { kind: 'grid'; sort?: ItemSort; filter?: ItemFilter; genre?: string; decade?: number }
+  /** The card's actions (open it, Mark watched, its watchlist item), where the server keeps watchlists. */
+  | { kind: 'menu'; item: BrowseItem }
 
 export type RowCard = {
   /** Unique in the row: the card's focus id is `<row group>/<key>`. */
@@ -57,6 +60,15 @@ export type RowContext = {
   now: number
   /** What a row's See all does here; none draws no See all card. */
   seeAll?: (target: SeeAllTarget, row: ScreenRow) => CardAction | undefined
+  /** Hold OK on a title opens its actions, with its watchlist item: the server keeps watchlists. */
+  menu?: boolean
+  /** A Movies or TV screen's type: a list's See all opens its page on it. */
+  screenType?: 'movie' | 'tv'
+}
+
+/** One of the person's watchlists, as a row: a list row with no source, since nothing fetches it. */
+export function isWatchlistRow(row: Pick<ScreenRow, 'id' | 'source'>): boolean {
+  return isListRow(row) && !row.source
 }
 
 /** The kit's card for a row's style. */
@@ -116,14 +128,21 @@ function spoken(...parts: (string | false | undefined)[]): string {
   return parts.filter(Boolean).join(', ')
 }
 
-/** A library card's OK and Hold OK: a movie's page and its watched mark; a show's most specific page; an unmatched file says so. */
-export function itemActions(item: BrowseItem): Pick<RowCard, 'press' | 'hold'> {
+/**
+ * A library card's OK and Hold OK: a movie's page and its watched mark; a
+ * show's most specific page; an unmatched file says so. With `menu` (the
+ * server keeps watchlists), Hold OK on a title TMDB has matched opens its
+ * actions instead, Mark watched among them.
+ */
+export function itemActions(item: BrowseItem, menu = false): Pick<RowCard, 'press' | 'hold'> {
   if (item.kind === 'unmatched') return { press: { kind: 'notMatched' } }
-  if (item.kind === 'movie') return { press: { kind: 'open', route: { name: 'movie', id: item.id } }, hold: { kind: 'watched', movieId: item.id, watched: !item.watched } }
-  return { press: { kind: 'open', route: routeOf(posterLinks(item).picture.to) } }
+  const actions: Pick<RowCard, 'press' | 'hold'> = item.kind === 'movie'
+    ? { press: { kind: 'open', route: { name: 'movie', id: item.id } }, hold: { kind: 'watched', movieId: item.id, watched: !item.watched } }
+    : { press: { kind: 'open', route: routeOf(posterLinks(item).picture.to) } }
+  return menu && watchlistTitle(item.kind, item.tmdbId) ? { ...actions, hold: { kind: 'menu', item } } : actions
 }
 
-export function itemCard(row: Pick<ScreenRow, 'id' | 'style'>, item: BrowseItem): RowCard {
+export function itemCard(row: Pick<ScreenRow, 'id' | 'style'>, item: BrowseItem, menu = false): RowCard {
   const wide = row.style === 'wide'
   const subtitle = posterLine(row, item)
   const path = wide ? item.backdropPath : item.posterPath
@@ -136,7 +155,7 @@ export function itemCard(row: Pick<ScreenRow, 'id' | 'style'>, item: BrowseItem)
     progress: item.progress,
     badges: badges(item.isNew, item.watched),
     label: spoken(item.title, subtitle, item.watched && 'watched'),
-    ...itemActions(item),
+    ...itemActions(item, menu),
   }
 }
 
@@ -200,7 +219,7 @@ const GUIDE_CARD: RowCard = {
 
 /** A row's See all card, where it has somewhere to go here. */
 export function seeAllCard(row: ScreenRow, ctx: RowContext): RowCard | undefined {
-  const target = ctx.seeAll && seeAllTarget(row, ctx.libraries)
+  const target = ctx.seeAll && seeAllTarget(row, ctx.libraries, ctx.screenType)
   const press = target && ctx.seeAll?.(target, row)
   if (!target || !press) return undefined
   const words = seeAllWords(target, titleParts(row)[0])
@@ -221,7 +240,7 @@ export function rowCards(row: ScreenRow, ctx: RowContext): RowCard[] {
       cards = ctx.channels.map((c) => channelCard(c, ctx.listings, ctx.now))
       if (ctx.listings) cards.push(GUIDE_CARD)
       return cards
-    default: cards = (row.items ?? []).map((i) => itemCard(row, i))
+    default: cards = (row.items ?? []).map((i) => itemCard(row, i, ctx.menu))
   }
   const all = seeAllCard(row, ctx)
   return all ? [...cards, all] : cards
@@ -237,7 +256,7 @@ export function rowHeading(row: ScreenRow, listings: boolean, clock?: string): [
 
 /** The route of a Home row's See all: a list's page, or its library sorted the row's way. */
 export function seeAllRoute(target: SeeAllTarget, row: Pick<ScreenRow, 'id' | 'title'>, libraries: readonly LibraryRef[]): Route | undefined {
-  if (target.kind === 'list') return { name: 'list', id: target.listId }
+  if (target.kind === 'list') return { name: 'list', id: target.listId, type: target.type }
   const libraryId = target.search.library ?? libraries.find((l) => l.type === target.type)?.id
   if (libraryId === undefined) return undefined
   const { sort, filter, genre, decade } = target.search
@@ -250,6 +269,7 @@ export function holdWords(action: CardAction | undefined): string | undefined {
     case 'watched': return action.watched ? 'marks it watched' : 'marks it unwatched'
     case 'play': return 'plays it'
     case 'open': return 'opens its page'
+    case 'menu': return 'for its menu'
     default: return undefined
   }
 }
@@ -279,6 +299,7 @@ export function holdHint(action: CardAction | undefined): string | undefined {
     case 'watched': return action.watched ? 'Mark watched' : 'Mark unwatched'
     case 'play': return 'Play it'
     case 'open': return 'Its page'
+    case 'menu': return 'Its menu'
     default: return undefined
   }
 }

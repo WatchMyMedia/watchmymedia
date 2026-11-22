@@ -3,7 +3,7 @@ import type { LiveChannel } from '../../../src/api/liveTV'
 import { formatDate, formatRuntime, plural } from '../../../src/lib/format'
 import { duration, nowAndNext, timeRange } from '../../../src/lib/liveGuide'
 import { isListRow, titleParts, type ScreenRow } from '../../../src/lib/screenRows'
-import { episodeCode, holdWords, timeLeft, type RowCard } from './rowCards'
+import { episodeCode, holdWords, isWatchlistRow, timeLeft, type RowCard } from './rowCards'
 
 // What the panel over a Home row screen says about its focused card
 // (Android's CardPanel): a kicker, the title, facts,
@@ -36,7 +36,9 @@ export type CardPanel = {
 function itemPanel(row: ScreenRow, item: BrowseItem, index: number, card: RowCard): CardPanel {
   const [heading] = titleParts(row)
   const released = formatDate(item.releaseDate)
-  const kicker = isListRow(row) ? `#${index + 1} on the list`
+  // A watchlist's row is in the order titles were saved, so it says which watchlist and what the title is, not a place.
+  const kicker = isWatchlistRow(row) ? `${row.title} · ${item.kind === 'show' ? 'TV show' : 'Movie'}`
+    : isListRow(row) ? `#${index + 1} on the list`
     : row.style === 'wide' ? (released ? `Released ${released}` : heading)
       : [heading, card.subtitle].filter(Boolean).join(' · ')
   const genres = item.genres.slice(0, 2).join(', ')

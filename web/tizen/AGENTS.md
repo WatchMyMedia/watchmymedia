@@ -37,7 +37,10 @@ and QN90D steps still to do.
   development convenience, not evidence of packaged TV networking. API level
   32 is what lets a `file://` page pair and send bearer requests; this app
   needs it (`REQUIRED_API_LEVEL` in `session/session.ts`) and keeps no
-  branches for older servers.
+  branches for older servers. A feature from a later level turns on by the
+  server's `apiLevel` and asks an older server nothing: watchlists, from 33
+  (`useWatchlistsOn()` in `screens/watchlists/`), so the screens that use
+  them call no watchlist query below it.
 - **The store identity** in `public/config.xml` is permanent: the widget id,
   package id `cPFf0iV3Li` and application id `cPFf0iV3Li.WatchMyMedia` never
   change, and every update is signed with the same Samsung author certificate.
@@ -55,7 +58,7 @@ context, and imports nothing from the shell's folders.
 | `app/` | The shell: `main.tsx` makes the session, the input and the one Player, then `app/App.tsx` shows the start screens or the signed-in `app/Shell.tsx`. Routes, the screens stack, focus, keys and the platform calls |
 | `session/` | Everything about servers and accounts: typed addresses, remembered servers, pairing and password sign-in, the signed-in session (client, cache, media token, events), switching between servers, and asking a server other than the current one (`peers.ts`) |
 | `ui/` | The kit: components, `tokens.css` and `kit.css`, and their pure helpers (`problemWords`, `qr`, `railBadge`, `tones`) |
-| `screens/` | One folder per feature: `start/` (server, sign-in, problems), `servers/` (the Servers panel, Settings' Servers pages, the note after a switch), `browse/` (Home, libraries, See all, lists), `details/` (movie and show pages, YouTube trailers), `player/`, `live/`, `search/`, `requests/` and `settings/` |
+| `screens/` | One folder per feature: `start/` (server, sign-in, problems), `servers/` (the Servers panel, Settings' Servers pages, the note after a switch), `browse/` (Home, libraries, See all, lists), `details/` (movie and show pages, YouTube trailers), `player/`, `live/`, `search/`, `requests/`, `settings/` and `watchlists/` (the title pages' button, Save to watchlist, a card's actions, the Watchlists screen and a watchlist's page) |
 | `player/` | The player engine (above) |
 | `fakes/` | The fictional server for the browser preview and tests |
 

@@ -1,6 +1,6 @@
 // The detail screens' own line icons from the boards (24×24), beside the
 // kit's: the ⋯ of More, the trailer's clapper, the menus' flag and bin, the
-// bell, and the rest. Drawn in currentColor; `fill` ones are solid.
+// bell, the watchlists' bookmark, and the rest. Drawn in currentColor; `fill` ones are solid.
 const GLYPHS = {
   more: { d: 'M5 10a2 2 0 1 0 0 4a2 2 0 1 0 0-4zM12 10a2 2 0 1 0 0 4a2 2 0 1 0 0-4zM19 10a2 2 0 1 0 0 4a2 2 0 1 0 0-4z', fill: true },
   clapper: { d: 'M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z', fill: true },
@@ -15,6 +15,12 @@ const GLYPHS = {
   pause: { d: 'M7 5h3.5v14H7zM13.5 5H17v14h-3.5z', fill: true },
   check: { d: 'M5 12l5 5 9-10', fill: false },
   down: { d: 'M6 9l6 6 6-6', fill: false },
+  // Watchlists: a bookmark, filled once the title is on one, and with a plus for New watchlist.
+  bookmark: { d: 'M6 3h12a1 1 0 0 1 1 1v17l-7-4.5L5 21V4a1 1 0 0 1 1-1z', fill: false },
+  bookmarkOn: { d: 'M6 3h12a1 1 0 0 1 1 1v17l-7-4.5L5 21V4a1 1 0 0 1 1-1z', fill: true },
+  bookmarkPlus: { d: 'M6 3h12a1 1 0 0 1 1 1v17l-7-4.5L5 21V4a1 1 0 0 1 1-1zM12 7.5v6M9 10.5h6', fill: false },
+  pencil: { d: 'M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4', fill: false },
+  open: { d: 'M5 12h14M13 6l6 6-6 6', fill: false },
 } as const
 
 export type GlyphName = keyof typeof GLYPHS
