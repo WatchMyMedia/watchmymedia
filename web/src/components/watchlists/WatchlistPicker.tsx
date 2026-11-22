@@ -59,16 +59,18 @@ function WatchlistPicker({ target, title, align, onClose, anchor }: { target: Wa
       const at = e.target as Node
       if (!panel.current?.contains(at) && !trigger?.contains(at)) close.current()
     }
+    // On the window, ahead of a Dialog's own Escape on the document, so
+    // inside the Request dialog Escape closes only the picker.
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       e.stopPropagation()
       close.current()
     }
     document.addEventListener('pointerdown', onDown)
-    document.addEventListener('keydown', onKey, true)
+    window.addEventListener('keydown', onKey, true)
     return () => {
       document.removeEventListener('pointerdown', onDown)
-      document.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('keydown', onKey, true)
       if (trigger?.isConnected) trigger.focus()
     }
   }, [anchor])
