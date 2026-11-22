@@ -1,4 +1,5 @@
 import { itemFilter, itemSort, type ItemFilter, type ItemSort } from './browseOptions'
+import { watchlistSort, watchlistType, type WatchlistSort, type WatchlistType } from './watchlists'
 
 /**
  * A season address's search, kept so older links still land: ?episode=
@@ -104,4 +105,11 @@ export function validateNewListSearch(s: Record<string, unknown>): NewListSearch
     screen: typeof s.screen === 'string' && /^(home|library-[0-9]+)$/.test(s.screen) ? s.screen : 'home',
     back: s.back === 'settings' ? 'settings' : undefined,
   }
+}
+
+/** A list's page: a watchlist's type and sort, from a Movies or TV screen's See all or the page's own choices. */
+export type ListSearch = { type?: WatchlistType; sort?: WatchlistSort }
+
+export function validateListSearch(s: Record<string, unknown>): ListSearch {
+  return { type: watchlistType(s.type), sort: watchlistSort(s.sort) }
 }

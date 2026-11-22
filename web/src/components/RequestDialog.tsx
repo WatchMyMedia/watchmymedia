@@ -5,6 +5,7 @@ import { requestOptionsQuery, requestableQuery, useCreateRequest, type MediaRequ
 import { requestButtonLabel } from '../lib/requests'
 import { Dialog } from './Dialog'
 import { Poster } from './Poster'
+import { WatchlistAction } from './watchlists/WatchlistButton'
 
 const seasonState: Record<string, string> = {
   available: 'In library',
@@ -41,6 +42,14 @@ export function RequestDialog({ mediaType, tmdbId, preselect, onClose }: { media
             </div>
             <p className="line-clamp-6 text-sm text-neutral-300">{r.overview}</p>
           </div>
+          {/* Saving never requests: a title can wait on a watchlist until it is asked for. */}
+          <WatchlistAction
+            className="mt-4"
+            compact={false}
+            target={{ mediaType, tmdbId, title: r.title, year: r.year, posterPath: r.posterPath }}
+            title={r.title}
+            watchlisted={r.watchlisted}
+          />
 
           {sent ? (
             <div role="status" className="mt-5 space-y-3 text-sm">

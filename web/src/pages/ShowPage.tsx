@@ -46,6 +46,8 @@ import {
   type OnTopReason,
 } from '../lib/showPage'
 import { useShowMissing } from '../lib/showMissing'
+import { watchlistTitle } from '../lib/watchlists'
+import { WatchlistButton } from '../components/watchlists/WatchlistButton'
 
 type Episode = components['schemas']['Episode']
 type SeasonDetail = components['schemas']['SeasonDetail']
@@ -612,6 +614,8 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
   const { pick } = usePickSeason(s)
   // Notify me, on servers from API level 29.
   const notify = useNotifyMe(s)
+  // Saving keeps the whole show, by its TMDB id; following stays apart.
+  const saving = watchlistTitle('show', s.tmdbId)
   const [acting, setActing] = useState<'fix' | 'poster' | 'request' | 'deleteSeason' | 'deleteShow' | null>(null)
   const today = new Date().toISOString().slice(0, 10)
   const askable = options.data?.shows ? askableSeasons(s.seasons, today) : []
@@ -661,6 +665,7 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
         <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
             {notify.able && <NotifyMeButton show={s.title} following={notify.following} onPress={notify.press} />}
+            {saving && <WatchlistButton target={saving} title={s.title} holding={s.watchlists ?? []} tall />}
             {mark && (
               <button type="button" disabled={markShow.isPending} onClick={() => markShow.mutate({ showId: s.id, watched: mark.watched })} className={secondaryBtn}>
                 {mark.label}

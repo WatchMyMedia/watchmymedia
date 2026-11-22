@@ -95,6 +95,18 @@ the user asks in this conversation; see Authority in the root file.
   with See all, once the details have loaded. Their query keys start with
   `related`, apart from the details', so refetching a page's details doesn't
   work the rows out again.
+- **Watchlists** are lists of kind `watchlist` (`isWatchlist` in
+  `src/lib/mediaLists.ts`), with their own page actions. Every save and
+  removal goes through `src/api/watchlists.ts`, which the Samsung TV app
+  uses too: it shows the change at once in every cached reply, puts it
+  back when refused, and holds a removal back while its message shows, so
+  Undo keeps the title's place on the list. Their words are
+  `src/lib/watchlists.ts`. The web has one button (`WatchlistButton`), one
+  action for titles the library lacks (`WatchlistAction`) and one picker,
+  in `src/components/watchlists/`.
+- **Messages with Undo** go through `showToast` (`src/lib/toast.ts`): one
+  at a time, drawn once by the layout, ending on their own timer; one
+  replaced or left behind by leaving the page is done, not undone.
 - **Row cards**: a card is a `div` of parts that are
   links of their own, drawn from `src/lib/cardLinks.ts` by
   `src/components/CardParts.tsx`: the title opens the title; a Recently

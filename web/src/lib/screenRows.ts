@@ -145,19 +145,21 @@ export function attribution(subtitle: string | undefined, source: ScreenRowSourc
   return out
 }
 
-export type SeeAllTarget = { kind: 'library'; type: 'movie' | 'tv'; search: BrowseSearch } | { kind: 'list'; listId: number }
+export type SeeAllTarget = { kind: 'library'; type: 'movie' | 'tv'; search: BrowseSearch } | { kind: 'list'; listId: number; type?: 'movie' | 'tv' }
 
 /**
  * Where a row's See all goes: a library's grid with the link's sort and
  * filter (its Overview when the link sets none), or a list's page. None for
- * a kind the web doesn't know or a library it can't find.
+ * a kind the web doesn't know or a library it can't find. From a Movies or
+ * TV screen (screenType) a list's page opens on that type, as a
+ * watchlist's row there holds only it.
  */
-export function seeAllTarget(row: Pick<ScreenRow, 'seeAll' | 'listId' | 'items'>, libraries: readonly LibraryRef[]): SeeAllTarget | undefined {
+export function seeAllTarget(row: Pick<ScreenRow, 'seeAll' | 'listId' | 'items'>, libraries: readonly LibraryRef[], screenType?: 'movie' | 'tv'): SeeAllTarget | undefined {
   const link = row.seeAll
   if (!link) return undefined
   if (link.kind === 'list') {
     const listId = link.listId ?? row.listId
-    return listId ? { kind: 'list', listId } : undefined
+    return listId ? { kind: 'list', listId, type: screenType } : undefined
   }
   if (link.kind !== 'library') return undefined
   const libraryId = link.libraryId ?? row.items?.find((i) => i.libraryId)?.libraryId

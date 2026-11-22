@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { episodeRedirect, validateBrowseSearch, validateEditSearch, validateNewListSearch, validatePlaySearch, validateSeasonSearch } from './routeSearch'
+import { episodeRedirect, validateBrowseSearch, validateEditSearch, validateListSearch, validateNewListSearch, validatePlaySearch, validateSeasonSearch } from './routeSearch'
 
 describe('validateSeasonSearch', () => {
   it('keeps an episode ID, as the router parses it or as text', () => {
@@ -93,5 +93,15 @@ describe('validateEditSearch and validateNewListSearch', () => {
     expect(validateNewListSearch({ screen: 'library-4', back: 'settings' })).toEqual({ screen: 'library-4', back: 'settings' })
     expect(validateNewListSearch({ screen: 'library-x' })).toEqual({ screen: 'home', back: undefined })
     expect(validateNewListSearch({})).toEqual({ screen: 'home', back: undefined })
+  })
+})
+
+describe('validateListSearch', () => {
+  it.each([
+    [{ type: 'movie', sort: 'title' }, { type: 'movie', sort: 'title' }],
+    [{ type: 'tv' }, { type: 'tv', sort: undefined }],
+    [{ type: 'all', sort: 'added' }, { type: undefined, sort: undefined }],
+  ])('reads %o as %o', (search, read) => {
+    expect(validateListSearch(search)).toEqual(read)
   })
 })
