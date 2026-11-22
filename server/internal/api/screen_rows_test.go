@@ -79,7 +79,8 @@ var unarrangedGolden embed.FS
 // were before rows could be arranged, byte for byte, so
 // apps that don't know rows see no change. The golden files were written
 // by the code before arranged rows existed (WMM_UPDATE_GOLDEN=1, which
-// writes them to testdata/ for the next build to embed).
+// writes them to testdata/ for the next build to embed), and written again
+// only for an optional field added to every card since (tmdbId).
 func TestUnarrangedRepliesUnchanged(t *testing.T) {
 	t.Parallel()
 	srv := newTestServer(t)

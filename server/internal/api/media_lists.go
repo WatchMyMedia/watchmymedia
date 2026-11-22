@@ -199,10 +199,9 @@ type MediaListSources struct {
 }
 
 // ListsChanged is the lists.changed event, sent to a list's audience when it
-// is made, changed or deleted, or a fetch changes its entries.
-type ListsChanged struct {
-	ListID int64 `json:"listId"`
-}
+// is made, changed or deleted, or a fetch changes its entries. Finishing a
+// title sends it too when that takes the title off a watchlist.
+type ListsChanged = lists.ListsChanged
 
 func registerMediaLists(h huma.API, deps Deps) {
 	huma.Register(h, huma.Operation{
@@ -437,6 +436,9 @@ func registerMediaLists(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
+		if lists.IsWatchlist(l) {
+			return nil, errWatchlistOp
+		}
 		b := in.Body
 		was := l
 		up := db.UpdateMediaListParams{ID: l.ID, Name: l.Name, SourceKind: l.SourceKind, Params: l.Params, EntryLimit: l.EntryLimit,
@@ -541,11 +543,7 @@ func registerMediaLists(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if _, err := deps.Queries.DeleteMediaList(ctx, l.ID); err != nil {
-			return nil, err
-		}
-		publishListChanged(deps.Bus, l)
-		return nil, nil
+		return nil, deleteList(ctx, deps, l)
 	})
 
 	huma.Register(h, huma.Operation{
@@ -559,6 +557,9 @@ func registerMediaLists(h huma.API, deps Deps) {
 		u, l, err := editableList(ctx, deps, in.ID)
 		if err != nil {
 			return nil, err
+		}
+		if lists.IsWatchlist(l) {
+			return nil, errWatchlistOp
 		}
 		if !lists.Outside(l.SourceKind) {
 			return nil, huma.Error422UnprocessableEntity("imports and library lists are not fetched")
@@ -616,7 +617,8 @@ func registerMediaLists(h huma.API, deps Deps) {
 			items = items[:min(len(items), int(l.EntryLimit))]
 			for i := range items {
 				it := items[i]
-				all = append(all, MediaListEntry{Rank: i + 1, MediaType: mediaOf(it), Title: it.Title, Year: it.Year, PosterPath: it.PosterPath, Found: true, Item: &it})
+				all = append(all, MediaListEntry{Rank: i + 1, MediaType: mediaOf(it), TMDBID: it.TMDBID, Title: it.Title, Year: it.Year, PosterPath: it.PosterPath,
+					Found: true, Item: &it, Watchlisted: it.Watchlisted})
 			}
 		} else {
 			entries, err := deps.Lists.Entries(ctx, l.ID)
@@ -635,17 +637,28 @@ func registerMediaLists(h huma.API, deps Deps) {
 			for _, r := range cards[l.ID] {
 				byRank[r.rank] = r.item
 			}
+			// A watchlist's own order is its row's: where each entry goes.
+			at, places := savedPlaces(data.ranks[l.ID]), map[int]string{}
 			for _, e := range entries {
 				v := apiEntry(e)
 				if it, ok := byRank[int64(e.Rank)]; ok {
 					v.Item = &it
 				}
+				v.Watchlisted = marks.watchlisted.has(e.MediaType, e.TMDBID)
+				places[e.Rank] = at.of(int64(e.Rank), e.AddedAt)
 				all = append(all, v)
 			}
+			if lists.IsWatchlist(l) && (in.Sort == "" || in.Sort == "added") {
+				sortSaved(all, func(e MediaListEntry) (string, int64) { return places[e.Rank], int64(e.Rank) })
+			}
 		}
-		for _, e := range all {
-			if e.Item != nil {
+		all = sortEntries(entriesOfType(all, in.MediaType), in.Sort)
+		for i := range all {
+			if all[i].Item != nil {
 				out.InLibrary++
+			}
+			if lists.IsWatchlist(l) {
+				all[i].Rank = i + 1
 			}
 		}
 		out.Total = len(all)
@@ -659,6 +672,46 @@ func registerMediaLists(h huma.API, deps Deps) {
 
 // previewEntries is how many entries a preview shows.
 const previewEntries = 50
+
+// errWatchlistOp refuses a list operation that doesn't apply to a
+// watchlist, which the watchlist operations change.
+var errWatchlistOp = huma.Error422UnprocessableEntity("A watchlist is changed from its own page.")
+
+// entriesOfType are a list page's entries of one media type, or all of
+// them for none.
+func entriesOfType(es []MediaListEntry, mediaType string) []MediaListEntry {
+	if mediaType == "" {
+		return es
+	}
+	return slices.DeleteFunc(es, func(e MediaListEntry) bool { return e.MediaType != mediaType })
+}
+
+// sortEntries sorts a list page by title or by release, newest first; any
+// other sort keeps the list's own order.
+func sortEntries(es []MediaListEntry, by string) []MediaListEntry {
+	title := func(e MediaListEntry) string {
+		if e.Item != nil {
+			return e.Item.Title
+		}
+		return e.Title
+	}
+	released := func(e MediaListEntry) string {
+		if e.Item != nil && e.Item.ReleaseDate != "" {
+			return e.Item.ReleaseDate
+		}
+		if e.Year > 0 {
+			return fmt.Sprintf("%04d", e.Year)
+		}
+		return ""
+	}
+	switch by {
+	case "title":
+		slices.SortStableFunc(es, func(a, b MediaListEntry) int { return strings.Compare(titleKey(title(a)), titleKey(title(b))) })
+	case "released":
+		slices.SortStableFunc(es, func(a, b MediaListEntry) int { return strings.Compare(released(b), released(a)) })
+	}
+	return es
+}
 
 func listLimit(n int) int {
 	if n <= 0 {
@@ -862,6 +915,7 @@ func mediaListView(ctx context.Context, deps Deps, u auth.User, l db.MediaList, 
 	if l.OwnerID != nil {
 		v.Owner = "me"
 	}
+	v.RemoveWatched = l.RemoveWatched == 1
 	if src := listRow(deps, &l).Source; src != nil {
 		v.SourceName, v.SourceURL = src.Name, src.URL
 	}
@@ -875,7 +929,7 @@ func mediaListView(ctx context.Context, deps Deps, u auth.User, l db.MediaList, 
 }
 
 // ListsChangedEvent is the lists.changed event.
-const ListsChangedEvent = "lists.changed"
+const ListsChangedEvent = lists.ChangedEvent
 
 // publishListChanged sends lists.changed to the list's audience: its
 // owner alone, or everyone for the household's.

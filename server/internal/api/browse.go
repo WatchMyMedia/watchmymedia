@@ -243,7 +243,7 @@ func registerBrowse(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
-		out := &GetMovieOutput{Body: MovieDetail{Movie: movieFromDB(row), Files: make([]MediaFileDetail, 0, len(files))}}
+		out := &GetMovieOutput{Body: MovieDetail{Movie: movieFromDB(row), Files: make([]MediaFileDetail, 0, len(files)), Watchlists: []int64{}}}
 		var maxHeight int64
 		for _, f := range files {
 			// Only present files, as on the season page: one that went
@@ -281,6 +281,9 @@ func registerBrowse(h huma.API, deps Deps) {
 				ws := watchFromDB(w)
 				out.Body.Watch = &ws
 			case !errors.Is(err, sql.ErrNoRows):
+				return nil, err
+			}
+			if out.Body.Watchlists, err = watchlistsHolding(ctx, deps, user.ID, "movie", row.TmdbID); err != nil {
 				return nil, err
 			}
 		}
@@ -347,7 +350,7 @@ func registerBrowse(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
-		out := &GetShowOutput{Body: ShowDetail{Show: showFromDB(row), Seasons: make([]Season, 0, len(seasons))}}
+		out := &GetShowOutput{Body: ShowDetail{Show: showFromDB(row), Seasons: make([]Season, 0, len(seasons)), Watchlists: []int64{}}}
 		for _, s := range seasons {
 			// Episodes named after files are the season's too, though TMDB's
 			// count leaves them out: "6 of 3" would read as nonsense.
@@ -383,6 +386,9 @@ func registerBrowse(h huma.API, deps Deps) {
 				out.Body.Seasons[i].WatchedCount = watchedBySeason[out.Body.Seasons[i].ID]
 			}
 			if out.Body.Following, err = deps.Queries.IsFollowingShow(ctx, db.IsFollowingShowParams{UserID: user.ID, TmdbID: row.TmdbID}); err != nil {
+				return nil, err
+			}
+			if out.Body.Watchlists, err = watchlistsHolding(ctx, deps, user.ID, "tv", row.TmdbID); err != nil {
 				return nil, err
 			}
 			n, err := deps.Queries.NextUnwatchedEpisode(ctx, db.NextUnwatchedEpisodeParams{UserID: user.ID, ShowID: row.ID})
