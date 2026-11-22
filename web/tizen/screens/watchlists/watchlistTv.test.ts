@@ -49,11 +49,11 @@ describe('the Watchlists screen', () => {
 
 describe('refusals, in our words', () => {
   it.each([
-    [{ status: 422 }, true, 'A watchlist holds up to 500 titles.'],
-    [{ status: 503 }, true, 'Couldn’t save it. The server is busy.'],
-    [new TypeError('fetch failed'), false, 'Couldn’t take it off. Can’t reach the server.'],
-  ])('a change refused with %o', (error, saving, words) => {
-    expect(changeFailed(error, saving)).toBe(words)
+    [{ status: 422 }, false, 'A watchlist holds up to 500 titles.'],
+    [{ status: 503 }, false, 'Couldn’t save to Halloween. The server is busy.'],
+    [new TypeError('fetch failed'), true, 'Couldn’t remove from Halloween. Can’t reach the server.'],
+  ])('a change refused with %o', (error, remove, words) => {
+    expect(changeFailed(error, { name: 'Halloween', remove })).toBe(words)
   })
 
   it.each([

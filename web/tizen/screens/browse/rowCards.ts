@@ -62,6 +62,8 @@ export type RowContext = {
   seeAll?: (target: SeeAllTarget, row: ScreenRow) => CardAction | undefined
   /** Hold OK on a title opens its actions, with its watchlist item: the server keeps watchlists. */
   menu?: boolean
+  /** A Movies or TV screen's type: a list's See all opens its page on it. */
+  screenType?: 'movie' | 'tv'
 }
 
 /** One of the person's watchlists, as a row: a list row with no source, since nothing fetches it. */
@@ -217,7 +219,7 @@ const GUIDE_CARD: RowCard = {
 
 /** A row's See all card, where it has somewhere to go here. */
 export function seeAllCard(row: ScreenRow, ctx: RowContext): RowCard | undefined {
-  const target = ctx.seeAll && seeAllTarget(row, ctx.libraries)
+  const target = ctx.seeAll && seeAllTarget(row, ctx.libraries, ctx.screenType)
   const press = target && ctx.seeAll?.(target, row)
   if (!target || !press) return undefined
   const words = seeAllWords(target, titleParts(row)[0])
@@ -254,7 +256,7 @@ export function rowHeading(row: ScreenRow, listings: boolean, clock?: string): [
 
 /** The route of a Home row's See all: a list's page, or its library sorted the row's way. */
 export function seeAllRoute(target: SeeAllTarget, row: Pick<ScreenRow, 'id' | 'title'>, libraries: readonly LibraryRef[]): Route | undefined {
-  if (target.kind === 'list') return { name: 'list', id: target.listId }
+  if (target.kind === 'list') return { name: 'list', id: target.listId, type: target.type }
   const libraryId = target.search.library ?? libraries.find((l) => l.type === target.type)?.id
   if (libraryId === undefined) return undefined
   const { sort, filter, genre, decade } = target.search

@@ -1,4 +1,4 @@
-import { keepsWatchedWords, limitWords, MAX_TITLES, nameProblem, titleActionLabel, watchlistCounts, type Watchlist } from '../../../src/lib/watchlists'
+import { keepsWatchedWords, limitWords, MAX_TITLES, nameProblem, removeFailedWords, saveFailedWords, titleActionLabel, watchlistCounts, type Watchlist } from '../../../src/lib/watchlists'
 import { problemWords, statusOf } from '../../ui/problemWords'
 
 // Watchlists on the TV: when the app offers them, what a card's actions
@@ -65,10 +65,13 @@ export function watchlistsLine(n: number): string | undefined {
   return n > 0 ? `${n} ${n === 1 ? 'watchlist' : 'watchlists'}` : undefined
 }
 
-/** A save or a removal that didn't happen. A save the server refused is a full watchlist. */
-export function changeFailed(error: unknown, saving: boolean, maxTitles = MAX_TITLES): string {
-  if (saving && statusOf(error) === 422) return `A watchlist holds up to ${maxTitles} titles.`
-  return `${saving ? 'Couldn’t save it' : 'Couldn’t take it off'}. ${problemWords(error).title}.`
+/**
+ * A save to a watchlist, or a removal from it, that didn't happen, and why
+ * in our words. A save the server refused is to a full watchlist.
+ */
+export function changeFailed(error: unknown, change: { name: string; remove: boolean }, maxTitles = MAX_TITLES): string {
+  if (!change.remove && statusOf(error) === 422) return `A watchlist holds up to ${maxTitles} titles.`
+  return `${change.remove ? removeFailedWords(change.name) : saveFailedWords(change.name)} ${problemWords(error).title}.`
 }
 
 /**

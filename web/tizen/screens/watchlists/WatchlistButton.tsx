@@ -24,7 +24,7 @@ export function WatchlistButton({ id, target, holding, title, onProblem, onHint 
   /** What OK does, while the button has focus. */
   onHint?(words: string | undefined): void
 }) {
-  const wl = useWatchlistPress(target, { holding }, (e) => onProblem(changeFailed(e, false)))
+  const wl = useWatchlistPress(target, { holding }, (e, change) => onProblem(changeFailed(e, change)))
   const [picking, setPicking] = useState(false)
   const [focused, setFocused] = useState(false)
   const hint = buttonHint(wl.picker, wl.saved, onlyName(wl.lists))
@@ -35,7 +35,7 @@ export function WatchlistButton({ id, target, holding, title, onProblem, onHint 
     if (r.kind === 'picker') setPicking(true)
     // A TV says nothing after a change, so nothing waits for Undo.
     else if (r.kind === 'removed') void r.commit()
-    else if (r.kind === 'failed') onProblem(changeFailed(r.error, true))
+    else if (r.kind === 'failed') onProblem(changeFailed(r.error, { name: onlyName(wl.lists), remove: false }))
   }
   return <>
     <span className={wl.saved ? 'wl-on' : undefined} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>

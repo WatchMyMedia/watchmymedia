@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { holdRemoval, useWatchlistPress, type WatchlistTarget } from '../../../src/api/watchlists'
-import type { Watchlist } from '../../../src/lib/watchlists'
+import { onlyName, type Watchlist } from '../../../src/lib/watchlists'
 import { MorePanel, type MenuItem } from '../details/DetailParts'
 import type { GlyphName } from '../details/Glyph'
 import { SavePanel } from './WatchlistPanels'
@@ -42,7 +42,7 @@ export function CardMenu({ title, kind, year, target, watchlisted, open, watched
   const qc = useQueryClient()
   // The card's own watchlisted is as it was when OK was held; what was pressed here since is this.
   const [saved, setSaved] = useState(watchlisted)
-  const wl = useWatchlistPress(target, { watchlisted: saved }, (e) => { setSaved(true); onProblem(changeFailed(e, false)) })
+  const wl = useWatchlistPress(target, { watchlisted: saved }, (e, change) => { setSaved(true); onProblem(changeFailed(e, change)) })
   const [picking, setPicking] = useState(false)
   if (picking) return <SavePanel target={target} title={title} onClose={onClose}/>
 
@@ -50,7 +50,7 @@ export function CardMenu({ title, kind, year, target, watchlisted, open, watched
   const then = (f?: () => void) => () => { onClose(); f?.() }
   const pressWatchlist = async () => {
     if (page) {
-      holdRemoval(qc, target, page.id, (e) => onProblem(changeFailed(e, false))).commit()
+      void holdRemoval(qc, target, page.id, (e) => onProblem(changeFailed(e, { name: page.name, remove: true }))).commit()
       // The card goes as the panel closes, so focus lands on the title after it.
       flushSync(onClose)
       return
@@ -59,7 +59,7 @@ export function CardMenu({ title, kind, year, target, watchlisted, open, watched
     if (r.kind === 'picker') setPicking(true)
     else if (r.kind === 'saved') setSaved(true)
     else if (r.kind === 'removed') { setSaved(false); void r.commit() }
-    else onProblem(changeFailed(r.error, true))
+    else onProblem(changeFailed(r.error, { name: onlyName(wl.lists), remove: false }))
   }
   const items: MenuItem[] = menu.items.map((m) => {
     switch (m.kind) {

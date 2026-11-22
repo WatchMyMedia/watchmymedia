@@ -66,6 +66,8 @@ describe('a row’s cards', () => {
     expect(cards[1].press).toEqual({ kind: 'open', route: { name: 'seeAll', libraryId: 3, title: 'Recently added', sort: 'added', filter: undefined, genre: 'Drama', decade: undefined } })
     // The first library of a type is named too.
     expect(seeAllRoute({ kind: 'library', type: 'tv', search: { sort: 'aired' } }, row(), libraries)).toMatchObject({ name: 'seeAll', libraryId: 2 })
+    // From a Movies or TV screen a list's page opens on that type, as a watchlist's row there holds only it.
+    expect(seeAllRoute({ kind: 'list', listId: 501, type: 'movie' }, row(), libraries)).toEqual({ name: 'list', id: 501, type: 'movie' })
     const list = rowCards(row({ id: 'list:3', listId: 3, style: 'wide', seeAll: { kind: 'list', listId: 3 } }), ctx({ seeAll: home }))
     expect(list[1]).toMatchObject({ variant: 'wide', more: { title: 'See all', glyph: 'list' }, press: { kind: 'open', route: { name: 'list', id: 3 } } })
     // Nowhere to go here: no card.

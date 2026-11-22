@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useWatchlistPicker, type WatchlistTarget } from '../../../src/api/watchlists'
-import { plural } from '../../../src/lib/format'
-import { canUseName, limitWords, MAX_NAME, nameProblem, type Watchlist } from '../../../src/lib/watchlists'
+import { canUseName, limitWords, MAX_NAME, nameProblem, titlesWords, type Watchlist } from '../../../src/lib/watchlists'
 import { useFocus } from '../../app/hooks'
 import { Button } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
@@ -104,7 +103,7 @@ export function SavePanel({ target, title, onClose }: { target: WatchlistTarget;
 
   const toggle = (w: Watchlist) => {
     setProblem(undefined)
-    picker.toggle(w).catch((e: unknown) => setProblem(changeFailed(e, !w.contains)))
+    picker.toggle(w).catch((e: unknown) => setProblem(changeFailed(e, { name: w.name, remove: !!w.contains })))
   }
   const startNaming = () => { made.current = undefined; setName(''); setRefused(undefined); setProblem(undefined); setNaming(true) }
   const create = () => picker.create.mutate(name, {
@@ -125,7 +124,7 @@ export function SavePanel({ target, title, onClose }: { target: WatchlistTarget;
                 data-autofocus={i === 0 || undefined} className="wl-option" onClick={() => toggle(w)}>
                 <span className={`wl-box${w.contains ? ' wl-box--on' : ''}`} aria-hidden="true">{w.contains && <Glyph name="check"/>}</span>
                 <span className="wl-option__name">{w.name}</span>
-                <span className="wl-option__count">{plural(w.titles, 'title')}</span>
+                <span className="wl-option__count">{titlesWords(w.titles)}</span>
               </button>)}
               {atLimit
                 ? <p className="wl-panel__limit">{limitWords(picker.max)}</p>

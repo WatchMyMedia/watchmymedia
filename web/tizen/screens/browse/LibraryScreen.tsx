@@ -298,12 +298,11 @@ function LibraryView({ library, type, initial, toGrid }: { library: Library; typ
   const refs = libraries.data?.items
   const menu = useWatchlistsOn()
   const base = useMemo<Omit<RowContext, 'now'>>(() => ({
-    libraries: refs ?? [], channels: [], listings: false, menu,
+    libraries: refs ?? [], channels: [], listings: false, menu, screenType: type,
     // A list's page, or the grid below sorted the row's way; a link to another library has none here.
     seeAll: (target, row): CardAction | undefined => {
       const route = seeAllRoute(target, row, refs ?? [])
-      // A watchlist's page opens with this screen's type chosen.
-      if (route?.name === 'list') return { kind: 'open', route: { ...route, type } }
+      if (route?.name === 'list') return { kind: 'open', route }
       if (target.kind !== 'library' || route?.name !== 'seeAll' || route.libraryId !== library.id) return undefined
       const { sort, filter, genre, decade } = target.search
       return { kind: 'grid', sort, filter, genre, decade }
