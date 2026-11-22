@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.home
 
+import media.watchmy.client.tv.watchlists.holdFor
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
@@ -322,7 +323,7 @@ private fun HomeContent(
                                     m,
                                     library,
                                     onClick = { m.open(onOpenShow, onOpenMovie, onPlay, notMatched) },
-                                    onLongClick = { onToggleWatched(m) },
+                                    onLongClick = holdFor(m, onToggleWatched),
                                     modifier = Modifier.focusMemory(memory, "movies:${m.id}"),
                                 )
                             }
@@ -344,7 +345,7 @@ private fun HomeContent(
                                     artWidth = 320.dp,
                                     artHeight = 180.dp,
                                     onClick = { onOpenMovie(m.id) },
-                                    onLongClick = { onToggleWatched(m) },
+                                    onLongClick = holdFor(m, onToggleWatched),
                                     modifier = Modifier.focusMemory(memory, "released:${m.id}"),
                                 ) {
                                     formatDate(m.releaseDate)?.let { ArtBadge(it, Modifier.align(Alignment.BottomStart).padding(10.dp)) }

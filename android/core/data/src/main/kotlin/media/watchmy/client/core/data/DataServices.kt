@@ -20,6 +20,7 @@ import kotlinx.coroutines.runBlocking
 import media.watchmy.client.model.AuthRepository
 import media.watchmy.client.model.CastGateway
 import media.watchmy.client.model.FollowsRepository
+import media.watchmy.client.model.WatchlistRepository
 import media.watchmy.client.model.ClientInfo
 import media.watchmy.client.model.LiveRepository
 import media.watchmy.client.model.LivePlaybackGateway
@@ -144,6 +145,7 @@ class DataServices internal constructor(
     val requests: RequestRepository = RealRequestRepository(store, http, events, scope, clock)
     val rows: RowsRepository = RealRowsRepository(http, events)
     val follows: FollowsRepository = RealFollowsRepository(store, http, events)
+    val watchlists: WatchlistRepository = RealWatchlistRepository(store, http, events, scope)
 
     /** library.changed alone, without the scans that change nothing: what the new-episode check waits for while the app is open. */
     val libraryContentsChanged: kotlinx.coroutines.flow.Flow<Unit> get() = events.contentsChanged

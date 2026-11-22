@@ -40,7 +40,18 @@ import media.watchmy.client.model.withWatched
 import media.watchmy.client.presentation.Freshness
 import media.watchmy.client.presentation.Latest
 import media.watchmy.client.presentation.Load
+import media.watchmy.client.presentation.mapReady
 import media.watchmy.client.presentation.ShownPage
+import media.watchmy.client.model.HeldRemoval
+import media.watchmy.client.model.ListShown
+import media.watchmy.client.model.ListSort
+import media.watchmy.client.model.WatchlistKey
+import media.watchmy.client.model.WatchlistRepository
+import media.watchmy.client.model.WatchlistWords
+import media.watchmy.client.model.watchlistTitle
+import media.watchmy.client.presentation.watchlists.Naming
+import media.watchmy.client.presentation.watchlists.UndoSlot
+import media.watchmy.client.presentation.watchlists.refusedName
 
 /**
  * A library's Movies or TV rows, above its grid,
@@ -298,12 +309,22 @@ class RowLayoutViewModel(
  * imports' unmatched titles as Not found. Refresh now and Delete for the
  * person who may change the list. Read again when the list, requests or the
  * library change.
+ *
+ * A watchlist's page has more: the type chips ([show]) and sorts
+ * ([sortBy]), Remove on each title, Rename, Delete and the switch that keeps
+ * watched titles. Remove takes the title off at once; with [messages]
+ * (phones and tablets) its message offers Undo and nothing is sent until the
+ * message goes, while a TV, which says nothing, sends it at once.
  */
 class MediaListViewModel(
     private val rows: RowsRepository,
     private val requests: RequestRepository,
     private val library: LibraryRepository,
     val listId: Long,
+    private val watchlists: WatchlistRepository = WatchlistRepository.Unavailable,
+    private val messages: Boolean = true,
+    /** The type chip it opens on: a watchlist's row on a Movies or TV screen opens it on Movies or TV shows. */
+    shown: ListShown = ListShown.All,
 ) : ViewModel(), ShownPage {
     data class Page(val list: MediaList, val entries: List<MediaListEntry>, val total: Int)
 
@@ -316,8 +337,31 @@ class MediaListViewModel(
         val deleting: Boolean = false,
         /** Said once, then [messageShown]. */
         val message: String? = null,
+        /** The message offers Undo. */
+        val undoable: Boolean = false,
+        /** A watchlist's type chip and sort. */
+        val shown: ListShown = ListShown.All,
+        val sort: ListSort = ListSort.Added,
+        /** Titles taken off this watchlist here whose removal waits for its message. */
+        val removed: Set<WatchlistKey> = emptySet(),
+        /** Rename's Name field. */
+        val naming: Naming? = null,
     ) {
         val list: MediaList? get() = (page as? Load.Ready)?.data?.list
+
+        val isWatchlist: Boolean get() = list?.isWatchlist == true
+
+        /** The entries as drawn: without those just removed. */
+        val entries: List<MediaListEntry> get() = (page as? Load.Ready)?.data?.entries.orEmpty().filter { e -> e.watchlistTitle()?.key !in removed }
+
+        /** The list with the counts as drawn, which go down at once as titles are removed. */
+        val shownList: MediaList?
+            get() {
+                val p = (page as? Load.Ready)?.data ?: return null
+                if (removed.isEmpty()) return p.list
+                val gone = p.entries.filter { e -> e.watchlistTitle()?.key in removed }
+                return p.list.copy(entries = (p.list.entries - gone.size).coerceAtLeast(0), inLibrary = (p.list.inLibrary - gone.count { it.inLibrary }).coerceAtLeast(0))
+            }
     }
 
     sealed interface Event {
@@ -325,7 +369,7 @@ class MediaListViewModel(
         data object Deleted : Event
     }
 
-    private val _state = MutableStateFlow(State())
+    private val _state = MutableStateFlow(State(shown = shown))
     val state: StateFlow<State> = _state.asStateFlow()
 
     private val _events = Channel<Event>(Channel.BUFFERED)
@@ -336,22 +380,36 @@ class MediaListViewModel(
 
     private val loads = Latest(viewModelScope)
 
+    private val undo = UndoSlot()
+
     init {
         load()
         freshness.follow(library.libraryChanges)
             .follow(rows.changes) { it is RowsChange.Lists && (it.listId == null || it.listId == listId) && !_state.value.deleting }
             .follow(requests.changes)
+            // Renamed on another device: a watchlist's own change.
+            .follow(watchlists.changes) { _state.value.isWatchlist && !_state.value.deleting }
     }
 
     override fun setShown(shown: Boolean) = freshness.setShown(shown)
 
     fun retry() = load()
 
-    fun messageShown() = _state.update { it.copy(message = null) }
+    /** The message went: a removal it held is sent. */
+    fun messageShown() {
+        undo.send()
+        _state.update { it.copy(message = null, undoable = false) }
+    }
+
+    /** The message's Undo: the title is back where it was. */
+    fun undo() {
+        undo.undo()
+        _state.update { it.copy(message = null, undoable = false) }
+    }
 
     /** The request sheet sent one: say so, and read the entries' states again. */
     fun requested(message: String) {
-        _state.update { it.copy(message = message) }
+        say(message)
         load(quiet = true)
     }
 
@@ -360,19 +418,20 @@ class MediaListViewModel(
         _state.update { it.copy(refreshing = true) }
         viewModelScope.launch {
             attempt { rows.refreshList(listId) }
-                .onSuccess { _state.update { it.copy(refreshing = false, message = "Refreshing the list") } }
-                .onFailure { e -> _state.update { it.copy(refreshing = false, message = errorMessage(e)) } }
+                .onSuccess { _state.update { it.copy(refreshing = false) }; say("Refreshing the list") }
+                .onFailure { e -> _state.update { it.copy(refreshing = false) }; say(errorMessage(e)) }
             load(quiet = true)
         }
     }
 
     fun delete() {
         if (_state.value.deleting) return
+        val watchlist = _state.value.isWatchlist
         _state.update { it.copy(deleting = true) }
         viewModelScope.launch {
-            attempt { rows.deleteList(listId) }
+            attempt { if (watchlist) watchlists.delete(listId) else rows.deleteList(listId) }
                 .onSuccess { _events.send(Event.Deleted) }
-                .onFailure { e -> _state.update { it.copy(deleting = false, message = errorMessage(e)) } }
+                .onFailure { e -> _state.update { it.copy(deleting = false) }; say(errorMessage(e)) }
         }
     }
 
@@ -380,10 +439,85 @@ class MediaListViewModel(
         val target = item.watchTarget() ?: return
         viewModelScope.launch {
             attempt { library.markWatched(target, watched) }
-                .onSuccess { _state.update { it.copy(message = markedMessage(watched)) } }
-                .onFailure { e -> _state.update { it.copy(message = errorMessage(e)) } }
+                .onSuccess { say(markedMessage(watched)) }
+                .onFailure { e -> say(errorMessage(e)) }
             load(quiet = true)
         }
+    }
+
+    /** A watchlist's type chip. */
+    fun show(shown: ListShown) {
+        if (shown == _state.value.shown) return
+        _state.update { it.copy(shown = shown) }
+        load(quiet = true)
+    }
+
+    /** A watchlist's sort. */
+    fun sortBy(sort: ListSort) {
+        if (sort == _state.value.sort) return
+        _state.update { it.copy(sort = sort) }
+        load(quiet = true)
+    }
+
+    /** Remove, on a title of this watchlist. */
+    fun remove(entry: MediaListEntry) {
+        val list = _state.value.list?.takeIf { it.isWatchlist } ?: return
+        val key = entry.watchlistTitle()?.key ?: return
+        val removal = watchlists.removeLater(key, from = listId)
+        _state.update { it.copy(removed = it.removed + key) }
+        if (!messages) return removal.send()
+        undo.hold(object : HeldRemoval {
+            override fun send() = removal.send()
+
+            override fun undo() {
+                removal.undo()
+                _state.update { it.copy(removed = it.removed - key) }
+            }
+        })
+        _state.update { it.copy(message = WatchlistWords.removed(list.name), undoable = true) }
+    }
+
+    /** Rename: the Name field, starting with the name it has. */
+    fun startRename() {
+        val list = _state.value.list?.takeIf { it.isWatchlist } ?: return
+        _state.update { it.copy(naming = Naming(renaming = list.id, current = list.name)) }
+    }
+
+    fun cancelRename() = _state.update { it.copy(naming = null) }
+
+    fun nameChanged() = _state.update { s -> s.naming?.takeIf { it.error != null }?.let { s.copy(naming = it.copy(error = null)) } ?: s }
+
+    fun rename(name: String) {
+        val naming = _state.value.naming ?: return
+        if (name.isBlank() || naming.busy) return
+        if (name.trim() == naming.current) return cancelRename()
+        refusedName(name, watchlists.watchlists.value.orEmpty(), except = listId)?.let { why -> return _state.update { it.copy(naming = naming.copy(error = why)) } }
+        _state.update { it.copy(naming = naming.copy(busy = true, error = null)) }
+        viewModelScope.launch {
+            attempt { watchlists.update(listId, name = name) }
+                .onSuccess { made ->
+                    _state.update { s -> s.copy(naming = null, page = s.page.mapReady { it.copy(list = it.list.copy(name = made.name)) }) }
+                }
+                .onFailure { e -> _state.update { it.copy(naming = naming.copy(busy = false, error = errorMessage(e))) } }
+        }
+    }
+
+    /** Remove titles once watched: on at once, put back if the server refuses. */
+    fun setRemoveWatched(on: Boolean) {
+        if (!_state.value.isWatchlist) return
+        fun set(value: Boolean) = _state.update { s -> s.copy(page = s.page.mapReady { it.copy(list = it.list.copy(removeWatched = value)) }) }
+        set(on)
+        viewModelScope.launch {
+            attempt { watchlists.update(listId, removeWatched = on) }.onFailure { e ->
+                set(!on)
+                say(errorMessage(e))
+            }
+        }
+    }
+
+    private fun say(text: String) {
+        undo.send()
+        _state.update { it.copy(message = text, undoable = false) }
     }
 
     private fun load(quiet: Boolean = false) {
@@ -392,13 +526,27 @@ class MediaListViewModel(
             attempt { requests.options() }.onSuccess { o -> _state.update { it.copy(options = o) } }
             attempt {
                 val list = rows.list(listId)
-                val entries = rows.entries(listId, 0, RowsRepository.MAX_LIST_ENTRIES)
-                Page(list, entries.items, entries.total)
+                val s = _state.value
+                val sort = s.sort.takeIf { list.isWatchlist }
+                val type = s.shown.type.takeIf { list.isWatchlist }
+                val first = rows.entries(listId, 0, RowsRepository.MAX_LIST_ENTRIES, sort, type)
+                // A watchlist holds more than one page: the rest, at once.
+                val more = if (list.isWatchlist && first.total > first.items.size) {
+                    rows.entries(listId, first.items.size, RowsRepository.MAX_LIST_ENTRIES, sort, type).items
+                } else {
+                    emptyList()
+                }
+                Page(list, first.items + more, first.total)
             }
-                .onSuccess { page -> _state.update { it.copy(page = Load.Ready(page)) } }
+                .onSuccess { page -> _state.update { it.copy(page = Load.Ready(page), removed = it.removed.filter { k -> page.entries.any { e -> e.watchlistTitle()?.key == k } }.toSet()) } }
                 .onFailure { e ->
-                    _state.update { if (quiet && it.page is Load.Ready) it.copy(message = errorMessage(e)) else it.copy(page = Load.Failed(errorMessage(e))) }
+                    if (quiet && _state.value.page is Load.Ready) say(errorMessage(e)) else _state.update { it.copy(page = Load.Failed(errorMessage(e))) }
                 }
         }
+    }
+
+    override fun onCleared() {
+        // The page closed with a removal's message up: it still reaches the server.
+        undo.send()
     }
 }

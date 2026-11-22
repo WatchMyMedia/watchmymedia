@@ -51,6 +51,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.layout.widthIn
+import media.watchmy.client.mobile.components.CardAction
+import media.watchmy.client.mobile.components.EmptyState
+import media.watchmy.client.mobile.components.PressableCard
+import media.watchmy.client.mobile.watchlists.NameField
+import media.watchmy.client.mobile.watchlists.WatchlistMessageHost
+import media.watchmy.client.model.ListShown
+import media.watchmy.client.model.MediaType
+import media.watchmy.client.model.WatchlistWords
+import media.watchmy.client.model.deleteBody
+import media.watchmy.client.model.deleteQuestion
+import media.watchmy.client.model.gridKey
+import media.watchmy.client.model.watchlistTitle
+import media.watchmy.client.presentation.watchlists.WatchlistMessage
+import media.watchmy.client.ui.LocalWatchlistControls
 import media.watchmy.client.mobile.components.BackTopBar
 import media.watchmy.client.mobile.components.BarIconButton
 import media.watchmy.client.mobile.components.ErrorState
@@ -89,6 +106,11 @@ import media.watchmy.client.ui.ReportShown
  * missing ones dimmed with Request (through the request sheet) or where
  * their request stands, and imports' unmatched titles as Not found. Its ⋮
  * has Refresh now and Delete list for whoever may change the list.
+ *
+ * A watchlist's page has the type chips and its sort under its name, no
+ * source line or rank numbers, Remove from it in each title's menu (with
+ * Undo in the message), and Rename, the switch that keeps watched titles
+ * and Delete in its ⋮. [type] is the chip it opens on.
  */
 @Composable
 fun ListScreen(
@@ -98,16 +120,21 @@ fun ListScreen(
     onOpenMovie: (Long) -> Unit,
     onPlay: (PlayRequest) -> Unit,
     modifier: Modifier = Modifier,
+    type: String? = null,
 ) {
     val services = LocalAppServices.current
     val layout = rememberTabletLayout()
-    val vm = viewModel(key = "list-$listId") { MediaListViewModel(services.rows, services.requests, services.library, listId) }
+    val shown = ListShown.of(MediaType.entries.firstOrNull { it.name.equals(type, ignoreCase = true) })
+    val vm = viewModel(key = "list-$listId") { MediaListViewModel(services.rows, services.requests, services.library, listId, services.watchlists, shown = shown) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val notMatched = rememberNotMatchedNotice()
     val uri = androidx.compose.ui.platform.LocalUriHandler.current
     var asking by remember { mutableStateOf<Requestable?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
+    val controls = LocalWatchlistControls.current
+    // On a watchlist's page, a title's menu item takes it off this watchlist.
+    val pageControls = remember(controls, state.list, state.entries) { controls.forPage(state, vm::remove) }
     LaunchedEffect(vm) { vm.events.collect { if (it == MediaListViewModel.Event.Deleted) onBack() } }
     val side = if (layout.isTablet) TabletLayout.margin else 16.dp
 
@@ -120,7 +147,9 @@ fun ListScreen(
         Column(Modifier.fillMaxSize()) {
             BackTopBar(null, onBack, overArt = true) {
                 val list = state.list
-                if (list?.canEdit == true) {
+                if (list?.isWatchlist == true && controls != null) {
+                    WatchlistMenu(list, vm::startRename, vm::setRemoveWatched, onDelete = { confirmDelete = true })
+                } else if (list?.canEdit == true) {
                     var menu by remember { mutableStateOf(false) }
                     Box {
                         BarIconButton(PhoneIcons.MoreVert, "List options", { menu = true }, overArt = true)
@@ -135,14 +164,15 @@ fun ListScreen(
                 when (val page = state.page) {
                     Load.Loading -> LoadingState()
                     is Load.Failed -> ErrorState(page.message, vm::retry, title = "Couldn't load this list")
-                    is Load.Ready -> LazyVerticalGrid(
+                    is Load.Ready -> CompositionLocalProvider(LocalWatchlistControls provides pageControls) { LazyVerticalGrid(
                         columns = if (layout.isTablet) GridCells.Adaptive(TabletLayout.posterMinimum) else GridCells.Fixed(3),
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(start = side, end = side, top = 8.dp, bottom = 24.dp),
                         horizontalArrangement = Arrangement.spacedBy(if (layout.isTablet) 16.dp else 8.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        val list = page.data.list
+                        val list = state.shownList ?: page.data.list
+                        val watchlist = list.isWatchlist
                         item(key = "head", span = { GridItemSpan(maxLineSpan) }, contentType = "head") {
                             Column(Modifier.padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(list.kicker().uppercase(), style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 0.96.sp, color = WmmColors.Accent))
@@ -159,24 +189,38 @@ fun ListScreen(
                                         if (url != null) Icon(PhoneIcons.External, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(14.dp))
                                     }
                                 }
-                                Text(list.summaryLine(), style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = WmmColors.TextMuted))
+                                if (watchlist) {
+                                    WatchlistControlsRow(list.summaryLine(), state.sort, vm::sortBy)
+                                    WatchlistChips(state.shown, vm::show)
+                                } else {
+                                    Text(list.summaryLine(), style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = WmmColors.TextMuted))
+                                }
                                 list.errorLine()?.let { line -> FailedNotice(line, onRetry = vm::refreshList.takeIf { list.canEdit && list.refreshable }, busy = state.refreshing) }
                             }
                         }
-                        items(page.data.entries, key = { it.rank }, contentType = { if (it.item != null) "have" else "missing" }) { entry ->
+                        if (watchlist && state.entries.isEmpty()) {
+                            item(key = "empty", span = { GridItemSpan(maxLineSpan) }, contentType = "empty") {
+                                EmptyState(WatchlistWords.EMPTY_TITLE, WatchlistWords.EMPTY_BODY, Modifier.padding(top = 48.dp))
+                            }
+                        }
+                        items(state.entries, key = { it.gridKey(watchlist) }, contentType = { if (it.item != null) "have" else "missing" }) { entry ->
                             val item = entry.item
                             if (item != null) {
                                 Box {
                                     PosterCard(item.copy(isNew = false), services.library.imageUrl(item.posterPath, ImageSize.W342), item.year?.toString(), { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) }, { vm.setWatched(item, it) }, titleSize = 13.sp, subtitleSize = 11.sp)
-                                    RankBadge(entry.rank, Modifier.align(Alignment.TopStart))
+                                    if (!watchlist) RankBadge(entry.rank, Modifier.align(Alignment.TopStart))
                                 }
                             } else {
-                                MissingCard(entry, services.library.imageUrl(entry.posterPath, ImageSize.W342), onRequest = { entry.requestSubject()?.let { asking = it } })
+                                MissingCard(entry, services.library.imageUrl(entry.posterPath, ImageSize.W342), ranked = !watchlist, onRequest = { entry.requestSubject()?.let { asking = it } })
                             }
                         }
-                    }
+                    } }
                 }
-                MessageHost(state.message, vm::messageShown, Modifier.align(Alignment.BottomCenter))
+                if (state.isWatchlist) {
+                    WatchlistMessageHost(state.message?.let { WatchlistMessage(it, state.undoable) }, vm::undo, vm::messageShown, Modifier.align(Alignment.BottomCenter))
+                } else {
+                    MessageHost(state.message, vm::messageShown, Modifier.align(Alignment.BottomCenter))
+                }
             }
         }
     }
@@ -184,13 +228,21 @@ fun ListScreen(
     asking?.let { subject ->
         RequestSheet(subject, state.options, onSent = { message -> asking = null; vm.requested(message) }, onDismiss = { asking = null })
     }
+    state.naming?.let { naming ->
+        Dialog(onDismissRequest = vm::cancelRename) {
+            Column(Modifier.widthIn(max = 440.dp).fillMaxWidth().background(WmmColors.Surface2, RoundedCornerShape(24.dp)).padding(20.dp)) {
+                Text(WatchlistWords.RENAME, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, color = WmmColors.Text), modifier = Modifier.padding(bottom = 12.dp).semantics { heading() })
+                NameField(naming, vm::cancelRename, vm::rename, vm::nameChanged, confirm = WatchlistWords.SAVE)
+            }
+        }
+    }
     if (confirmDelete) {
-        val name = state.list?.name.orEmpty()
+        val list = state.list
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             containerColor = WmmColors.Surface2,
-            title = { Text("Delete $name?") },
-            text = { Text("Its row goes from every screen, for everyone who sees it. This can’t be undone.") },
+            title = { Text(list?.deleteQuestion().orEmpty()) },
+            text = { Text(list?.deleteBody().orEmpty()) },
             confirmButton = { GoldTextButton("Delete", { confirmDelete = false; vm.delete() }) },
             dismissButton = { GoldTextButton("Cancel", { confirmDelete = false }, color = WmmColors.TextSoft) },
         )
@@ -240,9 +292,12 @@ private fun RankBadge(rank: Int, modifier: Modifier = Modifier) {
  * found box.
  */
 @Composable
-private fun MissingCard(entry: MediaListEntry, imageUrl: String?, onRequest: () -> Unit) {
+private fun MissingCard(entry: MediaListEntry, imageUrl: String?, onRequest: () -> Unit, ranked: Boolean = true) {
     val muted = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = WmmColors.TextMuted)
-    Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
+    // Its menu has the title's watchlist entry: Remove on a watchlist's page, Add to Watchlist on another list's.
+    val saving = LocalWatchlistControls.current?.item(entry.watchlistTitle(), entry.watchlisted)
+    val actions = remember(saving) { listOfNotNull(saving?.let { CardAction(it.label, it.onClick) }) }
+    PressableCard(onClick = { if (entry.requestable) onRequest() }, actions = actions, modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
         Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
             if (!entry.found) {
                 Column(
@@ -262,9 +317,9 @@ private fun MissingCard(entry: MediaListEntry, imageUrl: String?, onRequest: () 
                 )
                 MissingState(entry, onRequest)
             }
-            RankBadge(entry.rank, Modifier.align(Alignment.TopStart))
+            if (ranked) RankBadge(entry.rank, Modifier.align(Alignment.TopStart))
         }
-        CardCaptionMuted(entry.title, entry.missingLine, muted)
+        CardCaptionMuted(entry.title, if (ranked) entry.missingLine else WatchlistWords.NOT_IN_LIBRARY, muted)
     }
 }
 

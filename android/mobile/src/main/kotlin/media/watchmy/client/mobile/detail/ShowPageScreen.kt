@@ -97,7 +97,7 @@ fun ShowPageScreen(
     onOpenMovie: (Long) -> Unit = {},
 ) {
     val services = LocalAppServices.current
-    val vm = viewModel { ShowPageViewModel(services.library, showId, arrival, services.requests, services.downloads, services.follows, createSavedStateHandle()) }
+    val vm = viewModel { ShowPageViewModel(services.library, showId, arrival, services.requests, services.downloads, services.follows, createSavedStateHandle(), services.watchlists) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val downloadsVm = viewModel { DownloadsViewModel(services.downloads) }

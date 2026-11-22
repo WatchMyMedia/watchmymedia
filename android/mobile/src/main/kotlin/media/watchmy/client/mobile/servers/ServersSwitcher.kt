@@ -59,6 +59,7 @@ import media.watchmy.client.model.ADD_A_SERVER
 import media.watchmy.client.model.ADD_A_SERVER_LINE
 import media.watchmy.client.model.CURRENT_SERVER
 import media.watchmy.client.model.MANAGE_SERVERS
+import media.watchmy.client.model.WatchlistWords
 import media.watchmy.client.model.SERVERS
 import media.watchmy.client.model.SIGNED_OUT_HERE
 import media.watchmy.client.model.SWITCHING
@@ -94,6 +95,7 @@ internal fun ServersSheet(
     onManage: () -> Unit,
     onDismiss: () -> Unit,
     onSettings: (() -> Unit)? = null,
+    onWatchlists: (() -> Unit)? = null,
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -115,7 +117,7 @@ internal fun ServersSheet(
                     Icon(WmmIcons.Close, contentDescription = "Close", tint = WmmColors.Text, modifier = Modifier.size(20.dp))
                 }
             }
-            ServersList(state, actions, device, onAdd, onManage, onSettings)
+            ServersList(state, actions, device, onAdd, onManage, onSettings, onWatchlists)
         }
     }
 }
@@ -135,6 +137,7 @@ internal fun ServersPopover(
     onManage: () -> Unit,
     onDismiss: () -> Unit,
     onSettings: (() -> Unit)? = null,
+    onWatchlists: (() -> Unit)? = null,
 ) {
     Popup(
         alignment = Alignment.BottomStart,
@@ -162,19 +165,28 @@ internal fun ServersPopover(
                 style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, color = WmmColors.Text),
                 modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 10.dp).semantics { heading() },
             )
-            ServersList(state, actions, device, onAdd, onManage, onSettings)
+            ServersList(state, actions, device, onAdd, onManage, onSettings, onWatchlists)
         }
     }
 }
 
 /**
  * What Servers holds under its title: the casting line, a server that didn't
- * answer, the servers, then Add a server and Manage servers. [onSettings]
- * adds Settings at the end, where Settings has no tab of its own: with Live
- * TV in the bar, the account button was the way to it.
+ * answer, the servers, then Add a server and Manage servers. [onWatchlists]
+ * adds Watchlists (a server with watchlists), and [onSettings] Settings at
+ * the end, where Settings has no tab of its own: with Live TV in the bar,
+ * the account button was the way to it.
  */
 @Composable
-private fun ColumnScope.ServersList(state: ServersViewModel.State, actions: ServersActions, device: String, onAdd: () -> Unit, onManage: () -> Unit, onSettings: (() -> Unit)?) {
+private fun ColumnScope.ServersList(
+    state: ServersViewModel.State,
+    actions: ServersActions,
+    device: String,
+    onAdd: () -> Unit,
+    onManage: () -> Unit,
+    onSettings: (() -> Unit)?,
+    onWatchlists: (() -> Unit)?,
+) {
     state.casting?.let { tv ->
         Text(
             switchingStopsCasting(tv),
@@ -196,6 +208,11 @@ private fun ColumnScope.ServersList(state: ServersViewModel.State, actions: Serv
     )
     SwitcherRow(title = MANAGE_SERVERS, line = null, icon = WmmIcons.Sliders, onClick = onManage, minHeight = 60.dp) {
         Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.padding(end = 4.dp).size(22.dp))
+    }
+    if (onWatchlists != null) {
+        SwitcherRow(title = WatchlistWords.WATCHLISTS, line = null, icon = WmmIcons.Bookmark, onClick = onWatchlists, minHeight = 60.dp) {
+            Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.padding(end = 4.dp).size(22.dp))
+        }
     }
     if (onSettings != null) {
         SwitcherRow(title = "Settings", line = null, icon = WmmIcons.Settings, onClick = onSettings, minHeight = 60.dp) {

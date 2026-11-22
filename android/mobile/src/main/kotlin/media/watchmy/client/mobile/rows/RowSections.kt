@@ -36,6 +36,7 @@ import media.watchmy.client.mobile.components.PosterCard
 import media.watchmy.client.mobile.components.TonalButton
 import media.watchmy.client.mobile.components.WideCard
 import media.watchmy.client.mobile.components.watchToggle
+import media.watchmy.client.mobile.components.withWatchlist
 import media.watchmy.client.model.BrowseItem
 import media.watchmy.client.model.EpisodeCard
 import media.watchmy.client.model.ImageSize
@@ -197,7 +198,7 @@ private fun WideRowCard(item: BrowseItem, library: LibraryRepository, tablet: Bo
         width = if (tablet) 240.dp else 160.dp,
         outlined = outlined,
         onClick = { if (item.kind == ItemKind.Movie) actions.onOpenMovie(item.id) else item.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched) },
-        actions = listOfNotNull(item.watchTarget()?.let { t -> watchToggle(item.watched) { actions.onSetWatched(t, it) } }),
+        actions = listOfNotNull(item.watchTarget()?.let { t -> watchToggle(item.watched) { actions.onSetWatched(t, it) } }).withWatchlist(item),
     ) {
         formatDate(item.releaseDate)?.let { Badge(it, Modifier.align(Alignment.BottomStart).padding(6.dp)) }
         if (item.watched) Badge("Watched", Modifier.align(Alignment.TopEnd).padding(6.dp), style = BadgeStyle.Gold)

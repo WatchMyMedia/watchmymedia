@@ -68,6 +68,7 @@ import media.watchmy.client.mobile.components.WideCard
 import media.watchmy.client.mobile.components.groundFade
 import media.watchmy.client.mobile.downloads.OfflineHome
 import media.watchmy.client.mobile.components.watchToggle
+import media.watchmy.client.mobile.components.withWatchlist
 import media.watchmy.client.mobile.navigation.MobileRoutes
 import media.watchmy.client.mobile.live.LiveHomeRow
 import media.watchmy.client.mobile.rows.ArrangedRow
@@ -353,7 +354,7 @@ private fun LazyListScope.homeRows(
                     seed = item.title,
                     width = if (tablet) 240.dp else 160.dp,
                     onClick = { onOpenMovie(item.id) },
-                    actions = itemActions(item),
+                    actions = itemActions(item).withWatchlist(item),
                 ) {
                     formatDate(item.releaseDate)?.let { Badge(it, Modifier.align(Alignment.BottomStart).padding(6.dp)) }
                     if (item.watched) Badge("Watched", Modifier.align(Alignment.TopEnd).padding(6.dp), style = BadgeStyle.Gold)

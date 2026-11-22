@@ -227,7 +227,8 @@ class RowsViewModelsTest {
         val vm = LibraryRowsViewModel(services.library, services.rows)
         vm.show(FakeData.MOVIE_LIBRARY)
         advanceUntilIdle()
-        assertEquals(listOf(RowIds.RECENTLY_ADDED, RowIds.list(FakeRowsData.UNWATCHED_4K), RowIds.RECENTLY_RELEASED), vm.state.value.rows.map { it.id })
+        val watchlists = listOf(FakeRowsData.FIRST_WATCHLIST, FakeRowsData.HALLOWEEN, FakeRowsData.WITH_THE_KIDS).map(RowIds::list)
+        assertEquals(listOf(RowIds.RECENTLY_ADDED, RowIds.list(FakeRowsData.UNWATCHED_4K), RowIds.RECENTLY_RELEASED) + watchlists, vm.state.value.rows.map { it.id })
         assertTrue(vm.state.value.arrangeable)
 
         at(ROWS_API_LEVEL - 1)

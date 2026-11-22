@@ -40,6 +40,8 @@ import media.watchmy.client.model.attempt
 import media.watchmy.client.model.deletedMessage
 import media.watchmy.client.model.errorMessage
 import media.watchmy.client.model.followRefused
+import media.watchmy.client.model.WatchlistRepository
+import media.watchmy.client.model.watchlistTitle
 import media.watchmy.client.model.inTabOrder
 import media.watchmy.client.model.isUnreachable
 import media.watchmy.client.model.markWatched
@@ -113,6 +115,8 @@ class ShowPageViewModel(
     private val follows: FollowsRepository = FollowsRepository.Unavailable,
     /** From `createSavedStateHandle()`; tests pass their own or none. */
     private val saved: SavedStateHandle = SavedStateHandle(),
+    /** The person's watchlists, from [media.watchmy.client.model.WATCHLISTS_API_LEVEL]: where the page reads the show is. */
+    private val watchlists: WatchlistRepository = WatchlistRepository.Unavailable,
 ) : ViewModel(), ShowPageActions, ShownPage {
     /** The delete dialog: checking with Sonarr, asking, or saying it can't. */
     sealed interface Deleting {
@@ -269,6 +273,8 @@ class ShowPageViewModel(
         }
         // Followed or stopped on another device: the bell follows.
         viewModelScope.launch { follows.changes.collect { if (following?.isActive != true) load(quiet = true) } }
+        // Saved or removed on another device, or taken off by watching: the Watchlist button follows.
+        freshness.follow(watchlists.changes)
     }
 
     /**
@@ -544,6 +550,7 @@ class ShowPageViewModel(
         if (!quiet || _state.value.page !is Load.Ready) _state.update { it.copy(page = Load.Loading) }
         val presses = followPresses
         loads.launch {
+            val since = watchlists.revision
             attempt {
                 val show = library.show(showId)
                 val current = _state.value.seasonNumber ?: saved.get<Int>(SEASON)
@@ -560,6 +567,7 @@ class ShowPageViewModel(
                 }
             }
                 .onSuccess { (loaded, season, top) ->
+                    loaded.watchlists?.let { ids -> loaded.watchlistTitle()?.let { watchlists.known(it.key, ids, since) } }
                     seasons.clear()
                     seasons[season.season.number] = season
                     // A press on its way to the server, or one made since this reload began, outlives the reply.

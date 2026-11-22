@@ -10,4 +10,5 @@ dependencies {
     api(libs.kotlinx.coroutines.core)
     api(libs.androidx.media3.common)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

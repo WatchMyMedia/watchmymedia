@@ -110,6 +110,17 @@ object WmmIcons {
         .addPath(PathParser().parsePathString("M10.3 21a1.94 1.94 0 0 0 3.4 0").toNodes(), stroke = SolidColor(Color.White), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round)
         .build()
 
+    /** A watchlist: the button's outline bookmark, filled once the title is saved, and with a plus for New watchlist. */
+    private const val BOOKMARK = "M6 3h12a1 1 0 0 1 1 1v17l-7-4.5L5 21V4a1 1 0 0 1 1-1z"
+    val Bookmark = stroke(BOOKMARK)
+    val BookmarkFilled: ImageVector = ImageVector.Builder("bookmark-filled", 24.dp, 24.dp, 24f, 24f)
+        .addPath(PathParser().parsePathString(BOOKMARK).toNodes(), fill = SolidColor(Color.White), stroke = SolidColor(Color.White), strokeLineWidth = 2f, strokeLineJoin = StrokeJoin.Round)
+        .build()
+    val BookmarkPlus = stroke(BOOKMARK, "M12 7.5v6M9 10.5h6")
+
+    /** Rename. */
+    val Pencil = stroke("M4 20h4L19 9a2.83 2.83 0 0 0-4-4L4 16v4z", "m13.5 6.5 4 4")
+
     // Rows: the editor, Add a row and the list page.
     val ListBullets = stroke("M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01")
 

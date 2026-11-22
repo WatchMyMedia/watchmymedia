@@ -31,7 +31,11 @@ object TvRoutes {
     /** Settings › Home rows on [screen] (home or library-<id>), from a library's Edit rows. */
     @Serializable data class RowSettings(val screen: String)
     /** A list's page, from its row's See all card. */
-    @Serializable data class MediaList(val id: Long)
+    /** A list's page; [type] ("movie", "tv") is the chip a watchlist's page opens on, from a Movies or TV screen's row. */
+    @Serializable data class MediaList(val id: Long, val type: String? = null)
+
+    /** The person's watchlists, from Servers. */
+    @Serializable data object Watchlists
     /** Your requests, from Settings; [inbox] opens on the admins' Inbox. */
     @Serializable data class Requests(val inbox: Boolean = false)
     @Serializable data class Player(val fileId: Long, val startMs: Long? = null, val title: String, val subtitle: String? = null, val backdropPath: String? = null, val recordingId: String? = null)

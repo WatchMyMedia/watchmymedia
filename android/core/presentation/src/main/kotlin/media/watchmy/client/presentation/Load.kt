@@ -19,6 +19,9 @@ sealed interface Load<out T> {
 /** The data once it is ready, else null. */
 val <T> Load<T>.value: T? get() = (this as? Load.Ready)?.data
 
+/** [change] applied to the data once it is ready; loading and failed stay as they are. */
+fun <T> Load<T>.mapReady(change: (T) -> T): Load<T> = if (this is Load.Ready) Load.Ready(change(data)) else this
+
 /**
  * The newest of a kind of load. Starting one cancels the one before, so an
  * older answer can't land over a newer one: every coroutine here runs on

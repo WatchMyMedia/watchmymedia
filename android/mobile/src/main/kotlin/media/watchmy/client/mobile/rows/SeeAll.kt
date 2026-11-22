@@ -92,7 +92,8 @@ internal fun librarySeeAll(row: ScreenRow, type: LibraryType, libraryId: Long?, 
     val words = seeAllWords(link, type, row.heading().first) ?: return null
     return RowSeeAll(words, list = link is RowLink.ToList) {
         when (link) {
-            is RowLink.ToList -> onNavigate(MobileRoutes.MediaList(link.listId))
+            // A watchlist's page opens on this screen's type; other lists' pages have no chips.
+            is RowLink.ToList -> onNavigate(MobileRoutes.MediaList(link.listId, type = if (type == LibraryType.Movie) "movie" else "tv"))
             is RowLink.Library -> onOpen(link.browseRequest())
         }
     }

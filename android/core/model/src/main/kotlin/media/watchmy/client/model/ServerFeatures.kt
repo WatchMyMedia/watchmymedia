@@ -97,4 +97,7 @@ value class ServerFeatures(val level: Int) {
      * converted track may be FLAC, E-AC-3 or AC-3.
      */
     val pcmProfile: Boolean get() = level >= PCM_PROFILE_API_LEVEL
+
+    /** 33: watchlists, and the TMDB id and watchlist mark on cards. */
+    val watchlists: Boolean get() = level >= WATCHLISTS_API_LEVEL
 }

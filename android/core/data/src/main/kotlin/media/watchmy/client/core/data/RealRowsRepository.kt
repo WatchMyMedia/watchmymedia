@@ -5,6 +5,8 @@ import media.watchmy.client.core.api.apis.BrowseApi
 import media.watchmy.client.core.api.apis.ListsApi
 import media.watchmy.client.core.api.models.UpdateRowLayoutInputBody
 import media.watchmy.client.model.ApiException
+import media.watchmy.client.model.ListSort
+import media.watchmy.client.model.MediaType
 import media.watchmy.client.model.MediaList
 import media.watchmy.client.model.MediaListEntries
 import media.watchmy.client.model.ROWS_API_LEVEL
@@ -51,8 +53,21 @@ internal class RealRowsRepository(
 
     override suspend fun list(id: Long): MediaList = listsApi { it.getMediaList(id) }.toModel()
 
-    override suspend fun entries(id: Long, offset: Int, limit: Int): MediaListEntries =
-        listsApi { it.listMediaListEntries(id, limit = limit.coerceIn(1, MAX_LIST_ENTRIES).toLong(), offset = offset.coerceAtLeast(0).toLong()) }.toModel()
+    override suspend fun entries(id: Long, offset: Int, limit: Int, sort: ListSort?, type: MediaType?): MediaListEntries {
+        // The sorts and chips are a watchlist's page's, from the level that brought them; older servers aren't sent them.
+        val newer = http.features().watchlists
+        val order = sort?.takeIf { newer }?.let {
+            when (it) {
+                ListSort.Added -> ListsApi.SortListMediaListEntries.added
+                ListSort.Title -> ListsApi.SortListMediaListEntries.title
+                ListSort.Released -> ListsApi.SortListMediaListEntries.released
+            }
+        }
+        val only = type?.takeIf { newer }?.let { if (it == MediaType.Movie) ListsApi.MediaTypeListMediaListEntries.movie else ListsApi.MediaTypeListMediaListEntries.tv }
+        return listsApi {
+            it.listMediaListEntries(id, limit = limit.coerceIn(1, MAX_LIST_ENTRIES).toLong(), offset = offset.coerceAtLeast(0).toLong(), sort = order, mediaType = only)
+        }.toModel()
+    }
 
     override suspend fun refreshList(id: Long): MediaList = listsApi { it.refreshMediaList(id) }.toModel()
 

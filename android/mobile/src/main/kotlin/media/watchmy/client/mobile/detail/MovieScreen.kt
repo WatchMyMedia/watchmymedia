@@ -66,6 +66,9 @@ import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.PlaybackMode
 import media.watchmy.client.model.PlaybackPlan
 import media.watchmy.client.model.TrailerText
+import media.watchmy.client.model.watchlistTitle
+import media.watchmy.client.mobile.watchlists.WatchlistButton
+import media.watchmy.client.ui.LocalWatchlistControls
 import media.watchmy.client.model.formatDuration
 import media.watchmy.client.model.formatRating
 import media.watchmy.client.model.formatRemaining
@@ -108,7 +111,7 @@ fun MovieScreen(
 ) {
     val layout = rememberTabletLayout()
     val services = LocalAppServices.current
-    val vm = viewModel { MovieViewModel(services.library, movieId, services.requests, services.downloads, plans = services.playback::plans) }
+    val vm = viewModel { MovieViewModel(services.library, movieId, services.requests, services.downloads, plans = services.playback::plans, watchlists = services.watchlists) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val movie = state.movie.value
@@ -207,9 +210,10 @@ private fun MovieContent(
 }
 
 /**
- * Resume or Play, Play from start, Trailer and Mark watched, as
- * the design lays them out: Trailer beside Play from start when
- * partway, else beside Mark watched.
+ * Resume or Play, Play from start, Trailer, Watchlist and Mark watched, as
+ * the page lays them out. With watchlists, Trailer pairs with Watchlist
+ * under Play from start and Mark watched; without, Trailer sits beside Play
+ * from start when partway, else beside Mark watched.
  */
 @Composable
 private fun MovieActions(movie: MovieDetail, state: MovieViewModel.State, vm: MovieViewModel, onPlay: (PlayRequest) -> Unit, onOpenSettings: () -> Unit, onTrailer: () -> Unit) {
@@ -219,7 +223,29 @@ private fun MovieActions(movie: MovieDetail, state: MovieViewModel.State, vm: Mo
         val watch = movie.watch
         val markLabel = if (state.watched) "Mark unwatched" else "Mark watched"
         val hasTrailer = state.trailer != null
-        if (state.resumable && watch != null) {
+        val saves = LocalWatchlistControls.current != null && movie.watchlistTitle() != null && movie.watchlists != null && !state.offline
+        val mark: @Composable (Modifier) -> Unit = { m -> TonalButton(markLabel, { vm.setWatched(!state.watched) }, m, busy = state.busy) }
+        val save: @Composable (Modifier) -> Unit = { m -> WatchlistButton(movie.watchlistTitle(), movie.watchlists, m) }
+        if (saves) {
+            if (state.resumable && watch != null) {
+                ResumeButton(watch.durationMs - watch.positionMs, watch.positionMs.toFloat() / watch.durationMs) { vm.playRequest()?.let(onPlay) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TonalButton("Play from start", { vm.playRequest(fromStart = true)?.let(onPlay) }, Modifier.weight(1f))
+                    mark(Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (hasTrailer) TrailerButton(onTrailer, Modifier.weight(1f))
+                    save(Modifier.weight(1f))
+                }
+            } else {
+                if (default != null) FilledButton("Play", { vm.playRequest()?.let(onPlay) }, large = true, icon = WmmIcons.Play, modifier = Modifier.fillMaxWidth().testTag(TestTags.PLAY))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (hasTrailer) TrailerButton(onTrailer, Modifier.weight(1f)) else mark(Modifier.weight(1f))
+                    save(Modifier.weight(1f))
+                }
+                if (hasTrailer) mark(Modifier.fillMaxWidth())
+            }
+        } else if (state.resumable && watch != null) {
             ResumeButton(watch.durationMs - watch.positionMs, watch.positionMs.toFloat() / watch.durationMs) { vm.playRequest()?.let(onPlay) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TonalButton("Play from start", { vm.playRequest(fromStart = true)?.let(onPlay) }, Modifier.weight(1f))

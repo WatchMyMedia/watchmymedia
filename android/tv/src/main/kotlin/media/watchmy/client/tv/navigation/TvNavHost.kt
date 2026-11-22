@@ -12,6 +12,15 @@ import androidx.compose.runtime.setValue
 import media.watchmy.client.model.DeepLink
 import media.watchmy.client.presentation.servers.ServerSwitchViewModel
 import media.watchmy.client.tv.servers.LocalServersHost
+import media.watchmy.client.presentation.watchlists.WatchlistViewModel
+import media.watchmy.client.tv.components.Notice
+import media.watchmy.client.tv.watchlists.CardMenuDialog
+import media.watchmy.client.tv.watchlists.CardMenuHost
+import media.watchmy.client.tv.watchlists.LocalCardMenu
+import media.watchmy.client.tv.watchlists.WatchlistPanelTv
+import media.watchmy.client.tv.watchlists.WatchlistsTv
+import media.watchmy.client.ui.LocalWatchlistControls
+import media.watchmy.client.ui.rememberWatchlistControls
 import media.watchmy.client.tv.servers.ServersHost
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.key.KeyEventType
@@ -133,7 +142,20 @@ fun TvNavHost(
     // What Servers, on every screen's rail, needs from the app above these screens.
     val addServer by rememberUpdatedState(onAddServer)
     val openElsewhere by rememberUpdatedState(onOpenElsewhere)
-    val serversHost = remember { ServersHost(onAdd = { addServer() }, onOpenElsewhere = { id, query, page -> openElsewhere(id, query, page) }) }
+    // Saving titles to watchlists, from every page's Watchlist button and cards' Hold OK. A TV says nothing on a save.
+    val watchlistModel = viewModel(key = "watchlists") { WatchlistViewModel(services.watchlists, messages = false) }
+    val watchlist by watchlistModel.state.collectAsStateWithLifecycle()
+    val held by watchlistModel.held.collectAsStateWithLifecycle()
+    val watchlistControls = rememberWatchlistControls(watchlist.supported, watchlist.watchlists, held, watchlistModel::press)
+    val cardMenu = remember { CardMenuHost() }
+    val openWatchlists by rememberUpdatedState({ nav.navigate(TvRoutes.Watchlists) }.takeIf { watchlist.supported })
+    val serversHost = remember(watchlist.supported) {
+        ServersHost(
+            onAdd = { addServer() },
+            onOpenElsewhere = { id, query, page -> openElsewhere(id, query, page) },
+            onWatchlists = if (watchlist.supported) ({ openWatchlists?.invoke() }) else null,
+        )
+    }
     // The words a result on another server was found with, for Search on the server the app switched to.
     var searchWords by rememberSaveable { mutableStateOf<String?>(null) }
     val landed by rememberUpdatedState(onLandingShown)
@@ -198,7 +220,14 @@ fun TvNavHost(
         handled()
     }
     val badge by rememberRequestBadge(services.requests)
-    CompositionLocalProvider(LocalRequestBadge provides badge, LocalLiveTVAvailable provides live.available, LocalLiveChannelsShown provides showChannels, LocalServersHost provides serversHost) {
+    CompositionLocalProvider(
+        LocalRequestBadge provides badge,
+        LocalLiveTVAvailable provides live.available,
+        LocalLiveChannelsShown provides showChannels,
+        LocalServersHost provides serversHost,
+        LocalWatchlistControls provides watchlistControls,
+        LocalCardMenu provides cardMenu,
+    ) {
         // The banner never takes focus: Hold OK watches and Back dismisses, before the screen sees them.
         Box(
             Modifier.fillMaxSize().onBack(enabled = banner != null, overlay = true) { dismiss() }.onPreviewKeyEvent { event ->
@@ -240,9 +269,14 @@ fun TvNavHost(
                         onPlay = nav::play,
                     )
                 }
+                composable<TvRoutes.Watchlists> {
+                    WatchlistsTv(onNavigate = { r -> nav.navigateSection(r) }, onOpenList = { id -> nav.navigate(TvRoutes.MediaList(id)) })
+                }
                 composable<TvRoutes.MediaList> {
+                    val route = it.toRoute<TvRoutes.MediaList>()
                     ListPageTv(
-                        listId = it.toRoute<TvRoutes.MediaList>().id,
+                        listId = route.id,
+                        type = route.type,
                         onOpenShow = { id -> nav.navigate(TvRoutes.Show(id)) },
                         onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id)) },
                         onPlay = nav::play,
@@ -352,6 +386,12 @@ fun TvNavHost(
                     )
                 }
             }
+            watchlist.picker?.let { picker ->
+                WatchlistPanelTv(picker.title, watchlist.checked(held), picker.naming, watchlist.atLimit, watchlist.max, watchlistModel)
+            }
+            CardMenuDialog(cardMenu)
+            // A save the server refused: said, since the button went back.
+            Notice(watchlist.message?.text, watchlistModel::messageShown)
             banner?.let { b ->
                 TvReminderBanner(
                     b, bannerModel.leadMinutes, live.channels.firstOrNull { it.id == b.channelId }, format,

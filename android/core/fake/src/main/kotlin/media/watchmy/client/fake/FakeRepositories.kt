@@ -23,6 +23,8 @@ import media.watchmy.client.model.RELATED_API_LEVEL
 import media.watchmy.client.model.RowScreens
 import media.watchmy.client.model.ScreenRow
 import media.watchmy.client.model.ApiException
+import media.watchmy.client.model.MediaType
+import media.watchmy.client.model.WatchlistKey
 import media.watchmy.client.model.AudioPassthrough
 import media.watchmy.client.model.AuthRepository
 import media.watchmy.client.model.ContinueItem
@@ -72,7 +74,7 @@ private suspend fun latency() {
  * feature. A fake server at a lower level hides what its level lacks, as a
  * real one does.
  */
-const val FAKE_SERVER_API_LEVEL = 30
+const val FAKE_SERVER_API_LEVEL = 33
 
 /** The asset URL of one of the fakes' fictional backdrops ([FakeData.backdrop]); null for any other path. */
 fun fakeArtUrl(path: String?): String? =
@@ -328,8 +330,17 @@ class FakeLibraryRepository(
     override suspend fun home(): HomeData {
         latency()
         unreachable()
-        return shelf().home(System.currentTimeMillis())
+        return marked(shelf().home(System.currentTimeMillis()))
     }
+
+    /** Home's cards with their TMDB ids and watchlist marks, as a server with watchlists sends them. */
+    private fun marked(home: HomeData) = home.copy(
+        recentlyAddedShows = home.recentlyAddedShows.map(rows::marked),
+        recentlyAddedMovies = home.recentlyAddedMovies.map(rows::marked),
+        recentlyReleased = home.recentlyReleased.map(rows::marked),
+    )
+
+    private fun List<ScreenRow>.marked() = map { r -> r.copy(items = r.items.map(rows::marked)) }
 
     /** Home in the person's order from [ROWS_API_LEVEL], with the fixed arrays empty, as the server sends it. */
     override suspend fun arrangedHome(): HomeData {
@@ -346,7 +357,7 @@ class FakeLibraryRepository(
         latency()
         unreachable()
         if (level() < ROWS_API_LEVEL) return emptyList()
-        return rows.rows(RowScreens.library(libraryId), shelf().home(System.currentTimeMillis()))
+        return rows.rows(RowScreens.library(libraryId), marked(shelf().home(System.currentTimeMillis())))
     }
 
     override suspend fun continueWatching(): List<ContinueItem> = shelf().continueWatching.also { latency(); unreachable() }
@@ -383,7 +394,7 @@ class FakeLibraryRepository(
             ItemSort.Runtime -> list.sortedByDescending { it.runtimeMin }
         }
         return ItemPage(
-            items = list.drop(query.offset).take(query.limit), total = list.size, offset = query.offset,
+            items = list.drop(query.offset).take(query.limit).map(rows::marked), total = list.size, offset = query.offset,
             genres = genres, decades = all.mapNotNull { it.year?.div(10)?.times(10) }.distinct().sortedDescending(),
             summary = shelf.summary(query.libraryId),
             genreCounts = genreCounts,
@@ -396,29 +407,32 @@ class FakeLibraryRepository(
 
     override suspend fun show(id: Long) = shelf().show(id, arr, user())
         .let { s -> if (level() >= FOLLOWS_API_LEVEL && following != null) s.copy(following = following(s.id)) else s }
+        .let { s -> s.copy(watchlists = s.tmdbId?.let { rows.holding(WatchlistKey(MediaType.Tv, it)) }) }
         .also { latency(); unreachable() }
 
     override suspend fun season(showId: Long, number: Int) = shelf().season(showId, number, arr, user()).also { latency(); unreachable() }
 
-    override suspend fun movie(id: Long) = shelf().movie(id).let { if (level() >= TRAILERS_API_LEVEL) it else it.copy(trailers = emptyList()) }.also { latency(); unreachable() }
+    override suspend fun movie(id: Long) = shelf().movie(id).let { if (level() >= TRAILERS_API_LEVEL) it else it.copy(trailers = emptyList()) }
+        .let { m -> m.copy(watchlists = m.tmdbId?.let { rows.holding(WatchlistKey(MediaType.Movie, it)) }) }
+        .also { latency(); unreachable() }
 
     /** From [RELATED_API_LEVEL] ([FakeData.movieRelated]); an older fake server has none. */
     override suspend fun movieRelated(id: Long): List<ScreenRow> {
         latency()
         unreachable()
-        return if (level() >= RELATED_API_LEVEL) shelf().movieRelated(id) else emptyList()
+        return if (level() >= RELATED_API_LEVEL) shelf().movieRelated(id).marked() else emptyList()
     }
 
     override suspend fun showRelated(id: Long): List<ScreenRow> {
         latency()
         unreachable()
-        return if (level() >= RELATED_API_LEVEL) shelf().showRelated(id) else emptyList()
+        return if (level() >= RELATED_API_LEVEL) shelf().showRelated(id).marked() else emptyList()
     }
 
     override suspend fun search(text: String): SearchResults {
         latency()
         unreachable()
-        return shelf().search(text)
+        return shelf().search(text).let { r -> r.copy(movies = r.movies.map(rows::marked), shows = r.shows.map(rows::marked)) }
     }
 
     /**

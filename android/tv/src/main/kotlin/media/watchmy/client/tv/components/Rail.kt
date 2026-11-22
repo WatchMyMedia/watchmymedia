@@ -236,6 +236,7 @@ private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -
                 onNavigate(TvRoutes.Settings)
             },
             onDismiss = close,
+            onWatchlists = host?.onWatchlists?.let { open -> { close(); open() } },
         )
     }
 }

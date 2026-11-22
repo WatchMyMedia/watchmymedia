@@ -130,6 +130,7 @@ internal fun ApiMediaList.toModel() = MediaList(
     createdAtMs = epochMs(createdAt),
     sourceName = sourceName?.takeIf { it.isNotBlank() },
     sourceUrl = sourceUrl?.takeIf { it.startsWith("https://") || it.startsWith("http://") },
+    removeWatched = removeWatched == true,
 )
 
 private fun mediaTypeOf(value: String): MediaType? = when (value) {
@@ -157,6 +158,8 @@ internal fun ApiMediaListEntry.toModel() = MediaListEntry(
     found = found,
     item = item?.toModel(),
     requestState = requestStateOf(requestState),
+    watchlisted = watchlisted == true,
+    addedAtMs = epochMs(addedAt),
 )
 
 internal fun ApiMediaListEntries.toModel() = MediaListEntries(items.map { it.toModel() }, total.toInt(), inLibrary.toInt())

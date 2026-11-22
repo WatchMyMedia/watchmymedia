@@ -20,6 +20,8 @@ import media.watchmy.client.model.ScreenRow
 import media.watchmy.client.model.Trailer
 import media.watchmy.client.model.WatchProgress
 import media.watchmy.client.model.WatchTarget
+import media.watchmy.client.model.WatchlistRepository
+import media.watchmy.client.model.watchlistTitle
 import media.watchmy.client.model.attempt
 import media.watchmy.client.model.errorMessage
 import media.watchmy.client.model.isUnreachable
@@ -55,6 +57,8 @@ class MovieViewModel(
     private val requests: RequestRepository = RequestRepository.Unavailable,
     private val downloads: DownloadRepository = DownloadRepository.Unavailable,
     youTube: Boolean = true,
+    /** The person's watchlists, from [media.watchmy.client.model.WATCHLISTS_API_LEVEL]: where the page reads the movie is. */
+    private val watchlists: WatchlistRepository = WatchlistRepository.Unavailable,
     private val plans: suspend (List<Long>) -> Map<Long, PlaybackPlan> = { emptyMap() },
 ) : ViewModel(), ShownPage {
     data class State(
@@ -107,6 +111,8 @@ class MovieViewModel(
         load()
         viewModelScope.launch { attempt { requests.options() }.onSuccess { o -> _state.update { it.copy(options = o) } } }
         freshness.follow(library.libraryChanges) { it.touchesMovie(movieId) }
+        // Saved or removed on another device, or taken off by watching: the button follows.
+        freshness.follow(watchlists.changes)
         // Offline, the page is the download: it follows what is watched or marked here.
         viewModelScope.launch {
             downloads.downloads.collect {
@@ -195,8 +201,10 @@ class MovieViewModel(
     private fun load(quiet: Boolean = false) {
         if (!quiet || _state.value.movie !is Load.Ready) _state.update { it.copy(movie = Load.Loading) }
         loads.launch {
+            val since = watchlists.revision
             attempt { library.movie(movieId) }
                 .onSuccess { movie ->
+                    movie.watchlists?.let { ids -> movie.watchlistTitle()?.let { watchlists.known(it.key, ids, since) } }
                     _state.update { it.copy(movie = Load.Ready(movie), offline = false) }
                     loadRelated()
                     // A version list without the play mode is still right; a failure here is not shown.

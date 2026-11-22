@@ -127,6 +127,8 @@ internal fun ApiBrowseItem.toModel(): BrowseItem? = BrowseItem(
     fileCount = fileCount?.toInt(),
     episodeId = episodeId?.takeIf { seasonNumber != null },
     episodeSeason = seasonNumber?.toInt()?.takeIf { episodeId != null },
+    tmdbId = tmdbId?.takeIf { it > 0 && kind != ApiBrowseItem.Kind.unmatched },
+    watchlisted = watchlisted == true,
 )
 
 internal fun ApiMovie.toBrowseItem() = BrowseItem(
@@ -271,6 +273,7 @@ internal fun ApiShowDetail.toModel() = ShowDetail(
     tmdbId = tmdbId.takeIf { it > 0 },
     managedBy = managedBy.orNullIfBlank(),
     following = following,
+    watchlists = watchlists,
 )
 
 internal fun ApiSeasonDetail.toModel() = SeasonDetail(
@@ -336,6 +339,7 @@ internal fun ApiMovieDetail.toModel() = MovieDetail(
     download = download?.toModel(),
     managedBy = managedBy.orNullIfBlank(),
     trailers = trailers.orEmpty().mapNotNull { it.toModel() },
+    watchlists = watchlists,
 )
 
 /**
