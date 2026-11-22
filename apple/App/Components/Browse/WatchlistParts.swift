@@ -18,6 +18,7 @@ struct WatchlistButton: View {
     let said: [Int]?
     var fullWidth = true
     @Environment(WatchlistStore.self) private var watchlists
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         let holding = watchlists.holding(title.key, said: said)
@@ -30,7 +31,8 @@ struct WatchlistButton: View {
             .accessibilityAddTraits(holding.isEmpty ? .isToggle : [.isToggle, .isSelected])
             .accessibilityIdentifier("watchlist-button")
             .popover(item: Binding(get: { picker }, set: { if $0 == nil { picker?.close() } }), arrowEdge: .bottom) { picker in
-                WatchlistPickerView(picker: picker, popover: true)
+                // A popover from the button where there is room; a compact width draws it as a sheet, sized as one.
+                WatchlistPickerView(picker: picker, popover: sizeClass.isWide)
                     .presentationCompactAdaptation(.sheet)
             }
             .onChange(of: said, initial: true) { _, said in watchlists.pageRead(title.key, holding: said) }
@@ -104,7 +106,8 @@ struct WatchlistPickerView: View {
                     Button(WatchlistWords.cancel) { picker.cancelNaming() }
                         .keyboardShortcut(.cancelAction)
                 } else {
-                    Color.clear
+                    // Holds the width only: a bare Color.clear would take the sheet's height.
+                    Color.clear.frame(height: 0)
                 }
             }
             .frame(width: 80, alignment: .leading)
