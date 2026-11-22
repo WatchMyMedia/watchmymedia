@@ -138,7 +138,19 @@ type HealthOutput struct {
 // a bearer request is signed in by its token alone, never by the cookie;
 // and the API answers CORS for the origin file://, without credentials.
 // The TV apps ask people to update their server below this level.
-const APILevel = 32
+// 33: watchlists, the movies and shows a person means to watch:
+// /me/watchlists (list, create, rename and the Remove titles once watched
+// switch, delete), saving to and removing from one by TMDB id, and
+// /me/watchlist/titles for the Watchlist button (saveToOnlyWatchlist, whose
+// 409 carries the watchlists for the picker, and removeFromWatchlists).
+// A watchlist is a list of source kind watchlist, so its rows and page are a
+// list's, and older apps draw them; deleteMediaList deletes one, and the
+// other list operations refuse it. MovieDetail.watchlists,
+// ShowDetail.watchlists, BrowseItem.tmdbId and .watchlisted,
+// MediaListEntry.watchlisted and .addedAt, Requestable.watchlisted,
+// MediaList.removeWatched, and listMediaListEntries' sort and mediaType.
+// Apps offer saving only from this level.
+const APILevel = 33
 
 // ServerInfo identifies the server to apps before anyone signs in.
 type ServerInfo struct {

@@ -46,6 +46,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param request
  * @param seasons
  * @param showId The library's show, when it has one.
+ * @param watchlisted It is on one of the signed-in person's watchlists.
  * @param year
  */
 @Serializable
@@ -83,6 +84,10 @@ data class Requestable (
     /* The library's show, when it has one. */
     @SerialName(value = "showId")
     val showId: kotlin.Long? = null,
+
+    /* It is on one of the signed-in person's watchlists. */
+    @SerialName(value = "watchlisted")
+    val watchlisted: kotlin.Boolean? = null,
 
     @SerialName(value = "year")
     val year: kotlin.Long? = null

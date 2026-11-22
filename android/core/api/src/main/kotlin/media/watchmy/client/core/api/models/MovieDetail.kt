@@ -66,6 +66,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param tagline
  * @param trailers The movie's trailers, best first: trailer files in the library, then YouTube trailers while they are on. Apps play the first one whose source they know. Absent when it has none, and on older servers.
  * @param watch
+ * @param watchlists The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
  * @param year
  */
 @Serializable
@@ -158,6 +159,10 @@ data class MovieDetail (
 
     @SerialName(value = "watch")
     val watch: WatchState? = null,
+
+    /* The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33. */
+    @SerialName(value = "watchlists")
+    val watchlists: kotlin.collections.List<kotlin.Long>? = null,
 
     @SerialName(value = "year")
     val year: kotlin.Long? = null

@@ -40,6 +40,14 @@ filter:
     - unfollowShow
     - listFollows
     - removeFollow
+    - listWatchlists
+    - createWatchlist
+    - updateWatchlist
+    - deleteWatchlist
+    - saveToWatchlist
+    - removeFromWatchlist
+    - saveToOnlyWatchlist
+    - removeFromWatchlists
     - listNewEpisodes
     - getSeason
     - getMovie

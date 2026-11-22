@@ -34,7 +34,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * @param kind tmdb, mdblist, library or import. A plain string: show a list whose kind you don't know, and don't offer to edit it.
+ * @param kind tmdb, mdblist, library, import or watchlist (from API level 33; one of the person's watchlists, which listWatchlists and the watchlist operations change). A plain string: show a list whose kind you don't know, and don't offer to edit it.
  * @param chart tmdb: trending-day, trending-week, popular, top-rated, now-playing (movies), upcoming (movies), on-the-air (TV), airing-today (TV), discover, list or collection.
  * @param decade library: e.g. 1990.
  * @param filter library: as listLibraryItems' filter.
@@ -56,7 +56,7 @@ import kotlinx.serialization.encoding.Encoder
 
 data class MediaListSource (
 
-    /* tmdb, mdblist, library or import. A plain string: show a list whose kind you don't know, and don't offer to edit it. */
+    /* tmdb, mdblist, library, import or watchlist (from API level 33; one of the person's watchlists, which listWatchlists and the watchlist operations change). A plain string: show a list whose kind you don't know, and don't offer to edit it. */
     @SerialName(value = "kind")
     val kind: kotlin.String,
 

@@ -63,6 +63,8 @@ import kotlinx.serialization.encoding.Encoder
  * @param seasonNumber Recently added shows: that episode's season.
  * @param status
  * @param subtitle
+ * @param tmdbId The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved.
+ * @param watchlisted It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add.
  * @param year
  */
 @Serializable
@@ -165,6 +167,14 @@ data class BrowseItem (
 
     @SerialName(value = "subtitle")
     val subtitle: kotlin.String? = null,
+
+    /* The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved. */
+    @SerialName(value = "tmdbId")
+    val tmdbId: kotlin.Long? = null,
+
+    /* It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add. */
+    @SerialName(value = "watchlisted")
+    val watchlisted: kotlin.Boolean? = null,
 
     @SerialName(value = "year")
     val year: kotlin.Long? = null

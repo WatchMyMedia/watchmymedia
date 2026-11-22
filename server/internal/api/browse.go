@@ -64,6 +64,8 @@ type MovieDetail struct {
 	// Trailers are the movie's trailer files in the library, then its
 	// YouTube trailers from TMDB, APILevel 20.
 	Trailers []MovieTrailer `json:"trailers,omitempty" required:"false" nullable:"false" doc:"The movie's trailers, best first: trailer files in the library, then YouTube trailers while they are on. Apps play the first one whose source they know. Absent when it has none, and on older servers."`
+	// Watchlists is from API level 33.
+	Watchlists []int64 `json:"watchlists" required:"false" nullable:"false" doc:"The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33."`
 }
 
 // Show is a matched series with at least one present episode file.
@@ -127,6 +129,8 @@ type ShowDetail struct {
 	ManagedBy   string       `json:"managedBy,omitempty" required:"false" doc:"The Sonarr connection that has the show."`
 	// Following is from API level 29.
 	Following bool `json:"following" required:"false" doc:"The signed-in person follows the show (followShow). Absent on servers below API level 29."`
+	// Watchlists is from API level 33.
+	Watchlists []int64 `json:"watchlists" required:"false" nullable:"false" doc:"The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33."`
 }
 
 type NextEpisode struct {
@@ -239,7 +243,7 @@ func registerBrowse(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
-		out := &GetMovieOutput{Body: MovieDetail{Movie: movieFromDB(row), Files: make([]MediaFileDetail, 0, len(files))}}
+		out := &GetMovieOutput{Body: MovieDetail{Movie: movieFromDB(row), Files: make([]MediaFileDetail, 0, len(files)), Watchlists: []int64{}}}
 		var maxHeight int64
 		for _, f := range files {
 			// Only present files, as on the season page: one that went
@@ -277,6 +281,9 @@ func registerBrowse(h huma.API, deps Deps) {
 				ws := watchFromDB(w)
 				out.Body.Watch = &ws
 			case !errors.Is(err, sql.ErrNoRows):
+				return nil, err
+			}
+			if out.Body.Watchlists, err = watchlistsHolding(ctx, deps, user.ID, "movie", row.TmdbID); err != nil {
 				return nil, err
 			}
 		}
@@ -343,7 +350,7 @@ func registerBrowse(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
-		out := &GetShowOutput{Body: ShowDetail{Show: showFromDB(row), Seasons: make([]Season, 0, len(seasons))}}
+		out := &GetShowOutput{Body: ShowDetail{Show: showFromDB(row), Seasons: make([]Season, 0, len(seasons)), Watchlists: []int64{}}}
 		for _, s := range seasons {
 			// Episodes named after files are the season's too, though TMDB's
 			// count leaves them out: "6 of 3" would read as nonsense.
@@ -379,6 +386,9 @@ func registerBrowse(h huma.API, deps Deps) {
 				out.Body.Seasons[i].WatchedCount = watchedBySeason[out.Body.Seasons[i].ID]
 			}
 			if out.Body.Following, err = deps.Queries.IsFollowingShow(ctx, db.IsFollowingShowParams{UserID: user.ID, TmdbID: row.TmdbID}); err != nil {
+				return nil, err
+			}
+			if out.Body.Watchlists, err = watchlistsHolding(ctx, deps, user.ID, "tv", row.TmdbID); err != nil {
 				return nil, err
 			}
 			n, err := deps.Queries.NextUnwatchedEpisode(ctx, db.NextUnwatchedEpisodeParams{UserID: user.ID, ShowID: row.ID})

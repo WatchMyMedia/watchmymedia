@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -98,12 +100,15 @@ type listMatches struct {
 
 func listVersion(l db.MediaList) string { return deref(l.FetchedAt) + "|" + l.UpdatedAt }
 
-// matchesOf reads lists' matches, from the cache where it has them.
+// matchesOf reads lists' matches, from the cache where it has them. A
+// watchlist's are in its own order (savedOrder); other lists' by rank.
 func matchesOf(ctx context.Context, deps Deps, ls []db.MediaList) (map[int64]listMatches, error) {
 	gen, live := generation(deps)
 	out := map[int64]listMatches{}
 	var need []int64
+	watchlist := map[int64]bool{}
 	for _, l := range ls {
+		watchlist[l.ID] = lists.IsWatchlist(l)
 		if m, ok := deps.listsState.matches.get(gen, l.ID); live && ok && m.version == listVersion(l) {
 			out[l.ID] = m
 			continue
@@ -132,7 +137,7 @@ func matchesOf(ctx context.Context, deps Deps, ls []db.MediaList) (map[int64]lis
 	}
 	for _, r := range movies {
 		m := out[r.ListID]
-		m.refs = append(m.refs, rankRef{rank: r.Rank, id: r.ID, libraryID: r.LibraryID})
+		m.refs = append(m.refs, rankRef{rank: r.Rank, id: r.ID, libraryID: r.LibraryID, at: savedOrArrived(deref(r.SavedAt), r.ArrivedAt)})
 		out[r.ListID] = m
 	}
 	shows, err := deps.Queries.ListMediaListShowRanks(ctx, need)
@@ -141,12 +146,15 @@ func matchesOf(ctx context.Context, deps Deps, ls []db.MediaList) (map[int64]lis
 	}
 	for _, r := range shows {
 		m := out[r.ListID]
-		m.refs = append(m.refs, rankRef{rank: r.Rank, show: true, id: r.ID, libraryID: r.LibraryID})
+		m.refs = append(m.refs, rankRef{rank: r.Rank, show: true, id: r.ID, libraryID: r.LibraryID, at: savedOrArrived(deref(r.SavedAt), r.ArrivedAt)})
 		out[r.ListID] = m
 	}
 	for _, id := range need {
 		m := out[id]
 		slices.SortStableFunc(m.refs, func(a, b rankRef) int { return int(a.rank - b.rank) })
+		if watchlist[id] {
+			m.refs = savedOrder(m.refs)
+		}
 		out[id] = m
 		if live {
 			deps.listsState.matches.put(gen, id, m)
@@ -223,12 +231,46 @@ type listCounts struct {
 	entries, inLibrary, notFound int
 }
 
-// rankRef is a list entry the library has: its movie or show.
+// rankRef is a list entry the library has: its movie or show. at is
+// where a watchlist's entry goes in its order (savedOrder).
 type rankRef struct {
 	rank      int64
 	show      bool
 	id        int64
 	libraryID int64
+	at        string
+}
+
+// savedOrArrived is a watchlist entry's place in its order: when it was
+// saved, or when the title reached the library if that was later. Both
+// are database timestamps, which sort as text.
+func savedOrArrived(saved, arrived string) string {
+	return max(saved, arrived)
+}
+
+// savedOrder puts a watchlist's matches, in rank order, in the
+// watchlist's order: newest first by savedOrArrived, so a title that
+// arrives after it was saved goes to the front, the New badge on its
+// card. A title in two libraries counts from its first arrival, so its
+// copies keep one place, side by side; among equal times the newer saved
+// (the lower rank) comes first.
+func savedOrder(refs []rankRef) []rankRef {
+	first := map[int64]string{}
+	for _, r := range refs {
+		if at, ok := first[r.rank]; !ok || r.at < at {
+			first[r.rank] = r.at
+		}
+	}
+	for i := range refs {
+		refs[i].at = first[refs[i].rank]
+	}
+	slices.SortStableFunc(refs, func(a, b rankRef) int {
+		if c := strings.Compare(b.at, a.at); c != 0 {
+			return c
+		}
+		return int(a.rank - b.rank)
+	})
+	return refs
 }
 
 // rankedItem is a list entry the library has, as its card.
@@ -239,12 +281,17 @@ type rankedItem struct {
 
 // listData is what some lists hold for a screen, read once for its layout
 // and its rows: each list's counts, which of its entries the library has,
-// and library lists' items.
+// and library lists' items. matches, types and prefer are what ranks were
+// picked from, for Home to pick a watchlist's again without what Continue
+// watching shows.
 type listData struct {
 	counts  map[int64]listCounts
 	ranks   map[int64][]rankRef
 	library map[int64][]BrowseItem
 	marks   *watchMarks
+	matches map[int64]listMatches
+	types   []string
+	prefer  int64
 }
 
 // loadListData reads lists' entries of types. A title in two libraries
@@ -252,7 +299,8 @@ type listData struct {
 // marks marks library lists' items (and filters them, for unwatched);
 // when nil and a library list needs them, they are read here.
 func loadListData(ctx context.Context, deps Deps, ls []db.MediaList, types []string, prefer int64, marks *watchMarks) (listData, error) {
-	d := listData{counts: map[int64]listCounts{}, ranks: map[int64][]rankRef{}, library: map[int64][]BrowseItem{}, marks: marks}
+	d := listData{counts: map[int64]listCounts{}, ranks: map[int64][]rankRef{}, library: map[int64][]BrowseItem{}, marks: marks,
+		types: types, prefer: prefer}
 	var ids []int64
 	for _, l := range ls {
 		if l.SourceKind != lists.KindLibrary {
@@ -281,35 +329,78 @@ func loadListData(ctx context.Context, deps Deps, ls []db.MediaList, types []str
 			fetched = append(fetched, l)
 		}
 	}
-	matches, err := matchesOf(ctx, deps, fetched)
-	if err != nil {
+	var err error
+	if d.matches, err = matchesOf(ctx, deps, fetched); err != nil {
 		return d, err
 	}
 	for _, id := range ids {
-		m := matches[id]
+		m := d.matches[id]
 		var n listCounts
 		for _, t := range types {
 			n.entries += m.totals[t].entries
 			n.notFound += m.totals[t].notFound
 		}
-		// One entry per rank: the library prefer's copy, else the first.
-		var refs []rankRef
-		for _, r := range m.refs {
-			if r.show && !slices.Contains(types, "tv") || !r.show && !slices.Contains(types, "movie") {
-				continue
-			}
-			if k := len(refs) - 1; k >= 0 && refs[k].rank == r.rank {
-				if r.libraryID == prefer && refs[k].libraryID != prefer {
-					refs[k] = r
-				}
-				continue
-			}
-			refs = append(refs, r)
-		}
+		refs := d.pick(m.refs, nil)
 		n.inLibrary = len(refs)
 		d.counts[id], d.ranks[id] = n, refs
 	}
 	return d, nil
+}
+
+// pick is what a screen draws of a list's matches: those of its types,
+// one per entry (the screen's own library's copy, else the first),
+// leaving out entries any copy of which skip names.
+func (d listData) pick(refs []rankRef, skip func(rankRef) bool) []rankRef {
+	skipped := map[int64]bool{}
+	if skip != nil {
+		for _, r := range refs {
+			if skip(r) {
+				skipped[r.rank] = true
+			}
+		}
+	}
+	var out []rankRef
+	for _, r := range refs {
+		if skipped[r.rank] || r.show && !slices.Contains(d.types, "tv") || !r.show && !slices.Contains(d.types, "movie") {
+			continue
+		}
+		if k := len(out) - 1; k >= 0 && out[k].rank == r.rank {
+			if r.libraryID == d.prefer && out[k].libraryID != d.prefer {
+				out[k] = r
+			}
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+// without is d with ls's watchlists picked again, leaving out the movies
+// and shows Home's Continue watching shows, so a title isn't on Home
+// twice. The rows are cut to their 20 after, so they stay full; the
+// counts under them are the watchlists' own.
+func (d listData) without(ls []*db.MediaList, continuing []ContinueItem) listData {
+	movies, shows := map[int64]bool{}, map[int64]bool{}
+	for _, c := range continuing {
+		switch {
+		case c.MovieID != nil:
+			movies[*c.MovieID] = true
+		case c.ShowID != nil:
+			shows[*c.ShowID] = true
+		}
+	}
+	if len(movies)+len(shows) == 0 {
+		return d
+	}
+	skip := func(r rankRef) bool { return r.show && shows[r.id] || !r.show && movies[r.id] }
+	ranks := maps.Clone(d.ranks)
+	for _, l := range ls {
+		if lists.IsWatchlist(*l) {
+			ranks[l.ID] = d.pick(d.matches[l.ID].refs, skip)
+		}
+	}
+	d.ranks = ranks
+	return d
 }
 
 // cards are the first limit (0: every) entries the library has of each
@@ -471,24 +562,42 @@ func listScreenRows(ctx context.Context, deps Deps, d listData, ls []*db.MediaLi
 		for i, r := range ranked {
 			row.Items[i] = r.item
 		}
-		row.Subtitle = fmt.Sprintf("%d of %d · From %s", n.inLibrary, n.entries, row.Source.Name)
+		row.Subtitle = listRowLine(row, n)
 		out[l.ID] = row
 	}
 	return out, nil
 }
 
-// listRow is a list's row without its items.
+// listRow is a list's row without its items. A watchlist's has no
+// source: it is the person's own.
 func listRow(deps Deps, l *db.MediaList) ScreenRow {
+	row := ScreenRow{
+		ID: listRowID(l.ID), Style: RowStylePoster, Title: l.Name, ListID: l.ID,
+		SeeAll: &ScreenRowLink{Kind: "list", ListID: l.ID},
+	}
+	if lists.IsWatchlist(*l) {
+		return row
+	}
 	p := lists.DecodeParams(l.Params)
 	name := l.SourceKind
 	if deps.Lists != nil {
 		name = deps.Lists.Name(l.SourceKind, p)
 	}
-	return ScreenRow{
-		ID: listRowID(l.ID), Style: RowStylePoster, Title: l.Name, ListID: l.ID,
-		SeeAll: &ScreenRowLink{Kind: "list", ListID: l.ID},
-		Source: &ScreenRowSource{Kind: l.SourceKind, Name: name, URL: l.SourceUrl},
+	row.Source = &ScreenRowSource{Kind: l.SourceKind, Name: name, URL: l.SourceUrl}
+	return row
+}
+
+// listRowLine is the line under a fetched list's row: how many of its
+// titles of the screen's types the library has, and where it is from. A
+// watchlist's says only how many, and nothing when the library has all.
+func listRowLine(row ScreenRow, n listCounts) string {
+	if row.Source != nil {
+		return fmt.Sprintf("%d of %d · From %s", n.inLibrary, n.entries, row.Source.Name)
 	}
+	if n.inLibrary >= n.entries {
+		return ""
+	}
+	return fmt.Sprintf("%d of %d in your library", n.inLibrary, n.entries)
 }
 
 func plural(n int, word string) string {
@@ -525,7 +634,7 @@ func libraryItemsByTMDB(ctx context.Context, deps Deps, entries []lists.Entry, m
 			return nil, err
 		}
 		for _, r := range rows {
-			keep("movie", r.TmdbID, movieItem(db.ListMovieItemsRow{ID: r.ID, LibraryID: r.LibraryID, Title: r.Title, Year: r.Year, ReleaseDate: r.ReleaseDate,
+			keep("movie", r.TmdbID, movieItem(db.ListMovieItemsRow{ID: r.ID, LibraryID: r.LibraryID, TmdbID: r.TmdbID, Title: r.Title, Year: r.Year, ReleaseDate: r.ReleaseDate,
 				Overview: r.Overview, RuntimeMin: r.RuntimeMin, Genres: r.Genres, Rating: r.Rating, PosterPath: r.PosterPath, BackdropPath: r.BackdropPath,
 				ContentRating: r.ContentRating, FileCount: r.FileCount, AddedAt: r.AddedAt, MaxHeight: r.MaxHeight, HasHdr: r.HasHdr, TotalSize: r.TotalSize}))
 		}
@@ -536,7 +645,7 @@ func libraryItemsByTMDB(ctx context.Context, deps Deps, entries []lists.Entry, m
 			return nil, err
 		}
 		for _, r := range rows {
-			keep("tv", r.TmdbID, showItem(db.ListShowItemsRow{ID: r.ID, LibraryID: r.LibraryID, Title: r.Title, Year: r.Year, Overview: r.Overview,
+			keep("tv", r.TmdbID, showItem(db.ListShowItemsRow{ID: r.ID, LibraryID: r.LibraryID, TmdbID: r.TmdbID, Title: r.Title, Year: r.Year, Overview: r.Overview,
 				Status: r.Status, Genres: r.Genres, Rating: r.Rating, PosterPath: r.PosterPath, BackdropPath: r.BackdropPath, LastAirDate: r.LastAirDate,
 				NextAirDate: r.NextAirDate, ContentRating: r.ContentRating, EpisodeCount: r.EpisodeCount, AddedAt: r.AddedAt, MaxHeight: r.MaxHeight,
 				HasHdr: r.HasHdr, TotalSize: r.TotalSize}))
@@ -554,7 +663,11 @@ func entryKey(e lists.Entry) string { return fmt.Sprintf("%s/%d", e.MediaType, e
 
 // apiEntry is a list entry as the API shows it.
 func apiEntry(e lists.Entry) MediaListEntry {
-	return MediaListEntry{Rank: e.Rank, MediaType: e.MediaType, TMDBID: e.TMDBID, IMDbID: e.IMDbID, Title: e.Title, Year: e.Year, PosterPath: e.PosterPath, Found: e.Found()}
+	v := MediaListEntry{Rank: e.Rank, MediaType: e.MediaType, TMDBID: e.TMDBID, IMDbID: e.IMDbID, Title: e.Title, Year: e.Year, PosterPath: e.PosterPath, Found: e.Found()}
+	if e.AddedAt != "" {
+		v.AddedAt = new(db.ParseTime(e.AddedAt))
+	}
+	return v
 }
 
 // requestStates fills in what Request would do for the entries the

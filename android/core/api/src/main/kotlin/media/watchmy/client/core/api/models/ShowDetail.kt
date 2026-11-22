@@ -65,6 +65,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param quality
  * @param rating
  * @param status
+ * @param watchlists The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
  * @param year
  */
 @Serializable
@@ -160,6 +161,10 @@ data class ShowDetail (
 
     @SerialName(value = "status")
     val status: kotlin.String? = null,
+
+    /* The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33. */
+    @SerialName(value = "watchlists")
+    val watchlists: kotlin.collections.List<kotlin.Long>? = null,
 
     @SerialName(value = "year")
     val year: kotlin.Long? = null

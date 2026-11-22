@@ -64,6 +64,9 @@ type Service struct {
 	// WantedFor is how long after a screen last showed a list, or someone
 	// opened it, the job keeps fetching it.
 	WantedFor time.Duration
+	// Now is the clock watchlists' changes are dated by; nil is the
+	// wall clock.
+	Now func() time.Time
 }
 
 // New returns a service; it fetches in the background from Run.
@@ -227,7 +230,7 @@ func FromRows(rows []db.MediaListEntry) []Entry {
 	out := make([]Entry, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, Entry{Rank: int(r.Rank), MediaType: r.MediaType, TMDBID: deref(r.TmdbID), IMDbID: deref(r.ImdbID),
-			Title: r.Title, Year: deref(r.Year), PosterPath: deref(r.PosterPath)})
+			Title: r.Title, Year: deref(r.Year), PosterPath: deref(r.PosterPath), AddedAt: deref(r.AddedAt)})
 	}
 	return out
 }

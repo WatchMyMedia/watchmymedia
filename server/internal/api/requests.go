@@ -58,6 +58,8 @@ type Requestable struct {
 	Request *integrations.RequestState `json:"request,omitempty" doc:"The newest open request."`
 	// Seasons are a show's seasons, from the lookup only.
 	Seasons []RequestableSeason `json:"seasons,omitempty"`
+	// Watchlisted is from API level 33.
+	Watchlisted bool `json:"watchlisted,omitempty" required:"false" doc:"It is on one of the signed-in person's watchlists."`
 }
 
 type RequestableSeason struct {
@@ -246,7 +248,11 @@ func registerRequests(h huma.API, deps Deps) {
 			return nil, err
 		}
 		if s.Seerr() {
-			return seerrSearch(ctx, deps, s, p, in.Q)
+			out, err := seerrSearch(ctx, deps, s, p, in.Q)
+			if err != nil {
+				return nil, err
+			}
+			return out, markWatchlisted(ctx, deps, out.Body.Items)
 		}
 		if deps.TMDB == nil || !deps.TMDB.Configured() {
 			return nil, huma.Error503ServiceUnavailable("this server has no TMDB key")
@@ -282,7 +288,7 @@ func registerRequests(h huma.API, deps Deps) {
 		for _, h := range hits[:min(len(hits), 20)] {
 			out.Items = append(out.Items, requestableState(ctx, deps, s, p, h.r))
 		}
-		return &struct{ Body RequestableList }{Body: out}, nil
+		return &struct{ Body RequestableList }{Body: out}, markWatchlisted(ctx, deps, out.Items)
 	})
 
 	huma.Register(h, huma.Operation{
@@ -297,7 +303,14 @@ func registerRequests(h huma.API, deps Deps) {
 			return nil, err
 		}
 		if s.Seerr() {
-			return seerrLookup(ctx, deps, s, p, in.MediaType, in.TMDBID)
+			out, err := seerrLookup(ctx, deps, s, p, in.MediaType, in.TMDBID)
+			if err != nil {
+				return nil, err
+			}
+			one := []Requestable{out.Body}
+			err = markWatchlisted(ctx, deps, one)
+			out.Body = one[0]
+			return out, err
 		}
 		if deps.TMDB == nil || !deps.TMDB.Configured() {
 			return nil, huma.Error503ServiceUnavailable("this server has no TMDB key")
@@ -320,7 +333,9 @@ func registerRequests(h huma.API, deps Deps) {
 		if tv != nil {
 			r.Seasons = seasonStates(ctx, deps, s, p, tv)
 		}
-		return &struct{ Body Requestable }{Body: r}, nil
+		one := []Requestable{r}
+		err = markWatchlisted(ctx, deps, one)
+		return &struct{ Body Requestable }{Body: one[0]}, err
 	})
 
 	huma.Register(h, huma.Operation{

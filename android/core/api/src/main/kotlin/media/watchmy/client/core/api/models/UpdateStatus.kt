@@ -38,7 +38,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param current This server's version, as built.
  * @param development Not a release build, so it is never offered an update.
  * @param enabled Checking is on (updates.enabled in config); when off, Settings hides the button.
- * @param install How the server was installed, which decides the download.
+ * @param install How the server was installed, which decides the download, or the command that updates it.
  * @param updateAvailable
  * @param checked When the last check that worked ran; absent before the first.
  * @param date Release date of latest (YYYY-MM-DD).
@@ -64,7 +64,7 @@ data class UpdateStatus (
     @SerialName(value = "enabled")
     val enabled: kotlin.Boolean,
 
-    /* How the server was installed, which decides the download. */
+    /* How the server was installed, which decides the download, or the command that updates it. */
     @SerialName(value = "install")
     val install: UpdateStatus.Install,
 
@@ -101,15 +101,17 @@ data class UpdateStatus (
 ) {
 
     /**
-     * How the server was installed, which decides the download.
+     * How the server was installed, which decides the download, or the command that updates it.
      *
-     * Values: macosMinusApp,windowsMinusApp,docker,binary,unknown_default_open_api
+     * Values: macosMinusApp,windowsMinusApp,docker,deb,rpm,binary,unknown_default_open_api
      */
     @Serializable(with = InstallSerializer::class)
     enum class Install(val value: kotlin.String) {
         @SerialName(value = "macos-app") macosMinusApp("macos-app"),
         @SerialName(value = "windows-app") windowsMinusApp("windows-app"),
         @SerialName(value = "docker") docker("docker"),
+        @SerialName(value = "deb") deb("deb"),
+        @SerialName(value = "rpm") rpm("rpm"),
         @SerialName(value = "binary") binary("binary"),
         @SerialName(value = "unknown_default_open_api") unknown_default_open_api("unknown_default_open_api");
     }

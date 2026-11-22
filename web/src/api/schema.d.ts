@@ -2145,6 +2145,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/watchlist/titles/{mediaType}/{tmdbId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save a movie or show to the person's watchlist, when they have one
+         * @description The Watchlist button pressed once. With no watchlist it makes one called Watchlist (created) and saves there; with one it saves there; with two or more it saves nothing and answers 409 with the watchlists (WatchlistsConflict), and the app opens the picker. The body is saveToWatchlist's. From API level 33.
+         */
+        put: operations["saveToOnlyWatchlist"];
+        post?: never;
+        /**
+         * Take a movie or show off every one of the person's watchlists
+         * @description On Watchlist pressed again. Succeeds when no watchlist holds it. Sends lists.changed for each watchlist it left. From API level 33.
+         */
+        delete: operations["removeFromWatchlists"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/watchlists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The signed-in person's watchlists
+         * @description Apps read it when they start and again on rows.changed, and press Watchlist with saveToOnlyWatchlist when there is at most one, else open the picker. From API level 33.
+         */
+        get: operations["listWatchlists"];
+        put?: never;
+        /**
+         * Make a watchlist
+         * @description 422 when the person has 25, or another of theirs has the name. Its rows go on Home after Continue watching and New from shows you follow, and first on Movies and TV screens. Sends rows.changed to the person. From API level 33.
+         */
+        post: operations["createWatchlist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/watchlists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a watchlist
+         * @description Its titles stay in the library; its rows leave every screen. deleteMediaList does the same. Sends rows.changed to the person. From API level 33.
+         */
+        delete: operations["deleteWatchlist"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename a watchlist, or turn Remove titles once watched on or off
+         * @description 422 for a name another of the person's watchlists has. Another person's watchlist is not found, for admins too. Sends rows.changed to the person. From API level 33.
+         */
+        patch: operations["updateWatchlist"];
+        trace?: never;
+    };
+    "/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save a movie or show to a watchlist
+         * @description Any title, the library's or not. The body describes a title the server has no record of (one only Request search has shown); it is ignored when the server knows the title. A title already there keeps its place. 422 when the watchlist holds 500. Sends lists.changed to the person. From API level 33.
+         */
+        put: operations["saveToWatchlist"];
+        post?: never;
+        /**
+         * Take a movie or show off a watchlist
+         * @description Succeeds when it is not there. Sends lists.changed to the person. From API level 33.
+         */
+        delete: operations["removeFromWatchlist"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/movies/{id}": {
         parameters: {
             query?: never;
@@ -4352,10 +4448,17 @@ export interface components {
             title: string;
             /**
              * Format: int64
+             * @description The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved.
+             */
+            tmdbId?: number;
+            /**
+             * Format: int64
              * @description Bytes across present files.
              */
             totalSize: number;
             watched: boolean;
+            /** @description It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add. */
+            watchlisted?: boolean;
             /** Format: int64 */
             year?: number;
         };
@@ -6375,6 +6478,8 @@ export interface components {
             notFound?: number;
             /** @description me (the person's own) or everyone (the household's). A plain string. */
             owner: string;
+            /** @description Watchlists: a title leaves once the person finishes it (Watchlist.removeWatched). False for other lists. */
+            removeWatched?: boolean;
             /** @description The screen its row was made on and first shows on: home or library-<id>. */
             screen: string;
             source: components["schemas"]["MediaListSource"];
@@ -6415,6 +6520,11 @@ export interface components {
             total: number;
         };
         MediaListEntry: {
+            /**
+             * Format: date-time
+             * @description Watchlists: when the title was saved.
+             */
+            addedAt?: string;
             /** @description False for an imported title TMDB could not find: show it as Not found. */
             found: boolean;
             imdbId?: string;
@@ -6426,7 +6536,7 @@ export interface components {
             posterPath?: string;
             /**
              * Format: int64
-             * @description 1 for the first.
+             * @description 1 for the first. A watchlist's entries are numbered in the order sent.
              */
             rank: number;
             /** @description requestable, requested, downloading or available, as Requestable.state, when the person may request. Absent when requests aren't set up. A plain string. */
@@ -6437,6 +6547,8 @@ export interface components {
              * @description Absent when TMDB could not find the title (imports).
              */
             tmdbId?: number;
+            /** @description The title is on one of the signed-in person's watchlists. */
+            watchlisted?: boolean;
             /** Format: int64 */
             year?: number;
         };
@@ -6476,7 +6588,7 @@ export interface components {
             genre?: string;
             /** @description tmdb discover: TMDB genre IDs (from getMediaListSources), all of which must match. */
             genres?: number[] | null;
-            /** @description tmdb, mdblist, library or import. A plain string: show a list whose kind you don't know, and don't offer to edit it. */
+            /** @description tmdb, mdblist, library, import or watchlist (from API level 33; one of the person's watchlists, which listWatchlists and the watchlist operations change). A plain string: show a list whose kind you don't know, and don't offer to edit it. */
             kind: string;
             /** @description tmdb discover: original language, ISO 639-1 (ko, fr). */
             language?: string;
@@ -6689,6 +6801,8 @@ export interface components {
             trailers?: components["schemas"]["MovieTrailer"][];
             /** @description The signed-in user's progress. */
             watch?: components["schemas"]["WatchState"];
+            /** @description The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33. */
+            watchlists?: number[];
             /** Format: int64 */
             year?: number;
         };
@@ -8050,6 +8164,8 @@ export interface components {
             title: string;
             /** Format: int64 */
             tmdbId: number;
+            /** @description It is on one of the signed-in person's watchlists. */
+            watchlisted?: boolean;
             /** Format: int64 */
             year?: number;
         };
@@ -8108,6 +8224,7 @@ export interface components {
             id: string;
         };
         RowsChanged: {
+            /** @description The screen whose layout changed: home or library-<id>. home also when a watchlist was made, renamed or deleted, which changes every screen. */
             screen: string;
         };
         ScanFailed: {
@@ -8693,6 +8810,8 @@ export interface components {
             totalEpisodes: number;
             /** Format: int64 */
             totalSize: number;
+            /** @description The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33. */
+            watchlists?: number[];
             /** Format: int64 */
             year?: number;
         };
@@ -9227,6 +9346,11 @@ export interface components {
              */
             seerrUserId?: number;
         };
+        UpdateWatchlistInputBody: {
+            /** @description Different from the person's other watchlists' names, whatever the case. */
+            name?: string;
+            removeWatched?: boolean;
+        };
         UploadUpdate: {
             /**
              * Format: int64
@@ -9332,6 +9456,117 @@ export interface components {
              * @description Folders found but not watched.
              */
             unwatched: number;
+        };
+        Watchlist: {
+            /** @description With mediaType and tmdbId in listWatchlists' query: it holds that title. False otherwise. */
+            contains?: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /**
+             * Format: int64
+             * @description The watchlist's ID, which is also its list's: getMediaList and listMediaListEntries take it, and its rows are list:<id>.
+             */
+            id: number;
+            /**
+             * Format: int64
+             * @description Titles on it that some library has now.
+             */
+            inLibrary: number;
+            /** @example Watchlist */
+            name: string;
+            /** @description The poster paths of its first four titles that have one, in its order: TMDB paths, as posterPath elsewhere. */
+            posters: string[];
+            /** @description A title leaves once the person finishes it: a movie when it is watched, a show when every episode in the library is. Off, watched titles stay. */
+            removeWatched: boolean;
+            /**
+             * Format: int64
+             * @description Titles on it, in the library or not.
+             */
+            titles: number;
+            /**
+             * Format: date-time
+             * @description When it was renamed or its titles last changed.
+             */
+            updatedAt: string;
+        };
+        WatchlistBody: {
+            /** @description Different from the person's other watchlists' names, whatever the case. */
+            name: string;
+            /** @description Remove titles once watched. On when left out. */
+            removeWatched?: boolean;
+        };
+        WatchlistList: {
+            /** @description In the order they were made. */
+            items: components["schemas"]["Watchlist"][];
+            /**
+             * Format: int64
+             * @description Most watchlists one person may have.
+             */
+            max: number;
+            /**
+             * Format: int64
+             * @description Most titles one watchlist holds.
+             */
+            maxTitles: number;
+        };
+        WatchlistTitleChange: {
+            /** @description saveToOnlyWatchlist: the person had none, and Watchlist was made for this save. */
+            created?: boolean;
+            /** @description removeFromWatchlists: the watchlists it was taken off, for Undo. */
+            removed?: number[];
+            /** @description saveToWatchlist, removeFromWatchlist and saveToOnlyWatchlist: the watchlist it was saved to or taken from, as it is now (for its name in Saved to Watchlist). */
+            watchlist?: components["schemas"]["Watchlist"];
+            /** @description The person's watchlists that hold the title now, in the order they were made: what MovieDetail.watchlists and ShowDetail.watchlists now say. */
+            watchlists: number[];
+        };
+        WatchlistTitleDetails: {
+            /**
+             * @description TMDB's poster path, as Requestable.posterPath. Kept only in TMDB's shape: a slash, then letters, digits, _ or -, then .jpg or .png.
+             * @example /kqjL17yufvn9OVLyXYpvtyrFfak.jpg
+             */
+            posterPath?: string;
+            /** @description Needed for a title the server has no record of: without one the save is refused. */
+            title?: string;
+            /**
+             * Format: int64
+             * @description Kept when it is between 1870 and 2100.
+             */
+            year?: number;
+        };
+        WatchlistsConflict: {
+            /**
+             * @description A human-readable explanation specific to this occurrence of the problem.
+             * @example Property foo is required but is missing.
+             */
+            detail?: string;
+            /** @description Optional list of individual error details */
+            errors?: components["schemas"]["ErrorDetail"][] | null;
+            /**
+             * Format: uri
+             * @description A URI reference that identifies the specific occurrence of the problem.
+             * @example https://example.com/error-log/abc123
+             */
+            instance?: string;
+            /**
+             * Format: int64
+             * @description HTTP status code
+             * @example 400
+             */
+            status?: number;
+            /**
+             * @description A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
+             * @example Bad Request
+             */
+            title?: string;
+            /**
+             * Format: uri
+             * @description A URI reference to human-readable documentation for the error.
+             * @default about:blank
+             * @example https://example.com/errors/example
+             */
+            type: string;
+            /** @description The person's watchlists, as listWatchlists sends them for this title (with contains): what the picker shows. */
+            watchlists: components["schemas"]["Watchlist"][];
         };
     };
     responses: never;
@@ -13043,6 +13278,10 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                /** @description added: a watchlist's own order, newest first, a title counting from when it reached the library if that was after it was saved (the default for a watchlist; other lists keep their order). title: by title. released: newest release (or first air date) first. From API level 33. */
+                sort?: "added" | "title" | "released";
+                /** @description Only movies or only shows; total and inLibrary count those. From API level 33. */
+                mediaType?: "movie" | "tv";
             };
             header?: never;
             path: {
@@ -14198,6 +14437,292 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RowLayout"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    saveToOnlyWatchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mediaType: "movie" | "tv";
+                /** @description The title's TMDB id. */
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["WatchlistTitleDetails"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistTitleChange"];
+                };
+            };
+            /** @description The person has two or more watchlists: choose one. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["WatchlistsConflict"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    removeFromWatchlists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mediaType: "movie" | "tv";
+                /** @description The title's TMDB id. */
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistTitleChange"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listWatchlists: {
+        parameters: {
+            query?: {
+                /** @description With tmdbId: each watchlist says whether it holds this title (contains), for the picker. */
+                mediaType?: "movie" | "tv";
+                /** @description The title's TMDB id, with mediaType. */
+                tmdbId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistList"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createWatchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Watchlist"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteWatchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The watchlist's ID. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateWatchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The watchlist's ID. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWatchlistInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Watchlist"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    saveToWatchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The watchlist's ID. */
+                id: number;
+                mediaType: "movie" | "tv";
+                /** @description The title's TMDB id: BrowseItem.tmdbId, MovieDetail.tmdbId, ShowDetail.tmdbId, MediaListEntry.tmdbId or Requestable.tmdbId. */
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["WatchlistTitleDetails"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistTitleChange"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    removeFromWatchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The watchlist's ID. */
+                id: number;
+                mediaType: "movie" | "tv";
+                /** @description The title's TMDB id: BrowseItem.tmdbId, MovieDetail.tmdbId, ShowDetail.tmdbId, MediaListEntry.tmdbId or Requestable.tmdbId. */
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistTitleChange"];
                 };
             };
             /** @description Error */

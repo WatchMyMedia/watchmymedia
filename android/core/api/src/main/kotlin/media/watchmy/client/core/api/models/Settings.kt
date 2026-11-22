@@ -59,6 +59,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param tmdbConfigured
  * @param turnstile
  * @param capabilities
+ * @param configFile Where this server reads its config file, when that is not config.yaml in the data folder (WATCHMYMEDIA_CONFIG, as the Linux packages set it). A backup holds it as config.yaml, and after a restore it goes back there. Absent otherwise and on older servers.
  * @param hardwareAdapters
  * @param hardwareDiagnostics Bounded results of transcoder probes, including failures. Admin-only; synthetic inputs, never library files.
  * @param hwDevice Requested adapter: a CUDA index for NVENC, the render node number for QSV and VAAPI on Linux (N is /dev/dri/renderD128+N), a DirectX index for QSV/AMF on Windows; absent means backend default.
@@ -118,6 +119,10 @@ data class Settings (
 
     @SerialName(value = "capabilities")
     val capabilities: Capabilities? = null,
+
+    /* Where this server reads its config file, when that is not config.yaml in the data folder (WATCHMYMEDIA_CONFIG, as the Linux packages set it). A backup holds it as config.yaml, and after a restore it goes back there. Absent otherwise and on older servers. */
+    @SerialName(value = "configFile")
+    val configFile: kotlin.String? = null,
 
     @SerialName(value = "hardwareAdapters")
     val hardwareAdapters: Inventory? = null,
