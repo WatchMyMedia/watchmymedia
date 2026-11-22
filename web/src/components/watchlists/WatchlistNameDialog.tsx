@@ -45,7 +45,7 @@ export function WatchlistNameDialog({ heading, confirmLabel, lists, self, busy, 
           aria-invalid={!!taken}
           aria-describedby={problem ? `${id}-err` : undefined}
           onChange={(e) => setName(e.target.value)}
-          className={`${nameInput} ${taken ? 'border-red-400' : 'border-line-2'}`}
+          className={nameInput}
         />
         {problem && (
           <p id={`${id}-err`} role="alert" className="mt-2 text-[13px] leading-snug text-red-300">

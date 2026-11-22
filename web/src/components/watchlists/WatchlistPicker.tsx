@@ -168,7 +168,7 @@ function WatchlistPicker({ target, title, align, onClose, anchor }: { target: Wa
                 setName(e.target.value)
                 picker.create.reset()
               }}
-              className={`${nameInput} ${taken ? 'border-red-400' : 'border-line-2'}`}
+              className={nameInput}
             />
             {(taken || picker.create.isError) && (
               <p id={`${id}-err`} role="alert" className="mt-2 text-[13px] leading-snug text-red-300">
