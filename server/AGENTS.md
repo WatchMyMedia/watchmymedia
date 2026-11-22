@@ -168,7 +168,8 @@ SQLite plans joins without statistics, and a plan that looks fine after
   every machine, with a connection that waits three times the retry).
 - `TestHomeSpeed` (`internal/api/home_speed_test.go`) seeds a library the size
   of the largest real one (about 2,850 movies, 1,100 shows, 18,700 files),
-  with ten 250-entry lists and three library lists on Home, and times each
+  with ten 250-entry lists, three library lists and five 500-title
+  watchlists on Home, checks the watchlists' query plans, and times each
   page alone and the web Home's requests as one burst, arranged and not;
   `TestRelatedSpeed` (`internal/api/related_speed_test.go`) gives it TMDB-like tags and times a movie's and a show's related rows, alone and ten at once, and checks their plans; `TestNewEpisodesSpeed` (`internal/api/follows_speed_test.go`) adds 500
   follows and a week of arrivals to it and times the new-episodes feed, the
