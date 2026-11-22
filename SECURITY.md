@@ -17,7 +17,7 @@ A reverse proxy terminates HTTPS; it does not sandbox ffmpeg or the native proce
 For a public server behind SWAG, trust only the proxy's actual connection address
 and firewall the backend port against other sources. Do not trust an entire LAN
 or Docker subnet merely because SWAG uses one address there. Follow the
-[deployment instructions](README.md#install) and test remote sign-in after changes.
+[deployment instructions](docs/remote-access.md#with-swag) and test remote sign-in after changes.
 
 Media files and library directories must come from trusted sources. Direct file
 streaming uses a confined filesystem root; scanners reject media symlinks and

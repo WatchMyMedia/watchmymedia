@@ -1,8 +1,8 @@
 # deploy/AGENTS.md
 
 Packaging, CI support and the test library. Read the root
-[AGENTS.md](../AGENTS.md) first; the README's Install section is the human
-instructions. Where `AGENTS.private.md` sits beside this file, read it too:
+[AGENTS.md](../AGENTS.md) first; [docs/install.md](../docs/install.md) is the
+human instructions. Where `AGENTS.private.md` sits beside this file, read it too:
 it covers releases, the downloads Worker and the CI runners.
 
 ## Layout
