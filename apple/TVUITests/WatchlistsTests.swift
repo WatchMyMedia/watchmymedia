@@ -20,10 +20,16 @@ final class WatchlistsTests: XCTestCase {
         let button = app.descendants(matching: .any)["watchlist-button"]
         XCTAssertTrue(button.waitUntilExists(timeout: 20), "the button is on the movie's page from level 33")
         XCTAssertEqual(button.label, "Watchlist, Dead Reckoning Bay")
-        // Along the row of buttons from Play.
-        for _ in 0..<5 where !button.hasFocus {
-            remote.press(.right)
-            _ = button.waitForFocus(timeout: 2)
+        // Down from the tab bar into the row of buttons (under the focused tab), then along it.
+        remote.press(.down)
+        let inPage = app.descendants(matching: .any).matching(NSPredicate(format: "hasFocus == true"))
+        for _ in 0..<6 where !button.hasFocus {
+            guard let current = inPage.allElementsBoundByIndex.first, current.frame.minY > 150 else {
+                _ = button.waitForFocus(timeout: 1)
+                continue
+            }
+            remote.press(current.frame.minX > button.frame.minX ? .left : .right)
+            _ = button.waitForFocus(timeout: 1)
         }
         XCTAssertTrue(button.waitForFocus(timeout: 5))
         remote.press(.select)

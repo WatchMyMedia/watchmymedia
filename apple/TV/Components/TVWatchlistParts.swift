@@ -114,8 +114,8 @@ struct TVWatchlistPicker: View {
                         }
                         .buttonStyle(SettingsRowStyle())
                         .focused($focus, equals: .row(row.id))
-                        .accessibilityLabel(row.name)
-                        .accessibilityValue(row.count)
+                        // The count in the label: a toggle's value is whether it is on.
+                        .accessibilityLabel("\(row.name), \(row.count)")
                         .accessibilityAddTraits(row.checked ? [.isToggle, .isSelected] : .isToggle)
                         .accessibilityIdentifier("watchlist-row-\(row.id)")
                     }
