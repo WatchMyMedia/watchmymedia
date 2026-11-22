@@ -94,7 +94,7 @@ public final class RowEditorModel {
     }
 
     /// Under a row in the list: "Built in", "For everyone · 18 of 50 · From TMDB",
-    /// "Hidden · Your list · From an import".
+    /// "Hidden · Your list · From an import", "Watchlist · 9 of 12".
     public func line(_ entry: RowLayoutEntry) -> String {
         let base: String
         switch entry.kind {
@@ -102,7 +102,8 @@ public final class RowEditorModel {
             base = entry.style == .live ? "Built in · On now" : "Built in"
         case .list:
             let list = entry.listID.flatMap { lists[$0] }
-            base = [listOwnerLine(entry.owner ?? list?.owner), list?.shortCount, list?.sourceLine].compactMap { $0 }.joined(separator: " · ")
+            let owner = list?.isWatchlist == true ? WatchlistWords.kicker : listOwnerLine(entry.owner ?? list?.owner)
+            base = [owner, list?.shortCount, list?.sourceLine].compactMap { $0 }.joined(separator: " · ")
         }
         return entry.hidden ? (base.isEmpty ? "Hidden" : "Hidden · \(base)") : base
     }
@@ -111,6 +112,7 @@ public final class RowEditorModel {
     public func addLine(_ entry: RowLayoutEntry) -> String {
         guard entry.kind == .list else { return "Built in" }
         let list = entry.listID.flatMap { lists[$0] }
+        if list?.isWatchlist == true { return [WatchlistWords.kicker, list?.shortCount].compactMap { $0 }.joined(separator: " · ") }
         return [list?.shortCount, list?.sourceLine, list.flatMap { listMediaTypeLine($0.mediaType) }].compactMap { $0 }.joined(separator: " · ")
     }
 

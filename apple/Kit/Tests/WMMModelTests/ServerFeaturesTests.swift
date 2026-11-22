@@ -31,6 +31,7 @@ import WMMModel
         ("liveStatusWaits", 28, "mediaToken", { $0.liveStatusWaits }),
         ("follows", 29, "following shows", { $0.follows }),
         ("related", 30, "related titles", { $0.related }),
+        ("watchlists", 33, "watchlists", { $0.watchlists }),
     ]
 
     @Test(arguments: table.indices)

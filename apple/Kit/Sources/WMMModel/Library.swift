@@ -62,8 +62,13 @@ public struct BrowseItem: Hashable, Sendable, Identifiable {
     public var episodeID: Int?
     /// That episode's season.
     public var seasonNumber: Int?
+    /// The title's TMDB id, which a card's menu saves it to a watchlist by;
+    /// nil for a title TMDB hasn't matched, and from older servers.
+    public var tmdbID: Int?
+    /// On one of the person's watchlists, as the server read it.
+    public var watchlisted: Bool
 
-    public init(kind: ItemKind, id: Int, libraryID: Int, title: String, year: Int? = nil, overview: String = "", genres: [String] = [], rating: Double? = nil, posterPath: String? = nil, backdropPath: String? = nil, quality: QualityLabel? = nil, hdr: Bool = false, isNew: Bool = false, subtitle: String? = nil, watched: Bool = false, progress: Double? = nil, episodeCount: Int? = nil, runtimeMin: Int? = nil, releaseDate: String? = nil, fileName: String? = nil, fileCount: Int? = nil, episodeID: Int? = nil, seasonNumber: Int? = nil) {
+    public init(kind: ItemKind, id: Int, libraryID: Int, title: String, year: Int? = nil, overview: String = "", genres: [String] = [], rating: Double? = nil, posterPath: String? = nil, backdropPath: String? = nil, quality: QualityLabel? = nil, hdr: Bool = false, isNew: Bool = false, subtitle: String? = nil, watched: Bool = false, progress: Double? = nil, episodeCount: Int? = nil, runtimeMin: Int? = nil, releaseDate: String? = nil, fileName: String? = nil, fileCount: Int? = nil, episodeID: Int? = nil, seasonNumber: Int? = nil, tmdbID: Int? = nil, watchlisted: Bool = false) {
         self.kind = kind
         self.id = id
         self.libraryID = libraryID
@@ -87,6 +92,8 @@ public struct BrowseItem: Hashable, Sendable, Identifiable {
         self.fileCount = fileCount
         self.episodeID = episodeID
         self.seasonNumber = seasonNumber
+        self.tmdbID = tmdbID
+        self.watchlisted = watchlisted
     }
 }
 
@@ -477,8 +484,10 @@ public struct ShowDetail: Hashable, Sendable, Identifiable {
     public var managedBy: String?
     /// The signed-in person follows the show (Notify me); nil from servers below API level 29.
     public var following: Bool?
+    /// The person's watchlists that hold the show; nil from servers without watchlists.
+    public var watchlists: [Int]?
 
-    public init(id: Int, libraryID: Int, title: String, year: Int?, overview: String, status: String?, genres: [String], rating: Double?, posterPath: String?, backdropPath: String?, quality: QualityLabel?, hdr: Bool, seasons: [SeasonSummary], totalEpisodes: Int, episodesOnDisk: Int, totalSizeBytes: Int64, nextAirDate: String?, nextUp: NextUp?, cast: [Person], contentRating: String? = nil, tmdbID: Int? = nil, managedBy: String? = nil, following: Bool? = nil) {
+    public init(id: Int, libraryID: Int, title: String, year: Int?, overview: String, status: String?, genres: [String], rating: Double?, posterPath: String?, backdropPath: String?, quality: QualityLabel?, hdr: Bool, seasons: [SeasonSummary], totalEpisodes: Int, episodesOnDisk: Int, totalSizeBytes: Int64, nextAirDate: String?, nextUp: NextUp?, cast: [Person], contentRating: String? = nil, tmdbID: Int? = nil, managedBy: String? = nil, following: Bool? = nil, watchlists: [Int]? = nil) {
         self.id = id
         self.libraryID = libraryID
         self.title = title
@@ -502,6 +511,7 @@ public struct ShowDetail: Hashable, Sendable, Identifiable {
         self.tmdbID = tmdbID
         self.managedBy = managedBy
         self.following = following
+        self.watchlists = watchlists
     }
 
     /// Not ended: the server says "Returning Series", "In Production" and so on.
@@ -685,8 +695,12 @@ public struct MovieDetail: Hashable, Sendable, Identifiable {
     public var download: QueueDownload?
     /// Its trailers, best first: files in the library, then YouTube's.
     public var trailers: [MovieTrailer]
+    /// The movie's TMDB id, which a watchlist keeps it by; nil while TMDB hasn't matched it.
+    public var tmdbID: Int?
+    /// The person's watchlists that hold the movie; nil from servers without watchlists.
+    public var watchlists: [Int]?
 
-    public init(id: Int, libraryID: Int, title: String, year: Int?, tagline: String?, overview: String, releaseDate: String?, runtimeMin: Int?, genres: [String], rating: Double?, posterPath: String?, backdropPath: String?, quality: QualityLabel?, hdr: Bool, versions: [MediaVersion], cast: [Person], watch: WatchProgress?, contentRating: String? = nil, managedBy: String? = nil, download: QueueDownload? = nil, trailers: [MovieTrailer] = []) {
+    public init(id: Int, libraryID: Int, title: String, year: Int?, tagline: String?, overview: String, releaseDate: String?, runtimeMin: Int?, genres: [String], rating: Double?, posterPath: String?, backdropPath: String?, quality: QualityLabel?, hdr: Bool, versions: [MediaVersion], cast: [Person], watch: WatchProgress?, contentRating: String? = nil, managedBy: String? = nil, download: QueueDownload? = nil, trailers: [MovieTrailer] = [], tmdbID: Int? = nil, watchlists: [Int]? = nil) {
         self.id = id
         self.libraryID = libraryID
         self.title = title
@@ -708,6 +722,8 @@ public struct MovieDetail: Hashable, Sendable, Identifiable {
         self.managedBy = managedBy
         self.download = download
         self.trailers = trailers
+        self.tmdbID = tmdbID
+        self.watchlists = watchlists
     }
 
     public var watched: Bool { watch?.completed ?? false }

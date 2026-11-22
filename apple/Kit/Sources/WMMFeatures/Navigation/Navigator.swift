@@ -61,6 +61,8 @@ public enum Route: Hashable, Sendable, Codable {
     case liveSearch
     /// A list's page: every title on it, in rank order, from a list row's See all.
     case mediaList(id: Int)
+    /// The person's watchlists, from the account menu.
+    case watchlists
 }
 
 /// One player presentation, with separate domain targets and lifecycles.
@@ -264,6 +266,9 @@ public final class Navigator {
         case .mediaList(let id):
             closePlayer()
             open(.mediaList(id: id))
+        case .watchlists:
+            closePlayer()
+            open(.watchlists)
         case .linkTV(let code):
             closePlayer()
             tab = .settings

@@ -356,7 +356,7 @@ private final class RefusingRows: RowsRepository {
     func resetLayout(_ screen: RowScreen) async throws -> RowLayout { try await fake.resetLayout(screen) }
     func lists() async throws -> [MediaList] { [] }
     func list(id: Int) async throws -> MediaList { try await fake.list(id: id) }
-    func entries(listID: Int, offset: Int, limit: Int) async throws -> MediaListEntries { try await fake.entries(listID: listID, offset: offset, limit: limit) }
+    func entries(listID: Int, offset: Int, limit: Int, sort: ListSort?, mediaType: MediaType?) async throws -> MediaListEntries { try await fake.entries(listID: listID, offset: offset, limit: limit, sort: sort, mediaType: mediaType) }
     func refresh(listID: Int) async throws -> MediaList { try await fake.refresh(listID: listID) }
     func delete(listID: Int) async throws {}
     func changes() -> AsyncStream<Void> { AsyncStream { _ in } }

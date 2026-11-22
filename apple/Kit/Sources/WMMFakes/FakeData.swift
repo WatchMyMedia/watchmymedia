@@ -58,7 +58,7 @@ public enum FakeData {
             overview: "A storm closes the harbour for the first time in forty years, and the town has one night to find out who moved the channel markers.",
             genres: s.genres, rating: 7.0 + Double(i % 20) / 10, backdropPath: FakeBackdrops.path(for: s.title), quality: s.q, hdr: s.hdr, isNew: s.isNew,
             subtitle: "\(s.year) · \(plural(s.seasons, "season"))", watched: s.watched, progress: s.pct,
-            episodeCount: s.seasons * 8
+            episodeCount: s.seasons * 8, tmdbID: tmdbID(showID: 100 + i)
         )
     }
 
@@ -67,7 +67,7 @@ public enum FakeData {
             kind: .movie, id: 500 + i, libraryID: movieLibrary, title: m.title, year: m.year,
             overview: "A salvage crew finds a ship that sank twice, and only one of them remembers the first time.",
             genres: m.genres, rating: 6.5 + Double(i % 30) / 10, backdropPath: FakeBackdrops.path(for: m.title), quality: m.q, hdr: m.q == "4K", isNew: m.isNew,
-            watched: i == 6, progress: i == 1 ? 0.66 : nil, runtimeMin: m.runtime, releaseDate: m.released
+            watched: i == 6, progress: i == 1 ? 0.66 : nil, runtimeMin: m.runtime, releaseDate: m.released, tmdbID: tmdbID(movieID: 500 + i)
         )
     }
 
@@ -164,6 +164,8 @@ public enum FakeData {
 
     /// The show TMDB knows as `tmdbID` in the fakes: a library show's is 70000 + its ID.
     public static func tmdbID(showID: Int) -> Int { 70_000 + showID }
+    /// The movie TMDB knows as `tmdbID` in the fakes: a library movie's is 80000 + its ID.
+    public static func tmdbID(movieID: Int) -> Int { 80_000 + movieID }
 
     /// Harbor Lights' season 2 is missing its first three episodes, each for
     /// another reason: not monitored, downloading, and
@@ -339,7 +341,8 @@ public enum FakeData {
             watch: m.progress.map { WatchProgress(positionMs: Int($0 * Double(runtime * 60_000)), durationMs: runtime * 60_000, completed: false) }
                 ?? (m.watched ? WatchProgress(positionMs: 0, durationMs: runtime * 60_000, completed: true) : nil),
             contentRating: movieRows[index].cert,
-            trailers: trailers(movieID: m.id)
+            trailers: trailers(movieID: m.id),
+            tmdbID: tmdbID(movieID: m.id)
         )
     }
 

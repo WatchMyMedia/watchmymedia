@@ -61,6 +61,8 @@ public struct ServerFeatures: Hashable, Sendable {
         public static let follows = 29
         /// Related titles at the end of movie and show pages.
         public static let related = 30
+        /// Watchlists: titles a person saves to watch later.
+        public static let watchlists = 33
     }
 
     /// The server's API level; 0 when it isn't known.
@@ -119,6 +121,8 @@ public struct ServerFeatures: Hashable, Sendable {
     public var follows: Bool { apiLevel >= Level.follows }
     /// 30: related titles, the rows at the end of a movie's or a show's page.
     public var related: Bool { apiLevel >= Level.related }
+    /// 33: watchlists, the Watchlist button and the menus' Add to Watchlist.
+    public var watchlists: Bool { apiLevel >= Level.watchlists }
 }
 
 extension Server {
@@ -172,3 +176,4 @@ public let decisionTokenAPILevel = ServerFeatures.Level.tokenWithDecision
 public let followsAPILevel = ServerFeatures.Level.follows
 /// ``ServerFeatures/Level/related``.
 public let relatedAPILevel = ServerFeatures.Level.related
+public let watchlistsAPILevel = ServerFeatures.Level.watchlists

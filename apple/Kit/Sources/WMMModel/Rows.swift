@@ -221,8 +221,10 @@ public struct MediaList: Hashable, Sendable, Identifiable {
     public var createdAt: Date?
     /// A link to the list on its source's site, when it has one.
     public var url: URL?
+    /// A watchlist: titles leave once they are watched.
+    public var removeWatched: Bool
 
-    public init(id: Int, name: String, mediaType: String = "movie", sourceKind: String, sourceName: String? = nil, owner: RowLayoutEntry.Owner? = .me, canEdit: Bool = true, screen: RowScreen? = .home, limit: Int = 50, entries: Int = 0, inLibrary: Int = 0, notFound: Int = 0, fetching: Bool = false, fetchedAt: Date? = nil, nextFetchAt: Date? = nil, error: String? = nil, errorAt: Date? = nil, createdAt: Date? = nil, url: URL? = nil) {
+    public init(id: Int, name: String, mediaType: String = "movie", sourceKind: String, sourceName: String? = nil, owner: RowLayoutEntry.Owner? = .me, canEdit: Bool = true, screen: RowScreen? = .home, limit: Int = 50, entries: Int = 0, inLibrary: Int = 0, notFound: Int = 0, fetching: Bool = false, fetchedAt: Date? = nil, nextFetchAt: Date? = nil, error: String? = nil, errorAt: Date? = nil, createdAt: Date? = nil, url: URL? = nil, removeWatched: Bool = false) {
         self.id = id
         self.name = name
         self.mediaType = mediaType
@@ -242,10 +244,15 @@ public struct MediaList: Hashable, Sendable, Identifiable {
         self.errorAt = errorAt
         self.createdAt = createdAt
         self.url = url
+        self.removeWatched = removeWatched
     }
 
-    /// The server fetches it from TMDB or MDBList, so Refresh now can ask again.
-    public var refreshable: Bool { nextFetchAt != nil || sourceKind == "tmdb" || sourceKind == "mdblist" }
+    /// A person's watchlist: titles saved by hand, never fetched.
+    public var isWatchlist: Bool { sourceKind == watchlistSourceKind }
+
+    /// The server fetches it from TMDB or MDBList, so Refresh now can ask
+    /// again. Never a watchlist, whatever a server says of its next fetch.
+    public var refreshable: Bool { !isWatchlist && (nextFetchAt != nil || sourceKind == "tmdb" || sourceKind == "mdblist") }
 }
 
 /// One title on a list, in the list's order.
@@ -265,8 +272,12 @@ public struct MediaListEntry: Hashable, Sendable, Identifiable {
     /// What Request would do, when the person may request; nil when requests
     /// aren't set up or the state is one this app doesn't know.
     public var requestState: Requestable.State?
+    /// On one of the person's watchlists, as the server read it.
+    public var watchlisted: Bool
+    /// A watchlist's: when the title was saved.
+    public var addedAt: Date?
 
-    public init(rank: Int, mediaType: MediaType?, tmdbID: Int?, title: String, year: Int? = nil, posterPath: String? = nil, found: Bool = true, item: BrowseItem? = nil, requestState: Requestable.State? = nil) {
+    public init(rank: Int, mediaType: MediaType?, tmdbID: Int?, title: String, year: Int? = nil, posterPath: String? = nil, found: Bool = true, item: BrowseItem? = nil, requestState: Requestable.State? = nil, watchlisted: Bool = false, addedAt: Date? = nil) {
         self.rank = rank
         self.mediaType = mediaType
         self.tmdbID = tmdbID
@@ -276,6 +287,8 @@ public struct MediaListEntry: Hashable, Sendable, Identifiable {
         self.found = found
         self.item = item
         self.requestState = requestState
+        self.watchlisted = watchlisted
+        self.addedAt = addedAt
     }
 
     public var id: Int { rank }
@@ -330,8 +343,10 @@ public protocol RowsRepository: AnyObject {
 
     func list(id: Int) async throws -> MediaList
 
-    /// Up to `limit` entries from `offset`, in rank order.
-    func entries(listID: Int, offset: Int, limit: Int) async throws -> MediaListEntries
+    /// Up to `limit` entries from `offset`, in rank order, or a watchlist's
+    /// in `sort`'s; with `mediaType`, only movies or only shows (servers from
+    /// the watchlists' level; older ones send every entry in rank order).
+    func entries(listID: Int, offset: Int, limit: Int, sort: ListSort?, mediaType: MediaType?) async throws -> MediaListEntries
 
     /// Fetches the list again now.
     func refresh(listID: Int) async throws -> MediaList
@@ -342,6 +357,18 @@ public protocol RowsRepository: AnyObject {
     /// lists.changed, or a change made here), so screens refetch. Each call is
     /// a new listener; it ends when the task is cancelled.
     func changes() -> AsyncStream<Void>
+}
+
+extension RowsRepository {
+    /// Up to `limit` entries from `offset`, in the list's own order.
+    public func entries(listID: Int, offset: Int, limit: Int) async throws -> MediaListEntries {
+        try await entries(listID: listID, offset: offset, limit: limit, sort: nil, mediaType: nil)
+    }
+}
+
+/// How a list's page is sorted: a watchlist's newest first, by title, or newest release first.
+public enum ListSort: String, Hashable, Sendable, CaseIterable {
+    case added, title, released
 }
 
 /// A server below ``rowsAPILevel``, or nobody signed in.
@@ -357,7 +384,7 @@ public final class UnavailableRows: RowsRepository {
     public func resetLayout(_ screen: RowScreen) async throws -> RowLayout { throw UnavailableRows.tooOld }
     public func lists() async throws -> [MediaList] { [] }
     public func list(id: Int) async throws -> MediaList { throw UnavailableRows.tooOld }
-    public func entries(listID: Int, offset: Int, limit: Int) async throws -> MediaListEntries { throw UnavailableRows.tooOld }
+    public func entries(listID: Int, offset: Int, limit: Int, sort: ListSort?, mediaType: MediaType?) async throws -> MediaListEntries { throw UnavailableRows.tooOld }
     public func refresh(listID: Int) async throws -> MediaList { throw UnavailableRows.tooOld }
     public func delete(listID: Int) async throws { throw UnavailableRows.tooOld }
     public func changes() -> AsyncStream<Void> { AsyncStream { _ in } }
