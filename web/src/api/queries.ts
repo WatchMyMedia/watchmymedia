@@ -517,11 +517,15 @@ export const mediaListQuery = (id: number) =>
     refetchInterval: (q) => (q.state.data?.fetching ? 3_000 : false),
   })
 
-/** A page of a list's titles in rank order, with the library's item where it has one. */
-export const mediaListEntriesQuery = (id: number, offset: number, limit: number) =>
+/**
+ * A page of a list's titles in rank order, with the library's item where it
+ * has one. A watchlist's can be sorted and narrowed to movies or shows; its
+ * default order is newest saved first.
+ */
+export const mediaListEntriesQuery = (id: number, offset: number, limit: number, view: { sort?: 'added' | 'title' | 'released'; mediaType?: 'movie' | 'tv' } = {}) =>
   queryOptions({
-    queryKey: ['lists', id, 'entries', { offset, limit }],
-    queryFn: async () => unwrap(await api.GET('/api/lists/{id}/entries', { params: { path: { id }, query: { offset, limit } } })),
+    queryKey: ['lists', id, 'entries', { offset, limit, sort: view.sort, mediaType: view.mediaType }],
+    queryFn: async () => unwrap(await api.GET('/api/lists/{id}/entries', { params: { path: { id }, query: { offset, limit, sort: view.sort, mediaType: view.mediaType } } })),
     placeholderData: (prev) => prev,
   })
 

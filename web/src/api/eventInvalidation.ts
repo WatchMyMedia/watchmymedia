@@ -4,6 +4,7 @@ import { invalidatePlexState, plexHistoryEventInvalidator, resetPlexHistoryPages
 import { authScope } from '../lib/authScope'
 import { invalidatePersonalLiveTV, invalidateRecordings, invalidateRowsAndLists } from './queries'
 import { invalidateFollows } from './follows'
+import { invalidateWatchlists } from './watchlists'
 
 /** A server event's name and what it refetches, given the event's parsed data. */
 export type EventInvalidations = Readonly<Record<string, (data: unknown) => void>>
@@ -70,9 +71,17 @@ export function eventInvalidations(qc: QueryClient): EventInvalidations {
     'live.recordings.changed': () => invalidateRecordings(qc),
     // This person's rows were arranged on another device, or an admin changed
     // the household's default; a list was made, changed or deleted, or a fetch
-    // changed what is on it.
-    'rows.changed': () => invalidateRowsAndLists(qc),
-    'lists.changed': () => invalidateRowsAndLists(qc),
+    // changed what is on it. A watchlist is a list: made, renamed or deleted
+    // sends rows.changed, and a title saved or removed (watching it included)
+    // lists.changed, so the watchlists and an open title page's button redraw.
+    'rows.changed': () => {
+      invalidateRowsAndLists(qc)
+      invalidateWatchlists(qc)
+    },
+    'lists.changed': () => {
+      invalidateRowsAndLists(qc)
+      invalidateWatchlists(qc)
+    },
     // This person followed or stopped following a show, here or on another
     // device: the bell, Settings › Notifications and Home's row redraw.
     'follows.changed': () => invalidateFollows(qc),
