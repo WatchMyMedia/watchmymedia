@@ -23,6 +23,9 @@ const (
 	KindMDBList = "mdblist"
 	KindLibrary = "library"
 	KindImport  = "import"
+	// KindWatchlist is one of a person's watchlists (watchlist.go), which
+	// they change by hand: no source fetches it.
+	KindWatchlist = "watchlist"
 )
 
 // Kinds are every source, in the order the builder offers them.
@@ -103,6 +106,9 @@ type Entry struct {
 	Title      string
 	Year       int64
 	PosterPath string
+	// AddedAt is when a watchlist's title was saved; other lists' entries
+	// have none.
+	AddedAt string
 }
 
 // Found is whether the entry has a TMDB ID, which matches it to the library.

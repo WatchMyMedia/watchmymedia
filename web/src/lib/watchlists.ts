@@ -110,6 +110,19 @@ export function failureWords(error: unknown, fallback: string): string {
   return e?.status === 422 && typeof e.message === 'string' && e.message ? e.message : fallback
 }
 
+export function saveFailedWords(name: string): string {
+  return `Couldn’t save to ${name}.`
+}
+
+export function removeFailedWords(name: string): string {
+  return `Couldn’t remove from ${name}.`
+}
+
+/** "12 titles" beside a watchlist's check in the picker. */
+export function titlesWords(n: number): string {
+  return titles(n)
+}
+
 /** In the picker at the limit, in place of New watchlist…. */
 export function limitWords(max = MAX_WATCHLISTS): string {
   return `You have ${max} watchlists, the most you can make.`

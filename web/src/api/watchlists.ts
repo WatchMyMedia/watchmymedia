@@ -376,7 +376,7 @@ export type PressOutcome =
  * requestable title. label is the button's ("On Watchlist") with the ids,
  * and the action's ("Add to Watchlist") without them.
  */
-export function useWatchlistPress(t: WatchlistTarget | undefined, known: { holding?: readonly number[]; watchlisted?: boolean }, onFailed?: (error: unknown) => void) {
+export function useWatchlistPress(t: WatchlistTarget | undefined, known: { holding?: readonly number[]; watchlisted?: boolean }, onFailed?: (error: unknown, change: { name: string; remove: boolean }) => void) {
   const qc = useQueryClient()
   const lists = useQuery(watchlistsQuery)
   useHeldRemovals()
@@ -389,14 +389,15 @@ export function useWatchlistPress(t: WatchlistTarget | undefined, known: { holdi
     if (action === 'picker') return { kind: 'picker' }
     if (action === 'remove') {
       const name = (holding?.length === 1 && items?.find((w) => w.id === holding[0])?.name) || onlyName(items)
-      const h = holdRemoval(qc, t, undefined, onFailed)
+      const h = holdRemoval(qc, t, undefined, (e) => onFailed?.(e, { name, remove: true }))
       return { kind: 'removed', name, undo: h.undo, commit: h.commit }
     }
     try {
       const r = await saveTitleToOnly(qc, t)
       if ('picker' in r) return { kind: 'picker' }
       const w = r.change.watchlist
-      return { kind: 'saved', name: w?.name ?? FIRST_WATCHLIST, undo: () => (w ? removeTitle(qc, t, w.id) : removeTitleFromAll(qc, t)).catch((e: unknown) => onFailed?.(e)) }
+      const name = w?.name ?? FIRST_WATCHLIST
+      return { kind: 'saved', name, undo: () => (w ? removeTitle(qc, t, w.id) : removeTitleFromAll(qc, t)).catch((e: unknown) => onFailed?.(e, { name, remove: true })) }
     } catch (error) {
       return { kind: 'failed', error }
     }

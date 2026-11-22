@@ -15,6 +15,7 @@ import (
 	"watchmymedia/server/internal/auth"
 	"watchmymedia/server/internal/db"
 	"watchmymedia/server/internal/library"
+	"watchmymedia/server/internal/lists"
 )
 
 // Row kinds in a layout (RowLayoutEntry.kind).
@@ -112,9 +113,10 @@ type screenCat struct {
 	libs []db.Library
 	user *auth.User
 	// builtins are in their default order; own are the lists made on this
-	// screen, newest first; other the other lists allowed here.
-	builtins, own, other []rowDef
-	byID                 map[string]rowDef
+	// screen, newest first; other the other lists allowed here; watchlists
+	// the person's, in the order made, which every screen shows.
+	builtins, own, other, watchlists []rowDef
+	byID                             map[string]rowDef
 }
 
 // entryTypes are the entry media types the screen shows: a library's own,
@@ -204,9 +206,12 @@ func catalogue(ctx context.Context, deps Deps, ref screenRef, user *auth.User) (
 		if l.OwnerID != nil {
 			d.Owner = "me"
 		}
-		if l.Screen == ref.Name {
+		switch {
+		case lists.IsWatchlist(*l):
+			c.watchlists = slices.Insert(c.watchlists, 0, d)
+		case l.Screen == ref.Name:
 			c.own = append(c.own, d)
-		} else {
+		default:
 			c.other = append(c.other, d)
 		}
 		c.byID[d.ID] = d
@@ -215,6 +220,29 @@ func catalogue(ctx context.Context, deps Deps, ref screenRef, user *auth.User) (
 }
 
 func listRowID(id int64) string { return listRowPrefix + strconv.FormatInt(id, 10) }
+
+// defaultOrder is the screen's rows in their default order: the built-in
+// rows, with the person's watchlists, in the order they were made, after
+// New from shows you follow on Home (else after Continue watching, else
+// first) and first on a library's screen. They are placed in a saved
+// layout as a built-in row is: one made since goes after the row before
+// it in this order, shown.
+func (c screenCat) defaultOrder() []string {
+	return withWatchlists(c.ids(c.builtins), c.ids(c.watchlists), c.ref.LibraryID == 0)
+}
+
+func withWatchlists(builtins, watchlists []string, home bool) []string {
+	at := 0
+	if home {
+		for _, id := range []string{rowFollowed, rowContinue} {
+			if i := slices.Index(builtins, id); i >= 0 {
+				at = i + 1
+				break
+			}
+		}
+	}
+	return slices.Concat(builtins[:at], watchlists, builtins[at:])
+}
 
 // liveRowAvailable is whether Live TV is set up for user: a tuner is on
 // and the person may watch (for the household default, anyone may).
@@ -360,7 +388,7 @@ type placedRow struct {
 // the screen has now. customized says the order is the person's own (or,
 // for the household default, an admin's).
 func arrange(ctx context.Context, deps Deps, c screenCat) (rows []placedRow, customized bool, err error) {
-	builtins, own, other := c.ids(c.builtins), c.ids(c.own), c.ids(c.other)
+	builtins, own, other := c.defaultOrder(), c.ids(c.own), c.ids(c.other)
 	household, hasHousehold, err := householdRows(ctx, deps, c.ref)
 	if err != nil {
 		return nil, false, err
@@ -437,6 +465,8 @@ func layoutEntries(rows []placedRow, counts map[int64]listCounts) []RowLayoutEnt
 			e.Note = "Nothing in the library matches this list's filter"
 		case r.List != nil && n.entries == 0 && r.List.Error != nil:
 			e.Note = "This list couldn't be fetched: " + *r.List.Error
+		case r.List != nil && n.inLibrary == 0 && lists.IsWatchlist(*r.List):
+			e.Note = "None of these are in your library yet"
 		case r.List != nil && n.inLibrary == 0:
 			e.Note = "Nothing from this list is in your library yet"
 		case r.ID == rowFollowed && r.Kind == rowKindBuiltin:
@@ -584,8 +614,21 @@ func signedInUser(ctx context.Context) *auth.User {
 }
 
 // homeRows is Home's arranged rows from the fixed rows in h, which were
-// filled for wants, and the person's followed episodes.
+// filled for wants, and the person's followed episodes. While Continue
+// watching is drawn, the watchlists' rows leave out what it shows.
 func homeRows(ctx context.Context, deps Deps, c screenCat, rows []placedRow, entries []RowLayoutEntry, h HomeData, followed []EpisodeCard, data listData) ([]ScreenRow, error) {
+	for _, e := range entries {
+		if e.ID == rowContinue && e.Kind == rowKindBuiltin && e.Shown {
+			var ls []*db.MediaList
+			for _, r := range rows {
+				if r.List != nil {
+					ls = append(ls, r.List)
+				}
+			}
+			data = data.without(ls, h.ContinueWatching)
+			break
+		}
+	}
 	return arrangedRows(ctx, deps, c, rows, entries, data, func(id string) (ScreenRow, bool) {
 		switch id {
 		case rowContinue:

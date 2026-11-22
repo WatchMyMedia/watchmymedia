@@ -21,10 +21,13 @@ SELECT * FROM media_lists WHERE owner_id IS NULL ORDER BY id DESC;
 SELECT * FROM media_lists ORDER BY id;
 
 -- name: CountOwnedMediaLists :one
-SELECT COUNT(*) FROM media_lists WHERE owner_id = ?;
+-- A person's lists, against the lists' limit, which leaves watchlists out:
+-- they have their own.
+SELECT COUNT(*) FROM media_lists WHERE owner_id = ? AND source_kind != 'watchlist';
 
 -- name: CountMediaLists :one
-SELECT COUNT(*) FROM media_lists;
+-- The server's lists, against its limit, leaving watchlists out.
+SELECT COUNT(*) FROM media_lists WHERE source_kind != 'watchlist';
 
 -- name: UpdateMediaList :one
 UPDATE media_lists
@@ -96,8 +99,11 @@ GROUP BY list_id, media_type;
 -- few a row draws. The + keeps media_type from being an index term: with
 -- two or more lists in the slice and no statistics, the planner otherwise
 -- reads every list's movie entries through media_list_entries_tmdb_idx
--- rather than these lists' through the primary key.
-SELECT e.list_id, e.rank, m.id, m.library_id
+-- rather than these lists' through the primary key. saved_at is when a
+-- watchlist's title was saved, arrived_at when the movie's first present
+-- file came: a watchlist's row puts what arrived after it was saved first.
+SELECT e.list_id, e.rank, m.id, m.library_id, e.added_at AS saved_at,
+    CAST((SELECT MIN(f.added_at) FROM media_files f WHERE f.movie_id = m.id AND f.status = 'present') AS TEXT) AS arrived_at
 FROM media_list_entries e
 CROSS JOIN movies m ON m.tmdb_id = e.tmdb_id
 WHERE e.list_id IN (sqlc.slice(ids)) AND +e.media_type = 'movie'
@@ -106,8 +112,13 @@ ORDER BY e.list_id, e.rank, m.library_id, m.id;
 
 -- name: ListMediaListShowRanks :many
 -- ListMediaListMovieRanks for shows: a show counts once it has an episode
--- with a present file, and the same + on media_type.
-SELECT e.list_id, e.rank, s.id, s.library_id
+-- with a present file, and the same + on media_type. A show arrived with
+-- its first episode file, not its newest.
+SELECT e.list_id, e.rank, s.id, s.library_id, e.added_at AS saved_at,
+    CAST((SELECT MIN(f.added_at) FROM episodes ep
+        CROSS JOIN episode_files ef ON ef.episode_id = ep.id
+        CROSS JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
+        WHERE ep.show_id = s.id) AS TEXT) AS arrived_at
 FROM media_list_entries e
 CROSS JOIN shows s ON s.tmdb_id = e.tmdb_id
 WHERE e.list_id IN (sqlc.slice(ids)) AND +e.media_type = 'tv'
@@ -120,7 +131,7 @@ ORDER BY e.list_id, e.rank, s.library_id, s.id;
 
 -- name: ListMovieCardsByIDs :many
 -- ListMovieItems for some movies, in any library, for list rows.
-SELECT m.id, m.library_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
+SELECT m.id, m.library_id, m.tmdb_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
     m.poster_path, m.backdrop_path, m.content_rating,
     COUNT(f.id) AS file_count,
     MAX(f.added_at) AS added_at,
@@ -134,7 +145,7 @@ GROUP BY m.id;
 
 -- name: ListShowCardsByIDs :many
 -- ListShowItems for some shows, in any library, for list rows.
-SELECT s.id, s.library_id, s.title, s.year, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path,
+SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path,
     s.last_air_date, s.next_air_date, s.content_rating,
     COUNT(DISTINCT e.id) AS episode_count,
     MAX(f.added_at) AS added_at,

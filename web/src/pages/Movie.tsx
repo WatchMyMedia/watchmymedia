@@ -18,6 +18,8 @@ import type { components } from '../api/schema'
 import { ReportProblemDialog } from '../components/ReportProblemDialog'
 import { downloadLabel, toneText } from '../lib/requests'
 import { firstTrailer } from '../lib/trailers'
+import { watchlistTitle } from '../lib/watchlists'
+import { WatchlistButton } from '../components/watchlists/WatchlistButton'
 
 export function Movie({ movieId }: { movieId: number }) {
   const movie = useQuery(movieQuery(movieId))
@@ -41,6 +43,8 @@ export function Movie({ movieId }: { movieId: number }) {
   const label = `${m.title}${m.year ? ` (${m.year})` : ''}`
   // Trailer plays the first trailer the server lists that this app can play.
   const trailer = firstTrailer(m.trailers)
+  // A title TMDB hasn't matched can't be saved: watchlists keep titles by TMDB id.
+  const saving = watchlistTitle('movie', m.tmdbId)
   return (
     <div className="space-y-8">
       <DetailHeader
@@ -86,6 +90,7 @@ export function Movie({ movieId }: { movieId: number }) {
                 </SecondaryButton>
               </Link>
             )}
+            {saving && <WatchlistButton target={saving} title={m.title} holding={m.watchlists ?? []} />}
             <SecondaryButton disabled={mark.isPending} onClick={() => mark.mutate({ type: 'movie', id: m.id, watched: !m.watch?.completed })}>
               {m.watch?.completed ? '✓ Watched' : 'Mark watched'}
             </SecondaryButton>

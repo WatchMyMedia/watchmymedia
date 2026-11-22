@@ -18,6 +18,7 @@ import { serverCastsLive } from './lib/liveCast'
 import { isSettingsFlow } from './lib/settingsRoutes'
 import { AppPrompt, GetAppMenu } from './components/GetApp'
 import { appPrompt, showsGetAppMenu } from './lib/getApp'
+import { ToastHost } from './components/Toast'
 
 export function Layout() {
   const auth = useAuth()
@@ -75,7 +76,7 @@ function Shell() {
   const notices = <Notices banner={!player} />
   if (player) return <><Outlet />{notices}</>
   // A Settings task is focused: it draws its own bar with Exit.
-  if (isSettingsFlow(path)) return <><><Outlet /><CastBar /></>{notices}</>
+  if (isSettingsFlow(path)) return <><><Outlet /><CastBar /></>{notices}<ToastHost /></>
 
   return <>
     <div className="flex min-h-screen flex-col">
@@ -161,6 +162,9 @@ function Shell() {
                   {auth.user?.name}
                   {auth.user?.isAdmin && <span className="ml-1 text-xs text-neutral-500">admin</span>}
                 </div>
+                <Link to="/watchlists" onClick={() => setMenu(false)} className="block rounded px-3 py-2 hover:bg-surface-2">
+                  Watchlists
+                </Link>
                 <Link to="/activity/history" onClick={() => setMenu(false)} className="block rounded px-3 py-2 hover:bg-surface-2">
                   {activityAdmin ? 'Activity' : 'My history'}
                 </Link>
@@ -182,6 +186,7 @@ function Shell() {
       <CastBar />
     </div>
     {notices}
+    <ToastHost />
   </>
 }
 

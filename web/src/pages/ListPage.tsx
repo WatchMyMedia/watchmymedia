@@ -1,18 +1,21 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { ApiError } from '../api/client'
 import { librariesQuery, mediaListEntriesQuery, mediaListQuery, useDeleteMediaList, useRefreshMediaList } from '../api/queries'
 import { requestOptionsQuery } from '../api/requests'
 import { Dialog } from '../components/Dialog'
+import { Icon, ListEntryCard } from '../components/ListEntryCard'
 import { Pager } from '../components/Pager'
-import { Poster } from '../components/Poster'
-import { PosterCard, RankBadge } from '../components/PosterCard'
 import { RequestDialog } from '../components/RequestDialog'
+import { WatchlistAction } from '../components/watchlists/WatchlistButton'
 import { relativeTime } from '../lib/format'
-import { canEditList, canRefresh, entryView, inLibraryWords, listCountWords, listMeta, retryWords, screenName, type MediaList, type MediaListEntry } from '../lib/mediaLists'
+import { canEditList, canRefresh, emptyListWords, inLibraryWords, isWatchlist, listCountWords, listMeta, retryWords, screenName, type MediaList, type MediaListEntry } from '../lib/mediaLists'
+import type { ListSearch } from '../lib/routeSearch'
 import { screenTarget } from '../lib/screenRows'
+import { entryTitle } from '../lib/watchlists'
 import { useSettingsAccess } from './settings/shared'
+import { WatchlistPage } from './WatchlistPage'
 
 const PAGE = 100
 const b1 = 'inline-flex min-h-[40px] items-center justify-center rounded-md btn-primary px-4 text-sm font-semibold disabled:opacity-50'
@@ -25,7 +28,13 @@ const b2 = 'inline-flex min-h-[40px] items-center justify-center gap-2 rounded-m
  * poster and Request where the person may ask for them; imports TMDB
  * couldn't find are Not found.
  */
-export function ListPage({ listId }: { listId: number }) {
+export function ListPage({ listId, search = {} }: { listId: number; search?: ListSearch }) {
+  const list = useQuery(mediaListQuery(listId))
+  if (list.data && isWatchlist(list.data)) return <WatchlistPage list={list.data} search={search} />
+  return <FetchedListPage listId={listId} />
+}
+
+function FetchedListPage({ listId }: { listId: number }) {
   const list = useQuery(mediaListQuery(listId))
   const [offset, setOffset] = useState(0)
   const entries = useQuery({ ...mediaListEntriesQuery(listId, offset, PAGE), enabled: list.isSuccess })
@@ -53,13 +62,13 @@ export function ListPage({ listId }: { listId: number }) {
       {entries.isPending && <p className="text-neutral-400">Loading titles…</p>}
       {entries.isError && <p className="text-red-400">{entries.error.message}</p>}
       {e && e.items.length === 0 && (
-        <p className="text-neutral-400">{l.fetchedAt || l.source.kind === 'import' || l.source.kind === 'library' ? 'Nothing is on this list.' : 'The list hasn’t been fetched yet.'}</p>
+        <p className="text-neutral-400">{emptyListWords(l)}</p>
       )}
       {e && e.items.length > 0 && (
         <ol aria-label={`${l.name}, in order`} className={`grid grid-cols-3 gap-x-4 gap-y-5 md:grid-cols-5 xl:grid-cols-8 ${entries.isPlaceholderData ? 'opacity-60' : ''}`}>
           {e.items.map((entry) => (
             <li key={entry.rank} className="flex min-w-0 flex-col">
-              <EntryCard entry={entry} onRequest={() => setRequesting(entry)} />
+              <ListEntryCard entry={entry} rank={entry.rank} onRequest={() => setRequesting(entry)} actions={entry.found && entryTitle(entry) ? <SaveMissing entry={entry} /> : undefined} />
             </li>
           ))}
         </ol>
@@ -238,58 +247,11 @@ function DeleteListDialog({ list, onClose }: { list: MediaList; onClose: () => v
   )
 }
 
-const pills: Record<string, { label: string; gold?: boolean }> = { requested: { label: 'Requested' }, downloading: { label: 'Downloading', gold: true }, available: { label: 'Available' } }
-
-/** A title on the list: the library's card, a dimmed missing one, or Not found. */
-function EntryCard({ entry, onRequest }: { entry: MediaListEntry; onRequest: () => void }) {
-  const view = entryView(entry)
-  if (view.kind === 'library') return entry.item ? <PosterCard item={entry.item} rank={entry.rank} subtitle={entry.item.year ? String(entry.item.year) : ''} /> : null
-  if (view.kind === 'notFound')
-    return (
-      <>
-        <span className="relative flex aspect-[2/3] w-full items-center justify-center rounded-md border border-dashed border-neutral-600 bg-ground p-2.5 text-center text-xs leading-snug text-neutral-400">
-          <RankBadge rank={entry.rank} />
-          {entry.title}
-        </span>
-        <span className="mt-1.5 block truncate text-sm font-medium text-neutral-400">{entry.title}</span>
-        <span className="block truncate text-xs text-orange-300">Not found on TMDB</span>
-      </>
-    )
-  const pill = entry.requestState ? pills[entry.requestState] : undefined
-  return (
-    <>
-      <span className="relative block">
-        <RankBadge rank={entry.rank} />
-        <span className="block opacity-40 grayscale-[.6]">
-          <Poster path={entry.posterPath} alt={entry.title} />
-        </span>
-      </span>
-      <span className="mt-1.5 block truncate text-sm font-medium text-neutral-400">{entry.title}</span>
-      <span className="block truncate text-xs text-neutral-500">{[entry.year || '', 'Not in your library'].filter(Boolean).join(' · ')}</span>
-      {view.request ? (
-        <button
-          type="button"
-          onClick={onRequest}
-          aria-label={`Request ${entry.title}`}
-          className="mt-2 inline-flex min-h-[32px] items-center gap-1.5 self-start rounded-md border border-line-2 bg-surface px-3 text-[13px] font-semibold hover:border-accent hover:text-accent"
-        >
-          <Icon d="M12 5v14M5 12h14" size={14} />
-          Request
-        </button>
-      ) : (
-        pill && <Pill gold={pill.gold}>{pill.label}</Pill>
-      )}
-    </>
-  )
-}
-
-function Pill({ gold, children }: { gold?: boolean; children: ReactNode }) {
-  return (
-    <span className={`mt-2 inline-flex min-h-[28px] items-center gap-1.5 self-start whitespace-nowrap rounded-full border px-2.5 text-xs font-medium ${gold ? 'border-accent/55 text-accent' : 'border-line-2 text-neutral-400'}`}>
-      <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
-      {children}
-    </span>
-  )
+/** Add to Watchlist on a title the library doesn't have, with what the list knows of it. */
+function SaveMissing({ entry }: { entry: MediaListEntry }) {
+  const t = entryTitle(entry)
+  if (!t || !entry.found) return null
+  return <WatchlistAction target={{ ...t, title: entry.title, year: entry.year, posterPath: entry.posterPath }} title={entry.title} watchlisted={entry.watchlisted} />
 }
 
 function Sep() {
@@ -297,13 +259,5 @@ function Sep() {
     <span aria-hidden="true" className="text-neutral-600">
       ·
     </span>
-  )
-}
-
-function Icon({ d, size = 16 }: { d: string; size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={d} />
-    </svg>
   )
 }

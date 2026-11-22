@@ -91,7 +91,7 @@ function Rows({ libraryId, type, search }: { libraryId: number; type: 'movie' | 
   if (!rows.data) return null
   return (
     <div className="space-y-8">
-      <ScreenRows rows={libraryRows(rows.data, type)} libraries={libraries.data?.items ?? []} />
+      <ScreenRows rows={libraryRows(rows.data, type)} libraries={libraries.data?.items ?? []} screenType={type} />
       <EditRowsBar onEdit={() => void navigate({ to: type === 'tv' ? '/tv' : '/movies', search: { library: search.library, edit: true } })}>
         Move, hide and add the rows above {type === 'tv' ? 'All shows' : 'All movies'}.
       </EditRowsBar>

@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"watchmymedia/server/internal/db"
 	"watchmymedia/server/internal/lists"
 )
 
@@ -134,7 +136,9 @@ func TestHomeSpeed(t *testing.T) {
 	begin := time.Now()
 	tv := seedHomeLibrary(t, conn, time.Now())
 	seedHomeLists(t, conn, tv)
+	watchlists := seedHomeWatchlists(t, conn, time.Now())
 	t.Logf("seeded in %v", time.Since(begin).Round(time.Millisecond))
+	checkWatchlistPlans(t, conn, watchlists)
 
 	var show int64
 	if err := conn.QueryRowContext(t.Context(), `SELECT id FROM shows WHERE library_id = ? ORDER BY id LIMIT 1`, tv).Scan(&show); err != nil {
@@ -155,7 +159,10 @@ func TestHomeSpeed(t *testing.T) {
 		{"tv unmatched", fmt.Sprintf("/api/libraries/%d/unmatched", tv), 100 * time.Millisecond},
 		{"show", fmt.Sprintf("/api/shows/%d", show), 10 * time.Millisecond},
 		{"movie rows", "/api/libraries/1/rows", 100 * time.Millisecond},
+		{"movie rows arranged", "/api/libraries/1/rows?arranged=true", 100 * time.Millisecond},
 		{"libraries", "/api/libraries", 50 * time.Millisecond},
+		{"watchlists", "/api/me/watchlists", 50 * time.Millisecond},
+		{"watchlist page", fmt.Sprintf("/api/lists/%d/entries", watchlists[0]), 50 * time.Millisecond},
 	}
 	for _, c := range cases {
 		median := medianOf(t, func() { getOK(t, srv.client, srv.URL+c.path) })
@@ -180,7 +187,7 @@ func TestHomeSpeed(t *testing.T) {
 		}
 		report(t, strict, name, median, 150*time.Millisecond)
 	}
-	// The arranged Home drew every list row.
+	// The arranged Home drew every list row, the watchlists' among them.
 	var home HomeData
 	doJSON(t, srv.client, http.MethodGet, srv.URL+"/api/home?arranged=true", "", &home)
 	lists := 0
@@ -189,8 +196,116 @@ func TestHomeSpeed(t *testing.T) {
 			lists++
 		}
 	}
-	if lists != 13 {
-		t.Errorf("Home drew %d full list rows of 13", lists)
+	if lists != 13+len(watchlists) {
+		t.Errorf("Home drew %d full list rows of %d", lists, 13+len(watchlists))
+	}
+}
+
+// seedHomeWatchlists gives the admin five watchlists of 500 titles: half
+// of them missing from the library, the rest movies and shows it has,
+// first among them the shows the admin is partway through, which Home's
+// Continue watching shows.
+func seedHomeWatchlists(tb testing.TB, conn *sql.DB, now time.Time) []int64 {
+	tb.Helper()
+	ctx := tb.Context()
+	playing := func() []int64 {
+		rows, err := conn.QueryContext(ctx, `SELECT DISTINCT s.tmdb_id FROM watch_state w JOIN episodes e ON e.id = w.item_id JOIN shows s ON s.id = e.show_id
+			WHERE w.user_id = 1 AND w.item_type = 'episode' AND w.position_ms > 0 AND w.completed = 0 ORDER BY s.tmdb_id`)
+		if err != nil {
+			tb.Fatal(err)
+		}
+		defer func() { _ = rows.Close() }()
+		var out []int64
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				tb.Fatal(err)
+			}
+			out = append(out, id)
+		}
+		if err := rows.Err(); err != nil {
+			tb.Fatal(err)
+		}
+		return out
+	}()
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	exec := func(q string, args ...any) int64 {
+		res, err := tx.ExecContext(ctx, q, args...)
+		if err != nil {
+			tb.Fatal(err)
+		}
+		id, _ := res.LastInsertId()
+		return id
+	}
+	stamp := db.FormatTime(now)
+	var ids []int64
+	for k := range 5 {
+		id := exec(`INSERT INTO media_lists (owner_id, created_by, screen, name, source_kind, media_type, entry_limit, remove_watched, fetched_at)
+			VALUES (1, 1, 'home', ?, 'watchlist', 'all', 500, 1, ?)`, fmt.Sprintf("Watchlist %d", k), stamp)
+		ids = append(ids, id)
+		shows := slices.Clone(playing[:min(len(playing), 10)])
+		for s := 0; len(shows) < 125; s++ {
+			if tmdbID := int64(200000 + (k*89+s*7)%1100); !slices.Contains(shows, tmdbID) {
+				shows = append(shows, tmdbID)
+			}
+		}
+		for r := range 500 {
+			kind, tmdbID := "movie", int64(900000+k*1000+r) // not in the library
+			switch r % 4 {
+			case 1:
+				tmdbID = int64(100000 + (k*211+r*3)%2850)
+			case 3:
+				kind, tmdbID = "tv", shows[r/4]
+			}
+			exec(`INSERT INTO media_list_entries (list_id, rank, media_type, tmdb_id, title, poster_path, added_at) VALUES (?, ?, ?, ?, 'x', '/p.jpg', ?)`,
+				id, -r, kind, tmdbID, db.FormatTime(now.Add(-time.Duration(r)*time.Minute)))
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		tb.Fatal(err)
+	}
+	return ids
+}
+
+// checkWatchlistPlans checks the plans without statistics of the queries
+// watchlists read on every screen, and those a finished title runs: they
+// look titles up by their TMDB id and lists by their owner, never reading
+// a whole table of the library or of list entries.
+func checkWatchlistPlans(t *testing.T, conn *sql.DB, watchlists []int64) {
+	t.Helper()
+	ctx, owner := t.Context(), int64(1)
+	tmdbIDs := []int64{200001, 200002}
+	saved := []*int64{&tmdbIDs[0], &tmdbIDs[1]}
+	for _, c := range []struct {
+		name string
+		run  func(*db.Queries)
+	}{
+		{"watchlists' movies", func(q *db.Queries) { _, _ = q.ListMediaListMovieRanks(ctx, watchlists) }},
+		{"watchlists' shows", func(q *db.Queries) { _, _ = q.ListMediaListShowRanks(ctx, watchlists) }},
+		{"watchlisted", func(q *db.Queries) { _, _ = q.ListWatchlistEntries(ctx, &owner) }},
+		{"holding", func(q *db.Queries) {
+			_, _ = q.ListWatchlistsHolding(ctx, db.ListWatchlistsHoldingParams{MediaType: "tv", TmdbID: &tmdbIDs[0], OwnerID: &owner})
+		}},
+		{"leaving", func(q *db.Queries) {
+			_, _ = q.ListLeavingWatchlistEntries(ctx, db.ListLeavingWatchlistEntriesParams{MediaType: "tv", OwnerID: &owner, TmdbIds: saved})
+		}},
+		{"finished shows", func(q *db.Queries) {
+			_, _ = q.ListFinishedShows(ctx, db.ListFinishedShowsParams{UserID: owner, TmdbIds: tmdbIDs})
+		}},
+	} {
+		p := &planner{DB: conn, tb: t}
+		c.run(db.New(p))
+		t.Logf("%s plan:\n%s", c.name, p.plan)
+		for _, bad := range []string{"SCAN movies", "SCAN m\n", "SCAN shows", "SCAN s\n", "SCAN episodes", "SCAN ep\n", "SCAN media_files", "SCAN f\n",
+			"SCAN media_list_entries", "SCAN e\n", "SCAN media_lists", "SCAN l\n", "SCAN watch_state", "SCAN w\n"} {
+			if strings.Contains(p.plan+"\n", bad) {
+				t.Errorf("%s plan reads a whole table (%q)", c.name, strings.TrimSpace(bad))
+			}
+		}
 	}
 }
 
