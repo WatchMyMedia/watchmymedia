@@ -49,6 +49,12 @@ import media.watchmy.client.mobile.settings.ServersPage
 import media.watchmy.client.model.accountButtonLabel
 import media.watchmy.client.presentation.servers.ServerSwitchViewModel
 import media.watchmy.client.presentation.servers.ServersViewModel
+import media.watchmy.client.mobile.watchlists.WatchlistMessageHost
+import media.watchmy.client.mobile.watchlists.WatchlistPicker
+import media.watchmy.client.mobile.watchlists.WatchlistsScreen
+import media.watchmy.client.presentation.watchlists.WatchlistViewModel
+import media.watchmy.client.ui.LocalWatchlistControls
+import media.watchmy.client.ui.rememberWatchlistControls
 import media.watchmy.client.ui.TestTags
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -331,6 +337,11 @@ fun MobileNavHost(
     val openSeason = { id: Long, season: Int -> nav.navigate(MobileRoutes.Show(id, season)) }
     val openEpisode = { id: Long, season: Int, episode: Long -> nav.navigate(MobileRoutes.Episode(id, season, episode)) }
     val openMovie = { id: Long -> nav.navigate(MobileRoutes.Movie(id)) }
+    // Saving titles to watchlists, from every page's Watchlist button and cards' menus.
+    val watchlistModel = viewModel(key = "watchlists") { WatchlistViewModel(services.watchlists) }
+    val watchlist by watchlistModel.state.collectAsStateWithLifecycle()
+    val held by watchlistModel.held.collectAsStateWithLifecycle()
+    val watchlistControls = rememberWatchlistControls(watchlist.supported, watchlist.watchlists, held, watchlistModel::press)
     // Servers, the switcher: the account button opens it over whichever screen is up.
     val serversModel = viewModel(key = "servers") { ServersViewModel(services.servers, services.downloads, services.cast) }
     val servers by serversModel.state.collectAsStateWithLifecycle()
@@ -399,7 +410,12 @@ fun MobileNavHost(
     // Tapping the tab already shown takes its page to the top rather than doing nothing.
     val reselect = remember { TabReselect() }
     val selectTab = { t: MobileTab -> if (t == tab) reselect.reselect(t) else nav.openTab(t) }
-    CompositionLocalProvider(LocalTabReselect provides reselect, LocalLiveChannelsShown provides showChannels, LocalServersButton provides serversButton) {
+    CompositionLocalProvider(
+        LocalTabReselect provides reselect,
+        LocalLiveChannelsShown provides showChannels,
+        LocalServersButton provides serversButton,
+        LocalWatchlistControls provides watchlistControls,
+    ) {
         Box(Modifier.fillMaxSize()) {
             NavigationSuiteScaffold(
                 layoutType = if (showRail) NavigationSuiteType.NavigationRail else NavigationSuiteType.None,
@@ -423,11 +439,12 @@ fun MobileNavHost(
                 },
             ) {
                 Column(Modifier.fillMaxSize().then(sides)) {
+                    Box(Modifier.weight(1f)) {
                     // The TV's short fades, not Navigation's 700 ms default.
                     NavHost(
                         nav,
                         startDestination = MobileRoutes.Home,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxSize(),
                         enterTransition = { fadeIn(tween(PAGE_FADE_MS)) },
                         exitTransition = { fadeOut(tween(PAGE_FADE_MS)) },
                         popEnterTransition = { fadeIn(tween(PAGE_FADE_MS)) },
@@ -573,7 +590,8 @@ fun MobileNavHost(
                             }
                         }
                         composable<MobileRoutes.MediaList> {
-                            ListScreen(it.toRoute<MobileRoutes.MediaList>().id, onBack = { nav.popBackStack() }, onOpenShow = openShow, onOpenMovie = openMovie, onPlay = nav::play)
+                            val r = it.toRoute<MobileRoutes.MediaList>()
+                            ListScreen(r.id, onBack = { nav.popBackStack() }, onOpenShow = openShow, onOpenMovie = openMovie, onPlay = nav::play, type = r.type)
                         }
                         composable<MobileRoutes.MyRequests> { MyRequestsScreen(onBack = { nav.popBackStack() }) }
                         composable<MobileRoutes.Inbox> { InboxScreen(onBack = { nav.popBackStack() }) }
@@ -589,6 +607,12 @@ fun MobileNavHost(
                             val r = it.toRoute<MobileRoutes.Player>()
                             PlayerScreen(request = PlayRequest(r.fileId, r.startMs, r.title, r.subtitle, r.backdropPath, recordingId = r.recordingId), onExit = { nav.popBackStack() })
                         }
+                        composable<MobileRoutes.Watchlists> {
+                            WatchlistsScreen(onBack = { nav.popBackStack() }, onOpenList = { id -> nav.navigate(MobileRoutes.MediaList(id)) })
+                        }
+                    }
+                    // "Saved to Watchlist", with Undo, over whichever page saved it.
+                    if (!inPlayer) WatchlistMessageHost(watchlist.message, watchlistModel::undo, watchlistModel::messageShown, Modifier.align(Alignment.BottomCenter))
                     }
                     // While casting, the TV's play on every screen but the player itself: a channel's
                     // (Live TV included), or a file's (as before, not on Live TV).
@@ -630,8 +654,16 @@ fun MobileNavHost(
                     close()
                     nav.openTab(MobileTab.Settings)
                 }.takeIf { MobileTab.Settings !in tabs }
-                if (showRail) ServersPopover(servers, serversModel, device, railWidth = RailWidth, onAdd = add, onManage = manage, onDismiss = close, onSettings = settings)
-                else ServersSheet(servers, serversModel, device, onAdd = add, onManage = manage, onDismiss = close, onSettings = settings)
+                // Watchlists, above Settings: they can be reached while their rows are empty or hidden.
+                val lists = {
+                    close()
+                    nav.navigate(MobileRoutes.Watchlists)
+                }.takeIf { watchlist.supported }
+                if (showRail) ServersPopover(servers, serversModel, device, railWidth = RailWidth, onAdd = add, onManage = manage, onDismiss = close, onSettings = settings, onWatchlists = lists)
+                else ServersSheet(servers, serversModel, device, onAdd = add, onManage = manage, onDismiss = close, onSettings = settings, onWatchlists = lists)
+            }
+            watchlist.picker?.let { picker ->
+                WatchlistPicker(picker.title, watchlist.checked(held), picker.naming, watchlist.atLimit, watchlist.max, tablet = layout.isTablet, actions = watchlistModel)
             }
         }
     }

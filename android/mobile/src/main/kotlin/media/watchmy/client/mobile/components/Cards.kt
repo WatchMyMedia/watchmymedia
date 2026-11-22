@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.sp
 import media.watchmy.client.model.BrowseItem
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.WmmColors
+import media.watchmy.client.ui.watchlistItem
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.Badge
 import media.watchmy.client.ui.components.BadgeStyle
@@ -85,6 +86,13 @@ data class CardAction(val label: String, val onClick: () -> Unit)
 /** "Mark as watched" or "Mark as unwatched", whichever undoes [watched]. */
 fun watchToggle(watched: Boolean, onSet: (Boolean) -> Unit) =
     CardAction(if (watched) "Mark as unwatched" else "Mark as watched") { onSet(!watched) }
+
+/** These, then [item]'s watchlist entry (Add to Watchlist, Save to watchlist…) where it can be saved. */
+@Composable
+fun List<CardAction>.withWatchlist(item: BrowseItem): List<CardAction> {
+    val saving = watchlistItem(item) ?: return this
+    return remember(this, saving) { this + CardAction(saving.label, saving.onClick) }
+}
 
 /**
  * How a card is pointed at, for its artwork and title to show it
@@ -200,7 +208,8 @@ fun CardCaption(title: String, subtitle: String?, titleSize: TextUnit = 14.sp, s
  * fact on the hero and the detail pages, not a chip on every poster). The
  * title under it names the card, so the artwork has no description of its
  * own. With [onSetWatched], a long-press offers Mark as watched or
- * unwatched. The card builds that menu itself, so a grid recomposing passes
+ * unwatched, and where the server has watchlists the title's entry for
+ * them. The card builds that menu itself, so a grid recomposing passes
  * it the same values and the card skips. [outlined] rings the artwork in
  * gold: the leading card of a tablet Home row.
  */
@@ -218,7 +227,7 @@ fun PosterCard(
     outlined: Boolean = false,
 ) {
     val sized = if (width != null) modifier.width(width) else modifier.fillMaxWidth()
-    val actions = remember(item.watched, onSetWatched) { listOfNotNull(onSetWatched?.let { watchToggle(item.watched, it) }) }
+    val actions = remember(item.watched, onSetWatched) { listOfNotNull(onSetWatched?.let { watchToggle(item.watched, it) }) }.withWatchlist(item)
     PressableCard(onClick, actions, sized) {
         Artwork(
             url = imageUrl,

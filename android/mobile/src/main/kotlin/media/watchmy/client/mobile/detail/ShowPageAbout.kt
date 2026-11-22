@@ -31,6 +31,9 @@ import androidx.compose.ui.unit.sp
 import media.watchmy.client.mobile.components.TonalButton
 import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.ShowDetail
+import media.watchmy.client.model.watchlistTitle
+import media.watchmy.client.mobile.watchlists.WatchlistButton
+import media.watchmy.client.ui.LocalWatchlistControls
 import media.watchmy.client.model.formatBytes
 import media.watchmy.client.model.markShowLabel
 import media.watchmy.client.model.watched
@@ -70,8 +73,17 @@ internal fun AboutShow(show: ShowDetail, state: ShowPageViewModel.State, vm: Sho
             }
         }
         if (show.overview.isNotBlank()) Overview(show.overview, collapsedLines = if (compact) 3 else 4)
-        // Notify me, first of the show's actions.
-        state.following?.let { following -> FollowButton(following, show.title, page.onFollow, Modifier.fillMaxWidth()) }
+        // Notify me, first of the show's actions, with Watchlist beside it.
+        val saves = LocalWatchlistControls.current != null && show.watchlistTitle() != null && show.watchlists != null && !state.offline
+        val following = state.following
+        when {
+            following != null && saves -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FollowButton(following, show.title, page.onFollow, Modifier.weight(1f))
+                WatchlistButton(show.watchlistTitle(), show.watchlists, Modifier.weight(1f))
+            }
+            following != null -> FollowButton(following, show.title, page.onFollow, Modifier.fillMaxWidth())
+            saves -> WatchlistButton(show.watchlistTitle(), show.watchlists, Modifier.fillMaxWidth())
+        }
         if (state.canMarkShow) TonalButton(markShowLabel(state.showWatched), { vm.setShowWatched(!state.showWatched) }, Modifier.fillMaxWidth(), enabled = !state.acting)
         if (state.missingSeasons) TonalButton("Request missing seasons", { page.onAsk(ALL_SEASONS) }, Modifier.fillMaxWidth())
         if (compact) {

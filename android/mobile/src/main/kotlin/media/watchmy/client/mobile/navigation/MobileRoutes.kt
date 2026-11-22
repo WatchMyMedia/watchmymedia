@@ -61,8 +61,13 @@ object MobileRoutes {
     @Serializable data class EditRows(val screen: String, val name: String)
     /** The same, as a dialog over the screen on a tablet. */
     @Serializable data class EditRowsDialog(val screen: String, val name: String)
-    /** A list's page, from its row's See all. */
-    @Serializable data class MediaList(val id: Long)
+    /**
+     * A list's page, from its row's See all. [type] ("movie", "tv") is the
+     * chip a watchlist's page opens on, from a Movies or TV screen's row.
+     */
+    @Serializable data class MediaList(val id: Long, val type: String? = null)
+    /** The person's watchlists, from Servers and a row's See all. */
+    @Serializable data object Watchlists
     @Serializable data class Player(val fileId: Long, val startMs: Long? = null, val title: String, val subtitle: String? = null, val backdropPath: String? = null, val recordingId: String? = null)
 }
 
