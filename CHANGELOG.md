@@ -5,6 +5,55 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release. A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 2.1.0
+
+Everyone can keep the movies and shows they mean to watch on watchlists of their own, in the web
+app and in every phone, tablet and TV app, and each watchlist is a row on Home, Movies and TV.
+The web app also points people at the phone, tablet and TV apps.
+
+- This release changes the server's database. Back up before updating: Settings › Backups ›
+  Back up now, or `watchmymedia backup`. Going back to 2.0.1 afterwards needs that backup.
+- A Watchlist button on every movie's and show's page saves the title, beside Trailer on a movie
+  and beside Notify me on a show. The first save makes a watchlist called Watchlist. With one
+  watchlist, the button saves and removes in one press, and on the web, phones and tablets a
+  message says so with Undo. With two or more, it opens Save to watchlist, with a check for each
+  watchlist and New watchlist. The button says which watchlist holds the title: On Watchlist,
+  On Halloween, or On 2 watchlists.
+- Titles the library doesn't have can be saved too, from other lists' pages and from Search's
+  Not in your library results. Saving never requests a title.
+- On phones and tablets, a card's long press offers Add to Watchlist, Remove from Watchlist or
+  Save to watchlist. On Android TV and the Samsung TV app, holding OK on a card opens a menu
+  with that item and Mark watched, where holding OK used to mark a movie watched at once. On a
+  server without watchlists it still does. Apple TV puts the item first in a card's menu.
+- Each watchlist is a row: on Home with movies and shows, after New from shows you follow or
+  else after Continue watching; first on each Movies screen with its movies, and first on each
+  TV screen with its shows. The newest saves come first, and a title that reached the library
+  after it was saved moves to the front. Home leaves out what its Continue watching row already
+  shows. Under the row, "9 of 12 in your library" says when some titles are still missing.
+- Watchlists, in the web's account menu and under Servers in the apps, lists a person's
+  watchlists. A watchlist's page can show its movies or its shows alone, sorts by date added,
+  title or release year, and has Remove, Rename and Delete. See all at the end of a watchlist's
+  row on Movies or TV opens its page on that kind of title.
+- A watchlist takes a title off once you finish it after saving it: a movie when you've watched
+  it, a show when every episode the library has is watched. Remove titles once watched, on the
+  watchlist's page, turns that off. Watching on any app, Mark watched, offline plays and imports
+  all count.
+- No one else sees a person's watchlists, admins included. Each person can have up to 25, with
+  up to 500 titles each, and they don't count towards the limit on lists.
+- The phone, tablet and TV apps released before 2.1.0 show a watchlist's row and page as a list.
+  The 2.1.0 apps work with older servers, without watchlists.
+- The web app has a Get the app button after Search on computers, with the App Store and Google
+  Play. On an Android phone or tablet, and in Chrome, Firefox or Edge on an iPhone or iPad, a
+  strip above the bar offers the app until Not now or Get hides it. Safari on an iPhone or iPad
+  shows Apple's own banner. Neither shows in the players, during sign-in or in a Settings task.
+- The server, the Docker image, the Debian, Ubuntu and Fedora packages, the Mac app, the Windows
+  app and the Android app are 2.1.0. The Mac and Windows apps of 2.0.1 offer the update under
+  Check for updates. The iPhone, iPad and Apple TV apps are 2.1.0 once the App Store approves
+  them, and the Samsung TV app's 2.1.0 follows its earlier versions through Samsung's review.
+- Watchlists have been tried in the web app, on Android, iPhone, iPad and Apple TV emulators
+  and simulators, and in the Samsung TV app's preview, against test servers. They have not yet
+  been tried on a real TV or a phone, or with a screen reader.
+
 ## 2.0.1
 
 Importing from Plex now marks the episodes people watched there, not only the movies. This

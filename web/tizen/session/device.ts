@@ -3,7 +3,7 @@ import type { components } from '../../src/api/schema'
 export type ClientInfo = components['schemas']['Client']
 
 /** This app's version, as sign-ins and plays report it; config.xml carries the same (checked by a test). */
-export const TV_APP_VERSION = '2.0.0'
+export const TV_APP_VERSION = '2.1.0'
 
 const DEVICE_KEY = 'watchmymedia.tizen.device'
 let fallback = ''
