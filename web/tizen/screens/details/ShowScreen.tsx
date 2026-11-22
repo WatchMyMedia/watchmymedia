@@ -170,6 +170,9 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
     if (dialog || (i.action !== 'up' && i.action !== 'down')) return false
     const z = zoneOf(document.activeElement)
     const root = page.current
+    // About's buttons on two lines: ▲ ▼ move between them first.
+    const aboutLine = document.activeElement?.closest('.dt-about .dt-actions')
+    if (z === 'about' && aboutLine && (i.action === 'up' ? aboutLine.previousElementSibling?.classList.contains('dt-actions') : aboutLine.nextElementSibling?.classList.contains('dt-actions'))) return false
     const toEpisode = () => focus.focusId(`ep/${pin?.episodeId}`, root) || focus.focusFirst(root?.querySelector('.dt-eps') ?? null)
     const toTabs = () => focus.focusId(`tab/${tab}`, root) || focus.focusFirst(root?.querySelector('[data-zone="seasons"]') ?? null)
     if (i.action === 'down') {

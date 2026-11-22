@@ -1,9 +1,9 @@
 /* Watchlists: Save to watchlist and the name step, the Watchlists screen's
-   tiles, and a watchlist's page above its titles. Sizes from the boards,
-   divided by 16. */
+   tiles, and a watchlist's page above its titles. Sizes are a 1920-wide
+   screen's pixels divided by 16. */
 
 /* The panel: wider than a settings panel, to hold the keyboard. */
-.wl-panel { width: 50rem; padding: 4rem 2.75rem 2.75rem; gap: 1.25rem; }
+.tv-panel.wl-panel { width: 50rem; padding: 4rem 2.75rem 2.75rem; gap: 1.25rem; }
 .wl-panel__head { display: flex; flex-direction: column; gap: .5rem; padding: 0 1.125rem; }
 .wl-panel__title { font-size: 2.125rem; font-weight: 800; letter-spacing: -.015em; line-height: 1.15; }
 .wl-panel__sub { font-size: 1.3125rem; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -44,8 +44,9 @@
 .wls-title { font-size: 2.875rem; font-weight: 800; letter-spacing: -.02em; }
 .wls-sub { font-size: 1.25rem; color: var(--muted); }
 .wls-hint { display: flex; align-items: center; gap: .75rem; font-size: 1.1875rem; color: var(--text-3); white-space: nowrap; }
-.wls-body { position: absolute; left: var(--content-left); right: var(--gutter); top: 12.25rem; bottom: 0; }
-.wls-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.75rem; padding: .5rem 0 3rem; }
+/* Room above the first row for a focused tile's ring and scale, which the scroller would clip. */
+.wls-body { position: absolute; left: var(--content-left); right: var(--gutter); top: 11.25rem; bottom: 0; }
+.wls-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.75rem; padding: 1rem 0 3rem; }
 .wls-tile { display: flex; flex-direction: column; gap: .375rem; min-width: 0; min-height: 21.5rem; padding: 1.5rem; border-radius: var(--radius-m); background: var(--surface); border: 1px solid var(--line); text-align: left; transition: transform var(--focus-time) ease-out; }
 .wls-tile:focus { position: relative; z-index: 2; outline: var(--focus-width) solid var(--accent); outline-offset: var(--focus-offset); transform: scale(var(--focus-scale)); background: var(--surface-2); box-shadow: 0 1.125rem 2.75rem rgba(0, 0, 0, .6); }
 .wls-tile--new { align-items: center; justify-content: center; gap: 1rem; background: var(--surface); border: 2px dashed var(--dim); font-size: 1.5rem; font-weight: 700; }
@@ -55,7 +56,7 @@
 .wls-posters { display: flex; gap: .75rem; margin-bottom: .875rem; }
 .wls-poster { position: relative; flex: 1; aspect-ratio: 2 / 3; border-radius: .625rem; overflow: hidden; background: linear-gradient(165deg, var(--ph-a, var(--surface-2)), var(--ph-b, var(--surface-2))); }
 .wls-poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.wls-poster--none { background: var(--surface-2); }
+.wls-poster--none { background: var(--surface-3); }
 .wls-tile__name { font-size: 1.625rem; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wls-tile__count { font-size: 1.1875rem; color: var(--muted); }
 .wls-tile__keeps { margin-top: .125rem; font-size: 1.0625rem; color: var(--text-3); }
@@ -76,5 +77,5 @@
 .wl-empty p { font-size: 1.25rem; color: var(--muted); }
 .wl-hint { position: absolute; right: var(--gutter); bottom: 2.25rem; }
 
-/* The title pages' button once the title is on a watchlist: gold, as the boards draw it. */
+/* The title pages' button once the title is on a watchlist: gold, bookmark and words. */
 .wl-on .tv-btn { color: var(--accent); }

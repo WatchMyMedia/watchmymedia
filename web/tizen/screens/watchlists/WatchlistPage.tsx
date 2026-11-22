@@ -12,7 +12,7 @@ import { Chips } from '../../ui/Chips'
 import { Grid } from '../../ui/Grid'
 import { Icon } from '../../ui/Icon'
 import { Dialog, Option, SidePanel } from '../../ui/Overlays'
-import { SkeletonRow } from '../../ui/States'
+import { SkeletonRow, SkeletonText } from '../../ui/States'
 import { problemWords } from '../../ui/problemWords'
 import { useCardActions, useFocusHint, useFocusOnArrival, toneStyle } from '../browse/browseHooks'
 import { useEntryState } from '../browse/entryState'
@@ -25,6 +25,8 @@ import './watchlists.css'
 
 type TypeChoice = WatchlistType | 'all'
 const TYPES = watchlistFilters.map((f) => ({ value: (f.value ?? 'all') as TypeChoice, label: f.label }))
+
+type Titles = ReturnType<typeof useTitles>
 
 /** A watchlist's titles as the page shows them: both pages of up to MAX_ENTRIES, less any being taken off. */
 function useTitles(list: MediaList, sort: WatchlistSort, type: WatchlistType | undefined) {
@@ -46,20 +48,32 @@ function useTitles(list: MediaList, sort: WatchlistSort, type: WatchlistType | u
  * library lacks, Request. Delete asks first and then goes back.
  */
 export function WatchlistBody({ list, type: opened }: { list: MediaList; type?: WatchlistType }) {
+  const [type, setType] = useEntryState<WatchlistType | undefined>('watchlist-type', opened)
+  const [sort, setSort] = useEntryState<WatchlistSort>('watchlist-sort', 'added')
+  const titles = useTitles(list, sort, type)
+  // The page draws once its titles have come, so focus starts on the first; a new sort or type keeps the last ones until its own come.
+  if (titles.pending) return <div className="list-page" aria-busy="true">
+    <span className="tv-sr" role="status">Loading the watchlist</span>
+    <div className="list-head" aria-hidden="true"><div className="list-head__text"><SkeletonText width="14rem"/><SkeletonText width="30rem"/></div></div>
+    <div className="list-grid" aria-hidden="true"><SkeletonRow variant="poster" title={false}/></div>
+  </div>
+  return <WatchlistView list={list} titles={titles} type={type} setType={setType} sort={sort} setSort={setSort}/>
+}
+
+function WatchlistView({ list, titles, type, setType, sort, setSort }: {
+  list: MediaList; titles: Titles; type?: WatchlistType; setType(t: WatchlistType | undefined): void; sort: WatchlistSort; setSort(s: WatchlistSort): void
+}) {
   const nav = useNav()
   const qc = useQueryClient()
   const { say } = useCardActions()
   const watchlists = useQuery(watchlistsQuery)
   const update = useUpdateWatchlist()
   const remove = useDeleteWatchlist()
-  const [type, setType] = useEntryState<WatchlistType | undefined>('watchlist-type', opened)
-  const [sort, setSort] = useEntryState<WatchlistSort>('watchlist-sort', 'added')
   const [panel, setPanel] = useState<'rename' | 'delete' | 'sort'>()
   const [menuOf, setMenuOf] = useState<MediaListEntry>()
   const [asking, setAsking] = useState<RequestTarget>()
   const root = useRef<HTMLDivElement>(null)
   const hint = useFocusHint(root)
-  const titles = useTitles(list, sort, type)
   useFocusOnArrival()
 
   const empty = list.entries === 0 && !titles.items?.length
@@ -102,8 +116,7 @@ export function WatchlistBody({ list, type: opened }: { list: MediaList; type?: 
           </div>
         </div>
         <div className="list-grid wl-grid">
-          {titles.pending ? <div aria-hidden="true"><SkeletonRow variant="poster" title={false}/></div>
-            : titles.error ? <p className="list-empty">{`Couldn’t load its titles. ${problemWords(titles.error).title}.`}</p>
+          {titles.error ? <p className="list-empty">{`Couldn’t load its titles. ${problemWords(titles.error).title}.`}</p>
               : !titles.items?.length ? <p className="list-empty">{type ? emptyFilterWords(type) : `${emptyWatchlist.title}.`}</p>
                 : <div className="list-grid__body" data-autofocus>
                   {/* Keyed by place, so a title taken off hands focus to the one after it. */}
