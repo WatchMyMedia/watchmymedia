@@ -351,24 +351,25 @@ type MediaFile struct {
 }
 
 type MediaList struct {
-	ID          int64   `json:"id"`
-	OwnerID     *int64  `json:"owner_id"`
-	CreatedBy   *int64  `json:"created_by"`
-	Screen      string  `json:"screen"`
-	Name        string  `json:"name"`
-	SourceKind  string  `json:"source_kind"`
-	Params      string  `json:"params"`
-	MediaType   string  `json:"media_type"`
-	EntryLimit  int64   `json:"entry_limit"`
-	SourceUrl   string  `json:"source_url"`
-	FetchedAt   *string `json:"fetched_at"`
-	NextFetchAt *string `json:"next_fetch_at"`
-	Error       *string `json:"error"`
-	ErrorAt     *string `json:"error_at"`
-	Failures    int64   `json:"failures"`
-	WantedAt    *string `json:"wanted_at"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	ID            int64   `json:"id"`
+	OwnerID       *int64  `json:"owner_id"`
+	CreatedBy     *int64  `json:"created_by"`
+	Screen        string  `json:"screen"`
+	Name          string  `json:"name"`
+	SourceKind    string  `json:"source_kind"`
+	Params        string  `json:"params"`
+	MediaType     string  `json:"media_type"`
+	EntryLimit    int64   `json:"entry_limit"`
+	SourceUrl     string  `json:"source_url"`
+	FetchedAt     *string `json:"fetched_at"`
+	NextFetchAt   *string `json:"next_fetch_at"`
+	Error         *string `json:"error"`
+	ErrorAt       *string `json:"error_at"`
+	Failures      int64   `json:"failures"`
+	WantedAt      *string `json:"wanted_at"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
+	RemoveWatched int64   `json:"remove_watched"`
 }
 
 type MediaListEntry struct {
@@ -380,6 +381,7 @@ type MediaListEntry struct {
 	Title      string  `json:"title"`
 	Year       *int64  `json:"year"`
 	PosterPath *string `json:"poster_path"`
+	AddedAt    *string `json:"added_at"`
 }
 
 type MediaSegment struct {

@@ -1,12 +1,21 @@
 package api
 
 import (
+	"cmp"
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+
+	"watchmymedia/server/internal/auth"
+	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/lists"
 )
 
 // Watchlists are the movies and shows a person means to watch, in lists
@@ -14,16 +23,6 @@ import (
 // (media_lists with source kind watchlist), so its rows, its places in the
 // layouts and its page are a list's. What differs is who may change it,
 // where its rows go, their order, and that a finished title leaves it.
-
-// The limits on watchlists, apart from the lists' own.
-const (
-	// maxWatchlists is how many watchlists one person may have.
-	maxWatchlists = 25
-	// maxWatchlistTitles is how many titles one watchlist holds.
-	maxWatchlistTitles = 500
-	// maxWatchlistName is the longest name, in characters.
-	maxWatchlistName = 60
-)
 
 // Watchlist is one of the signed-in person's watchlists.
 type Watchlist struct {
@@ -131,59 +130,347 @@ func registerWatchlists(h huma.API, deps Deps) {
 		return huma.Operation{OperationID: id, Method: method, Path: Prefix + path, Summary: summary,
 			Description: description + " From API level 33.", Tags: []string{"watchlists"}}
 	}
-	notYet := huma.Error501NotImplemented("watchlists are not ready on this server yet")
-	_ = deps
 
 	huma.Register(h, op("listWatchlists", http.MethodGet, "/me/watchlists", "The signed-in person's watchlists",
 		"Apps read it when they start and again on rows.changed, and press Watchlist with saveToOnlyWatchlist when there is at most one, else open the picker."),
 		func(ctx context.Context, in *ListWatchlistsInput) (*WatchlistListOutput, error) {
-			return nil, notYet
+			u, err := currentUser(ctx)
+			if err != nil {
+				return nil, err
+			}
+			ls, err := deps.Queries.ListWatchlists(ctx, &u.ID)
+			if err != nil {
+				return nil, err
+			}
+			items, err := watchlistViews(ctx, deps, u.ID, ls, titleRef{in.MediaType, in.TMDBID})
+			if err != nil {
+				return nil, err
+			}
+			return &WatchlistListOutput{Body: WatchlistList{Items: items, Max: lists.MaxWatchlists, MaxTitles: lists.MaxWatchlistTitles}}, nil
 		})
 
 	create := op("createWatchlist", http.MethodPost, "/me/watchlists", "Make a watchlist",
 		"422 when the person has 25, or another of theirs has the name. Its rows go on Home after Continue watching and New from shows you follow, and first on Movies and TV screens. Sends rows.changed to the person.")
 	create.DefaultStatus = http.StatusCreated
 	huma.Register(h, create, func(ctx context.Context, in *CreateWatchlistInput) (*WatchlistOutput, error) {
-		return nil, notYet
+		u, err := currentUser(ctx)
+		if err != nil {
+			return nil, err
+		}
+		l, err := deps.Lists.CreateWatchlist(ctx, u.ID, in.Body.Name, in.Body.RemoveWatched == nil || *in.Body.RemoveWatched)
+		if err != nil {
+			return nil, watchlistError(err)
+		}
+		watchlistMoved(deps, l)
+		return watchlistOutput(ctx, deps, u.ID, l)
 	})
 
 	huma.Register(h, op("updateWatchlist", http.MethodPatch, "/me/watchlists/{id}", "Rename a watchlist, or turn Remove titles once watched on or off",
 		"422 for a name another of the person's watchlists has. Another person's watchlist is not found, for admins too. Sends rows.changed to the person."),
 		func(ctx context.Context, in *UpdateWatchlistInput) (*WatchlistOutput, error) {
-			return nil, notYet
+			u, l, err := ownWatchlist(ctx, deps, in.ID)
+			if err != nil {
+				return nil, err
+			}
+			if l, err = deps.Lists.UpdateWatchlist(ctx, l, in.Body.Name, in.Body.RemoveWatched); err != nil {
+				return nil, watchlistError(err)
+			}
+			watchlistMoved(deps, l)
+			return watchlistOutput(ctx, deps, u.ID, l)
 		})
 
 	del := op("deleteWatchlist", http.MethodDelete, "/me/watchlists/{id}", "Delete a watchlist",
 		"Its titles stay in the library; its rows leave every screen. deleteMediaList does the same. Sends rows.changed to the person.")
 	del.DefaultStatus = http.StatusNoContent
 	huma.Register(h, del, func(ctx context.Context, in *WatchlistIDInput) (*struct{}, error) {
-		return nil, notYet
+		_, l, err := ownWatchlist(ctx, deps, in.ID)
+		if err != nil {
+			return nil, err
+		}
+		return nil, deleteList(ctx, deps, l)
 	})
 
 	huma.Register(h, op("saveToWatchlist", http.MethodPut, "/me/watchlists/{id}/titles/{mediaType}/{tmdbId}", "Save a movie or show to a watchlist",
 		"Any title, the library's or not. The body describes a title the server has no record of (one only Request search has shown); it is ignored when the server knows the title. A title already there keeps its place. 422 when the watchlist holds 500. Sends lists.changed to the person."),
 		func(ctx context.Context, in *SaveToWatchlistInput) (*WatchlistTitleChangeOutput, error) {
-			return nil, notYet
+			u, l, err := ownWatchlist(ctx, deps, in.ID)
+			if err != nil {
+				return nil, err
+			}
+			saved, err := deps.Lists.SaveToWatchlist(ctx, l, savedTitle(in.MediaType, in.TMDBID, in.Body))
+			if err != nil {
+				return nil, watchlistError(err)
+			}
+			if saved {
+				publishListChanged(deps.Bus, l)
+			}
+			return titleChange(ctx, deps, u.ID, titleRef{in.MediaType, in.TMDBID}, l.ID, WatchlistTitleChange{})
 		})
 
 	huma.Register(h, op("removeFromWatchlist", http.MethodDelete, "/me/watchlists/{id}/titles/{mediaType}/{tmdbId}", "Take a movie or show off a watchlist",
 		"Succeeds when it is not there. Sends lists.changed to the person."),
 		func(ctx context.Context, in *WatchlistTitlePath) (*WatchlistTitleChangeOutput, error) {
-			return nil, notYet
+			u, l, err := ownWatchlist(ctx, deps, in.ID)
+			if err != nil {
+				return nil, err
+			}
+			removed, err := deps.Lists.RemoveFromWatchlist(ctx, l, in.MediaType, in.TMDBID)
+			if err != nil {
+				return nil, err
+			}
+			if removed {
+				publishListChanged(deps.Bus, l)
+			}
+			return titleChange(ctx, deps, u.ID, titleRef{in.MediaType, in.TMDBID}, l.ID, WatchlistTitleChange{})
 		})
 
 	only := op("saveToOnlyWatchlist", http.MethodPut, "/me/watchlist/titles/{mediaType}/{tmdbId}", "Save a movie or show to the person's watchlist, when they have one",
 		"The Watchlist button pressed once. With no watchlist it makes one called Watchlist (created) and saves there; with one it saves there; with two or more it saves nothing and answers 409 with the watchlists (WatchlistsConflict), and the app opens the picker. The body is saveToWatchlist's.")
 	only.Responses = watchlistsConflictResponses(h)
 	huma.Register(h, only, func(ctx context.Context, in *SaveToOnlyWatchlistInput) (*WatchlistTitleChangeOutput, error) {
-		return nil, notYet
+		u, err := currentUser(ctx)
+		if err != nil {
+			return nil, err
+		}
+		title := titleRef{in.MediaType, in.TMDBID}
+		l, created, saved, err := deps.Lists.SaveToOnlyWatchlist(ctx, u.ID, savedTitle(in.MediaType, in.TMDBID, in.Body))
+		if several, ok := errors.AsType[*lists.SeveralError](err); ok {
+			views, verr := watchlistViews(ctx, deps, u.ID, several.Watchlists, title)
+			if verr != nil {
+				return nil, verr
+			}
+			return nil, &WatchlistsConflict{Title: http.StatusText(http.StatusConflict), Status: http.StatusConflict, Detail: several.Error(), Watchlists: views}
+		}
+		if err != nil {
+			return nil, watchlistError(err)
+		}
+		if created {
+			watchlistMoved(deps, l)
+		} else if saved {
+			publishListChanged(deps.Bus, l)
+		}
+		return titleChange(ctx, deps, u.ID, title, l.ID, WatchlistTitleChange{Created: created})
 	})
 
 	huma.Register(h, op("removeFromWatchlists", http.MethodDelete, "/me/watchlist/titles/{mediaType}/{tmdbId}", "Take a movie or show off every one of the person's watchlists",
 		"On Watchlist pressed again. Succeeds when no watchlist holds it. Sends lists.changed for each watchlist it left."),
 		func(ctx context.Context, in *AnyWatchlistTitlePath) (*WatchlistTitleChangeOutput, error) {
-			return nil, notYet
+			u, err := currentUser(ctx)
+			if err != nil {
+				return nil, err
+			}
+			left, err := deps.Lists.RemoveFromWatchlists(ctx, u.ID, in.MediaType, in.TMDBID)
+			if err != nil {
+				return nil, err
+			}
+			change := WatchlistTitleChange{Removed: []int64{}}
+			for _, l := range left {
+				publishListChanged(deps.Bus, l)
+				change.Removed = append(change.Removed, l.ID)
+			}
+			return titleChange(ctx, deps, u.ID, titleRef{in.MediaType, in.TMDBID}, 0, change)
 		})
+}
+
+// titleRef is a movie or show by its TMDB id.
+type titleRef struct {
+	mediaType string
+	tmdbID    int64
+}
+
+func (t titleRef) key() string { return fmt.Sprintf("%s/%d", t.mediaType, t.tmdbID) }
+
+// watchlisted is the titles on a person's watchlists, by titleRef.key.
+type watchlisted map[string]bool
+
+func (w watchlisted) has(mediaType string, tmdbID int64) bool {
+	return tmdbID > 0 && w[titleRef{mediaType, tmdbID}.key()]
+}
+
+// loadWatchlisted reads what is on the person's watchlists, once for a
+// request however many cards it marks.
+func loadWatchlisted(ctx context.Context, deps Deps, userID int64) (watchlisted, error) {
+	rows, err := deps.Queries.ListWatchlistEntries(ctx, &userID)
+	out := make(watchlisted, len(rows))
+	for _, r := range rows {
+		out[titleRef{r.MediaType, r.TmdbID}.key()] = true
+	}
+	return out, err
+}
+
+// markWatchlisted says which of some titles to request are on the
+// person's watchlists.
+func markWatchlisted(ctx context.Context, deps Deps, items []Requestable) error {
+	u, ok := auth.UserFrom(ctx)
+	if !ok || len(items) == 0 {
+		return nil
+	}
+	saved, err := loadWatchlisted(ctx, deps, u.ID)
+	for i := range items {
+		items[i].Watchlisted = saved.has(items[i].MediaType, items[i].TMDBID)
+	}
+	return err
+}
+
+// watchlistsHolding is which of the person's watchlists hold a title, for
+// its page.
+func watchlistsHolding(ctx context.Context, deps Deps, userID int64, mediaType string, tmdbID int64) ([]int64, error) {
+	ids, err := deps.Queries.ListWatchlistsHolding(ctx, db.ListWatchlistsHoldingParams{MediaType: mediaType, TmdbID: &tmdbID, OwnerID: &userID})
+	if ids == nil {
+		ids = []int64{}
+	}
+	return ids, err
+}
+
+// ownWatchlist is one of the signed-in person's watchlists. Anything else,
+// another person's watchlist above all, is not found, for admins too.
+func ownWatchlist(ctx context.Context, deps Deps, id int64) (auth.User, db.MediaList, error) {
+	u, l, err := visibleList(ctx, deps, id)
+	se, isStatus := errors.AsType[huma.StatusError](err)
+	if isStatus && se.GetStatus() == http.StatusNotFound || err == nil && (!lists.IsWatchlist(l) || l.OwnerID == nil) {
+		return u, db.MediaList{}, huma.Error404NotFound("watchlist not found")
+	}
+	return u, l, err
+}
+
+// watchlistError words what the watchlist rules refused, which apps show.
+func watchlistError(err error) error {
+	if e, ok := errors.AsType[*lists.InvalidError](err); ok {
+		return huma.Error422UnprocessableEntity(e.Reason)
+	}
+	return err
+}
+
+func savedTitle(mediaType string, tmdbID int64, d *WatchlistTitleDetails) lists.Title {
+	t := lists.Title{MediaType: mediaType, TMDBID: tmdbID}
+	if d != nil {
+		t.Title, t.Year, t.PosterPath = d.Title, d.Year, d.PosterPath
+	}
+	return t
+}
+
+// watchlistMoved tells the person's devices that a watchlist was made,
+// renamed or deleted: its rows change (rows.changed) and so does its page
+// (lists.changed).
+func watchlistMoved(deps Deps, l db.MediaList) {
+	publishRowsChanged(deps, ScreenHome, l.OwnerID)
+	publishListChanged(deps.Bus, l)
+}
+
+// deleteList deletes a list and its rows. A watchlist's rows are the
+// person's, so they hear of it as a layout change too.
+func deleteList(ctx context.Context, deps Deps, l db.MediaList) error {
+	if _, err := deps.Queries.DeleteMediaList(ctx, l.ID); err != nil {
+		return err
+	}
+	if lists.IsWatchlist(l) {
+		watchlistMoved(deps, l)
+	} else {
+		publishListChanged(deps.Bus, l)
+	}
+	return nil
+}
+
+func watchlistOutput(ctx context.Context, deps Deps, userID int64, l db.MediaList) (*WatchlistOutput, error) {
+	views, err := watchlistViews(ctx, deps, userID, []db.MediaList{l}, titleRef{})
+	if err != nil {
+		return nil, err
+	}
+	return &WatchlistOutput{Body: views[0]}, nil
+}
+
+// titleChange is where a title stands after a save or a removal: the
+// watchlists holding it now and, with changed, that watchlist as it is.
+func titleChange(ctx context.Context, deps Deps, userID int64, t titleRef, changed int64, out WatchlistTitleChange) (*WatchlistTitleChangeOutput, error) {
+	var err error
+	if out.Watchlists, err = watchlistsHolding(ctx, deps, userID, t.mediaType, t.tmdbID); err != nil {
+		return nil, err
+	}
+	if changed != 0 {
+		l, err := deps.Queries.GetMediaList(ctx, changed)
+		if err != nil {
+			return nil, err
+		}
+		v, err := watchlistOutput(ctx, deps, userID, l)
+		if err != nil {
+			return nil, err
+		}
+		out.Watchlist = &v.Body
+	}
+	return &WatchlistTitleChangeOutput{Body: out}, nil
+}
+
+// watchlistViews are the person's watchlists ls as the API shows them,
+// with whether each holds t when t names a title.
+func watchlistViews(ctx context.Context, deps Deps, userID int64, ls []db.MediaList, t titleRef) ([]Watchlist, error) {
+	out := make([]Watchlist, 0, len(ls))
+	if len(ls) == 0 {
+		return out, nil
+	}
+	data, err := loadListData(ctx, deps, ls, []string{"movie", "tv"}, 0, nil)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := deps.Queries.ListWatchlistEntries(ctx, &userID)
+	if err != nil {
+		return nil, err
+	}
+	entries := map[int64][]db.ListWatchlistEntriesRow{}
+	for _, r := range rows {
+		entries[r.ListID] = append(entries[r.ListID], r)
+	}
+	for _, l := range ls {
+		n := data.counts[l.ID]
+		v := Watchlist{ID: l.ID, Name: l.Name, Titles: n.entries, InLibrary: n.inLibrary, RemoveWatched: l.RemoveWatched == 1,
+			Posters: []string{}, CreatedAt: db.ParseTime(l.CreatedAt), UpdatedAt: db.ParseTime(l.UpdatedAt)}
+		es := entries[l.ID]
+		at := savedPlaces(data.ranks[l.ID])
+		sortSaved(es, func(e db.ListWatchlistEntriesRow) (string, int64) { return at.of(e.Rank, e.AddedAt), e.Rank })
+		for _, e := range es {
+			if p := deref(e.PosterPath); p != "" && len(v.Posters) < 4 {
+				v.Posters = append(v.Posters, p)
+			}
+			if e.MediaType == t.mediaType && e.TmdbID == t.tmdbID {
+				v.Contains = true
+			}
+		}
+		out = append(out, v)
+	}
+	return out, nil
+}
+
+// savedPlace is where each of a watchlist's titles the library has goes in
+// its order (rankRef.at), by rank.
+type savedPlace map[int64]string
+
+func savedPlaces(refs []rankRef) savedPlace {
+	out := savedPlace{}
+	for _, r := range refs {
+		out[r.rank] = r.at
+	}
+	return out
+}
+
+// of is an entry's place: the library's title's, else when it was saved.
+func (p savedPlace) of(rank int64, saved string) string {
+	if at, ok := p[rank]; ok {
+		return at
+	}
+	return saved
+}
+
+// sortSaved puts a watchlist's entries in its order, as its row has them
+// (savedOrder): newest first, the newer saved first among equals. place
+// says each entry's place and rank.
+func sortSaved[E any](es []E, place func(E) (string, int64)) {
+	slices.SortStableFunc(es, func(a, b E) int {
+		at, ra := place(a)
+		bt, rb := place(b)
+		if c := strings.Compare(bt, at); c != 0 {
+			return c
+		}
+		return cmp.Compare(ra, rb)
+	})
 }
 
 // watchlistsConflictResponses document saveToOnlyWatchlist's 409, whose

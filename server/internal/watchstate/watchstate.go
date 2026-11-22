@@ -134,6 +134,9 @@ func (s *Service) Report(ctx context.Context, p Progress) (db.WatchState, error)
 	if notify {
 		s.publish(p.UserID, p.ItemType, p.ItemIDs)
 	}
+	if p.Completed {
+		s.leaveWatchlists(ctx, p.UserID, p.ItemType, p.ItemIDs)
+	}
 	return last, nil
 }
 
@@ -159,6 +162,7 @@ func (s *Service) MarkWatched(ctx context.Context, userID int64, itemType string
 	})
 	if err == nil {
 		s.publish(userID, itemType, []int64{id})
+		s.leaveWatchlists(ctx, userID, itemType, []int64{id})
 	}
 	return err
 }
@@ -213,6 +217,9 @@ func (s *Service) MarkSeason(ctx context.Context, userID, seasonID int64, watche
 	})
 	if err == nil {
 		s.publish(userID, Episode, ids)
+		if watched {
+			s.leaveWatchlists(ctx, userID, Episode, ids)
+		}
 	}
 	return err
 }
@@ -240,6 +247,9 @@ func (s *Service) MarkShow(ctx context.Context, userID, showID int64, watched bo
 	})
 	if err == nil {
 		s.publish(userID, Episode, ids)
+		if watched {
+			s.leaveWatchlists(ctx, userID, Episode, ids)
+		}
 	}
 	return err
 }

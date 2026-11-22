@@ -123,7 +123,7 @@ func (q *Queries) GetShowFileStats(ctx context.Context, showID int64) (GetShowFi
 }
 
 const listMovieItems = `-- name: ListMovieItems :many
-SELECT m.id, m.library_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
+SELECT m.id, m.library_id, m.tmdb_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
     m.poster_path, m.backdrop_path, m.content_rating,
     COUNT(f.id) AS file_count,
     MAX(f.added_at) AS added_at,
@@ -139,6 +139,7 @@ GROUP BY m.id
 type ListMovieItemsRow struct {
 	ID            int64       `json:"id"`
 	LibraryID     int64       `json:"library_id"`
+	TmdbID        int64       `json:"tmdb_id"`
 	Title         string      `json:"title"`
 	Year          *int64      `json:"year"`
 	ReleaseDate   *string     `json:"release_date"`
@@ -170,6 +171,7 @@ func (q *Queries) ListMovieItems(ctx context.Context, libraryID int64) ([]ListMo
 		if err := rows.Scan(
 			&i.ID,
 			&i.LibraryID,
+			&i.TmdbID,
 			&i.Title,
 			&i.Year,
 			&i.ReleaseDate,
@@ -371,7 +373,7 @@ func (q *Queries) ListRecentlyAddedEpisodeFiles(ctx context.Context, arg ListRec
 }
 
 const listRecentlyAddedMovieItems = `-- name: ListRecentlyAddedMovieItems :many
-SELECT m.id, m.library_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
+SELECT m.id, m.library_id, m.tmdb_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
     m.poster_path, m.backdrop_path, m.content_rating,
     COUNT(f.id) AS file_count,
     MAX(f.added_at) AS added_at,
@@ -394,6 +396,7 @@ type ListRecentlyAddedMovieItemsParams struct {
 type ListRecentlyAddedMovieItemsRow struct {
 	ID            int64       `json:"id"`
 	LibraryID     int64       `json:"library_id"`
+	TmdbID        int64       `json:"tmdb_id"`
 	Title         string      `json:"title"`
 	Year          *int64      `json:"year"`
 	ReleaseDate   *string     `json:"release_date"`
@@ -424,6 +427,7 @@ func (q *Queries) ListRecentlyAddedMovieItems(ctx context.Context, arg ListRecen
 		if err := rows.Scan(
 			&i.ID,
 			&i.LibraryID,
+			&i.TmdbID,
 			&i.Title,
 			&i.Year,
 			&i.ReleaseDate,
@@ -552,7 +556,7 @@ func (q *Queries) ListRecentlyAiredEpisodes(ctx context.Context, arg ListRecentl
 }
 
 const listRecentlyReleasedMovieItems = `-- name: ListRecentlyReleasedMovieItems :many
-SELECT m.id, m.library_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
+SELECT m.id, m.library_id, m.tmdb_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
     m.poster_path, m.backdrop_path, m.content_rating,
     COUNT(f.id) AS file_count,
     MAX(f.added_at) AS added_at,
@@ -575,6 +579,7 @@ type ListRecentlyReleasedMovieItemsParams struct {
 type ListRecentlyReleasedMovieItemsRow struct {
 	ID            int64       `json:"id"`
 	LibraryID     int64       `json:"library_id"`
+	TmdbID        int64       `json:"tmdb_id"`
 	Title         string      `json:"title"`
 	Year          *int64      `json:"year"`
 	ReleaseDate   *string     `json:"release_date"`
@@ -606,6 +611,7 @@ func (q *Queries) ListRecentlyReleasedMovieItems(ctx context.Context, arg ListRe
 		if err := rows.Scan(
 			&i.ID,
 			&i.LibraryID,
+			&i.TmdbID,
 			&i.Title,
 			&i.Year,
 			&i.ReleaseDate,
@@ -722,7 +728,7 @@ func (q *Queries) ListShowFiles(ctx context.Context, showID int64) (int64, error
 }
 
 const listShowItems = `-- name: ListShowItems :many
-SELECT s.id, s.library_id, s.title, s.year, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path,
+SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path,
     s.last_air_date, s.next_air_date, s.content_rating,
     COUNT(DISTINCT e.id) AS episode_count,
     MAX(f.added_at) AS added_at,
@@ -740,6 +746,7 @@ GROUP BY s.id
 type ListShowItemsRow struct {
 	ID            int64       `json:"id"`
 	LibraryID     int64       `json:"library_id"`
+	TmdbID        int64       `json:"tmdb_id"`
 	Title         string      `json:"title"`
 	Year          *int64      `json:"year"`
 	Overview      string      `json:"overview"`
@@ -772,6 +779,7 @@ func (q *Queries) ListShowItems(ctx context.Context, libraryID int64) ([]ListSho
 		if err := rows.Scan(
 			&i.ID,
 			&i.LibraryID,
+			&i.TmdbID,
 			&i.Title,
 			&i.Year,
 			&i.Overview,
@@ -803,7 +811,7 @@ func (q *Queries) ListShowItems(ctx context.Context, libraryID int64) ([]ListSho
 }
 
 const listShowItemsByIDs = `-- name: ListShowItemsByIDs :many
-SELECT s.id, s.library_id, s.title, s.year, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path,
+SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path,
     s.last_air_date, s.next_air_date, s.content_rating,
     COUNT(DISTINCT e.id) AS episode_count,
     MAX(f.added_at) AS added_at,
@@ -826,6 +834,7 @@ type ListShowItemsByIDsParams struct {
 type ListShowItemsByIDsRow struct {
 	ID            int64       `json:"id"`
 	LibraryID     int64       `json:"library_id"`
+	TmdbID        int64       `json:"tmdb_id"`
 	Title         string      `json:"title"`
 	Year          *int64      `json:"year"`
 	Overview      string      `json:"overview"`
@@ -868,6 +877,7 @@ func (q *Queries) ListShowItemsByIDs(ctx context.Context, arg ListShowItemsByIDs
 		if err := rows.Scan(
 			&i.ID,
 			&i.LibraryID,
+			&i.TmdbID,
 			&i.Title,
 			&i.Year,
 			&i.Overview,
