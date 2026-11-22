@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -78,7 +79,8 @@ var unarrangedGolden embed.FS
 // were before rows could be arranged, byte for byte, so
 // apps that don't know rows see no change. The golden files were written
 // by the code before arranged rows existed (WMM_UPDATE_GOLDEN=1, which
-// writes them to testdata/ for the next build to embed).
+// writes them to testdata/ for the next build to embed), and written again
+// only for an optional field added to every card since (tmdbId).
 func TestUnarrangedRepliesUnchanged(t *testing.T) {
 	t.Parallel()
 	srv := newTestServer(t)
@@ -164,5 +166,68 @@ func TestMergeRows(t *testing.T) {
 		if !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s:\n got %v\nwant %v", c.name, got, c.want)
 		}
+	}
+}
+
+// Where watchlists' rows go: as built-in rows do, from their place in the
+// default order (withWatchlists), in the order they were made.
+func TestWatchlistPlacement(t *testing.T) {
+	t.Parallel()
+	p := func(spec ...string) []RowPlacement {
+		out := []RowPlacement{}
+		for _, s := range spec {
+			id, hidden := strings.CutPrefix(s, "-")
+			out = append(out, RowPlacement{ID: id, Hidden: hidden})
+		}
+		return out
+	}
+	home := []string{"continue", "followed", "live", "shows", "movies"}
+	var full []string // Home with 31 rows, New from shows you follow not counting
+	for i := range 29 {
+		full = append(full, fmt.Sprintf("row%d", i))
+	}
+	full = append([]string{"continue", "followed"}, full...)
+	for _, c := range []struct {
+		name                 string
+		base                 []RowPlacement
+		builtins, watchlists []string
+		library              bool
+		want                 []RowPlacement
+	}{
+		{name: "a new person", builtins: home, watchlists: []string{"list:1"},
+			want: p("continue", "followed", "list:1", "live", "shows", "movies")},
+		{name: "no New from shows you follow: after Continue watching", builtins: []string{"continue", "live", "movies"}, watchlists: []string{"list:1"},
+			want: p("continue", "list:1", "live", "movies")},
+		{name: "neither: first", builtins: []string{"live", "movies"}, watchlists: []string{"list:1"},
+			want: p("list:1", "live", "movies")},
+		{name: "a library's screen: first, in the order made", library: true, builtins: []string{"recentlyAdded", "recentlyReleased"}, watchlists: []string{"list:1", "list:2"},
+			want: p("list:1", "list:2", "recentlyAdded", "recentlyReleased")},
+		{name: "a layout saved before it", base: p("movies", "continue", "followed", "shows", "live"), builtins: home, watchlists: []string{"list:1"},
+			want: p("movies", "continue", "followed", "list:1", "shows", "live")},
+		{name: "one made later goes after the earlier, wherever that was moved", base: p("list:1", "movies", "continue", "followed", "shows", "live"),
+			builtins: home, watchlists: []string{"list:1", "list:2"},
+			want: p("list:1", "list:2", "movies", "continue", "followed", "shows", "live")},
+		{name: "a hidden one stays hidden", base: p("-list:1", "continue", "followed", "live", "shows", "movies"), builtins: home, watchlists: []string{"list:1"},
+			want: p("-list:1", "continue", "followed", "live", "shows", "movies")},
+		{name: "a deleted one goes", base: p("continue", "followed", "list:1", "live", "shows", "movies"), builtins: home,
+			want: p("continue", "followed", "live", "shows", "movies")},
+		{name: "a full screen", base: p(full...), builtins: full, watchlists: []string{"list:1"},
+			want: p(slices.Insert(slices.Clone(full), 2, "list:1")...)},
+	} {
+		order := withWatchlists(c.builtins, c.watchlists, !c.library)
+		got := mergeRows(c.base, order, order, nil, nil)
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s:\n got %v\nwant %v", c.name, got, c.want)
+		}
+	}
+	// On the full screen the new row is drawn and the last one isn't.
+	order := withWatchlists(full, []string{"list:1"}, true)
+	var rows []placedRow
+	for _, r := range mergeRows(p(full...), order, order, nil, nil) {
+		rows = append(rows, placedRow{ID: r.ID, Kind: rowKindBuiltin})
+	}
+	entries := layoutEntries(rows, nil)
+	if last := entries[len(entries)-1]; !entries[2].Shown || last.Shown || last.Note != "Not shown: too many rows" {
+		t.Errorf("a full screen: %+v ... %+v", entries[2], last)
 	}
 }

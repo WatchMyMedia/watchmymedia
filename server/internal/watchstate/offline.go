@@ -33,7 +33,7 @@ func (s *Service) ReportAt(ctx context.Context, p Progress, at time.Time) ([]Out
 		return nil, errors.New("watchstate: a report needs an item")
 	}
 	fileID := p.FileID
-	return s.offline(ctx, p.UserID, p.ItemType, p.ItemIDs, at, func(q *db.Queries, id int64, stamp string) error {
+	return s.offline(ctx, p.UserID, p.ItemType, p.ItemIDs, at, p.Completed, func(q *db.Queries, id int64, stamp string) error {
 		return q.UpsertWatchStateAt(ctx, db.UpsertWatchStateAtParams{
 			UserID: p.UserID, ItemType: p.ItemType, ItemID: id, MediaFileID: &fileID, PositionMs: p.PositionMs, DurationMs: p.DurationMs,
 			Completed: db.BoolInt(p.Completed), UpdatedAt: stamp,
@@ -46,7 +46,7 @@ func (s *Service) ReportAt(ctx context.Context, p Progress, at time.Time) ([]Out
 // MarkWatched does; unwatched deletes the state and keeps a guard, as
 // MarkUnwatched does.
 func (s *Service) MarkAt(ctx context.Context, userID int64, itemType string, ids []int64, watched bool, at time.Time) ([]Outcome, error) {
-	return s.offline(ctx, userID, itemType, ids, at, func(q *db.Queries, id int64, stamp string) error {
+	return s.offline(ctx, userID, itemType, ids, at, watched, func(q *db.Queries, id int64, stamp string) error {
 		if !watched {
 			return q.DeleteWatchState(ctx, db.DeleteWatchStateParams{UserID: userID, ItemType: itemType, ItemID: id})
 		}
@@ -56,8 +56,9 @@ func (s *Service) MarkAt(ctx context.Context, userID int64, itemType string, ids
 
 // offline applies write to each item the offline change at may decide,
 // in one transaction that takes the next revision, and claims those items
-// for the user with at as the guard's time.
-func (s *Service) offline(ctx context.Context, userID int64, itemType string, ids []int64, at time.Time, write func(q *db.Queries, id int64, stamp string) error) ([]Outcome, error) {
+// for the user with at as the guard's time. finishes says the change
+// marks them watched.
+func (s *Service) offline(ctx context.Context, userID int64, itemType string, ids []int64, at time.Time, finishes bool, write func(q *db.Queries, id int64, stamp string) error) ([]Outcome, error) {
 	// Stored times have milliseconds; compare at as it will be stored.
 	at = at.UTC().Truncate(time.Millisecond)
 	stamp := db.FormatTime(at)
@@ -89,6 +90,9 @@ func (s *Service) offline(ctx context.Context, userID int64, itemType string, id
 	}
 	if len(applied) > 0 {
 		s.publish(userID, itemType, applied)
+		if finishes {
+			s.leaveWatchlists(ctx, userID, itemType, applied)
+		}
 	}
 	return out, nil
 }

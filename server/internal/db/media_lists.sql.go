@@ -64,9 +64,10 @@ func (q *Queries) CountMediaListEntries(ctx context.Context, ids []int64) ([]Cou
 }
 
 const countMediaLists = `-- name: CountMediaLists :one
-SELECT COUNT(*) FROM media_lists
+SELECT COUNT(*) FROM media_lists WHERE source_kind != 'watchlist'
 `
 
+// The server's lists, against its limit, leaving watchlists out.
 func (q *Queries) CountMediaLists(ctx context.Context) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countMediaLists)
 	var count int64
@@ -75,9 +76,11 @@ func (q *Queries) CountMediaLists(ctx context.Context) (int64, error) {
 }
 
 const countOwnedMediaLists = `-- name: CountOwnedMediaLists :one
-SELECT COUNT(*) FROM media_lists WHERE owner_id = ?
+SELECT COUNT(*) FROM media_lists WHERE owner_id = ? AND source_kind != 'watchlist'
 `
 
+// A person's lists, against the lists' limit, which leaves watchlists out:
+// they have their own.
 func (q *Queries) CountOwnedMediaLists(ctx context.Context, ownerID *int64) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countOwnedMediaLists, ownerID)
 	var count int64
@@ -89,7 +92,7 @@ const createMediaList = `-- name: CreateMediaList :one
 INSERT INTO media_lists (owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url,
     fetched_at, next_fetch_at, wanted_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at
+RETURNING id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at, remove_watched
 `
 
 type CreateMediaListParams struct {
@@ -143,6 +146,7 @@ func (q *Queries) CreateMediaList(ctx context.Context, arg CreateMediaListParams
 		&i.WantedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RemoveWatched,
 	)
 	return i, err
 }
@@ -193,7 +197,7 @@ func (q *Queries) DeleteUserPreferencesByKey(ctx context.Context, key string) er
 }
 
 const getMediaList = `-- name: GetMediaList :one
-SELECT id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at FROM media_lists WHERE id = ?
+SELECT id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at, remove_watched FROM media_lists WHERE id = ?
 `
 
 func (q *Queries) GetMediaList(ctx context.Context, id int64) (MediaList, error) {
@@ -218,6 +222,7 @@ func (q *Queries) GetMediaList(ctx context.Context, id int64) (MediaList, error)
 		&i.WantedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RemoveWatched,
 	)
 	return i, err
 }
@@ -269,7 +274,7 @@ func (q *Queries) InsertMediaListEntry(ctx context.Context, arg InsertMediaListE
 }
 
 const listAllMediaLists = `-- name: ListAllMediaLists :many
-SELECT id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at FROM media_lists ORDER BY id
+SELECT id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at, remove_watched FROM media_lists ORDER BY id
 `
 
 func (q *Queries) ListAllMediaLists(ctx context.Context) ([]MediaList, error) {
@@ -300,6 +305,7 @@ func (q *Queries) ListAllMediaLists(ctx context.Context) ([]MediaList, error) {
 			&i.WantedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RemoveWatched,
 		); err != nil {
 			return nil, err
 		}
@@ -315,7 +321,7 @@ func (q *Queries) ListAllMediaLists(ctx context.Context) ([]MediaList, error) {
 }
 
 const listDueMediaLists = `-- name: ListDueMediaLists :many
-SELECT id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at FROM media_lists
+SELECT id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at, remove_watched FROM media_lists
 WHERE next_fetch_at IS NOT NULL AND next_fetch_at <= ?1
     AND wanted_at IS NOT NULL AND wanted_at >= ?2
     AND source_kind IN (/*SLICE:kinds*/?)
@@ -372,6 +378,7 @@ func (q *Queries) ListDueMediaLists(ctx context.Context, arg ListDueMediaListsPa
 			&i.WantedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RemoveWatched,
 		); err != nil {
 			return nil, err
 		}
@@ -387,7 +394,7 @@ func (q *Queries) ListDueMediaLists(ctx context.Context, arg ListDueMediaListsPa
 }
 
 const listHouseholdMediaLists = `-- name: ListHouseholdMediaLists :many
-SELECT id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at FROM media_lists WHERE owner_id IS NULL ORDER BY id DESC
+SELECT id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at, remove_watched FROM media_lists WHERE owner_id IS NULL ORDER BY id DESC
 `
 
 func (q *Queries) ListHouseholdMediaLists(ctx context.Context) ([]MediaList, error) {
@@ -418,6 +425,7 @@ func (q *Queries) ListHouseholdMediaLists(ctx context.Context) ([]MediaList, err
 			&i.WantedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RemoveWatched,
 		); err != nil {
 			return nil, err
 		}
@@ -433,7 +441,7 @@ func (q *Queries) ListHouseholdMediaLists(ctx context.Context) ([]MediaList, err
 }
 
 const listMediaListEntries = `-- name: ListMediaListEntries :many
-SELECT list_id, rank, media_type, tmdb_id, imdb_id, title, year, poster_path FROM media_list_entries WHERE list_id = ? ORDER BY rank
+SELECT list_id, rank, media_type, tmdb_id, imdb_id, title, year, poster_path, added_at FROM media_list_entries WHERE list_id = ? ORDER BY rank
 `
 
 func (q *Queries) ListMediaListEntries(ctx context.Context, listID int64) ([]MediaListEntry, error) {
@@ -454,6 +462,7 @@ func (q *Queries) ListMediaListEntries(ctx context.Context, listID int64) ([]Med
 			&i.Title,
 			&i.Year,
 			&i.PosterPath,
+			&i.AddedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -469,7 +478,8 @@ func (q *Queries) ListMediaListEntries(ctx context.Context, listID int64) ([]Med
 }
 
 const listMediaListMovieRanks = `-- name: ListMediaListMovieRanks :many
-SELECT e.list_id, e.rank, m.id, m.library_id
+SELECT e.list_id, e.rank, m.id, m.library_id, e.added_at AS saved_at,
+    CAST((SELECT MIN(f.added_at) FROM media_files f WHERE f.movie_id = m.id AND f.status = 'present') AS TEXT) AS arrived_at
 FROM media_list_entries e
 CROSS JOIN movies m ON m.tmdb_id = e.tmdb_id
 WHERE e.list_id IN (/*SLICE:ids*/?) AND +e.media_type = 'movie'
@@ -478,10 +488,12 @@ ORDER BY e.list_id, e.rank, m.library_id, m.id
 `
 
 type ListMediaListMovieRanksRow struct {
-	ListID    int64 `json:"list_id"`
-	Rank      int64 `json:"rank"`
-	ID        int64 `json:"id"`
-	LibraryID int64 `json:"library_id"`
+	ListID    int64   `json:"list_id"`
+	Rank      int64   `json:"rank"`
+	ID        int64   `json:"id"`
+	LibraryID int64   `json:"library_id"`
+	SavedAt   *string `json:"saved_at"`
+	ArrivedAt string  `json:"arrived_at"`
 }
 
 // Each list's movie entries the library has with a present file, in rank
@@ -491,7 +503,9 @@ type ListMediaListMovieRanksRow struct {
 // few a row draws. The + keeps media_type from being an index term: with
 // two or more lists in the slice and no statistics, the planner otherwise
 // reads every list's movie entries through media_list_entries_tmdb_idx
-// rather than these lists' through the primary key.
+// rather than these lists' through the primary key. saved_at is when a
+// watchlist's title was saved, arrived_at when the movie's first present
+// file came: a watchlist's row puts what arrived after it was saved first.
 func (q *Queries) ListMediaListMovieRanks(ctx context.Context, ids []int64) ([]ListMediaListMovieRanksRow, error) {
 	query := listMediaListMovieRanks
 	var queryParams []interface{}
@@ -516,6 +530,8 @@ func (q *Queries) ListMediaListMovieRanks(ctx context.Context, ids []int64) ([]L
 			&i.Rank,
 			&i.ID,
 			&i.LibraryID,
+			&i.SavedAt,
+			&i.ArrivedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -531,7 +547,11 @@ func (q *Queries) ListMediaListMovieRanks(ctx context.Context, ids []int64) ([]L
 }
 
 const listMediaListShowRanks = `-- name: ListMediaListShowRanks :many
-SELECT e.list_id, e.rank, s.id, s.library_id
+SELECT e.list_id, e.rank, s.id, s.library_id, e.added_at AS saved_at,
+    CAST((SELECT MIN(f.added_at) FROM episodes ep
+        CROSS JOIN episode_files ef ON ef.episode_id = ep.id
+        CROSS JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
+        WHERE ep.show_id = s.id) AS TEXT) AS arrived_at
 FROM media_list_entries e
 CROSS JOIN shows s ON s.tmdb_id = e.tmdb_id
 WHERE e.list_id IN (/*SLICE:ids*/?) AND +e.media_type = 'tv'
@@ -544,14 +564,17 @@ ORDER BY e.list_id, e.rank, s.library_id, s.id
 `
 
 type ListMediaListShowRanksRow struct {
-	ListID    int64 `json:"list_id"`
-	Rank      int64 `json:"rank"`
-	ID        int64 `json:"id"`
-	LibraryID int64 `json:"library_id"`
+	ListID    int64   `json:"list_id"`
+	Rank      int64   `json:"rank"`
+	ID        int64   `json:"id"`
+	LibraryID int64   `json:"library_id"`
+	SavedAt   *string `json:"saved_at"`
+	ArrivedAt string  `json:"arrived_at"`
 }
 
 // ListMediaListMovieRanks for shows: a show counts once it has an episode
-// with a present file, and the same + on media_type.
+// with a present file, and the same + on media_type. A show arrived with
+// its first episode file, not its newest.
 func (q *Queries) ListMediaListShowRanks(ctx context.Context, ids []int64) ([]ListMediaListShowRanksRow, error) {
 	query := listMediaListShowRanks
 	var queryParams []interface{}
@@ -576,6 +599,8 @@ func (q *Queries) ListMediaListShowRanks(ctx context.Context, ids []int64) ([]Li
 			&i.Rank,
 			&i.ID,
 			&i.LibraryID,
+			&i.SavedAt,
+			&i.ArrivedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -591,7 +616,7 @@ func (q *Queries) ListMediaListShowRanks(ctx context.Context, ids []int64) ([]Li
 }
 
 const listMovieCardsByIDs = `-- name: ListMovieCardsByIDs :many
-SELECT m.id, m.library_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
+SELECT m.id, m.library_id, m.tmdb_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
     m.poster_path, m.backdrop_path, m.content_rating,
     COUNT(f.id) AS file_count,
     MAX(f.added_at) AS added_at,
@@ -607,6 +632,7 @@ GROUP BY m.id
 type ListMovieCardsByIDsRow struct {
 	ID            int64       `json:"id"`
 	LibraryID     int64       `json:"library_id"`
+	TmdbID        int64       `json:"tmdb_id"`
 	Title         string      `json:"title"`
 	Year          *int64      `json:"year"`
 	ReleaseDate   *string     `json:"release_date"`
@@ -647,6 +673,7 @@ func (q *Queries) ListMovieCardsByIDs(ctx context.Context, ids []int64) ([]ListM
 		if err := rows.Scan(
 			&i.ID,
 			&i.LibraryID,
+			&i.TmdbID,
 			&i.Title,
 			&i.Year,
 			&i.ReleaseDate,
@@ -823,7 +850,7 @@ func (q *Queries) ListMoviesByIMDb(ctx context.Context, imdbIds []*string) ([]Li
 }
 
 const listShowCardsByIDs = `-- name: ListShowCardsByIDs :many
-SELECT s.id, s.library_id, s.title, s.year, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path,
+SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path,
     s.last_air_date, s.next_air_date, s.content_rating,
     COUNT(DISTINCT e.id) AS episode_count,
     MAX(f.added_at) AS added_at,
@@ -841,6 +868,7 @@ GROUP BY s.id
 type ListShowCardsByIDsRow struct {
 	ID            int64       `json:"id"`
 	LibraryID     int64       `json:"library_id"`
+	TmdbID        int64       `json:"tmdb_id"`
 	Title         string      `json:"title"`
 	Year          *int64      `json:"year"`
 	Overview      string      `json:"overview"`
@@ -882,6 +910,7 @@ func (q *Queries) ListShowCardsByIDs(ctx context.Context, ids []int64) ([]ListSh
 		if err := rows.Scan(
 			&i.ID,
 			&i.LibraryID,
+			&i.TmdbID,
 			&i.Title,
 			&i.Year,
 			&i.Overview,
@@ -1007,7 +1036,7 @@ func (q *Queries) ListShowItemsByTMDB(ctx context.Context, tmdbIds []int64) ([]L
 }
 
 const listVisibleMediaLists = `-- name: ListVisibleMediaLists :many
-SELECT id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at FROM media_lists
+SELECT id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at, remove_watched FROM media_lists
 WHERE owner_id = ?1 OR owner_id IS NULL
 ORDER BY owner_id IS NULL, id DESC
 `
@@ -1041,6 +1070,7 @@ func (q *Queries) ListVisibleMediaLists(ctx context.Context, userID *int64) ([]M
 			&i.WantedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RemoveWatched,
 		); err != nil {
 			return nil, err
 		}
@@ -1150,7 +1180,7 @@ SET name = ?1, source_kind = ?2, params = ?3,
     next_fetch_at = ?7,
     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE id = ?8
-RETURNING id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at
+RETURNING id, owner_id, created_by, screen, name, source_kind, params, media_type, entry_limit, source_url, fetched_at, next_fetch_at, error, error_at, failures, wanted_at, created_at, updated_at, remove_watched
 `
 
 type UpdateMediaListParams struct {
@@ -1195,6 +1225,7 @@ func (q *Queries) UpdateMediaList(ctx context.Context, arg UpdateMediaListParams
 		&i.WantedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RemoveWatched,
 	)
 	return i, err
 }
